@@ -13,25 +13,26 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-// readSeekCloser is an interface that combines the functionality of io.ReadSeekCloser and io.ReaderAt.
-// It supports reading data, seeking within an open resource, and closing the resource once operations are complete.
-// Additionally, it allows reading from a specific offset within the resource without altering its current position,
-// enabling efficient and flexible data access patterns. This interface is particularly useful for handling files
-// or other data streams where random access and sequential processing are required.
-type readSeekCloser interface {
-	io.ReadSeekCloser
-	io.ReaderAt
-}
-
-type customReader struct {
+// fileReader is a custom reader that wraps an io.Reader and provides additional functionality for identifying
+// and handling different file types. It abstracts away the complexity of detecting file formats, MIME types,
+// and archive types, allowing for a more modular and extensible file handling process.
+//
+// fileReader leverages the archiver and mimetype packages for file type identification and provides information
+// about the detected file format, MIME type, and whether the file is an archive. This information can be
+// used by FileHandler implementations to make decisions on how to process the file.
+//
+// By encapsulating the file type detection logic, fileReader simplifies the implementation of FileHandler and
+// promotes a more cohesive and maintainable codebase. It also embeds a BufferedFileReader to provide efficient
+// random access to the file content.
+type fileReader struct {
 	format   archiver.Format
 	mimeType mimeType
 	*readers.BufferedFileReader
 	isArchive bool
 }
 
-func newCustomReader(ctx logContext.Context, r io.Reader) (customReader, error) {
-	var custom customReader
+func newFileReader(ctx logContext.Context, r io.Reader) (fileReader, error) {
+	var custom fileReader
 	rdr, err := readers.NewBufferedFileReader(ctx, r)
 	if err != nil {
 		return custom, fmt.Errorf("error creating random access reader: %w", err)
@@ -45,7 +46,8 @@ func newCustomReader(ctx logContext.Context, r io.Reader) (customReader, error) 
 		custom.mimeType = mimeType(format.Name())
 		custom.format = format
 	case errors.Is(err, archiver.ErrNoMatch):
-		// Not an archive, process as a regular file.
+		// Not an archive handled by archiver, try to detect MIME type.
+		// This will occur for un-supported archive types and non-archive files. (ex: .deb, .rpm, .txt)
 		mimeT, err := mimetype.DetectReader(reader)
 		if err != nil {
 			return custom, fmt.Errorf("error detecting MIME type: %w", err)
@@ -59,24 +61,14 @@ func newCustomReader(ctx logContext.Context, r io.Reader) (customReader, error) 
 		return custom, fmt.Errorf("error seeking to start of file: %w", err)
 	}
 
-	// if format != nil {
-	// 	custom.format = format.Name()
-	// }
-
-	// if _, err = rdr.Seek(0, io.SeekStart); err != nil {
-	// 	return custom, fmt.Errorf("error seeking to start of file: %w", err)
-	// }
-
 	return custom, nil
 }
 
 // FileHandler represents a handler for files.
-// It has a single method, HandleFile, which takes a context and a readSeekCloser as input,
+// It has a single method, HandleFile, which takes a context and a fileReader as input,
 // and returns a channel of byte slices and an error.
-// The readSeekCloser extends io.ReadSeekCloser with io.ReaderAt capabilities,
-// allowing handlers to perform random and direct access on the file content efficiently.
 type FileHandler interface {
-	HandleFile(ctx logContext.Context, reader customReader) (chan []byte, error)
+	HandleFile(ctx logContext.Context, reader fileReader) (chan []byte, error)
 }
 
 // fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
@@ -142,13 +134,8 @@ func getHandlerForType(mimeT mimeType) FileHandler {
 // HandleFile orchestrates the complete file handling process for a given file.
 // It determines the MIME type of the file, selects the appropriate handler based on this type, and processes the file.
 // This function initializes the handling process and delegates to the specific handler to manage file
-// extraction or processing. Errors at any stage (MIME type determination, handler retrieval,
-// seeking, or file handling) result in an error return value.
+// extraction or processing. Errors at any stage result in an error return value.
 // Successful handling passes the file content through a channel to be chunked and reported.
-//
-// The function takes an io.Reader as input and creates a readSeekCloser using bufferwriter.NewBufferReadSeekCloser.
-// The readSeekCloser supports seeking and provides an io.ReaderAt interface, which is essential for
-// file handlers requiring random access to file content.
 //
 // If the skipArchives option is set to true and the detected MIME type is a known archive type,
 // the function will skip processing the file and return nil.
@@ -159,41 +146,7 @@ func HandleFile(
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
 ) error {
-	// rdr, err := readers.NewBufferedFileReader(ctx, reader)
-	// if err != nil {
-	// 	return fmt.Errorf("error creating random access reader: %w", err)
-	// }
-	// defer rdr.Close()
-	//
-	// mimeT, err := mimetype.DetectReader(rdr)
-	// if err != nil {
-	// 	return fmt.Errorf("error detecting MIME type: %w", err)
-	// }
-	// mime := mimeType(mimeT.String())
-	//
-	// if _, err = rdr.Seek(0, io.SeekStart); err != nil {
-	// 	return fmt.Errorf("error seeking to start of file: %w", err)
-	// }
-	//
-	// config := newFileHandlingConfig(options...)
-	//
-	// isArchive := false
-	// _, _, err = archiver.Identify("", rdr)
-	// switch {
-	// case err == nil: // Archive detected
-	// 	isArchive = true
-	// case errors.Is(err, archiver.ErrNoMatch):
-	// 	// Not an archive, process as a regular file.
-	// default: // Error identifying archive
-	// 	return fmt.Errorf("error identifying archive: %w", err)
-	// }
-	//
-	// if _, err = rdr.Seek(0, io.SeekStart); err != nil {
-	// 	return fmt.Errorf("error seeking to start of file: %w", err)
-	// }
-	//
-
-	rdr, err := newCustomReader(ctx, reader)
+	rdr, err := newFileReader(ctx, reader)
 	if err != nil {
 		return fmt.Errorf("error creating custom reader: %w", err)
 	}

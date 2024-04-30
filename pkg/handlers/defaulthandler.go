@@ -56,7 +56,7 @@ func newDefaultHandler(handlerType handlerType) *defaultHandler {
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *defaultHandler) HandleFile(ctx logContext.Context, input customReader) (chan []byte, error) {
+func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	// Shared channel for both archive and non-archive content.
 	dataChan := make(chan []byte, defaultBufferSize)
 
@@ -121,7 +121,7 @@ var ErrMaxDepthReached = errors.New("max archive depth reached")
 // It takes a reader from which it attempts to identify and process the archive format. Depending on the archive type,
 // it either decompresses or extracts the contents directly, sending data to the provided channel.
 // Returns an error if the archive cannot be processed due to issues like exceeding maximum depth or unsupported formats.
-func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader customReader, archiveChan chan []byte) error {
+func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader fileReader, archiveChan chan []byte) error {
 	if common.IsDone(ctx) {
 		return ctx.Err()
 	}
@@ -136,13 +136,6 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader c
 	if reader.format == nil && depth > 0 {
 		return h.handleNonArchiveContent(ctx, arReader, archiveChan)
 	}
-	// if errors.Is(err, archiver.ErrNoMatch) && depth > 0 {
-	// 	return h.handleNonArchiveContent(ctx, arReader, archiveChan)
-	// }
-	//
-	// if err != nil {
-	// 	return fmt.Errorf("error identifying archive: %w", err)
-	// }
 
 	switch archive := reader.format.(type) {
 	case archiver.Decompressor:
@@ -153,17 +146,11 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader c
 		}
 		defer compReader.Close()
 
-		rdr, err := newCustomReader(ctx, compReader)
+		rdr, err := newFileReader(ctx, compReader)
 		if err != nil {
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
 		defer rdr.Close()
-
-		// rdr, err := readers.NewBufferedFileReader(ctx, compReader)
-		// if err != nil {
-		// 	return fmt.Errorf("error creating random access reader: %w", err)
-		// }
-		// defer rdr.Close()
 
 		return h.openArchive(ctx, depth+1, rdr, archiveChan)
 	case archiver.Extractor:
@@ -222,17 +209,11 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		}
 		defer f.Close()
 
-		rdr, err := newCustomReader(lCtx, f)
+		rdr, err := newFileReader(lCtx, f)
 		if err != nil {
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
 		defer rdr.Close()
-
-		// rdr, err := readers.NewBufferedFileReader(lCtx, f)
-		// if err != nil {
-		// 	return fmt.Errorf("error creating random access reader: %w", err)
-		// }
-		// defer rdr.Close()
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)

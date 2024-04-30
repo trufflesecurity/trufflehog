@@ -29,7 +29,7 @@ func newRPMHandler() *rpmHandler {
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
 // handle RPM specific archive operations.
-func (h *rpmHandler) HandleFile(ctx logContext.Context, input customReader) (chan []byte, error) {
+func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {
