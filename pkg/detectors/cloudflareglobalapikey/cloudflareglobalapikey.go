@@ -20,12 +20,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `([A-Za-z0-9_-]{37})`)
+	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b([A-Za-z0-9_-]{37})\b`)
 
 	// email pattern thanks https://golangcode.com/validate-an-email-address/
 	// emailPat = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	// the emailPat regex will also match emails ending in .co.uk and .engineering
 
-	emailPat = regexp.MustCompile(`\b([a-zA-Z0-9+._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)\b`)
+	emailPat = regexp.MustCompile(`\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(\.[A-Za-z]{2})?)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
