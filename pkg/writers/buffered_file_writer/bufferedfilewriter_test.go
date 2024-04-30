@@ -2,7 +2,11 @@ package bufferedfilewriter
 
 import (
 	"bytes"
+	"crypto/rand"
+	"fmt"
+	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -492,6 +496,100 @@ func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
 		assert.NoError(b, err)
 		rc.Close()
 	}
+}
+
+// Create a custom reader that can simulate errors.
+type errorReader struct{}
+
+func (errorReader) Read([]byte) (n int, err error) { return 0, fmt.Errorf("error reading") }
+
+func TestNewFromReader(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		reader   io.Reader
+		wantErr  bool
+		wantData string
+	}{
+		{
+			name:     "Success case",
+			reader:   strings.NewReader("hello world"),
+			wantData: "hello world",
+		},
+		{
+			name:    "Empty reader",
+			reader:  strings.NewReader(""),
+			wantErr: true,
+		},
+		{
+			name:    "Error reader",
+			reader:  errorReader{},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			bufWriter, err := NewFromReader(tc.reader)
+			if err != nil && tc.wantErr {
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, bufWriter)
+
+			err = bufWriter.CloseForWriting()
+			assert.NoError(t, err)
+
+			b := new(bytes.Buffer)
+			rdr, err := bufWriter.ReadCloser()
+			if err != nil && tc.wantErr {
+				return
+			}
+			assert.NoError(t, err)
+			defer rdr.Close()
+
+			_, err = b.ReadFrom(rdr)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantData, b.String())
+		})
+	}
+}
+
+func TestNewFromReaderThresholdExceeded(t *testing.T) {
+	t.Parallel()
+
+	// Create a large data buffer that exceeds the threshold.
+	largeData := make([]byte, 1024*1024) // 1 MB
+	_, err := rand.Read(largeData)
+	assert.NoError(t, err)
+
+	// Create a BufferedFileWriter with a smaller threshold.
+	threshold := uint64(1024) // 1 KB
+	bufWriter, err := NewFromReader(bytes.NewReader(largeData), WithThreshold(threshold))
+	assert.NoError(t, err)
+
+	err = bufWriter.CloseForWriting()
+	assert.NoError(t, err)
+
+	rdr, err := bufWriter.ReadCloser()
+	assert.NoError(t, err)
+	defer rdr.Close()
+
+	// Verify that the data was written to a file.
+	assert.NotEmpty(t, bufWriter.filename)
+	assert.NotNil(t, bufWriter.file)
+
+	// Read the data from the BufferedFileWriter.
+	readData, err := io.ReadAll(rdr)
+	assert.NoError(t, err)
+	assert.Equal(t, largeData, readData)
+
+	// Verify the size of the data written.
+	assert.Equal(t, uint64(len(largeData)), bufWriter.size)
 }
 
 func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
