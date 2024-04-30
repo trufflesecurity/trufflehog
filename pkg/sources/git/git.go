@@ -928,7 +928,7 @@ func sendBinaryDiffWithRetry(ctx context.Context, diff binaryDiff, binaryDiffCha
 	const (
 		maxRetries           = 10
 		initialRetryInterval = 100 * time.Millisecond
-		maxRetryInterval     = 10 * time.Second
+		maxRetryInterval     = 30 * time.Second
 	)
 	retryInterval := initialRetryInterval
 
@@ -952,6 +952,25 @@ func sendBinaryDiffWithRetry(ctx context.Context, diff binaryDiff, binaryDiffCha
 	return fmt.Errorf("failed to send binary diff, channel full after %d retries", maxRetries)
 }
 
+// ScanRepo performs a comprehensive scan of a Git repository, analyzing commits and binary diffs
+// concurrently to identify potential security risks and report them through a chunks reporter.
+//
+// The scan process involves the following steps:
+//  1. Initialize a buffered channel (binaryDiffChan) for concurrent processing of binary diffs.
+//  2. Create a cancellable context to allow early termination of the scan if an error occurs.
+//  3. Spawn a configurable number of consumer goroutines to handle binary diffs concurrently.
+//  4. Spawn producer goroutines to scan commits and staged changes concurrently, reporting results
+//     and binary diffs through the respective channels.
+//  5. Wait for all producer goroutines to finish and close the binaryDiffChan.
+//  6. Synchronize the completion of consumer goroutines and handle any errors encountered.
+//
+// The function uses a producer-consumer pattern to process binary diffs concurrently, allowing for
+// efficient utilization of system resources. The binaryDiffChan is buffered to balance the workload
+// between producers and consumers, preventing the channel from becoming a bottleneck.
+//
+// Errors encountered during the scan process are propagated through the errChan, and the context is
+// cancelled to signal all goroutines to terminate gracefully. The function returns an error if any
+// critical issues are encountered during the scan or binary diff handling.
 func (s *Git) ScanRepo(
 	ctx context.Context,
 	repo *git.Repository,

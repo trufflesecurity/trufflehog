@@ -235,10 +235,6 @@ func (d *DiffChan) RecordConsumptionTime(duration time.Duration) {
 	d.metrics.observeConsumeDiffDuration(float64(duration.Microseconds()))
 }
 
-func (d *DiffChan) RecordWaitingTime(duration time.Duration) {
-	d.metrics.observeDiffWaitingTime(float64(duration.Microseconds()))
-}
-
 func (d *DiffChan) Close() { close(d.ch) }
 
 // RepoPath parses the output of the `git log` command for the `source` path.

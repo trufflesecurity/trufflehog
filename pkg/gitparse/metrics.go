@@ -23,20 +23,11 @@ var (
 		Help:      "Duration of consuming a diff.",
 		Buckets:   prometheus.ExponentialBuckets(1, 10, 8),
 	})
-
-	diffWaitingDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:      "diff_waiting_duration_microseconds",
-		Namespace: common.MetricsNamespace,
-		Subsystem: common.MetricsSubsystem,
-		Help:      "Waiting time of a diff in the queue.",
-		Buckets:   prometheus.ExponentialBuckets(1, 10, 8),
-	})
 )
 
 type metrics struct {
 	produceDiffDuration prometheus.Histogram
 	consumeDiffDuration prometheus.Histogram
-	diffWaitingTime     prometheus.Histogram
 }
 
 // newDiffChanMetrics creates a new metrics instance configured with Prometheus metrics specific to a DiffChan.
@@ -50,10 +41,6 @@ type metrics struct {
 //     It tracks the time taken to retrieve a diff from the DiffChan.
 //     This metric helps to monitor the performance and latency of diff consumption.
 //
-//   - diffWaitingDuration: a Histogram metric that measures the waiting time of a diff in the queue.
-//     It tracks the time a diff spends waiting in the queue before being processed.
-//     This metric helps to monitor the queuing time and identify any bottlenecks or delays in diff processing.
-//
 // These metrics are useful for monitoring the performance and throughput of the DiffChan.
 // By tracking the durations of diff production and consumption, as well as the total counts,
 // you can identify bottlenecks, optimize performance, and ensure that the DiffChan is operating efficiently.
@@ -64,7 +51,6 @@ func newDiffChanMetrics() *metrics {
 	return &metrics{
 		produceDiffDuration: produceDiffDuration,
 		consumeDiffDuration: consumeDiffDuration,
-		diffWaitingTime:     diffWaitingDuration,
 	}
 }
 
@@ -74,8 +60,4 @@ func (m *metrics) observeProduceDiffDuration(duration float64) {
 
 func (m *metrics) observeConsumeDiffDuration(duration float64) {
 	m.consumeDiffDuration.Observe(duration)
-}
-
-func (m *metrics) observeDiffWaitingTime(duration float64) {
-	m.diffWaitingTime.Observe(duration)
 }
