@@ -831,7 +831,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results = detectors.CleanResults(results)
 	}
 
-	results = detectors.FilterKnownFalsePositives(ctx, results, detectors.DefaultFalsePositives, true, e.logFilteredUnverified)
+	results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
 
 	if e.filterEntropy != nil {
 		results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, e.logFilteredUnverified)

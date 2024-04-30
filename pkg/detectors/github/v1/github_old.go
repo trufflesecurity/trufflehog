@@ -69,6 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		token := match[1]
 
+		// Note that this false positive check happens **before** verification! I don't know why it's written this way
+		// but that's why this logic wasn't moved into a CustomFalsePositiveChecker implementation.
 		specificFPs := []detectors.FalsePositive{"github commit"}
 		if detectors.IsKnownFalsePositive(token, specificFPs, false) {
 			continue

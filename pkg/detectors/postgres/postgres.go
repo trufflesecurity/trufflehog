@@ -55,6 +55,9 @@ type Scanner struct {
 	detectLoopback bool // Automated tests run against localhost, but we want to ignore those results in the wild
 }
 
+var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+
 func (s Scanner) Keywords() []string {
 	return []string{"postgres"}
 }
@@ -142,6 +145,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	}
 
 	return results, nil
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
+	return false
 }
 
 func findUriMatches(data []byte) []map[string]string {
