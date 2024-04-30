@@ -276,7 +276,7 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 	}
 
 	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_orgs", len(uniqueOrgs))
-	githubOrgsEnumerated.WithLabelValues(s.name).Set(float64(len(uniqueOrgs)))
+	githubOrgsEnumerated.WithLabelValues(s.name).Add(float64(len(uniqueOrgs)))
 
 	return nil
 }
