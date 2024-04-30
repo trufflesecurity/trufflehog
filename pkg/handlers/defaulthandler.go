@@ -10,10 +10,10 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archiver/v4"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -165,13 +165,13 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 
 		h.metrics.incFilesProcessed()
 
-		reReader, err := diskbufferreader.New(compReader)
+		rdr, err := readers.NewBufferedFileReader(compReader)
 		if err != nil {
-			return fmt.Errorf("error creating reusable reader: %w", err)
+			return fmt.Errorf("error creating random access reader: %w", err)
 		}
-		defer reReader.Close()
+		defer rdr.Close()
 
-		return h.openArchive(ctx, depth+1, reReader, archiveChan)
+		return h.openArchive(ctx, depth+1, rdr, archiveChan)
 	case archiver.Extractor:
 		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
 		if err != nil {
@@ -216,7 +216,7 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return nil
 		}
 
-		if common.SkipFile(file.Name()) {
+		if common.SkipFile(file.Name()) || common.IsBinary(file.Name()) {
 			lCtx.Logger().V(5).Info("skipping file")
 			h.metrics.incFilesSkipped()
 			return nil
@@ -228,16 +228,16 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		}
 		defer fReader.Close()
 
-		reReader, err := diskbufferreader.New(fReader)
+		rdr, err := readers.NewBufferedFileReader(fReader)
 		if err != nil {
-			return fmt.Errorf("error creating reusable reader: %w", err)
+			return fmt.Errorf("error creating random access reader: %w", err)
 		}
-		defer reReader.Close()
+		defer rdr.Close()
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
 
-		return h.openArchive(lCtx, depth, reReader, archiveChan)
+		return h.openArchive(lCtx, depth, rdr, archiveChan)
 	}
 }
 
@@ -258,7 +258,7 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 	mime := mimetype.Detect(buffer)
 	mimeT := mimeType(mime.String())
 
-	if common.SkipFile(mime.Extension()) {
+	if common.SkipFile(mime.Extension()) || common.IsBinary(mime.Extension()) {
 		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
 		h.metrics.incFilesSkipped()
 		return nil
