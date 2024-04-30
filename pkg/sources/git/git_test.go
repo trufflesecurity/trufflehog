@@ -585,6 +585,6 @@ func TestChunkUnit(t *testing.T) {
 	}, &reporter)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 11, len(reporter.Chunks))
+	assert.Equal(t, 22, len(reporter.Chunks))
 	assert.Equal(t, 1, len(reporter.ChunkErrs))
 }
