@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -83,9 +82,9 @@ func TestArchiveHandler(t *testing.T) {
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 			defer resp.Body.Close()
 
-			handler := newDefaultHandler(defaultHandlerType, true)
+			handler := newDefaultHandler(defaultHandlerType)
 
-			newReader, err := diskbufferreader.New(resp.Body)
+			newReader, err := newCustomReader(logContext.Background(), resp.Body)
 			if err != nil {
 				t.Errorf("error creating reusable reader: %s", err)
 			}
@@ -117,8 +116,12 @@ func TestOpenInvalidArchive(t *testing.T) {
 	ctx := logContext.AddLogger(context.Background())
 	handler := defaultHandler{}
 
+	rdr, err := newCustomReader(ctx, reader)
+	assert.NoError(t, err)
+	defer rdr.Close()
+
 	archiveChan := make(chan []byte)
 
-	err := handler.openArchive(ctx, 0, reader, archiveChan)
+	err = handler.openArchive(ctx, 0, rdr, archiveChan)
 	assert.Error(t, err)
 }

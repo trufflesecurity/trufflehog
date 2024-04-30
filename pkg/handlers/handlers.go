@@ -23,13 +23,60 @@ type readSeekCloser interface {
 	io.ReaderAt
 }
 
+type customReader struct {
+	format   archiver.Format
+	mimeType mimeType
+	*readers.BufferedFileReader
+	isArchive bool
+}
+
+func newCustomReader(ctx logContext.Context, r io.Reader) (customReader, error) {
+	var custom customReader
+	rdr, err := readers.NewBufferedFileReader(ctx, r)
+	if err != nil {
+		return custom, fmt.Errorf("error creating random access reader: %w", err)
+	}
+	custom.BufferedFileReader = rdr
+
+	format, reader, err := archiver.Identify("", rdr)
+	switch {
+	case err == nil: // Archive detected
+		custom.isArchive = true
+		custom.mimeType = mimeType(format.Name())
+		custom.format = format
+	case errors.Is(err, archiver.ErrNoMatch):
+		// Not an archive, process as a regular file.
+		mimeT, err := mimetype.DetectReader(reader)
+		if err != nil {
+			return custom, fmt.Errorf("error detecting MIME type: %w", err)
+		}
+		custom.mimeType = mimeType(mimeT.String())
+	default: // Error identifying archive
+		return custom, fmt.Errorf("error identifying archive: %w", err)
+	}
+
+	if _, err = rdr.Seek(0, io.SeekStart); err != nil {
+		return custom, fmt.Errorf("error seeking to start of file: %w", err)
+	}
+
+	// if format != nil {
+	// 	custom.format = format.Name()
+	// }
+
+	// if _, err = rdr.Seek(0, io.SeekStart); err != nil {
+	// 	return custom, fmt.Errorf("error seeking to start of file: %w", err)
+	// }
+
+	return custom, nil
+}
+
 // FileHandler represents a handler for files.
 // It has a single method, HandleFile, which takes a context and a readSeekCloser as input,
 // and returns a channel of byte slices and an error.
 // The readSeekCloser extends io.ReadSeekCloser with io.ReaderAt capabilities,
 // allowing handlers to perform random and direct access on the file content efficiently.
 type FileHandler interface {
-	HandleFile(ctx logContext.Context, reader readSeekCloser) (chan []byte, error)
+	HandleFile(ctx logContext.Context, reader customReader) (chan []byte, error)
 }
 
 // fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
@@ -78,7 +125,7 @@ const (
 // a defaultHandler is used, leveraging the archiver library to manage these formats.
 // The chosen handler is then configured with provided options, adapting it to specific operational needs.
 // Returns the configured handler.
-func getHandlerForType(mimeT mimeType, isArchive bool) FileHandler {
+func getHandlerForType(mimeT mimeType) FileHandler {
 	var handler FileHandler
 	switch mimeT {
 	case arMime, unixArMime, debMime:
@@ -86,7 +133,7 @@ func getHandlerForType(mimeT mimeType, isArchive bool) FileHandler {
 	case rpmMime, cpioMime:
 		handler = newRPMHandler()
 	default:
-		handler = newDefaultHandler(defaultHandlerType, isArchive)
+		handler = newDefaultHandler(defaultHandlerType)
 	}
 
 	return handler
@@ -112,45 +159,53 @@ func HandleFile(
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
 ) error {
-	rdr, err := readers.NewBufferedFileReader(ctx, reader)
+	// rdr, err := readers.NewBufferedFileReader(ctx, reader)
+	// if err != nil {
+	// 	return fmt.Errorf("error creating random access reader: %w", err)
+	// }
+	// defer rdr.Close()
+	//
+	// mimeT, err := mimetype.DetectReader(rdr)
+	// if err != nil {
+	// 	return fmt.Errorf("error detecting MIME type: %w", err)
+	// }
+	// mime := mimeType(mimeT.String())
+	//
+	// if _, err = rdr.Seek(0, io.SeekStart); err != nil {
+	// 	return fmt.Errorf("error seeking to start of file: %w", err)
+	// }
+	//
+	// config := newFileHandlingConfig(options...)
+	//
+	// isArchive := false
+	// _, _, err = archiver.Identify("", rdr)
+	// switch {
+	// case err == nil: // Archive detected
+	// 	isArchive = true
+	// case errors.Is(err, archiver.ErrNoMatch):
+	// 	// Not an archive, process as a regular file.
+	// default: // Error identifying archive
+	// 	return fmt.Errorf("error identifying archive: %w", err)
+	// }
+	//
+	// if _, err = rdr.Seek(0, io.SeekStart); err != nil {
+	// 	return fmt.Errorf("error seeking to start of file: %w", err)
+	// }
+	//
+
+	rdr, err := newCustomReader(ctx, reader)
 	if err != nil {
-		return fmt.Errorf("error creating random access reader: %w", err)
+		return fmt.Errorf("error creating custom reader: %w", err)
 	}
 	defer rdr.Close()
 
-	mimeT, err := mimetype.DetectReader(rdr)
-	if err != nil {
-		return fmt.Errorf("error detecting MIME type: %w", err)
-	}
-	mime := mimeType(mimeT.String())
-
-	if _, err = rdr.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("error seeking to start of file: %w", err)
-	}
-
 	config := newFileHandlingConfig(options...)
-
-	isArchive := false
-	_, _, err = archiver.Identify("", rdr)
-	switch {
-	case err == nil: // Archive detected
-		isArchive = true
-	case errors.Is(err, archiver.ErrNoMatch):
-		// Not an archive, process as a regular file.
-	default: // Error identifying archive
-		return fmt.Errorf("error identifying archive: %w", err)
-	}
-
-	if _, err = rdr.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("error seeking to start of file: %w", err)
-	}
-
-	if config.skipArchives && isArchive {
-		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
+	if config.skipArchives && rdr.isArchive {
+		ctx.Logger().V(5).Info("skipping archive file", "mime", rdr.mimeType)
 		return nil
 	}
 
-	handler := getHandlerForType(mime, isArchive)
+	handler := getHandlerForType(rdr.mimeType)
 	archiveChan, err := handler.HandleFile(ctx, rdr) // Delegate to the specific handler to process the file.
 	if err != nil {
 		return fmt.Errorf("error handling file: %w", err)

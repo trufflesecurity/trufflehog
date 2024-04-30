@@ -22,14 +22,14 @@ type arHandler struct {
 // newARHandler creates an arHandler with the provided metrics.
 func newARHandler() *arHandler {
 	return &arHandler{
-		defaultHandler: newDefaultHandler(arHandlerType, false),
+		defaultHandler: newDefaultHandler(arHandlerType),
 		metrics:        newHandlerMetrics(arHandlerType),
 	}
 }
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.
-func (h *arHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (chan []byte, error) {
+func (h *arHandler) HandleFile(ctx logContext.Context, input customReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {

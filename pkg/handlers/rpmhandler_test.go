@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
 )
 
 func TestHandleRPMFile(t *testing.T) {
@@ -19,7 +18,7 @@ func TestHandleRPMFile(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	rdr, err := readers.NewBufferedFileReader(ctx, file)
+	rdr, err := newCustomReader(ctx, file)
 	assert.NoError(t, err)
 	defer rdr.Close()
 

@@ -13,7 +13,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -42,29 +41,26 @@ func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 // defaultHandler provides a base implementation for file handlers, encapsulating common behaviors
 // needed across different handlers. This handler is embedded in other specialized handlers to ensure
 // consistent application of these common behaviors and to simplify the extension of handler functionalities.
-type defaultHandler struct {
-	isArchive bool
-	metrics   *metrics
-}
+type defaultHandler struct{ metrics *metrics }
 
 // newDefaultHandler creates a defaultHandler with metrics configured based on the provided handlerType.
 // The handlerType parameter is used to initialize the metrics instance with the appropriate handler type,
 // ensuring that the metrics recorded within the defaultHandler methods are correctly attributed to the
 // specific handler that invoked them. This allows for accurate metrics attribution when the defaultHandler
 // is embedded in specialized handlers like arHandler or rpmHandler.
-func newDefaultHandler(handlerType handlerType, isArchive bool) *defaultHandler {
-	return &defaultHandler{metrics: newHandlerMetrics(handlerType), isArchive: isArchive}
+func newDefaultHandler(handlerType handlerType) *defaultHandler {
+	return &defaultHandler{metrics: newHandlerMetrics(handlerType)}
 }
 
 // HandleFile processes the input as either an archive or non-archive based on its content,
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *defaultHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (chan []byte, error) {
+func (h *defaultHandler) HandleFile(ctx logContext.Context, input customReader) (chan []byte, error) {
 	// Shared channel for both archive and non-archive content.
 	dataChan := make(chan []byte, defaultBufferSize)
 
-	if !h.isArchive {
+	if !input.isArchive {
 		// Not an archive, handle as non-archive content in a separate goroutine.
 		ctx.Logger().V(3).Info("File not recognized as an archive, handling as non-archive content.")
 		go func() {
@@ -125,7 +121,7 @@ var ErrMaxDepthReached = errors.New("max archive depth reached")
 // It takes a reader from which it attempts to identify and process the archive format. Depending on the archive type,
 // it either decompresses or extracts the contents directly, sending data to the provided channel.
 // Returns an error if the archive cannot be processed due to issues like exceeding maximum depth or unsupported formats.
-func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader io.Reader, archiveChan chan []byte) error {
+func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader customReader, archiveChan chan []byte) error {
 	if common.IsDone(ctx) {
 		return ctx.Err()
 	}
@@ -135,39 +131,49 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		return ErrMaxDepthReached
 	}
 
-	format, arReader, err := archiver.Identify("", reader)
-	if errors.Is(err, archiver.ErrNoMatch) && depth > 0 {
+	// format, arReader, err := archiver.Identify("", reader)
+	arReader := reader.BufferedFileReader
+	if reader.format == nil && depth > 0 {
 		return h.handleNonArchiveContent(ctx, arReader, archiveChan)
 	}
+	// if errors.Is(err, archiver.ErrNoMatch) && depth > 0 {
+	// 	return h.handleNonArchiveContent(ctx, arReader, archiveChan)
+	// }
+	//
+	// if err != nil {
+	// 	return fmt.Errorf("error identifying archive: %w", err)
+	// }
 
-	if err != nil {
-		return fmt.Errorf("error identifying archive: %w", err)
-	}
-
-	switch archive := format.(type) {
+	switch archive := reader.format.(type) {
 	case archiver.Decompressor:
 		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
 		compReader, err := archive.OpenReader(arReader)
 		if err != nil {
-			return fmt.Errorf("error opening decompressor with format: %s %w", format.Name(), err)
+			return fmt.Errorf("error opening decompressor with format: %s %w", reader.format.Name(), err)
 		}
 		defer compReader.Close()
 
-		rdr, err := readers.NewBufferedFileReader(ctx, compReader)
+		rdr, err := newCustomReader(ctx, compReader)
 		if err != nil {
-			return fmt.Errorf("error creating random access reader: %w", err)
+			return fmt.Errorf("error creating custom reader: %w", err)
 		}
 		defer rdr.Close()
+
+		// rdr, err := readers.NewBufferedFileReader(ctx, compReader)
+		// if err != nil {
+		// 	return fmt.Errorf("error creating random access reader: %w", err)
+		// }
+		// defer rdr.Close()
 
 		return h.openArchive(ctx, depth+1, rdr, archiveChan)
 	case archiver.Extractor:
 		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
 		if err != nil {
-			return fmt.Errorf("error extracting archive with format: %s: %w", format.Name(), err)
+			return fmt.Errorf("error extracting archive with format: %s: %w", reader.format.Name(), err)
 		}
 		return nil
 	default:
-		return fmt.Errorf("unknown archive type: %s", format.Name())
+		return fmt.Errorf("unknown archive type: %s", reader.format.Name())
 	}
 }
 
@@ -216,11 +222,17 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		}
 		defer f.Close()
 
-		rdr, err := readers.NewBufferedFileReader(lCtx, f)
+		rdr, err := newCustomReader(lCtx, f)
 		if err != nil {
-			return fmt.Errorf("error creating random access reader: %w", err)
+			return fmt.Errorf("error creating custom reader: %w", err)
 		}
 		defer rdr.Close()
+
+		// rdr, err := readers.NewBufferedFileReader(lCtx, f)
+		// if err != nil {
+		// 	return fmt.Errorf("error creating random access reader: %w", err)
+		// }
+		// defer rdr.Close()
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)

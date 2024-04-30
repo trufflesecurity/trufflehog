@@ -36,7 +36,8 @@ type Pool struct {
 	metrics poolMetrics
 }
 
-const defaultBufferSize = 1 << 12 // 4KB
+// const defaultBufferSize = 1 << 12 // 4KB
+const defaultBufferSize = 1 << 16 // 64KB
 // NewBufferPool creates a new instance of BufferPool.
 func NewBufferPool(opts ...Opts) *Pool {
 	pool := &Pool{bufferSize: defaultBufferSize}

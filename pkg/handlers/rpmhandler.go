@@ -22,14 +22,14 @@ type rpmHandler struct {
 // newRPMHandler creates an rpmHandler with the provided metrics.
 func newRPMHandler() *rpmHandler {
 	return &rpmHandler{
-		defaultHandler: newDefaultHandler(rpmHandlerType, false),
+		defaultHandler: newDefaultHandler(rpmHandlerType),
 		metrics:        newHandlerMetrics(rpmHandlerType),
 	}
 }
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
 // handle RPM specific archive operations.
-func (h *rpmHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (chan []byte, error) {
+func (h *rpmHandler) HandleFile(ctx logContext.Context, input customReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {
