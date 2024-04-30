@@ -114,7 +114,7 @@ func (h *DefaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		return ctx.Err()
 	}
 
-	if depth >= maxDepth {
+	if depth > maxDepth {
 		return ErrMaxDepthReached
 	}
 
