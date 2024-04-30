@@ -166,5 +166,19 @@ func (brc *readCloser) Close() error {
 	}
 
 	brc.onClose() // Return the buffer to the pool
+	brc.Reader = nil
 	return nil
+}
+
+// Read reads up to len(p) bytes into p from the underlying reader.
+// It returns the number of bytes read and any error encountered.
+// If the reader reaches the end of the available data, Read returns 0, io.EOF.
+// It ensures that Read should not be called after the reader is closed.
+// It implements the io.Reader interface.
+func (brc *readCloser) Read(p []byte) (int, error) {
+	if brc.Reader == nil {
+		return 0, io.EOF
+	}
+
+	return brc.Reader.Read(p)
 }

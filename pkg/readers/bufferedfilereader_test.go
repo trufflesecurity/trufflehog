@@ -53,25 +53,11 @@ func TestBufferedFileReaderClose(t *testing.T) {
 	err = bufferReadSeekCloser.Close()
 	assert.NoError(t, err)
 
-	// Read after closing.
+	// Read should NOT return any data after closing the reader.
 	buffer := make([]byte, len(data))
 	n, err := bufferReadSeekCloser.Read(buffer)
-	assert.NoError(t, err)
-	assert.Equal(t, len(data), n)
-	assert.Equal(t, data, buffer)
-
-	// Seek after closing.
-	offset := 7
-	seekPos, err := bufferReadSeekCloser.Seek(int64(offset), io.SeekStart)
-	assert.NoError(t, err)
-	assert.Equal(t, int64(offset), seekPos)
-
-	// ReadAt after closing.
-	buffer = make([]byte, len(data)-offset)
-	n, err = bufferReadSeekCloser.ReadAt(buffer, int64(offset))
-	assert.NoError(t, err)
-	assert.Equal(t, len(data)-offset, n)
-	assert.Equal(t, data[offset:], buffer)
+	assert.ErrorIs(t, err, io.EOF)
+	assert.Equal(t, 0, n)
 }
 
 func TestBufferedFileReaderReadFromFile(t *testing.T) {
