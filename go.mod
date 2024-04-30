@@ -91,7 +91,7 @@ require (
 	golang.org/x/sync v0.7.0
 	golang.org/x/text v0.14.0
 	google.golang.org/api v0.176.1
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.34.0
 	gopkg.in/h2non/gock.v1 v1.1.2
 	pgregory.net/rapid v1.1.0
 	sigs.k8s.io/yaml v1.4.0
