@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/sassoftware/go-rpmutils"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
@@ -15,6 +16,11 @@ import (
 // from defaultHandler and introduces additional logic specific to RPM packages.
 type rpmHandler struct{ *defaultHandler }
 
+// newRPMHandler creates an rpmHandler.
+func newRPMHandler() *rpmHandler {
+	return &rpmHandler{defaultHandler: newDefaultHandler(rpmHandlerType)}
+}
+
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
 // handle RPM specific archive operations.
 func (h *rpmHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
@@ -25,19 +31,26 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.
 		defer cancel()
 		defer close(archiveChan)
 
-		rpm, err := rpmutils.ReadRpm(input)
+		// Update the metrics for the file processing.
+		start := time.Now()
+		var err error
+		defer h.measureLatencyAndHandleErrors(start, err)
+
+		var rpm *rpmutils.Rpm
+		rpm, err = rpmutils.ReadRpm(input)
 		if err != nil {
 			ctx.Logger().Error(err, "error reading RPM")
 			return
 		}
 
-		reader, err := rpm.PayloadReaderExtended()
+		var reader rpmutils.PayloadReader
+		reader, err = rpm.PayloadReaderExtended()
 		if err != nil {
 			ctx.Logger().Error(err, "error getting RPM payload reader")
 			return
 		}
 
-		if err := h.processRPMFiles(ctx, reader, archiveChan); err != nil {
+		if err = h.processRPMFiles(ctx, reader, archiveChan); err != nil {
 			ctx.Logger().Error(err, "error processing RPM files")
 		}
 	}()
@@ -59,11 +72,17 @@ func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 				}
 				return fmt.Errorf("error reading RPM payload: %w", err)
 			}
-			fileCtx := logContext.WithValues(ctx, "filename", fileInfo.Name, "size", fileInfo.Size)
+
+			fileSize := fileInfo.Size()
+			fileCtx := logContext.WithValues(ctx, "filename", fileInfo.Name, "size", fileSize)
 
 			if err := h.handleNonArchiveContent(fileCtx, reader, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in RPM")
+				h.metrics.incErrors()
 			}
+
+			h.metrics.incFilesProcessed()
+			h.metrics.observeFileSize(fileSize)
 		}
 	}
 }

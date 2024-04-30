@@ -42,7 +42,16 @@ func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 // defaultHandler provides a base implementation for file handlers, encapsulating common behaviors
 // needed across different handlers. This handler is embedded in other specialized handlers to ensure
 // consistent application of these common behaviors and to simplify the extension of handler functionalities.
-type defaultHandler struct{}
+type defaultHandler struct{ metrics *metrics }
+
+// newDefaultHandler creates a defaultHandler with metrics configured based on the provided handlerType.
+// The handlerType parameter is used to initialize the metrics instance with the appropriate handler type,
+// ensuring that the metrics recorded within the defaultHandler methods are correctly attributed to the
+// specific handler that invoked them. This allows for accurate metrics attribution when the defaultHandler
+// is embedded in specialized handlers like arHandler or rpmHandler.
+func newDefaultHandler(handlerType handlerType) *defaultHandler {
+	return &defaultHandler{metrics: newHandlerMetrics(handlerType)}
+}
 
 // HandleFile processes the input as either an archive or non-archive based on its content,
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
@@ -59,13 +68,24 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 			ctx.Logger().V(3).Info("File not recognized as an archive, handling as non-archive content.")
 			go func() {
 				defer close(dataChan)
-				if err := h.handleNonArchiveContent(ctx, arReader, dataChan); err != nil {
+
+				// Update the metrics for the file processing.
+				start := time.Now()
+				var err error
+				defer func() {
+					h.measureLatencyAndHandleErrors(start, err)
+					h.metrics.incFilesProcessed()
+				}()
+
+				if err = h.handleNonArchiveContent(ctx, arReader, dataChan); err != nil {
 					ctx.Logger().Error(err, "error handling non-archive content.")
 				}
 			}()
+
 			return dataChan, nil
 		}
 
+		h.metrics.incErrors()
 		return nil, err
 	}
 
@@ -74,11 +94,30 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferrea
 		defer cancel()
 		defer close(dataChan)
 
-		if err := h.openArchive(ctx, 0, arReader, dataChan); err != nil {
+		// Update the metrics for the file processing.
+		start := time.Now()
+		var err error
+		defer h.measureLatencyAndHandleErrors(start, err)
+
+		if err = h.openArchive(ctx, 0, arReader, dataChan); err != nil {
 			ctx.Logger().Error(err, "error unarchiving chunk.")
 		}
 	}()
 	return dataChan, nil
+}
+
+// measureLatencyAndHandleErrors measures the latency of the file processing and updates the metrics accordingly.
+// It also records errors and timeouts in the metrics.
+func (h *defaultHandler) measureLatencyAndHandleErrors(start time.Time, err error) {
+	if err == nil {
+		h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
+		return
+	}
+
+	h.metrics.incErrors()
+	if errors.Is(err, context.DeadlineExceeded) {
+		h.metrics.incFileProcessingTimeouts()
+	}
 }
 
 var ErrMaxDepthReached = errors.New("max archive depth reached")
@@ -93,6 +132,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 	}
 
 	if depth > maxDepth {
+		h.metrics.incMaxArchiveDepthCount()
 		return ErrMaxDepthReached
 	}
 
@@ -120,14 +160,19 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
 		compReader, err := archive.OpenReader(arReader)
 		if err != nil {
-			return err
+			return fmt.Errorf("error opening decompressor with format %q: %w", format.Name(), err)
 		}
-
 		defer compReader.Close()
+
+		h.metrics.incFilesProcessed()
 
 		return h.openArchive(ctx, depth+1, compReader, archiveChan)
 	case archiver.Extractor:
-		return archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
+		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
+		if err != nil {
+			return fmt.Errorf("error extracting archive with format: %s: %w", format.Name(), err)
+		}
+		return nil
 	default:
 		return fmt.Errorf("unknown archive type: %s", format.Name())
 	}
@@ -146,6 +191,11 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		)
 		lCtx.Logger().V(5).Info("Handling extracted file.")
 
+		if file.IsDir() || file.LinkTarget != "" {
+			lCtx.Logger().V(5).Info("skipping directory or symlink")
+			return nil
+		}
+
 		if common.IsDone(ctx) {
 			return ctx.Err()
 		}
@@ -154,21 +204,27 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
 			depth = ctxDepth
 		}
-		if int(file.Size()) > maxSize {
+
+		fileSize := file.Size()
+		if int(fileSize) > maxSize {
 			lCtx.Logger().V(3).Info("skipping file due to size")
 			return nil
 		}
 
 		if common.SkipFile(file.Name()) {
 			lCtx.Logger().V(5).Info("skipping file")
+			h.metrics.incFilesSkipped()
 			return nil
 		}
 
 		fReader, err := file.Open()
 		if err != nil {
-			return err
+			return fmt.Errorf("error opening file %q: %w", file.Name(), err)
 		}
 		defer fReader.Close()
+
+		h.metrics.incFilesProcessed()
+		h.metrics.observeFileSize(fileSize)
 
 		return h.openArchive(lCtx, depth, fReader, archiveChan)
 	}
@@ -193,6 +249,7 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 
 	if common.SkipFile(mime.Extension()) {
 		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
+		h.metrics.incFilesSkipped()
 		return nil
 	}
 
@@ -201,11 +258,14 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 	for data := range chunkResChan {
 		if err := data.Error(); err != nil {
 			ctx.Logger().Error(err, "error reading chunk")
+			h.metrics.incErrors()
 			continue
 		}
+
 		if err := common.CancellableWrite(ctx, archiveChan, data.Bytes()); err != nil {
 			return err
 		}
+		h.metrics.incBytesProcessed(len(data.Bytes()))
 	}
 	return nil
 }
