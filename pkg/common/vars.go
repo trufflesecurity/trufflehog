@@ -23,6 +23,8 @@ var (
 		"tga":  {},
 		"tif":  {},
 		"tiff": {},
+		"vsdx": {}, // Microsoft Visio drawing file
+		"vsix": {}, // Visual Studio extension file
 
 		// audio
 		"fev":  {}, // video game audio
@@ -102,6 +104,10 @@ var (
 		"pyo":    {}, // Compiled Python file
 		"pyc":    {}, // Compiled Python file
 		"sym":    {}, // Symbolic link, Unix/Linux
+		"rlib":   {}, // Rust library
+		"pth":    {}, // Pytorch serialized model
+		"pbix":   {}, // Power BI report file
+		"pbit":   {}, // Power BI template file
 	}
 )
 
