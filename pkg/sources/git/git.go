@@ -1081,7 +1081,7 @@ func (s *Git) extractBinaryDiffs(ctx context.Context, reporter sources.ChunkRepo
 		fileCtx := context.WithValues(ctx, "commit", diff.commit.String()[:7], "path", diff.fileName)
 		fileCtx.Logger().V(5).Info("handling binary file")
 
-		if common.SkipFile(diff.fileName) {
+		if common.SkipFile(diff.fileName) || common.IsBinary(diff.fileName) {
 			fileCtx.Logger().V(5).Info("file contains ignored extension")
 			continue
 		}
