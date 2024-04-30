@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,19 +11,12 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// arHandler specializes defaultHandler to handle AR archive formats. By embedding defaultHandler,
-// arHandler inherits and can further customize the common handling behavior such as skipping binaries.
-type arHandler struct {
-	*defaultHandler
-	metrics *metrics
-}
+// arHandler handles AR archive formats.
+type arHandler struct{ *nonArchiveHandler }
 
-// newARHandler creates an arHandler with the provided metrics.
+// newARHandler creates an arHandler.
 func newARHandler() *arHandler {
-	return &arHandler{
-		defaultHandler: newDefaultHandler(arHandlerType),
-		metrics:        newHandlerMetrics(arHandlerType),
-	}
+	return &arHandler{nonArchiveHandler: newNonArchiveHandler(arHandlerType)}
 }
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
@@ -38,18 +30,12 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan [
 		defer close(archiveChan)
 
 		// Update the metrics for the file processing.
+		start := time.Now()
 		var err error
-		defer func(start time.Time) {
-			if err != nil {
-				h.metrics.incErrors()
-				if errors.Is(err, context.DeadlineExceeded) {
-					h.metrics.incFileProcessingTimeouts()
-				}
-				return
-			}
-
-			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
-		}(time.Now())
+		defer func() {
+			h.measureLatencyAndHandleErrors(start, err)
+			h.metrics.incFilesProcessed()
+		}()
 
 		var arReader *deb.Ar
 		arReader, err = deb.LoadAr(input)

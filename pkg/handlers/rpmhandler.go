@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,19 +11,13 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// rpmHandler specializes defaultHandler to manage RPM package files. It leverages shared behaviors
-// from defaultHandler and introduces additional logic specific to RPM packages.
-type rpmHandler struct {
-	*defaultHandler
-	metrics *metrics
-}
+// rpmHandler specializes archiveHandler to manage RPM package files. It leverages shared behaviors
+// from archiveHandler and introduces additional logic specific to RPM packages.
+type rpmHandler struct{ *nonArchiveHandler }
 
 // newRPMHandler creates an rpmHandler with the provided metrics.
 func newRPMHandler() *rpmHandler {
-	return &rpmHandler{
-		defaultHandler: newDefaultHandler(rpmHandlerType),
-		metrics:        newHandlerMetrics(rpmHandlerType),
-	}
+	return &rpmHandler{nonArchiveHandler: newNonArchiveHandler(rpmHandlerType)}
 }
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
@@ -38,18 +31,12 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 		defer close(archiveChan)
 
 		// Update the metrics for the file processing.
+		start := time.Now()
 		var err error
-		defer func(start time.Time) {
-			if err != nil {
-				h.metrics.incErrors()
-				if errors.Is(err, context.DeadlineExceeded) {
-					h.metrics.incFileProcessingTimeouts()
-				}
-				return
-			}
-
-			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
-		}(time.Now())
+		defer func() {
+			h.measureLatencyAndHandleErrors(start, err)
+			h.metrics.incFilesProcessed()
+		}()
 
 		var rpm *rpmutils.Rpm
 		rpm, err = rpmutils.ReadRpm(input)

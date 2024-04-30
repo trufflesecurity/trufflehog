@@ -94,9 +94,10 @@ func WithSkipArchives(skip bool) func(*fileHandlingConfig) {
 type handlerType string
 
 const (
-	defaultHandlerType handlerType = "default"
-	arHandlerType      handlerType = "ar"
-	rpmHandlerType     handlerType = "rpm"
+	archiveHandlerType    handlerType = "archive"
+	arHandlerType         handlerType = "ar"
+	rpmHandlerType        handlerType = "rpm"
+	nonArchiveHandlerType handlerType = "non-archive"
 )
 
 type mimeType string
@@ -109,23 +110,27 @@ const (
 	debMime    mimeType = "application/vnd.debian.binary-package"
 )
 
-// getHandlerForType dynamically selects and configures a FileHandler based on the provided MIME type.
-// This method uses specialized handlers for specific archive types and RPM packages:
-// - arHandler is used for 'arMime', 'unixArMime', and 'debMime' which include Unix archives and Debian packages.
-// - rpmHandler is used for 'rpmMime' and 'cpioMime', handling RPM and CPIO archives.
-// For all other MIME types, which typically include common archive formats like .zip, .tar, .gz, etc.,
-// a defaultHandler is used, leveraging the archiver library to manage these formats.
-// The chosen handler is then configured with provided options, adapting it to specific operational needs.
-// Returns the configured handler.
-func getHandlerForType(mimeT mimeType) FileHandler {
+// selectHandler dynamically selects and configures a FileHandler based on the provided fileReader.
+// The fileReader contains information about the MIME type and whether the file is an archive.
+// This method uses specialized handlers for specific file types:
+// - arHandler is used for Unix archives and Debian packages ('arMime', 'unixArMime', and 'debMime').
+// - rpmHandler is used for RPM and CPIO archives ('rpmMime' and 'cpioMime').
+// - archiveHandler is used for common archive formats supported by the archiver library (.zip, .tar, .gz, etc.).
+// - nonArchiveHandler is used for non-archive files.
+// The selected handler is then returned, ready to handle the file according to its specific format and requirements.
+func selectHandler(r fileReader) FileHandler {
 	var handler FileHandler
-	switch mimeT {
+	switch r.mimeType {
 	case arMime, unixArMime, debMime:
 		handler = newARHandler()
 	case rpmMime, cpioMime:
 		handler = newRPMHandler()
 	default:
-		handler = newDefaultHandler(defaultHandlerType)
+		if r.isArchive {
+			handler = newArchiveHandler()
+		} else {
+			handler = newNonArchiveHandler(nonArchiveHandlerType)
+		}
 	}
 
 	return handler
@@ -158,7 +163,7 @@ func HandleFile(
 		return nil
 	}
 
-	handler := getHandlerForType(rdr.mimeType)
+	handler := selectHandler(rdr)
 	archiveChan, err := handler.HandleFile(ctx, rdr) // Delegate to the specific handler to process the file.
 	if err != nil {
 		return fmt.Errorf("error handling file: %w", err)

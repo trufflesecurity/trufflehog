@@ -1,19 +1,15 @@
 package handlers
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
-	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archiver/v4"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 type ctxKey int
@@ -38,56 +34,19 @@ func SetArchiveMaxDepth(depth int) { maxDepth = depth }
 // SetArchiveMaxTimeout sets the maximum timeout for the archive handler.
 func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 
-// defaultHandler provides a base implementation for file handlers, encapsulating common behaviors
-// needed across different handlers. This handler is embedded in other specialized handlers to ensure
-// consistent application of these common behaviors and to simplify the extension of handler functionalities.
-type defaultHandler struct{ metrics *metrics }
+// archiveHandler is a handler for common archive files that are supported by the archiver library.
+type archiveHandler struct{ *nonArchiveHandler }
 
-// newDefaultHandler creates a defaultHandler with metrics configured based on the provided handlerType.
-// The handlerType parameter is used to initialize the metrics instance with the appropriate handler type,
-// ensuring that the metrics recorded within the defaultHandler methods are correctly attributed to the
-// specific handler that invoked them. This allows for accurate metrics attribution when the defaultHandler
-// is embedded in specialized handlers like arHandler or rpmHandler.
-func newDefaultHandler(handlerType handlerType) *defaultHandler {
-	return &defaultHandler{metrics: newHandlerMetrics(handlerType)}
+func newArchiveHandler() *archiveHandler {
+	return &archiveHandler{nonArchiveHandler: newNonArchiveHandler(archiveHandlerType)}
 }
 
 // HandleFile processes the input as either an archive or non-archive based on its content,
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
-	// Shared channel for both archive and non-archive content.
+func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	dataChan := make(chan []byte, defaultBufferSize)
-
-	if !input.isArchive {
-		// Not an archive, handle as non-archive content in a separate goroutine.
-		ctx.Logger().V(3).Info("File not recognized as an archive, handling as non-archive content.")
-		go func() {
-			defer close(dataChan)
-
-			// Update the metrics for the file processing.
-			var err error
-			defer func(start time.Time) {
-				if err != nil {
-					h.metrics.incErrors()
-					if errors.Is(err, context.DeadlineExceeded) {
-						h.metrics.incFileProcessingTimeouts()
-					}
-					return
-				}
-
-				h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
-				h.metrics.incFilesProcessed()
-			}(time.Now())
-
-			if err = h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
-				ctx.Logger().Error(err, "error handling non-archive content.")
-			}
-		}()
-
-		return dataChan, nil
-	}
 
 	go func() {
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
@@ -95,23 +54,18 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 		defer close(dataChan)
 
 		// Update the metrics for the file processing.
+		start := time.Now()
 		var err error
-		defer func(start time.Time) {
-			if err != nil {
-				h.metrics.incErrors()
-				if errors.Is(err, context.DeadlineExceeded) {
-					h.metrics.incFileProcessingTimeouts()
-				}
-				return
-			}
-
-			h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
-		}(time.Now())
+		defer func() {
+			h.measureLatencyAndHandleErrors(start, err)
+			h.metrics.incFilesProcessed()
+		}()
 
 		if err = h.openArchive(ctx, 0, input, dataChan); err != nil {
 			ctx.Logger().Error(err, "error unarchiving chunk.")
 		}
 	}()
+
 	return dataChan, nil
 }
 
@@ -121,7 +75,7 @@ var ErrMaxDepthReached = errors.New("max archive depth reached")
 // It takes a reader from which it attempts to identify and process the archive format. Depending on the archive type,
 // it either decompresses or extracts the contents directly, sending data to the provided channel.
 // Returns an error if the archive cannot be processed due to issues like exceeding maximum depth or unsupported formats.
-func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader fileReader, archiveChan chan []byte) error {
+func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader fileReader, archiveChan chan []byte) error {
 	if common.IsDone(ctx) {
 		return ctx.Err()
 	}
@@ -168,7 +122,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader f
 // It logs the extraction, checks for cancellation, and decides whether to skip the file based on its name or type,
 // particularly for binary files if configured to skip. If the file is not skipped, it recursively calls openArchive
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
-func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
+func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, file archiver.File) error {
 		lCtx := logContext.WithValues(
 			logContext.AddLogger(ctx),
@@ -220,45 +174,4 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 
 		return h.openArchive(lCtx, depth, rdr, archiveChan)
 	}
-}
-
-// handleNonArchiveContent processes files that do not contain nested archives, serving as the final stage in the
-// extraction/decompression process. It reads the content to detect its MIME type and decides whether to skip based
-// on the type, particularly for binary files. It manages reading file chunks and writing them to the archive channel,
-// effectively collecting the final bytes for further processing. This function is a key component in ensuring that all
-// file content, regardless of being an archive or not, is handled appropriately.
-func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
-	bufReader := bufio.NewReaderSize(reader, defaultBufferSize)
-	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
-	// If fewer bytes are read, MIME type detection may still succeed.
-	buffer, err := bufReader.Peek(defaultBufferSize)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return fmt.Errorf("unable to read file for MIME type detection: %w", err)
-	}
-
-	mime := mimetype.Detect(buffer)
-	mimeT := mimeType(mime.String())
-
-	if common.SkipFile(mime.Extension()) || common.IsBinary(mime.Extension()) {
-		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
-		h.metrics.incFilesSkipped()
-		return nil
-	}
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, bufReader)
-	for data := range chunkResChan {
-		if err := data.Error(); err != nil {
-			ctx.Logger().Error(err, "error reading chunk")
-			h.metrics.incErrors()
-			continue
-		}
-
-		if err := common.CancellableWrite(ctx, archiveChan, data.Bytes()); err != nil {
-			return err
-		}
-		h.metrics.incBytesProcessed(len(data.Bytes()))
-	}
-
-	return nil
 }
