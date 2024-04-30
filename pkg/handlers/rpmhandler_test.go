@@ -1,15 +1,13 @@
 package handlers
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
-	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestHandleRPMFile(t *testing.T) {
@@ -20,12 +18,8 @@ func TestHandleRPMFile(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	newReader, err := diskbufferreader.New(file)
-	assert.NoError(t, err)
-	defer newReader.Close()
-
 	handler := newRPMHandler()
-	archiveChan, err := handler.HandleFile(logContext.AddLogger(ctx), newReader)
+	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), file)
 	assert.NoError(t, err)
 
 	wantChunkCount := 179
