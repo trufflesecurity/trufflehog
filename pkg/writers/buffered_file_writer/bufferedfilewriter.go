@@ -4,6 +4,7 @@ package bufferedfilewriter
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,13 +27,9 @@ func (bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Durat
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func (bufferedFileWriterMetrics) recordDiskWrite(f *os.File) {
+func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
 	diskWriteCount.Inc()
-	size, err := f.Stat()
-	if err != nil {
-		return
-	}
-	fileSizeHistogram.Observe(float64(size.Size()))
+	fileSizeHistogram.Observe(float64(size))
 }
 
 // state represents the current mode of BufferedFileWriter.
@@ -82,6 +79,16 @@ func New(opts ...Option) *BufferedFileWriter {
 	}
 
 	return w
+}
+
+// NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
+func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
+	writer := New(opts...)
+	if _, err := io.Copy(writer, r); err != nil {
+		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
+	}
+
+	return writer, nil
 }
 
 // Len returns the number of bytes written to the buffer or file.
@@ -165,10 +172,51 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	if err != nil {
 		return n, err
 	}
-
-	w.metrics.recordDiskWrite(w.file)
+	w.metrics.recordDiskWrite(int64(n))
 
 	return n, nil
+}
+
+// ReadFrom reads data from the provided reader and writes it to the buffer or file, depending on the size.
+// This method satisfies the io.ReaderFrom interface, allowing it to be used with standard library functions
+// like io.Copy and io.CopyBuffer.
+//
+// By implementing this method, BufferedFileWriter can leverage optimized data transfer mechanisms provided
+// by the standard library. For example, when using io.Copy with a BufferedFileWriter, the copy operation
+// will be delegated to the ReadFrom method, avoiding the potentially non-optimized default approach.
+//
+// This is particularly useful when creating a new BufferedFileWriter from an io.Reader using the NewFromReader
+// function. By leveraging the ReadFrom method, data can be efficiently transferred from the reader to
+// the BufferedFileWriter.
+func (w *BufferedFileWriter) ReadFrom(reader io.Reader) (int64, error) {
+	if w.state != writeOnly {
+		return 0, fmt.Errorf("BufferedFileWriter must be in write-only mode to write")
+	}
+
+	var totalBytesRead int64
+	const bufferSize = 1 << 16 // 64KB
+	buf := make([]byte, bufferSize)
+
+	for {
+		n, err := reader.Read(buf)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return totalBytesRead, err
+		}
+
+		if n > 0 {
+			written, err := w.Write(buf[:n])
+			if err != nil {
+				return totalBytesRead, err
+			}
+			totalBytesRead += int64(written)
+		}
+
+		if errors.Is(err, io.EOF) {
+			break
+		}
+	}
+
+	return totalBytesRead, nil
 }
 
 // CloseForWriting flushes any remaining data in the buffer to the file, closes the file if created,
@@ -192,14 +240,19 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 	return w.file.Close()
 }
 
-// ReadCloser returns an io.ReadCloser to read the written content. It provides a reader
-// based on the current storage medium of the data (in-memory buffer or file).
-// If the total content size exceeds the predefined threshold, it is stored in a temporary file and a file
-// reader is returned. For in-memory data, it returns a custom reader that handles returning
+// ReadCloser returns an io.ReadCloser to read the written content.
+// If the content is stored in a file, it opens the file and returns a file reader.
+// If the content is stored in memory, it returns a custom reader that handles returning the buffer to the pool.
+// The caller should call Close() on the returned io.Reader when done to ensure resources are properly released.
+// This method can only be used when the BufferedFileWriter is in read-only mode.
+func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) { return w.ReadSeekCloser() }
+
+// ReadSeekCloser returns an io.ReadSeekCloser to read the written content.
+// If the content is stored in a file, it opens the file and returns a file reader.
+// If the content is stored in memory, it returns a custom reader that allows seeking and handles returning
 // the buffer to the pool.
-// The caller should call Close() on the returned io.Reader when done to ensure files are cleaned up.
-// It can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
+// This method can only be used when the BufferedFileWriter is in read-only mode.
+func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
 	if w.state != readOnly {
 		return nil, fmt.Errorf("BufferedFileWriter must be in read-only mode to read")
 	}

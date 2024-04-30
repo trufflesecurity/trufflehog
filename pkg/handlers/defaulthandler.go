@@ -10,10 +10,10 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archiver/v4"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -57,7 +57,7 @@ func newDefaultHandler(handlerType handlerType) *defaultHandler {
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *defaultHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
+func (h *defaultHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (chan []byte, error) {
 	// Shared channel for both archive and non-archive content.
 	dataChan := make(chan []byte, defaultBufferSize)
 
@@ -131,17 +131,27 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 		return ctx.Err()
 	}
 
-	if depth >= maxDepth {
+	if depth > maxDepth {
 		h.metrics.incMaxArchiveDepthCount()
 		return ErrMaxDepthReached
 	}
 
 	format, arReader, err := archiver.Identify("", reader)
-	if errors.Is(err, archiver.ErrNoMatch) && depth > 0 {
-		return h.handleNonArchiveContent(ctx, arReader, archiveChan)
-	}
-
-	if err != nil {
+	switch {
+	case err == nil:
+		// Continue with the rest of the code.
+	case errors.Is(err, archiver.ErrNoMatch):
+		if depth > 0 {
+			// If openArchive is called on an already extracted/decompressed file and the depth is greater than 0,
+			// it means we are at least 1 layer deep in the archive. In this case, we should handle the content
+			// as non-archive data by calling handleNonArchiveContent.
+			return h.handleNonArchiveContent(ctx, arReader, archiveChan)
+		}
+		// If openArchive is called on the root (depth == 0) and we can't identify the format,
+		// it means we can't handle the content at all. Return the archiver.ErrNoMatch error.
+		return err
+	default:
+		// Some other error occurred.
 		return fmt.Errorf("error identifying archive: %w", err)
 	}
 
@@ -156,13 +166,13 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 
 		h.metrics.incFilesProcessed()
 
-		reReader, err := diskbufferreader.New(compReader)
+		rdr, err := readers.NewBufferedFileReader(compReader)
 		if err != nil {
-			return fmt.Errorf("error creating reusable reader: %w", err)
+			return fmt.Errorf("error creating random access reader: %w", err)
 		}
-		defer reReader.Close()
+		defer rdr.Close()
 
-		return h.openArchive(ctx, depth+1, reReader, archiveChan)
+		return h.openArchive(ctx, depth+1, rdr, archiveChan)
 	case archiver.Extractor:
 		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
 		if err != nil {
@@ -207,7 +217,7 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return nil
 		}
 
-		if common.SkipFile(file.Name()) {
+		if common.SkipFile(file.Name()) || common.IsBinary(file.Name()) {
 			lCtx.Logger().V(5).Info("skipping file")
 			h.metrics.incFilesSkipped()
 			return nil
@@ -219,16 +229,16 @@ func (h *defaultHandler) extractorHandler(archiveChan chan []byte) func(context.
 		}
 		defer fReader.Close()
 
-		reReader, err := diskbufferreader.New(fReader)
+		rdr, err := readers.NewBufferedFileReader(fReader)
 		if err != nil {
-			return fmt.Errorf("error creating reusable reader: %w", err)
+			return fmt.Errorf("error creating random access reader: %w", err)
 		}
-		defer reReader.Close()
+		defer rdr.Close()
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
 
-		return h.openArchive(lCtx, depth, reReader, archiveChan)
+		return h.openArchive(lCtx, depth, rdr, archiveChan)
 	}
 }
 
@@ -249,7 +259,7 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 	mime := mimetype.Detect(buffer)
 	mimeT := mimeType(mime.String())
 
-	if common.SkipFile(mime.Extension()) {
+	if common.SkipFile(mime.Extension()) || common.IsBinary(mime.Extension()) {
 		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
 		h.metrics.incFilesSkipped()
 		return nil

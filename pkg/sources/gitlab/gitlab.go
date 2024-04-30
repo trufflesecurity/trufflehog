@@ -186,6 +186,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 
 	// Get all repos if not specified.
 	if len(repos) == 0 {
+		ctx.Logger().Info("no repositories configured, enumerating")
 		ignoreRepo := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
 			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", pattern)
 		})
@@ -453,6 +454,7 @@ func (s *Source) getAllProjectRepos(
 			}
 			break
 		}
+		ctx.Logger().V(3).Info("listed user projects", "count", len(userProjects))
 		if err := processProjects(userProjects); err != nil {
 			return err
 		}
@@ -488,6 +490,7 @@ func (s *Source) getAllProjectRepos(
 			}
 			break
 		}
+		ctx.Logger().V(3).Info("listed groups", "count", len(groupList))
 		groups = append(groups, groupList...)
 		gitlabGroupsEnumerated.WithLabelValues(s.name).Add(float64(len(groupList)))
 		listGroupsOptions.Page = res.NextPage
@@ -517,6 +520,7 @@ func (s *Source) getAllProjectRepos(
 				}
 				break
 			}
+			ctx.Logger().V(3).Info("listed group projects", "count", len(grpPrjs))
 			if err := processProjects(grpPrjs); err != nil {
 				return err
 			}
@@ -536,6 +540,7 @@ func (s *Source) getAllProjectRepos(
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
+	ctx.Logger().V(2).Info("filtered repos to resume", "before", len(s.repos), "after", len(reposToScan))
 	s.repos = reposToScan
 	scanErrs := sources.NewScanErrors()
 

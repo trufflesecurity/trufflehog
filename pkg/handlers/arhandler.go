@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"pault.ag/go/debian/deb"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -23,7 +22,7 @@ func newARHandler() *arHandler {
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.
-func (h *arHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
+func (h *arHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {
