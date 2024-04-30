@@ -22,7 +22,7 @@ import (
 
 const (
 	// defaultDateFormat is the standard date format for git.
-	defaultDateFormat = "Mon Jan 02 15:04:05 2006 -0700"
+	defaultDateFormat = "Mon Jan 2 15:04:05 2006 -0700"
 
 	// defaultMaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
 	defaultMaxDiffSize = 2 * 1024 * 1024 * 1024 // 2GB
@@ -108,11 +108,12 @@ func (d *Diff) finalize() error { return d.contentWriter.CloseForWriting() }
 
 // Commit contains commit header info and diffs.
 type Commit struct {
-	Hash    string
-	Author  string
-	Date    time.Time
-	Message strings.Builder
-	Size    int // in bytes
+	Hash      string
+	Author    string
+	Committer string
+	Date      time.Time
+	Message   strings.Builder
+	Size      int // in bytes
 
 	hasDiffs bool
 }
@@ -133,10 +134,15 @@ const (
 	CommitLine
 	MergeLine
 	AuthorLine
-	DateLine
+	AuthorDateLine
+	CommitterLine
+	CommitterDateLine
 	MessageStartLine
 	MessageLine
 	MessageEndLine
+	NotesStartLine
+	NotesLine
+	NotesEndLine
 	DiffLine
 	ModeLine
 	IndexLine
@@ -154,10 +160,15 @@ func (state ParseState) String() string {
 		"CommitLine",
 		"MergeLine",
 		"AuthorLine",
-		"DateLine",
+		"AuthorDateLine",
+		"CommitterLine",
+		"CommitterDateLine",
 		"MessageStartLine",
 		"MessageLine",
 		"MessageEndLine",
+		"NotesStartLine",
+		"NotesLine",
+		"NotesEndLine",
 		"DiffLine",
 		"ModeLine",
 		"IndexLine",
@@ -211,7 +222,15 @@ func NewParser(options ...Option) *Parser {
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log.
 func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan *Diff, error) {
-	args := []string{"-C", source, "log", "-p", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
+	args := []string{
+		"-C", source,
+		"log",
+		"--patch", // https://git-scm.com/docs/git-log#Documentation/git-log.txt---patch
+		"--full-history",
+		"--date=format:%a %b %d %H:%M:%S %Y %z",
+		"--pretty=fuller", // https://git-scm.com/docs/git-log#_pretty_formats
+		"--notes",         // https://git-scm.com/docs/git-log#Documentation/git-log.txt---notesltrefgt
+	}
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
 	}
@@ -375,16 +394,23 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			latestState = MergeLine
 		case isAuthorLine(isStaged, latestState, line):
 			latestState = AuthorLine
-			currentCommit.Author = strings.TrimRight(string(line[8:]), "\n")
+			currentCommit.Author = strings.TrimSpace(string(line[8:]))
+		case isAuthorDateLine(isStaged, latestState, line):
+			latestState = AuthorDateLine
 
-		case isDateLine(isStaged, latestState, line):
-			latestState = DateLine
-
-			date, err := time.Parse(c.dateFormat, strings.TrimSpace(string(line[6:])))
+			date, err := time.Parse(c.dateFormat, strings.TrimSpace(string(line[12:])))
 			if err != nil {
-				ctx.Logger().V(2).Info("Could not parse date from git stream.", "error", err)
+				ctx.Logger().Error(err, "failed to parse commit date", "commit", currentCommit.Hash, "latestState", latestState.String())
+				latestState = ParseFailure
+				continue
 			}
 			currentCommit.Date = date
+		case isCommitterLine(isStaged, latestState, line):
+			latestState = CommitterLine
+			currentCommit.Committer = strings.TrimSpace(string(line[8:]))
+		case isCommitterDateLine(isStaged, latestState, line):
+			latestState = CommitterDateLine
+			// NoOp
 		case isMessageStartLine(isStaged, latestState, line):
 			latestState = MessageStartLine
 			// NoOp
@@ -394,6 +420,17 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 
 		case isMessageEndLine(isStaged, latestState, line):
 			latestState = MessageEndLine
+			// NoOp
+		case isNotesStartLine(isStaged, latestState, line):
+			latestState = NotesStartLine
+
+			currentCommit.Message.WriteString("\n")
+			currentCommit.Message.Write(line)
+		case isNotesLine(isStaged, latestState, line):
+			latestState = NotesLine
+			currentCommit.Message.Write(line[4:]) // Notes are indented by 4 spaces.
+		case isNotesEndLine(isStaged, latestState, line):
+			latestState = NotesEndLine
 			// NoOp
 		case isDiffLine(isStaged, latestState, line):
 			latestState = DiffLine
@@ -579,20 +616,42 @@ func isAuthorLine(isStaged bool, latestState ParseState, line []byte) bool {
 	return false
 }
 
-// Date:   Tue Aug 10 15:20:40 2021 +0100
-func isDateLine(isStaged bool, latestState ParseState, line []byte) bool {
+// AuthorDate:   Tue Aug 10 15:20:40 2021 +0100
+func isAuthorDateLine(isStaged bool, latestState ParseState, line []byte) bool {
 	if isStaged || latestState != AuthorLine {
 		return false
 	}
-	if len(line) > 7 && bytes.Equal(line[:5], []byte("Date:")) {
+	if len(line) > 10 && bytes.Equal(line[:11], []byte("AuthorDate:")) {
 		return true
 	}
 	return false
 }
 
-// Line directly after Date with only a newline.
+// Commit: Bill Rich <bill.rich@trufflesec.com>
+func isCommitterLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || latestState != AuthorDateLine {
+		return false
+	}
+	if len(line) > 8 && bytes.Equal(line[:7], []byte("Commit:")) {
+		return true
+	}
+	return false
+}
+
+// CommitDate: Wed Apr 17 19:59:28 2024 -0400
+func isCommitterDateLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || latestState != CommitterLine {
+		return false
+	}
+	if len(line) > 10 && bytes.Equal(line[:11], []byte("CommitDate:")) {
+		return true
+	}
+	return false
+}
+
+// Line directly after CommitterDate with only a newline.
 func isMessageStartLine(isStaged bool, latestState ParseState, line []byte) bool {
-	if isStaged || latestState != DateLine {
+	if isStaged || latestState != CommitterDateLine {
 		return false
 	}
 	// TODO: Improve the implementation of this and isMessageEndLine
@@ -624,15 +683,51 @@ func isMessageEndLine(isStaged bool, latestState ParseState, line []byte) bool {
 	return false
 }
 
+// `Notes:` or `Notes (context):`
+// See https://tylercipriani.com/blog/2022/11/19/git-notes-gits-coolest-most-unloved-feature/
+func isNotesStartLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || latestState != MessageEndLine {
+		return false
+	}
+	if len(line) > 5 && bytes.Equal(line[:5], []byte("Notes")) {
+		return true
+	}
+	return false
+}
+
+// Line after NotesStartLine that starts with 4 spaces
+func isNotesLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || !(latestState == NotesStartLine || latestState == NotesLine) {
+		return false
+	}
+	if len(line) > 4 && bytes.Equal(line[:4], []byte("    ")) {
+		return true
+	}
+	return false
+}
+
+// Line directly after NotesLine with only a newline.
+func isNotesEndLine(isStaged bool, latestState ParseState, line []byte) bool {
+	if isStaged || latestState != NotesLine {
+		return false
+	}
+	if len(strings.TrimRight(string(line[:]), "\r\n")) == 0 {
+		return true
+	}
+	return false
+}
+
 // diff --git a/internal/addrs/move_endpoint_module.go b/internal/addrs/move_endpoint_module.go
 func isDiffLine(isStaged bool, latestState ParseState, line []byte) bool {
 	if !(latestState == MessageStartLine || // Empty commit messages can go from MessageStart->Diff
 		latestState == MessageEndLine ||
+		latestState == NotesEndLine ||
 		latestState == BinaryFileLine ||
+		latestState == ModeLine ||
 		latestState == IndexLine ||
 		latestState == HunkContentLine ||
 		latestState == ParseFailure) {
-		if latestState == Initial && !isStaged {
+		if !(isStaged && latestState == Initial) {
 			return false
 		}
 	}
