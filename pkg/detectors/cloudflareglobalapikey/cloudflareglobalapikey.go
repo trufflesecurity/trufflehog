@@ -48,6 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		apiKeyRes := strings.TrimSpace(apiKeyMatch[1])
 
 		for _, emailMatch := range emailMatches {
+			if len(emailMatch) != 2 {
+				continue
+			}
 			emailRes := strings.TrimSpace(emailMatch[1])
 
 			if detectors.IsKnownFalsePositive(apiKeyRes, detectors.DefaultFalsePositives, true) { // wait- (apiKeyRes, email) might be false positive does not mean (apiKeyRes, another_email) is ?
