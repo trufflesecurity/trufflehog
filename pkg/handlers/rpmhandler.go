@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/sassoftware/go-rpmutils"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -23,7 +22,7 @@ func newRPMHandler() *rpmHandler {
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
 // handle RPM specific archive operations.
-func (h *rpmHandler) HandleFile(ctx logContext.Context, input *diskbufferreader.DiskBufferReader) (chan []byte, error) {
+func (h *rpmHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
 	go func() {
