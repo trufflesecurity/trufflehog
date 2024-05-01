@@ -34,36 +34,36 @@ type fileReader struct {
 func newFileReader(ctx logContext.Context, r io.ReadCloser) (fileReader, error) {
 	defer r.Close()
 
-	var custom fileReader
+	var reader fileReader
 	rdr, err := readers.NewBufferedFileReader(ctx, r)
 	if err != nil {
-		return custom, fmt.Errorf("error creating random access reader: %w", err)
+		return reader, fmt.Errorf("error creating random access reader: %w", err)
 	}
-	custom.BufferedFileReader = rdr
+	reader.BufferedFileReader = rdr
 
-	format, reader, err := archiver.Identify("", rdr)
+	format, arReader, err := archiver.Identify("", rdr)
 	switch {
 	case err == nil: // Archive detected
-		custom.isArchive = true
-		custom.mimeType = mimeType(format.Name())
-		custom.format = format
+		reader.isArchive = true
+		reader.mimeType = mimeType(format.Name())
+		reader.format = format
 	case errors.Is(err, archiver.ErrNoMatch):
 		// Not an archive handled by archiver, try to detect MIME type.
 		// This will occur for un-supported archive types and non-archive files. (ex: .deb, .rpm, .txt)
-		mimeT, err := mimetype.DetectReader(reader)
+		mimeT, err := mimetype.DetectReader(arReader)
 		if err != nil {
-			return custom, fmt.Errorf("error detecting MIME type: %w", err)
+			return reader, fmt.Errorf("error detecting MIME type: %w", err)
 		}
-		custom.mimeType = mimeType(mimeT.String())
+		reader.mimeType = mimeType(mimeT.String())
 	default: // Error identifying archive
-		return custom, fmt.Errorf("error identifying archive: %w", err)
+		return reader, fmt.Errorf("error identifying archive: %w", err)
 	}
 
 	if _, err = rdr.Seek(0, io.SeekStart); err != nil {
-		return custom, fmt.Errorf("error seeking to start of file: %w", err)
+		return reader, fmt.Errorf("error seeking to start of file: %w", err)
 	}
 
-	return custom, nil
+	return reader, nil
 }
 
 // FileHandler represents a handler for files.
