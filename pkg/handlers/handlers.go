@@ -119,22 +119,18 @@ const (
 // - archiveHandler is used for common archive formats supported by the archiver library (.zip, .tar, .gz, etc.).
 // - nonArchiveHandler is used for non-archive files.
 // The selected handler is then returned, ready to handle the file according to its specific format and requirements.
-func selectHandler(r fileReader) FileHandler {
-	var handler FileHandler
-	switch r.mimeType {
+func selectHandler(file fileReader) FileHandler {
+	switch file.mimeType {
 	case arMime, unixArMime, debMime:
-		handler = newARHandler()
+		return newARHandler()
 	case rpmMime, cpioMime:
-		handler = newRPMHandler()
+		return newRPMHandler()
 	default:
-		if r.isArchive {
-			handler = newArchiveHandler()
-		} else {
-			handler = newNonArchiveHandler(nonArchiveHandlerType)
+		if file.isArchive {
+			return newArchiveHandler()
 		}
+		return newNonArchiveHandler(nonArchiveHandlerType)
 	}
-
-	return handler
 }
 
 // HandleFile orchestrates the complete file handling process for a given file.
