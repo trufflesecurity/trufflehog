@@ -1,7 +1,6 @@
 package pool
 
 import (
-	"bytes"
 	"sync"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
@@ -20,18 +19,14 @@ func (poolMetrics) recordBufferRetrival() {
 	bufferCount.Inc()
 }
 
-func (poolMetrics) recordBufferReturn(buf *buffer.Buffer) {
+func (poolMetrics) recordBufferReturn(buf *buffer.CheckoutBuffer) {
 	activeBufferCount.Dec()
 	buf.RecordMetric()
 }
 
-// Opts is a function that configures a BufferPool.
-type Opts func(pool *Pool)
-
 // Pool of buffers.
 type Pool struct {
 	*sync.Pool
-	bufferSize uint32
 
 	metrics poolMetrics
 }
@@ -39,26 +34,22 @@ type Pool struct {
 // const defaultBufferSize = 1 << 12 // 4KB
 const defaultBufferSize = 1 << 16 // 64KB
 // NewBufferPool creates a new instance of BufferPool.
-func NewBufferPool(opts ...Opts) *Pool {
-	pool := &Pool{bufferSize: defaultBufferSize}
+func NewBufferPool(opts ...buffer.Option) *Pool {
+	pool := new(Pool)
 
-	for _, opt := range opts {
-		opt(pool)
-	}
+	buf := buffer.NewBuffer(opts...)
 	pool.Pool = &sync.Pool{
-		New: func() any {
-			return &buffer.Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
-		},
+		New: func() any { return buf },
 	}
 
 	return pool
 }
 
-// Get returns a Buffer from the pool.
-func (p *Pool) Get() *buffer.Buffer {
-	buf, ok := p.Pool.Get().(*buffer.Buffer)
+// Get returns a CheckoutBuffer from the pool.
+func (p *Pool) Get() *buffer.CheckoutBuffer {
+	buf, ok := p.Pool.Get().(*buffer.CheckoutBuffer)
 	if !ok {
-		buf = &buffer.Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
+		buf = buffer.NewBuffer()
 	}
 	p.metrics.recordBufferRetrival()
 	buf.ResetMetric()
@@ -66,18 +57,18 @@ func (p *Pool) Get() *buffer.Buffer {
 	return buf
 }
 
-// Put returns a Buffer to the pool.
-func (p *Pool) Put(buf *buffer.Buffer) {
+// Put returns a CheckoutBuffer to the pool.
+func (p *Pool) Put(buf *buffer.CheckoutBuffer) {
 	p.metrics.recordBufferReturn(buf)
 
-	// If the Buffer is more than twice the default size, replace it with a new Buffer.
+	// If the CheckoutBuffer is more than twice the default size, replace it with a new CheckoutBuffer.
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
 	if buf.Cap() > maxAllowedCapacity {
 		p.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		buf = &buffer.Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
+		buf = buffer.NewBuffer()
 	} else {
-		// Reset the Buffer to clear any existing data.
+		// Reset the CheckoutBuffer to clear any existing data.
 		buf.Reset()
 	}
 

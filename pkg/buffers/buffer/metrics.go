@@ -26,14 +26,14 @@ var (
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Name:      "checkout_duration_total_us",
-		Help:      "Total duration in microseconds of Buffer checkouts.",
+		Help:      "Total duration in microseconds of CheckoutBuffer checkouts.",
 	})
 
 	checkoutDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Name:      "checkout_duration_us",
-		Help:      "Duration in microseconds of Buffer checkouts.",
+		Help:      "Duration in microseconds of CheckoutBuffer checkouts.",
 		Buckets:   prometheus.ExponentialBuckets(10, 10, 7),
 	})
 

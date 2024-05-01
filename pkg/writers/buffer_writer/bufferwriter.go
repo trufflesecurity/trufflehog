@@ -20,7 +20,7 @@ func (metrics) recordDataProcessed(size int64, dur time.Duration) {
 
 func init() { bufferPool = pool.NewBufferPool() }
 
-// bufferPool is the shared Buffer pool used by all BufferedFileWriters.
+// bufferPool is the shared CheckoutBuffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
 var bufferPool *pool.Pool
 
@@ -36,10 +36,10 @@ const (
 
 // BufferWriter implements contentWriter, using a shared buffer pool for memory management.
 type BufferWriter struct {
-	buf     *buffer.Buffer // The current buffer in use.
-	bufPool *pool.Pool     // The buffer pool used to manage the buffer.
-	size    int            // The total size of the content written to the buffer.
-	state   state          // The current state of the buffer.
+	buf     *buffer.CheckoutBuffer // The current buffer in use.
+	bufPool *pool.Pool             // The buffer pool used to manage the buffer.
+	size    int                    // The total size of the content written to the buffer.
+	state   state                  // The current state of the buffer.
 
 	metrics metrics
 }
@@ -62,6 +62,7 @@ func NewFromReader(ctx context.Context, r io.Reader) (*BufferWriter, error) {
 	return buf, nil
 }
 
+const defaultBufferSize = 1 << 12 // 4KB
 // Write delegates the writing operation to the underlying bytes.Buffer.
 func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.state != writeOnly {

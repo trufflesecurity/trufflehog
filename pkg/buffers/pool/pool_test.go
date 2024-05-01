@@ -38,13 +38,13 @@ func TestBufferPoolGetPut(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
-		preparePool       func(p *Pool) *buffer.Buffer // Prepare the pool and return an initial buffer to put if needed
-		expectedCapBefore int                          // Expected capacity before putting it back
-		expectedCapAfter  int                          // Expected capacity after retrieving it again
+		preparePool       func(p *Pool) *buffer.CheckoutBuffer // Prepare the pool and return an initial buffer to put if needed
+		expectedCapBefore int                                  // Expected capacity before putting it back
+		expectedCapAfter  int                                  // Expected capacity after retrieving it again
 	}{
 		{
 			name: "Get new buffer and put back without modification",
-			preparePool: func(_ *Pool) *buffer.Buffer {
+			preparePool: func(_ *Pool) *buffer.CheckoutBuffer {
 				return nil // No initial buffer to put
 			},
 			expectedCapBefore: int(defaultBufferSize),
@@ -52,8 +52,8 @@ func TestBufferPoolGetPut(t *testing.T) {
 		},
 		{
 			name: "Put oversized buffer, expect shrink",
-			preparePool: func(p *Pool) *buffer.Buffer {
-				buf := &buffer.Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, 3*defaultBufferSize))}
+			preparePool: func(p *Pool) *buffer.CheckoutBuffer {
+				buf := &buffer.CheckoutBuffer{Buffer: bytes.NewBuffer(make([]byte, 0, 3*defaultBufferSize))}
 				return buf
 			},
 			expectedCapBefore: int(defaultBufferSize),

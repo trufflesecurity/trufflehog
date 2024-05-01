@@ -30,7 +30,7 @@ func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
 
 func init() { bufferPool = pool.NewBufferPool() }
 
-// bufferPool is the shared Buffer pool used by all BufferedFileWriters.
+// bufferPool is the shared CheckoutBuffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
 var bufferPool *pool.Pool
 
@@ -50,10 +50,10 @@ type BufferedFileWriter struct {
 	threshold uint64 // Threshold for switching to file writing.
 	size      uint64 // Total size of the data written.
 
-	bufPool  *pool.Pool     // Pool for storing buffers for reuse.
-	buf      *buffer.Buffer // Buffer for storing data under the threshold in memory.
-	filename string         // Name of the temporary file.
-	file     *os.File       // File for storing data over the threshold.
+	bufPool  *pool.Pool             // Pool for storing buffers for reuse.
+	buf      *buffer.CheckoutBuffer // CheckoutBuffer for storing data under the threshold in memory.
+	filename string                 // Name of the temporary file.
+	file     *os.File               // File for storing data over the threshold.
 
 	state state // Current state of the writer. (writeOnly or readOnly)
 
