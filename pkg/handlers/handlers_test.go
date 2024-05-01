@@ -203,3 +203,18 @@ func TestHandleFileAR(t *testing.T) {
 	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
+
+func TestHandleFileNonArchive(t *testing.T) {
+	wantChunkCount := 6
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
+
+	file, err := os.Open("testdata/nonarchive.txt")
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	assert.NoError(t, HandleFile(ctx, file, &sources.Chunk{}, reporter))
+	assert.NoError(t, err)
+	assert.Equal(t, wantChunkCount, len(reporter.Ch))
+}
