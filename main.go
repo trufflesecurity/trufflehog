@@ -626,6 +626,7 @@ func run(state overseer.State) {
 		"verified_secrets", metrics.VerifiedSecretsFound,
 		"unverified_secrets", metrics.UnverifiedSecretsFound,
 		"scan_duration", metrics.ScanDuration.String(),
+		"trufflehog_version", version.BuildVersion,
 	)
 
 	if *printAvgDetectorTime {
