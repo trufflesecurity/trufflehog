@@ -38,7 +38,6 @@ func (h *nonArchiveHandler) HandleFile(ctx logContext.Context, input fileReader)
 	// Shared channel for both archive and non-archive content.
 	dataChan := make(chan []byte, defaultBufferSize)
 
-	ctx.Logger().V(3).Info("File not recognized as an archive, handling as non-archive content.")
 	go func() {
 		defer close(dataChan)
 
