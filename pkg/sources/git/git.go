@@ -571,7 +571,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			ctx.Logger().V(3).Info("finished scanning commits")
 			break
 		}
-		func() {
+
+		shouldBreak := func() bool {
 			start := time.Now() // Start the timer for processing the diff.
 			defer func(t time.Time) {
 				diffChan.RecordConsumptionTime(time.Since(t)) // Record the time taken to process the diff.
@@ -579,13 +580,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 				logger.V(1).Info("reached max depth", "depth", depth)
-				return
+				return true
 			}
 
 			fullHash := diff.Commit.Hash
 			if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
 				logger.V(1).Info("reached base commit", "commit", fullHash)
-				return
+				return true
 			}
 
 			if fullHash != lastCommitHash {
@@ -598,13 +599,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			// Check if the diff passes the filter.
 			// This helps to avoid processing unnecessary diffs.
 			if !scanOptions.Filter.Pass(diff.PathB) {
-				return
+				return false
 			}
 
 			fileName := diff.PathB
 			// Avoid processing empty file names.
 			if fileName == "" {
-				return
+				return false
 			}
 			email := diff.Commit.Author
 			when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
@@ -627,7 +628,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					ctx.Logger().Error(err, "error sending binary diff", "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
 
-				return
+				return false
 			}
 
 			// Check if the diff size exceeds the chunk size limit.
@@ -635,7 +636,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			// This helps to efficiently process large diffs and avoid memory issues.
 			if diff.Len() > sources.ChunkSize+sources.PeekSize {
 				s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
-				return
+				return false
 			}
 
 			chunkData := func(d *gitparse.Diff) error {
@@ -675,9 +676,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				return reporter.ChunkOk(ctx, chunk)
 			}
 			if err := chunkData(diff); err != nil {
-				return
+				return false
 			}
-		}()
+
+			return false
+		}
+
+		if shouldBreak() {
+			break
+		}
 
 	}
 
@@ -805,7 +812,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			break
 		}
 
-		func() {
+		shouldBreak := func() bool {
 			start := time.Now() // Start the timer for processing the diff.
 			defer func(t time.Time) {
 				diffChan.RecordConsumptionTime(time.Since(t)) // Record the time taken to process the diff.
@@ -817,7 +824,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 				logger.V(1).Info("reached max depth")
-				return
+				return true
 			}
 
 			if fullHash != lastCommitHash {
@@ -827,7 +834,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			}
 
 			if reachedBase && fullHash != scanOptions.BaseHash {
-				return
+				return true
 			}
 
 			if scanOptions.BaseHash != "" && fullHash == scanOptions.BaseHash {
@@ -836,12 +843,12 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 			}
 
 			if !scanOptions.Filter.Pass(diff.PathB) {
-				return
+				return false
 			}
 
 			fileName := diff.PathB
 			if fileName == "" {
-				return
+				return false
 			}
 
 			email := diff.Commit.Author
@@ -864,7 +871,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				if err := sendBinaryDiffWithRetry(ctx, bd, binaryDiffChan); err != nil {
 					ctx.Logger().Error(err, "error sending binary diff", "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
-				return
+				return false
 			}
 
 			chunkData := func(d *gitparse.Diff) error {
@@ -904,10 +911,15 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				return reporter.ChunkOk(ctx, chunk)
 			}
 			if err := chunkData(diff); err != nil {
-				return
+				return false
 			}
 
-		}()
+			return false
+		}
+
+		if shouldBreak() {
+			break
+		}
 
 	}
 
