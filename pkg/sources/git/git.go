@@ -1103,26 +1103,74 @@ func (s *Git) extractBinaryDiffs(ctx context.Context, reporter sources.ChunkRepo
 			continue
 		}
 
-		if err := s.extractBinaryDiff(ctx, diff, reporter); err != nil {
-			ctx.Logger().Error(err, "error extracting binary diff")
+		rdr, err := newGitCatFileReader(diff.gitDir, diff.commit.String(), diff.fileName)
+		if err != nil {
+			return err
 		}
+
+		return handlers.HandleFile(ctx, rdr, diff.chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 	}
 
 	return nil
 }
 
-func (s *Git) extractBinaryDiff(ctx context.Context, diff binaryDiff, reporter sources.ChunkReporter) error {
-	cmd := exec.Command("git", "-C", diff.gitDir, "cat-file", "blob", diff.commit.String()+":"+diff.fileName)
+// gitCatFileReader is a custom type that implements io.ReadCloser interfaces.
+// It is used to efficiently stream the output of the git cat-file command through a pipe.
+type gitCatFileReader struct {
+	pr     *io.PipeReader // read end of the pipe
+	pw     *io.PipeWriter // write end of the pipe
+	cmd    *exec.Cmd      // git command being executed
+	stderr bytes.Buffer   // buffer to capture the standard error output of the git command
+}
 
+func (r *gitCatFileReader) Read(p []byte) (n int, err error) {
+	return r.pr.Read(p)
+}
+
+func (r *gitCatFileReader) Close() error {
+	if err := r.pr.Close(); err != nil {
+		return err
+	}
+	return r.cmd.Wait()
+}
+
+func newGitCatFileReader(gitDir, commitHash, path string) (*gitCatFileReader, error) {
+	pr, pw := io.Pipe()
+
+	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash+":"+path)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	stdout, err := cmd.Output()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
+		return nil, fmt.Errorf("error creating stdout pipe: %w", err)
 	}
 
-	return handlers.HandleFile(ctx, bytes.NewReader(stdout), diff.chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
+	}
+
+	// Start a goroutine to read from the git command's standard output and write to the pipe.
+	go func() {
+		_, err := io.Copy(pw, stdout)
+		if err != nil {
+			err := pw.CloseWithError(fmt.Errorf("error copying output to pipe: %w", err))
+			if err != nil {
+				stderr.WriteString(err.Error())
+			}
+			return
+		}
+		if err = stdout.Close(); err != nil {
+			if err := pw.CloseWithError(fmt.Errorf("error closing stdout: %w", err)); err != nil {
+				stderr.WriteString(err.Error())
+			}
+		}
+		if err = pw.Close(); err != nil {
+			stderr.WriteString(err.Error())
+		}
+	}()
+
+	return &gitCatFileReader{pr: pr, pw: pw, cmd: cmd, stderr: stderr}, nil
 }
 
 // normalizeConfig updates scanOptions with the resolved base and head commit hashes.
@@ -1384,33 +1432,6 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 		return ""
 	}
 	return safeURL
-}
-
-func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
-	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
-	fileCtx.Logger().V(5).Info("handling binary file")
-
-	if common.SkipFile(path) {
-		fileCtx.Logger().V(5).Info("file contains ignored extension")
-		return nil
-	}
-
-	if s.skipBinaries {
-		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
-		return nil
-	}
-
-	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	stdout, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
-	}
-
-	return handlers.HandleFile(fileCtx, bytes.NewReader(stdout), chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {

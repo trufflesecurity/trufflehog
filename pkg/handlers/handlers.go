@@ -31,12 +31,13 @@ type fileReader struct {
 	isArchive bool
 }
 
-func newFileReader(ctx logContext.Context, r io.Reader) (fileReader, error) {
+func newFileReader(ctx logContext.Context, r io.ReadCloser) (fileReader, error) {
 	var custom fileReader
 	rdr, err := readers.NewBufferedFileReader(ctx, r)
 	if err != nil {
 		return custom, fmt.Errorf("error creating random access reader: %w", err)
 	}
+	defer r.Close()
 	custom.BufferedFileReader = rdr
 
 	format, reader, err := archiver.Identify("", rdr)
@@ -141,12 +142,13 @@ func selectHandler(r fileReader) FileHandler {
 // This function initializes the handling process and delegates to the specific handler to manage file
 // extraction or processing. Errors at any stage result in an error return value.
 // Successful handling passes the file content through a channel to be chunked and reported.
+// The function will close the reader when it has consumed all the data.
 //
 // If the skipArchives option is set to true and the detected MIME type is a known archive type,
 // the function will skip processing the file and return nil.
 func HandleFile(
 	ctx logContext.Context,
-	reader io.Reader,
+	reader io.ReadCloser,
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),

@@ -353,5 +353,5 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 		},
 	}
 
-	return handlers.HandleFile(ctx, o, chunkSkel, sources.ChanReporter{Ch: s.chunksCh})
+	return handlers.HandleFile(ctx, io.NopCloser(o), chunkSkel, sources.ChanReporter{Ch: s.chunksCh})
 }

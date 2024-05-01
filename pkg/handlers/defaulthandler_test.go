@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -116,7 +117,7 @@ func TestOpenInvalidArchive(t *testing.T) {
 	ctx := logContext.AddLogger(context.Background())
 	handler := archiveHandler{}
 
-	rdr, err := newFileReader(ctx, reader)
+	rdr, err := newFileReader(ctx, io.NopCloser(reader))
 	assert.NoError(t, err)
 	defer rdr.Close()
 
