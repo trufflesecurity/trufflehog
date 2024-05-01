@@ -13,11 +13,11 @@ import (
 
 // rpmHandler specializes archiveHandler to manage RPM package files. It leverages shared behaviors
 // from archiveHandler and introduces additional logic specific to RPM packages.
-type rpmHandler struct{ *nonArchiveHandler }
+type rpmHandler struct{ *defaultHandler }
 
 // newRPMHandler creates an rpmHandler with the provided metrics.
 func newRPMHandler() *rpmHandler {
-	return &rpmHandler{nonArchiveHandler: newNonArchiveHandler(rpmHandlerType)}
+	return &rpmHandler{defaultHandler: newNonArchiveHandler(rpmHandlerType)}
 }
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately

@@ -12,11 +12,11 @@ import (
 )
 
 // arHandler handles AR archive formats.
-type arHandler struct{ *nonArchiveHandler }
+type arHandler struct{ *defaultHandler }
 
 // newARHandler creates an arHandler.
 func newARHandler() *arHandler {
-	return &arHandler{nonArchiveHandler: newNonArchiveHandler(arHandlerType)}
+	return &arHandler{defaultHandler: newNonArchiveHandler(arHandlerType)}
 }
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or

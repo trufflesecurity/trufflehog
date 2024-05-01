@@ -96,10 +96,10 @@ func WithSkipArchives(skip bool) func(*fileHandlingConfig) {
 type handlerType string
 
 const (
-	archiveHandlerType    handlerType = "archive"
-	arHandlerType         handlerType = "ar"
-	rpmHandlerType        handlerType = "rpm"
-	nonArchiveHandlerType handlerType = "non-archive"
+	archiveHandlerType handlerType = "archive"
+	arHandlerType      handlerType = "ar"
+	rpmHandlerType     handlerType = "rpm"
+	defaultHandlerType handlerType = "default"
 )
 
 type mimeType string
@@ -118,7 +118,7 @@ const (
 // - arHandler is used for Unix archives and Debian packages ('arMime', 'unixArMime', and 'debMime').
 // - rpmHandler is used for RPM and CPIO archives ('rpmMime' and 'cpioMime').
 // - archiveHandler is used for common archive formats supported by the archiver library (.zip, .tar, .gz, etc.).
-// - nonArchiveHandler is used for non-archive files.
+// - defaultHandler is used for non-archive files.
 // The selected handler is then returned, ready to handle the file according to its specific format and requirements.
 func selectHandler(file fileReader) FileHandler {
 	switch file.mimeType {
@@ -130,7 +130,7 @@ func selectHandler(file fileReader) FileHandler {
 		if file.isArchive {
 			return newArchiveHandler()
 		}
-		return newNonArchiveHandler(nonArchiveHandlerType)
+		return newNonArchiveHandler(defaultHandlerType)
 	}
 }
 

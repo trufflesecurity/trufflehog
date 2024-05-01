@@ -35,10 +35,10 @@ func SetArchiveMaxDepth(depth int) { maxDepth = depth }
 func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 
 // archiveHandler is a handler for common archive files that are supported by the archiver library.
-type archiveHandler struct{ *nonArchiveHandler }
+type archiveHandler struct{ *defaultHandler }
 
 func newArchiveHandler() *archiveHandler {
-	return &archiveHandler{nonArchiveHandler: newNonArchiveHandler(archiveHandlerType)}
+	return &archiveHandler{defaultHandler: newNonArchiveHandler(archiveHandlerType)}
 }
 
 // HandleFile processes the input as either an archive or non-archive based on its content,

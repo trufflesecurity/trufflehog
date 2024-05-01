@@ -15,26 +15,26 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-// nonArchiveHandler is a handler for non-archive files.
+// defaultHandler is a handler for non-archive files.
 // It is embedded in other specialized handlers to provide a consistent way of handling non-archive content
 // once it has been extracted or decompressed by the specific handler.
 // This allows the specialized handlers to focus on their specific archive formats while leveraging
-// the common functionality provided by the nonArchiveHandler for processing the extracted content.
-type nonArchiveHandler struct{ metrics *metrics }
+// the common functionality provided by the defaultHandler for processing the extracted content.
+type defaultHandler struct{ metrics *metrics }
 
-// newNonArchiveHandler creates a nonArchiveHandler with metrics configured based on the provided handlerType.
+// newNonArchiveHandler creates a defaultHandler with metrics configured based on the provided handlerType.
 // The handlerType parameter is used to initialize the metrics instance with the appropriate handler type,
-// ensuring that the metrics recorded within the nonArchiveHandler methods are correctly attributed to the
+// ensuring that the metrics recorded within the defaultHandler methods are correctly attributed to the
 // specific handler that invoked them.
-func newNonArchiveHandler(handlerType handlerType) *nonArchiveHandler {
-	return &nonArchiveHandler{metrics: newHandlerMetrics(handlerType)}
+func newNonArchiveHandler(handlerType handlerType) *defaultHandler {
+	return &defaultHandler{metrics: newHandlerMetrics(handlerType)}
 }
 
 // HandleFile processes the input as either an archive or non-archive based on its content,
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *nonArchiveHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
+func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	// Shared channel for both archive and non-archive content.
 	dataChan := make(chan []byte, defaultBufferSize)
 
@@ -59,7 +59,7 @@ func (h *nonArchiveHandler) HandleFile(ctx logContext.Context, input fileReader)
 
 // measureLatencyAndHandleErrors measures the latency of the file processing and updates the metrics accordingly.
 // It also records errors and timeouts in the metrics.
-func (h *nonArchiveHandler) measureLatencyAndHandleErrors(start time.Time, err error) {
+func (h *defaultHandler) measureLatencyAndHandleErrors(start time.Time, err error) {
 	if err == nil {
 		h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		return
@@ -76,7 +76,7 @@ func (h *nonArchiveHandler) measureLatencyAndHandleErrors(start time.Time, err e
 // on the type, particularly for binary files. It manages reading file chunks and writing them to the archive channel,
 // effectively collecting the final bytes for further processing. This function is a key component in ensuring that all
 // file content, regardless of being an archive or not, is handled appropriately.
-func (h *nonArchiveHandler) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
+func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
 	bufReader := bufio.NewReaderSize(reader, defaultBufferSize)
 	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
 	// If fewer bytes are read, MIME type detection may still succeed.
