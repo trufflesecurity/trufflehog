@@ -1005,9 +1005,7 @@ func (s *Git) ScanRepo(
 		go func() {
 			ctx := context.WithValue(ctx, "binary_diff_worker_id", common.RandomID(5))
 			defer consumerWg.Done()
-			if err := s.extractBinaryDiffs(ctx, reporter, binaryDiffChan); err != nil {
-				ctx.Logger().Error(err, "error handling binary file")
-			}
+			s.extractBinaryDiffs(ctx, reporter, binaryDiffChan)
 		}()
 	}
 
@@ -1088,89 +1086,56 @@ func waitForConsumers(wg *sync.WaitGroup) <-chan struct{} {
 	return done
 }
 
-func (s *Git) extractBinaryDiffs(ctx context.Context, reporter sources.ChunkReporter, binaryDiffChan <-chan binaryDiff) error {
+func (s *Git) extractBinaryDiffs(ctx context.Context, reporter sources.ChunkReporter, binaryDiffChan <-chan binaryDiff) {
 	for diff := range binaryDiffChan {
-		fileCtx := context.WithValues(ctx, "commit", diff.commit.String()[:7], "path", diff.fileName)
+		commitHash := diff.commit.String()
+		filename := diff.fileName
+
+		fileCtx := context.WithValues(ctx, "commit", commitHash, "path", filename)
 		fileCtx.Logger().V(5).Info("handling binary file")
 
-		if common.SkipFile(diff.fileName) || common.IsBinary(diff.fileName) {
+		if common.SkipFile(filename) || common.IsBinary(filename) {
 			fileCtx.Logger().V(5).Info("file contains ignored extension")
 			continue
 		}
 
 		if s.skipBinaries {
-			fileCtx.Logger().V(5).Info("skipping binary file", "path", diff.fileName)
+			fileCtx.Logger().V(5).Info("skipping binary file", "path", filename)
 			continue
 		}
 
-		rdr, err := newGitCatFileReader(diff.gitDir, diff.commit.String(), diff.fileName)
-		if err != nil {
-			return err
+		if err := extracBinaryDiff(fileCtx, diff, reporter); err != nil {
+			fileCtx.Logger().Error(err, "error extracting binary diff")
 		}
-
-		return handlers.HandleFile(ctx, rdr, diff.chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 	}
-
-	return nil
 }
 
-// gitCatFileReader is a custom type that implements io.ReadCloser interfaces.
-// It is used to efficiently stream the output of the git cat-file command through a pipe.
-type gitCatFileReader struct {
-	pr     *io.PipeReader // read end of the pipe
-	pw     *io.PipeWriter // write end of the pipe
-	cmd    *exec.Cmd      // git command being executed
-	stderr bytes.Buffer   // buffer to capture the standard error output of the git command
-}
-
-func (r *gitCatFileReader) Read(p []byte) (n int, err error) {
-	return r.pr.Read(p)
-}
-
-func (r *gitCatFileReader) Close() error {
-	if err := r.pr.Close(); err != nil {
-		return err
-	}
-	return r.cmd.Wait()
-}
-
-func newGitCatFileReader(gitDir, commitHash, path string) (*gitCatFileReader, error) {
-	pr, pw := io.Pipe()
-
-	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash+":"+path)
+func extracBinaryDiff(ctx context.Context, diff binaryDiff, reporter sources.ChunkReporter) error {
+	cmd := exec.Command("git", "-C", diff.gitDir, "cat-file", "blob", diff.commit.String()+":"+diff.fileName)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	stdout, err := cmd.StdoutPipe()
+	fileReader, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("error creating stdout pipe: %w", err)
+		return err
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
+		return err
 	}
 
-	// Start a goroutine to read from the git command's standard output and write to the pipe.
-	go func() {
-		_, err := io.Copy(pw, stdout)
-		if err != nil {
-			err := pw.CloseWithError(fmt.Errorf("error copying output to pipe: %w", err))
-			if err != nil {
-				stderr.WriteString(err.Error())
-			}
-			return
-		}
-		if err = stdout.Close(); err != nil {
-			if err := pw.CloseWithError(fmt.Errorf("error closing stdout: %w", err)); err != nil {
-				stderr.WriteString(err.Error())
-			}
-		}
-		if err = pw.Close(); err != nil {
-			stderr.WriteString(err.Error())
-		}
-	}()
+	if err = handlers.HandleFile(ctx, fileReader, diff.chunkSkel, reporter); err != nil {
+		return fmt.Errorf("error handling file: %w", err)
+	}
 
-	return &gitCatFileReader{pr: pr, pw: pw, cmd: cmd, stderr: stderr}, nil
+	if err = cmd.Wait(); err != nil {
+		return fmt.Errorf(
+			"error waiting for command: command=%s, stderr=%s, commit=%s: %w",
+			cmd.String(), stderr.String(), diff.commit.String(), err,
+		)
+	}
+
+	return nil
 }
 
 // normalizeConfig updates scanOptions with the resolved base and head commit hashes.

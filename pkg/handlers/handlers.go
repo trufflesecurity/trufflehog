@@ -32,12 +32,13 @@ type fileReader struct {
 }
 
 func newFileReader(ctx logContext.Context, r io.ReadCloser) (fileReader, error) {
+	defer r.Close()
+
 	var custom fileReader
 	rdr, err := readers.NewBufferedFileReader(ctx, r)
 	if err != nil {
 		return custom, fmt.Errorf("error creating random access reader: %w", err)
 	}
-	defer r.Close()
 	custom.BufferedFileReader = rdr
 
 	format, reader, err := archiver.Identify("", rdr)
@@ -149,6 +150,10 @@ func HandleFile(
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
 ) error {
+	if reader == nil {
+		return fmt.Errorf("reader is nil")
+	}
+
 	rdr, err := newFileReader(ctx, reader)
 	if err != nil {
 		return fmt.Errorf("error creating custom reader: %w", err)
