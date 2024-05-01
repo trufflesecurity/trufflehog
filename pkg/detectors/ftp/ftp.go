@@ -30,6 +30,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	keyPat = regexp.MustCompile(`\bftp://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
@@ -96,14 +97,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if detectors.IsKnownFalsePositive(string(s1.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false) {
-			continue
-		}
-
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func (s Scanner) IsFalsePositive(result detectors.Result) bool {
+	return detectors.IsKnownFalsePositive(string(result.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false)
 }
 
 func isErrDeterminate(e error) bool {
