@@ -287,7 +287,7 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 // job reporting.
 func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	// Introspect on the chunks we get from the Chunks method.
-	ch := make(chan *Chunk, 1)
+	ch := make(chan *Chunk, runtime.NumCPU())
 	var wg sync.WaitGroup
 	// Consume chunks and export chunks.
 	wg.Add(1)
