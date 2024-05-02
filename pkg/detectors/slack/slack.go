@@ -53,7 +53,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	for _, tokenPat := range tokenPats {
+	for key, tokenPat := range tokenPats {
 		tokens := tokenPat.FindAllString(dataStr, -1)
 
 		for _, token := range tokens {
@@ -63,6 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
+				"token_type":     key,
 			}
 			if verify {
 				client := s.client
@@ -89,6 +90,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					if authResponse.Ok {
 						s1.Verified = true
+						// Store name of user and team in extra data received from slack's api
+						s1.ExtraData["team"] = authResponse.Team
+						s1.ExtraData["name"] = authResponse.User
 						// Slack API returns 200 even if the token is invalid. We need to check the error field.
 					} else if authResponse.Error == "invalid_auth" {
 						// The secret is determinately not verified (nothing to do)
