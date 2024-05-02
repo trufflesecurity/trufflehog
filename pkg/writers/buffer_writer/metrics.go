@@ -8,11 +8,12 @@ import (
 )
 
 var (
-	totalWriteSize = promauto.NewCounter(prometheus.CounterOpts{
+	writeSize = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
-		Name:      "buffer_writer_total_write_size_bytes",
-		Help:      "Total size of data written by the BufferWriter in bytes.",
+		Name:      "buffer_writer_write_size_bytes",
+		Help:      "Size of data written by the BufferWriter in bytes.",
+		Buckets:   prometheus.ExponentialBuckets(100, 10, 7),
 	})
 
 	totalWriteDuration = promauto.NewCounter(prometheus.CounterOpts{

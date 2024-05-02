@@ -73,10 +73,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
-
 		results = append(results, s)
 	}
 
@@ -114,10 +110,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if strings.HasPrefix(password, "$") {
 				continue
 			}
-		}
-
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-			continue
 		}
 
 		results = append(results, s)

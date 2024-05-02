@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/postman"
 )
 
-// ScanGitHub scans Postman with the provided options.
+// ScanPostman scans Postman with the provided options.
 func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error {
 	connection := sourcespb.Postman{
 		Workspaces:          c.Workspaces,

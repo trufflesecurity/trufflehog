@@ -626,6 +626,7 @@ func run(state overseer.State) {
 		"verified_secrets", metrics.VerifiedSecretsFound,
 		"unverified_secrets", metrics.UnverifiedSecretsFound,
 		"scan_duration", metrics.ScanDuration.String(),
+		"trufflehog_version", version.BuildVersion,
 	)
 
 	if *printAvgDetectorTime {
@@ -653,10 +654,10 @@ func parseResults(input *string) (map[string]struct{}, error) {
 	)
 	for _, value := range values {
 		switch value {
-		case "verified", "unknown", "unverified":
+		case "verified", "unknown", "unverified", "filtered_unverified":
 			results[value] = struct{}{}
 		default:
-			return nil, fmt.Errorf("invalid value '%s', valid values are 'verified,unknown,unverified'", value)
+			return nil, fmt.Errorf("invalid value '%s', valid values are 'verified,unknown,unverified,filtered_unverified'", value)
 		}
 	}
 	return results, nil

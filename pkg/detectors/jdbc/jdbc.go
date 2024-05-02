@@ -45,6 +45,7 @@ func WithIgnorePattern(ignoreStrings []string) func(*Scanner) {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	keyPat = regexp.MustCompile(`(?i)jdbc:[\w]{3,10}:[^\s"']{0,512}`)
@@ -98,14 +99,14 @@ matchLoop:
 			// TODO: specialized redaction
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
-
 		results = append(results, s)
 	}
 
 	return
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
+	return false
 }
 
 func tryRedactAnonymousJDBC(conn string) string {

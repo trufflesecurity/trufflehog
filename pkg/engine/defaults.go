@@ -139,6 +139,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudelements"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflarecakey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareglobalapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudimage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudmersive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudplan"
@@ -469,6 +470,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onelogin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepagecrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onesignal"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onfleet"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onwaterio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
@@ -824,7 +826,7 @@ func DefaultDetectors() []detectors.Detector {
 		&clarifai.Scanner{},
 		&cloudflareapitoken.Scanner{},
 		&cloudflarecakey.Scanner{},
-		// &cloudflareglobalapikey.Scanner{},
+		&cloudflareglobalapikey.Scanner{},
 		&terraformcloudpersonaltoken.Scanner{},
 		&asanapersonalaccesstoken.Scanner{},
 		&trelloapikey.Scanner{},
@@ -1601,6 +1603,7 @@ func DefaultDetectors() []detectors.Detector {
 		&jupiterone.Scanner{},
 		gcpapplicationdefaultcredentials.Scanner{},
 		wiz.Scanner{},
+		onfleet.Scanner{},
 	}
 }
 

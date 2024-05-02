@@ -2,11 +2,12 @@ package opsgenie
 
 import (
 	"context"
-	"fmt"
-	regexp "github.com/wasilibs/go-re2"
-	"net/http"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -52,43 +53,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 
-		if verify {
-			// Check for false positives
-		    if detectors.IsKnownFalsePositive(match[0], append(detectors.DefaultFalsePositives, "opsgenie.com/alert/detail/"), true) {
-		        continue
-		    }
-		    req, err := http.NewRequestWithContext(ctx, "GET", "https://api.opsgenie.com/v2/alerts", nil)
-		    if err != nil {
+		if strings.Contains(match[0], "opsgenie.com/alert/detail/") {
 			continue
-		    }
-		    req.Header.Add("Authorization", fmt.Sprintf("GenieKey %s", resMatch))
-		    res, err := client.Do(req)
-		    if err != nil {
-			continue
-		    }
-		    defer res.Body.Close()
-
-		    // Check for 200 status code
-		    if res.StatusCode == 200 {
-			var data map[string]interface{}
-			err := json.NewDecoder(res.Body).Decode(&data)
-			if err != nil {
-			    s1.Verified = false
-			    continue
-			}
-
-			// Check if "data" is one of the top-level attributes
-			if _, ok := data["data"]; ok {
-			    s1.Verified = true
-			} else {
-			    s1.Verified = false
-			}
-		    } else {
-			s1.Verified = false
-
-		    }
 		}
 
+		if verify {
+
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.opsgenie.com/v2/alerts", nil)
+			if err != nil {
+				continue
+			}
+			req.Header.Add("Authorization", fmt.Sprintf("GenieKey %s", resMatch))
+			res, err := client.Do(req)
+			if err != nil {
+				continue
+			}
+			defer res.Body.Close()
+
+			// Check for 200 status code
+			if res.StatusCode == 200 {
+				var data map[string]interface{}
+				err := json.NewDecoder(res.Body).Decode(&data)
+				if err != nil {
+					s1.Verified = false
+					continue
+				}
+
+				// Check if "data" is one of the top-level attributes
+				if _, ok := data["data"]; ok {
+					s1.Verified = true
+				} else {
+					s1.Verified = false
+				}
+			} else {
+				s1.Verified = false
+
+			}
+		}
 
 		results = append(results, s1)
 	}

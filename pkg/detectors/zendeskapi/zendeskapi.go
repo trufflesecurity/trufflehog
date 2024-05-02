@@ -59,10 +59,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				resEmail := strings.TrimSpace(email[1])
 
-				if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-					continue
-				}
-
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZendeskApi,
 					Raw:          []byte(resMatch),
