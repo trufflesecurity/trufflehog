@@ -107,7 +107,7 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 		api:          &headlessAPI{},
 		sem:          semaphore.New(runtime.NumCPU()),
 		prioritySem:  semaphore.New(runtime.NumCPU()),
-		outputChunks: make(chan *Chunk),
+		outputChunks: make(chan *Chunk, runtime.NumCPU()),
 		firstErr:     make(chan error, 1),
 	}
 	for _, opt := range opts {
