@@ -163,6 +163,22 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 		}
 		defer f.Close()
 
+		// Archiver v4 is in alpha and using an experimental version of
+		// rardecode. There is a bug somewhere with rar decoder format 29
+		// that can lead to a panic. An issue is open in rardecode repo
+		// https://github.com/nwaples/rardecode/issues/30.
+		defer func() {
+			if r := recover(); r != nil {
+				// Return the panic as an error.
+				if e, ok := r.(error); ok {
+					err = e
+				} else {
+					err = fmt.Errorf("panic occurred: %v", r)
+				}
+				lCtx.Logger().Error(err, "Panic occurred when reading archive")
+			}
+		}()
+
 		rdr, err := newFileReader(lCtx, f)
 		if err != nil {
 			return fmt.Errorf("error creating custom reader: %w", err)
