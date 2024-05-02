@@ -402,11 +402,13 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 }
 
 func (e *Engine) initSourceManager(ctx context.Context) {
+	const defaultOutputBufferSize = 64
+
 	opts := []func(*sources.SourceManager){
 		sources.WithConcurrentSources(int(e.concurrency)),
 		sources.WithConcurrentUnits(int(e.concurrency)),
 		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultChannelBuffer),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
 	}
 	if e.jobReportWriter != nil {
 		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
