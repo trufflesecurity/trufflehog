@@ -70,7 +70,7 @@ func WithThreshold(threshold uint64) Option {
 
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
-func New(_ context.Context, opts ...Option) *BufferedFileWriter {
+func New( opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
@@ -85,7 +85,7 @@ func New(_ context.Context, opts ...Option) *BufferedFileWriter {
 
 // NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
 func NewFromReader(ctx context.Context, r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
-	writer := New(ctx, opts...)
+	writer := New( opts...)
 	n, err := io.Copy(writer, r)
 	if err != nil {
 		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
@@ -186,7 +186,17 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	return n, nil
 }
 
-// ReadFrom reads data from the reader and writes it to the buffer or a file, depending on the size.
+// ReadFrom reads data from the provided reader and writes it to the buffer or file, depending on the size.
+// This method satisfies the io.ReaderFrom interface, allowing it to be used with standard library functions
+// like io.Copy and io.CopyBuffer.
+//
+// By implementing this method, BufferedFileWriter can leverage optimized data transfer mechanisms provided
+// by the standard library. For example, when using io.Copy with a BufferedFileWriter, the copy operation
+// will be delegated to the ReadFrom method, avoiding the potentially non-optimized default approach.
+//
+// This is particularly useful when creating a new BufferedFileWriter from an io.Reader using the NewFromReader
+// function. By leveraging the ReadFrom method, data can be efficiently transferred from the reader to
+// the BufferedFileWriter.
 func (w *BufferedFileWriter) ReadFrom(reader io.Reader) (int64, error) {
 	if w.state != writeOnly {
 		return 0, fmt.Errorf("BufferedFileWriter must be in write-only mode to write")
@@ -239,14 +249,19 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 	return w.file.Close()
 }
 
-// ReadCloser returns an io.ReadCloser to read the written content. It provides a reader
-// based on the current storage medium of the data (in-memory buffer or file).
-// If the total content size exceeds the predefined threshold, it is stored in a temporary file and a file
-// reader is returned. For in-memory data, it returns a custom reader that handles returning
+// ReadCloser returns an io.ReadCloser to read the written content.
+// If the content is stored in a file, it opens the file and returns a file reader.
+// If the content is stored in memory, it returns a custom reader that handles returning the buffer to the pool.
+// The caller should call Close() on the returned io.Reader when done to ensure resources are properly released.
+// This method can only be used when the BufferedFileWriter is in read-only mode.
+func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) { return w.ReadSeekCloser() }
+
+// ReadSeekCloser returns an io.ReadSeekCloser to read the written content.
+// If the content is stored in a file, it opens the file and returns a file reader.
+// If the content is stored in memory, it returns a custom reader that allows seeking and handles returning
 // the buffer to the pool.
-// The caller should call Close() on the returned io.Reader when done to ensure files are cleaned up.
-// It can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
+// This method can only be used when the BufferedFileWriter is in read-only mode.
+func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
 	if w.state != readOnly {
 		return nil, fmt.Errorf("BufferedFileWriter must be in read-only mode to read")
 	}

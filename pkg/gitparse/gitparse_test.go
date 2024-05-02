@@ -78,7 +78,7 @@ func TestLineChecksWithStaged(t *testing.T) {
 			},
 			fails: []testCaseLine{
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte("    Merge pull request #34511 from cescoffier/duplicated-context-doc"),
 				},
 				{
@@ -111,16 +111,16 @@ func TestLineChecksWithStaged(t *testing.T) {
 			},
 			function: isAuthorLine,
 		},
-		"dateLine": {
+		"authorDateLine": {
 			passes: []testCaseLine{
 				{
 					AuthorLine,
-					[]byte("Date:   Tue Jan 18 16:59:18 2022 -0800"),
+					[]byte("AuthorDate:   Tue Jan 18 16:59:18 2022 -0800"),
 				},
 			},
 			fails: []testCaseLine{
 				{
-					DateLine,
+					AuthorDateLine,
 					[]byte(""),
 				},
 				{
@@ -128,12 +128,54 @@ func TestLineChecksWithStaged(t *testing.T) {
 					[]byte("notcorrect"),
 				},
 			},
-			function: isDateLine,
+			function: isAuthorDateLine,
+		},
+		"committerLine": {
+			passes: []testCaseLine{
+				{
+					AuthorDateLine,
+					[]byte("Commit: Zachary Rice <zachary.rice@trufflesec.com>"),
+				},
+				{
+					AuthorDateLine,
+					[]byte("Commit: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					CommitLine,
+					[]byte("Date:   Tue Jun 20 13:55:31 2023 -0500"),
+				},
+				{
+					AuthorLine,
+					[]byte("Author: Bill Rich <bill.rich@trufflesec.com>"),
+				},
+			},
+			function: isCommitterLine,
+		},
+		"committerDateLine": {
+			passes: []testCaseLine{
+				{
+					CommitterLine,
+					[]byte("CommitDate:   Tue Jan 18 16:59:18 2022 -0800"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					CommitterDateLine,
+					[]byte(""),
+				},
+				{
+					CommitterLine,
+					[]byte("notcorrect"),
+				},
+			},
+			function: isCommitterDateLine,
 		},
 		"messageStartLine": {
 			passes: []testCaseLine{
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte(""),
 				},
 			},
@@ -143,7 +185,7 @@ func TestLineChecksWithStaged(t *testing.T) {
 					[]byte("Date:   Tue Jun 20 13:21:19 2023 -0700"),
 				},
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte("notcorrect"),
 				},
 			},
@@ -166,7 +208,7 @@ func TestLineChecksWithStaged(t *testing.T) {
 					[]byte("Date:   Tue Jun 20 13:21:19 2023 -0700"),
 				},
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte("notcorrect"),
 				},
 			},
@@ -191,6 +233,67 @@ func TestLineChecksWithStaged(t *testing.T) {
 			},
 			function: isMessageEndLine,
 		},
+		"notesStartLine": {
+			passes: []testCaseLine{
+				{
+					MessageEndLine,
+					[]byte("Notes:"),
+				},
+				{
+					MessageEndLine,
+					[]byte("Notes (review):"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					MessageStartLine,
+					[]byte(""),
+				},
+				{
+					MessageEndLine,
+					[]byte("notcorrect"),
+				},
+			},
+			function: isNotesStartLine,
+		},
+		"notesLine": {
+			passes: []testCaseLine{
+				{
+					NotesStartLine,
+					[]byte("    Submitted-by: Random J Developer <random@developer.example.org>"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					MessageEndLine,
+					[]byte(""),
+				},
+				{
+					MessageEndLine,
+					[]byte("notcorrect"),
+				},
+			},
+			function: isNotesLine,
+		},
+		"notesEndLine": {
+			passes: []testCaseLine{
+				{
+					NotesLine,
+					[]byte("\n"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					MessageEndLine,
+					[]byte("\n"),
+				},
+				{
+					NotesLine,
+					[]byte("notcorrect"),
+				},
+			},
+			function: isNotesEndLine,
+		},
 		"diffLine": {
 			passes: []testCaseLine{
 				{
@@ -202,6 +305,10 @@ func TestLineChecksWithStaged(t *testing.T) {
 					[]byte("diff --git a/ Lunch and Learn - HCDiag.pdf b/ Lunch and Learn - HCDiag.pdf"),
 				},
 				{
+					NotesEndLine,
+					[]byte("diff --git \"a/one.txt\" \"b/one.txt\""),
+				},
+				{
 					BinaryFileLine,
 					[]byte("diff --git a/pkg/decoders/utf16_test.go b/pkg/decoders/utf16_test.go"),
 				},
@@ -209,15 +316,23 @@ func TestLineChecksWithStaged(t *testing.T) {
 					HunkContentLine,
 					[]byte("diff --git a/pkg/decoders/utf8.go b/pkg/decoders/utf8.go"),
 				},
+				{
+					ModeLine,
+					[]byte("diff --git a/pkg/decoders/utf8.go b/pkg/decoders/utf8.go"),
+				},
 			},
 			fails: []testCaseLine{
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte("    Make trace error message so newlines aren't escaped (#1396)"),
 				},
 				{
 					MessageLine,
 					[]byte("notcorrect"),
+				},
+				{
+					NotesLine,
+					[]byte("diff --git a/pkg/decoders/utf8.go b/pkg/decoders/utf8.go"),
 				},
 			},
 			function: isDiffLine,
@@ -630,6 +745,11 @@ func TestToFileLinePathParse(t *testing.T) {
 func (d1 *Diff) Equal(ctx context.Context, d2 *Diff) bool {
 	// isEqualString handles the error-prone String() method calls and compares the results.
 	isEqualContentString := func(s1, s2 contentWriter) (bool, error) {
+		// If the content is nil, it's likely a binary so there won't be any content to compare.
+		if s1.Len() == 0 && s2.Len() == 0 {
+			return true, nil
+		}
+
 		str1, err := s1.String()
 		if err != nil {
 			return false, err
@@ -692,8 +812,7 @@ func TestCommitParsing(t *testing.T) {
 }
 
 func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
-	ctx := context.Background()
-	b := bufferedfilewriter.New(ctx)
+	b := bufferedfilewriter.New()
 	_, err := b.Write(content) // Using Write method to add content
 	if err != nil {
 		panic(err)
@@ -702,8 +821,7 @@ func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.Buffer
 }
 
 func newBufferWithContent(content []byte) *bufferwriter.BufferWriter {
-	ctx := context.Background()
-	b := bufferwriter.New(ctx)
+	b := bufferwriter.New()
 	_, _ = b.Write(content) // Using Write method to add content
 	return b
 }
@@ -928,30 +1046,33 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 			PathB:     ".travis.yml",
 			LineStart: 1,
 			Commit: &Commit{
-				Hash:    "df393b4125c2aa217211b2429b8963d0cefcee27",
-				Author:  "Stephen <stephen@egroat.com>",
-				Date:    newTime("Wed Dec 06 14:44:41 2017 -0800"),
-				Message: newStringBuilderValue("Add travis testing\n"),
+				Hash:      "df393b4125c2aa217211b2429b8963d0cefcee27",
+				Author:    "Stephen <stephen@egroat.com>",
+				Committer: "Stephen <stephen@egroat.com>",
+				Date:      newTime("Wed Dec 06 14:44:41 2017 -0800"),
+				Message:   newStringBuilderValue("Add travis testing\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("language: python\npython:\n  - \"2.6\"\n  - \"2.7\"\n  - \"3.2\"\n  - \"3.3\"\n  - \"3.4\"\n  - \"3.5\"\n  - \"3.5-dev\" # 3.5 development branch\n  - \"3.6\"\n  - \"3.6-dev\" # 3.6 development branch\n  - \"3.7-dev\" # 3.7 development branch\n  - \"nightly\"\n")),
 			IsBinary:      false,
 		},
 		{
 			Commit: &Commit{
-				Hash:    "3d76a97faad96e0f326afb61c232b9c2a18dca35",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 18:03:54 2023 -0400"),
-				Message: strings.Builder{},
+				Hash:      "3d76a97faad96e0f326afb61c232b9c2a18dca35",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:03:54 2023 -0400"),
+				Message:   strings.Builder{},
 			},
 		},
 		{
 			PathB:     "tzu",
 			LineStart: 11,
 			Commit: &Commit{
-				Hash:    "7bd16429f1f708746dabf970e54b05d2b4734997",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 18:10:49 2023 -0400"),
-				Message: newStringBuilderValue("Change file\n"),
+				Hash:      "7bd16429f1f708746dabf970e54b05d2b4734997",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:10:49 2023 -0400"),
+				Message:   newStringBuilderValue("Change file\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
@@ -979,30 +1100,33 @@ func TestCommitParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 			PathB:     ".travis.yml",
 			LineStart: 1,
 			Commit: &Commit{
-				Hash:    "df393b4125c2aa217211b2429b8963d0cefcee27",
-				Author:  "Stephen <stephen@egroat.com>",
-				Date:    newTime("Wed Dec 06 14:44:41 2017 -0800"),
-				Message: newStringBuilderValue("Add travis testing\n"),
+				Hash:      "df393b4125c2aa217211b2429b8963d0cefcee27",
+				Author:    "Stephen <stephen@egroat.com>",
+				Committer: "Stephen <stephen@egroat.com>",
+				Date:      newTime("Wed Dec 06 14:44:41 2017 -0800"),
+				Message:   newStringBuilderValue("Add travis testing\n"),
 			},
 			contentWriter: newBufferedFileWriterWithContent([]byte("language: python\npython:\n  - \"2.6\"\n  - \"2.7\"\n  - \"3.2\"\n  - \"3.3\"\n  - \"3.4\"\n  - \"3.5\"\n  - \"3.5-dev\" # 3.5 development branch\n  - \"3.6\"\n  - \"3.6-dev\" # 3.6 development branch\n  - \"3.7-dev\" # 3.7 development branch\n  - \"nightly\"\n")),
 			IsBinary:      false,
 		},
 		{
 			Commit: &Commit{
-				Hash:    "3d76a97faad96e0f326afb61c232b9c2a18dca35",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 18:03:54 2023 -0400"),
-				Message: strings.Builder{},
+				Hash:      "3d76a97faad96e0f326afb61c232b9c2a18dca35",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:03:54 2023 -0400"),
+				Message:   strings.Builder{},
 			},
 		},
 		{
 			PathB:     "tzu",
 			LineStart: 11,
 			Commit: &Commit{
-				Hash:    "7bd16429f1f708746dabf970e54b05d2b4734997",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 18:10:49 2023 -0400"),
-				Message: newStringBuilderValue("Change file\n"),
+				Hash:      "7bd16429f1f708746dabf970e54b05d2b4734997",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:10:49 2023 -0400"),
+				Message:   newStringBuilderValue("Change file\n"),
 			},
 			contentWriter: newBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
@@ -1031,7 +1155,9 @@ func TestCommitParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 
 const recoverableCommits = `commit df393b4125c2aa217211b2429b8963d0cefcee27
 Author: Stephen <stephen@egroat.com>
-Date:   Wed Dec 06 14:44:41 2017 -0800
+AuthorDate:   Wed Dec 06 14:44:41 2017 -0800
+Commit: Stephen <stephen@egroat.com>
+CommitDate:   Wed Dec 06 14:44:41 2017 -0800
 
     Add travis testing
 
@@ -1071,7 +1197,9 @@ index 00000000..e69de29b
 
 commit 3d76a97faad96e0f326afb61c232b9c2a18dca35 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:03:54 2023 -0400
+AuthorDate:   Tue Jul 11 18:03:54 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:03:54 2023 -0400
 
 diff --git a/sample.txt b/sample.txt
 new file mode 100644
@@ -1083,7 +1211,9 @@ index 0000000..af5626b
 
 commit 7bd16429f1f708746dabf970e54b05d2b4734997 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:10:49 2023 -0400
+AuthorDate:   Tue Jul 11 18:10:49 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:10:49 2023 -0400
 
     Change file
 
@@ -1357,7 +1487,9 @@ func TestMaxCommitSize(t *testing.T) {
 
 const commitLog = `commit e50b135fd29e91b2fbb25923797f5ecffe59f359
 Author: lionzxy <nikita@kulikof.ru>
-Date:   Wed Mar 1 18:20:04 2017 +0300
+AuthorDate:   Wed Mar 1 18:20:04 2017 +0300
+Commit: lionzxy <nikita@kulikof.ru>
+CommitDate:   Wed Mar 1 18:20:04 2017 +0300
 
     Все работает, но он не принимает :(
 
@@ -1379,9 +1511,14 @@ index 85bfb17..89b08b5 100644
 
 commit fd6e99e7a80199b76a694603be57c5ade1de18e7
 Author: Jaliborc <jaliborc@gmail.com>
-Date:   Mon Apr 25 16:28:06 2011 +0100
+AuthorDate:   Mon Apr 25 16:28:06 2011 +0100
+Commit: Jaliborc <jaliborc@gmail.com>
+CommitDate:   Mon Apr 25 16:28:06 2011 +0100
 
     Added Unusable coloring
+
+Notes:
+    Message-Id: <1264640755-22447-1-git-send-email-user@example.de>
 
 diff --git a/components/item.lua b/components/item.lua
 index fc74534..f8d7d50 100755
@@ -1417,17 +1554,23 @@ new file mode 160000
 
 commit 4727ffb7ad6dc5130bf4b4dd166e00705abdd018 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 22:26:11 2023 -0400
+AuthorDate:   Tue Jul 11 22:26:11 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 22:26:11 2023 -0400
 
 commit c904e0f5cd9f30ae520c66bd5f70806219fe7ca2 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 10:17:11 2023 -0400
+AuthorDate:   Mon Jul 10 10:17:11 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 10:17:11 2023 -0400
 
     Empty Commit
 
 commit 3d76a97faad96e0f326afb61c232b9c2a18dca35 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:03:54 2023 -0400
+AuthorDate:   Tue Jul 11 18:03:54 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:03:54 2023 -0400
 
 diff --git a/sample.txt b/sample.txt
 new file mode 100644
@@ -1439,7 +1582,9 @@ index 0000000..af5626b
 
 commit df393b4125c2aa217211b2429b8963d0cefcee27
 Author: Stephen <stephen@egroat.com>
-Date:   Wed Dec 06 14:44:41 2017 -0800
+AuthorDate:   Wed Dec 06 14:44:41 2017 -0800
+Commit: Stephen <stephen@egroat.com>
+CommitDate:   Wed Dec 06 14:44:41 2017 -0800
 
     Add travis testing
 
@@ -1479,7 +1624,9 @@ index 00000000..e69de29b
 
 commit 4218c39d99b5f30153f62471c1be1c1596f0a4d4
 Author: Dustin Decker <dustin@trufflesec.com>
-Date:   Thu Jan 13 12:02:24 2022 -0800
+AuthorDate:   Thu Jan 13 12:02:24 2022 -0800
+Commit: Dustin Decker <dustin@trufflesec.com>
+CommitDate:   Thu Jan 13 12:02:24 2022 -0800
 
     Initial CLI w/ partially implemented Git source and demo detector (#1)
 
@@ -1535,7 +1682,9 @@ index 00000000..7fb2f73c
 
 commit 934cf5d255fd8e28b33f5a6ba64276caf0b284bf (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:43:22 2023 -0400
+AuthorDate:   Tue Jul 11 18:43:22 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:43:22 2023 -0400
 
     Test toFile/plusLine parsing
 
@@ -1551,7 +1700,9 @@ index 0000000..451be67
 
 commit 2a5d703b02b52d65c65ee9f7928f158b919ab741
 Author: Sergey Beryozkin <sberyozkin@gmail.com>
-Date:   Fri Jul 7 17:44:26 2023 +0100
+AuthorDate:   Fri Jul 7 17:44:26 2023 +0100
+Commit: Sergey Beryozkin <sberyozkin@gmail.com>
+CommitDate:   Fri Jul 7 17:44:26 2023 +0100
 
     Do not refresh OIDC session if the user is requesting logout
 
@@ -1659,7 +1810,9 @@ index 51e1b9a932d..472c2743bc4 100644
 
 commit 2a057632d7f5fa3d1c77b9aa037263211c0e0290
 Author: rjtmahinay <rjt.mahinay@gmail.com>
-Date:   Mon Jul 10 01:22:32 2023 +0800
+AuthorDate:   Mon Jul 10 01:22:32 2023 +0800
+Commit: rjtmahinay <rjt.mahinay@gmail.com>
+CommitDate:   Mon Jul 10 01:22:32 2023 +0800
 
     Add QuarkusApplication javadoc
     
@@ -1677,7 +1830,9 @@ index 350685123d5..87d2220eb98 100644
 
 commit bca2d17491015ea1522f34517223b5a366aea73c (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:12:21 2023 -0400
+AuthorDate:   Tue Jul 11 18:12:21 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:12:21 2023 -0400
 
     Delete binary file
 
@@ -1688,7 +1843,9 @@ Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and /dev/null differ
 
 commit afc6dc5d47f28366638da877ecb6b819c69e659b
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 12:21:33 2023 -0400
+AuthorDate:   Mon Jul 10 12:21:33 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 12:21:33 2023 -0400
 
     Change binary file
 
@@ -1698,7 +1855,9 @@ Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and b/trufflehog_3.42.0_linu
 
 commit 638595917417c5c8a956937b28c5127719023363
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 12:20:35 2023 -0400
+AuthorDate:   Mon Jul 10 12:20:35 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 12:20:35 2023 -0400
 
     Add binary file
 
@@ -1709,7 +1868,9 @@ Binary files /dev/null and b/trufflehog_3.42.0_linux_arm64.tar.gz differ
 
 commit ce0f5d1fe0272f180ccb660196f439c0c2f4ec8e (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:08:52 2023 -0400
+AuthorDate:   Tue Jul 11 18:08:52 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:08:52 2023 -0400
 
     Delete file
 
@@ -1733,7 +1894,9 @@ index 635ef2c..0000000
 
 commit d606a729383371558473b70a6a7b1ca264b0d205
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 14:17:04 2023 -0400
+AuthorDate:   Mon Jul 10 14:17:04 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 14:17:04 2023 -0400
 
     Rename file
 
@@ -1744,7 +1907,9 @@ rename to tzu.txt
 
 commit 7bd16429f1f708746dabf970e54b05d2b4734997 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:10:49 2023 -0400
+AuthorDate:   Tue Jul 11 18:10:49 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:10:49 2023 -0400
 
     Change file
 
@@ -1761,7 +1926,9 @@ index 5af88a8..c729cdb 100644
 
 commit c7062674c17192caa284615ab2fa9778c6602164 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 10:15:18 2023 -0400
+AuthorDate:   Mon Jul 10 10:15:18 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 10:15:18 2023 -0400
 
     Create files
 
@@ -1821,10 +1988,11 @@ func expectedDiffs() []*Diff {
 			PathB:     "C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml",
 			LineStart: 29,
 			Commit: &Commit{
-				Hash:    "e50b135fd29e91b2fbb25923797f5ecffe59f359",
-				Author:  "lionzxy <nikita@kulikof.ru>",
-				Date:    newTime("Wed Mar 1 18:20:04 2017 +0300"),
-				Message: newStringBuilderValue("Все работает, но он не принимает :(\n"),
+				Hash:      "e50b135fd29e91b2fbb25923797f5ecffe59f359",
+				Author:    "lionzxy <nikita@kulikof.ru>",
+				Committer: "lionzxy <nikita@kulikof.ru>",
+				Date:      newTime("Wed Mar 1 18:20:04 2017 +0300"),
+				Message:   newStringBuilderValue("Все работает, но он не принимает :(\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\n\n            <state relative-caret-position=\"72\">\n              <caret line=\"4\" column=\"0\" lean-forward=\"false\" selection-start-line=\"4\" selection-start-column=\"0\" selection-end-line=\"4\" selection-end-column=\"0\" />\n\n\n\n")),
 			IsBinary:      false,
@@ -1833,10 +2001,11 @@ func expectedDiffs() []*Diff {
 			PathB:     "components/item.lua",
 			LineStart: 9,
 			Commit: &Commit{
-				Hash:    "fd6e99e7a80199b76a694603be57c5ade1de18e7",
-				Author:  "Jaliborc <jaliborc@gmail.com>",
-				Date:    newTime("Mon Apr 25 16:28:06 2011 +0100"),
-				Message: newStringBuilderValue("Added Unusable coloring\n"),
+				Hash:      "fd6e99e7a80199b76a694603be57c5ade1de18e7",
+				Author:    "Jaliborc <jaliborc@gmail.com>",
+				Committer: "Jaliborc <jaliborc@gmail.com>",
+				Date:      newTime("Mon Apr 25 16:28:06 2011 +0100"),
+				Message:   newStringBuilderValue("Added Unusable coloring\n\nNotes:\nMessage-Id: <1264640755-22447-1-git-send-email-user@example.de>\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\nlocal Unfit = LibStub('Unfit-1.0')\n\n\n")),
 			IsBinary:      false,
@@ -1846,10 +2015,11 @@ func expectedDiffs() []*Diff {
 			LineStart:     6,
 			contentWriter: newBufferWithContent([]byte("\n\n       <Script file=\"libs\\Unfit-1.0\\Unfit-1.0.lua\"/>\n\n\n\n")),
 			Commit: &Commit{
-				Hash:    "fd6e99e7a80199b76a694603be57c5ade1de18e7",
-				Author:  "Jaliborc <jaliborc@gmail.com>",
-				Date:    newTime("Mon Apr 25 16:28:06 2011 +0100"),
-				Message: newStringBuilderValue("Added Unusable coloring\n"),
+				Hash:      "fd6e99e7a80199b76a694603be57c5ade1de18e7",
+				Author:    "Jaliborc <jaliborc@gmail.com>",
+				Committer: "Jaliborc <jaliborc@gmail.com>",
+				Date:      newTime("Mon Apr 25 16:28:06 2011 +0100"),
+				Message:   newStringBuilderValue("Added Unusable coloring\n\nNotes:\nMessage-Id: <1264640755-22447-1-git-send-email-user@example.de>\n"),
 			},
 			IsBinary: false,
 		},
@@ -1858,27 +2028,30 @@ func expectedDiffs() []*Diff {
 			LineStart:     1,
 			contentWriter: newBufferWithContent([]byte("Subproject commit 0000000000000000000000000000000000000000\n")),
 			Commit: &Commit{
-				Hash:    "fd6e99e7a80199b76a694603be57c5ade1de18e7",
-				Author:  "Jaliborc <jaliborc@gmail.com>",
-				Date:    newTime("Mon Apr 25 16:28:06 2011 +0100"),
-				Message: newStringBuilderValue("Added Unusable coloring\n"),
+				Hash:      "fd6e99e7a80199b76a694603be57c5ade1de18e7",
+				Author:    "Jaliborc <jaliborc@gmail.com>",
+				Committer: "Jaliborc <jaliborc@gmail.com>",
+				Date:      newTime("Mon Apr 25 16:28:06 2011 +0100"),
+				Message:   newStringBuilderValue("Added Unusable coloring\n\nNotes:\nMessage-Id: <1264640755-22447-1-git-send-email-user@example.de>\n"),
 			},
 			IsBinary: false,
 		},
 		{
 			Commit: &Commit{
-				Hash:    "4727ffb7ad6dc5130bf4b4dd166e00705abdd018",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 22:26:11 2023 -0400"),
-				Message: strings.Builder{},
+				Hash:      "4727ffb7ad6dc5130bf4b4dd166e00705abdd018",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 22:26:11 2023 -0400"),
+				Message:   strings.Builder{},
 			},
 		},
 		{
 			Commit: &Commit{
-				Hash:    "c904e0f5cd9f30ae520c66bd5f70806219fe7ca2",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Mon Jul 10 10:17:11 2023 -0400"),
-				Message: newStringBuilderValue("Empty Commit\n"),
+				Hash:      "c904e0f5cd9f30ae520c66bd5f70806219fe7ca2",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 10:17:11 2023 -0400"),
+				Message:   newStringBuilderValue("Empty Commit\n"),
 			},
 		},
 		{
@@ -1886,10 +2059,11 @@ func expectedDiffs() []*Diff {
 			LineStart:     1,
 			contentWriter: newBufferWithContent([]byte("Hello, world!\n")),
 			Commit: &Commit{
-				Hash:    "3d76a97faad96e0f326afb61c232b9c2a18dca35",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 18:03:54 2023 -0400"),
-				Message: strings.Builder{},
+				Hash:      "3d76a97faad96e0f326afb61c232b9c2a18dca35",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:03:54 2023 -0400"),
+				Message:   strings.Builder{},
 			},
 			IsBinary: false,
 		},
@@ -1898,10 +2072,11 @@ func expectedDiffs() []*Diff {
 			LineStart:     1,
 			contentWriter: newBufferWithContent([]byte("\n\n\n**/__pycache__/\n**/*.pyc\n")),
 			Commit: &Commit{
-				Hash:    "df393b4125c2aa217211b2429b8963d0cefcee27",
-				Author:  "Stephen <stephen@egroat.com>",
-				Date:    newTime("Wed Dec 06 14:44:41 2017 -0800"),
-				Message: newStringBuilderValue("Add travis testing\n"),
+				Hash:      "df393b4125c2aa217211b2429b8963d0cefcee27",
+				Author:    "Stephen <stephen@egroat.com>",
+				Committer: "Stephen <stephen@egroat.com>",
+				Date:      newTime("Wed Dec 06 14:44:41 2017 -0800"),
+				Message:   newStringBuilderValue("Add travis testing\n"),
 			},
 			IsBinary: false,
 		},
@@ -1909,10 +2084,11 @@ func expectedDiffs() []*Diff {
 			PathB:     ".travis.yml",
 			LineStart: 1,
 			Commit: &Commit{
-				Hash:    "df393b4125c2aa217211b2429b8963d0cefcee27",
-				Author:  "Stephen <stephen@egroat.com>",
-				Date:    newTime("Wed Dec 06 14:44:41 2017 -0800"),
-				Message: newStringBuilderValue("Add travis testing\n"),
+				Hash:      "df393b4125c2aa217211b2429b8963d0cefcee27",
+				Author:    "Stephen <stephen@egroat.com>",
+				Committer: "Stephen <stephen@egroat.com>",
+				Date:      newTime("Wed Dec 06 14:44:41 2017 -0800"),
+				Message:   newStringBuilderValue("Add travis testing\n"),
 			},
 			contentWriter: newBufferWithContent([]byte(`language: python
 python:
@@ -1934,10 +2110,11 @@ python:
 			PathB:     "Makefile",
 			LineStart: 1,
 			Commit: &Commit{
-				Hash:    "4218c39d99b5f30153f62471c1be1c1596f0a4d4",
-				Author:  "Dustin Decker <dustin@trufflesec.com>",
-				Date:    newTime("Thu Jan 13 12:02:24 2022 -0800"),
-				Message: newStringBuilderValue("Initial CLI w/ partially implemented Git source and demo detector (#1)\n"),
+				Hash:      "4218c39d99b5f30153f62471c1be1c1596f0a4d4",
+				Author:    "Dustin Decker <dustin@trufflesec.com>",
+				Committer: "Dustin Decker <dustin@trufflesec.com>",
+				Date:      newTime("Thu Jan 13 12:02:24 2022 -0800"),
+				Message:   newStringBuilderValue("Initial CLI w/ partially implemented Git source and demo detector (#1)\n"),
 			},
 			contentWriter: newBufferWithContent([]byte(`PROTOS_IMAGE=us-docker.pkg.dev/thog-artifacts/public/go-ci-1.17-1
 
@@ -1978,10 +2155,11 @@ protos:
 			PathB:     "plusLine.txt",
 			LineStart: 1,
 			Commit: &Commit{
-				Hash:    "934cf5d255fd8e28b33f5a6ba64276caf0b284bf",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 18:43:22 2023 -0400"),
-				Message: newStringBuilderValue("Test toFile/plusLine parsing\n"),
+				Hash:      "934cf5d255fd8e28b33f5a6ba64276caf0b284bf",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:43:22 2023 -0400"),
+				Message:   newStringBuilderValue("Test toFile/plusLine parsing\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("-- test\n++ test\n\n")),
 			IsBinary:      false,
@@ -1990,10 +2168,11 @@ protos:
 			PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/BackChannelLogoutTokenCache.java",
 			LineStart: 45,
 			Commit: &Commit{
-				Hash:    "2a5d703b02b52d65c65ee9f7928f158b919ab741",
-				Author:  "Sergey Beryozkin <sberyozkin@gmail.com>",
-				Date:    newTime("Fri Jul 7 17:44:26 2023 +0100"),
-				Message: newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\n    public boolean containsTokenVerification(String token) {\n        return cacheMap.containsKey(token);\n    }\n\n\n\n\n")),
 			IsBinary:      false,
@@ -2002,10 +2181,11 @@ protos:
 			PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
 			LineStart: 1023,
 			Commit: &Commit{
-				Hash:    "2a5d703b02b52d65c65ee9f7928f158b919ab741",
-				Author:  "Sergey Beryozkin <sberyozkin@gmail.com>",
-				Date:    newTime("Fri Jul 7 17:44:26 2023 +0100"),
-				Message: newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\n    private boolean isRpInitiatedLogout(RoutingContext context, TenantConfigContext configContext) {\n\n\n")),
 			IsBinary:      false,
@@ -2014,10 +2194,11 @@ protos:
 			PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
 			LineStart: 1214,
 			Commit: &Commit{
-				Hash:    "2a5d703b02b52d65c65ee9f7928f158b919ab741",
-				Author:  "Sergey Beryozkin <sberyozkin@gmail.com>",
-				Date:    newTime("Fri Jul 7 17:44:26 2023 +0100"),
-				Message: newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\n\n\n    private class LogoutCall implements Function<SecurityIdentity, Uni<?>> {\n        RoutingContext context;\n        TenantConfigContext configContext;\n        String idToken;\n\n        LogoutCall(RoutingContext context, TenantConfigContext configContext, String idToken) {\n            this.context = context;\n            this.configContext = configContext;\n            this.idToken = idToken;\n        }\n\n        @Override\n        public Uni<Void> apply(SecurityIdentity identity) {\n            if (isRpInitiatedLogout(context, configContext)) {\n                LOG.debug(\"Performing an RP initiated logout\");\n                fireEvent(SecurityEvent.Type.OIDC_LOGOUT_RP_INITIATED, identity);\n                return buildLogoutRedirectUriUni(context, configContext, idToken);\n            }\n            if (isBackChannelLogoutPendingAndValid(configContext, identity)\n                    || isFrontChannelLogoutValid(context, configContext,\n                            identity)) {\n                return removeSessionCookie(context, configContext.oidcConfig)\n                        .map(new Function<Void, Void>() {\n                            @Override\n                            public Void apply(Void t) {\n                                throw new LogoutException();\n                            }\n                        });\n\n            }\n            return VOID_UNI;\n        }\n    }\n\n")),
 			IsBinary:      false,
@@ -2026,10 +2207,11 @@ protos:
 			PathB:     "integration-tests/oidc-wiremock/src/main/resources/application.properties",
 			LineStart: 20,
 			Commit: &Commit{
-				Hash:    "2a5d703b02b52d65c65ee9f7928f158b919ab741",
-				Author:  "Sergey Beryozkin <sberyozkin@gmail.com>",
-				Date:    newTime("Fri Jul 7 17:44:26 2023 +0100"),
-				Message: newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\n\nquarkus.oidc.code-flow.token.refresh-expired=true\nquarkus.oidc.code-flow.token.refresh-token-time-skew=5M\n\n\n")),
 			IsBinary:      false,
@@ -2039,10 +2221,11 @@ protos:
 			PathB:     "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
 			LineStart: 6,
 			Commit: &Commit{
-				Hash:    "2a5d703b02b52d65c65ee9f7928f158b919ab741",
-				Author:  "Sergey Beryozkin <sberyozkin@gmail.com>",
-				Date:    newTime("Fri Jul 7 17:44:26 2023 +0100"),
-				Message: newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\n\n\n\n\n")),
 			IsBinary:      false,
@@ -2051,10 +2234,11 @@ protos:
 			PathB:     "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
 			LineStart: 76,
 			Commit: &Commit{
-				Hash:    "2a5d703b02b52d65c65ee9f7928f158b919ab741",
-				Author:  "Sergey Beryozkin <sberyozkin@gmail.com>",
-				Date:    newTime("Fri Jul 7 17:44:26 2023 +0100"),
-				Message: newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\n            // Logout\n\n\n\n")),
 			IsBinary:      false,
@@ -2063,29 +2247,32 @@ protos:
 			PathB:     "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
 			LineStart: 3,
 			Commit: &Commit{
-				Hash:    "2a057632d7f5fa3d1c77b9aa037263211c0e0290",
-				Author:  "rjtmahinay <rjt.mahinay@gmail.com>",
-				Date:    newTime("Mon Jul 10 01:22:32 2023 +0800"),
-				Message: newStringBuilderValue("Add QuarkusApplication javadoc\n\n* Fix #34463\n"),
+				Hash:      "2a057632d7f5fa3d1c77b9aa037263211c0e0290",
+				Author:    "rjtmahinay <rjt.mahinay@gmail.com>",
+				Committer: "rjtmahinay <rjt.mahinay@gmail.com>",
+				Date:      newTime("Mon Jul 10 01:22:32 2023 +0800"),
+				Message:   newStringBuilderValue("Add QuarkusApplication javadoc\n\n* Fix #34463\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
 			IsBinary:      false,
 		},
 		{
 			Commit: &Commit{
-				Hash:    "bca2d17491015ea1522f34517223b5a366aea73c",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 18:12:21 2023 -0400"),
-				Message: newStringBuilderValue("Delete binary file\n"),
+				Hash:      "bca2d17491015ea1522f34517223b5a366aea73c",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:12:21 2023 -0400"),
+				Message:   newStringBuilderValue("Delete binary file\n"),
 			},
 		},
 		{
 			PathB: "trufflehog_3.42.0_linux_arm64.tar.gz",
 			Commit: &Commit{
-				Hash:    "afc6dc5d47f28366638da877ecb6b819c69e659b",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Mon Jul 10 12:21:33 2023 -0400"),
-				Message: newStringBuilderValue("Change binary file\n"),
+				Hash:      "afc6dc5d47f28366638da877ecb6b819c69e659b",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 12:21:33 2023 -0400"),
+				Message:   newStringBuilderValue("Change binary file\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("")),
 			IsBinary:      true,
@@ -2093,38 +2280,42 @@ protos:
 		{
 			PathB: "trufflehog_3.42.0_linux_arm64.tar.gz",
 			Commit: &Commit{
-				Hash:    "638595917417c5c8a956937b28c5127719023363",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Mon Jul 10 12:20:35 2023 -0400"),
-				Message: newStringBuilderValue("Add binary file\n"),
+				Hash:      "638595917417c5c8a956937b28c5127719023363",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 12:20:35 2023 -0400"),
+				Message:   newStringBuilderValue("Add binary file\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("")),
 			IsBinary:      true,
 		},
 		{
 			Commit: &Commit{
-				Hash:    "ce0f5d1fe0272f180ccb660196f439c0c2f4ec8e",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 18:08:52 2023 -0400"),
-				Message: newStringBuilderValue("Delete file\n"),
+				Hash:      "ce0f5d1fe0272f180ccb660196f439c0c2f4ec8e",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:08:52 2023 -0400"),
+				Message:   newStringBuilderValue("Delete file\n"),
 			},
 		},
 		{
 			Commit: &Commit{
-				Hash:    "d606a729383371558473b70a6a7b1ca264b0d205",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Mon Jul 10 14:17:04 2023 -0400"),
-				Message: newStringBuilderValue("Rename file\n"),
+				Hash:      "d606a729383371558473b70a6a7b1ca264b0d205",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 14:17:04 2023 -0400"),
+				Message:   newStringBuilderValue("Rename file\n"),
 			},
 		},
 		{
 			PathB:     "tzu",
 			LineStart: 11,
 			Commit: &Commit{
-				Hash:    "7bd16429f1f708746dabf970e54b05d2b4734997",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Tue Jul 11 18:10:49 2023 -0400"),
-				Message: newStringBuilderValue("Change file\n"),
+				Hash:      "7bd16429f1f708746dabf970e54b05d2b4734997",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:10:49 2023 -0400"),
+				Message:   newStringBuilderValue("Change file\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
@@ -2133,10 +2324,11 @@ protos:
 			PathB:     "lao",
 			LineStart: 1,
 			Commit: &Commit{
-				Hash:    "c7062674c17192caa284615ab2fa9778c6602164",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Mon Jul 10 10:15:18 2023 -0400"),
-				Message: newStringBuilderValue("Create files\n"),
+				Hash:      "c7062674c17192caa284615ab2fa9778c6602164",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 10:15:18 2023 -0400"),
+				Message:   newStringBuilderValue("Create files\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
 			IsBinary:      false,
@@ -2145,10 +2337,11 @@ protos:
 			PathB:     "tzu",
 			LineStart: 1,
 			Commit: &Commit{
-				Hash:    "c7062674c17192caa284615ab2fa9778c6602164",
-				Author:  "John Smith <john.smith@example.com>",
-				Date:    newTime("Mon Jul 10 10:15:18 2023 -0400"),
-				Message: newStringBuilderValue("Create files\n"),
+				Hash:      "c7062674c17192caa284615ab2fa9778c6602164",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 10:15:18 2023 -0400"),
+				Message:   newStringBuilderValue("Create files\n"),
 			},
 			contentWriter: newBufferWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
 			IsBinary:      false,
@@ -2283,7 +2476,9 @@ index 0000000..5af88a8
 
 const singleCommitMultiDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
-Date:   Mon Mar 15 23:27:16 2021 -0700
+AuthorDate:   Mon Mar 15 23:27:16 2021 -0700
+Commit: Dustin Decker <humanatcomputer@gmail.com>
+CommitDate:   Mon Mar 15 23:27:16 2021 -0700
 
     Update aws
 
@@ -2324,7 +2519,9 @@ index 239b415..2ee133b 100644
 
 const singleCommitSingleDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
-Date:   Mon Mar 15 23:27:16 2021 -0700
+AuthorDate:   Mon Mar 15 23:27:16 2021 -0700
+Commit: Dustin Decker <humanatcomputer@gmail.com>
+CommitDate:   Mon Mar 15 23:27:16 2021 -0700
 
     Update aws
 

@@ -75,10 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		// Least expensive-> most expensive filters.
 		// Substrings, then patterns.
 
-		if detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
-			continue
-		}
-
 		// toss any that match regexes
 		if hasReMatch(s.excludeMatchers, token) {
 			continue

@@ -64,6 +64,9 @@ func (b *Buffer) Write(data []byte) (int, error) {
 	return b.Buffer.Write(data)
 }
 
+// Compile time check to make sure readCloser implements io.ReadSeekCloser.
+var _ io.ReadSeekCloser = (*readCloser)(nil)
+
 // readCloser is a custom implementation of io.ReadCloser. It wraps a bytes.Reader
 // for reading data from an in-memory buffer and includes an onClose callback.
 // The onClose callback is used to return the buffer to the pool, ensuring buffer re-usability.
@@ -86,5 +89,18 @@ func (brc *readCloser) Close() error {
 	}
 
 	brc.onClose() // Return the buffer to the pool
+	brc.Reader = nil
 	return nil
+}
+
+// Read reads up to len(p) bytes into p from the underlying reader.
+// It returns the number of bytes read and any error encountered.
+// On reaching the end of the available data, it returns 0 and io.EOF.
+// Calling Read on a closed reader will also return 0 and io.EOF.
+func (brc *readCloser) Read(p []byte) (int, error) {
+	if brc.Reader == nil {
+		return 0, io.EOF
+	}
+
+	return brc.Reader.Read(p)
 }

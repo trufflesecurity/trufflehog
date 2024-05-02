@@ -45,7 +45,7 @@ type BufferWriter struct {
 }
 
 // New creates a new instance of BufferWriter.
-func New(_ context.Context) *BufferWriter {
+func New() *BufferWriter {
 	return &BufferWriter{state: writeOnly, bufPool: bufferPool}
 }
 
@@ -74,6 +74,13 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 		}
 	}
 
+	if b.buf == nil {
+		b.buf = b.bufPool.Get()
+		if b.buf == nil {
+			b.buf = buffer.NewBuffer()
+		}
+	}
+
 	size := len(data)
 	b.size += size
 	start := time.Now()
@@ -89,6 +96,9 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 func (b *BufferWriter) ReadCloser() (io.ReadCloser, error) {
 	if b.state != readOnly {
 		return nil, fmt.Errorf("buffer is in read-only mode")
+	}
+	if b.buf == nil {
+		return nil, fmt.Errorf("writer buffer is nil")
 	}
 
 	return buffer.ReadCloser(b.buf.Bytes(), func() { b.bufPool.Put(b.buf) }), nil

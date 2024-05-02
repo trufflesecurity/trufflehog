@@ -29,6 +29,7 @@ var (
 		Help:      "Total number of times data was written to disk by the BufferedFileWriter.",
 	})
 
+	// The first bucket is greater than the default threshold to avoid a bucket with a zero value.
 	fileSizeHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
