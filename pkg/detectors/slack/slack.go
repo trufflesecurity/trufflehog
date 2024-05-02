@@ -53,7 +53,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	for _, tokenPat := range tokenPats {
+	for key, tokenPat := range tokenPats {
 		tokens := tokenPat.FindAllString(dataStr, -1)
 
 		for _, token := range tokens {
@@ -63,6 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
+				"token_type":     key,
 			}
 			if verify {
 				client := s.client
