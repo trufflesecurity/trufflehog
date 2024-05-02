@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -40,12 +39,10 @@ func TestHandleFile(t *testing.T) {
 }
 
 func BenchmarkHandleFile(b *testing.B) {
-	file, err := os.Open("testdata/test.tgz")
-	assert.Nil(b, err)
-
-	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sourceChan := make(chan *sources.Chunk, 1)
+		file, err := os.Open("testdata/test.tgz")
+		assert.Nil(b, err)
 
 		b.StartTimer()
 		go func() {
@@ -57,9 +54,6 @@ func BenchmarkHandleFile(b *testing.B) {
 		for range sourceChan {
 		}
 		b.StopTimer()
-
-		_, err = file.Seek(0, io.SeekStart)
-		assert.NoError(b, err)
 	}
 }
 
