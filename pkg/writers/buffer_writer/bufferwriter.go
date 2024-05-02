@@ -51,7 +51,7 @@ func New() *BufferWriter {
 
 // NewFromReader creates a new instance of BufferWriter and writes the content from the provided reader to the buffer.
 func NewFromReader(ctx context.Context, r io.Reader) (*BufferWriter, error) {
-	buf := New(ctx)
+	buf := New()
 	n, err := io.Copy(buf, r)
 	if err != nil {
 		return nil, fmt.Errorf("error writing to buffer writer: %w", err)

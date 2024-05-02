@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestBufferedFileWriterNewThreshold(t *testing.T) {
@@ -594,7 +593,7 @@ func TestNewFromReaderThresholdExceeded(t *testing.T) {
 }
 
 func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
-	bufPool := buffer.NewBufferPool()
+	bufPool := pool.NewBufferPool()
 
 	buf := bufPool.Get()
 	writer := &BufferedFileWriter{

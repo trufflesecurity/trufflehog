@@ -31,11 +31,11 @@ type fileReader struct {
 	isArchive bool
 }
 
-func newFileReader(ctx logContext.Context, r io.ReadCloser) (fileReader, error) {
+func newFileReader(r io.ReadCloser) (fileReader, error) {
 	defer r.Close()
 
 	var reader fileReader
-	rdr, err := readers.NewBufferedFileReader(ctx, r)
+	rdr, err := readers.NewBufferedFileReader(r)
 	if err != nil {
 		return reader, fmt.Errorf("error creating random access reader: %w", err)
 	}
@@ -154,7 +154,7 @@ func HandleFile(
 		return fmt.Errorf("reader is nil")
 	}
 
-	rdr, err := newFileReader(ctx, reader)
+	rdr, err := newFileReader(reader)
 	if err != nil {
 		return fmt.Errorf("error creating custom reader: %w", err)
 	}

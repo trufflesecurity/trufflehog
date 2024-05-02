@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestBufferWriterWrite(t *testing.T) {

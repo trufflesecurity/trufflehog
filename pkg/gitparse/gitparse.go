@@ -250,7 +250,7 @@ func (d *DiffChan) Close() { close(d.ch) }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan *Diff, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (*DiffChan, error) {
 	args := []string{
 		"-C", source,
 		"log",

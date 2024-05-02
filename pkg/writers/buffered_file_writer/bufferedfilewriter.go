@@ -13,7 +13,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type bufferedFileWriterMetrics struct{}
@@ -70,7 +69,7 @@ func WithThreshold(threshold uint64) Option {
 
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
-func New( opts ...Option) *BufferedFileWriter {
+func New(opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
@@ -84,18 +83,15 @@ func New( opts ...Option) *BufferedFileWriter {
 }
 
 // NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
-func NewFromReader(ctx context.Context, r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
-	writer := New( opts...)
-	n, err := io.Copy(writer, r)
-	if err != nil {
+func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
+	writer := New(opts...)
+	if _, err := io.Copy(writer, r); err != nil {
 		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
 	}
 
 	if writer.buf == nil {
 		return nil, fmt.Errorf("buffer is empty, no reader created")
 	}
-
-	ctx.Logger().V(3).Info("data written to buffered file writer", "bytes", n)
 
 	return writer, nil
 }

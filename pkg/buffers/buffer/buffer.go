@@ -4,6 +4,7 @@ package buffer
 
 import (
 	"bytes"
+	"io"
 	"time"
 )
 

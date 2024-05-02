@@ -100,7 +100,7 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		}
 		defer compReader.Close()
 
-		rdr, err := newFileReader(ctx, compReader)
+		rdr, err := newFileReader(compReader)
 		if err != nil {
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
@@ -179,7 +179,7 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 			}
 		}()
 
-		rdr, err := newFileReader(lCtx, f)
+		rdr, err := newFileReader(f)
 		if err != nil {
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
