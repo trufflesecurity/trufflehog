@@ -107,7 +107,7 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 		api:          &headlessAPI{},
 		sem:          semaphore.New(runtime.NumCPU()),
 		prioritySem:  semaphore.New(runtime.NumCPU()),
-		outputChunks: make(chan *Chunk, runtime.NumCPU()),
+		outputChunks: make(chan *Chunk, 64),
 		firstErr:     make(chan error, 1),
 	}
 	for _, opt := range opts {
@@ -287,7 +287,7 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 // job reporting.
 func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	// Introspect on the chunks we get from the Chunks method.
-	ch := make(chan *Chunk, runtime.NumCPU())
+	ch := make(chan *Chunk, 64)
 	var wg sync.WaitGroup
 	// Consume chunks and export chunks.
 	wg.Add(1)
