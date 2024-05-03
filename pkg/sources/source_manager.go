@@ -100,6 +100,9 @@ func WithConcurrentUnits(n int) func(*SourceManager) {
 	return func(mgr *SourceManager) { mgr.concurrentUnits = n }
 }
 
+// The default channel size for all the channels that are used to transport chunks.
+const defaultChannelSize = 64
+
 // NewManager creates a new manager with the provided options.
 func NewManager(opts ...func(*SourceManager)) *SourceManager {
 	mgr := SourceManager{
@@ -107,7 +110,7 @@ func NewManager(opts ...func(*SourceManager)) *SourceManager {
 		api:          &headlessAPI{},
 		sem:          semaphore.New(runtime.NumCPU()),
 		prioritySem:  semaphore.New(runtime.NumCPU()),
-		outputChunks: make(chan *Chunk),
+		outputChunks: make(chan *Chunk, defaultChannelSize),
 		firstErr:     make(chan error, 1),
 	}
 	for _, opt := range opts {
@@ -287,7 +290,7 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 // job reporting.
 func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	// Introspect on the chunks we get from the Chunks method.
-	ch := make(chan *Chunk, 1)
+	ch := make(chan *Chunk, defaultChannelSize)
 	var wg sync.WaitGroup
 	// Consume chunks and export chunks.
 	wg.Add(1)
@@ -352,7 +355,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 		unit := unit
 		chunkReporter := &mgrChunkReporter{
 			unit:    unit,
-			chunkCh: make(chan *Chunk, 1),
+			chunkCh: make(chan *Chunk, defaultChannelSize),
 			report:  report,
 		}
 		// Consume units and produce chunks.
