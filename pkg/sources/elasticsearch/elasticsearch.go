@@ -2,7 +2,8 @@ package elasticsearch
 
 import (
 	"fmt"
-	"log"
+	"sync"
+	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/go-errors/errors"
@@ -123,12 +124,16 @@ func (s *Source) Chunks(
 	chunksChan chan *sources.Chunk,
 	targets ...sources.ChunkingTarget,
 ) error {
-	indices, err := fetchIndices(s.ctx, s.client, s.filterParams)
+	indices := Indices{filterParams: &s.filterParams}
+
+	err := indices.Update(s.ctx, s.client)
 	if err != nil {
 		return err
 	}
 
-	unitsOfWork := DistributeDocumentScans(s.concurrency, indices, s.filterParams)
+	unitsOfWork := distributeDocumentScans(s.concurrency, indices)
+	totalDocumentsProcessed := 0
+	lock := sync.RWMutex{}
 
 	workerPool := new(errgroup.Group)
 	workerPool.SetLimit(s.concurrency)
@@ -145,73 +150,78 @@ func (s *Source) Chunks(
 			}
 
 			for _, docSearch := range uow.documentSearches {
-				// We should never set out to process a range of documents if the unit
-				// of work's document count is 0; if that's the case we goofed
-				// accounting somewhere. Log a warning in that case.
-				if uow.documentCount == 0 {
-					log.Println("Accounting error: doc count is 0 but pages remain")
-				}
+				documentsFetched, err := processSearchedDocuments(
+					s.ctx,
+					client,
+					&docSearch,
+					func(document *Document) error {
+						parsedTimestamp, err := time.Parse(time.RFC3339, document.timestamp)
+						if err == nil {
+							if parsedTimestamp.After(docSearch.index.latestTimestamp) {
+								docSearch.index.latestTimestamp = parsedTimestamp
+							}
+						}
 
-				documents, err := fetchIndexDocuments(s.ctx, client, &docSearch)
+						chunk := sources.Chunk{
+							SourceType: s.Type(),
+							SourceName: s.name,
+							SourceID:   s.SourceID(),
+							JobID:      s.JobID(),
+							SourceMetadata: &source_metadatapb.MetaData{
+								Data: &source_metadatapb.MetaData_Elasticsearch{
+									Elasticsearch: &source_metadatapb.Elasticsearch{
+										Index:      sanitizer.UTF8(docSearch.index.name),
+										DocumentId: sanitizer.UTF8(document.id),
+										Timestamp:  sanitizer.UTF8(document.timestamp),
+									},
+								},
+							},
+							Verify: s.verify,
+						}
+
+						chunk.Data = []byte(document.message)
+
+						return common.CancellableWrite(ctx, chunksChan, &chunk)
+					},
+				)
 				if err != nil {
 					return err
 				}
 
-				for _, document := range documents {
-					chunk := sources.Chunk{
-						SourceType: s.Type(),
-						SourceName: s.name,
-						SourceID:   s.SourceID(),
-						JobID:      s.JobID(),
-						SourceMetadata: &source_metadatapb.MetaData{
-							Data: &source_metadatapb.MetaData_Elasticsearch{
-								Elasticsearch: &source_metadatapb.Elasticsearch{
-									Index:      sanitizer.UTF8(docSearch.name),
-									DocumentId: sanitizer.UTF8(document.id),
-									Timestamp:  sanitizer.UTF8(document.timestamp),
-								},
-							},
-						},
-						Verify: s.verify,
-					}
+				// [TODO] Warn if documentsFetched != docSearch.documentCount
 
-					chunk.Data = []byte(document.message)
+				lock.Lock()
+				totalDocumentsProcessed += docSearch.documentCount
+				lock.Unlock()
 
-					if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
-						return err
-					}
-					uow.documentCount--
-					docSearch.offset++
-
-					// When we use the Elastic API in this way, we can't tell it to only
-					// return a specific number of documents. We can only say "return a
-					// page of documents after this offset". So we might reach the limit
-					// of how many documents we're supposed to process with this worker
-					// in the middle of a page, so check for that here.
-					//
-					// (We could use the API in a different way to get a precise number
-					// of documents back, but that use is limited to 10000 documents
-					// which we could well exceed)
-					if uow.documentCount == 0 {
-						s.SetProgressComplete(
-							uow.maxDocumentCount,
-							uow.maxDocumentCount,
-							fmt.Sprintf("Scanned %d total documents", uow.maxDocumentCount),
-							"",
-						)
-						break
-					}
+				// When we use the Elastic API in this way, we can't tell it to only
+				// return a specific number of documents. We can only say "return a
+				// page of documents after this offset". So we might reach the limit
+				// of how many documents we're supposed to process with this worker
+				// in the middle of a page, so check for that here.
+				//
+				// (We could use the API in a different way to get a precise number
+				// of documents back, but that use is limited to 10000 documents
+				// which we could well exceed)
+				if totalDocumentsProcessed >= uow.documentCount {
 					s.SetProgressComplete(
-						uow.maxDocumentCount-uow.documentCount,
 						uow.maxDocumentCount,
-						fmt.Sprintf(
-							"Scanned %d documents from index %s",
-							len(documents),
-							docSearch.name,
-						),
+						uow.maxDocumentCount,
+						fmt.Sprintf("Scanned %d total documents", uow.maxDocumentCount),
 						"",
 					)
+					break
 				}
+				s.SetProgressComplete(
+					totalDocumentsProcessed,
+					uow.maxDocumentCount,
+					fmt.Sprintf(
+						"Finished scanning %d documents from index %s",
+						documentsFetched,
+						docSearch.index.name,
+					),
+					"",
+				)
 			}
 
 			return nil

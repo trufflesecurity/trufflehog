@@ -3,9 +3,10 @@ package elasticsearch
 import "fmt"
 
 type DocumentSearch struct {
-	Index
-	offset       int
-	filterParams FilterParams
+	index         *Index
+	offset        int
+	documentCount int
+	filterParams  *FilterParams
 }
 
 type UnitOfWork struct {
@@ -23,29 +24,26 @@ func NewUnitOfWork(maxDocumentCount int) UnitOfWork {
 
 func (ds *DocumentSearch) String() string {
 	if ds.offset > 0 {
-		return fmt.Sprintf("%s [%d:]", ds.name, ds.offset)
+		return fmt.Sprintf("%s [%d:]", ds.index.name, ds.offset)
 	} else {
-		return ds.name
+		return ds.index.name
 	}
 }
 
 func (uow *UnitOfWork) AddSearch(
-	index Index,
+	index *Index,
 	offset int,
-	filterParams FilterParams,
+	filterParams *FilterParams,
 ) int {
 	indexDocCount := index.documentCount - offset
 	addedDocumentCount := min(uow.maxDocumentCount-uow.documentCount, indexDocCount)
 
 	if addedDocumentCount > 0 {
 		uow.documentSearches = append(uow.documentSearches, DocumentSearch{
-			Index: Index{
-				name:          index.name,
-				primaryShards: index.primaryShards,
-				documentCount: addedDocumentCount,
-			},
-			offset:       offset,
-			filterParams: filterParams,
+			index:         index,
+			offset:        offset,
+			documentCount: addedDocumentCount,
+			filterParams:  filterParams,
 		})
 
 		uow.documentCount += addedDocumentCount
@@ -54,14 +52,13 @@ func (uow *UnitOfWork) AddSearch(
 	return addedDocumentCount
 }
 
-func DistributeDocumentScans(
+func distributeDocumentScans(
 	maxUnits int,
-	indices []Index,
-	filterParams FilterParams,
+	indices Indices,
 ) []UnitOfWork {
 	totalDocumentCount := 0
 
-	for _, i := range indices {
+	for _, i := range indices.indices {
 		totalDocumentCount += i.documentCount
 	}
 
@@ -83,16 +80,16 @@ func DistributeDocumentScans(
 	}
 
 	unitOfWorkIndex := 0
-	for _, i := range indices {
+	for _, i := range indices.indices {
 		uow := &unitsOfWork[unitOfWorkIndex]
-		offset := uow.AddSearch(i, 0, filterParams)
+		offset := uow.AddSearch(&i, 0, indices.filterParams)
 
 		// If we've yet to distribute all the documents in the index, go into the
 		// next unit of work, and the next, and the next....
 		for offset < i.documentCount {
 			unitOfWorkIndex++
 			uow := &unitsOfWork[unitOfWorkIndex]
-			offset += uow.AddSearch(i, offset, filterParams)
+			offset += uow.AddSearch(&i, offset, indices.filterParams)
 		}
 	}
 

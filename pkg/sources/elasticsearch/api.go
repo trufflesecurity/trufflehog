@@ -8,38 +8,24 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+)
+
+type IndexStatus int
+
+const (
+	indexRemoved IndexStatus = iota
+	indexExists
+	indexAdded
 )
 
 type FilterParams struct {
 	indexPattern   string
 	queryJSON      string
 	sinceTimestamp string
-}
-
-func (fp *FilterParams) Query() (map[string]any, error) {
-	query := make(map[string]any)
-
-	if fp.queryJSON != "" {
-		err := json.Unmarshal([]byte(fp.queryJSON), &query)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if fp.sinceTimestamp != "" {
-		gte := make(map[string]string)
-		gte["gte"] = fp.sinceTimestamp
-
-		timestamp := make(map[string]map[string]string)
-		timestamp["timestamp"] = gte
-
-		query["range"] = timestamp
-	}
-
-	return query, nil
 }
 
 type PointInTime struct {
@@ -61,13 +47,50 @@ type Document struct {
 }
 
 type Index struct {
-	name          string
-	primaryShards []int
-	documentCount int
+	name            string
+	primaryShards   []int
+	documentCount   int
+	latestTimestamp time.Time
+}
+
+type Indices struct {
+	indices      []Index
+	filterParams *FilterParams
 }
 
 type elasticSearchRequest interface {
 	Do(providedCtx context.Context, transport esapi.Transport) (*esapi.Response, error)
+}
+
+func (fp *FilterParams) Query(latestTimestamp time.Time) (map[string]any, error) {
+	query := make(map[string]any)
+
+	if fp.queryJSON != "" {
+		err := json.Unmarshal([]byte(fp.queryJSON), &query)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !latestTimestamp.IsZero() {
+		gte := make(map[string]string)
+		gte["gte"] = latestTimestamp.Format(time.RFC3339)
+
+		timestamp := make(map[string]map[string]string)
+		timestamp["timestamp"] = gte
+
+		query["range"] = timestamp
+	} else if fp.sinceTimestamp != "" {
+		gte := make(map[string]string)
+		gte["gte"] = fp.sinceTimestamp
+
+		timestamp := make(map[string]map[string]string)
+		timestamp["timestamp"] = gte
+
+		query["range"] = timestamp
+	}
+
+	return query, nil
 }
 
 func makeElasticSearchRequest(
@@ -214,15 +237,15 @@ func fetchIndexDocumentCount(
 	return int(count), nil
 }
 
-func createPITSearch(
+func createPITForSearch(
 	ctx context.Context,
 	client *es.TypedClient,
 	docSearch *DocumentSearch,
 ) (string, error) {
 	req := esapi.OpenPointInTimeRequest{
-		Index:      []string{docSearch.name},
+		Index:      []string{docSearch.index.name},
 		KeepAlive:  "1m",
-		Preference: getShardListPreference(docSearch.primaryShards),
+		Preference: getShardListPreference(docSearch.index.primaryShards),
 	}
 
 	data, err := makeElasticSearchRequest(ctx, client, req)
@@ -238,30 +261,23 @@ func createPITSearch(
 	return pitID, nil
 }
 
-// Fetches a range of documents from an index
-func fetchIndexDocuments(
+// Processes documents fetched by a search, returns the number of documents
+// fetched.
+func processSearchedDocuments(
 	ctx context.Context,
 	client *es.TypedClient,
 	docSearch *DocumentSearch,
-) ([]Document, error) {
-	/* [TODO]
-
-	It's possible that between counting and fetching documents that the count's
-	changed; in particular a document could have been deleted. That won't cause
-	issues with our bookkeeping here as we'll see we didn't get more hits for a
-	search and bail (this short circuits the loop invariant), but it could
-	result in us scanning a document multiple times. I think this isn't a
-	problem, but need to validate with Truffle.
-	*/
-	pitID, err := createPITSearch(ctx, client, docSearch)
+	sendDocument func(document *Document) error,
+) (int, error) {
+	pitID, err := createPITForSearch(ctx, client, docSearch)
 	if err != nil {
-		return nil, err
+		fmt.Println("-1")
+		return 0, err
 	}
 
-	documents := make([]Document, 0)
-
-	allowPartialSearchResults := false
 	documentsFetched := 0
+
+	fmt.Printf("docs fetched/count: %d/%d\n", documentsFetched, docSearch.documentCount)
 
 	for documentsFetched < docSearch.documentCount {
 		searchReqBody := SearchRequestBody{
@@ -277,125 +293,158 @@ func fetchIndexDocuments(
 			searchReqBody.SearchAfter = []int{searchAfter}
 		}
 
-		query, err := docSearch.filterParams.Query()
+		query, err := docSearch.filterParams.Query(docSearch.index.latestTimestamp)
 		if err != nil {
-			return nil, err
+			fmt.Println("a")
+			return 0, err
 		}
 
 		searchReqBody.Query = query
 
 		body, err := json.MarshalIndent(searchReqBody, "", "  ")
 		if err != nil {
-			return nil, err
+			fmt.Println("b")
+			return 0, err
 		}
 
 		req := esapi.SearchRequest{
-			AllowPartialSearchResults: &allowPartialSearchResults,
-			Body:                      strings.NewReader(string(body)),
-			SourceIncludes:            []string{"@timestamp", "message"},
+			Body:           strings.NewReader(string(body)),
+			SourceIncludes: []string{"@timestamp", "message"},
 		}
 
 		searchResults, err := makeElasticSearchRequest(ctx, client, req)
 		if err != nil {
-			return nil, err
+			fmt.Println("c")
+			return 0, err
 		}
-
-		// [TODO] Check for errors
 
 		topLevelHits, ok := searchResults["hits"].(map[string]any)
 		if !ok {
+			fmt.Println("1")
+			// [TODO] This almost certainly means there were errors in the response we should
+			//		    probably surface somehow
 			continue
 		}
 
 		hits, ok := topLevelHits["hits"].([]any)
 		if !ok {
+			fmt.Println("2")
 			continue
 		}
 
 		if len(hits) == 0 {
+			fmt.Println("No hits")
 			break
 		}
+
+		fmt.Printf("Got %d hits\n", len(hits))
 
 		documentsFetched += len(hits)
 
 		for _, jsonHit := range hits {
 			hit, ok := jsonHit.(map[string]any)
 			if !ok {
+				fmt.Println("3")
 				continue
 			}
 
 			id, ok := hit["_id"].(string)
 			if !ok {
+				fmt.Println("4")
 				continue
 			}
 
 			source, ok := hit["_source"].(map[string]any)
 			if !ok {
+				fmt.Println("5")
 				continue
 			}
 
 			timestamp, ok := source["@timestamp"].(string)
 			if !ok {
+				fmt.Println("6")
 				continue
 			}
 
 			message, ok := source["message"].(string)
 			if !ok {
+				fmt.Println("7")
 				continue
 			}
 
-			documents = append(
-				documents,
-				Document{
-					id:        id,
-					timestamp: timestamp,
-					message:   message,
-				},
-			)
+			document := Document{
+				id:        id,
+				timestamp: timestamp,
+				message:   message,
+			}
+			if err = sendDocument(&document); err != nil {
+				fmt.Println("8")
+				return 0, nil
+			}
 		}
 	}
 
-	return documents, nil
+	fmt.Println("buddy")
+	return documentsFetched, nil
 }
 
-// Returns an array of all of the indices in an Elasticsearch cluster.
-func fetchIndices(
+// Updates a set of indices from an Elasticsearch cluster. If an index has been
+// deleted it will be removed; if it's been added it'll be added; if its
+// document count has changed (based on filterParams and latestTimestamp) it'll
+// be updated.
+func (indices *Indices) Update(
 	ctx context.Context,
 	client *es.TypedClient,
-	filterParams FilterParams,
-) ([]Index, error) {
-	indices := []Index{}
-
-	indexNames, err := fetchIndexNames(ctx, client, filterParams.indexPattern)
+) error {
+	indexNames, err := fetchIndexNames(ctx, client, indices.filterParams.indexPattern)
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	indicesByName := make(map[string]*Index)
+	if indices.indices != nil {
+		for _, index := range indices.indices {
+			indicesByName[index.name] = &index
+		}
+	}
+
+	newIndicesByName := make(map[string]*Index)
+	for _, name := range indexNames {
+		index, found := indicesByName[name]
+		if found {
+			newIndicesByName[name] = index
+		} else {
+			newIndicesByName[name] = &Index{name: name}
+		}
 	}
 
 	indexPrimaryShards, err := fetchIndexPrimaryShards(ctx, client, indexNames)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	for indexName, primaryShards := range indexPrimaryShards {
-		query, err := filterParams.Query()
+	for name, primaryShards := range indexPrimaryShards {
+		// This can't be an index we don't know about because we passed indexNames
+		index := newIndicesByName[name]
+		index.primaryShards = primaryShards
+
+		query, err := indices.filterParams.Query(index.latestTimestamp)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		c, err := fetchIndexDocumentCount(ctx, client, indexName, query)
+		documentCount, err := fetchIndexDocumentCount(ctx, client, name, query)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		indices = append(
-			indices,
-			Index{
-				name:          indexName,
-				primaryShards: primaryShards,
-				documentCount: c,
-			},
-		)
+		index.documentCount = documentCount
 	}
 
-	return indices, nil
+	indices.indices = make([]Index, 0, len(newIndicesByName))
+	for _, index := range newIndicesByName {
+		indices.indices = append(indices.indices, *index)
+	}
+
+	return nil
 }

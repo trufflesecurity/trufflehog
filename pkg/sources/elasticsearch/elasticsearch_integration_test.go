@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"testing"
 	"time"
@@ -64,7 +65,9 @@ func TestSource_ElasticAPI(t *testing.T) {
 	})
 
 	indexName := gofakeit.Word()
+	t.Log(fmt.Sprintf("indexName: %s\n", indexName))
 	indexName2 := gofakeit.Word()
+	t.Log(fmt.Sprintf("indexName2: %s\n", indexName2))
 	now := time.Now()
 
 	payload := make(map[string]string)
@@ -129,42 +132,29 @@ func TestSource_ElasticAPI(t *testing.T) {
 	defer res.Body.Close()
 
 	t.Run(
-		"Unspecified indexPattern fetches no indices",
-		func(t *testing.T) {
-			indices, err := fetchIndices(ctx, es, FilterParams{})
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if len(indices) != 0 {
-				t.Errorf("wanted 0 indices, got %d\n", len(indices))
-			}
-		},
-	)
-
-	t.Run(
 		"Indices have the correct document count",
 		func(t *testing.T) {
-			indices, err := fetchIndices(ctx, es, FilterParams{indexPattern: "*"})
+			indices := Indices{filterParams: &FilterParams{indexPattern: "*"}}
+			err := indices.Update(ctx, es)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if len(indices) != 2 {
-				t.Errorf("wanted 2 indices, got %d\n", len(indices))
+			if len(indices.indices) != 2 {
+				t.Errorf("wanted 2 indices, got %d\n", len(indices.indices))
 			}
 
-			if indices[0].documentCount != 1 {
+			if indices.indices[0].documentCount != 1 {
 				t.Errorf(
 					"wanted documentCount of 1 in 1st index, got %d\n",
-					indices[0].documentCount,
+					indices.indices[0].documentCount,
 				)
 			}
 
-			if indices[1].documentCount != 1 {
+			if indices.indices[1].documentCount != 1 {
 				t.Errorf(
 					"wanted documentCount of 1 in 2nd index, got %d\n",
-					indices[1].documentCount,
+					indices.indices[1].documentCount,
 				)
 			}
 		},
@@ -173,12 +163,13 @@ func TestSource_ElasticAPI(t *testing.T) {
 	t.Run(
 		"A single unit of work has the correct max document count",
 		func(t *testing.T) {
-			indices, err := fetchIndices(ctx, es, FilterParams{indexPattern: "*"})
+			indices := Indices{filterParams: &FilterParams{indexPattern: "*"}}
+			err := indices.Update(ctx, es)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			unitsOfWork := DistributeDocumentScans(1, indices, FilterParams{indexPattern: "*"})
+			unitsOfWork := distributeDocumentScans(1, indices)
 
 			if len(unitsOfWork) != 1 {
 				t.Fatalf("wanted 1 unit of work, got %d\n", len(unitsOfWork))
@@ -210,12 +201,13 @@ func TestSource_ElasticAPI(t *testing.T) {
 	t.Run(
 		"Multiple units of work have the correct max document count",
 		func(t *testing.T) {
-			indices, err := fetchIndices(ctx, es, FilterParams{indexPattern: "*"})
+			indices := Indices{filterParams: &FilterParams{indexPattern: "*"}}
+			err := indices.Update(ctx, es)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			unitsOfWork := DistributeDocumentScans(2, indices, FilterParams{indexPattern: "*"})
+			unitsOfWork := distributeDocumentScans(2, indices)
 
 			if len(unitsOfWork) != 2 {
 				t.Fatalf("wanted 2 units of work, got %d\n", len(unitsOfWork))
@@ -297,18 +289,33 @@ func TestSource_ElasticAPI(t *testing.T) {
 		"Stored document matches passed values",
 		func(t *testing.T) {
 			docSearch := DocumentSearch{
-				Index: Index{
+				index: &Index{
 					name:          indexName,
 					primaryShards: []int{0},
 					documentCount: 1,
 				},
-				offset:       0,
-				filterParams: FilterParams{},
+				documentCount: 1,
+				offset:        0,
+				filterParams:  &FilterParams{},
 			}
 
-			docs, err := fetchIndexDocuments(ctx, es, &docSearch)
+			docs := []Document{}
+
+			docsProcessed, err := processSearchedDocuments(
+				ctx,
+				es,
+				&docSearch,
+				func(document *Document) error {
+					docs = append(docs, *document)
+					return nil
+				},
+			)
 			if err != nil {
 				t.Error(err)
+			}
+
+			if docsProcessed != 1 {
+				t.Fatalf("wanted 1 document processed, got %d\n", docsProcessed)
 			}
 
 			if len(docs) != 1 {
