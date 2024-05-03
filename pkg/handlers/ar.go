@@ -37,6 +37,18 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan [
 			h.metrics.incFilesProcessed()
 		}()
 
+		defer func() {
+			if r := recover(); r != nil {
+				// Return the panic as an error.
+				if e, ok := r.(error); ok {
+					err = e
+				} else {
+					err = fmt.Errorf("panic occurred: %v", r)
+				}
+				ctx.Logger().Error(err, "Panic occurred when reading ar archive")
+			}
+		}()
+
 		var arReader *deb.Ar
 		arReader, err = deb.LoadAr(input)
 		if err != nil {

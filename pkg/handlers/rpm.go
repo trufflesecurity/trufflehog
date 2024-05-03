@@ -38,6 +38,18 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 			h.metrics.incFilesProcessed()
 		}()
 
+		defer func() {
+			if r := recover(); r != nil {
+				// Return the panic as an error.
+				if e, ok := r.(error); ok {
+					err = e
+				} else {
+					err = fmt.Errorf("panic occurred: %v", r)
+				}
+				ctx.Logger().Error(err, "Panic occurred when reading rpm archive")
+			}
+		}()
+
 		var rpm *rpmutils.Rpm
 		rpm, err = rpmutils.ReadRpm(input)
 		if err != nil {
@@ -51,10 +63,10 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 			ctx.Logger().Error(err, "error getting RPM payload reader")
 			return
 		}
-		if reader.IsLink() {
-			ctx.Logger().V(2).Info("RPM payload is a symbolic link, skipping processing")
-			return
-		}
+		// if reader.IsLink() {
+		// 	ctx.Logger().V(2).Info("RPM payload is a symbolic link, skipping processing")
+		// 	return
+		// }
 
 		if err = h.processRPMFiles(ctx, reader, archiveChan); err != nil {
 			ctx.Logger().Error(err, "error processing RPM files")
