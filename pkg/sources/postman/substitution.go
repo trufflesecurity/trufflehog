@@ -70,8 +70,13 @@ func (s *Source) buildSubstitution(data string, metadata Metadata, combos *map[s
 			if slice.Metadata.CollectionInfo.PostmanID != "" && slice.Metadata.CollectionInfo.PostmanID != metadata.CollectionInfo.PostmanID {
 				continue
 			}
-			// to ensure we don't infinitely recurse, we will trim all `{{}}` from the values before replacement
-			d := strings.ReplaceAll(data, match, strings.Trim(slice.value, "{}"))
+
+			// to ensure we don't infinitely recurse, we will trim all `{{}}` from the values before replacement.
+			// this is to prevent the case where a variable is replaced with a value that contains the same variable causing
+			// an infinite loop
+			removedBrackets := strings.ReplaceAll(strings.ReplaceAll(slice.value, "{{", ""), "}}", "")
+
+			d := strings.ReplaceAll(data, match, removedBrackets)
 			s.buildSubstitution(d, metadata, combos)
 		}
 	}
