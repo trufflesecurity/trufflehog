@@ -8,10 +8,10 @@ import (
 
 func TestSource_distributeDocumentScans(t *testing.T) {
 	indices := Indices{
-		indices: []Index{
-			Index{name: "index", primaryShards: []int{}, documentCount: 20},
-			Index{name: "index2", primaryShards: []int{}, documentCount: 9},
-			Index{name: "index3", primaryShards: []int{}, documentCount: 0},
+		indices: []*Index{
+			&Index{name: "index", primaryShards: []int{}, documentCount: 20},
+			&Index{name: "index2", primaryShards: []int{}, documentCount: 9},
+			&Index{name: "index3", primaryShards: []int{}, documentCount: 0},
 		},
 		filterParams: &FilterParams{},
 	}
@@ -20,7 +20,7 @@ func TestSource_distributeDocumentScans(t *testing.T) {
 	// Search{"index", 0, 15, ""}
 	// Search{"index", 5, 20, ""}
 	// Search{"index2", 0, 9, ""}
-	uows := distributeDocumentScans(2, indices)
+	uows := distributeDocumentScans(2, &indices)
 
 	assert.Equal(t, 2, len(uows))
 

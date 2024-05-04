@@ -329,6 +329,7 @@ type ElasticsearchConfig struct {
 	IndexPattern   string
 	QueryJSON      string
 	SinceTimestamp string
+	BestEffortScan bool
 }
 
 // Progress is used to update job completion progress across sources.

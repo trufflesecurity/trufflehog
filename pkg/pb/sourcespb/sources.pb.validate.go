@@ -5814,6 +5814,8 @@ func (m *Elasticsearch) validate(all bool) error {
 
 	// no validation rules for SinceTimestamp
 
+	// no validation rules for BestEffortScan
+
 	if len(errors) > 0 {
 		return ElasticsearchMultiError(errors)
 	}

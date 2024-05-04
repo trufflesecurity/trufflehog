@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"log"
 	"runtime"
 
 	"google.golang.org/protobuf/proto"
@@ -15,9 +16,18 @@ import (
 // ScanElasticsearch scans a Elasticsearch installation.
 func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchConfig) error {
 	connection := &sourcespb.Elasticsearch{
-		CloudId: c.CloudID,
-		ApiKey:  c.APIKey,
+		Username:       c.Username,
+		Password:       c.Password,
+		CloudId:        c.CloudID,
+		ApiKey:         c.APIKey,
+		ServiceToken:   c.ServiceToken,
+		IndexPattern:   c.IndexPattern,
+		QueryJson:      c.QueryJSON,
+		SinceTimestamp: c.SinceTimestamp,
+		BestEffortScan: c.BestEffortScan,
 	}
+
+	log.Printf("Best effort scan: %v\n", c.BestEffortScan)
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {

@@ -178,6 +178,7 @@ var (
 	elasticsearchIndexPattern   = elasticsearchScan.Flag("index-pattern", "Filters the indices to search").Default("*").Envar("ELASTICSEARCH_INDEX_PATTERN").String()
 	elasticsearchQueryJSON      = elasticsearchScan.Flag("query-json", "Filters the documents to search").Envar("ELASTICSEARCH_QUERY_JSON").String()
 	elasticsearchSinceTimestamp = elasticsearchScan.Flag("since-timestamp", "Filters the documents to search to those created since this timestamp; overrides any timestamp from --query-json").Envar("ELASTICSEARCH_SINCE_TIMESTAMP").String()
+	elasticsearchBestEffortScan = elasticsearchScan.Flag("best-effort-scan", "Attempts to continuously scan a cluster").Envar("ELASTICSEARCH_BEST_EFFORT_SCAN").Bool()
 )
 
 func init() {
@@ -626,6 +627,7 @@ func run(state overseer.State) {
 			IndexPattern:   *elasticsearchIndexPattern,
 			QueryJSON:      *elasticsearchQueryJSON,
 			SinceTimestamp: *elasticsearchSinceTimestamp,
+			BestEffortScan: *elasticsearchBestEffortScan,
 		}
 		if err := e.ScanElasticsearch(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Elasticsearch.")

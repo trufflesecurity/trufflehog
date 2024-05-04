@@ -419,4 +419,5 @@ message Elasticsearch {
   string index_pattern = 7;
   string query_json = 8;
   string since_timestamp = 9;
+  bool best_effort_scan = 10;
 }

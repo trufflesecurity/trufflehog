@@ -8,6 +8,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
@@ -47,15 +48,20 @@ type Document struct {
 }
 
 type Index struct {
-	name            string
-	primaryShards   []int
-	documentCount   int
-	latestTimestamp time.Time
+	name             string
+	primaryShards    []int
+	documentCount    int
+	latestTimestamp  time.Time
+	latestDocumentID int
+	lock             sync.RWMutex
 }
 
 type Indices struct {
-	indices      []Index
-	filterParams *FilterParams
+	indices                 []*Index
+	documentCount           int
+	processedDocumentsCount int
+	filterParams            *FilterParams
+	lock                    sync.RWMutex
 }
 
 type elasticSearchRequest interface {
@@ -63,10 +69,10 @@ type elasticSearchRequest interface {
 }
 
 func (fp *FilterParams) Query(latestTimestamp time.Time) (map[string]any, error) {
-	query := make(map[string]any)
+	range_ := make(map[string]any)
 
 	if fp.queryJSON != "" {
-		err := json.Unmarshal([]byte(fp.queryJSON), &query)
+		err := json.Unmarshal([]byte(fp.queryJSON), &range_)
 		if err != nil {
 			return nil, err
 		}
@@ -77,20 +83,39 @@ func (fp *FilterParams) Query(latestTimestamp time.Time) (map[string]any, error)
 		gte["gte"] = latestTimestamp.Format(time.RFC3339)
 
 		timestamp := make(map[string]map[string]string)
-		timestamp["timestamp"] = gte
+		timestamp["@timestamp"] = gte
 
-		query["range"] = timestamp
+		range_["range"] = timestamp
 	} else if fp.sinceTimestamp != "" {
 		gte := make(map[string]string)
 		gte["gte"] = fp.sinceTimestamp
 
 		timestamp := make(map[string]map[string]string)
-		timestamp["timestamp"] = gte
+		timestamp["@timestamp"] = gte
 
-		query["range"] = timestamp
+		range_["range"] = timestamp
 	}
 
+	query := make(map[string]any)
+	query["query"] = range_
+
 	return query, nil
+}
+
+func NewIndex() *Index {
+	return &Index{latestDocumentID: -1}
+}
+
+func (i *Index) DocumentIDAlreadySeen(docID int) bool {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	if docID > i.latestDocumentID {
+		i.latestDocumentID = docID
+		return false
+	}
+
+	return true
 }
 
 func makeElasticSearchRequest(
@@ -206,16 +231,19 @@ func fetchIndexDocumentCount(
 	indexName string,
 	query map[string]any,
 ) (int, error) {
-	body, err := json.Marshal(query)
-	if err != nil {
-		return 0, err
+	size := 0
+
+	req := esapi.SearchRequest{
+		Index:      []string{indexName},
+		SearchType: "query_then_fetch",
+		Size:       &size,
 	}
 
-	req := esapi.CountRequest{
-		Index: []string{indexName},
-	}
-
-	if len(body) > 0 {
+	if len(query["query"].(map[string]any)) > 0 {
+		body, err := json.MarshalIndent(query, "", "  ")
+		if err != nil {
+			return 0, err
+		}
 		req.Body = strings.NewReader(string(body))
 	}
 
@@ -224,14 +252,19 @@ func fetchIndexDocumentCount(
 		return 0, err
 	}
 
-	rawCount, found := data["count"]
-	if !found {
-		return 0, errors.New("No count in response")
+	hits, ok := data["hits"].(map[string]any)
+	if !ok {
+		return 0, errors.New("No hits in response")
 	}
 
-	count, ok := rawCount.(float64)
+	total, ok := hits["total"].(map[string]any)
 	if !ok {
-		return 0, fmt.Errorf("Failed to coerce '%s' to float64", rawCount)
+		return 0, errors.New("No total in hits")
+	}
+
+	count, ok := total["value"].(float64)
+	if !ok {
+		return 0, errors.New("No value in total")
 	}
 
 	return int(count), nil
@@ -255,7 +288,7 @@ func createPITForSearch(
 
 	pitID, found := data["id"].(string)
 	if !found {
-		return "", errors.New("No count in response")
+		return "", errors.New("No id in response")
 	}
 
 	return pitID, nil
@@ -271,13 +304,10 @@ func processSearchedDocuments(
 ) (int, error) {
 	pitID, err := createPITForSearch(ctx, client, docSearch)
 	if err != nil {
-		fmt.Println("-1")
 		return 0, err
 	}
 
 	documentsFetched := 0
-
-	fmt.Printf("docs fetched/count: %d/%d\n", documentsFetched, docSearch.documentCount)
 
 	for documentsFetched < docSearch.documentCount {
 		searchReqBody := SearchRequestBody{
@@ -295,15 +325,13 @@ func processSearchedDocuments(
 
 		query, err := docSearch.filterParams.Query(docSearch.index.latestTimestamp)
 		if err != nil {
-			fmt.Println("a")
 			return 0, err
 		}
 
-		searchReqBody.Query = query
+		searchReqBody.Query = query["query"].(map[string]any)
 
 		body, err := json.MarshalIndent(searchReqBody, "", "  ")
 		if err != nil {
-			fmt.Println("b")
 			return 0, err
 		}
 
@@ -314,61 +342,68 @@ func processSearchedDocuments(
 
 		searchResults, err := makeElasticSearchRequest(ctx, client, req)
 		if err != nil {
-			fmt.Println("c")
 			return 0, err
 		}
 
 		topLevelHits, ok := searchResults["hits"].(map[string]any)
 		if !ok {
-			fmt.Println("1")
-			// [TODO] This almost certainly means there were errors in the response we should
-			//		    probably surface somehow
+			apiErr, ok := searchResults["error"].(map[string]any)
+			if ok {
+				return 0, fmt.Errorf("Error fetching search results: %v\n", apiErr)
+			}
 			continue
 		}
 
 		hits, ok := topLevelHits["hits"].([]any)
 		if !ok {
-			fmt.Println("2")
 			continue
 		}
 
 		if len(hits) == 0 {
-			fmt.Println("No hits")
 			break
 		}
-
-		fmt.Printf("Got %d hits\n", len(hits))
 
 		documentsFetched += len(hits)
 
 		for _, jsonHit := range hits {
 			hit, ok := jsonHit.(map[string]any)
+
 			if !ok {
-				fmt.Println("3")
 				continue
+			}
+
+			sort, ok := hit["sort"].([]any)
+			if ok {
+				docID := -1
+
+				if len(sort) == 1 {
+					docID = int(sort[0].(float64))
+				} else {
+					docID = int(sort[1].(float64))
+				}
+
+				if docSearch.index.DocumentIDAlreadySeen(docID) {
+					continue
+				}
 			}
 
 			id, ok := hit["_id"].(string)
 			if !ok {
-				fmt.Println("4")
 				continue
 			}
 
 			source, ok := hit["_source"].(map[string]any)
 			if !ok {
-				fmt.Println("5")
 				continue
 			}
 
 			timestamp, ok := source["@timestamp"].(string)
 			if !ok {
-				fmt.Println("6")
 				continue
 			}
 
 			message, ok := source["message"].(string)
 			if !ok {
-				fmt.Println("7")
 				continue
 			}
 
@@ -378,14 +413,28 @@ func processSearchedDocuments(
 				message:   message,
 			}
 			if err = sendDocument(&document); err != nil {
-				fmt.Println("8")
 				return 0, nil
 			}
 		}
 	}
 
-	fmt.Println("buddy")
 	return documentsFetched, nil
+}
+
+// Returns the number of documents processed within these indices
+func (indices *Indices) GetProcessedDocumentCount() int {
+	indices.lock.RLock()
+	defer indices.lock.RUnlock()
+
+	return indices.processedDocumentsCount
+}
+
+// Adds documents processed to the count, used for progress
+func (indices *Indices) UpdateProcessedDocumentCount(additionalDocumentsProcessed int) {
+	indices.lock.Lock()
+	defer indices.lock.Unlock()
+
+	indices.processedDocumentsCount += additionalDocumentsProcessed
 }
 
 // Updates a set of indices from an Elasticsearch cluster. If an index has been
@@ -404,7 +453,7 @@ func (indices *Indices) Update(
 	indicesByName := make(map[string]*Index)
 	if indices.indices != nil {
 		for _, index := range indices.indices {
-			indicesByName[index.name] = &index
+			indicesByName[index.name] = index
 		}
 	}
 
@@ -414,7 +463,9 @@ func (indices *Indices) Update(
 		if found {
 			newIndicesByName[name] = index
 		} else {
-			newIndicesByName[name] = &Index{name: name}
+			index = NewIndex()
+			index.name = name
+			newIndicesByName[name] = index
 		}
 	}
 
@@ -441,9 +492,13 @@ func (indices *Indices) Update(
 		index.documentCount = documentCount
 	}
 
-	indices.indices = make([]Index, 0, len(newIndicesByName))
+	indices.indices = make([]*Index, 0, len(newIndicesByName))
+	indices.documentCount = 0
+	indices.processedDocumentsCount = 0
+
 	for _, index := range newIndicesByName {
-		indices.indices = append(indices.indices, *index)
+		indices.indices = append(indices.indices, index)
+		indices.documentCount += index.documentCount
 	}
 
 	return nil

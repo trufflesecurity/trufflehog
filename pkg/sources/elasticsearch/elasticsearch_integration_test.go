@@ -169,7 +169,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			unitsOfWork := distributeDocumentScans(1, indices)
+			unitsOfWork := distributeDocumentScans(1, &indices)
 
 			if len(unitsOfWork) != 1 {
 				t.Fatalf("wanted 1 unit of work, got %d\n", len(unitsOfWork))
@@ -207,7 +207,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			unitsOfWork := distributeDocumentScans(2, indices)
+			unitsOfWork := distributeDocumentScans(2, &indices)
 
 			if len(unitsOfWork) != 2 {
 				t.Fatalf("wanted 2 units of work, got %d\n", len(unitsOfWork))
@@ -269,11 +269,13 @@ func TestSource_ElasticAPI(t *testing.T) {
 	t.Run(
 		"Adding a document to a new index creates a document count of 1",
 		func(t *testing.T) {
+			query := make(map[string]any)
+			query["query"] = make(map[string]any)
 			indexDocumentCount, err := fetchIndexDocumentCount(
 				ctx,
 				es,
 				indexName,
-				make(map[string]any),
+				query,
 			)
 			if err != nil {
 				t.Error(err)
@@ -290,9 +292,10 @@ func TestSource_ElasticAPI(t *testing.T) {
 		func(t *testing.T) {
 			docSearch := DocumentSearch{
 				index: &Index{
-					name:          indexName,
-					primaryShards: []int{0},
-					documentCount: 1,
+					name:             indexName,
+					primaryShards:    []int{0},
+					documentCount:    1,
+					latestDocumentID: -1,
 				},
 				documentCount: 1,
 				offset:        0,
@@ -320,6 +323,10 @@ func TestSource_ElasticAPI(t *testing.T) {
 
 			if len(docs) != 1 {
 				t.Fatalf("wanted 1 document, got %d\n", len(docs))
+			}
+
+			if docSearch.index.latestDocumentID != 0 {
+				t.Errorf("Wanted latestDocumentID 0, got %d\n", docSearch.index.latestDocumentID)
 			}
 
 			doc := docs[0]
