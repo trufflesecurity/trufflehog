@@ -25,26 +25,19 @@ func (poolMetrics) recordBufferReturn(buf *buffer.Buffer) {
 	buf.RecordMetric()
 }
 
-// Opts is a function that configures a BufferPool.
-type Opts func(pool *Pool)
-
 // Pool of buffers.
 type Pool struct {
 	*sync.Pool
-	bufferSize uint32
+	bufferSize int
 
 	metrics poolMetrics
 }
 
-// const defaultBufferSize = 1 << 12 // 4KB
-const defaultBufferSize = 1 << 16 // 64KB
+const defaultBufferSize = 1 << 12 // 4KB
 // NewBufferPool creates a new instance of BufferPool.
-func NewBufferPool(opts ...Opts) *Pool {
-	pool := &Pool{bufferSize: defaultBufferSize}
+func NewBufferPool(size int) *Pool {
+	pool := &Pool{bufferSize: size}
 
-	for _, opt := range opts {
-		opt(pool)
-	}
 	pool.Pool = &sync.Pool{
 		New: func() any {
 			return &buffer.Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
@@ -73,7 +66,7 @@ func (p *Pool) Put(buf *buffer.Buffer) {
 	// If the Buffer is more than twice the default size, replace it with a new Buffer.
 	// This prevents us from returning very large buffers to the pool.
 	const maxAllowedCapacity = 2 * defaultBufferSize
-	if buf.Cap() > maxAllowedCapacity {
+	if buf.Cap() > int(maxAllowedCapacity) {
 		p.metrics.recordShrink(buf.Cap() - defaultBufferSize)
 		buf = &buffer.Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
 	} else {

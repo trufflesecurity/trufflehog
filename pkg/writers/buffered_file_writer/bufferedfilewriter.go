@@ -27,11 +27,24 @@ func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
 	fileSizeHistogram.Observe(float64(size))
 }
 
-func init() { bufferPool = pool.NewBufferPool() }
+type PoolSize int
 
-// bufferPool is the shared Buffer pool used by all BufferedFileWriters.
-// This allows for efficient reuse of buffers across multiple writers.
-var bufferPool *pool.Pool
+const (
+	Default PoolSize = iota
+	Large
+)
+
+func init() {
+	defaultBufferPool = pool.NewBufferPool(int(Default))
+	largeBufferPool = pool.NewBufferPool(int(Large))
+}
+
+// Different buffer pools for different buffer sizes.
+// This allows for more efficient memory management based on the size of the data being written.
+var (
+	defaultBufferPool *pool.Pool
+	largeBufferPool   *pool.Pool
+)
 
 // state represents the current mode of BufferedFileWriter.
 type state uint8
@@ -67,16 +80,34 @@ func WithThreshold(threshold uint64) Option {
 	return func(w *BufferedFileWriter) { w.threshold = threshold }
 }
 
+// WithBufferSize sets the buffer size for the BufferedFileWriter.
+func WithBufferSize(size PoolSize) Option {
+	return func(w *BufferedFileWriter) {
+		switch size {
+		case Default:
+			w.bufPool = defaultBufferPool
+		case Large:
+			w.bufPool = largeBufferPool
+		default:
+			w.bufPool = defaultBufferPool
+		}
+	}
+}
+
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
 func New(opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
-		bufPool:   bufferPool,
 	}
+
 	for _, opt := range opts {
 		opt(w)
+	}
+
+	if w.bufPool == nil {
+		w.bufPool = defaultBufferPool
 	}
 
 	return w
@@ -84,6 +115,7 @@ func New(opts ...Option) *BufferedFileWriter {
 
 // NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
 func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
+	opts = append(opts, WithBufferSize(Large))
 	writer := New(opts...)
 	if _, err := io.Copy(writer, r); err != nil {
 		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)

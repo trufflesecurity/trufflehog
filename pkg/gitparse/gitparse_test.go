@@ -792,13 +792,14 @@ func TestCommitParsing(t *testing.T) {
 	expected := expectedDiffs()
 
 	r := bytes.NewReader([]byte(commitLog))
-	diffChan := make(chan *Diff)
+	diffChan := newDiffChan(1)
 	parser := NewParser()
 	go func() {
 		parser.FromReader(context.Background(), r, diffChan, false)
 	}()
 	i := 0
-	for diff := range diffChan {
+	for {
+		diff := diffChan.ConsumeDiff()
 		if len(expected) <= i {
 			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
@@ -914,13 +915,14 @@ func TestStagedDiffParsing(t *testing.T) {
 	}
 
 	r := bytes.NewReader([]byte(stagedDiffs))
-	diffChan := make(chan *Diff)
+	diffChan := newDiffChan(1)
 	parser := NewParser()
 	go func() {
 		parser.FromReader(context.Background(), r, diffChan, true)
 	}()
 	i := 0
-	for diff := range diffChan {
+	for {
+		diff := diffChan.ConsumeDiff()
 		if len(expected) <= i {
 			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
@@ -1021,13 +1023,14 @@ func TestStagedDiffParsingBufferedFileWriter(t *testing.T) {
 	}
 
 	r := bytes.NewReader([]byte(stagedDiffs))
-	diffChan := make(chan *Diff)
+	diffChan := newDiffChan(1)
 	parser := NewParser()
 	go func() {
 		parser.FromReader(context.Background(), r, diffChan, true)
 	}()
 	i := 0
-	for diff := range diffChan {
+	for {
+		diff := diffChan.ConsumeDiff()
 		if len(expected) <= i {
 			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
@@ -1080,13 +1083,14 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 	}
 
 	r := bytes.NewReader([]byte(recoverableCommits))
-	diffChan := make(chan *Diff)
+	diffChan := newDiffChan(1)
 	parser := NewParser()
 	go func() {
 		parser.FromReader(context.Background(), r, diffChan, false)
 	}()
 	i := 0
-	for diff := range diffChan {
+	for {
+		diff := diffChan.ConsumeDiff()
 		if !diff.Equal(context.Background(), expected[i]) {
 			t.Errorf("Diff does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], diff)
 		}
@@ -1134,13 +1138,14 @@ func TestCommitParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 	}
 
 	r := bytes.NewReader([]byte(recoverableCommits))
-	diffChan := make(chan *Diff)
+	diffChan := newDiffChan(1)
 	parser := NewParser()
 	go func() {
 		parser.FromReader(context.Background(), r, diffChan, false)
 	}()
 	i := 0
-	for diff := range diffChan {
+	for {
+		diff := diffChan.ConsumeDiff()
 		if len(expected) <= i {
 			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
@@ -1270,13 +1275,14 @@ func TestDiffParseFailureRecovery(t *testing.T) {
 	}
 
 	r := bytes.NewReader([]byte(recoverableDiffs))
-	diffChan := make(chan *Diff)
+	diffChan := newDiffChan(1)
 	parser := NewParser()
 	go func() {
 		parser.FromReader(context.Background(), r, diffChan, true)
 	}()
 	i := 0
-	for diff := range diffChan {
+	for {
+		diff := diffChan.ConsumeDiff()
 		if len(expected) <= i {
 			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
@@ -1330,13 +1336,14 @@ func TestDiffParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 	}
 
 	r := bytes.NewReader([]byte(recoverableDiffs))
-	diffChan := make(chan *Diff)
+	diffChan := newDiffChan(1)
 	parser := NewParser()
 	go func() {
 		parser.FromReader(context.Background(), r, diffChan, true)
 	}()
 	i := 0
-	for diff := range diffChan {
+	for {
+		diff := diffChan.ConsumeDiff()
 		if len(expected) <= i {
 			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
@@ -1447,7 +1454,7 @@ func TestMaxDiffSize(t *testing.T) {
 	}
 	bigReader := strings.NewReader(builder.String())
 
-	diffChan := make(chan *Diff, 1)                                          // Buffer to prevent blocking
+	diffChan := newDiffChan(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second) // Timeout to prevent long wait
 	defer cancel()
 
@@ -1455,13 +1462,11 @@ func TestMaxDiffSize(t *testing.T) {
 		parser.FromReader(ctx, bigReader, diffChan, false)
 	}()
 
-	select {
-	case diff := <-diffChan:
+	for {
+		diff := diffChan.ConsumeDiff()
 		if diff.Len() > parser.maxDiffSize+1024 {
 			t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", diff.Len(), parser.maxDiffSize+1024)
 		}
-	case <-ctx.Done():
-		t.Fatal("Test timed out")
 	}
 }
 
@@ -1469,16 +1474,21 @@ func TestMaxCommitSize(t *testing.T) {
 	parser := NewParser(WithMaxCommitSize(1))
 	commitText := bytes.Buffer{}
 	commitText.WriteString(singleCommitMultiDiff)
-	diffChan := make(chan *Diff)
+	diffChan := newDiffChan(1)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1)*time.Second)
 	defer cancel()
 	go func() {
 		parser.FromReader(ctx, &commitText, diffChan, false)
 	}()
 	diffCount := 0
-	for range diffChan {
+	for {
+		diff := diffChan.ConsumeDiff()
+		if diff == nil {
+			break
+		}
 		diffCount++
 	}
+
 	if diffCount != 2 {
 		t.Errorf("Commit count does not match. Got: %d, expected: %d", diffCount, 2)
 	}

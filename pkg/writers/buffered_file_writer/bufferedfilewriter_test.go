@@ -593,7 +593,7 @@ func TestNewFromReaderThresholdExceeded(t *testing.T) {
 }
 
 func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
-	bufPool := pool.NewBufferPool()
+	bufPool := pool.NewBufferPool(defaultThreshold)
 
 	buf := bufPool.Get()
 	writer := &BufferedFileWriter{
