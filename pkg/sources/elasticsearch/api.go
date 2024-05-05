@@ -340,6 +340,16 @@ func processSearchedDocuments(
 			SourceIncludes: []string{"@timestamp", "message"},
 		}
 
+		// If we're still in the "skip" phase of scanning, don't actually fetch the
+		// documents.
+		percentFetched :=
+			float64(documentsFetched+10) / float64(docSearch.documentCount)
+		if percentFetched <= docSearch.skipPercent {
+			zero := 0
+			req.Size = &zero
+			req.SearchType = "query_then_fetch"
+		}
+
 		searchResults, err := makeElasticSearchRequest(ctx, client, req)
 		if err != nil {
 			return 0, err

@@ -7,6 +7,7 @@ type DocumentSearch struct {
 	offset        int
 	documentCount int
 	filterParams  *FilterParams
+	skipPercent   float64
 }
 
 type UnitOfWork struct {
@@ -32,8 +33,9 @@ func (ds *DocumentSearch) String() string {
 
 func (uow *UnitOfWork) AddSearch(
 	index *Index,
-	offset int,
 	filterParams *FilterParams,
+	offset int,
+	scanCoverageRate float64,
 ) int {
 	indexDocCount := index.documentCount - offset
 	addedDocumentCount := min(uow.maxDocumentCount-uow.documentCount, indexDocCount)
@@ -44,6 +46,7 @@ func (uow *UnitOfWork) AddSearch(
 			offset:        offset,
 			documentCount: addedDocumentCount,
 			filterParams:  filterParams,
+			skipPercent:   1.0 - scanCoverageRate,
 		})
 
 		uow.documentCount += addedDocumentCount
@@ -53,8 +56,9 @@ func (uow *UnitOfWork) AddSearch(
 }
 
 func distributeDocumentScans(
-	maxUnits int,
 	indices *Indices,
+	maxUnits int,
+	scanCoverageRate float64,
 ) []UnitOfWork {
 	totalDocumentCount := 0
 
@@ -82,14 +86,14 @@ func distributeDocumentScans(
 	unitOfWorkIndex := 0
 	for _, i := range indices.indices {
 		uow := &unitsOfWork[unitOfWorkIndex]
-		offset := uow.AddSearch(i, 0, indices.filterParams)
+		offset := uow.AddSearch(i, indices.filterParams, 0, scanCoverageRate)
 
 		// If we've yet to distribute all the documents in the index, go into the
 		// next unit of work, and the next, and the next....
 		for offset < i.documentCount {
 			unitOfWorkIndex++
 			uow := &unitsOfWork[unitOfWorkIndex]
-			offset += uow.AddSearch(i, offset, indices.filterParams)
+			offset += uow.AddSearch(i, indices.filterParams, offset, scanCoverageRate)
 		}
 	}
 

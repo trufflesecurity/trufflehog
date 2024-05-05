@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"log"
 	"runtime"
 
 	"google.golang.org/protobuf/proto"
@@ -27,7 +26,6 @@ func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchC
 		BestEffortScan: c.BestEffortScan,
 	}
 
-	log.Printf("Best effort scan: %v\n", c.BestEffortScan)
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {

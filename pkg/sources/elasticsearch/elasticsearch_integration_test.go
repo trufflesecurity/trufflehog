@@ -169,7 +169,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			unitsOfWork := distributeDocumentScans(1, &indices)
+			unitsOfWork := distributeDocumentScans(&indices, 1, 1.0)
 
 			if len(unitsOfWork) != 1 {
 				t.Fatalf("wanted 1 unit of work, got %d\n", len(unitsOfWork))
@@ -207,7 +207,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			unitsOfWork := distributeDocumentScans(2, &indices)
+			unitsOfWork := distributeDocumentScans(&indices, 2, 1.0)
 
 			if len(unitsOfWork) != 2 {
 				t.Fatalf("wanted 2 units of work, got %d\n", len(unitsOfWork))

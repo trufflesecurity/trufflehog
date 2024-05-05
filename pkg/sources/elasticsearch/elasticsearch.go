@@ -132,12 +132,21 @@ func (s *Source) Chunks(
 		workerPool := new(errgroup.Group)
 		workerPool.SetLimit(s.concurrency)
 
+		previousDocumentCount := indices.documentCount
 		err := indices.Update(s.ctx, s.client)
 		if err != nil {
 			return err
 		}
 
-		unitsOfWork := distributeDocumentScans(s.concurrency, &indices)
+		// The scanCoverageRate is documentsScanned / documentsAdded. If it's not 1,
+		// we need each DocumentSearch to skip some records.
+		scanCoverageRate := 1.0
+		if previousDocumentCount != 0 {
+			scanCoverageRate =
+				float64(previousDocumentCount) / float64(indices.documentCount)
+		}
+
+		unitsOfWork := distributeDocumentScans(&indices, s.concurrency, scanCoverageRate)
 
 		for uowIndex, outerUOW := range unitsOfWork {
 			uow := outerUOW
