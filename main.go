@@ -342,13 +342,13 @@ func run(state overseer.State) {
 	// Verify that all the user-provided detectors support the optional
 	// detector features.
 	{
-		if err, id := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
+		if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
 			logFatal(err, "invalid include list detector configuration", "detector", id)
 		}
-		if err, id := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
+		if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
 			logFatal(err, "invalid exclude list detector configuration", "detector", id)
 		}
-		if err, id := verifyDetectorsAreVersioner(detectorsWithCustomVerifierEndpoints); err != nil {
+		if id, err := verifyDetectorsAreVersioner(detectorsWithCustomVerifierEndpoints); err != nil {
 			logFatal(err, "invalid verifier detector configuration", "detector", id)
 		}
 		// Extra check for endpoint customization.
@@ -608,6 +608,8 @@ func run(state overseer.State) {
 		if err := e.ScanPostman(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Postman.")
 		}
+	default:
+		logFatal(fmt.Errorf("invalid command"), "Command not recognized.")
 	}
 
 	// Wait for all workers to finish.
@@ -691,7 +693,10 @@ func commaSeparatedToSlice(s []string) []string {
 }
 
 func printAverageDetectorTime(e *engine.Engine) {
-	fmt.Fprintln(os.Stderr, "Average detector time is the measurement of average time spent on each detector when results are returned.")
+	fmt.Fprintln(
+		os.Stderr,
+		"Average detector time is the measurement of average time spent on each detector when results are returned.",
+	)
 	for detectorName, duration := range e.GetDetectorsMetrics() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
@@ -724,7 +729,7 @@ func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T
 
 // verifyDetectorsAreVersioner checks all keys in a provided map to verify the
 // provided type is actually a Versioner.
-func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (error, config.DetectorID) {
+func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (config.DetectorID, error) {
 	isVersioner := engine.DefaultDetectorTypesImplementing[detectors.Versioner]()
 	for id := range data {
 		if id.Version == 0 {
@@ -736,7 +741,7 @@ func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (error, co
 			continue
 		}
 		// Version provided on a non-Versioner detector.
-		return fmt.Errorf("version provided but detector does not have a version"), id
+		return id, fmt.Errorf("version provided but detector does not have a version")
 	}
-	return nil, config.DetectorID{}
+	return config.DetectorID{}, nil
 }
