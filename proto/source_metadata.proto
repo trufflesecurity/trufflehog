@@ -280,6 +280,18 @@ message AzureRepos {
   string organization = 11;
 }
 
+message Vector {
+  string timestamp = 1;
+  string source_type = 2;
+  string host = 3;
+}
+
+message Webhook {
+  oneof data {
+    Vector vector = 1;
+  }
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -310,5 +322,6 @@ message MetaData {
     GoogleDrive googleDrive = 26;
     AzureRepos azureRepos = 27;
     TravisCI travisCI = 28;
+    Webhook webhook = 29;
   }
 }

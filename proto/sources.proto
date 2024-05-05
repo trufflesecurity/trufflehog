@@ -45,6 +45,7 @@ enum SourceType {
   SOURCE_TYPE_GCS_UNAUTHED = 30;
   SOURCE_TYPE_AZURE_REPOS = 31;
   SOURCE_TYPE_TRAVISCI = 32;
+  SOURCE_TYPE_WEBHOOK = 33;
 }
 
 message LocalSource {
@@ -378,4 +379,12 @@ message AzureRepos {
   repeated string ignore_projects = 11;
   bool skip_binaries = 12;
   bool skip_archives = 13;
+}
+
+message Webhook {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    credentials.Header header = 2;
+  }
+  bool insecure_skip_verify_tls = 3;
 }
