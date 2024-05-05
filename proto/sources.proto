@@ -144,6 +144,8 @@ message Docker {
     bool docker_keychain = 4;
   }
   repeated string images = 5;
+  bool cache = 6;
+  string cache_db = 7;
 }
 
 message ECR {

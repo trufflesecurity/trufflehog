@@ -1329,6 +1329,10 @@ func (m *Docker) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for Cache
+
+	// no validation rules for CacheDb
+
 	switch v := m.Credential.(type) {
 	case *Docker_Unauthenticated:
 		if v == nil {

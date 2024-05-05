@@ -28,6 +28,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/docker"
 )
 
 var overlapError = errors.New("More than one detector has found this result. For your safety, verification has been disabled. You can override this behavior by using the --allow-verification-overlap flag.")
@@ -105,6 +106,10 @@ type Engine struct {
 
 	// verify determines whether the scanner will attempt to verify candidate secrets
 	verify bool
+
+	// dockerCache and dockerCacheDb is used to cache the results of scanning docker layers.
+	dockerCache   bool
+	dockerCacheDb string
 
 	// Note: bad hack only used for testing
 	verificationOverlapTracker *verificationOverlapTracker
@@ -240,6 +245,14 @@ func withVerificationOverlapTracking() Option {
 func WithVerificationOverlap(verificationOverlap bool) Option {
 	return func(e *Engine) {
 		e.verificationOverlap = verificationOverlap
+	}
+}
+
+// WithDockerCache enables caching of the results of scanning docker layers.
+func WithDockerCache(dockerCache bool, dockerCacheDb string) Option {
+	return func(e *Engine) {
+		e.dockerCache = dockerCache
+		e.dockerCacheDb = dockerCacheDb
 	}
 }
 
@@ -872,6 +885,32 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 
 func (e *Engine) notifyResults(ctx context.Context) {
 	for r := range e.ResultsChan() {
+
+		// Handle docker layer caching if applicable
+		if e.dockerCache && r.SourceType == sourcespb.SourceType_SOURCE_TYPE_DOCKER {
+			layer := r.SourceMetadata.GetDocker().Layer
+			db, err := docker.ConnectToLayersDB(e.dockerCacheDb)
+			if err != nil {
+				ctx.Logger().Error(err, "error connecting to docker cache")
+				err = docker.UpdateCompleted(db, layer, false)
+				if err != nil {
+					ctx.Logger().Error(err, "error updating docker cache")
+				}
+			}
+			if r.Verified {
+				err = docker.UpdateVerified(db, layer, true)
+			} else if r.VerificationError() != nil {
+				err = docker.UpdateUnverified(db, layer, true)
+			}
+			if err != nil {
+				ctx.Logger().Error(err, "error adding to docker cache")
+				err = docker.UpdateCompleted(db, layer, false)
+				if err != nil {
+					ctx.Logger().Error(err, "error updating docker cache")
+				}
+			}
+		}
+
 		// Filter unwanted results, based on `--results`.
 		if !r.Verified {
 			if r.VerificationError() != nil {

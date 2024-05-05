@@ -56,7 +56,7 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init initializes the source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -69,6 +69,19 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
+	}
+
+	// If using layer caching, initialize the database.
+	if s.conn.Cache {
+		db, err := ConnectToLayersDB(s.conn.CacheDb)
+		if err != nil {
+			return fmt.Errorf("error connecting to layer cache database: %w", err)
+		}
+		err = InitializeLayersDB(db)
+		if err != nil {
+			return fmt.Errorf("error initializing layers database: %w", err)
+		}
+		ctx.Logger().V(2).Info("layer cache database initialized")
 	}
 
 	return nil
@@ -194,6 +207,26 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 		return err
 	}
 
+	// If using layer caching, check if layer already scanned. If no secrets found before, skip.
+	if s.conn.Cache {
+		db, err := ConnectToLayersDB(s.conn.CacheDb)
+		if err != nil {
+			return fmt.Errorf("error connecting to layer cache database: %w", err)
+		}
+		skipLayer, err := SkipDockerLayer(db, layerInfo.digest.String())
+		if err != nil {
+			return fmt.Errorf("error checking if layer should be skipped: %w", err)
+		}
+		if skipLayer {
+			ctx.Logger().WithValues("layer", layerInfo.digest.String()).V(2).Info("skipping previously scanned layer with no secrets")
+			return nil
+		}
+		err = InsertReplaceDigest(db, layerInfo.digest.String())
+		if err != nil {
+			return fmt.Errorf("error inserting layer into database: %w", err)
+		}
+	}
+
 	ctx.Logger().WithValues("layer", layerInfo.digest.String()).V(2).Info("scanning layer")
 
 	rc, err := layer.Compressed()
@@ -221,6 +254,18 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 		info := chunkProcessingInfo{size: header.Size, name: header.Name, reader: tarReader, layer: layerInfo}
 		if err := s.processChunk(ctx, info, chunksChan); err != nil {
 			return err
+		}
+	}
+
+	// If using layer caching, update layer cache db that layer has been scanned.
+	if s.conn.Cache {
+		db, err := ConnectToLayersDB(s.conn.CacheDb)
+		if err != nil {
+			return fmt.Errorf("error connecting to layer cache database: %w", err)
+		}
+		err = UpdateCompleted(db, layerInfo.digest.String(), true)
+		if err != nil {
+			return fmt.Errorf("error updating layer completion status: %w", err)
 		}
 	}
 

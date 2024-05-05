@@ -150,6 +150,8 @@ var (
 
 	dockerScan       = cli.Command("docker", "Scan Docker Image")
 	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+	dockerCache      = dockerScan.Flag("cache", "Use layer caching. Don't re-scan a layer that has already been scanned and is in the layer caching db.").Bool()
+	dockerCacheDB    = dockerScan.Flag("cache-db", "Path to the layer caching database. Default is trufflehog_layers.sqlite3").Default("trufflehog_layers.sqlite3").String()
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
@@ -448,6 +450,7 @@ func run(state overseer.State) {
 		engine.WithFilterEntropy(*filterEntropy),
 		engine.WithVerificationOverlap(*allowVerificationOverlap),
 		engine.WithJobReportWriter(jobReportWriter),
+		engine.WithDockerCache(*dockerCache, *dockerCacheDB),
 	)
 	if err != nil {
 		logFatal(err, "error initializing engine")
@@ -583,6 +586,8 @@ func run(state overseer.State) {
 			Credential: &sourcespb.Docker_DockerKeychain{
 				DockerKeychain: true,
 			},
+			Cache:   *dockerCache,
+			CacheDb: *dockerCacheDB,
 		}
 		anyConn, err := anypb.New(&dockerConn)
 		if err != nil {
