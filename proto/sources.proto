@@ -382,9 +382,8 @@ message AzureRepos {
 }
 
 message Webhook {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string listen_address = 1 [(validate.rules).string.hostname = true];
   oneof credential {
     credentials.Header header = 2;
   }
-  bool insecure_skip_verify_tls = 3;
 }

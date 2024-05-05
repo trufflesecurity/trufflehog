@@ -4829,10 +4829,10 @@ func (m *Webhook) validate(all bool) error {
 
 	var errors []error
 
-	if _, err := url.Parse(m.GetEndpoint()); err != nil {
+	if err := m._validateHostname(m.GetListenAddress()); err != nil {
 		err = WebhookValidationError{
-			field:  "Endpoint",
-			reason: "value must be a valid URI",
+			field:  "ListenAddress",
+			reason: "value must be a valid hostname",
 			cause:  err,
 		}
 		if !all {
@@ -4840,8 +4840,6 @@ func (m *Webhook) validate(all bool) error {
 		}
 		errors = append(errors, err)
 	}
-
-	// no validation rules for InsecureSkipVerifyTls
 
 	switch m.Credential.(type) {
 
@@ -4880,6 +4878,36 @@ func (m *Webhook) validate(all bool) error {
 
 	if len(errors) > 0 {
 		return WebhookMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *Webhook) _validateHostname(host string) error {
+	s := strings.ToLower(strings.TrimSuffix(host, "."))
+
+	if len(host) > 253 {
+		return errors.New("hostname cannot exceed 253 characters")
+	}
+
+	for _, part := range strings.Split(s, ".") {
+		if l := len(part); l == 0 || l > 63 {
+			return errors.New("hostname part must be non-empty and cannot exceed 63 characters")
+		}
+
+		if part[0] == '-' {
+			return errors.New("hostname parts cannot begin with hyphens")
+		}
+
+		if part[len(part)-1] == '-' {
+			return errors.New("hostname parts cannot end with hyphens")
+		}
+
+		for _, r := range part {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+				return fmt.Errorf("hostname parts can only contain alphanumeric characters or hyphens, got %q", string(r))
+			}
+		}
 	}
 
 	return nil
