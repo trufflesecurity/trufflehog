@@ -89,7 +89,7 @@ require (
 	golang.org/x/net v0.24.0
 	golang.org/x/oauth2 v0.19.0
 	golang.org/x/sync v0.7.0
-	golang.org/x/text v0.14.0
+	golang.org/x/text v0.15.0
 	google.golang.org/api v0.177.0
 	google.golang.org/protobuf v1.34.0
 	gopkg.in/h2non/gock.v1 v1.1.2
