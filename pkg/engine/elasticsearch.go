@@ -15,6 +15,7 @@ import (
 // ScanElasticsearch scans a Elasticsearch installation.
 func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchConfig) error {
 	connection := &sourcespb.Elasticsearch{
+		Nodes:          c.Nodes,
 		Username:       c.Username,
 		Password:       c.Password,
 		CloudId:        c.CloudID,

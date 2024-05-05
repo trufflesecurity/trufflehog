@@ -61,6 +61,10 @@ func (s *Source) Init(
 
 	esConfig := es.Config{}
 
+	if len(conn.Nodes) > 0 {
+		esConfig.Addresses = conn.Nodes
+	}
+
 	if conn.Username != "" {
 		esConfig.Username = conn.Username
 	}

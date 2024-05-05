@@ -622,8 +622,12 @@ func run(state overseer.State) {
 		}
 	case elasticsearchScan.FullCommand():
 		cfg := sources.ElasticsearchConfig{
+			Nodes:          *elasticsearchNodes,
+			Username:       *elasticsearchUsername,
+			Password:       *elasticsearchPassword,
 			CloudID:        *elasticsearchCloudId,
 			APIKey:         *elasticsearchAPIKey,
+			ServiceToken:   *elasticsearchServiceToken,
 			IndexPattern:   *elasticsearchIndexPattern,
 			QueryJSON:      *elasticsearchQueryJSON,
 			SinceTimestamp: *elasticsearchSinceTimestamp,
