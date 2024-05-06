@@ -4,6 +4,8 @@ package source_metadata;
 
 option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb";
 
+import "google/protobuf/timestamp.proto";
+
 message Azure {
   string container = 1;
   string file = 2;
@@ -301,7 +303,7 @@ message Postman {
 
 
 message Vector {
-  string timestamp = 1;
+  google.protobuf.Timestamp timestamp = 1;
   string source_type = 2;
   string host = 3;
 }
