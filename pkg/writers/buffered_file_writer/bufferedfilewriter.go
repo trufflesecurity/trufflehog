@@ -34,9 +34,14 @@ const (
 	Large
 )
 
+const (
+	defaultBufferSize = 1 << 12 // 4KB
+	largeBufferSize   = 1 << 16 // 64KB
+)
+
 func init() {
-	defaultBufferPool = pool.NewBufferPool(int(Default))
-	largeBufferPool = pool.NewBufferPool(int(Large))
+	defaultBufferPool = pool.NewBufferPool(defaultBufferSize)
+	largeBufferPool = pool.NewBufferPool(largeBufferSize)
 }
 
 // Different buffer pools for different buffer sizes.
