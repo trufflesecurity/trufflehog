@@ -21,6 +21,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v61/github"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/oauth2"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -550,6 +552,11 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
+	parseRepoCtx, span := otel.Tracer("parser").Start(repoCtx, "ParseRepoPath")
+	defer span.End()
+
+	repoCtx = context.AddLogger(parseRepoCtx)
+
 	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 	if err != nil {
 		return err
@@ -571,11 +578,19 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			ctx.Logger().V(3).Info("finished scanning commits")
 			break
 		}
+		repoCtx = context.AddLogger(diff.Context())
 
 		shouldBreak := func() bool {
+			diffCtx, span := otel.Tracer("parser").Start(repoCtx, "ParseDiff")
+			defer span.End()
+
+			repoCtx = context.AddLogger(diffCtx)
+
 			start := time.Now() // Start the timer for processing the diff.
 			defer func(t time.Time) {
-				diffChan.RecordConsumptionTime(time.Since(t)) // Record the time taken to process the diff.
+				since := time.Since(t)
+				span.SetAttributes(attribute.Key("diff_scan_microseconds").Int64(since.Microseconds()))
+				diffChan.RecordConsumptionTime(since) // Record the time taken to process the diff.
 			}(start) // Release the worker back to the pool.
 
 			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
@@ -624,8 +639,13 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 				commitHash := plumbing.NewHash(fullHash)
 				bd := binaryDiff{fileName, gitDir, commitHash, chunkSkel}
-				if err := sendBinaryDiffWithRetry(ctx, bd, binaryDiffChan); err != nil {
-					ctx.Logger().Error(err, "error sending binary diff", "filename", fileName, "commit", commitHash, "file", diff.PathB)
+				binaryDiffCtx, span := otel.Tracer("parser").Start(repoCtx, "SendBinaryDiff")
+				defer span.End()
+
+				span.SetAttributes(attribute.Key("file").String(fileName), attribute.Key("commit").String(commitHash.String()))
+				span.AddEvent("sending binary diff")
+				if err := sendBinaryDiffWithRetry(context.AddLogger(binaryDiffCtx), bd, binaryDiffChan); err != nil {
+					repoCtx.Logger().Error(err, "error sending binary diff", "filename", fileName, "commit", commitHash, "file", diff.PathB)
 				}
 
 				return false
@@ -635,7 +655,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			// If it does, chunk it to handle the large diff.
 			// This helps to efficiently process large diffs and avoid memory issues.
 			if diff.Len() > sources.ChunkSize+sources.PeekSize {
-				s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
+				s.gitChunk(repoCtx, diff, fileName, email, fullHash, when, remoteURL, reporter)
 				return false
 			}
 
@@ -644,7 +664,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 				reader, err := d.ReadCloser()
 				if err != nil {
-					ctx.Logger().Error(
+					repoCtx.Logger().Error(
 						err, "error creating reader for commits",
 						"filename", fileName,
 						"commit", fullHash,
@@ -656,7 +676,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 				data := make([]byte, d.Len())
 				if _, err := io.ReadFull(reader, data); err != nil {
-					ctx.Logger().Error(
+					repoCtx.Logger().Error(
 						err, "error reading diff content for commit",
 						"filename", fileName,
 						"commit", fullHash,
@@ -673,7 +693,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 					Data:           data,
 					Verify:         s.verify,
 				}
-				return reporter.ChunkOk(ctx, chunk)
+				chunk.AddContext(repoCtx)
+				return reporter.ChunkOk(repoCtx, chunk)
 			}
 			if err := chunkData(diff); err != nil {
 				return false
@@ -720,6 +741,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
 					Verify:         s.verify,
 				}
+				chunk.AddContext(ctx)
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
 					return
@@ -740,6 +762,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					Data:           line,
 					Verify:         s.verify,
 				}
+				chunk.AddContext(ctx)
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					// TODO: Return error.
 					return
@@ -764,6 +787,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
 			Verify:         s.verify,
 		}
+		chunk.AddContext(ctx)
 		if err := reporter.ChunkOk(ctx, chunk); err != nil {
 			// TODO: Return error.
 			return
@@ -1023,8 +1047,10 @@ func (s *Git) ScanRepo(
 	var producerWg sync.WaitGroup
 	producerWg.Add(1)
 	go func() {
+		scanCommitsCtx, span := otel.Tracer("scanner").Start(ctx, "ScanCommits")
+		defer span.End()
 		defer producerWg.Done()
-		if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, reporter, binaryDiffChan); err != nil {
+		if err := s.ScanCommits(context.AddLogger(scanCommitsCtx), repo, repoPath, scanOptions, reporter, binaryDiffChan); err != nil {
 			// Propagate errors and cancel the context to stop all goroutines.
 			errChan <- err
 			cancel(fmt.Errorf("error scanning commits: %w", err))
@@ -1104,9 +1130,14 @@ func (s *Git) extractBinaryDiffs(ctx context.Context, reporter sources.ChunkRepo
 			continue
 		}
 
-		if err := extracBinaryDiff(fileCtx, diff, reporter); err != nil {
+		extractCtx, span := otel.Tracer("parser").Start(fileCtx, "ExtractBinaryDiff")
+		start := time.Now()
+		if err := extracBinaryDiff(context.AddLogger(extractCtx), diff, reporter); err != nil {
 			fileCtx.Logger().Error(err, "error extracting binary diff")
 		}
+		span.End()
+		span.SetAttributes(attribute.Key("binary_diff_extraction_duration_ms").Int64(time.Since(start).Milliseconds()))
+
 	}
 }
 

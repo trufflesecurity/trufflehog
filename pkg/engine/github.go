@@ -2,6 +2,7 @@ package engine
 
 import (
 	gogit "github.com/go-git/go-git/v5"
+	"go.opentelemetry.io/otel"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -14,6 +15,11 @@ import (
 
 // ScanGitHub scans GitHub with the provided options.
 func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
+	scanCtx, span := otel.Tracer("scanner").Start(ctx, "ScanGithub")
+	defer span.End()
+
+	ctx = context.AddLogger(scanCtx)
+
 	connection := sourcespb.GitHub{
 		Endpoint:                   c.Endpoint,
 		Organizations:              c.Orgs,
@@ -58,6 +64,10 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 		return err
 	}
 	githubSource.WithScanOptions(scanOptions)
-	_, err = e.sourceManager.Run(ctx, sourceName, githubSource)
+
+	ctxRun, spanRun := otel.Tracer("scanner").Start(ctx, "Run")
+	defer spanRun.End()
+
+	_, err = e.sourceManager.Run(context.AddLogger(ctxRun), sourceName, githubSource)
 	return err
 }

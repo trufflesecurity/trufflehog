@@ -14,6 +14,8 @@ import (
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -336,6 +338,9 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 // detectors, conducts basic sanity checks, and kickstarts all necessary workers.
 // Once started, the engine begins processing input data to identify secrets.
 func Start(ctx context.Context, options ...Option) (*Engine, error) {
+	_, span := otel.Tracer("scanner").Start(ctx, "Start Engine")
+	defer span.End()
+
 	e := &Engine{}
 
 	if err := e.initialize(ctx, options...); err != nil {
@@ -585,6 +590,8 @@ type detectableChunk struct {
 	chunk    sources.Chunk
 	decoder  detectorspb.DecoderType
 	wgDoneFn func()
+
+	ctx context.Context
 }
 
 // verificationOverlapChunk is a decoded chunk that has multiple detectors that match it.
@@ -595,6 +602,8 @@ type verificationOverlapChunk struct {
 	decoder                     detectorspb.DecoderType
 	detectors                   []ahocorasick.DetectorInfo
 	verificationOverlapWgDoneFn func()
+
+	ctx context.Context
 }
 
 func (e *Engine) detectorWorker(ctx context.Context) {
@@ -605,43 +614,71 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	const avgDetectorsPerChunk = 8
 	chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, avgDetectorsPerChunk)
 	for chunk := range e.ChunksChan() {
-		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
-		for _, decoder := range e.decoders {
-			decoded := decoder.FromChunk(chunk)
-			if decoded == nil {
-				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
-				continue
-			}
+		ctx = chunk.Context()
+		func() {
+			chunkCtx, span := otel.Tracer("scanner").Start(ctx, "stage1_detectableChunk")
+			defer span.End()
 
-			matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
-			if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
-				wgVerificationOverlap.Add(1)
-				e.verificationOverlapChunksChan <- verificationOverlapChunk{
-					chunk:                       *decoded.Chunk,
-					detectors:                   matchingDetectors,
-					decoder:                     decoded.DecoderType,
-					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+			now := time.Now()
+			defer func(t time.Time) {
+				span.SetAttributes(attribute.Key("scan_chunk_duration_microseconds").Int64(time.Since(t).Microseconds()))
+			}(now)
+
+			ctx = context.AddLogger(chunkCtx)
+
+			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
+			for _, decoder := range e.decoders {
+				decoded := decoder.FromChunk(chunk)
+				if decoded == nil {
+					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+					continue
 				}
-				// Empty the map.
-				for k := range chunkSpecificDetectors {
+
+				matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
+				if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
+					wgVerificationOverlap.Add(1)
+
+					overlapCtx, span := otel.Tracer("scanner").Start(ctx, "stage1_verificationOverlap")
+					ctx = context.AddLogger(overlapCtx)
+
+					span.AddEvent("verification overlap detected")
+					e.verificationOverlapChunksChan <- verificationOverlapChunk{
+						chunk:                       *decoded.Chunk,
+						detectors:                   matchingDetectors,
+						decoder:                     decoded.DecoderType,
+						verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+						ctx:                         ctx,
+					}
+					span.End()
+					// Empty the map.
+					for k := range chunkSpecificDetectors {
+						delete(chunkSpecificDetectors, k)
+					}
+					continue
+				}
+
+				for k, detector := range chunkSpecificDetectors {
+					decoded.Chunk.Verify = e.verify
+					wgDetect.Add(1)
+
+					detectCtx, span := otel.Tracer("scanner").Start(ctx, "stage1_detectChunks")
+					ctx = context.AddLogger(detectCtx)
+
+					span.AddEvent("detecting chunk")
+
+					e.detectableChunksChan <- detectableChunk{
+						chunk:    *decoded.Chunk,
+						detector: detector,
+						decoder:  decoded.DecoderType,
+						wgDoneFn: wgDetect.Done,
+						ctx:      ctx,
+					}
+					span.End()
 					delete(chunkSpecificDetectors, k)
 				}
-				continue
 			}
-
-			for k, detector := range chunkSpecificDetectors {
-				decoded.Chunk.Verify = e.verify
-				wgDetect.Add(1)
-				e.detectableChunksChan <- detectableChunk{
-					chunk:    *decoded.Chunk,
-					detector: detector,
-					decoder:  decoded.DecoderType,
-					wgDoneFn: wgDetect.Done,
-				}
-				delete(chunkSpecificDetectors, k)
-			}
-		}
-		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
+			atomic.AddUint64(&e.metrics.ChunksScanned, 1)
+		}()
 	}
 
 	wgVerificationOverlap.Wait()
@@ -704,86 +741,112 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
-		for _, detector := range chunk.detectors {
-			// DO NOT VERIFY at this stage of the pipeline.
-			results, err := detector.FromData(ctx, false, chunk.chunk.Data)
-			if err != nil {
-				ctx.Logger().Error(err, "error verifying chunk")
+		func() {
+			ctx = chunk.ctx
+			for _, detector := range chunk.detectors {
+				func() {
+					verCtx, span := otel.Tracer("scanner").Start(ctx, "stage1_verificationOverlap")
+					defer span.End()
+
+					ctx = context.AddLogger(verCtx)
+
+					// DO NOT VERIFY at this stage of the pipeline.
+					results, err := detector.FromData(ctx, false, chunk.chunk.Data)
+					if err != nil {
+						ctx.Logger().Error(err, "error verifying chunk")
+					}
+
+					if len(results) == 0 {
+						return
+					}
+					if _, ok := detectorKeysWithResults[detector.Key]; !ok {
+						detectorKeysWithResults[detector.Key] = struct{}{}
+					}
+
+					for _, res := range results {
+						var val []byte
+						if res.RawV2 != nil {
+							val = res.RawV2
+						} else {
+							val = res.Raw
+						}
+
+						// Use levenstein distance to determine if the secret is likely the same.
+						// Ex:
+						// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+						// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+						key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
+						if _, ok := chunkSecrets[key]; ok {
+							continue
+						}
+
+						if likelyDuplicate(ctx, key, chunkSecrets) {
+							// This indicates that the same secret was found by multiple detectors.
+							// We should NOT VERIFY this chunk's data.
+							if e.verificationOverlapTracker != nil {
+								e.verificationOverlapTracker.increment()
+							}
+							res.SetVerificationError(overlapError)
+
+							dupeCtx, span := otel.Tracer("scanner").Start(ctx, "stage1_verificationOverlap_dupe")
+							span.AddEvent("verification overlap detected, sending without verification")
+
+							ctx = context.AddLogger(dupeCtx)
+
+							e.processResult(ctx, detectableChunk{
+								chunk:    chunk.chunk,
+								detector: detector,
+								decoder:  chunk.decoder,
+								wgDoneFn: wgDetect.Done,
+								ctx:      ctx,
+							}, res)
+							span.End()
+
+							// Remove the detector key from the list of detector keys with results.
+							// This is to ensure that the chunk is not reprocessed with verification enabled
+							// for this detector.
+							delete(detectorKeysWithResults, detector.Key)
+						}
+						chunkSecrets[key] = struct{}{}
+					}
+				}()
 			}
 
-			if len(results) == 0 {
-				continue
-			}
-			if _, ok := detectorKeysWithResults[detector.Key]; !ok {
-				detectorKeysWithResults[detector.Key] = struct{}{}
-			}
-
-			for _, res := range results {
-				var val []byte
-				if res.RawV2 != nil {
-					val = res.RawV2
-				} else {
-					val = res.Raw
-				}
-
-				// Use levenstein distance to determine if the secret is likely the same.
-				// Ex:
-				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
-				if _, ok := chunkSecrets[key]; ok {
+			for key := range detectorKeysWithResults {
+				detector := e.ahoCorasickCore.GetDetectorByKey(key)
+				if detector == nil {
+					ctx.Logger().Info("detector not found", "key", key)
 					continue
 				}
 
-				if likelyDuplicate(ctx, key, chunkSecrets) {
-					// This indicates that the same secret was found by multiple detectors.
-					// We should NOT VERIFY this chunk's data.
-					if e.verificationOverlapTracker != nil {
-						e.verificationOverlapTracker.increment()
-					}
-					res.SetVerificationError(overlapError)
-					e.processResult(ctx, detectableChunk{
-						chunk:    chunk.chunk,
-						detector: detector,
-						decoder:  chunk.decoder,
-						wgDoneFn: wgDetect.Done,
-					}, res)
+				detectCtx, span := otel.Tracer("scanner").Start(ctx, "stage1_detectChunks")
+				span.AddEvent("sending chunk for verification")
 
-					// Remove the detector key from the list of detector keys with results.
-					// This is to ensure that the chunk is not reprocessed with verification enabled
-					// for this detector.
-					delete(detectorKeysWithResults, detector.Key)
+				ctx = context.AddLogger(detectCtx)
+
+				wgDetect.Add(1)
+				chunk.chunk.Verify = e.verify
+				e.detectableChunksChan <- detectableChunk{
+					chunk:    chunk.chunk,
+					detector: detector,
+					decoder:  chunk.decoder,
+					wgDoneFn: wgDetect.Done,
+					ctx:      ctx,
 				}
-				chunkSecrets[key] = struct{}{}
-			}
-		}
-
-		for key := range detectorKeysWithResults {
-			detector := e.ahoCorasickCore.GetDetectorByKey(key)
-			if detector == nil {
-				ctx.Logger().Info("detector not found", "key", key)
-				continue
+				span.End()
 			}
 
-			wgDetect.Add(1)
-			chunk.chunk.Verify = e.verify
-			e.detectableChunksChan <- detectableChunk{
-				chunk:    chunk.chunk,
-				detector: detector,
-				decoder:  chunk.decoder,
-				wgDoneFn: wgDetect.Done,
+			// Empty the dupes and detectors slice
+			for k := range chunkSecrets {
+				delete(chunkSecrets, k)
 			}
-		}
+			for k := range detectorKeysWithResults {
+				delete(detectorKeysWithResults, k)
+			}
 
-		// Empty the dupes and detectors slice
-		for k := range chunkSecrets {
-			delete(chunkSecrets, k)
-		}
-		for k := range detectorKeysWithResults {
-			delete(detectorKeysWithResults, k)
-		}
+			chunk.verificationOverlapWgDoneFn()
+		}()
 
-		chunk.verificationOverlapWgDoneFn()
 	}
 
 	wgDetect.Wait()
@@ -792,7 +855,14 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 func (e *Engine) detectChunks(ctx context.Context) {
 	for data := range e.detectableChunksChan {
+		ctx = data.ctx
+		dCtx, span := otel.Tracer("scanner").Start(ctx, "stage2_detectChunks")
+		span.AddEvent("detecting chunk")
+		ctx = context.AddLogger(dCtx)
+		now := time.Now()
 		e.detectChunk(ctx, data)
+		span.SetAttributes(attribute.Key("detect_chunk_duration_microseconds").Int64(time.Since(now).Microseconds()))
+		span.End()
 	}
 }
 
@@ -836,7 +906,13 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 
 	for _, res := range results {
+		rCtx, span := otel.Tracer("scanner").Start(ctx, "processResult")
+		span.AddEvent("processing result")
+		ctx = context.AddLogger(rCtx)
+		now := time.Now()
 		e.processResult(ctx, data, res)
+		span.SetAttributes(attribute.Key("proccess_result_duration_microseconds").Int64(time.Since(now).Microseconds()))
+		span.End()
 	}
 	data.wgDoneFn()
 }
@@ -863,51 +939,64 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 
 	secret := detectors.CopyMetadata(&data.chunk, res)
 	secret.DecoderType = data.decoder
+	secret.AddContext(ctx)
 	e.results <- secret
 }
 
 func (e *Engine) notifyResults(ctx context.Context) {
 	for r := range e.ResultsChan() {
-		// Filter unwanted results, based on `--results`.
-		if !r.Verified {
-			if r.VerificationError() != nil {
-				if !e.notifyUnknownResults {
-					// Skip results with verification errors.
-					continue
+		ctx = r.Context()
+		func() {
+			nCtx, span := otel.Tracer("scanner").Start(ctx, "stage3_notifyResults")
+			defer span.End()
+			span.AddEvent("notifying result")
+			now := time.Now()
+			defer func(t time.Time) {
+				span.SetAttributes(attribute.Key("notify_result_duration_microseconds").Int64(time.Since(t).Microseconds()))
+			}(now)
+
+			ctx = context.AddLogger(nCtx)
+			// Filter unwanted results, based on `--results`.
+			if !r.Verified {
+				if r.VerificationError() != nil {
+					if !e.notifyUnknownResults {
+						// Skip results with verification errors.
+						return
+					}
+				} else if !e.notifyUnverifiedResults {
+					// Skip unverified results.
+					return
 				}
-			} else if !e.notifyUnverifiedResults {
-				// Skip unverified results.
-				continue
+			} else if !e.notifyVerifiedResults {
+				// Skip verified results.
+				// TODO: Is this a legitimate use case?
+				return
 			}
-		} else if !e.notifyVerifiedResults {
-			// Skip verified results.
-			// TODO: Is this a legitimate use case?
-			continue
-		}
-		atomic.AddUint32(&e.numFoundResults, 1)
+			atomic.AddUint32(&e.numFoundResults, 1)
 
-		// Dedupe results by comparing the detector type, raw result, and source metadata.
-		// We want to avoid duplicate results with different decoder types, but we also
-		// want to include duplicate results with the same decoder type.
-		// Duplicate results with the same decoder type SHOULD have their own entry in the
-		// results list, this would happen if the same secret is found multiple times.
-		// Note: If the source type is postman, we dedupe the results regardless of decoder type.
-		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
-		if val, ok := e.dedupeCache.Get(key); ok && (val != r.DecoderType ||
-			r.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
-			continue
-		}
-		e.dedupeCache.Add(key, r.DecoderType)
+			// Dedupe results by comparing the detector type, raw result, and source metadata.
+			// We want to avoid duplicate results with different decoder types, but we also
+			// want to include duplicate results with the same decoder type.
+			// Duplicate results with the same decoder type SHOULD have their own entry in the
+			// results list, this would happen if the same secret is found multiple times.
+			// Note: If the source type is postman, we dedupe the results regardless of decoder type.
+			key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
+			if val, ok := e.dedupeCache.Get(key); ok && (val != r.DecoderType ||
+				r.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
+				return
+			}
+			e.dedupeCache.Add(key, r.DecoderType)
 
-		if r.Verified {
-			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
-		} else {
-			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
-		}
+			if r.Verified {
+				atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
+			} else {
+				atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
+			}
 
-		if err := e.printer.Print(ctx, &r); err != nil {
-			ctx.Logger().Error(err, "error printing result")
-		}
+			if err := e.printer.Print(ctx, &r); err != nil {
+				ctx.Logger().Error(err, "error printing result")
+			}
+		}()
 	}
 }
 

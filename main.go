@@ -18,6 +18,13 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
@@ -244,7 +251,41 @@ func main() {
 }
 
 func run(state overseer.State) {
-	ctx, cancel := context.WithCancelCause(context.Background())
+	// exporter, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint("http://localhost:14268/api/traces")))
+	// if err != nil {
+	// 	// logFatal(err, "failed to create Jaeger exporter")
+	// 	panic(err)
+	// }
+	exporter, err := otlptrace.New(
+		context.Background(),
+		otlptracegrpc.NewClient(
+			otlptracegrpc.WithInsecure(),
+			otlptracegrpc.WithEndpoint("localhost:4317"),
+		),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// Set up the trace provider
+	tp := sdktrace.NewTracerProvider(
+		// sdktrace.WithSampler(sdktrace.TraceIDRatioBased(0.5)),
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceNameKey.String("scanner-tool"))),
+	)
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			// logFatal(err, "failed to shutdown trace provider")
+			panic(err)
+		}
+	}()
+	otel.SetTracerProvider(tp)
+
+	tracer := tp.Tracer("scanner")
+	sctx, span := tracer.Start(context.Background(), "scanner")
+	defer span.End()
+
+	ctx, cancel := context.WithCancelCause(context.AddLogger(sctx))
 	defer cancel(nil)
 
 	go func() {
@@ -292,6 +333,9 @@ func run(state overseer.State) {
 			router := http.NewServeMux()
 			router.Handle("/debug/pprof/", http.DefaultServeMux)
 			router.Handle("/debug/fgprof", fgprof.Handler())
+
+			router.Handle("/metrics", promhttp.Handler())
+
 			logger.Info("starting pprof and fgprof server on :18066 /debug/pprof and /debug/fgprof")
 			if err := http.ListenAndServe(":18066", router); err != nil {
 				logger.Error(err, "error serving pprof and fgprof")
@@ -493,7 +537,9 @@ func run(state overseer.State) {
 			IncludeGistComments:        *githubScanGistComments,
 			Filter:                     filter,
 		}
-		if err := e.ScanGitHub(ctx, cfg); err != nil {
+		scanCtx, span := otel.Tracer("scanner").Start(ctx, "github_scan")
+		defer span.End()
+		if err := e.ScanGitHub(context.AddLogger(scanCtx), cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")
 		}
 	case gitlabScan.FullCommand():

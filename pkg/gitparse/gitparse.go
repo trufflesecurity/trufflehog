@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"go.opentelemetry.io/otel"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -59,8 +60,12 @@ type Diff struct {
 
 	Commit *Commit
 
+	ctx           context.Context
 	contentWriter contentWriter
 }
+
+// Context returns the context associated with the diff.
+func (d *Diff) Context() context.Context { return d.ctx }
 
 type diffOption func(*Diff)
 
@@ -76,8 +81,12 @@ func withCustomContentWriter(cr contentWriter) diffOption {
 // All Diffs must have an associated commit.
 // The contentWriter is used to manage the diff's content, allowing for flexible handling of diff data.
 // By default, a buffer is used as the contentWriter, but this can be overridden with a custom contentWriter.
-func newDiff(commit *Commit, opts ...diffOption) *Diff {
-	diff := &Diff{Commit: commit}
+func newDiff(ctx context.Context, commit *Commit, opts ...diffOption) *Diff {
+	nCtx, span := otel.Tracer("scanner").Start(ctx, "newDiff")
+	defer span.End()
+	// span.SetAttributes(attribute.Key("commit").String(commit.Hash))
+
+	diff := &Diff{Commit: commit, ctx: context.AddLogger(nCtx)}
 	for _, opt := range opts {
 		opt(diff)
 	}
@@ -292,7 +301,10 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 		}
 	}
 
-	return c.executeCommand(ctx, cmd, false)
+	executeCmdCtx, span := otel.Tracer("scanner").Start(ctx, "executeCmd")
+	defer span.End()
+
+	return c.executeCommand(context.AddLogger(executeCmdCtx), cmd, false)
 }
 
 // Staged parses the output of the `git diff` command for the `source` path.
@@ -359,12 +371,12 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan *Dif
 
 	diff := func(c *Commit, opts ...diffOption) *Diff {
 		opts = append(opts, withCustomContentWriter(bufferwriter.New()))
-		return newDiff(c, opts...)
+		return newDiff(ctx, c, opts...)
 	}
 	if c.useCustomContentWriter {
 		diff = func(c *Commit, opts ...diffOption) *Diff {
 			opts = append(opts, withCustomContentWriter(bufferedfilewriter.New()))
-			return newDiff(c, opts...)
+			return newDiff(ctx, c, opts...)
 		}
 	}
 	currentDiff := diff(currentCommit)

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -103,9 +105,14 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 			continue
 		}
 
-		if err := common.CancellableWrite(ctx, archiveChan, data.Bytes()); err != nil {
+		contentCtx, span := otel.Tracer("scanner").Start(ctx, "handleNonArchiveContent")
+		span.AddEvent("content chunk processed, writing to archive channel")
+		span.SetAttributes(attribute.Key("content_size_bytes").Int64(int64(len(data.Bytes()))))
+		if err := common.CancellableWrite(logContext.AddLogger(contentCtx), archiveChan, data.Bytes()); err != nil {
+			span.End()
 			return err
 		}
+		span.End()
 		h.metrics.incBytesProcessed(len(data.Bytes()))
 	}
 

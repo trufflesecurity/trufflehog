@@ -7,6 +7,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archiver/v4"
+	"go.opentelemetry.io/otel"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
@@ -198,9 +199,18 @@ func handleChunks(
 			}
 			chunk := *chunkSkel
 			chunk.Data = data
+
+			hctx, span := otel.Tracer("scanner").Start(ctx, "handleChunks")
+			span.AddEvent("chunk processed, reporting chunk for detection")
+
+			ctx = logContext.AddLogger(hctx)
+			chunk.AddContext(ctx)
+
 			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+				span.End()
 				return fmt.Errorf("error reporting chunk: %w", err)
 			}
+			span.End()
 		case <-ctx.Done():
 			return ctx.Err()
 		}

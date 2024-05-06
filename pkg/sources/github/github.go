@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"golang.org/x/exp/rand"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -352,6 +353,11 @@ const cloudEndpoint = "https://api.github.com"
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
+	chunkCtx, span := otel.Tracer("scanner").Start(ctx, "github.Chunks")
+	defer span.End()
+
+	ctx = context.AddLogger(chunkCtx)
+
 	apiEndpoint := s.conn.Endpoint
 	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
 		apiEndpoint = cloudEndpoint
@@ -369,12 +375,17 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
 	githubReposScanned.WithLabelValues(s.name).Set(0)
 
-	installationClient, err := s.enumerate(ctx, apiEndpoint)
+	ctxEnum, spanEnum := otel.Tracer("scanner").Start(ctx, "enumerate")
+	defer spanEnum.End()
+
+	installationClient, err := s.enumerate(context.AddLogger(ctxEnum), apiEndpoint)
 	if err != nil {
 		return err
 	}
 
-	return s.scan(ctx, installationClient, chunksChan)
+	ctxScan, spanScan := otel.Tracer("scanner").Start(ctx, "scan")
+	defer spanScan.End()
+	return s.scan(context.AddLogger(ctxScan), installationClient, chunksChan)
 }
 
 func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Client, error) {
@@ -731,6 +742,11 @@ func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Cl
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
+	scanCtx, span := otel.Tracer("scanner").Start(ctx, "github.scan")
+	defer span.End()
+
+	ctx = context.AddLogger(scanCtx)
+
 	var scannedCount uint64 = 1
 
 	s.log.V(2).Info("Found repos to scan", "count", len(s.repos))
@@ -775,7 +791,10 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				return nil
 			}
 			repoCtx := context.WithValues(ctx, "repo", repoURL)
-			duration, err := s.cloneAndScanRepo(repoCtx, installationClient, repoURL, repoInfo, chunksChan)
+
+			cloneScanCtx, span := otel.Tracer("scanner").Start(repoCtx, "cloneAndScanRepo")
+			defer span.End()
+			duration, err := s.cloneAndScanRepo(context.AddLogger(cloneScanCtx), installationClient, repoURL, repoInfo, chunksChan)
 			if err != nil {
 				scanErrs.Add(err)
 				return nil
@@ -818,10 +837,18 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 }
 
 func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, repoURL string, repoInfo repoInfo, chunksChan chan *sources.Chunk) (time.Duration, error) {
+	cloneAndScanCtx, span := otel.Tracer("scanner").Start(ctx, "cloneRepo")
+	defer span.End()
+
+	ctx = context.AddLogger(cloneAndScanCtx)
 	var duration time.Duration
 
 	ctx.Logger().V(2).Info("attempting to clone repo")
-	path, repo, err := s.cloneRepo(ctx, repoURL, client)
+
+	cloneCtx, span := otel.Tracer("scanner").Start(ctx, "cloneRepo")
+	defer span.End()
+
+	path, repo, err := s.cloneRepo(context.AddLogger(cloneCtx), repoURL, client)
 	if err != nil {
 		return duration, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
 	}
@@ -840,7 +867,9 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, re
 	logger.V(2).Info("scanning repo")
 
 	start := time.Now()
-	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
+	scanCtx, span := otel.Tracer("scanner").Start(ctx, "scanRepo")
+	defer span.End()
+	if err = s.git.ScanRepo(context.AddLogger(scanCtx), repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
 		return duration, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
 	}
 	duration = time.Since(start)

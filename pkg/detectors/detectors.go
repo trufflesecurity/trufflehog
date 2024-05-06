@@ -3,13 +3,13 @@ package detectors
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"math/big"
 	"net/url"
 	"strings"
 	"unicode"
 
-	"errors"
-
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -112,7 +112,15 @@ type ResultWithMetadata struct {
 	Result
 	// Data from the sources.Chunk which this result was emitted for
 	Data []byte
+
+	ctx logContext.Context
 }
+
+// AddContext adds a context to the result.
+func (r *ResultWithMetadata) AddContext(ctx logContext.Context) { r.ctx = ctx }
+
+// Context returns the context associated with the result.
+func (r *ResultWithMetadata) Context() logContext.Context { return r.ctx }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
 func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {

@@ -3,6 +3,7 @@ package engine
 import (
 	"runtime"
 
+	"go.opentelemetry.io/otel"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -14,6 +15,9 @@ import (
 
 // ScanGit scans any git source.
 func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
+	_, span := otel.Tracer("scanner").Start(ctx, "ScanGit")
+	defer span.End()
+
 	connection := &sourcespb.Git{
 		Head:             c.HeadRef,
 		Base:             c.BaseRef,

@@ -36,6 +36,8 @@ type Chunk struct {
 	// Only secrets that are being reverified will have a SecretID.
 	SecretID int64
 
+	// This is only use for tracing.
+	ctx context.Context
 	// SourceMetadata holds the context of where the Chunk was found.
 	SourceMetadata *source_metadatapb.MetaData
 	// SourceType is the type of Source that produced the chunk.
@@ -44,6 +46,12 @@ type Chunk struct {
 	// Verify specifies whether any secrets in the Chunk should be verified.
 	Verify bool
 }
+
+// AddContext adds a context to the Chunk.
+func (c *Chunk) AddContext(ctx context.Context) { c.ctx = ctx }
+
+// Context returns the context associated with the Chunk.
+func (c *Chunk) Context() context.Context { return c.ctx }
 
 // ChunkingTarget specifies criteria for a targeted chunking process.
 // Instead of collecting data indiscriminately, this struct allows the caller

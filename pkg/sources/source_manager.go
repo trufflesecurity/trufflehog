@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/marusama/semaphore/v2"
+	"go.opentelemetry.io/otel"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -124,6 +125,11 @@ func (s *SourceManager) GetIDs(ctx context.Context, sourceName string, kind sour
 // asynchronously runs it. Error information is stored and accessible via the
 // JobProgressRef as it becomes available.
 func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source, targets ...ChunkingTarget) (JobProgressRef, error) {
+	runCtx, span := otel.Tracer("scanner").Start(ctx, "Run source manager")
+	defer span.End()
+
+	ctx = context.AddLogger(runCtx)
+
 	sourceID, jobID := source.SourceID(), source.JobID()
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx); err != nil {
@@ -156,7 +162,11 @@ func (s *SourceManager) Run(ctx context.Context, sourceName string, source Sourc
 		)
 		defer common.Recover(ctx)
 		defer cancel(nil)
-		if err := s.run(ctx, source, progress, targets...); err != nil {
+
+		childRunCtx, span := otel.Tracer("scanner").Start(ctx, "Run source manager worker")
+		defer span.End()
+
+		if err := s.run(context.AddLogger(childRunCtx), source, progress, targets...); err != nil {
 			select {
 			case s.firstErr <- err:
 			default:
@@ -246,6 +256,11 @@ func (s *SourceManager) preflightChecks(ctx context.Context) error {
 // acquired resources. An error is returned if there was a fatal error during
 // the run. This information is also recorded in the JobProgress.
 func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
+	runCtx, span := otel.Tracer("scanner").Start(ctx, "run source manager")
+	defer span.End()
+
+	ctx = context.AddLogger(runCtx)
+
 	report.Start(time.Now())
 	defer func() { report.End(time.Now()) }()
 
@@ -280,18 +295,30 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 		"with_units", false,
 		"target_count", len(targets),
 		"source_manager_units_configurable", s.useSourceUnitsFunc != nil)
-	return s.runWithoutUnits(ctx, source, report, targets...)
+
+	noUnitCtx, span := otel.Tracer("scanner").Start(ctx, "run source manager without units")
+	defer span.End()
+
+	return s.runWithoutUnits(context.AddLogger(noUnitCtx), source, report, targets...)
 }
 
 // runWithoutUnits is a helper method to run a Source. It has coarse-grained
 // job reporting.
 func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
+	runCtx, span := otel.Tracer("scanner").Start(ctx, "run source manager without units")
+	defer span.End()
+
+	ctx = context.AddLogger(runCtx)
+
 	// Introspect on the chunks we get from the Chunks method.
 	ch := make(chan *Chunk, 64)
 	var wg sync.WaitGroup
 	// Consume chunks and export chunks.
 	wg.Add(1)
 	go func() {
+		_, span := otel.Tracer("scanner").Start(ctx, "consume chunks")
+		defer span.End()
+
 		defer wg.Done()
 		for chunk := range ch {
 			chunk.JobID = source.JobID()
@@ -305,7 +332,10 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, repo
 	// stack.
 	defer wg.Wait()
 	defer close(ch)
-	if err := source.Chunks(ctx, ch, targets...); err != nil {
+
+	chunkCtx, span := otel.Tracer("scanner").Start(ctx, "source.Chunks")
+	defer span.End()
+	if err := source.Chunks(context.AddLogger(chunkCtx), ch, targets...); err != nil {
 		report.ReportError(Fatal{err})
 		return Fatal{err}
 	}
