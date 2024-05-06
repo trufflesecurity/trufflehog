@@ -71,11 +71,11 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 type DetectorInfo struct {
 	Key DetectorKey
 	detectors.Detector
-	offset int64
+	keywordOffset int64
 }
 
-// Offset returns the byte position of the detected pattern.
-func (d DetectorInfo) Offset() int64 { return d.offset }
+// KeywordOffset returns the byte position of the detected pattern.
+func (d DetectorInfo) KeywordOffset() int64 { return d.keywordOffset }
 
 // MatchingDetectors returns a slice of unique 'DetectorInfo' corresponding to the detectors that match
 // the provided input string (chunkData).
@@ -103,7 +103,7 @@ func (ac *AhoCorasickCore) MatchingDetectors(chunkData string) []DetectorInfo {
 
 			// Add the detector to the map and slice.
 			detector := ac.detectorsByKey[k]
-			uniqueDetectors = append(uniqueDetectors, DetectorInfo{Key: k, Detector: detector, offset: m.Pos()})
+			uniqueDetectors = append(uniqueDetectors, DetectorInfo{Key: k, Detector: detector, keywordOffset: m.Pos()})
 		}
 	}
 

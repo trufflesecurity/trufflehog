@@ -804,7 +804,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	results, err := data.detector.FromData(
 		ctx,
 		data.chunk.Verify,
-		data.chunk.Data[data.detector.Offset():min(chunkDataLen, chunkDataLen+300)],
+		data.chunk.Data[data.detector.KeywordOffset():min(chunkDataLen, chunkDataLen+300)],
 	)
 	if err != nil {
 		ctx.Logger().Error(err, "error scanning chunk")
