@@ -309,6 +309,7 @@ message Vector {
 message Webhook {
   oneof data {
     Vector vector = 1;
+  }
 }
 
 message MetaData {
