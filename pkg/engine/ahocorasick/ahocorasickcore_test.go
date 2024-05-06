@@ -76,11 +76,10 @@ func TestAhoCorasickCore_MultipleCustomDetectorsMatchable(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	detectorsMap := make(map[DetectorKey]detectors.Detector, 2)
-	ac.PopulateMatchingDetectors("a", detectorsMap)
+	dts := ac.MatchingDetectors("a")
 	matchingDetectors := make([]detectors.Detector, 0, 2)
-	for _, d := range detectorsMap {
-		matchingDetectors = append(matchingDetectors, d)
+	for _, d := range dts {
+		matchingDetectors = append(matchingDetectors, d.Detector)
 	}
 	assert.ElementsMatch(t, allDetectors, matchingDetectors)
 }
@@ -92,11 +91,10 @@ func TestAhoCorasickCore_MultipleDetectorVersionsMatchable(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	detectorsMap := make(map[DetectorKey]detectors.Detector, 2)
-	ac.PopulateMatchingDetectors("a", detectorsMap)
+	dts := ac.MatchingDetectors("a")
 	matchingDetectors := make([]detectors.Detector, 0, 2)
-	for _, d := range detectorsMap {
-		matchingDetectors = append(matchingDetectors, d)
+	for _, d := range dts {
+		matchingDetectors = append(matchingDetectors, d.Detector)
 	}
 	assert.ElementsMatch(t, allDetectors, matchingDetectors)
 }
@@ -107,11 +105,10 @@ func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	detectorsMap := make(map[DetectorKey]detectors.Detector, 2)
-	ac.PopulateMatchingDetectors("a a b b", detectorsMap)
+	dts := ac.MatchingDetectors("a a b b")
 	matchingDetectors := make([]detectors.Detector, 0, 2)
-	for _, d := range detectorsMap {
-		matchingDetectors = append(matchingDetectors, d)
+	for _, d := range dts {
+		matchingDetectors = append(matchingDetectors, d.Detector)
 	}
 	assert.ElementsMatch(t, allDetectors, matchingDetectors)
 }

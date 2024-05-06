@@ -583,7 +583,7 @@ func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
-	detector detectors.Detector
+	detector ahocorasick.DetectorInfo
 	chunk    sources.Chunk
 	decoder  detectorspb.DecoderType
 	wgDoneFn func()
@@ -603,9 +603,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
 
-	// Reuse the same map to avoid allocations.
-	const avgDetectorsPerChunk = 8
-	chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, avgDetectorsPerChunk)
 	for originalChunk := range e.ChunksChan() {
 		for chunk := range sources.Chunker(originalChunk) {
 			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
@@ -616,8 +613,8 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
-				if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
+				matchingDetectors := e.ahoCorasickCore.MatchingDetectors(string(decoded.Chunk.Data))
+				if len(matchingDetectors) > 1 && !e.verificationOverlap {
 					wgVerificationOverlap.Add(1)
 					e.verificationOverlapChunksChan <- verificationOverlapChunk{
 						chunk:                       *decoded.Chunk,
@@ -625,14 +622,10 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						decoder:                     decoded.DecoderType,
 						verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
 					}
-					// Empty the map.
-					for k := range chunkSpecificDetectors {
-						delete(chunkSpecificDetectors, k)
-					}
 					continue
 				}
 
-				for k, detector := range chunkSpecificDetectors {
+				for _, detector := range matchingDetectors {
 					decoded.Chunk.Verify = e.verify
 					wgDetect.Add(1)
 					e.detectableChunksChan <- detectableChunk{
@@ -641,7 +634,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 						decoder:  decoded.DecoderType,
 						wgDoneFn: wgDetect.Done,
 					}
-					delete(chunkSpecificDetectors, k)
 				}
 			}
 		}
@@ -704,7 +696,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]struct{}, avgSecretsPerDetector)
+	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]ahocorasick.DetectorInfo, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
@@ -719,7 +711,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				continue
 			}
 			if _, ok := detectorKeysWithResults[detector.Key]; !ok {
-				detectorKeysWithResults[detector.Key] = struct{}{}
+				detectorKeysWithResults[detector.Key] = detector
 			}
 
 			for _, res := range results {
@@ -762,13 +754,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			}
 		}
 
-		for key := range detectorKeysWithResults {
-			detector := e.ahoCorasickCore.GetDetectorByKey(key)
-			if detector == nil {
-				ctx.Logger().Info("detector not found", "key", key)
-				continue
-			}
-
+		for _, detector := range detectorKeysWithResults {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
 			e.detectableChunksChan <- detectableChunk{
@@ -809,7 +795,17 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	defer common.Recover(ctx)
 	defer cancel()
 
-	results, err := data.detector.FromData(ctx, data.chunk.Verify, data.chunk.Data)
+	// To reduce the overhead of regex calls in the detector, we limit the amount of data passed to each detector.
+	// We pass a small portion of the chunk, starting from the offset where the keyword was found for each detector,
+	// and up to a maximum of 300 characters from that offset. This optimization is based on the assumption that
+	// most secrets shouldn't exceed 300 characters in length from the keyword's position.
+	// The value of 300 is a temporary placeholder and can be adjusted based on further analysis and requirements.
+	chunkDataLen := len(data.chunk.Data)
+	results, err := data.detector.FromData(
+		ctx,
+		data.chunk.Verify,
+		data.chunk.Data[data.detector.Offset():min(chunkDataLen, chunkDataLen+300)],
+	)
 	if err != nil {
 		ctx.Logger().Error(err, "error scanning chunk")
 	}
