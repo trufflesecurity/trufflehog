@@ -280,6 +280,26 @@ message AzureRepos {
   string organization = 11;
 }
 
+message Postman {
+  string link = 1;
+  string workspace_uuid = 2;
+  string workspace_name = 3;
+  string globals_id = 4;
+  string collection_id = 5;
+  string collection_name = 6;
+  string environment_id = 7;
+  string environment_name = 8;
+  string request_id =  9;
+  string request_name = 10;
+  string folder_id = 11;
+  string folder_name = 12;
+  string field_type = 13;
+  string field_name = 14;
+  string variable_type = 15;
+}
+
+
+
 message Vector {
   string timestamp = 1;
   string source_type = 2;
@@ -289,7 +309,6 @@ message Vector {
 message Webhook {
   oneof data {
     Vector vector = 1;
-  }
 }
 
 message MetaData {
@@ -322,6 +341,7 @@ message MetaData {
     GoogleDrive googleDrive = 26;
     AzureRepos azureRepos = 27;
     TravisCI travisCI = 28;
-    Webhook webhook = 29;
+    Postman postman = 29;
+    Webhook webhook = 30;
   }
 }

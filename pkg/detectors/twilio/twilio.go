@@ -88,10 +88,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
-
 			if len(keyMatches) > 0 {
 				results = append(results, s1)
 			}

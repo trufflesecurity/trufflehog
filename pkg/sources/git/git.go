@@ -19,7 +19,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v61/github"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
@@ -421,7 +421,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
-	safeURL, err := stripPassword(params.gitURL)
+	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
 	if err != nil {
 		ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
 	}
@@ -433,17 +433,24 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	)
 
 	// Execute command and wait for the stdout / stderr.
-	output, err := cloneCmd.CombinedOutput()
+	outputBytes, err := cloneCmd.CombinedOutput()
+	var output string
+	if secretForRedaction != "" {
+		output = strings.ReplaceAll(string(outputBytes), secretForRedaction, "<secret>")
+	} else {
+		output = string(outputBytes)
+	}
+
 	if err != nil {
 		err = fmt.Errorf("error executing git clone: %w", err)
 	}
-	logger.V(3).Info("git subcommand finished", "output", string(output))
+	logger.V(3).Info("git subcommand finished", "output", output)
 
 	if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
 	}
 	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "output", string(output), "error", err)
+		logger.V(1).Info("git clone failed", "output", output, "error", err)
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
@@ -555,29 +562,55 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			break
 		}
 
-		fullHash := diff.Commit.Hash
+		commit := diff.Commit
+		fullHash := commit.Hash
 		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
 			logger.V(1).Info("reached base commit", "commit", fullHash)
 			break
 		}
+
+		email := commit.Author
+		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
 			logger.V(5).Info("scanning commit", "commit", fullHash)
-		}
 
-		if !scanOptions.Filter.Pass(diff.PathB) {
-			continue
+			// Scan the commit metadata.
+			// See https://github.com/trufflesecurity/trufflehog/issues/2683
+			var (
+				metadata = s.sourceMetadataFunc("", email, fullHash, when, remoteURL, 0)
+				sb       strings.Builder
+			)
+			sb.WriteString(email)
+			sb.WriteString("\n")
+			sb.WriteString(commit.Committer)
+			sb.WriteString("\n")
+			sb.WriteString(commit.Message.String())
+			chunk := sources.Chunk{
+				SourceName:     s.sourceName,
+				SourceID:       s.sourceID,
+				JobID:          s.jobID,
+				SourceType:     s.sourceType,
+				SourceMetadata: metadata,
+				Data:           []byte(sb.String()),
+				Verify:         s.verify,
+			}
+			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+				return err
+			}
 		}
 
 		fileName := diff.PathB
 		if fileName == "" {
 			continue
 		}
-		email := diff.Commit.Author
-		when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
+
+		if !scanOptions.Filter.Pass(fileName) {
+			continue
+		}
 
 		// Handle binary files by reading the entire file rather than using the diff.
 		if diff.IsBinary {
@@ -979,19 +1012,24 @@ func resolveHash(repo *git.Repository, ref string) (string, error) {
 	return resolved.String(), nil
 }
 
-func stripPassword(u string) (string, error) {
+// stripPassword removes username:password contents from URLs. The first return value is the cleaned URL and the second
+// is the password that was returned, if any. Callers can therefore use this function to identify secret material to
+// redact elsewhere. If the argument begins with git@, it is returned unchanged, and the returned password is the empty
+// string. If the argument is otherwise not parseable by url.Parse, an error is returned.
+func stripPassword(u string) (string, string, error) {
 	if strings.HasPrefix(u, "git@") {
-		return u, nil
+		return u, "", nil
 	}
 
 	repoURL, err := url.Parse(u)
 	if err != nil {
-		return "", fmt.Errorf("repo remote is not a URI: %w", err)
+		return "", "", fmt.Errorf("repo remote is not a URI: %w", err)
 	}
 
+	password, _ := repoURL.User.Password()
 	repoURL.User = nil
 
-	return repoURL.String(), nil
+	return repoURL.String(), password, nil
 }
 
 // TryAdditionalBaseRefs looks for additional possible base refs for a repo and returns a hash if found.
@@ -1153,7 +1191,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 		remote = remotes[0]
 	}
 	// URLs is guaranteed to be non-empty
-	safeURL, err := stripPassword(remote.Config().URLs[0])
+	safeURL, _, err := stripPassword(remote.Config().URLs[0])
 	if err != nil {
 		return ""
 	}

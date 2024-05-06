@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
 	"golang.org/x/crypto/ssh"
@@ -27,7 +28,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// TODO: add base64 encoded key support
-	client = common.RetryableHttpClient()
+	client = common.RetryableHTTPClient()
 	keyPat = regexp.MustCompile(`(?i)-----\s*?BEGIN[ A-Z0-9_-]*?PRIVATE KEY\s*?-----[\s\S]*?----\s*?END[ A-Z0-9_-]*? PRIVATE KEY\s*?-----`)
 )
 

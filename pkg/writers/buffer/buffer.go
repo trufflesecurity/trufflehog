@@ -4,11 +4,9 @@ package buffer
 
 import (
 	"bytes"
-	"fmt"
+	"io"
 	"sync"
 	"time"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type poolMetrics struct{}
@@ -24,10 +22,11 @@ func (poolMetrics) recordBufferRetrival() {
 	bufferCount.Inc()
 }
 
-func (poolMetrics) recordBufferReturn(bufCap, bufLen int64) {
+func (poolMetrics) recordBufferReturn(buf *Buffer) {
 	activeBufferCount.Dec()
-	totalBufferSize.Add(float64(bufCap))
-	totalBufferLength.Add(float64(bufLen))
+	totalBufferSize.Add(float64(buf.Cap()))
+	totalBufferLength.Add(float64(buf.Len()))
+	buf.recordMetric()
 }
 
 // PoolOpts is a function that configures a BufferPool.
@@ -59,10 +58,9 @@ func NewBufferPool(opts ...PoolOpts) *Pool {
 }
 
 // Get returns a Buffer from the pool.
-func (p *Pool) Get(ctx context.Context) *Buffer {
+func (p *Pool) Get() *Buffer {
 	buf, ok := p.Pool.Get().(*Buffer)
 	if !ok {
-		ctx.Logger().Error(fmt.Errorf("Buffer pool returned unexpected type"), "using new Buffer")
 		buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
 	}
 	p.metrics.recordBufferRetrival()
@@ -73,7 +71,7 @@ func (p *Pool) Get(ctx context.Context) *Buffer {
 
 // Put returns a Buffer to the pool.
 func (p *Pool) Put(buf *Buffer) {
-	p.metrics.recordBufferReturn(int64(buf.Cap()), int64(buf.Len()))
+	p.metrics.recordBufferReturn(buf)
 
 	// If the Buffer is more than twice the default size, replace it with a new Buffer.
 	// This prevents us from returning very large buffers to the pool.
@@ -85,7 +83,6 @@ func (p *Pool) Put(buf *Buffer) {
 		// Reset the Buffer to clear any existing data.
 		buf.Reset()
 	}
-	buf.recordMetric()
 
 	p.Pool.Put(buf)
 }
@@ -118,10 +115,9 @@ func (b *Buffer) recordGrowth(size int) {
 }
 
 // Write date to the buffer.
-func (b *Buffer) Write(ctx context.Context, data []byte) (int, error) {
+func (b *Buffer) Write(data []byte) (int, error) {
 	if b.Buffer == nil {
 		// This case should ideally never occur if buffers are properly managed.
-		ctx.Logger().Error(fmt.Errorf("buffer is nil, initializing a new buffer"), "action", "initializing_new_buffer")
 		b.Buffer = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 		b.resetMetric()
 	}
@@ -129,33 +125,24 @@ func (b *Buffer) Write(ctx context.Context, data []byte) (int, error) {
 	size := len(data)
 	bufferLength := b.Buffer.Len()
 	totalSizeNeeded := bufferLength + size
-	// If the total size is within the threshold, write to the buffer.
-	ctx.Logger().V(4).Info(
-		"writing to buffer",
-		"data_size", size,
-		"content_size", bufferLength,
-	)
 
+	// If the total size is within the threshold, write to the buffer.
 	availableSpace := b.Buffer.Cap() - bufferLength
 	growSize := totalSizeNeeded - bufferLength
 	if growSize > availableSpace {
-		ctx.Logger().V(4).Info(
-			"buffer size exceeded, growing buffer",
-			"current_size", bufferLength,
-			"new_size", totalSizeNeeded,
-			"available_space", availableSpace,
-			"grow_size", growSize,
-		)
 		// We are manually growing the buffer so we can track the growth via metrics.
 		// Knowing the exact data size, we directly resize to fit it, rather than exponential growth
 		// which may require multiple allocations and copies if the size required is much larger
 		// than double the capacity. Our approach aligns with default behavior when growth sizes
 		// happen to match current capacity, retaining asymptotic efficiency benefits.
-		b.Buffer.Grow(growSize)
+		b.Grow(growSize)
 	}
 
 	return b.Buffer.Write(data)
 }
+
+// Compile time check to make sure readCloser implements io.ReadSeekCloser.
+var _ io.ReadSeekCloser = (*readCloser)(nil)
 
 // readCloser is a custom implementation of io.ReadCloser. It wraps a bytes.Reader
 // for reading data from an in-memory buffer and includes an onClose callback.
@@ -179,5 +166,18 @@ func (brc *readCloser) Close() error {
 	}
 
 	brc.onClose() // Return the buffer to the pool
+	brc.Reader = nil
 	return nil
+}
+
+// Read reads up to len(p) bytes into p from the underlying reader.
+// It returns the number of bytes read and any error encountered.
+// On reaching the end of the available data, it returns 0 and io.EOF.
+// Calling Read on a closed reader will also return 0 and io.EOF.
+func (brc *readCloser) Read(p []byte) (int, error) {
+	if brc.Reader == nil {
+		return 0, io.EOF
+	}
+
+	return brc.Reader.Read(p)
 }

@@ -23,13 +23,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"alchemy"}) + `\b([a-zA-Z0-9]{23}_[a-zA-Z0-9]{8})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"alchemy"}) + `\b([0-9a-zA-Z_]{32}|alcht_[0-9a-zA-Z]{30})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"alchemy"}
+	return []string{"alchemy","alcht_"}
 }
 
 // FromData will find and optionally verify Alchemy secrets in a given set of bytes.
@@ -59,11 +59,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.SetVerificationError(verificationErr, match)
 		}
 
-		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-		if !s1.Verified && detectors.IsKnownFalsePositive(match, detectors.DefaultFalsePositives, true) {
-			continue
-		}
-
 		results = append(results, s1)
 	}
 
@@ -85,15 +80,15 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		_ = res.Body.Close()
 	}()
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	switch res.StatusCode {
+	case http.StatusOK:
 		// If the endpoint returns useful information, we can return it as a map.
 		return true, nil, nil
-	} else if res.StatusCode == 401 {
+	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
-	} else {
-		err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-		return false, nil, err
+	default:
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 

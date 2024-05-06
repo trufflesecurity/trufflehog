@@ -95,6 +95,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
+	if len(conn.Buckets) > 0 && len(conn.IgnoreBuckets) > 0 {
+		return fmt.Errorf("either a bucket include list or a bucket ignore list can be specified, but not both")
+	}
+
 	return nil
 }
 
@@ -172,6 +176,11 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 		return s.conn.Buckets, nil
 	}
 
+	ignore := make(map[string]struct{}, len(s.conn.IgnoreBuckets))
+	for _, bucket := range s.conn.IgnoreBuckets {
+		ignore[bucket] = struct{}{}
+	}
+
 	res, err := client.ListBuckets(&s3.ListBucketsInput{})
 	if err != nil {
 		return nil, err
@@ -179,7 +188,10 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 
 	var bucketsToScan []string
 	for _, bucket := range res.Buckets {
-		bucketsToScan = append(bucketsToScan, *bucket.Name)
+		name := *bucket.Name
+		if _, ignored := ignore[name]; !ignored {
+			bucketsToScan = append(bucketsToScan, name)
+		}
 	}
 	return bucketsToScan, nil
 }

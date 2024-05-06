@@ -93,9 +93,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", path), "")
 
 		cleanPath := filepath.Clean(path)
-		fileInfo, err := os.Stat(cleanPath)
+		fileInfo, err := os.Lstat(cleanPath)
 		if err != nil {
 			logger.Error(err, "unable to get file info")
+			continue
+		}
+
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
+			logger.Info("skipping, not a regular file", "path", cleanPath)
 			continue
 		}
 
@@ -112,7 +117,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	return nil
 }
-
 func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	workerPool := new(errgroup.Group)
 	workerPool.SetLimit(s.concurrency)
@@ -148,12 +152,12 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 
 func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	logger := ctx.Logger().WithValues("path", path)
-	fileStat, err := os.Stat(path)
+	fileStat, err := os.Lstat(path)
 	if err != nil {
 		return fmt.Errorf("unable to stat file: %w", err)
 	}
-	if !fileStat.Mode().IsRegular() {
-		return fmt.Errorf("not a regular file")
+	if fileStat.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("skipping symlink")
 	}
 
 	inputFile, err := os.Open(path)
@@ -231,7 +235,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // filepath or a directory.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
-		fileInfo, err := os.Stat(filepath.Clean(path))
+		fileInfo, err := os.Lstat(filepath.Clean(path))
 		if err != nil {
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
@@ -274,7 +278,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	logger := ctx.Logger().WithValues("path", path)
 
 	cleanPath := filepath.Clean(path)
-	fileInfo, err := os.Stat(cleanPath)
+	fileInfo, err := os.Lstat(cleanPath)
 	if err != nil {
 		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get file info: %w", err))
 	}

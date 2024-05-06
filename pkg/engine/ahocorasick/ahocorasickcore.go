@@ -123,3 +123,7 @@ func CreateDetectorKey(d detectors.Detector) DetectorKey {
 	}
 	return DetectorKey{detectorType: detectorType, version: version, customDetectorName: customDetectorName}
 }
+
+func (ac *AhoCorasickCore) KeywordsToDetectors() map[string][]DetectorKey {
+	return ac.keywordsToDetectors
+}
