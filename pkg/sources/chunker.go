@@ -11,7 +11,7 @@ import (
 
 const (
 	// ChunkSize is the maximum size of a chunk.
-	ChunkSize = 10 * 1024
+	ChunkSize = 64 * 1024
 	// PeekSize is the size of the peek into the previous chunk.
 	PeekSize = 3 * 1024
 	// TotalChunkSize is the total size of a chunk with peek data.
@@ -149,6 +149,14 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 				ctx.Logger().Error(err, "error reading chunk")
 				chunkRes.err = err
 			case n > 0:
+				// If the capacity of the data slice is more than 10 times the length of the data slice,
+				// create a new slice with the length of the data slice.
+				// This is to prevent the data slice from holding more memory than needed.
+				if cap(chunkRes.data) > len(chunkRes.data)*10 {
+					data := make([]byte, len(chunkRes.data))
+					copy(data, chunkRes.data)
+					chunkRes.data = data
+				}
 				chunkRes.err = nil
 			default:
 				return

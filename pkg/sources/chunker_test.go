@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"math/rand"
 	"runtime"
@@ -179,25 +180,31 @@ func TestNewChunkedReader(t *testing.T) {
 }
 
 func BenchmarkChunkReader(b *testing.B) {
-	var bigChunk = make([]byte, 1<<24) // 16MB
+	chunkSizes := []int{1 << 10, 1 << 12, 1 << 14, 1 << 16, 1 << 18, 1 << 20, 1 << 22, 1 << 24} // 1KB, 4KB, 16KB, 64KB, 256KB, 1MB, 4MB, 16MB
 
-	reader := bytes.NewReader(bigChunk)
-	chunkReader := NewChunkReader(WithChunkSize(ChunkSize), WithPeekSize(PeekSize))
+	for _, chunkSize := range chunkSizes {
+		b.Run(fmt.Sprintf("ChunkSize_%d", chunkSize), func(b *testing.B) {
+			var bigChunk = make([]byte, chunkSize)
 
-	b.ReportAllocs()
-	b.ResetTimer()
+			reader := bytes.NewReader(bigChunk)
+			chunkReader := NewChunkReader(WithChunkSize(ChunkSize), WithPeekSize(PeekSize))
 
-	for i := 0; i < b.N; i++ {
-		b.StartTimer()
-		chunkResChan := chunkReader(context.Background(), reader)
+			b.ReportAllocs()
+			b.ResetTimer()
 
-		// Drain the channel.
-		for range chunkResChan {
-		}
+			for i := 0; i < b.N; i++ {
+				b.StartTimer()
+				chunkResChan := chunkReader(context.Background(), reader)
 
-		b.StopTimer()
-		_, err := reader.Seek(0, 0)
-		assert.Nil(b, err)
+				// Drain the channel.
+				for range chunkResChan {
+				}
+
+				b.StopTimer()
+				_, err := reader.Seek(0, 0)
+				assert.Nil(b, err)
+			}
+		})
 	}
 }
 
