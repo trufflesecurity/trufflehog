@@ -24,6 +24,8 @@
 
 **...and more**
 
+To learn more about about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
+
 </div>
 
 # :loudspeaker: Join Our Community
