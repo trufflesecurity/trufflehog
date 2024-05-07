@@ -73,24 +73,22 @@ type DetectorMatch struct {
 	Key DetectorKey
 	detectors.Detector
 	keywordOffset int64
-	spans         []span
+	matchSpans    []matchSpan
 }
 
-// span represents a single occurrence of a matched keyword in the chunk.
-type span struct {
-	start int64
-	end   int64
+// MatchSpan represents a single occurrence of a matched keyword in the chunk.
+// It contains the startOffset and endOffset byte offsets of the matched keyword within the chunk.
+type matchSpan struct {
+	startOffset int64
+	endOffset   int64
 }
-
-// KeywordOffset returns the byte position of the detected pattern.
-func (d *DetectorMatch) KeywordOffset() int64 { return d.keywordOffset }
 
 // Matches returns a slice of byte slices, each representing a matched portion of the chunk data.
 func (d *DetectorMatch) Matches(chunkData []byte) [][]byte {
-	matches := make([][]byte, len(d.spans))
-	for i, m := range d.spans {
-		end := min(m.end, int64(len(chunkData)))
-		matches[i] = chunkData[m.start:end]
+	matches := make([][]byte, len(d.matchSpans))
+	for i, m := range d.matchSpans {
+		end := min(m.endOffset, int64(len(chunkData)))
+		matches[i] = chunkData[m.startOffset:end]
 	}
 	return matches
 }
@@ -100,7 +98,7 @@ const maxMatchLength = 300
 // FindDetectorMatches finds the matching detectors for a given chunk of data using the Aho-Corasick algorithm.
 // It returns a slice of DetectorMatch instances, each containing the detector key, detector,
 // and a slice of matches.
-// Each span represents a position in the chunk data where a keyword was found,
+// Each matchSpan represents a position in the chunk data where a keyword was found,
 // along with a corresponding end position.
 // The end position is determined by taking the minimum of the keyword position + maxMatchLength and
 // the length of the chunk data.
@@ -122,9 +120,9 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 			if _, exists := detectorMatches[k]; !exists {
 				detector := ac.detectorsByKey[k]
 				detectorMatches[k] = &DetectorMatch{
-					Key:      k,
-					Detector: detector,
-					spans:    make([]span, 0),
+					Key:        k,
+					Detector:   detector,
+					matchSpans: make([]matchSpan, 0),
 				}
 			}
 
@@ -134,31 +132,31 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 			if end > int64(len(chunkData)) {
 				end = int64(len(chunkData))
 			}
-			detectorMatch.spans = append(detectorMatch.spans, span{start: start, end: end})
+			detectorMatch.matchSpans = append(detectorMatch.matchSpans, matchSpan{startOffset: start, endOffset: end})
 		}
 	}
 
 	uniqueDetectors := make([]DetectorMatch, 0, len(detectorMatches))
 	for _, detectorMatch := range detectorMatches {
-		detectorMatch.spans = mergeMatches(detectorMatch.spans)
+		detectorMatch.matchSpans = mergeMatches(detectorMatch.matchSpans)
 		uniqueDetectors = append(uniqueDetectors, *detectorMatch)
 	}
 
 	return uniqueDetectors
 }
 
-func mergeMatches(matches []span) []span {
+func mergeMatches(matches []matchSpan) []matchSpan {
 	if len(matches) <= 1 {
 		return matches
 	}
 
-	merged := make([]span, 0, len(matches))
+	merged := make([]matchSpan, 0, len(matches))
 	current := matches[0]
 
 	for i := 1; i < len(matches); i++ {
-		if matches[i].start <= current.end {
-			if matches[i].end > current.end {
-				current.end = matches[i].end
+		if matches[i].startOffset <= current.endOffset {
+			if matches[i].endOffset > current.endOffset {
+				current.endOffset = matches[i].endOffset
 			}
 		} else {
 			merged = append(merged, current)
