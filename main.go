@@ -158,11 +158,11 @@ var (
 	postmanScan  = cli.Command("postman", "Scan Postman")
 	postmanToken = postmanScan.Flag("token", "Postman token. Can also be provided with environment variable").Envar("POSTMAN_TOKEN").String()
 
-	postmanWorkspaces    = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
-	postmanCollectionIDs = postmanScan.Flag("collection-id", "Postman collection ID to scan. You can repeat this flag.").Strings()
-
-	postmanCollections  = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanWorkspaces   = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
 	postmanWorkspaceIDs = postmanScan.Flag("workspace-id", "Postman workspace ID to scan. You can repeat this flag.").Strings()
+
+	postmanCollections   = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanCollectionIDs = postmanScan.Flag("collection-id", "Postman collection ID to scan. You can repeat this flag.").Strings()
 
 	postmanEnvironments = postmanScan.Flag("environment", "Postman environment to scan. You can repeat this flag.").Strings()
 
