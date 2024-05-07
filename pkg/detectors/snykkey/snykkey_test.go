@@ -49,7 +49,7 @@ set PATH=%PATH%;C:\Program Files\nodejs\;C:\Program Files\Git\cmd`,
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, 2)
-			ahoCorasickCore.MatchingDetectors(test.input, chunkSpecificDetectors)
+			ahoCorasickCore.FindDetectorMatches(test.input, chunkSpecificDetectors)
 			if len(chunkSpecificDetectors) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return

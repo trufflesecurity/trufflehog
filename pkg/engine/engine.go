@@ -583,7 +583,7 @@ func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
-	detector ahocorasick.DetectorInfo
+	detector ahocorasick.DetectorMatch
 	chunk    sources.Chunk
 	decoder  detectorspb.DecoderType
 	wgDoneFn func()
@@ -595,7 +595,7 @@ type detectableChunk struct {
 type verificationOverlapChunk struct {
 	chunk                       sources.Chunk
 	decoder                     detectorspb.DecoderType
-	detectors                   []ahocorasick.DetectorInfo
+	detectors                   []ahocorasick.DetectorMatch
 	verificationOverlapWgDoneFn func()
 }
 
@@ -613,7 +613,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					continue
 				}
 
-				matchingDetectors := e.ahoCorasickCore.MatchingDetectors(string(decoded.Chunk.Data))
+				matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(string(decoded.Chunk.Data))
 				if len(matchingDetectors) > 1 && !e.verificationOverlap {
 					wgVerificationOverlap.Add(1)
 					e.verificationOverlapChunksChan <- verificationOverlapChunk{
@@ -696,7 +696,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]ahocorasick.DetectorInfo, avgSecretsPerDetector)
+	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]ahocorasick.DetectorMatch, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
@@ -796,47 +796,47 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	defer cancel()
 
 	// To reduce the overhead of regex calls in the detector, we limit the amount of data passed to each detector.
-	// We pass a small portion of the chunk, starting from the offset where the keyword was found for each detector,
-	// and up to a maximum of 300 characters from that offset. This optimization is based on the assumption that
-	// most secrets shouldn't exceed 300 characters in length from the keyword's position.
-	// The value of 300 is a temporary placeholder and can be adjusted based on further analysis and requirements.
-	chunkDataLen := len(data.chunk.Data)
-	results, err := data.detector.FromData(
-		ctx,
-		data.chunk.Verify,
-		data.chunk.Data[data.detector.KeywordOffset():min(chunkDataLen, chunkDataLen+300)],
-	)
-	if err != nil {
-		ctx.Logger().Error(err, "error scanning chunk")
-	}
-
-	if e.printAvgDetectorTime && len(results) > 0 {
-		elapsed := time.Since(start)
-		detectorName := results[0].DetectorType.String()
-		avgTimeI, ok := e.metrics.detectorAvgTime.Load(detectorName)
-		var avgTime []time.Duration
-		if ok {
-			avgTime, ok = avgTimeI.([]time.Duration)
-			if !ok {
-				return
-			}
+	// The Matches method of the DetectorMatch struct is used to extract the relevant portions of the chunk data
+	// based on the start and end positions of each match. The end position is determined by taking the minimum
+	// of the keyword position + maxMatchLength and the length of the chunk data.
+	// This optimization is based on the assumption that most secrets shouldn't exceed maxMatchLength (300)
+	// characters in length from the keyword's position.
+	// The value of maxMatchLength is a constant and can be adjusted based on further analysis and requirements.
+	matchedBytes := data.detector.Matches(data.chunk.Data)
+	for _, match := range matchedBytes {
+		results, err := data.detector.FromData(ctx, data.chunk.Verify, match)
+		if err != nil {
+			ctx.Logger().Error(err, "error scanning chunk")
 		}
-		avgTime = append(avgTime, elapsed)
-		e.metrics.detectorAvgTime.Store(detectorName, avgTime)
-	}
 
-	if e.filterUnverified {
-		results = detectors.CleanResults(results)
-	}
+		if e.printAvgDetectorTime && len(results) > 0 {
+			elapsed := time.Since(start)
+			detectorName := results[0].DetectorType.String()
+			avgTimeI, ok := e.metrics.detectorAvgTime.Load(detectorName)
+			var avgTime []time.Duration
+			if ok {
+				avgTime, ok = avgTimeI.([]time.Duration)
+				if !ok {
+					return
+				}
+			}
+			avgTime = append(avgTime, elapsed)
+			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
+		}
 
-	results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
+		if e.filterUnverified {
+			results = detectors.CleanResults(results)
+		}
 
-	if e.filterEntropy != nil {
-		results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, e.logFilteredUnverified)
-	}
+		results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
 
-	for _, res := range results {
-		e.processResult(ctx, data, res)
+		if e.filterEntropy != nil {
+			results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, e.logFilteredUnverified)
+		}
+
+		for _, res := range results {
+			e.processResult(ctx, data, res)
+		}
 	}
 	data.wgDoneFn()
 }

@@ -549,11 +549,11 @@ func TestSetLink(t *testing.T) {
 func TestLikelyDuplicate(t *testing.T) {
 	// Initialize detectors
 	// (not actually calling detector FromData or anything, just using detector struct for key creation)
-	detectorA := ahocorasick.DetectorInfo{
+	detectorA := ahocorasick.DetectorMatch{
 		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[0]),
 		Detector: DefaultDetectors()[0],
 	}
-	detectorB := ahocorasick.DetectorInfo{
+	detectorB := ahocorasick.DetectorMatch{
 		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[1]),
 		Detector: DefaultDetectors()[1],
 	}
@@ -656,7 +656,7 @@ func BenchmarkPopulateMatchingDetectors(b *testing.B) {
 					}
 					chunk := sampleData[offset:end]
 					b.StartTimer()
-					ac.MatchingDetectors(chunk)
+					ac.FindDetectorMatches(chunk)
 					b.StopTimer()
 					offset = end
 				}
