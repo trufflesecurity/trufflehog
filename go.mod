@@ -20,7 +20,7 @@ require (
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
-	github.com/brianvoe/gofakeit/v7 v7.0.2
+	github.com/brianvoe/gofakeit/v7 v7.0.3
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.26.1
 	github.com/charmbracelet/glamour v0.7.0
