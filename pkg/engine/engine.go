@@ -402,11 +402,13 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 }
 
 func (e *Engine) initSourceManager(ctx context.Context) {
+	const defaultOutputBufferSize = 64
+
 	opts := []func(*sources.SourceManager){
 		sources.WithConcurrentSources(int(e.concurrency)),
 		sources.WithConcurrentUnits(int(e.concurrency)),
 		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultChannelBuffer),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
 	}
 	if e.jobReportWriter != nil {
 		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
@@ -581,7 +583,7 @@ func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
-	detector detectors.Detector
+	detector ahocorasick.DetectorMatch
 	chunk    sources.Chunk
 	decoder  detectorspb.DecoderType
 	wgDoneFn func()
@@ -593,7 +595,7 @@ type detectableChunk struct {
 type verificationOverlapChunk struct {
 	chunk                       sources.Chunk
 	decoder                     detectorspb.DecoderType
-	detectors                   []ahocorasick.DetectorInfo
+	detectors                   []ahocorasick.DetectorMatch
 	verificationOverlapWgDoneFn func()
 }
 
@@ -601,46 +603,40 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
 
-	// Reuse the same map to avoid allocations.
-	const avgDetectorsPerChunk = 8
-	chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, avgDetectorsPerChunk)
 	for chunk := range e.ChunksChan() {
-		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
-		for _, decoder := range e.decoders {
-			decoded := decoder.FromChunk(chunk)
-			if decoded == nil {
-				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
+			for _, decoder := range e.decoders {
+				decoded := decoder.FromChunk(chunk)
+				if decoded == nil {
+					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+					continue
+				}
+
+				matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(string(decoded.Chunk.Data))
+				if len(matchingDetectors) > 1 && !e.verificationOverlap {
+					wgVerificationOverlap.Add(1)
+					e.verificationOverlapChunksChan <- verificationOverlapChunk{
+						chunk:                       *decoded.Chunk,
+						detectors:                   matchingDetectors,
+						decoder:                     decoded.DecoderType,
+						verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+					}
+					continue
+				}
+
+				for _, detector := range matchingDetectors {
+					decoded.Chunk.Verify = e.verify
+					wgDetect.Add(1)
+					e.detectableChunksChan <- detectableChunk{
+						chunk:    *decoded.Chunk,
+						detector: detector,
+						decoder:  decoded.DecoderType,
+						wgDoneFn: wgDetect.Done,
+					}
+				}
 				continue
 			}
-
-			matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
-			if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
-				wgVerificationOverlap.Add(1)
-				e.verificationOverlapChunksChan <- verificationOverlapChunk{
-					chunk:                       *decoded.Chunk,
-					detectors:                   matchingDetectors,
-					decoder:                     decoded.DecoderType,
-					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
-				}
-				// Empty the map.
-				for k := range chunkSpecificDetectors {
-					delete(chunkSpecificDetectors, k)
-				}
-				continue
-			}
-
-			for k, detector := range chunkSpecificDetectors {
-				decoded.Chunk.Verify = e.verify
-				wgDetect.Add(1)
-				e.detectableChunksChan <- detectableChunk{
-					chunk:    *decoded.Chunk,
-					detector: detector,
-					decoder:  decoded.DecoderType,
-					wgDoneFn: wgDetect.Done,
-				}
-				delete(chunkSpecificDetectors, k)
-			}
-		}
+}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
 	}
 
@@ -700,7 +696,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]struct{}, avgSecretsPerDetector)
+	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]ahocorasick.DetectorMatch, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
@@ -715,7 +711,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				continue
 			}
 			if _, ok := detectorKeysWithResults[detector.Key]; !ok {
-				detectorKeysWithResults[detector.Key] = struct{}{}
+				detectorKeysWithResults[detector.Key] = detector
 			}
 
 			for _, res := range results {
@@ -758,13 +754,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			}
 		}
 
-		for key := range detectorKeysWithResults {
-			detector := e.ahoCorasickCore.GetDetectorByKey(key)
-			if detector == nil {
-				ctx.Logger().Info("detector not found", "key", key)
-				continue
-			}
-
+		for _, detector := range detectorKeysWithResults {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
 			e.detectableChunksChan <- detectableChunk{
@@ -805,38 +795,48 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	defer common.Recover(ctx)
 	defer cancel()
 
-	results, err := data.detector.FromData(ctx, data.chunk.Verify, data.chunk.Data)
-	if err != nil {
-		ctx.Logger().Error(err, "error scanning chunk")
-	}
-
-	if e.printAvgDetectorTime && len(results) > 0 {
-		elapsed := time.Since(start)
-		detectorName := results[0].DetectorType.String()
-		avgTimeI, ok := e.metrics.detectorAvgTime.Load(detectorName)
-		var avgTime []time.Duration
-		if ok {
-			avgTime, ok = avgTimeI.([]time.Duration)
-			if !ok {
-				return
-			}
+	// To reduce the overhead of regex calls in the detector, we limit the amount of data passed to each detector.
+	// The Matches method of the DetectorMatch struct is used to extract the relevant portions of the chunk data
+	// based on the start and end positions of each match. The end position is determined by taking the minimum
+	// of the keyword position + maxMatchLength and the length of the chunk data.
+	// This optimization is based on the assumption that most secrets shouldn't exceed maxMatchLength (300)
+	// characters in length from the keyword's position.
+	// The value of maxMatchLength is a constant and can be adjusted based on further analysis and requirements.
+	matchedBytes := data.detector.Matches(data.chunk.Data)
+	for _, match := range matchedBytes {
+		results, err := data.detector.FromData(ctx, data.chunk.Verify, match)
+		if err != nil {
+			ctx.Logger().Error(err, "error scanning chunk")
 		}
-		avgTime = append(avgTime, elapsed)
-		e.metrics.detectorAvgTime.Store(detectorName, avgTime)
-	}
 
-	if e.filterUnverified {
-		results = detectors.CleanResults(results)
-	}
+		if e.printAvgDetectorTime && len(results) > 0 {
+			elapsed := time.Since(start)
+			detectorName := results[0].DetectorType.String()
+			avgTimeI, ok := e.metrics.detectorAvgTime.Load(detectorName)
+			var avgTime []time.Duration
+			if ok {
+				avgTime, ok = avgTimeI.([]time.Duration)
+				if !ok {
+					return
+				}
+			}
+			avgTime = append(avgTime, elapsed)
+			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
+		}
 
-	results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
+		if e.filterUnverified {
+			results = detectors.CleanResults(results)
+		}
 
-	if e.filterEntropy != nil {
-		results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, e.logFilteredUnverified)
-	}
+		results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
 
-	for _, res := range results {
-		e.processResult(ctx, data, res)
+		if e.filterEntropy != nil {
+			results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, e.logFilteredUnverified)
+		}
+
+		for _, res := range results {
+			e.processResult(ctx, data, res)
+		}
 	}
 	data.wgDoneFn()
 }

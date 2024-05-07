@@ -66,47 +66,106 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 	}
 }
 
-// GetDetectorByKey returns the detector associated with the given key. If no detector is found, it
-// returns nil.
-func (ac *AhoCorasickCore) GetDetectorByKey(key DetectorKey) detectors.Detector {
-	return ac.detectorsByKey[key]
-}
-
-// DetectorInfo represents a detected pattern's metadata in a data chunk.
-// It encapsulates the key identifying a specific detector and the detector instance itself.
-type DetectorInfo struct {
+// DetectorMatch represents a detected pattern's metadata in a data chunk.
+// It encapsulates the key identifying a specific detector, the detector instance itself,
+// and the start and end offsets of the matched keyword in the chunk.
+type DetectorMatch struct {
 	Key DetectorKey
 	detectors.Detector
+	keywordOffset int64
+	matchSpans    []matchSpan
 }
 
-// PopulateMatchingDetectors populates the given detector slice with all the detectors matching the
-// provided input. This method populates an existing map rather than allocating a new one because
-// it will be called once per chunk and that many allocations has a noticeable performance cost.
-// It returns a slice of unique 'DetectorInfo' corresponding to the matched detectors. This slice is
-// constructed to prevent duplications by utilizing an internal map to track already processed detectors.
-func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[DetectorKey]detectors.Detector) []DetectorInfo {
+// MatchSpan represents a single occurrence of a matched keyword in the chunk.
+// It contains the startOffset and endOffset byte offsets of the matched keyword within the chunk.
+type matchSpan struct {
+	startOffset int64
+	endOffset   int64
+}
+
+// Matches returns a slice of byte slices, each representing a matched portion of the chunk data.
+func (d *DetectorMatch) Matches(chunkData []byte) [][]byte {
+	matches := make([][]byte, len(d.matchSpans))
+	for i, m := range d.matchSpans {
+		end := min(m.endOffset, int64(len(chunkData)))
+		matches[i] = chunkData[m.startOffset:end]
+	}
+	return matches
+}
+
+const maxMatchLength = 300
+
+// FindDetectorMatches finds the matching detectors for a given chunk of data using the Aho-Corasick algorithm.
+// It returns a slice of DetectorMatch instances, each containing the detector key, detector,
+// and a slice of matches.
+// Each matchSpan represents a position in the chunk data where a keyword was found,
+// along with a corresponding end position.
+// The end position is determined by taking the minimum of the keyword position + maxMatchLength and
+// the length of the chunk data.
+// Adjacent or overlapping matches are merged to avoid duplicating or overlapping the matched
+// portions of the chunk data.
+func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch {
 	matches := ac.prefilter.MatchString(strings.ToLower(chunkData))
 
-	// Use a map to avoid adding duplicate detectors to the slice.
-	addedDetectors := make(map[DetectorKey]struct{})
-	uniqueDetectors := make([]DetectorInfo, 0, len(matches))
+	matchCount := len(matches)
+
+	if matchCount == 0 {
+		return nil
+	}
+
+	detectorMatches := make(map[DetectorKey]*DetectorMatch)
 
 	for _, m := range matches {
 		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
-			if _, exists := addedDetectors[k]; exists {
-				continue
+			if _, exists := detectorMatches[k]; !exists {
+				detector := ac.detectorsByKey[k]
+				detectorMatches[k] = &DetectorMatch{
+					Key:        k,
+					Detector:   detector,
+					matchSpans: make([]matchSpan, 0),
+				}
 			}
-			// Add to the map to track already added detectors.
-			addedDetectors[k] = struct{}{}
 
-			// Add the detector to the map and slice.
-			detector := ac.detectorsByKey[k]
-			dts[k] = detector
-			uniqueDetectors = append(uniqueDetectors, DetectorInfo{Key: k, Detector: detector})
+			detectorMatch := detectorMatches[k]
+			start := m.Pos()
+			end := start + maxMatchLength
+			if end > int64(len(chunkData)) {
+				end = int64(len(chunkData))
+			}
+			detectorMatch.matchSpans = append(detectorMatch.matchSpans, matchSpan{startOffset: start, endOffset: end})
 		}
 	}
 
+	uniqueDetectors := make([]DetectorMatch, 0, len(detectorMatches))
+	for _, detectorMatch := range detectorMatches {
+		detectorMatch.matchSpans = mergeMatches(detectorMatch.matchSpans)
+		uniqueDetectors = append(uniqueDetectors, *detectorMatch)
+	}
+
 	return uniqueDetectors
+}
+
+func mergeMatches(matches []matchSpan) []matchSpan {
+	if len(matches) <= 1 {
+		return matches
+	}
+
+	merged := make([]matchSpan, 0, len(matches))
+	current := matches[0]
+
+	for i := 1; i < len(matches); i++ {
+		if matches[i].startOffset <= current.endOffset {
+			if matches[i].endOffset > current.endOffset {
+				current.endOffset = matches[i].endOffset
+			}
+		} else {
+			merged = append(merged, current)
+			current = matches[i]
+		}
+	}
+
+	merged = append(merged, current)
+	return merged
 }
 
 // CreateDetectorKey creates a unique key for each detector from its type, version, and, for
