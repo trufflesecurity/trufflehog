@@ -34,12 +34,24 @@ type fileReader struct {
 func newFileReader(r io.ReadCloser) (fileReader, error) {
 	defer r.Close()
 
-	var reader fileReader
-	rdr, err := readers.NewBufferedFileReader(r)
+	var (
+		reader fileReader
+		rdr    *readers.BufferedFileReader
+		err    error
+	)
+	rdr, err = readers.NewBufferedFileReader(r)
 	if err != nil {
 		return reader, fmt.Errorf("error creating random access reader: %w", err)
 	}
 	reader.BufferedFileReader = rdr
+
+	// Ensure the reader is closed if an error occurs after the reader is created.
+	// During non-error conditions, the caller is responsible for closing the reader.
+	defer func() {
+		if err != nil && rdr != nil {
+			_ = rdr.Close()
+		}
+	}()
 
 	format, arReader, err := archiver.Identify("", rdr)
 	switch {
