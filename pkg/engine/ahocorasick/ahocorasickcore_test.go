@@ -134,7 +134,7 @@ func TestFindDetectorMatches(t *testing.T) {
 	}{
 
 		{
-			name: "single match",
+			name: "single span",
 			detectors: []detectors.Detector{
 				testDetectorV3{},
 			},
@@ -198,8 +198,8 @@ func TestFindDetectorMatches(t *testing.T) {
 				assert.Contains(t, tc.expectedResult, detectorMatch.Key, "Expected detector key to be present")
 
 				expectedMatches := tc.expectedResult[detectorMatch.Key]
-				actualMatches := make([][]int64, len(detectorMatch.matches))
-				for i, match := range detectorMatch.matches {
+				actualMatches := make([][]int64, len(detectorMatch.spans))
+				for i, match := range detectorMatch.spans {
 					actualMatches[i] = []int64{match.start, match.end}
 				}
 
@@ -211,7 +211,7 @@ func TestFindDetectorMatches(t *testing.T) {
 				var actualMatches [][]int64
 				for _, detectorMatch := range detectorMatches {
 					if detectorMatch.Key == key {
-						for _, match := range detectorMatch.matches {
+						for _, match := range detectorMatch.spans {
 							actualMatches = append(actualMatches, []int64{match.start, match.end})
 						}
 					}

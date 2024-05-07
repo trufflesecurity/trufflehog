@@ -73,11 +73,11 @@ type DetectorMatch struct {
 	Key DetectorKey
 	detectors.Detector
 	keywordOffset int64
-	matches       []match
+	spans         []span
 }
 
-// match represents a single occurrence of a matched keyword in the chunk.
-type match struct {
+// span represents a single occurrence of a matched keyword in the chunk.
+type span struct {
 	start int64
 	end   int64
 }
@@ -87,8 +87,8 @@ func (d *DetectorMatch) KeywordOffset() int64 { return d.keywordOffset }
 
 // Matches returns a slice of byte slices, each representing a matched portion of the chunk data.
 func (d *DetectorMatch) Matches(chunkData []byte) [][]byte {
-	matches := make([][]byte, len(d.matches))
-	for i, m := range d.matches {
+	matches := make([][]byte, len(d.spans))
+	for i, m := range d.spans {
 		end := min(m.end, int64(len(chunkData)))
 		matches[i] = chunkData[m.start:end]
 	}
@@ -100,7 +100,7 @@ const maxMatchLength = 300
 // FindDetectorMatches finds the matching detectors for a given chunk of data using the Aho-Corasick algorithm.
 // It returns a slice of DetectorMatch instances, each containing the detector key, detector,
 // and a slice of matches.
-// Each match represents a position in the chunk data where a keyword was found,
+// Each span represents a position in the chunk data where a keyword was found,
 // along with a corresponding end position.
 // The end position is determined by taking the minimum of the keyword position + maxMatchLength and
 // the length of the chunk data.
@@ -124,7 +124,7 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 				detectorMatches[k] = &DetectorMatch{
 					Key:      k,
 					Detector: detector,
-					matches:  make([]match, 0),
+					spans:    make([]span, 0),
 				}
 			}
 
@@ -134,25 +134,25 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 			if end > int64(len(chunkData)) {
 				end = int64(len(chunkData))
 			}
-			detectorMatch.matches = append(detectorMatch.matches, match{start: start, end: end})
+			detectorMatch.spans = append(detectorMatch.spans, span{start: start, end: end})
 		}
 	}
 
 	uniqueDetectors := make([]DetectorMatch, 0, len(detectorMatches))
 	for _, detectorMatch := range detectorMatches {
-		detectorMatch.matches = mergeMatches(detectorMatch.matches)
+		detectorMatch.spans = mergeMatches(detectorMatch.spans)
 		uniqueDetectors = append(uniqueDetectors, *detectorMatch)
 	}
 
 	return uniqueDetectors
 }
 
-func mergeMatches(matches []match) []match {
+func mergeMatches(matches []span) []span {
 	if len(matches) <= 1 {
 		return matches
 	}
 
-	merged := make([]match, 0, len(matches))
+	merged := make([]span, 0, len(matches))
 	current := matches[0]
 
 	for i := 1; i < len(matches); i++ {
