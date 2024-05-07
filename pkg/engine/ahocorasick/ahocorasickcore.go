@@ -72,12 +72,11 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 type DetectorMatch struct {
 	Key DetectorKey
 	detectors.Detector
-	keywordOffset int64
-	matchSpans    []matchSpan
+	matchSpans []matchSpan
 }
 
 // MatchSpan represents a single occurrence of a matched keyword in the chunk.
-// It contains the startOffset and endOffset byte offsets of the matched keyword within the chunk.
+// It contains the start and end byte offsets of the matched keyword within the chunk.
 type matchSpan struct {
 	startOffset int64
 	endOffset   int64
@@ -145,6 +144,8 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 	return uniqueDetectors
 }
 
+// mergeMatches merges overlapping or adjacent matchSpans into a single matchSpan.
+// It takes a slice of matchSpans and returns a new slice with merged matchSpans.
 func mergeMatches(matches []matchSpan) []matchSpan {
 	if len(matches) <= 1 {
 		return matches
