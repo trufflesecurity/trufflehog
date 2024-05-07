@@ -28,7 +28,7 @@ To learn more about about TruffleHog and its features and capabilities, visit ou
 
 </div>
 
-# :money_with_wings: Enterprise product
+# :money_with_wings: Trufflehog Enterprise
 
 Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more <https://trufflesecurity.com/contact/>
 
