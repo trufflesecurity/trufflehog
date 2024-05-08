@@ -156,9 +156,9 @@ func CleanResults(results []Result) []Result {
 // 40 characters of the capturing group that follows.
 // This can help prevent false positives.
 func PrefixRegex(keywords []string) string {
-	pre := `(?i)(?:`
+	pre := `(?i:`
 	middle := strings.Join(keywords, "|")
-	post := `)(?:.|[\n\r]){0,40}?(?-i)`
+	post := `)(?:.|[\n\r]){0,40}?`
 	return pre + middle + post
 }
 
