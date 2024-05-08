@@ -111,21 +111,26 @@ func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName
 	}
 	defer res.Body.Close()
 
-	// parse container names and append in extra data
-	body, err := io.ReadAll(res.Body)
-	if err == nil {
-		response := storageResponse{}
-		if err := xml.Unmarshal(body, &response); err == nil {
-			var containerNames []string
-			for _, c := range response.Containers.Container {
-				containerNames = append(containerNames, c.Name)
-			}
-			extraData["container_names"] = strings.Join(containerNames, ", ")
-		}
-	}
-
 	switch res.StatusCode {
 	case http.StatusOK:
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+
+		// parse response
+		response := storageResponse{}
+		if err := xml.Unmarshal(body, &response); err != nil {
+			return false, err
+		}
+
+		// update the extra data with container names only
+		var containerNames []string
+		for _, c := range response.Containers.Container {
+			containerNames = append(containerNames, c.Name)
+		}
+		extraData["container_names"] = strings.Join(containerNames, ", ")
+
 		return true, nil
 	case http.StatusForbidden:
 		// 403 if account id or key is invalid, or if the account is disabled
