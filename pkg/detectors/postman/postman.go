@@ -22,7 +22,7 @@ const verifyURL = "https://api.getpostman.com/collections"
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(PMAK-[a-zA-Z-0-9]{59})\b`)

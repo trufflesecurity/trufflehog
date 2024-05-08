@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 const verifyURL = "https://api.pagerduty.com/users"
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"pagerduty", "pager_duty", "pd_", "pd-"}) + `\b(u\+[a-zA-Z0-9_+-]{18})\b`)
 )

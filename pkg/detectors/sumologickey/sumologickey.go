@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"sumo"}) + `\b([A-Za-z0-9]{14})\b`)

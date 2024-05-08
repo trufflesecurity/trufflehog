@@ -24,7 +24,7 @@ var _ detectors.Versioner = (*Scanner)(nil)
 func (Scanner) Version() int { return 2 }
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"figma"}) + `\b(fig[d|((u|o)(r|h)?)]_[a-z0-9A-Z_-]{40})\b`)
 )
 

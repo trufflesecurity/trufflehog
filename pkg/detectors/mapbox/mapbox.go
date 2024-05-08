@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 	idPat  = regexp.MustCompile(`([a-zA-Z-0-9]{4,32})`)
 	keyPat = regexp.MustCompile(`\b(sk\.[a-zA-Z-0-9\.]{80,240})\b`)
 )

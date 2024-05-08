@@ -16,7 +16,7 @@ type Scanner struct {
 }
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	usernamePat   = regexp.MustCompile(`\b[a-z0-9]{12}\b`)
 	passwordPat   = regexp.MustCompile(`\bpscale_tkn_[A-Za-z0-9_]{43}\b`)
 )

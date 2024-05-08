@@ -25,7 +25,7 @@ var _ detectors.Versioner = (*Scanner)(nil)
 func (Scanner) Version() int { return 2 }
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/
 	// Tokens created after Jan 18 2023 use a variable length

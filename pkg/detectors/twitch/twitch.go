@@ -24,7 +24,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 const verifyURL = "https://id.twitch.tv/oauth2/token"
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitch"}) + `\b([0-9a-z]{30})\b`)

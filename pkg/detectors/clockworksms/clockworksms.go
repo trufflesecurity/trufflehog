@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	userKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"clockwork", "textanywhere"}) + `\b([0-9]{5})\b`)

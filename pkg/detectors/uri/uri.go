@@ -26,7 +26,7 @@ var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 var (
 	keyPat = regexp.MustCompile(`\b(?:https?:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

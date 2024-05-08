@@ -22,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(ak_live_[a-zA-Z0-9]{30})\b`)
 )
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	//req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.pagar.me/1/balance", nil) send a post to this endpoint with the parameters api_key=token
+	// req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.pagar.me/1/balance", nil) send a post to this endpoint with the parameters api_key=token
 	data := `{"api_key":"` + token + `"}`
 	payload := strings.NewReader(data)
 

@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) doVerification(ctx context.Context, token string) (bool, map[string]string, error) {
 	client := s.client
 	if client == nil {
-		client = common.SaneHttpClient()
+		client = common.SaneHttpClient(common.WithDetectorTransport())
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://snyk.io/api/v1/user/me", nil)

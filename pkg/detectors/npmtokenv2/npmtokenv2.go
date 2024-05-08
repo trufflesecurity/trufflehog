@@ -20,7 +20,7 @@ var _ detectors.Versioner = (*Scanner)(nil)
 func (s Scanner) Version() int { return 2 }
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`(npm_[0-9a-zA-Z]{36})`)

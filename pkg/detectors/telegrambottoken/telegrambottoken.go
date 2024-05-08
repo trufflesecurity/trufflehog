@@ -20,7 +20,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// https://core.telegram.org/bots#6-botfather
 	// thanks https://stackoverflow.com/questions/61868770/tegram-bot-api-token-format

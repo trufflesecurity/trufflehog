@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	appPat      = regexp.MustCompile(`(app[a-zA-Z0-9_-]{14})`) // could be part of url
 	keyPat      = regexp.MustCompile(`\b(key[a-zA-Z0-9_-]{14})\b`)

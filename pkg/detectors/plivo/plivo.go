@@ -19,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"plivo"}) + `\b([A-Z]{20})\b`)
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"plivo"}) + `\b([A-Za-z0-9_-]{40})\b`)
 )

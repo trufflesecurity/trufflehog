@@ -18,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 	// TODO: support live key
 	keyPat = regexp.MustCompile(`\b(sk\_[a-z]{1,}\_[A-Za-z0-9]{40})\b`)
 )

@@ -24,7 +24,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// There is conflicting information about the expected length of access tokens.
 	// 10 seems like a reasonable minimum that will weed out placeholders.

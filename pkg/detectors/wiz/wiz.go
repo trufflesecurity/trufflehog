@@ -23,7 +23,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"wiz"}) + `\b([a-zA-Z0-9]{53})\b`)
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"wiz"}) + `\b([a-zA-Z0-9]{64})\b`)
