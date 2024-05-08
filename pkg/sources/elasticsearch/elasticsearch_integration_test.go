@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"testing"
 	"time"
@@ -65,9 +64,7 @@ func TestSource_ElasticAPI(t *testing.T) {
 	})
 
 	indexName := gofakeit.Word()
-	t.Log(fmt.Sprintf("indexName: %s\n", indexName))
 	indexName2 := gofakeit.Word()
-	t.Log(fmt.Sprintf("indexName2: %s\n", indexName2))
 	now := time.Now()
 
 	payload := make(map[string]string)
@@ -343,6 +340,105 @@ func TestSource_ElasticAPI(t *testing.T) {
 					payload["message"],
 					doc.message,
 				)
+			}
+		},
+	)
+
+	t.Run(
+		"Correct number of documents is skipped given a skipPercent",
+		func(t *testing.T) {
+			messagesFound := 0
+
+			for i := 0; i < 40; i++ {
+				pl := make(map[string]string)
+				pl["message"] = gofakeit.Word()
+				pl["@timestamp"] = time.Now().Format(time.RFC3339)
+
+				index := indexName2
+				if i < 20 {
+					index = indexName
+				}
+
+				jsonMsg, err := json.Marshal(pl)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				req = esapi.IndexRequest{
+					Index:   index,
+					Body:    bytes.NewReader(jsonMsg),
+					Refresh: "true",
+				}
+
+				res, err = req.Do(ctx, es)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer res.Body.Close()
+			}
+
+			docSearch := DocumentSearch{
+				index: &Index{
+					name:             indexName,
+					primaryShards:    []int{0},
+					documentCount:    21,
+					latestDocumentID: -1,
+				},
+				documentCount: 21,
+				offset:        0,
+				filterParams:  &FilterParams{},
+				skipPercent:   .5,
+			}
+
+			docsProcessed, err := processSearchedDocuments(
+				ctx,
+				es,
+				&docSearch,
+				func(document *Document) error {
+					messagesFound += 1
+					return nil
+				},
+			)
+			if err != nil {
+				t.Error(err)
+			}
+
+			if docsProcessed != 21 {
+				t.Errorf("wanted 21 documents processed, got %d\n", docsProcessed)
+			}
+
+			docSearch = DocumentSearch{
+				index: &Index{
+					name:             indexName2,
+					primaryShards:    []int{0},
+					documentCount:    21,
+					latestDocumentID: -1,
+				},
+				documentCount: 21,
+				offset:        0,
+				filterParams:  &FilterParams{},
+				skipPercent:   .5,
+			}
+
+			docsProcessed, err = processSearchedDocuments(
+				ctx,
+				es,
+				&docSearch,
+				func(document *Document) error {
+					messagesFound += 1
+					return nil
+				},
+			)
+			if err != nil {
+				t.Error(err)
+			}
+
+			if docsProcessed != 21 {
+				t.Errorf("wanted 21 documents processed, got %d\n", docsProcessed)
+			}
+
+			if messagesFound != 22 {
+				t.Errorf("wanted 22 messages found, got %d\n", messagesFound)
 			}
 		},
 	)

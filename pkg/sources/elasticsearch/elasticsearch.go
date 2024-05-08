@@ -145,7 +145,7 @@ func (s *Source) Chunks(
 		// The scanCoverageRate is documentsScanned / documentsAdded. If it's not 1,
 		// we need each DocumentSearch to skip some records.
 		scanCoverageRate := 1.0
-		if previousDocumentCount != 0 {
+		if previousDocumentCount > 0 && indices.documentCount > 0 {
 			scanCoverageRate =
 				float64(previousDocumentCount) / float64(indices.documentCount)
 		}

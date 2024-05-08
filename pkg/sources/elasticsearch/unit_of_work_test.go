@@ -16,33 +16,37 @@ func TestSource_distributeDocumentScans(t *testing.T) {
 		filterParams: &FilterParams{},
 	}
 
-	// Scanning 30 documents with 2 workers should yield 2 UOWs 15 docs each:
-	// Search{"index", 0, 15, ""}
-	// Search{"index", 5, 20, ""}
-	// Search{"index2", 0, 9, ""}
-	uows := distributeDocumentScans(&indices, 2, 1.0)
+	t.Run(
+		"Distributing 30 documents from 3 indices (1 empty) with 2 workers works",
+		func(t *testing.T) {
+			uows := distributeDocumentScans(&indices, 2, .9)
 
-	assert.Equal(t, 2, len(uows))
+			assert.Equal(t, 2, len(uows))
 
-	assert.Equal(t, 14, uows[0].maxDocumentCount)
-	assert.Equal(t, 14, uows[0].documentCount)
-	assert.Equal(t, 1, len(uows[0].documentSearches))
+			assert.Equal(t, 14, uows[0].maxDocumentCount)
+			assert.Equal(t, 14, uows[0].documentCount)
+			assert.Equal(t, 1, len(uows[0].documentSearches))
 
-	assert.Equal(t, "index", uows[0].documentSearches[0].index.name)
-	assert.Equal(t, 0, uows[0].documentSearches[0].offset)
-	assert.Equal(t, 14, uows[0].documentSearches[0].documentCount)
+			assert.Equal(t, "index", uows[0].documentSearches[0].index.name)
+			assert.Equal(t, 0, uows[0].documentSearches[0].offset)
+			assert.Equal(t, 14, uows[0].documentSearches[0].documentCount)
+			assert.Equal(t, 0.09999999999999998, uows[0].documentSearches[0].skipPercent)
 
-	assert.Equal(t, 15, uows[1].maxDocumentCount)
-	assert.Equal(t, 15, uows[1].documentCount)
-	assert.Equal(t, 2, len(uows[1].documentSearches))
+			assert.Equal(t, 15, uows[1].maxDocumentCount)
+			assert.Equal(t, 15, uows[1].documentCount)
+			assert.Equal(t, 2, len(uows[1].documentSearches))
 
-	assert.Equal(t, "index", uows[1].documentSearches[0].index.name)
-	assert.Equal(t, 14, uows[1].documentSearches[0].offset)
-	assert.Equal(t, 6, uows[1].documentSearches[0].documentCount)
+			assert.Equal(t, "index", uows[1].documentSearches[0].index.name)
+			assert.Equal(t, 14, uows[1].documentSearches[0].offset)
+			assert.Equal(t, 6, uows[1].documentSearches[0].documentCount)
+			assert.Equal(t, 0.09999999999999998, uows[1].documentSearches[0].skipPercent)
 
-	assert.Equal(t, "index2", uows[1].documentSearches[1].index.name)
-	assert.Equal(t, 0, uows[1].documentSearches[1].offset)
-	assert.Equal(t, 9, uows[1].documentSearches[1].documentCount)
+			assert.Equal(t, "index2", uows[1].documentSearches[1].index.name)
+			assert.Equal(t, 0, uows[1].documentSearches[1].offset)
+			assert.Equal(t, 9, uows[1].documentSearches[1].documentCount)
+			assert.Equal(t, 0.09999999999999998, uows[1].documentSearches[1].skipPercent)
+		},
+	)
 }
 
 func TestSource_AddSearch(t *testing.T) {
