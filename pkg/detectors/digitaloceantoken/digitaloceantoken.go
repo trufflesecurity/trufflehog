@@ -18,7 +18,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ocean", "do"}) + `\b([A-Za-z0-9_-]{64})\b`)
 )

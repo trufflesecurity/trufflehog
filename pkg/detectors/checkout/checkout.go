@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Tokens starting with sk_test are used for the app's sandbox environment while tokens starting with sk only are for production environment

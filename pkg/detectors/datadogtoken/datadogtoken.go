@@ -23,7 +23,7 @@ var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 func (Scanner) DefaultEndpoint() string { return "https://api.datadoghq.com" }
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)

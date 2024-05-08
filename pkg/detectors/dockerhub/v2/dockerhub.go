@@ -74,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				if s.client == nil {
-					s.client = common.SaneHttpClient()
+					s.client = common.SaneHttpClient(common.WithDetectorTransport())
 				}
 
 				isVerified, extraData, verificationErr := s.verifyMatch(ctx, username, token)

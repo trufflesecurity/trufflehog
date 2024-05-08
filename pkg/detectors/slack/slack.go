@@ -22,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = Scanner{}
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	tokenPats     = map[string]*regexp.Regexp{
 		"Slack Bot Token":               regexp.MustCompile(`xoxb\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
 		"Slack User Token":              regexp.MustCompile(`xoxp\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),

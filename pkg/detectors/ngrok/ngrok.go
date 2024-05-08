@@ -19,7 +19,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b2[a-zA-Z0-9]{26}_\d[a-zA-Z0-9]{20}\b`)
 )

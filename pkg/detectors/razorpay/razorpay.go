@@ -19,7 +19,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 // The (`) character adds secondary encoding to parsed strings by Golang which also allows for escape sequences
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	keyPat    = regexp.MustCompile(`(?i)\brzp_live_[A-Za-z0-9]{14}\b`)
 	secretPat = regexp.MustCompile(`\b[A-Za-z0-9]{24}\b`)

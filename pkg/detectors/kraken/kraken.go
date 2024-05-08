@@ -25,7 +25,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	// Bounds have been removed because there are some cases that tokens have trailing frontslash(/) or plus sign (+)

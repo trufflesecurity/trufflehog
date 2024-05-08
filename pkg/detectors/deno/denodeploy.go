@@ -22,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	tokenPat      = regexp.MustCompile(`\b(dd[pw]_[a-zA-Z0-9]{36})\b`)
 )
 

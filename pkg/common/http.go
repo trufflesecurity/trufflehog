@@ -208,11 +208,33 @@ var saneTransport = &http.Transport{
 	ExpectContinueTimeout: 1 * time.Second,
 }
 
-func SaneHttpClient() *http.Client {
-	httpClient := &http.Client{}
-	httpClient.Timeout = DefaultResponseTimeout
-	httpClient.Transport = NewCustomTransport(saneTransport)
-	return httpClient
+// TransportOption configures how we set up the transport.
+type TransportOption func(*http.Transport)
+
+// WithDetectorTransport allows setting a custom transport for detectors.
+// This is useful given the large number of detectors that are run concurrently.
+func WithDetectorTransport() TransportOption {
+	return func(t *http.Transport) {
+		t.DialContext = (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext
+		t.MaxIdleConns = 100
+		t.MaxIdleConnsPerHost = 10
+		t.IdleConnTimeout = 90 * time.Second
+	}
+}
+
+// SaneHttpClient creates a new HTTP client with sane defaults.
+// It can be customized with TransportOptions.
+func SaneHttpClient(opts ...TransportOption) *http.Client {
+	transport := saneTransport
+
+	for _, opt := range opts {
+		opt(transport)
+	}
+
+	return &http.Client{Timeout: DefaultResponseTimeout, Transport: NewCustomTransport(transport)}
 }
 
 // SaneHttpClientTimeOut adds a custom timeout for some scanners

@@ -21,7 +21,7 @@ var (
 	// Ensure the Scanner satisfies the interface at compile time.
 	_ detectors.Detector = (*Scanner)(nil)
 
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"aha"}) + `\b([0-9a-f]{64})\b`)

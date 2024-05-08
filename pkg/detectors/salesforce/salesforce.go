@@ -24,7 +24,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	accessTokenPat = regexp.MustCompile(`\b00[a-zA-Z0-9]{13}![a-zA-Z0-9_.]{96}\b`)
 	instancePat    = regexp.MustCompile(`\bhttps://[0-9a-zA-Z-\.]{1,100}\.my\.salesforce\.com\b`)

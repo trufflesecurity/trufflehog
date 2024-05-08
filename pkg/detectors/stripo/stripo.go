@@ -20,7 +20,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	// JWT token
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"stripo"}) + `\b(eyJhbGciOiJIUzI1NiJ9\.[0-9A-Za-z]{130}\.[0-9A-Za-z_-]{43})\b`)
 )
