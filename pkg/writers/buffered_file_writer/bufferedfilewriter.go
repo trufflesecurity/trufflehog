@@ -204,6 +204,9 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 		// This ensures all the data is in one place - either entirely in the buffer or the file.
 		if bufferLength > 0 {
 			if _, err := w.buf.WriteTo(w.file); err != nil {
+				if err := os.RemoveAll(w.filename); err != nil {
+					return 0, fmt.Errorf("failed to remove file: %w", err)
+				}
 				return 0, err
 			}
 			w.buf.Reset()
@@ -326,6 +329,6 @@ func newAutoDeletingFileReader(file *os.File) *autoDeletingFileReader {
 
 // Close implements the io.Closer interface, deletes the file after closing.
 func (r *autoDeletingFileReader) Close() error {
-	defer os.Remove(r.Name()) // Delete the file after closing
+	defer os.RemoveAll(r.Name()) // Delete the file after closing
 	return r.File.Close()
 }
