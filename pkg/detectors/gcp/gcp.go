@@ -19,6 +19,7 @@ type Scanner struct{}
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 
 var (
 	keyPat = regexp.MustCompile(`\{[^{]+auth_provider_x509_cert_url[^}]+\}`)
@@ -48,6 +49,11 @@ func trimCarrots(s string) string {
 func (s Scanner) Keywords() []string {
 	return []string{"provider_x509"}
 }
+
+const maxGCPKeySize = 4096
+
+// ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
+func (s Scanner) ProvideMaxSecretSize() int64 { return maxGCPKeySize }
 
 // FromData will find and optionally verify GCP secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {

@@ -3,12 +3,11 @@ package detectors
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"math/big"
 	"net/url"
 	"strings"
 	"unicode"
-
-	"errors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -31,6 +30,12 @@ type Detector interface {
 // differentiate instances of the same detector type.
 type Versioner interface {
 	Version() int
+}
+
+// MaxSecretSizeProvider is an optional interface that a detector can implement to
+// provide a custom max size for the secret it finds.
+type MaxSecretSizeProvider interface {
+	ProvideMaxSecretSize() int64
 }
 
 // EndpointCustomizer is an optional interface that a detector can implement to

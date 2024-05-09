@@ -92,15 +92,15 @@ func (d *DetectorMatch) Matches(chunkData []byte) [][]byte {
 	return matches
 }
 
-const maxMatchLength = 300
+const maxMatchLength int64 = 300
 
 // FindDetectorMatches finds the matching detectors for a given chunk of data using the Aho-Corasick algorithm.
 // It returns a slice of DetectorMatch instances, each containing the detector key, detector,
 // and a slice of matches.
 // Each matchSpan represents a position in the chunk data where a keyword was found,
 // along with a corresponding end position.
-// The end position is determined by taking the minimum of the keyword position + maxMatchLength and
-// the length of the chunk data.
+// The end position is determined based on the detector's ProvideMaxSecretSize if it implements the
+// MaxSecretSizeProvider interface, or falls back to the default maxMatchLength.
 // Adjacent or overlapping matches are merged to avoid duplicating or overlapping the matched
 // portions of the chunk data.
 func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch {
@@ -126,12 +126,17 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 			}
 
 			detectorMatch := detectorMatches[k]
-			start := m.Pos()
-			end := start + maxMatchLength
-			if end > int64(len(chunkData)) {
-				end = int64(len(chunkData))
+			startIdx := m.Pos()
+			maxSize := maxMatchLength
+			if sizeProvider, ok := detectorMatch.Detector.(detectors.MaxSecretSizeProvider); ok {
+				maxSize = sizeProvider.ProvideMaxSecretSize()
 			}
-			detectorMatch.matchSpans = append(detectorMatch.matchSpans, matchSpan{startOffset: start, endOffset: end})
+
+			endIdx := startIdx + maxSize
+			if endIdx > int64(len(chunkData)) {
+				endIdx = int64(len(chunkData))
+			}
+			detectorMatch.matchSpans = append(detectorMatch.matchSpans, matchSpan{startOffset: startIdx, endOffset: endIdx})
 		}
 	}
 
