@@ -632,14 +632,13 @@ func BenchmarkPopulateMatchingDetectors(b *testing.B) {
 	dataSize := 1 << 20 // 1 MB
 	sampleData := generateRandomDataWithKeywords(dataSize, allDetectors)
 
-	smallChunk := 1 << 10     // 1 KB
-	mediumChunk := 1 << 12    // 4 KB
-	currentChunk := 1024 * 10 // 10 KB
-	largeChunk := 1 << 14     // 16 KB
-	xlChunk := 1 << 15        // 32 KB
-	xxlChunk := 1 << 16       // 64 KB
-	xxxlChunk := 1 << 18      // 256 KB
-	chunkSizes := []int{smallChunk, mediumChunk, currentChunk, largeChunk, xlChunk, xxlChunk, xxxlChunk}
+	smallChunk := 1 << 10  // 1 KB
+	mediumChunk := 1 << 12 // 4 KB
+	largeChunk := 1 << 14  // 16 KB
+	xlChunk := 1 << 15     // 32 KB
+	xxlChunk := 1 << 16    // 64 KB
+	xxxlChunk := 1 << 18   // 256 KB
+	chunkSizes := []int{smallChunk, mediumChunk, largeChunk, xlChunk, xxlChunk, xxxlChunk}
 
 	for _, chunkSize := range chunkSizes {
 		b.Run(fmt.Sprintf("ChunkSize_%d", chunkSize), func(b *testing.B) {
