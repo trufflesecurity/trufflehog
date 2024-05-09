@@ -306,6 +306,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - circleci
 - travisci
 - GCS (Google Cloud Storage)
+- postman
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
