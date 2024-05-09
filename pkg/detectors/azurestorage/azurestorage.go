@@ -114,22 +114,19 @@ func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName
 	switch res.StatusCode {
 	case http.StatusOK:
 		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			return false, err
+		// ignore the error if failed because our keys has been verified.
+		if err == nil {
+			// parse response
+			response := storageResponse{}
+			if err := xml.Unmarshal(body, &response); err == nil {
+				// update the extra data with container names only
+				var containerNames []string
+				for _, c := range response.Containers.Container {
+					containerNames = append(containerNames, c.Name)
+				}
+				extraData["container_names"] = strings.Join(containerNames, ", ")
+			}
 		}
-
-		// parse response
-		response := storageResponse{}
-		if err := xml.Unmarshal(body, &response); err != nil {
-			return false, err
-		}
-
-		// update the extra data with container names only
-		var containerNames []string
-		for _, c := range response.Containers.Container {
-			containerNames = append(containerNames, c.Name)
-		}
-		extraData["container_names"] = strings.Join(containerNames, ", ")
 
 		return true, nil
 	case http.StatusForbidden:
