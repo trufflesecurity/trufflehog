@@ -20,7 +20,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	keyPat        = regexp.MustCompile(`\b(r8_[0-9A-Za-z-_]{37})\b`)
 )
 

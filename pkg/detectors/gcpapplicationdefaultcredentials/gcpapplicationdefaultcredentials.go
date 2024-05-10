@@ -26,7 +26,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 
 	keyPat = regexp.MustCompile(`\{[^{]+client_secret[^}]+\}`)
 )

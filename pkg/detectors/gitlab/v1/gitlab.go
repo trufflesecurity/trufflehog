@@ -31,7 +31,7 @@ func (Scanner) Version() int            { return 1 }
 func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9\-=_]{20,22})\b`)
 )
 

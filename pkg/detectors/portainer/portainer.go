@@ -20,7 +20,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	endpointPat = regexp.MustCompile(detectors.PrefixRegex([]string{"portainer"}) + `\b(https?:\/\/\S+(:[0-9]{4,5})?)\b`)
 	tokenPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"portainer"}) + `\b(eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[0-9A-Za-z]{50,310}\.[0-9A-Z-a-z\-_]{43})\b`)
@@ -79,8 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.SetVerificationError(err, resMatch)
 				}
 			}
-
-			
 
 			if len(endpointMatches) > 0 {
 				results = append(results, s1)

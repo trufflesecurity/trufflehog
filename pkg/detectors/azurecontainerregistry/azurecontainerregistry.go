@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	url      = regexp.MustCompile(`([a-zA-Z0-9-]{1,100})\.azurecr\.io`)
 	password = regexp.MustCompile(`\b[A-Za-z0-9+/=]{52}\b`)

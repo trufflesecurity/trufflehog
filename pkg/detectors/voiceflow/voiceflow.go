@@ -22,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	// Reference: https://developer.voiceflow.com/reference/project#dialog-manager-api-keys
 	//
 	// TODO: This includes Workspace and Legacy Workspace API keys; I haven't validated whether these actually work.
