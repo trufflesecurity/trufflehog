@@ -88,12 +88,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
+						s1.Verified = true
 						var serviceResponse serviceResponse
-						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err != nil { // unexpected response
-							err = fmt.Errorf("failed to decode service response: %w", err)
-							s1.SetVerificationError(err, key)
-						} else {
-							s1.Verified = true
+						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have atleast one service
 							service := serviceResponse.Services[0]
 							s1.ExtraData["friendly_name"] = service.FriendlyName
 							s1.ExtraData["account_sid"] = service.AccountSID
