@@ -92,7 +92,7 @@ func (d *DetectorMatch) Matches(chunkData []byte) [][]byte {
 	return matches
 }
 
-const maxMatchLength int64 = 300
+const maxMatchLength int64 = 512
 
 // FindDetectorMatches finds the matching detectors for a given chunk of data using the Aho-Corasick algorithm.
 // It returns a slice of DetectorMatch instances, each containing the detector key, detector,
