@@ -1215,12 +1215,25 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	stdout, err := cmd.Output()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	return handlers.HandleFile(fileCtx, bytes.NewReader(stdout), chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	defer func() {
+		if err = cmd.Wait(); err != nil {
+			ctx.Logger().Error(fmt.Errorf(
+				"error waiting for command: command=%s, stderr=%s, commit=%s: %w",
+				cmd.String(), stderr.String(), commitHash.String(), err,
+			), "waiting for command failed")
+		}
+	}()
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
+	}
+
+	return handlers.HandleFile(fileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
