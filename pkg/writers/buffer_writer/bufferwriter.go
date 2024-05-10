@@ -1,4 +1,4 @@
-// Package bufferwriter provides a contentWriter implementation using a shared buffer pool for memory management.
+// Package bufferwritter provides a contentWriter implementation using a shared buffer pool for memory management.
 package bufferwriter
 
 import (
@@ -8,6 +8,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type metrics struct{}
@@ -17,7 +18,8 @@ func (metrics) recordDataProcessed(size int64, dur time.Duration) {
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func init() { bufferPool = pool.NewBufferPool() }
+const defaultBufferSize = 1 << 12 // 4KB
+func init()                       { bufferPool = pool.NewBufferPool(defaultBufferSize) }
 
 // bufferPool is the shared Buffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
@@ -44,12 +46,33 @@ type BufferWriter struct {
 }
 
 // New creates a new instance of BufferWriter.
-func New() *BufferWriter { return &BufferWriter{state: writeOnly, bufPool: bufferPool} }
+func New() *BufferWriter {
+	return &BufferWriter{state: writeOnly, bufPool: bufferPool}
+}
+
+// NewFromReader creates a new instance of BufferWriter and writes the content from the provided reader to the buffer.
+func NewFromReader(ctx context.Context, r io.Reader) (*BufferWriter, error) {
+	buf := New()
+	n, err := io.Copy(buf, r)
+	if err != nil {
+		return nil, fmt.Errorf("error writing to buffer writer: %w", err)
+	}
+
+	ctx.Logger().V(3).Info("file written to buffer writer", "bytes", n)
+
+	return buf, nil
+}
 
 // Write delegates the writing operation to the underlying bytes.Buffer.
 func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.state != writeOnly {
 		return 0, fmt.Errorf("buffer must be in write-only mode to write data; current state: %d", b.state)
+	}
+	if b.buf == nil {
+		b.buf = b.bufPool.Get()
+		if b.buf == nil {
+			b.buf = buffer.NewBuffer()
+		}
 	}
 
 	if b.buf == nil {
@@ -65,7 +88,6 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	defer func(start time.Time) {
 		b.metrics.recordDataProcessed(int64(size), time.Since(start))
 	}(start)
-
 	return b.buf.Write(data)
 }
 

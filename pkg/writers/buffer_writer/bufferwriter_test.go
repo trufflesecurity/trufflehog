@@ -1,9 +1,15 @@
 package bufferwriter
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestBufferWriterWrite(t *testing.T) {
@@ -149,6 +155,66 @@ func TestBufferWriterString(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedStr, result)
 			}
+		})
+	}
+}
+
+// Create a custom reader that can simulate errors.
+type errorReader struct{}
+
+func (errorReader) Read([]byte) (n int, err error) { return 0, fmt.Errorf("error reading") }
+
+func TestNewFromReader(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		reader   io.Reader
+		wantErr  bool
+		wantData string
+	}{
+		{
+			name:     "Success case",
+			reader:   strings.NewReader("hello world"),
+			wantData: "hello world",
+		},
+		{
+			name:   "Empty reader",
+			reader: strings.NewReader(""),
+		},
+		{
+			name:    "Error reader",
+			reader:  errorReader{},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			bufWriter, err := NewFromReader(ctx, tc.reader)
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, bufWriter)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, bufWriter)
+
+			err = bufWriter.CloseForWriting()
+			assert.NoError(t, err)
+
+			buffer := new(bytes.Buffer)
+			rdr, err := bufWriter.ReadCloser()
+			assert.NoError(t, err)
+			defer rdr.Close()
+
+			_, err = buffer.ReadFrom(rdr)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantData, buffer.String())
 		})
 	}
 }

@@ -13,13 +13,13 @@ func TestNewBufferPool(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name             string
-		opts             []Opts
+		size             int
 		expectedBuffSize uint32
 	}{
-		{name: "Default pool size", expectedBuffSize: defaultBufferSize},
+		{name: "Default pool size", size: defaultBufferSize, expectedBuffSize: defaultBufferSize},
 		{
 			name:             "Custom pool size",
-			opts:             []Opts{func(p *Pool) { p.bufferSize = 8 * 1024 }}, // 8KB
+			size:             8 * 1024,
 			expectedBuffSize: 8 * 1024,
 		},
 	}
@@ -28,7 +28,7 @@ func TestNewBufferPool(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			pool := NewBufferPool(tc.opts...)
+			pool := NewBufferPool(tc.size)
 			assert.Equal(t, tc.expectedBuffSize, pool.bufferSize)
 		})
 	}
@@ -65,7 +65,7 @@ func TestBufferPoolGetPut(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			pool := NewBufferPool()
+			pool := NewBufferPool(defaultBufferSize)
 			initialBuf := tc.preparePool(pool)
 			if initialBuf != nil {
 				pool.Put(initialBuf)

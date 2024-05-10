@@ -15,12 +15,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 )
 
-// sharedBufferPool is the shared buffer pool used by all BufferedFileWriters.
-// This allows for efficient reuse of buffers across multiple writers.
-var sharedBufferPool *pool.Pool
-
-func init() { sharedBufferPool = pool.NewBufferPool() }
-
 type bufferedFileWriterMetrics struct{}
 
 func (bufferedFileWriterMetrics) recordDataProcessed(size uint64, dur time.Duration) {
@@ -32,6 +26,30 @@ func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
 	diskWriteCount.Inc()
 	fileSizeHistogram.Observe(float64(size))
 }
+
+type PoolSize int
+
+const (
+	Default PoolSize = iota
+	Large
+)
+
+const (
+	defaultBufferSize = 1 << 12 // 4KB
+	largeBufferSize   = 1 << 16 // 64KB
+)
+
+func init() {
+	defaultBufferPool = pool.NewBufferPool(defaultBufferSize)
+	largeBufferPool = pool.NewBufferPool(largeBufferSize)
+}
+
+// Different buffer pools for different buffer sizes.
+// This allows for more efficient memory management based on the size of the data being written.
+var (
+	defaultBufferPool *pool.Pool
+	largeBufferPool   *pool.Pool
+)
 
 // state represents the current mode of BufferedFileWriter.
 type state uint8
@@ -67,16 +85,34 @@ func WithThreshold(threshold uint64) Option {
 	return func(w *BufferedFileWriter) { w.threshold = threshold }
 }
 
+// WithBufferSize sets the buffer size for the BufferedFileWriter.
+func WithBufferSize(size PoolSize) Option {
+	return func(w *BufferedFileWriter) {
+		switch size {
+		case Default:
+			w.bufPool = defaultBufferPool
+		case Large:
+			w.bufPool = largeBufferPool
+		default:
+			w.bufPool = defaultBufferPool
+		}
+	}
+}
+
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
 func New(opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
-		bufPool:   sharedBufferPool,
 	}
+
 	for _, opt := range opts {
 		opt(w)
+	}
+
+	if w.bufPool == nil {
+		w.bufPool = defaultBufferPool
 	}
 
 	return w
@@ -84,9 +120,14 @@ func New(opts ...Option) *BufferedFileWriter {
 
 // NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
 func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
+	opts = append(opts, WithBufferSize(Large))
 	writer := New(opts...)
 	if _, err := io.Copy(writer, r); err != nil {
 		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
+	}
+
+	if writer.buf == nil {
+		return nil, fmt.Errorf("buffer is empty, no reader created")
 	}
 
 	return writer, nil
@@ -163,9 +204,12 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 		// This ensures all the data is in one place - either entirely in the buffer or the file.
 		if bufferLength > 0 {
 			if _, err := w.buf.WriteTo(w.file); err != nil {
+				if err := os.RemoveAll(w.filename); err != nil {
+					return 0, fmt.Errorf("failed to remove file: %w", err)
+				}
 				return 0, err
 			}
-			w.bufPool.Put(w.buf)
+			w.buf.Reset()
 		}
 	}
 
@@ -268,7 +312,7 @@ func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
 	}
 
 	if w.buf == nil {
-		return nil, fmt.Errorf("BufferedFileWriter has not buffer data to read")
+		return nil, fmt.Errorf("buffer is empty")
 	}
 
 	// Data is in memory.
@@ -285,6 +329,6 @@ func newAutoDeletingFileReader(file *os.File) *autoDeletingFileReader {
 
 // Close implements the io.Closer interface, deletes the file after closing.
 func (r *autoDeletingFileReader) Close() error {
-	defer os.Remove(r.Name()) // Delete the file after closing
+	defer os.RemoveAll(r.Name()) // Delete the file after closing
 	return r.File.Close()
 }
