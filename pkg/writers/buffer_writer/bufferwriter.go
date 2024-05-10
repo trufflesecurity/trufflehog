@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffer"
 )
 
 type metrics struct{}

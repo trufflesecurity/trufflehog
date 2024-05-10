@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffer"
 )
 
 func TestBufferedFileWriterNewThreshold(t *testing.T) {

@@ -10,8 +10,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
 
 // sharedBufferPool is the shared buffer pool used by all BufferedFileWriters.
