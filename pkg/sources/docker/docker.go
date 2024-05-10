@@ -132,6 +132,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	_ = workers.Wait()
 	if scanErrs.Count() > 0 {
 		ctx.Logger().V(2).Info("scan errors", "errors", scanErrs.String())
+		return errors.New(scanErrs.String())
 	}
 
 	return nil
