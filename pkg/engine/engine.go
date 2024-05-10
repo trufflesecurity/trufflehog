@@ -30,7 +30,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-var overlapError = errors.New("More than one detector has found this result. For your safety, verification has been disabled. You can override this behavior by using the --allow-verification-overlap flag.")
+var errOverlap = errors.New(
+	"More than one detector has found this result. For your safety, verification has been disabled." +
+		"You can override this behavior by using the --allow-verification-overlap flag.",
+)
 
 // Metrics for the scan engine for external consumption.
 type Metrics struct {
@@ -383,7 +386,9 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	e.notifyVerifiedResults = true
 	e.notifyUnknownResults = true
 	e.notifyUnverifiedResults = true
-	e.verificationOverlapChunksChan = make(chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier)
+	e.verificationOverlapChunksChan = make(
+		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
+	)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
 	e.dedupeCache = cache
 	e.printer = new(output.PlainPrinter)
@@ -402,11 +407,13 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 }
 
 func (e *Engine) initSourceManager(ctx context.Context) {
+	const defaultOutputBufferSize = 64
+
 	opts := []func(*sources.SourceManager){
-		sources.WithConcurrentSources(int(e.concurrency)),
-		sources.WithConcurrentUnits(int(e.concurrency)),
+		sources.WithConcurrentSources(e.concurrency),
+		sources.WithConcurrentUnits(e.concurrency),
 		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultChannelBuffer),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
 	}
 	if e.jobReportWriter != nil {
 		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
@@ -526,7 +533,7 @@ func (e *Engine) startWorkers(ctx context.Context) {
 	const notifierWorkerRatio = 4
 	maxNotifierWorkers := 1
 	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
-		maxNotifierWorkers = int(numWorkers)
+		maxNotifierWorkers = numWorkers
 	}
 	ctx.Logger().V(2).Info("starting notifier workers", "count", maxNotifierWorkers)
 	for worker := 0; worker < maxNotifierWorkers; worker++ {
@@ -743,7 +750,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					if e.verificationOverlapTracker != nil {
 						e.verificationOverlapTracker.increment()
 					}
-					res.SetVerificationError(overlapError)
+					res.SetVerificationError(errOverlap)
 					e.processResult(ctx, detectableChunk{
 						chunk:    chunk.chunk,
 						detector: detector,

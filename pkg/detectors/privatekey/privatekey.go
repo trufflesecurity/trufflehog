@@ -25,6 +25,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	// TODO: add base64 encoded key support
@@ -144,6 +145,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	return results, nil
 }
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) bool { return false }
 
 type result struct {
 	CertificateURLs []string

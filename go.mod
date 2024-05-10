@@ -7,7 +7,7 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2
 replace github.com/snowflakedb/gosnowflake => github.com/trufflesecurity/gosnowflake v0.0.1
 
 require (
-	cloud.google.com/go/secretmanager v1.12.0
+	cloud.google.com/go/secretmanager v1.13.0
 	cloud.google.com/go/storage v1.40.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2
@@ -15,14 +15,14 @@ require (
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/aws/aws-sdk-go v1.51.32
+	github.com/aws/aws-sdk-go v1.52.6
 	github.com/aymanbagabas/go-osc52 v1.2.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
-	github.com/brianvoe/gofakeit/v7 v7.0.2
+	github.com/brianvoe/gofakeit/v7 v7.0.3
 	github.com/charmbracelet/bubbles v0.18.0
-	github.com/charmbracelet/bubbletea v0.25.0
+	github.com/charmbracelet/bubbletea v0.26.2
 	github.com/charmbracelet/glamour v0.7.0
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/coinbase/waas-client-library-go v1.0.8
@@ -47,9 +47,8 @@ require (
 	github.com/google/go-containerregistry v0.19.1
 	github.com/google/go-github/v61 v61.0.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/gax-go/v2 v2.12.3
-	github.com/h2non/filetype v1.1.3
-	github.com/hashicorp/go-retryablehttp v0.7.5
+	github.com/googleapis/gax-go/v2 v2.12.4
+	github.com/hashicorp/go-retryablehttp v0.7.6
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jlaffaye/ftp v0.2.0
 	github.com/joho/godotenv v1.5.1
@@ -67,12 +66,12 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.19.0
-	github.com/rabbitmq/amqp091-go v1.9.0
+	github.com/prometheus/client_golang v1.19.1
+	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/sassoftware/go-rpmutils v0.3.0
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 	github.com/shuheiktgw/go-travis v0.3.1
-	github.com/snowflakedb/gosnowflake v1.8.0
+	github.com/snowflakedb/gosnowflake v1.10.0
 	github.com/stretchr/testify v1.9.0
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/testcontainers/testcontainers-go v0.30.0
@@ -81,18 +80,18 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.30.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.5.2
-	github.com/xanzy/go-gitlab v0.103.0
+	github.com/xanzy/go-gitlab v0.104.1
 	go.mongodb.org/mongo-driver v1.15.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.22.0
-	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
-	golang.org/x/net v0.24.0
-	golang.org/x/oauth2 v0.19.0
+	golang.org/x/crypto v0.23.0
+	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
+	golang.org/x/net v0.25.0
+	golang.org/x/oauth2 v0.20.0
 	golang.org/x/sync v0.7.0
-	golang.org/x/text v0.14.0
-	google.golang.org/api v0.177.0
-	google.golang.org/protobuf v1.34.0
+	golang.org/x/text v0.15.0
+	google.golang.org/api v0.178.0
+	google.golang.org/protobuf v1.34.1
 	gopkg.in/h2non/gock.v1 v1.1.2
 	pault.ag/go/debian v0.16.0
 	pgregory.net/rapid v1.1.0
@@ -105,7 +104,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/iam v1.1.7 // indirect
-	cloud.google.com/go/longrunning v0.5.5 // indirect
+	cloud.google.com/go/longrunning v0.5.6 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
@@ -139,7 +138,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
-	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/containerd/containerd v1.7.12 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
@@ -163,6 +161,7 @@ require (
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
+	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
@@ -227,7 +226,7 @@ require (
 	github.com/montanaflynn/stats v0.7.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
-	github.com/muesli/ansi v0.0.0-20211031195517-c9f0611b6c70 // indirect
+	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.2 // indirect
@@ -276,13 +275,13 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
-	golang.org/x/term v0.19.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/term v0.20.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.20.0 // indirect
+	golang.org/x/tools v0.21.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
-	google.golang.org/genproto v0.0.0-20240227224415-6ceb2ff114de // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240314234333-6e1732d8331c // indirect
+	google.golang.org/genproto v0.0.0-20240401170217-c3f982113cda // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240429193739-8cf5692501f6 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240429193739-8cf5692501f6 // indirect
 	google.golang.org/grpc v1.63.2 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
