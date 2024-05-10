@@ -14,7 +14,7 @@ func TestNewBufferPool(t *testing.T) {
 	tests := []struct {
 		name             string
 		size             int
-		expectedBuffSize uint32
+		expectedBuffSize int
 	}{
 		{name: "Default pool size", size: defaultBufferSize, expectedBuffSize: defaultBufferSize},
 		{
@@ -47,8 +47,8 @@ func TestBufferPoolGetPut(t *testing.T) {
 			preparePool: func(_ *Pool) *buffer.Buffer {
 				return nil // No initial buffer to put
 			},
-			expectedCapBefore: int(defaultBufferSize),
-			expectedCapAfter:  int(defaultBufferSize),
+			expectedCapBefore: defaultBufferSize,
+			expectedCapAfter:  defaultBufferSize,
 		},
 		{
 			name: "Put oversized buffer, expect shrink",
@@ -56,8 +56,8 @@ func TestBufferPoolGetPut(t *testing.T) {
 				buf := &buffer.Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, 3*defaultBufferSize))}
 				return buf
 			},
-			expectedCapBefore: int(defaultBufferSize),
-			expectedCapAfter:  int(defaultBufferSize), // Should shrink back to default
+			expectedCapBefore: defaultBufferSize,
+			expectedCapAfter:  defaultBufferSize, // Should shrink back to default
 		},
 	}
 
