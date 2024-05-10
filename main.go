@@ -155,14 +155,25 @@ var (
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
 
 	// Postman is hidden for now until we get more feedback from the community.
-	postmanScan                = cli.Command("postman", "Scan Postman")
-	postmanToken               = postmanScan.Flag("token", "Postman token. Can also be provided with environment variable").Envar("POSTMAN_TOKEN").String()
-	postmanWorkspaces          = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag.").Strings()
-	postmanCollections         = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag.").Strings()
-	postmanEnvironments        = postmanScan.Flag("environment", "Postman environment to scan. You can repeat this flag.").Strings()
-	postmanIncludeCollections  = postmanScan.Flag("include-collections", "Collections to include in scan. You can repeat this flag.").Strings()
+	postmanScan  = cli.Command("postman", "Scan Postman")
+	postmanToken = postmanScan.Flag("token", "Postman token. Can also be provided with environment variable").Envar("POSTMAN_TOKEN").String()
+
+	postmanWorkspaces   = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanWorkspaceIDs = postmanScan.Flag("workspace-id", "Postman workspace ID to scan. You can repeat this flag.").Strings()
+
+	postmanCollections   = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanCollectionIDs = postmanScan.Flag("collection-id", "Postman collection ID to scan. You can repeat this flag.").Strings()
+
+	postmanEnvironments = postmanScan.Flag("environment", "Postman environment to scan. You can repeat this flag.").Strings()
+
+	postmanIncludeCollections   = postmanScan.Flag("include-collections", "Collections to include in scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanIncludeCollectionIDs = postmanScan.Flag("include-collection-id", "Collection ID to include in scan. You can repeat this flag.").Strings()
+
 	postmanIncludeEnvironments = postmanScan.Flag("include-environments", "Environments to include in scan. You can repeat this flag.").Strings()
-	postmanExcludeCollections  = postmanScan.Flag("exclude-collections", "Collections to exclude from scan. You can repeat this flag.").Strings()
+
+	postmanExcludeCollections   = postmanScan.Flag("exclude-collections", "Collections to exclude from scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanExcludeCollectionIDs = postmanScan.Flag("exclude-collection-id", "Collection ID to exclude from scan. You can repeat this flag.").Strings()
+
 	postmanExcludeEnvironments = postmanScan.Flag("exclude-environments", "Environments to exclude from scan. You can repeat this flag.").Strings()
 	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
 	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
@@ -592,14 +603,34 @@ func run(state overseer.State) {
 			logFatal(err, "Failed to scan Docker.")
 		}
 	case postmanScan.FullCommand():
+		// handle deprecated flag
+		workspaceIDs := make([]string, 0, len(*postmanWorkspaceIDs)+len(*postmanWorkspaces))
+		workspaceIDs = append(workspaceIDs, *postmanWorkspaceIDs...)
+		workspaceIDs = append(workspaceIDs, *postmanWorkspaces...)
+
+		// handle deprecated flag
+		collectionIDs := make([]string, 0, len(*postmanCollectionIDs)+len(*postmanCollections))
+		collectionIDs = append(collectionIDs, *postmanCollectionIDs...)
+		collectionIDs = append(collectionIDs, *postmanCollections...)
+
+		// handle deprecated flag
+		includeCollectionIDs := make([]string, 0, len(*postmanIncludeCollectionIDs)+len(*postmanIncludeCollections))
+		includeCollectionIDs = append(includeCollectionIDs, *postmanIncludeCollectionIDs...)
+		includeCollectionIDs = append(includeCollectionIDs, *postmanIncludeCollections...)
+
+		// handle deprecated flag
+		excludeCollectionIDs := make([]string, 0, len(*postmanExcludeCollectionIDs)+len(*postmanExcludeCollections))
+		excludeCollectionIDs = append(excludeCollectionIDs, *postmanExcludeCollectionIDs...)
+		excludeCollectionIDs = append(excludeCollectionIDs, *postmanExcludeCollections...)
+
 		cfg := sources.PostmanConfig{
 			Token:               *postmanToken,
-			Workspaces:          *postmanWorkspaces,
-			Collections:         *postmanCollections,
+			Workspaces:          workspaceIDs,
+			Collections:         collectionIDs,
 			Environments:        *postmanEnvironments,
-			IncludeCollections:  *postmanIncludeCollections,
+			IncludeCollections:  includeCollectionIDs,
 			IncludeEnvironments: *postmanIncludeEnvironments,
-			ExcludeCollections:  *postmanExcludeCollections,
+			ExcludeCollections:  excludeCollectionIDs,
 			ExcludeEnvironments: *postmanExcludeEnvironments,
 			CollectionPaths:     *postmanCollectionPaths,
 			WorkspacePaths:      *postmanWorkspacePaths,
