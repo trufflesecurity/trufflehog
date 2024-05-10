@@ -16,12 +16,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -357,16 +355,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				}
 				return nil
 			}
-
-			bufferName := cleantemp.MkFilename()
-
 			defer res.Body.Close()
-			reader, err := diskbufferreader.New(res.Body, diskbufferreader.WithBufferName(bufferName))
-			if err != nil {
-				s.log.Error(err, "Could not create reader.")
-				return nil
-			}
-			defer reader.Close()
 
 			email := "Unknown"
 			if obj.Owner != nil {
@@ -391,29 +380,10 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				},
 				Verify: s.verify,
 			}
-			if handlers.HandleFile(ctx, reader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
-				atomic.AddUint64(objectCount, 1)
-				s.log.V(5).Info("S3 object scanned.", "object_count", objectCount, "page_number", pageNumber)
+
+			if err := handlers.HandleFile(ctx, res.Body, chunkSkel, sources.ChanReporter{Ch: chunksChan}); err != nil {
+				ctx.Logger().Error(err, "error handling file")
 				return nil
-			}
-
-			if err := reader.Reset(); err != nil {
-				s.log.Error(err, "Error resetting reader to start.")
-			}
-			reader.Stop()
-
-			chunkReader := sources.NewChunkReader()
-			chunkResChan := chunkReader(ctx, reader)
-			for data := range chunkResChan {
-				if err := data.Error(); err != nil {
-					s.log.Error(err, "error reading chunk.")
-					continue
-				}
-				chunk := *chunkSkel
-				chunk.Data = data.Bytes()
-				if err := common.CancellableWrite(ctx, chunksChan, &chunk); err != nil {
-					return err
-				}
 			}
 
 			atomic.AddUint64(objectCount, 1)
