@@ -1,6 +1,6 @@
 // Package buffer provides a custom buffer type that includes metrics for tracking buffer usage.
 // It also provides a pool for managing buffer reusability.
-package buffer
+package buffers
 
 import (
 	"bytes"

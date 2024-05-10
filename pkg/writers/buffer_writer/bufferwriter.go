@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers"
 )
 
 type metrics struct{}
@@ -16,11 +16,11 @@ func (metrics) recordDataProcessed(size int64, dur time.Duration) {
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func init() { bufferPool = buffer.NewBufferPool() }
+func init() { bufferPool = buffers.NewBufferPool() }
 
 // bufferPool is the shared Buffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
-var bufferPool *buffer.Pool
+var bufferPool *buffers.Pool
 
 // state represents the current mode of buffer.
 type state uint8
@@ -34,10 +34,10 @@ const (
 
 // BufferWriter implements contentWriter, using a shared buffer pool for memory management.
 type BufferWriter struct {
-	buf     *buffer.Buffer // The current buffer in use.
-	bufPool *buffer.Pool   // The buffer pool used to manage the buffer.
-	size    int            // The total size of the content written to the buffer.
-	state   state          // The current state of the buffer.
+	buf     *buffers.Buffer // The current buffer in use.
+	bufPool *buffers.Pool   // The buffer pool used to manage the buffer.
+	size    int             // The total size of the content written to the buffer.
+	state   state           // The current state of the buffer.
 
 	metrics metrics
 }
@@ -54,7 +54,7 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.buf == nil {
 		b.buf = b.bufPool.Get()
 		if b.buf == nil {
-			b.buf = buffer.NewBuffer()
+			b.buf = buffers.NewBuffer()
 		}
 	}
 
@@ -79,7 +79,7 @@ func (b *BufferWriter) ReadCloser() (io.ReadCloser, error) {
 		return nil, fmt.Errorf("writer buffer is nil")
 	}
 
-	return buffer.ReadCloser(b.buf.Bytes(), func() { b.bufPool.Put(b.buf) }), nil
+	return buffers.ReadCloser(b.buf.Bytes(), func() { b.bufPool.Put(b.buf) }), nil
 }
 
 // CloseForWriting is a no-op for buffer, as there is no resource cleanup needed for bytes.Buffer.

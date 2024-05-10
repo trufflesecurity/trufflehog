@@ -1,4 +1,4 @@
-package buffer
+package buffers
 
 import (
 	"github.com/prometheus/client_golang/prometheus"

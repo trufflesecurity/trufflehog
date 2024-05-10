@@ -10,15 +10,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 )
 
 // sharedBufferPool is the shared buffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
-var sharedBufferPool *buffer.Pool
+var sharedBufferPool *buffers.Pool
 
-func init() { sharedBufferPool = buffer.NewBufferPool() }
+func init() { sharedBufferPool = buffers.NewBufferPool() }
 
 type bufferedFileWriterMetrics struct{}
 
@@ -48,10 +48,10 @@ type BufferedFileWriter struct {
 	threshold uint64 // Threshold for switching to file writing.
 	size      uint64 // Total size of the data written.
 
-	bufPool  *buffer.Pool   // Pool for storing buffers for reuse.
-	buf      *buffer.Buffer // Buffer for storing data under the threshold in memory.
-	filename string         // Name of the temporary file.
-	file     *os.File       // File for storing data over the threshold.
+	bufPool  *buffers.Pool   // Pool for storing buffers for reuse.
+	buf      *buffers.Buffer // Buffer for storing data under the threshold in memory.
+	filename string          // Name of the temporary file.
+	file     *os.File        // File for storing data over the threshold.
 
 	state state // Current state of the writer. (writeOnly or readOnly)
 
@@ -130,7 +130,7 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 	if w.buf == nil {
 		w.buf = w.bufPool.Get()
 		if w.buf == nil {
-			w.buf = buffer.NewBuffer()
+			w.buf = buffers.NewBuffer()
 		}
 	}
 
@@ -271,7 +271,7 @@ func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
 	}
 
 	// Data is in memory.
-	return buffer.ReadCloser(w.buf.Bytes(), func() { w.bufPool.Put(w.buf) }), nil
+	return buffers.ReadCloser(w.buf.Bytes(), func() { w.bufPool.Put(w.buf) }), nil
 }
 
 // autoDeletingFileReader wraps an *os.File and deletes the file on Close.
