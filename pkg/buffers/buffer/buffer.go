@@ -1,91 +1,11 @@
 // Package buffer provides a custom buffer type that includes metrics for tracking buffer usage.
 // It also provides a pool for managing buffer reusability.
-package buffers
+package buffer
 
 import (
 	"bytes"
-	"io"
-	"sync"
 	"time"
 )
-
-type poolMetrics struct{}
-
-func (poolMetrics) recordShrink(amount int) {
-	shrinkCount.Inc()
-	shrinkAmount.Add(float64(amount))
-}
-
-func (poolMetrics) recordBufferRetrival() {
-	activeBufferCount.Inc()
-	checkoutCount.Inc()
-	bufferCount.Inc()
-}
-
-func (poolMetrics) recordBufferReturn(buf *Buffer) {
-	activeBufferCount.Dec()
-	totalBufferSize.Add(float64(buf.Cap()))
-	totalBufferLength.Add(float64(buf.Len()))
-	buf.recordMetric()
-}
-
-// PoolOpts is a function that configures a BufferPool.
-type PoolOpts func(pool *Pool)
-
-// Pool of buffers.
-type Pool struct {
-	*sync.Pool
-	bufferSize uint32
-
-	metrics poolMetrics
-}
-
-const defaultBufferSize = 1 << 12 // 4KB
-// NewBufferPool creates a new instance of BufferPool.
-func NewBufferPool(opts ...PoolOpts) *Pool {
-	pool := &Pool{bufferSize: defaultBufferSize}
-
-	for _, opt := range opts {
-		opt(pool)
-	}
-	pool.Pool = &sync.Pool{
-		New: func() any {
-			return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, pool.bufferSize))}
-		},
-	}
-
-	return pool
-}
-
-// Get returns a Buffer from the pool.
-func (p *Pool) Get() *Buffer {
-	buf, ok := p.Pool.Get().(*Buffer)
-	if !ok {
-		buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
-	}
-	p.metrics.recordBufferRetrival()
-	buf.resetMetric()
-
-	return buf
-}
-
-// Put returns a Buffer to the pool.
-func (p *Pool) Put(buf *Buffer) {
-	p.metrics.recordBufferReturn(buf)
-
-	// If the Buffer is more than twice the default size, replace it with a new Buffer.
-	// This prevents us from returning very large buffers to the pool.
-	const maxAllowedCapacity = 2 * defaultBufferSize
-	if buf.Cap() > maxAllowedCapacity {
-		p.metrics.recordShrink(buf.Cap() - defaultBufferSize)
-		buf = &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, p.bufferSize))}
-	} else {
-		// Reset the Buffer to clear any existing data.
-		buf.Reset()
-	}
-
-	p.Pool.Put(buf)
-}
 
 // Buffer is a wrapper around bytes.Buffer that includes a timestamp for tracking Buffer checkout duration.
 type Buffer struct {
@@ -93,6 +13,7 @@ type Buffer struct {
 	checkedOutAt time.Time
 }
 
+const defaultBufferSize = 1 << 12 // 4KB
 // NewBuffer creates a new instance of Buffer.
 func NewBuffer() *Buffer { return &Buffer{Buffer: bytes.NewBuffer(make([]byte, 0, defaultBufferSize))} }
 
@@ -101,12 +22,14 @@ func (b *Buffer) Grow(size int) {
 	b.recordGrowth(size)
 }
 
-func (b *Buffer) resetMetric() { b.checkedOutAt = time.Now() }
+func (b *Buffer) ResetMetric() { b.checkedOutAt = time.Now() }
 
-func (b *Buffer) recordMetric() {
+func (b *Buffer) RecordMetric() {
 	dur := time.Since(b.checkedOutAt)
 	checkoutDuration.Observe(float64(dur.Microseconds()))
 	checkoutDurationTotal.Add(float64(dur.Microseconds()))
+	totalBufferSize.Add(float64(b.Len()))
+	totalBufferLength.Add(float64(b.Len()))
 }
 
 func (b *Buffer) recordGrowth(size int) {
@@ -119,7 +42,7 @@ func (b *Buffer) Write(data []byte) (int, error) {
 	if b.Buffer == nil {
 		// This case should ideally never occur if buffers are properly managed.
 		b.Buffer = bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-		b.resetMetric()
+		b.ResetMetric()
 	}
 
 	size := len(data)
@@ -140,9 +63,6 @@ func (b *Buffer) Write(data []byte) (int, error) {
 
 	return b.Buffer.Write(data)
 }
-
-// Compile time check to make sure readCloser implements io.ReadSeekCloser.
-var _ io.ReadSeekCloser = (*readCloser)(nil)
 
 // readCloser is a custom implementation of io.ReadCloser. It wraps a bytes.Reader
 // for reading data from an in-memory buffer and includes an onClose callback.
@@ -166,18 +86,5 @@ func (brc *readCloser) Close() error {
 	}
 
 	brc.onClose() // Return the buffer to the pool
-	brc.Reader = nil
 	return nil
-}
-
-// Read reads up to len(p) bytes into p from the underlying reader.
-// It returns the number of bytes read and any error encountered.
-// On reaching the end of the available data, it returns 0 and io.EOF.
-// Calling Read on a closed reader will also return 0 and io.EOF.
-func (brc *readCloser) Read(p []byte) (int, error) {
-	if brc.Reader == nil {
-		return 0, io.EOF
-	}
-
-	return brc.Reader.Read(p)
 }
