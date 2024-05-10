@@ -38,7 +38,7 @@ func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 type archiveHandler struct{ *defaultHandler }
 
 func newArchiveHandler() *archiveHandler {
-	return &archiveHandler{defaultHandler: newNonArchiveHandler(archiveHandlerType)}
+	return &archiveHandler{defaultHandler: newDefaultHandler(archiveHandlerType)}
 }
 
 // HandleFile processes the input as either an archive or non-archive based on its content,

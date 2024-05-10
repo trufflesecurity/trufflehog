@@ -22,7 +22,7 @@ func TestHandleNonArchiveFile(t *testing.T) {
 	assert.NoError(t, err)
 	defer rdr.Close()
 
-	handler := newNonArchiveHandler(defaultHandlerType)
+	handler := newDefaultHandler(defaultHandlerType)
 	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 

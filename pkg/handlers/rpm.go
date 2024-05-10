@@ -17,7 +17,7 @@ type rpmHandler struct{ *defaultHandler }
 
 // newRPMHandler creates an rpmHandler with the provided metrics.
 func newRPMHandler() *rpmHandler {
-	return &rpmHandler{defaultHandler: newNonArchiveHandler(rpmHandlerType)}
+	return &rpmHandler{defaultHandler: newDefaultHandler(rpmHandlerType)}
 }
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
@@ -38,6 +38,7 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 			h.metrics.incFilesProcessed()
 		}()
 
+		// Defer a panic recovery to handle any panics that occur during the RPM processing.
 		defer func() {
 			if r := recover(); r != nil {
 				// Return the panic as an error.
@@ -63,10 +64,6 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 			ctx.Logger().Error(err, "error getting RPM payload reader")
 			return
 		}
-		// if reader.IsLink() {
-		// 	ctx.Logger().V(2).Info("RPM payload is a symbolic link, skipping processing")
-		// 	return
-		// }
 
 		if err = h.processRPMFiles(ctx, reader, archiveChan); err != nil {
 			ctx.Logger().Error(err, "error processing RPM files")
