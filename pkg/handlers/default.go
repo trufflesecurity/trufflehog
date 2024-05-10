@@ -108,6 +108,5 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 		}
 		h.metrics.incBytesProcessed(len(data.Bytes()))
 	}
-
 	return nil
 }

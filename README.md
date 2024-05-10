@@ -16,13 +16,23 @@
 
 ---
 
-# :mag_right: _Now Scanning_
+# :mag*right: \_Now Scanning*
 
 <div align="center">
 
 <img src="assets/scanning_logos.svg">
 
 **...and more**
+
+To learn more about about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
+
+</div>
+
+# :globe_with_meridians: TruffleHog Enterprise
+
+Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint, and more..** for credentials? We have an enterprise product that can help! Learn more at <https://trufflesecurity.com/trufflehog-enterprise>.
+
+We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
 
 </div>
 
@@ -54,7 +64,7 @@ brew install trufflehog
 
 ### Docker:
 
-<sub><i>*Ensure Docker engine is running before executing the following commands:*</i></sub>
+<sub><i>_Ensure Docker engine is running before executing the following commands:_</i></sub>
 
 #### &nbsp;&nbsp;&nbsp;&nbsp;Unix
 
@@ -251,10 +261,10 @@ trufflehog git file://. --since-commit main --branch feature-1 --only-verified -
 
 ## 12: Scan a Postman workspace
 
-Use the `--workspace`, `--collection`, `--environment` flags multiple times to scan multiple targets.
+Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
 
 ```bash
-trufflehog postman --token=<postman api token> --workspace=<workspace id>
+trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
 
 # :question: FAQ
@@ -487,7 +497,7 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
 ```yaml
 stages:
   - security
-  
+
 security-secrets:
   stage: security
   allow_failure: false
@@ -616,7 +626,7 @@ class Verifier(BaseHTTPRequestHandler):
             self.log_message("%s", request)
 
             # check the match, you'll need to implement validateToken, which takes an array of ID's and Secrets
-            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']): 
+            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']):
                 self.send_response(200)
                 self.end_headers()
             else:
@@ -662,8 +672,3 @@ the stability of the public APIs at this time.
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
 
-# :money_with_wings: Enterprise product
-
-Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more <https://trufflesecurity.com/contact/>
-
-We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.

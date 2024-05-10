@@ -46,6 +46,7 @@ enum SourceType {
   SOURCE_TYPE_AZURE_REPOS = 31;
   SOURCE_TYPE_TRAVISCI = 32;
   SOURCE_TYPE_POSTMAN = 33;
+  SOURCE_TYPE_WEBHOOK = 34;
 }
 
 message LocalSource {
@@ -399,4 +400,10 @@ message Postman {
   repeated string collection_paths = 12;
   repeated string environment_paths = 13;
 }
- 
+
+message Webhook {
+  string listen_address = 1 [(validate.rules).string.hostname = true];
+  oneof credential {
+    credentials.Header header = 2;
+  }
+}
