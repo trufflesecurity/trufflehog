@@ -219,38 +219,9 @@ func NewParser(options ...Option) *Parser {
 	return parser
 }
 
-type DiffChan struct {
-	ch      chan *Diff
-	metrics *metrics
-}
-
-func newDiffChan(capacity int) *DiffChan {
-	return &DiffChan{
-		ch:      make(chan *Diff, capacity),
-		metrics: newDiffChanMetrics(),
-	}
-}
-
-func (d *DiffChan) produceDiff(diff *Diff) {
-	startTime := time.Now()
-	d.ch <- diff
-	d.metrics.observeProduceDiffDuration(float64(time.Since(startTime).Microseconds()))
-}
-
-func (d *DiffChan) ConsumeDiff() *Diff {
-	diff := <-d.ch
-	return diff
-}
-
-func (d *DiffChan) RecordConsumptionTime(duration time.Duration) {
-	d.metrics.observeConsumeDiffDuration(float64(duration.Microseconds()))
-}
-
-func (d *DiffChan) Close() { close(d.ch) }
-
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (*DiffChan, error) {
+func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan *Diff, error) {
 	args := []string{
 		"-C", source,
 		"log",
@@ -296,7 +267,7 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 }
 
 // Staged parses the output of the `git diff` command for the `source` path.
-func (c *Parser) Staged(ctx context.Context, source string) (*DiffChan, error) {
+func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) {
 	// Provide the --cached flag to diff to get the diff of the staged changes.
 	args := []string{"-C", source, "diff", "-p", "--cached", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 
@@ -311,8 +282,8 @@ func (c *Parser) Staged(ctx context.Context, source string) (*DiffChan, error) {
 }
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
-func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (*DiffChan, error) {
-	diffChan := newDiffChan(32)
+func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (chan *Diff, error) {
+	diffChan := make(chan *Diff, 64)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
@@ -348,7 +319,7 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged boo
 	return diffChan, nil
 }
 
-func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan *DiffChan, isStaged bool) {
+func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan *Diff, isStaged bool) {
 	outReader := bufio.NewReader(stdOut)
 	var (
 		currentCommit *Commit
@@ -370,7 +341,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan *Dif
 	currentDiff := diff(currentCommit)
 
 	defer common.RecoverWithExit(ctx)
-	defer diffChan.Close()
+	defer close(diffChan)
 	for {
 		if common.IsDone(ctx) {
 			break
@@ -397,7 +368,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan *Dif
 						"latest_state", latestState.String(),
 					)
 				}
-				diffChan.produceDiff(currentDiff)
+				diffChan <- currentDiff
 				currentCommit.Size += currentDiff.Len()
 				currentCommit.hasDiffs = true
 			}
@@ -408,7 +379,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan *Dif
 					// Initialize an empty Diff instance associated with the given commit.
 					// Since this diff represents "no changes", we only need to set the commit.
 					// This is required to ensure commits that have no diffs are still processed.
-					diffChan.produceDiff(diff(currentCommit))
+					diffChan <- &Diff{Commit: currentCommit}
 				}
 			}
 
@@ -474,7 +445,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan *Dif
 						"latest_state", latestState.String(),
 					)
 				}
-				diffChan.produceDiff(currentDiff)
+				diffChan <- currentDiff
 				currentCommit.hasDiffs = true
 			}
 
@@ -534,7 +505,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan *Dif
 						"latest_state", latestState.String(),
 					)
 				}
-				diffChan.produceDiff(currentDiff)
+				diffChan <- currentDiff
 			}
 			currentDiff = diff(currentCommit, withPathB(currentDiff.PathB))
 
@@ -983,7 +954,7 @@ func isCommitSeparatorLine(latestState ParseState, line []byte) bool {
 	return false
 }
 
-func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff, diffChan *DiffChan, totalLogSize *int) {
+func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff, diffChan chan *Diff, totalLogSize *int) {
 	if err := currentDiff.finalize(); err != nil {
 		ctx.Logger().Error(err, "failed to finalize diff")
 		return
@@ -992,7 +963,7 @@ func cleanupParse(ctx context.Context, currentCommit *Commit, currentDiff *Diff,
 	// Ignore empty or binary diffs (this condition may be redundant).
 	if currentDiff != nil && (currentDiff.Len() > 0 || currentDiff.IsBinary) {
 		currentDiff.Commit = currentCommit
-		diffChan.produceDiff(currentDiff)
+		diffChan <- currentDiff
 	}
 	if currentCommit != nil {
 		if totalLogSize != nil {

@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/google/go-github/v61/github"
 	"golang.org/x/oauth2"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -63,7 +63,7 @@ type Git struct {
 	sourceMetadataFunc func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData
 	verify             bool
 	metrics            metrics
-	concurrency        int
+	concurrency        *semaphore.Weighted
 	skipBinaries       bool
 	skipArchives       bool
 
@@ -110,7 +110,7 @@ func NewGit(config *Config) *Git {
 		jobID:              config.JobID,
 		sourceMetadataFunc: config.SourceMetadataFunc,
 		verify:             config.Verify,
-		concurrency:        config.Concurrency,
+		concurrency:        semaphore.NewWeighted(int64(config.Concurrency)),
 		skipBinaries:       config.SkipBinaries,
 		skipArchives:       config.SkipArchives,
 		parser:             parser,
@@ -518,17 +518,7 @@ func (s *Git) CommitsScanned() uint64 {
 
 const gitDirName = ".git"
 
-// timestampedDiff combines a gitparse.Diff and a timestamp.
-// It is used to track the time when a diff is enqueued for processing.
-//
-// The timestamp field records the time when the diff is enqueued into the diffQueue.
-// This timestamp is used to calculate the waiting time and processing time of the diff.
-type timestampedDiff struct {
-	*gitparse.Diff
-	timestamp time.Time
-}
-
-func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter, binaryDiffChan chan<- binaryDiff) error {
+func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the remote URL for reporting (may be empty)
 	remoteURL := getSafeRemoteURL(repo, "origin")
 	var repoCtx context.Context
@@ -564,130 +554,132 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	var depth int64
 	var lastCommitHash string
-
-	for {
-		diff := diffChan.ConsumeDiff()
-		if diff == nil {
-			ctx.Logger().V(3).Info("finished scanning commits")
+	for diff := range diffChan {
+		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+			logger.V(1).Info("reached max depth", "depth", depth)
 			break
 		}
 
-		shouldBreak := func() bool {
-			start := time.Now() // Start the timer for processing the diff.
-			defer func(t time.Time) {
-				diffChan.RecordConsumptionTime(time.Since(t)) // Record the time taken to process the diff.
-			}(start) // Release the worker back to the pool.
-
-			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-				logger.V(1).Info("reached max depth", "depth", depth)
-				return true
-			}
-
-			fullHash := diff.Commit.Hash
-			if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
-				logger.V(1).Info("reached base commit", "commit", fullHash)
-				return true
-			}
-
-			if fullHash != lastCommitHash {
-				depth++
-				lastCommitHash = fullHash
-				atomic.AddUint64(&s.metrics.commitsScanned, 1)
-				logger.V(5).Info("scanning commit", "commit", fullHash)
-			}
-
-			// Check if the diff passes the filter.
-			// This helps to avoid processing unnecessary diffs.
-			if !scanOptions.Filter.Pass(diff.PathB) {
-				return false
-			}
-
-			fileName := diff.PathB
-			// Avoid processing empty file names.
-			if fileName == "" {
-				return false
-			}
-			email := diff.Commit.Author
-			when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
-
-			// Handle binary files by reading the entire file rather than using the diff.
-			if diff.IsBinary {
-				metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, 0)
-				chunkSkel := &sources.Chunk{
-					SourceName:     s.sourceName,
-					SourceID:       s.sourceID,
-					JobID:          s.jobID,
-					SourceType:     s.sourceType,
-					SourceMetadata: metadata,
-					Verify:         s.verify,
-				}
-
-				commitHash := plumbing.NewHash(fullHash)
-				bd := binaryDiff{fileName, gitDir, commitHash, chunkSkel}
-				if err := sendBinaryDiffWithRetry(ctx, bd, binaryDiffChan); err != nil {
-					ctx.Logger().Error(err, "error sending binary diff", "filename", fileName, "commit", commitHash, "file", diff.PathB)
-				}
-
-				return false
-			}
-
-			// Check if the diff size exceeds the chunk size limit.
-			// If it does, chunk it to handle the large diff.
-			// This helps to efficiently process large diffs and avoid memory issues.
-			if diff.Len() > sources.ChunkSize+sources.PeekSize {
-				s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
-				return false
-			}
-
-			chunkData := func(d *gitparse.Diff) error {
-				metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, int64(diff.LineStart))
-
-				reader, err := d.ReadCloser()
-				if err != nil {
-					ctx.Logger().Error(
-						err, "error creating reader for commits",
-						"filename", fileName,
-						"commit", fullHash,
-						"file", diff.PathB,
-					)
-					return nil
-				}
-				defer reader.Close()
-
-				data := make([]byte, d.Len())
-				if _, err := io.ReadFull(reader, data); err != nil {
-					ctx.Logger().Error(
-						err, "error reading diff content for commit",
-						"filename", fileName,
-						"commit", fullHash,
-						"file", diff.PathB,
-					)
-					return nil
-				}
-				chunk := sources.Chunk{
-					SourceName:     s.sourceName,
-					SourceID:       s.sourceID,
-					JobID:          s.jobID,
-					SourceType:     s.sourceType,
-					SourceMetadata: metadata,
-					Data:           data,
-					Verify:         s.verify,
-				}
-				return reporter.ChunkOk(ctx, chunk)
-			}
-			if err := chunkData(diff); err != nil {
-				return false
-			}
-
-			return false
-		}
-
-		if shouldBreak() {
+		commit := diff.Commit
+		fullHash := commit.Hash
+		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
+			logger.V(1).Info("reached base commit", "commit", fullHash)
 			break
 		}
 
+		email := commit.Author
+		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
+
+		if fullHash != lastCommitHash {
+			depth++
+			lastCommitHash = fullHash
+			atomic.AddUint64(&s.metrics.commitsScanned, 1)
+			logger.V(5).Info("scanning commit", "commit", fullHash)
+
+			// Scan the commit metadata.
+			// See https://github.com/trufflesecurity/trufflehog/issues/2683
+			var (
+				metadata = s.sourceMetadataFunc("", email, fullHash, when, remoteURL, 0)
+				sb       strings.Builder
+			)
+			sb.WriteString(email)
+			sb.WriteString("\n")
+			sb.WriteString(commit.Committer)
+			sb.WriteString("\n")
+			sb.WriteString(commit.Message.String())
+			chunk := sources.Chunk{
+				SourceName:     s.sourceName,
+				SourceID:       s.sourceID,
+				JobID:          s.jobID,
+				SourceType:     s.sourceType,
+				SourceMetadata: metadata,
+				Data:           []byte(sb.String()),
+				Verify:         s.verify,
+			}
+			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+				return err
+			}
+		}
+
+		fileName := diff.PathB
+		if fileName == "" {
+			continue
+		}
+
+		if !scanOptions.Filter.Pass(fileName) {
+			continue
+		}
+
+		// Handle binary files by reading the entire file rather than using the diff.
+		if diff.IsBinary {
+			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, 0)
+			chunkSkel := &sources.Chunk{
+				SourceName:     s.sourceName,
+				SourceID:       s.sourceID,
+				JobID:          s.jobID,
+				SourceType:     s.sourceType,
+				SourceMetadata: metadata,
+				Verify:         s.verify,
+			}
+
+			commitHash := plumbing.NewHash(fullHash)
+			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+				logger.V(1).Info(
+					"error handling binary file",
+					"error", err,
+					"filename", fileName,
+					"commit", commitHash,
+					"file", diff.PathB,
+				)
+			}
+			continue
+		}
+
+		if diff.Len() > sources.ChunkSize+sources.PeekSize {
+			s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
+			continue
+		}
+
+		chunkData := func(d *gitparse.Diff) error {
+			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, int64(diff.LineStart))
+
+			reader, err := d.ReadCloser()
+			if err != nil {
+				ctx.Logger().Error(
+					err, "error creating reader for commits",
+					"filename", fileName,
+					"commit", fullHash,
+					"file", diff.PathB,
+				)
+				return nil
+			}
+			defer reader.Close()
+
+			data := make([]byte, d.Len())
+			if _, err := io.ReadFull(reader, data); err != nil {
+				ctx.Logger().Error(
+					err, "error reading diff content for commit",
+					"filename", fileName,
+					"commit", fullHash,
+					"file", diff.PathB,
+				)
+				return nil
+			}
+			chunk := sources.Chunk{
+				SourceName:     s.sourceName,
+				SourceID:       s.sourceID,
+				JobID:          s.jobID,
+				SourceType:     s.sourceType,
+				SourceMetadata: metadata,
+				Data:           data,
+				Verify:         s.verify,
+			}
+			return reporter.ChunkOk(ctx, chunk)
+		}
+		if err := chunkData(diff); err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
 
@@ -772,7 +764,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 }
 
 // ScanStaged chunks staged changes.
-func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter, binaryDiffChan chan<- binaryDiff) error {
+func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the URL metadata for reporting (may be empty).
 	urlMetadata := getSafeRemoteURL(repo, "origin")
 
@@ -804,211 +796,105 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	var depth int64
 	var lastCommitHash string
+	for diff := range diffChan {
+		fullHash := diff.Commit.Hash
+		logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
+		logger.V(2).Info("scanning staged changes from git")
 
-	for {
-		diff := diffChan.ConsumeDiff()
-		if diff == nil {
-			ctx.Logger().V(3).Info("finished scanning staged changes")
+		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
+			logger.V(1).Info("reached max depth")
 			break
 		}
 
-		shouldBreak := func() bool {
-			start := time.Now() // Start the timer for processing the diff.
-			defer func(t time.Time) {
-				diffChan.RecordConsumptionTime(time.Since(t)) // Record the time taken to process the diff.
-			}(start) // Release the worker back to the pool.
-
-			fullHash := diff.Commit.Hash
-			logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
-			logger.V(2).Info("scanning staged changes from git")
-
-			if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
-				logger.V(1).Info("reached max depth")
-				return true
-			}
-
-			if fullHash != lastCommitHash {
-				depth++
-				lastCommitHash = fullHash
-				atomic.AddUint64(&s.metrics.commitsScanned, 1)
-			}
-
-			if reachedBase && fullHash != scanOptions.BaseHash {
-				return true
-			}
-
-			if scanOptions.BaseHash != "" && fullHash == scanOptions.BaseHash {
-				logger.V(1).Info("reached base hash, finishing scanning files")
-				reachedBase = true
-			}
-
-			if !scanOptions.Filter.Pass(diff.PathB) {
-				return false
-			}
-
-			fileName := diff.PathB
-			if fileName == "" {
-				return false
-			}
-
-			email := diff.Commit.Author
-			when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
-
-			// Handle binary files by reading the entire file rather than using the diff.
-			if diff.IsBinary {
-				commitHash := plumbing.NewHash(fullHash)
-				metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, 0)
-				chunkSkel := &sources.Chunk{
-					SourceName:     s.sourceName,
-					SourceID:       s.sourceID,
-					JobID:          s.jobID,
-					SourceType:     s.sourceType,
-					SourceMetadata: metadata,
-					Verify:         s.verify,
-				}
-
-				bd := binaryDiff{fileName, gitDir, commitHash, chunkSkel}
-				if err := sendBinaryDiffWithRetry(ctx, bd, binaryDiffChan); err != nil {
-					ctx.Logger().Error(err, "error sending binary diff", "filename", fileName, "commit", commitHash, "file", diff.PathB)
-				}
-				return false
-			}
-
-			chunkData := func(d *gitparse.Diff) error {
-				metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
-
-				reader, err := d.ReadCloser()
-				if err != nil {
-					ctx.Logger().Error(
-						err, "error creating reader for staged",
-						"filename", fileName,
-						"commit", fullHash,
-						"file", diff.PathB,
-					)
-					return nil
-				}
-				defer reader.Close()
-
-				data := make([]byte, d.Len())
-				if _, err := reader.Read(data); err != nil {
-					ctx.Logger().Error(
-						err, "error reading diff content for staged",
-						"filename", fileName,
-						"commit", fullHash,
-						"file", diff.PathB,
-					)
-					return nil
-				}
-				chunk := sources.Chunk{
-					SourceName:     s.sourceName,
-					SourceID:       s.sourceID,
-					JobID:          s.jobID,
-					SourceType:     s.sourceType,
-					SourceMetadata: metadata,
-					Data:           data,
-					Verify:         s.verify,
-				}
-				return reporter.ChunkOk(ctx, chunk)
-			}
-			if err := chunkData(diff); err != nil {
-				return false
-			}
-
-			return false
+		if fullHash != lastCommitHash {
+			depth++
+			lastCommitHash = fullHash
+			atomic.AddUint64(&s.metrics.commitsScanned, 1)
 		}
 
-		if shouldBreak() {
+		if reachedBase && fullHash != scanOptions.BaseHash {
 			break
 		}
 
+		if scanOptions.BaseHash != "" && fullHash == scanOptions.BaseHash {
+			logger.V(1).Info("reached base hash, finishing scanning files")
+			reachedBase = true
+		}
+
+		if !scanOptions.Filter.Pass(diff.PathB) {
+			continue
+		}
+
+		fileName := diff.PathB
+		if fileName == "" {
+			continue
+		}
+
+		email := diff.Commit.Author
+		when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
+
+		// Handle binary files by reading the entire file rather than using the diff.
+		if diff.IsBinary {
+			commitHash := plumbing.NewHash(fullHash)
+			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, 0)
+			chunkSkel := &sources.Chunk{
+				SourceName:     s.sourceName,
+				SourceID:       s.sourceID,
+				JobID:          s.jobID,
+				SourceType:     s.sourceType,
+				SourceMetadata: metadata,
+				Verify:         s.verify,
+			}
+			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+				logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
+			}
+			continue
+		}
+
+		chunkData := func(d *gitparse.Diff) error {
+			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, int64(diff.LineStart))
+
+			reader, err := d.ReadCloser()
+			if err != nil {
+				ctx.Logger().Error(
+					err, "error creating reader for staged",
+					"filename", fileName,
+					"commit", fullHash,
+					"file", diff.PathB,
+				)
+				return nil
+			}
+			defer reader.Close()
+
+			data := make([]byte, d.Len())
+			if _, err := reader.Read(data); err != nil {
+				ctx.Logger().Error(
+					err, "error reading diff content for staged",
+					"filename", fileName,
+					"commit", fullHash,
+					"file", diff.PathB,
+				)
+				return nil
+			}
+			chunk := sources.Chunk{
+				SourceName:     s.sourceName,
+				SourceID:       s.sourceID,
+				JobID:          s.jobID,
+				SourceType:     s.sourceType,
+				SourceMetadata: metadata,
+				Data:           data,
+				Verify:         s.verify,
+			}
+			return reporter.ChunkOk(ctx, chunk)
+		}
+		if err := chunkData(diff); err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
 
-// binaryDiff contains the information needed to read a binary file from a git repository.
-// It is used to send binary diffs to the binaryDiffChan for asynchronous processing.
-type binaryDiff struct {
-	fileName  string
-	gitDir    string
-	commit    plumbing.Hash // 20 bytes
-	chunkSkel *sources.Chunk
-}
-
-// sendBinaryDiffWithRetry attempts to send a binary diff to the binaryDiffChan with exponential backoff retry logic.
-func sendBinaryDiffWithRetry(ctx context.Context, diff binaryDiff, binaryDiffChan chan<- binaryDiff) error {
-	const (
-		maxRetries           = 10
-		initialRetryInterval = 100 * time.Millisecond
-		maxRetryInterval     = 30 * time.Second
-	)
-	retryInterval := initialRetryInterval
-
-	for retries := 0; retries <= maxRetries; retries++ {
-		select {
-		case binaryDiffChan <- diff:
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			if retries < maxRetries {
-				time.Sleep(retryInterval)
-				retryInterval *= 2
-				if retryInterval > maxRetryInterval {
-					retryInterval = maxRetryInterval
-				}
-			}
-		}
-	}
-
-	return fmt.Errorf("failed to send binary diff, channel full after %d retries", maxRetries)
-}
-
-// ScanRepo performs a comprehensive scan of a Git repository, analyzing commits and binary diffs
-// concurrently to identify potential security risks and report them through a chunks reporter.
-//
-// The scan process involves the following steps:
-//  1. Initialize a buffered channel (binaryDiffChan) for concurrent processing of binary diffs.
-//  2. Create a cancellable context to allow early termination of the scan if an error occurs.
-//  3. Spawn a configurable number of consumer goroutines to handle binary diffs concurrently.
-//  4. Spawn producer goroutines to scan commits and staged changes concurrently, reporting results
-//     and binary diffs through the respective channels.
-//  5. Wait for all producer goroutines to finish and close the binaryDiffChan.
-//  6. Synchronize the completion of consumer goroutines and handle any errors encountered.
-//
-// The function uses a producer-consumer pattern to process binary diffs concurrently, allowing for
-// efficient utilization of system resources. The binaryDiffChan is buffered to balance the workload
-// between producers and consumers, preventing the channel from becoming a bottleneck.
-//
-// Errors encountered during the scan process are propagated through the errChan, and the context is
-// cancelled to signal all goroutines to terminate gracefully. The function returns an error if any
-// critical issues are encountered during the scan or binary diff handling.
-func (s *Git) ScanRepo(
-	ctx context.Context,
-	repo *git.Repository,
-	repoPath string,
-	scanOptions *ScanOptions,
-	reporter sources.ChunkReporter,
-) error {
-	// Initialize a buffered channel for handling binary diffs for asynchronous processing.
-	binaryDiffChan := make(chan binaryDiff, s.concurrency*4)
-
-	// Create a cancellable context to allow early exit in case of error.
-	// This is to preserve existing behavior, but we may want to consider
-	// allowing the scan to finish even if an error occurs.
-	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
-
-	var consumerWg sync.WaitGroup
-	for i := 0; i < s.concurrency; i++ {
-		consumerWg.Add(1)
-		go func() {
-			ctx := context.WithValue(ctx, "binary_diff_worker_id", common.RandomID(5))
-			defer consumerWg.Done()
-			s.extractBinaryDiffs(ctx, reporter, binaryDiffChan)
-		}()
-	}
-
+func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	if scanOptions == nil {
 		scanOptions = NewScanOptions()
 	}
@@ -1017,124 +903,35 @@ func (s *Git) ScanRepo(
 	}
 	start := time.Now().Unix()
 
-	errChan := make(chan error, 1)
-	defer close(errChan)
-
-	var producerWg sync.WaitGroup
-	producerWg.Add(1)
-	go func() {
-		defer producerWg.Done()
-		if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, reporter, binaryDiffChan); err != nil {
-			// Propagate errors and cancel the context to stop all goroutines.
-			errChan <- err
-			cancel(fmt.Errorf("error scanning commits: %w", err))
-		}
-	}()
-
+	if err := s.ScanCommits(ctx, repo, repoPath, scanOptions, reporter); err != nil {
+		return err
+	}
 	if !scanOptions.Bare {
-		producerWg.Add(1)
-		go func() {
-			defer producerWg.Done()
-			if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, reporter, binaryDiffChan); err != nil {
-				ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
-			}
-		}()
+		if err := s.ScanStaged(ctx, repo, repoPath, scanOptions, reporter); err != nil {
+			ctx.Logger().V(1).Info("error scanning unstaged changes", "error", err)
+		}
 	}
 
+	logger := ctx.Logger()
 	// We're logging time, but the repoPath is usually a dynamically generated folder in /tmp.
 	// To make this duration logging useful, we need to log the remote as well.
-	remotes, _ := repo.Remotes()
-	repoURL := "Could not get remote for repo"
-	if len(remotes) != 0 {
-		repoURL = getSafeRemoteURL(repo, remotes[0].Config().Name)
-	}
-
-	producerWg.Wait()
-	close(binaryDiffChan)
-
-	// Synchronize the completion of consumers or return early on error.
-	var consumerErr error
-	select {
-	case <-waitForConsumers(&consumerWg):
-		// All consumers finished.
-	case consumerErr = <-errChan:
-		// Received an error, context cancellation will stop consumers.
-	}
-
-	if consumerErr != nil {
-		return fmt.Errorf("error handling binary diffs: %w", consumerErr)
+	// Other sources may have included this info to the context, in which case we don't need to add it again.
+	if ctx.Value("repo") == nil {
+		remotes, _ := repo.Remotes()
+		repoURL := "Could not get remote for repo"
+		if len(remotes) != 0 {
+			repoURL = getSafeRemoteURL(repo, remotes[0].Config().Name)
+		}
+		logger = logger.WithValues("repo", repoURL)
 	}
 
 	scanTime := time.Now().Unix() - start
-	ctx.Logger().V(1).Info(
+	logger.V(1).Info(
 		"scanning git repo complete",
-		"repo", repoURL,
 		"path", repoPath,
 		"time_seconds", scanTime,
 		"commits_scanned", atomic.LoadUint64(&s.metrics.commitsScanned),
 	)
-	return nil
-}
-
-// Wait for all consumers to finish and signal that they are done.
-func waitForConsumers(wg *sync.WaitGroup) <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-	return done
-}
-
-func (s *Git) extractBinaryDiffs(ctx context.Context, reporter sources.ChunkReporter, binaryDiffChan <-chan binaryDiff) {
-	for diff := range binaryDiffChan {
-		commitHash := diff.commit.String()
-		filename := diff.fileName
-
-		fileCtx := context.WithValues(ctx, "commit", commitHash, "path", filename)
-		fileCtx.Logger().V(5).Info("handling binary file")
-
-		if common.SkipFile(filename) || common.IsBinary(filename) {
-			fileCtx.Logger().V(5).Info("file contains ignored extension")
-			continue
-		}
-
-		if s.skipBinaries {
-			fileCtx.Logger().V(5).Info("skipping binary file", "path", filename)
-			continue
-		}
-
-		if err := extracBinaryDiff(fileCtx, diff, reporter); err != nil {
-			fileCtx.Logger().Error(err, "error extracting binary diff")
-		}
-	}
-}
-
-func extracBinaryDiff(ctx context.Context, diff binaryDiff, reporter sources.ChunkReporter) error {
-	cmd := exec.Command("git", "-C", diff.gitDir, "cat-file", "blob", diff.commit.String()+":"+diff.fileName)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	fileReader, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	if err = handlers.HandleFile(ctx, fileReader, diff.chunkSkel, reporter); err != nil {
-		return fmt.Errorf("error handling file: %w", err)
-	}
-
-	if err = cmd.Wait(); err != nil {
-		return fmt.Errorf(
-			"error waiting for command: command=%s, stderr=%s, commit=%s: %w",
-			cmd.String(), stderr.String(), diff.commit.String(), err,
-		)
-	}
-
 	return nil
 }
 
@@ -1397,6 +1194,33 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 		return ""
 	}
 	return safeURL
+}
+
+func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
+	fileCtx.Logger().V(5).Info("handling binary file")
+
+	if common.SkipFile(path) {
+		fileCtx.Logger().V(5).Info("file contains ignored extension")
+		return nil
+	}
+
+	if s.skipBinaries {
+		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
+		return nil
+	}
+
+	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	stdout, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
+	}
+
+	return handlers.HandleFile(fileCtx, bytes.NewReader(stdout), chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {

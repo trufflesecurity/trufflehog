@@ -562,26 +562,19 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	if s.orgsCache.Count() > 0 {
 		specificScope = true
 		for _, org := range s.orgsCache.Keys() {
-			org := org
-			s.jobPool.Go(func() error {
-				logger := s.log.WithValues("org", org)
-				if err := s.getReposByOrg(ctx, org); err != nil {
-					logger.Error(err, "error fetching repos for org")
-				}
+			logger := s.log.WithValues("org", org)
+			if err := s.getReposByOrg(ctx, org); err != nil {
+				logger.Error(err, "error fetching repos for org")
+			}
 
-				if s.conn.ScanUsers {
-					err := s.addMembersByOrg(ctx, org)
-					if err != nil {
-						logger.Error(err, "Unable to add members by org")
-						return nil
-					}
+			if s.conn.ScanUsers {
+				err := s.addMembersByOrg(ctx, org)
+				if err != nil {
+					logger.Error(err, "Unable to add members by org")
+					continue
 				}
-
-				return nil
-			})
+			}
 		}
-
-		_ = s.jobPool.Wait()
 	}
 
 	// If no scope was provided, enumerate them.
@@ -600,29 +593,22 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		}
 
 		for _, org := range s.orgsCache.Keys() {
-			org := org
-			s.jobPool.Go(func() error {
-				logger := s.log.WithValues("org", org)
-				if err := s.getReposByOrg(ctx, org); err != nil {
-					logger.Error(err, "error fetching repos by org")
-				}
+			logger := s.log.WithValues("org", org)
+			if err := s.getReposByOrg(ctx, org); err != nil {
+				logger.Error(err, "error fetching repos by org")
+			}
 
-				if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-					logger.Error(err, "error fetching repos by user")
-				}
+			if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
+				logger.Error(err, "error fetching repos by user")
+			}
 
-				if s.conn.ScanUsers {
-					if err := s.addMembersByOrg(ctx, org); err != nil {
-						logger.Error(err, "Unable to add members by org")
-						return nil
-					}
+			if s.conn.ScanUsers {
+				err := s.addMembersByOrg(ctx, org)
+				if err != nil {
+					logger.Error(err, "Unable to add members by org for org")
 				}
-
-				return nil
-			})
+			}
 		}
-
-		_ = s.jobPool.Wait()
 
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
