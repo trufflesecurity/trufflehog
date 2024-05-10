@@ -86,17 +86,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					var serviceResponse serviceResponse
-					if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err != nil {
-						err = fmt.Errorf("failed to decode service response: %w", err)
-						s1.SetVerificationError(err, key)
-					}
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-						service := serviceResponse.Services[0]
-						s1.ExtraData["friendly_name"] = service.FriendlyName
-						s1.ExtraData["account_sid"] = service.AccountSID
+						var serviceResponse serviceResponse
+						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err != nil { // unexpected response
+							err = fmt.Errorf("failed to decode service response: %w", err)
+							s1.SetVerificationError(err, key)
+						} else {
+							s1.Verified = true
+							service := serviceResponse.Services[0]
+							s1.ExtraData["friendly_name"] = service.FriendlyName
+							s1.ExtraData["account_sid"] = service.AccountSID
+						}
 					} else if res.StatusCode == 401 || res.StatusCode == 403 {
 						// The secret is determinately not verified (nothing to do)
 					} else {
