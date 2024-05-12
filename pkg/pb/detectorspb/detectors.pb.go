@@ -2074,6 +2074,7 @@ var (
 		984: "Wiz",
 		985: "Pagarme",
 		986: "Onfleet",
+		987: "Intra42",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
