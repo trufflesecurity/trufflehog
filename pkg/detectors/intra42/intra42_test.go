@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
@@ -27,9 +26,14 @@ func TestIntra42_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "typical pattern",
-			input: "intra_client_secret = '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'",
-			want:  []string{"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"},
+			name: "typical pattern",
+			input: `
+intra_client_id = 'u-s4t2ud-d91c558a2ba6b47f60f690efc20a33d28c252d5bed8400343246f3eb68f490d2'
+intra_client_secret = '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'
+`,
+			want: []string{
+				"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",
+			},
 		},
 	}
 
@@ -78,13 +82,14 @@ func TestIntra42_Pattern(t *testing.T) {
 }
 
 func TestIntra42_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("INTRA42")
+	secret := testSecrets.MustGetField("INTRA42_SECRET")
+	id := testSecrets.MustGetField("INTRA42_ID")
 	inactiveSecret := testSecrets.MustGetField("INTRA42_INACTIVE")
 
 	type args struct {
@@ -105,7 +110,7 @@ func TestIntra42_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a intra42 secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find an intra42 secret %s within intra42 %s", secret, id)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -114,44 +119,14 @@ func TestIntra42_FromChunk(t *testing.T) {
 					Verified:     true,
 				},
 			},
-			wantErr:             false,
-			wantVerificationErr: false,
-		},
-		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a intra42 secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Intra42,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
-		},
-		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:                nil,
-			wantErr:             false,
-			wantVerificationErr: false,
+			wantErr: false,
 		},
 		{
 			name: "found, would be verified if not for timeout",
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a intra42 secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find an intra42 secret %s within intra42 %s", secret, id)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -168,7 +143,7 @@ func TestIntra42_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a intra42 secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find an intra42 secret %s within intra42 %s", secret, id)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -179,6 +154,33 @@ func TestIntra42_FromChunk(t *testing.T) {
 			},
 			wantErr:             false,
 			wantVerificationErr: true,
+		},
+		{
+			name: "found, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find an intra42 secret %s within intra42 %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Intra42,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "not found",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("You cannot find the secret within"),
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -193,7 +195,7 @@ func TestIntra42_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
+					t.Errorf("Intra42.FromData() verificationError = %v, wantVerificationErr %v", got[i].VerificationError(), tt.wantVerificationErr)
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")

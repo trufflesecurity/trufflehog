@@ -2,7 +2,11 @@ package intra42
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -15,13 +19,17 @@ type Scanner struct {
 	client *http.Client
 }
 
-// Ensure the Scanner satisfies the interface at compile time.
+// Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
+
+const verifyURL = "https://api.intra.42.fr/oauth/token"
 
 var (
 	defaultClient = common.SaneHttpClient()
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
+
+	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"intra", "intra42", "secret"}) + `\b(s-s4t2(?:ud|af)-[abcdef0123456789]{64})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"intra", "intra42", "secret"}) + `\b(u-s4t2(?:ud|af)-[abcdef0123456789]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,61 +42,74 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	uniqueMatches := make(map[string]struct{})
-	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueMatches[match[1]] = struct{}{}
-	}
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
-	for match := range uniqueMatches {
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Intra42,
-			Raw:          []byte(match),
+	for _, match := range matches {
+		if len(match) != 2 {
+			continue
 		}
+		resMatch := strings.TrimSpace(match[1])
 
-		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
+		for _, idMatch := range idMatches {
+			if len(idMatch) != 2 {
+				continue
+			}
+			resIdMatch := strings.TrimSpace(idMatch[1])
+
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Intra42,
+				Raw:          []byte(resMatch),
 			}
 
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
-			s1.Verified = isVerified
-			s1.ExtraData = extraData
-			s1.SetVerificationError(verificationErr, match)
+			if verify {
+				client := s.getClient()
+				isVerified, verificationErr := verifyIntra42(ctx, client, resMatch, resIdMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
+			}
+
+			results = append(results, s1)
 		}
-
-		results = append(results, s1)
 	}
-
-	return
+	return results, nil
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	return false, nil, nil
-	// req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://eth-mainnet.g.intra42.com/v2/"+token+"/getNFTs/?owner=vitalik.eth", nil)
-	// if err != nil {
-	// 	return false, nil, nil
-	// }
-	//
-	// res, err := client.Do(req)
-	// if err != nil {
-	// 	return false, nil, err
-	// }
-	// defer func() {
-	// 	_, _ = io.Copy(io.Discard, res.Body)
-	// 	_ = res.Body.Close()
-	// }()
-	//
-	// switch res.StatusCode {
-	// case http.StatusOK:
-	// 	// If the endpoint returns useful information, we can return it as a map.
-	// 	return true, nil, nil
-	// case http.StatusUnauthorized:
-	// 	// The secret is determinately not verified (nothing to do)
-	// 	return false, nil, nil
-	// default:
-	// 	return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-	// }
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
+func verifyIntra42(ctx context.Context, client *http.Client, resMatch string, resIdMatch string) (bool, error) {
+	data := url.Values{}
+	data.Set("client_id", resIdMatch)
+	data.Set("client_secret", resMatch)
+	data.Set("grant_type", "client_credentials")
+	encodedData := data.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, verifyURL, strings.NewReader(encodedData))
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected http response status %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
