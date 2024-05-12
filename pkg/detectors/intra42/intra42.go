@@ -28,8 +28,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"intra", "intra42", "secret"}) + `\b(s-s4t2(?:ud|af)-[abcdef0123456789]{64})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"intra", "intra42", "secret"}) + `\b(u-s4t2(?:ud|af)-[abcdef0123456789]{64})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"intra", "intra42", "client", "secret"}) + `\b(s-s4t2(?:ud|af)-[abcdef0123456789]{64})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"intra", "intra42", "client", "id"}) + `\b(u-s4t2(?:ud|af)-[abcdef0123456789]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
