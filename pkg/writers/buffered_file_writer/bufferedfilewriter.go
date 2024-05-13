@@ -329,6 +329,6 @@ func newAutoDeletingFileReader(file *os.File) *autoDeletingFileReader {
 
 // Close implements the io.Closer interface, deletes the file after closing.
 func (r *autoDeletingFileReader) Close() error {
-	defer os.RemoveAll(r.Name()) // Delete the file after closing
+	defer os.Remove(r.Name()) // Delete the file after closing
 	return r.File.Close()
 }
