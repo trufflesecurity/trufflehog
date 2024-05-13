@@ -99,7 +99,12 @@ var (
 	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue descriptions and comments in scan.").Bool()
 	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
+<<<<<<< test_rebase_axr
 	githubScanSinceDate     = githubScan.Flag("since", "Scan commits more recent than a specific date.").String()
+=======
+	// githubScanMaxDepth     = githubScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
+	githubScanSinceDate = githubScan.Flag("since", "Scan commits more recent than a specific date.").String()
+>>>>>>> main
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -506,7 +511,12 @@ func run(state overseer.State) {
 			IncludePullRequestComments: *githubScanPRComments,
 			IncludeGistComments:        *githubScanGistComments,
 			Filter:                     filter,
+<<<<<<< test_rebase_axr
 			SinceDate:                  *githubScanSinceDate,
+=======
+			// MaxDepth:       *githubScanMaxDepth,
+			SinceDate: *githubScanSinceDate,
+>>>>>>> main
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")

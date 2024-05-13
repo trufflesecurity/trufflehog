@@ -519,6 +519,7 @@ func (s *Git) CommitsScanned() uint64 {
 const gitDirName = ".git"
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
+<<<<<<< test_rebase_axr
 	// Get the remote URL for reporting (may be empty)
 	remoteURL := getSafeRemoteURL(repo, "origin")
 	var repoCtx context.Context
@@ -541,6 +542,9 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	}
 
 	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare, scanOptions.SinceDate)
+=======
+	commitChan, err := gitparse.NewParser().RepoPath(ctx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare, scanOptions.SinceDate)
+>>>>>>> main
 	if err != nil {
 		return err
 	}
