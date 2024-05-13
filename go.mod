@@ -29,7 +29,7 @@ require (
 	github.com/couchbase/gocb/v2 v2.8.1
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/envoyproxy/protoc-gen-validate v1.0.4
-	github.com/fatih/color v1.16.0
+	github.com/fatih/color v1.17.0
 	github.com/felixge/fgprof v0.9.4
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/getsentry/sentry-go v0.27.0
