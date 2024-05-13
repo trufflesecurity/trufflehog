@@ -1,4 +1,4 @@
-// Package bufferwritter provides a contentWriter implementation using a shared buffer pool for memory management.
+// Package bufferwriter provides a contentWriter implementation using a shared buffer pool for memory management.
 package bufferwriter
 
 import (
@@ -6,7 +6,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
 )
 
 type metrics struct{}
@@ -16,11 +17,11 @@ func (metrics) recordDataProcessed(size int64, dur time.Duration) {
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func init() { bufferPool = buffers.NewBufferPool() }
+func init() { bufferPool = pool.NewBufferPool() }
 
 // bufferPool is the shared Buffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
-var bufferPool *buffers.Pool
+var bufferPool *pool.Pool
 
 // state represents the current mode of buffer.
 type state uint8
@@ -34,10 +35,10 @@ const (
 
 // BufferWriter implements contentWriter, using a shared buffer pool for memory management.
 type BufferWriter struct {
-	buf     *buffers.Buffer // The current buffer in use.
-	bufPool *buffers.Pool   // The buffer pool used to manage the buffer.
-	size    int             // The total size of the content written to the buffer.
-	state   state           // The current state of the buffer.
+	buf     *buffer.Buffer // The current buffer in use.
+	bufPool *pool.Pool     // The buffer pool used to manage the buffer.
+	size    int            // The total size of the content written to the buffer.
+	state   state          // The current state of the buffer.
 
 	metrics metrics
 }
@@ -54,7 +55,7 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.buf == nil {
 		b.buf = b.bufPool.Get()
 		if b.buf == nil {
-			b.buf = buffers.NewBuffer()
+			b.buf = buffer.NewBuffer()
 		}
 	}
 
@@ -63,8 +64,8 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	start := time.Now()
 	defer func(start time.Time) {
 		b.metrics.recordDataProcessed(int64(size), time.Since(start))
-
 	}(start)
+
 	return b.buf.Write(data)
 }
 
@@ -79,7 +80,7 @@ func (b *BufferWriter) ReadCloser() (io.ReadCloser, error) {
 		return nil, fmt.Errorf("writer buffer is nil")
 	}
 
-	return buffers.ReadCloser(b.buf.Bytes(), func() { b.bufPool.Put(b.buf) }), nil
+	return buffer.ReadCloser(b.buf.Bytes(), func() { b.bufPool.Put(b.buf) }), nil
 }
 
 // CloseForWriting is a no-op for buffer, as there is no resource cleanup needed for bytes.Buffer.
