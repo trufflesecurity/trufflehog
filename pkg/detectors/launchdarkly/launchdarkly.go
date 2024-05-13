@@ -2,6 +2,7 @@ package launchdarkly
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -38,6 +39,16 @@ var (
 	keyPat = regexp.MustCompile(`\b((?:api|sdk)-[a-z0-9]{8}-[a-z0-9]{4}-4[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
 )
 
+type tokenResponse struct {
+	Items      []token `json:"items"`
+	TotalCount int32   `json:"totalCount"`
+}
+
+type token struct {
+	Name string `json:"name"`
+	Role string `json:"role"`
+}
+
 // We are not including "mob-" because client keys are not sensitive.
 // They are expected to be public.
 func (s Scanner) Keywords() []string {
@@ -59,10 +70,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LaunchDarkly,
 			Raw:          []byte(resMatch),
+			ExtraData:    make(map[string]string),
 		}
 
 		if verify {
 			if strings.HasPrefix(resMatch, "api-") {
+				s1.ExtraData["token_type"] = "api"
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://app.launchdarkly.com/api/v2/tokens", nil)
 				if err != nil {
 					continue
@@ -77,6 +90,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
+						var tokenResponse tokenResponse
+						if err := json.NewDecoder(res.Body).Decode(&tokenResponse); err == nil && len(tokenResponse.Items) > 0 { // no error in parsing and have atleast one item
+							token := tokenResponse.Items[0]
+							s1.ExtraData["name"] = token.Name
+							s1.ExtraData["role"] = token.Role
+							s1.ExtraData["total_count"] = fmt.Sprintf("%d", tokenResponse.TotalCount)
+						}
 					} else if res.StatusCode == 401 {
 						// 401 is expected for an invalid token, so there is nothing to do here.
 					} else {
@@ -88,6 +108,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			} else {
 				// This is a server SDK key. Try to initialize using the SDK.
+				s1.ExtraData["token_type"] = "sdk"
 				_, err := ldclient.MakeCustomClient(resMatch, defaultSDKConfig, defaultSDKTimeout)
 				if err == nil {
 					s1.Verified = true
