@@ -21,6 +21,10 @@ import (
 // about the detected file format, MIME type, and whether the file is an archive. This information can be
 // used by FileHandler implementations to make decisions on how to process the file.
 //
+// The IsGenericArchive field indicates whether the file represents an archive format that is supported by the
+// archiver library. This allows FileHandler implementations to determine if the file can be processed using
+// the default archive handling capabilities provided by the archiver package.
+//
 // By encapsulating the file type detection logic, fileReader simplifies the implementation of FileHandler and
 // promotes a more cohesive and maintainable codebase. It also embeds a BufferedFileReader to provide efficient
 // random access to the file content.
@@ -28,7 +32,7 @@ type fileReader struct {
 	format   archiver.Format
 	mimeType mimeType
 	*readers.BufferedFileReader
-	isArchive bool
+	isGenericArchive bool
 }
 
 func newFileReader(r io.ReadCloser) (fileReader, error) {
@@ -56,7 +60,7 @@ func newFileReader(r io.ReadCloser) (fileReader, error) {
 	format, arReader, err := archiver.Identify("", rdr)
 	switch {
 	case err == nil: // Archive detected
-		reader.isArchive = true
+		reader.isGenericArchive = true
 		reader.mimeType = mimeType(format.Name())
 		reader.format = format
 	case errors.Is(err, archiver.ErrNoMatch):
@@ -139,7 +143,7 @@ func selectHandler(file fileReader) FileHandler {
 	case rpmMime, cpioMime:
 		return newRPMHandler()
 	default:
-		if file.isArchive {
+		if file.isGenericArchive {
 			return newArchiveHandler()
 		}
 		return newDefaultHandler(defaultHandlerType)
@@ -173,7 +177,7 @@ func HandleFile(
 	defer rdr.Close()
 
 	config := newFileHandlingConfig(options...)
-	if config.skipArchives && rdr.isArchive {
+	if config.skipArchives && rdr.isGenericArchive {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", rdr.mimeType)
 		return nil
 	}
