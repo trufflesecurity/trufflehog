@@ -1,4 +1,4 @@
-// Package bufferwritter provides a contentWriter implementation using a shared buffer pool for memory management.
+// Package bufferwriter provides a contentWriter implementation using a shared buffer pool for memory management.
 package bufferwriter
 
 import (
@@ -61,19 +61,13 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 		}
 	}
 
-	if b.buf == nil {
-		b.buf = b.bufPool.Get()
-		if b.buf == nil {
-			b.buf = buffer.NewBuffer()
-		}
-	}
-
 	size := len(data)
 	b.size += size
 	start := time.Now()
 	defer func(start time.Time) {
 		b.metrics.recordDataProcessed(int64(size), time.Since(start))
 	}(start)
+
 	return b.buf.Write(data)
 }
 
