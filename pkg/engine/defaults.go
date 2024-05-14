@@ -347,6 +347,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/integromat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intercom"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/interseller"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intra42"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intrinio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/invoiceocean"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ip2location"
@@ -1604,6 +1605,7 @@ func DefaultDetectors() []detectors.Detector {
 		gcpapplicationdefaultcredentials.Scanner{},
 		wiz.Scanner{},
 		onfleet.Scanner{},
+		intra42.Scanner{},
 	}
 }
 
