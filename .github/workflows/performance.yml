@@ -26,13 +26,14 @@ jobs:
           go build -o current .
           repo_tmp=$(mktemp -d)
           git clone https://github.com/trufflesecurity/trufflehog.git $repo_tmp
+          git -c $repo_tmp checkout v3.75.1
 
           user_time_sum=0
 
           for i in {1..5}
           do
             tmpfile=$(mktemp)
-            /usr/bin/time -o $tmpfile $GITHUB_WORKSPACE/current git "file://$repo_tmp" --no-verification --no-update > out.txt
+            /usr/bin/time -o $tmpfile $GITHUB_WORKSPACE/current filesystem "$repo_tmp" --no-verification --no-update > out.txt
             cat $tmpfile
             time_output=$(cat $tmpfile)
             rm $tmpfile
@@ -62,13 +63,14 @@ jobs:
           go build -o previous .
           repo_tmp=$(mktemp -d)
           git clone https://github.com/trufflesecurity/trufflehog.git $repo_tmp
+          git -c $repo_tmp checkout v3.75.1
 
           user_time_sum=0
 
           for i in {1..5}
           do
             tmpfile=$(mktemp)
-            /usr/bin/time -o $tmpfile $GITHUB_WORKSPACE/previous git "file://$repo_tmp" --no-verification --no-update > out.txt
+            /usr/bin/time -o $tmpfile $GITHUB_WORKSPACE/previous filesystem "$repo_tmp" --no-verification --no-update > out.txt
             cat $tmpfile
             time_output=$(cat $tmpfile)
             rm $tmpfile
