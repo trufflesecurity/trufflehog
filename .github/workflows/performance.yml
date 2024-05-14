@@ -27,7 +27,6 @@ jobs:
           repo_tmp=$(mktemp -d)
           git clone https://github.com/trufflesecurity/trufflehog.git $repo_tmp
           cd $repo_tmp
-          echo "checking out 1"
           git checkout v3.75.1
 
           user_time_sum=0
@@ -66,7 +65,6 @@ jobs:
           repo_tmp=$(mktemp -d)
           git clone https://github.com/trufflesecurity/trufflehog.git $repo_tmp
           cd $repo_tmp
-          echo "checking out 2"
           git checkout v3.75.1
 
           user_time_sum=0
