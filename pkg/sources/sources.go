@@ -190,12 +190,8 @@ type GitConfig struct {
 	// ExcludeGlobs is a list of comma separated globs to exclude from the scan.
 	// This differs from the Filter exclusions as ExcludeGlobs is applied at the `git log -p` level
 	ExcludeGlobs string
-<<<<<<< test_rebase_axr
 	// SkipBinaries allows skipping binary files from the scan.
 	SkipBinaries bool
-=======
-
->>>>>>> main
 	SinceDate string
 }
 
@@ -227,16 +223,11 @@ type GithubConfig struct {
 	IncludePullRequestComments bool
 	// IncludeGistComments indicates whether to include GitHub gist comments in the scan.
 	IncludeGistComments bool
-<<<<<<< test_rebase_axr
 	// SkipBinaries allows skipping binary files from the scan.
 	SkipBinaries bool
 	// IncludeWikis indicates whether to include repository wikis in the scan.
 	IncludeWikis bool
 	// SinceDate indicates the last X days commits to scan
-=======
-	// MaxDepth is the maximum depth to scan the source.
-	// MaxDepth int
->>>>>>> main
 	SinceDate string
 }
 

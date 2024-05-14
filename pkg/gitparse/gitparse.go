@@ -220,7 +220,6 @@ func NewParser(options ...Option) *Parser {
 }
 
 // RepoPath parses the output of the `git log` command for the `source` path.
-<<<<<<< test_rebase_axr
 // The Diff chan will return diffs in the order they are parsed from the log.
 func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool, sinceDate string) (chan *Diff, error) {
 	args := []string{
@@ -232,10 +231,6 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 		"--pretty=fuller", // https://git-scm.com/docs/git-log#_pretty_formats
 		"--notes",         // https://git-scm.com/docs/git-log#Documentation/git-log.txt---notesltrefgt
 	}
-=======
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool, sinceDate string) (chan Commit, error) {
-	args := []string{"-C", source, "log", "-p", "--full-history", "--date=format:%a %b %d %H:%M:%S %Y %z"}
->>>>>>> main
 	if abbreviatedLog {
 		args = append(args, "--diff-filter=AM")
 	}
