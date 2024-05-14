@@ -1,6 +1,7 @@
 package engine
 
 import (
+	aCtx "context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,8 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
@@ -23,6 +24,44 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
+
+const fakeDetectorKeyword = "fakedetector"
+
+type fakeDetectorV1 struct{}
+type fakeDetectorV2 struct{}
+
+var _ detectors.Detector = (*fakeDetectorV1)(nil)
+var _ detectors.Versioner = (*fakeDetectorV1)(nil)
+var _ detectors.Detector = (*fakeDetectorV2)(nil)
+var _ detectors.Versioner = (*fakeDetectorV2)(nil)
+
+func (f fakeDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	return []detectors.Result{
+		{
+			DetectorType: detectorspb.DetectorType(-1),
+			Verified:     true,
+			Raw:          []byte("fake secret v1"),
+		},
+	}, nil
+}
+
+func (f fakeDetectorV1) Keywords() []string             { return []string{fakeDetectorKeyword} }
+func (f fakeDetectorV1) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+func (f fakeDetectorV1) Version() int                   { return 1 }
+
+func (f fakeDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	return []detectors.Result{
+		{
+			DetectorType: detectorspb.DetectorType(-1),
+			Verified:     true,
+			Raw:          []byte("fake secret v2"),
+		},
+	}, nil
+}
+
+func (f fakeDetectorV2) Keywords() []string             { return []string{fakeDetectorKeyword} }
+func (f fakeDetectorV2) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+func (f fakeDetectorV2) Version() int                   { return 2 }
 
 func TestFragmentLineOffset(t *testing.T) {
 	tests := []struct {
@@ -227,38 +266,30 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
-	if err != nil {
-		t.Log("Failed to get secrets, likely running community-tests")
-		return
-	}
-	assert.NoError(t, err)
-	secretV2 := testSecrets.MustGetField("GITLABV2")
-	secretV1 := testSecrets.MustGetField("GITLAB")
 
 	tmpFile, err := os.CreateTemp("", "testfile")
 	assert.Nil(t, err)
 	defer tmpFile.Close()
 	defer os.Remove(tmpFile.Name())
 
-	_, err = tmpFile.WriteString(fmt.Sprintf("You can find a gitlab secrets %s and another gitlab secret %s within", secretV2, secretV1))
-	assert.Nil(t, err)
+	_, err = tmpFile.WriteString(fmt.Sprintf("test data using keyword %s", fakeDetectorKeyword))
+	assert.NoError(t, err)
 
 	e, err := Start(ctx,
 		WithConcurrency(1),
 		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(DefaultDetectors()...),
+		WithDetectors(&fakeDetectorV1{}, &fakeDetectorV2{}),
 		WithVerify(true),
 		WithPrinter(new(discardPrinter)),
 	)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
 		return
 	}
 
-	assert.Nil(t, e.Finish(ctx))
+	assert.NoError(t, e.Finish(ctx))
 	want := uint64(2)
 	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
 }
