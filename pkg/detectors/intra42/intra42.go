@@ -35,7 +35,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"intra", "intra42", "secret", "s-s4t2ud-", "s-s4t2af-"}
+	return []string{"s-s4t2ud-", "s-s4t2af-"}
 }
 
 // FromData will find and optionally verify Intra42 secrets in a given set of bytes.
