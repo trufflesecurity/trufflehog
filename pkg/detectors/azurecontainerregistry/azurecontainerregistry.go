@@ -5,7 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"regexp"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -18,6 +19,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -49,8 +51,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureContainerRegistry,
 				Raw:          []byte(endpoint),
-				Redacted:     endpoint,
 				RawV2:        []byte(endpoint + password),
+				Redacted:     endpoint,
 			}
 
 			if verify {
@@ -83,10 +85,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			if !s1.Verified && detectors.IsKnownFalsePositive(password, detectors.DefaultFalsePositives, true) {
-				continue
-			}
-
 			results = append(results, s1)
 			if s1.Verified {
 				break
@@ -95,6 +93,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
+	return false
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

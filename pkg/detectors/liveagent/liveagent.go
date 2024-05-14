@@ -3,8 +3,8 @@ package liveagent
 import (
 	"context"
 	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -83,11 +83,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// If the message is "You do not have sufficient privileges", then the key is valid, but does not have access to the `/agents` endpoint.
 						if r.Message == "You do not have sufficient privileges" {
 							s1.Verified = true
-						}
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
 						}
 					}
 				}

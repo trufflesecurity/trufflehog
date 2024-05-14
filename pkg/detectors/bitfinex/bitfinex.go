@@ -3,8 +3,8 @@ package bitfinex
 import (
 	"context"
 	"flag"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
@@ -77,10 +77,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					if strings.HasPrefix(err.Error(), "POST https://") { // eg POST https://api-pub.bitfinex.com/v2/auth/r/orders/hist: 500 apikey: digest invalid (10100)
 						isValid = false
-					} else {
-						if detectors.IsKnownFalsePositive(apiKeyRes, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 

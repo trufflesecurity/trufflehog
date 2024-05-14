@@ -94,7 +94,11 @@ type ChunkError struct {
 }
 
 func (f ChunkError) Error() string {
-	return fmt.Sprintf("error chunking unit %q: %s", f.Unit.SourceUnitID(), f.Err.Error())
+	unit, kind := "<nil>", SourceUnitKind("unit")
+	if f.Unit != nil {
+		unit, kind = f.Unit.SourceUnitID()
+	}
+	return fmt.Sprintf("error chunking %s %q: %s", kind, unit, f.Err.Error())
 }
 func (f ChunkError) Unwrap() error { return f.Err }
 
@@ -128,9 +132,9 @@ type JobProgressMetrics struct {
 	FinishedUnits uint64 `json:"finished_units,omitempty"`
 	// Total number of chunks produced. This metric updates before the
 	// chunk is sent on the output channel.
-	TotalChunks uint64 `json:"total_chunks,omitempty"`
+	TotalChunks uint64 `json:"total_chunks"`
 	// All errors encountered.
-	Errors []error `json:"errors,omitempty"`
+	Errors []error `json:"errors"`
 	// Set to true if the source supports enumeration and has finished
 	// enumerating. If the source does not support enumeration, this field
 	// is always false.
@@ -179,8 +183,13 @@ func (jp *JobProgress) TrackProgress(progress *Progress) {
 // executeHooks is a helper method to execute all the hooks for the given
 // closure.
 func (jp *JobProgress) executeHooks(todo func(hook JobProgressHook)) {
+	defer func(start time.Time) {
+		elapsed := time.Since(start).Milliseconds()
+		hooksExecTime.WithLabelValues().Observe(float64(elapsed))
+	}(time.Now())
 	for _, hook := range jp.hooks {
-		// TODO: Non-blocking?
+		// Execute hooks synchronously so they can provide
+		// back-pressure to the source.
 		todo(hook)
 	}
 }
@@ -298,13 +307,13 @@ func (jp *JobProgress) Ref() JobProgressRef {
 	}
 }
 
-// EnumerationErrors joins all errors encountered during initialization or
+// EnumerationError joins all errors encountered during initialization or
 // enumeration.
 func (m JobProgressMetrics) EnumerationError() error {
 	return errors.Join(m.Errors...)
 }
 
-// ChunkErrors joins all errors encountered during chunking.
+// ChunkError joins all errors encountered during chunking.
 func (m JobProgressMetrics) ChunkError() error {
 	var aggregate []error
 	for _, err := range m.Errors {

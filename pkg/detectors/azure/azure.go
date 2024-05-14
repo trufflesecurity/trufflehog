@@ -3,7 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -71,15 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					err = token.Refresh()
 					if err == nil {
 						s.Verified = true
-					}
-				}
-
-				if !s.Verified {
-					if detectors.IsKnownFalsePositive(s.Redacted, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-					if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-						continue
 					}
 				}
 

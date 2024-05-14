@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
+	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
 
 type testCaseLine struct {
@@ -14,13 +16,13 @@ type testCaseLine struct {
 	line        []byte
 }
 
-type testCase struct {
-	passes   []testCaseLine
-	fails    []testCaseLine
-	function func(bool, ParseState, []byte) bool
-}
+func TestLineChecksWithStaged(t *testing.T) {
+	type testCase struct {
+		passes   []testCaseLine
+		fails    []testCaseLine
+		function func(bool, ParseState, []byte) bool
+	}
 
-func TestLineChecks(t *testing.T) {
 	tests := map[string]testCase{
 		"commitLine": {
 			passes: []testCaseLine{
@@ -76,7 +78,7 @@ func TestLineChecks(t *testing.T) {
 			},
 			fails: []testCaseLine{
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte("    Merge pull request #34511 from cescoffier/duplicated-context-doc"),
 				},
 				{
@@ -109,16 +111,16 @@ func TestLineChecks(t *testing.T) {
 			},
 			function: isAuthorLine,
 		},
-		"dateLine": {
+		"authorDateLine": {
 			passes: []testCaseLine{
 				{
 					AuthorLine,
-					[]byte("Date:   Tue Jan 18 16:59:18 2022 -0800"),
+					[]byte("AuthorDate:   Tue Jan 18 16:59:18 2022 -0800"),
 				},
 			},
 			fails: []testCaseLine{
 				{
-					DateLine,
+					AuthorDateLine,
 					[]byte(""),
 				},
 				{
@@ -126,12 +128,54 @@ func TestLineChecks(t *testing.T) {
 					[]byte("notcorrect"),
 				},
 			},
-			function: isDateLine,
+			function: isAuthorDateLine,
+		},
+		"committerLine": {
+			passes: []testCaseLine{
+				{
+					AuthorDateLine,
+					[]byte("Commit: Zachary Rice <zachary.rice@trufflesec.com>"),
+				},
+				{
+					AuthorDateLine,
+					[]byte("Commit: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					CommitLine,
+					[]byte("Date:   Tue Jun 20 13:55:31 2023 -0500"),
+				},
+				{
+					AuthorLine,
+					[]byte("Author: Bill Rich <bill.rich@trufflesec.com>"),
+				},
+			},
+			function: isCommitterLine,
+		},
+		"committerDateLine": {
+			passes: []testCaseLine{
+				{
+					CommitterLine,
+					[]byte("CommitDate:   Tue Jan 18 16:59:18 2022 -0800"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					CommitterDateLine,
+					[]byte(""),
+				},
+				{
+					CommitterLine,
+					[]byte("notcorrect"),
+				},
+			},
+			function: isCommitterDateLine,
 		},
 		"messageStartLine": {
 			passes: []testCaseLine{
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte(""),
 				},
 			},
@@ -141,7 +185,7 @@ func TestLineChecks(t *testing.T) {
 					[]byte("Date:   Tue Jun 20 13:21:19 2023 -0700"),
 				},
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte("notcorrect"),
 				},
 			},
@@ -164,7 +208,7 @@ func TestLineChecks(t *testing.T) {
 					[]byte("Date:   Tue Jun 20 13:21:19 2023 -0700"),
 				},
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte("notcorrect"),
 				},
 			},
@@ -189,11 +233,80 @@ func TestLineChecks(t *testing.T) {
 			},
 			function: isMessageEndLine,
 		},
+		"notesStartLine": {
+			passes: []testCaseLine{
+				{
+					MessageEndLine,
+					[]byte("Notes:"),
+				},
+				{
+					MessageEndLine,
+					[]byte("Notes (review):"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					MessageStartLine,
+					[]byte(""),
+				},
+				{
+					MessageEndLine,
+					[]byte("notcorrect"),
+				},
+			},
+			function: isNotesStartLine,
+		},
+		"notesLine": {
+			passes: []testCaseLine{
+				{
+					NotesStartLine,
+					[]byte("    Submitted-by: Random J Developer <random@developer.example.org>"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					MessageEndLine,
+					[]byte(""),
+				},
+				{
+					MessageEndLine,
+					[]byte("notcorrect"),
+				},
+			},
+			function: isNotesLine,
+		},
+		"notesEndLine": {
+			passes: []testCaseLine{
+				{
+					NotesLine,
+					[]byte("\n"),
+				},
+			},
+			fails: []testCaseLine{
+				{
+					MessageEndLine,
+					[]byte("\n"),
+				},
+				{
+					NotesLine,
+					[]byte("notcorrect"),
+				},
+			},
+			function: isNotesEndLine,
+		},
 		"diffLine": {
 			passes: []testCaseLine{
 				{
 					MessageEndLine,
 					[]byte("diff --git a/pkg/sources/source_unit.go b/pkg/sources/source_unit.go"),
+				},
+				{
+					MessageEndLine,
+					[]byte("diff --git a/ Lunch and Learn - HCDiag.pdf b/ Lunch and Learn - HCDiag.pdf"),
+				},
+				{
+					NotesEndLine,
+					[]byte("diff --git \"a/one.txt\" \"b/one.txt\""),
 				},
 				{
 					BinaryFileLine,
@@ -203,19 +316,51 @@ func TestLineChecks(t *testing.T) {
 					HunkContentLine,
 					[]byte("diff --git a/pkg/decoders/utf8.go b/pkg/decoders/utf8.go"),
 				},
+				{
+					ModeLine,
+					[]byte("diff --git a/pkg/decoders/utf8.go b/pkg/decoders/utf8.go"),
+				},
 			},
 			fails: []testCaseLine{
 				{
-					DateLine,
+					CommitterDateLine,
 					[]byte("    Make trace error message so newlines aren't escaped (#1396)"),
 				},
 				{
 					MessageLine,
 					[]byte("notcorrect"),
 				},
+				{
+					NotesLine,
+					[]byte("diff --git a/pkg/decoders/utf8.go b/pkg/decoders/utf8.go"),
+				},
 			},
 			function: isDiffLine,
 		},
+	}
+
+	for name, test := range tests {
+		for _, pass := range test.passes {
+			if !test.function(false, pass.latestState, pass.line) {
+				t.Errorf("%s: Parser did not recognize correct line. (%s)", name, string(pass.line))
+			}
+		}
+		for _, fail := range test.fails {
+			if test.function(false, fail.latestState, fail.line) {
+				t.Errorf("%s: Parser did not recognize incorrect line. (%s)", name, string(fail.line))
+			}
+		}
+	}
+}
+
+func TestLineChecksNoStaged(t *testing.T) {
+	type testCase struct {
+		passes   []testCaseLine
+		fails    []testCaseLine
+		function func(ParseState, []byte) bool
+	}
+
+	tests := map[string]testCase{
 		"modeLine": {
 			passes: []testCaseLine{
 				{
@@ -292,6 +437,10 @@ func TestLineChecks(t *testing.T) {
 					IndexLine,
 					[]byte("Binary files /dev/null and b/plugin.sig differ"),
 				},
+				{
+					IndexLine,
+					[]byte("Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ"),
+				},
 			},
 			fails: []testCaseLine{
 				{
@@ -313,6 +462,13 @@ func TestLineChecks(t *testing.T) {
 				},
 				{
 					IndexLine,
+					[]byte("--- /dev/null"),
+				},
+				// New file (https://github.com/trufflesecurity/trufflehog/issues/2109)
+				// diff --git a/libs/Unfit-1.0 b/libs/Unfit-1.0
+				// new file mode 160000
+				{
+					ModeLine,
 					[]byte("--- /dev/null"),
 				},
 				// Uncommon but valid prefixes. Will these ever show up?
@@ -535,348 +691,463 @@ func TestLineChecks(t *testing.T) {
 
 	for name, test := range tests {
 		for _, pass := range test.passes {
-			if !test.function(false, pass.latestState, pass.line) {
+			if !test.function(pass.latestState, pass.line) {
 				t.Errorf("%s: Parser did not recognize correct line. (%s)", name, string(pass.line))
 			}
 		}
 		for _, fail := range test.fails {
-			if test.function(false, fail.latestState, fail.line) {
+			if test.function(fail.latestState, fail.line) {
 				t.Errorf("%s: Parser did not recognize incorrect line. (%s)", name, string(fail.line))
 			}
 		}
 	}
 }
 
-type messageParsingTestCase struct {
-	data     string
-	expected string
-}
-
-func TestMessageParsing(t *testing.T) {
-	tests := []messageParsingTestCase{
-		{
-			data: `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
-Author: Dustin Decker <humanatcomputer@gmail.com>
-Date:   Mon Mar 15 23:27:16 2021 -0700
-
-    Update aws
-
-diff --git a/aws b/aws
-index 2ee133b..12b4843 100644
---- a/aws
-+++ b/aws
-@@ -1,7 +1,5 @@
-+[default]
- aws_access_key_id = AKIAXYZDQCEN4B6JSJQI
-+aws_secret_access_key = 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
-`,
-			expected: "Update aws\n",
-		},
-		{
-			data: `commit 74ffbd28787b3bb4e6953ce1c3ee6899af650bce
-Author: Zachary Rice <zachary.rice@trufflesec.com>
-Date:   Tue Jun 13 14:49:21 2023 -0500
-
-    add a custom detector check for logging duplicate detector (#1394)
-    
-    * add a custom detector check for logging duplicate detector
-    
-    * use pb type
-
-diff --git a/pkg/engine/engine.go b/pkg/engine/engine.go
-index 090c6ba6..38d67dd2 100644
---- a/pkg/engine/engine.go
-+++ b/pkg/engine/engine.go
-@@ -165,7 +165,7 @@ func Start(ctx context.Context, options ...EngineOption) *Engine {
-                seenDetectors := make(map[config.DetectorID]struct{}, len(dets))
-                for _, det := range dets {
-                        id := config.GetDetectorID(det)
--                       if _, ok := seenDetectors[id]; ok {
-+                       if _, ok := seenDetectors[id]; ok && id.ID != detectorspb.DetectorType_CustomRegex {
-                                ctx.Logger().Info("possible duplicate detector configured", "detector", id)
-                        }
-                        seenDetectors[id] = struct{}{}`,
-			expected: `add a custom detector check for logging duplicate detector (#1394)
-
-* add a custom detector check for logging duplicate detector
-
-* use pb type
-`,
-		},
-		{
-			data: `commit a8bc99bfe2c7178d1d2de9aa2f8ea6752bcf02c8
-Author: Michelle Purcell <92924207+michelle-purcell@users.noreply.github.com>
-Date:   Tue Jun 27 13:48:04 2023 +0100
-
-    Update docs/src/main/asciidoc/security-vulnerability-detection.adoc
-    
-    Co-authored-by: Sergey Beryozkin <sberyozkin@gmail.com>
-    (cherry picked from commit 10f04b79e0ab3a331ac1bfae78d7ed399e243bf0)
-
-diff --git a/docs/src/main/asciidoc/security-vulnerability-detection.adoc b/docs/src/main/asciidoc/security-vulnerability-detection.adoc
-index 6e90300f9f6..e3cc8d1485f 100644
---- a/docs/src/main/asciidoc/security-vulnerability-detection.adoc
-+++ b/docs/src/main/asciidoc/security-vulnerability-detection.adoc
-@@ -139 +139 @@ You can adjust the expiry date if you need to.
--* xref:security-authentication-mechanisms.adoc#other-supported-authentication-mechanisms[Other supported authentication mechanisms]
-\ No newline at end of file
-+* xref:security-authentication-mechanisms.adoc[Authentication mechanisms in Quarkus]
-\ No newline at end of file
-`,
-			expected: `Update docs/src/main/asciidoc/security-vulnerability-detection.adoc
-
-Co-authored-by: Sergey Beryozkin <sberyozkin@gmail.com>
-(cherry picked from commit 10f04b79e0ab3a331ac1bfae78d7ed399e243bf0)
-`,
-		},
+func TestBinaryPathParse(t *testing.T) {
+	cases := map[string]string{
+		"Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and /dev/null differ\n":                                                                                         "",
+		"Binary files /dev/null and b/plugin.sig differ\n":                                                                                                                   "plugin.sig",
+		"Binary files /dev/null and b/ Lunch and Learn - HCDiag.pdf differ\n":                                                                                                " Lunch and Learn - HCDiag.pdf",
+		"Binary files /dev/null and \"b/assets/retailers/ON-ikony-Platforma-ecom \\342\\200\\224 kopia.png\" differ\n":                                                       "assets/retailers/ON-ikony-Platforma-ecom — kopia.png",
+		"Binary files /dev/null and \"b/\\346\\267\\261\\345\\272\\246\\345\\255\\246\\344\\271\\240500\\351\\227\\256-Tan-00\\347\\233\\256\\345\\275\\225.docx\" differ\n": "深度学习500问-Tan-00目录.docx",
 	}
 
-	for _, test := range tests {
-		r := bytes.NewReader([]byte(test.data))
-		commitChan := make(chan Commit)
-		parser := NewParser()
+	for name, expected := range cases {
+		filename, ok := pathFromBinaryLine([]byte(name))
+		if !ok {
+			t.Errorf("Failed to get path: %s", name)
+		}
+		if filename != expected {
+			t.Errorf("Expected: %s, Got: %s", expected, filename)
+		}
+	}
+}
 
-		go func() {
-			parser.FromReader(context.Background(), r, commitChan, false)
-		}()
-		for commit := range commitChan {
-			if commit.Message.String() != test.expected {
-				t.Errorf("Message does not match. Got:\n%s\nexpected:\n%s", commit.Message.String(), test.expected)
+func TestToFileLinePathParse(t *testing.T) {
+	cases := map[string]string{
+		"+++ /dev/null\n":      "",
+		"+++ b/embeds.xml\t\n": "embeds.xml",
+		"+++ \"b/C++/1 \\320\\243\\321\\200\\320\\276\\320\\272/B.c\"\t\n": "C++/1 Урок/B.c",
+	}
+
+	for name, expected := range cases {
+		filename, ok := pathFromToFileLine([]byte(name))
+		if !ok {
+			t.Errorf("Failed to get path: %s", name)
+		}
+		if filename != expected {
+			t.Errorf("Expected: %s, Got: %s", expected, filename)
+		}
+	}
+}
+
+// Equal compares the content of two Commits to determine if they are the same.
+func (d1 *Diff) Equal(ctx context.Context, d2 *Diff) bool {
+	// isEqualString handles the error-prone String() method calls and compares the results.
+	isEqualContentString := func(s1, s2 contentWriter) (bool, error) {
+		// If the content is nil, it's likely a binary so there won't be any content to compare.
+		if s1.Len() == 0 && s2.Len() == 0 {
+			return true, nil
+		}
+
+		str1, err := s1.String()
+		if err != nil {
+			return false, err
+		}
+		str2, err := s2.String()
+		if err != nil {
+			return false, err
+		}
+		return str1 == str2, nil
+	}
+
+	switch {
+	case d1.PathB != d2.PathB:
+		return false
+	case d1.Commit.Hash != d2.Commit.Hash:
+		return false
+	case d1.Commit.Author != d2.Commit.Author:
+		return false
+	case d1.Commit.Date != d2.Commit.Date:
+		return false
+	case d1.Commit.Message.String() != d2.Commit.Message.String():
+		return false
+	case d1.LineStart != d2.LineStart:
+		return false
+	case d1.IsBinary != d2.IsBinary:
+		return false
+	default:
+		if d1.contentWriter != nil && d2.contentWriter != nil {
+			equal, err := isEqualContentString(d1.contentWriter, d2.contentWriter)
+			if err != nil || !equal {
+				ctx.Logger().Error(err, "failed to compare diff content")
+				return false
 			}
 		}
 	}
-}
-
-func TestBinaryPathParse(t *testing.T) {
-	filename := pathFromBinaryLine([]byte("Binary files /dev/null and b/plugin.sig differ"))
-	expected := "plugin.sig"
-	if filename != expected {
-		t.Errorf("Expected: %s, Got: %s", expected, filename)
-	}
-}
-
-func newTime(timestamp string) time.Time {
-	date, _ := time.Parse(defaultDateFormat, timestamp)
-	return date
-}
-
-func newStringBuilderValue(value string) strings.Builder {
-	builder := strings.Builder{}
-	builder.Write([]byte(value))
-	return builder
+	return true
 }
 
 func TestCommitParsing(t *testing.T) {
-	expected := expectedCommits()
+	expected := expectedDiffs()
 
 	r := bytes.NewReader([]byte(commitLog))
-	commitChan := make(chan Commit)
+	diffChan := make(chan *Diff)
 	parser := NewParser()
 	go func() {
-		parser.FromReader(context.Background(), r, commitChan, false)
+		parser.FromReader(context.Background(), r, diffChan, false)
 	}()
 	i := 0
-	for commit := range commitChan {
+	for diff := range diffChan {
 		if len(expected) <= i {
-			t.Errorf("Missing expected case for commit: %+v", commit)
+			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
-			t.Errorf("Commit does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[i].Message.String(), commit, commit.Message.String())
+		if !diff.Equal(context.Background(), expected[i]) {
+			t.Errorf("Diff does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[i].Commit.Hash, diff, diff.Commit.Hash)
 		}
 		i++
 	}
 }
 
-func TestIndividualCommitParsing(t *testing.T) {
-	// Arrange
-	expected := expectedCommits()
-	commits := strings.Split(commitLog, "\ncommit ")
-	for index, commit := range commits {
-		if !strings.HasPrefix(commit, "commit") {
-			commits[index] = "commit " + commit
-		}
+func newBufferedFileWriterWithContent(content []byte) *bufferedfilewriter.BufferedFileWriter {
+	b := bufferedfilewriter.New()
+	_, err := b.Write(content) // Using Write method to add content
+	if err != nil {
+		panic(err)
 	}
+	return b
+}
 
-	// Act
-	for i, commit := range commits {
-		r := bytes.NewReader([]byte(commit))
-		commitChan := make(chan Commit)
-		parser := NewParser()
-		go func() {
-			parser.FromReader(context.Background(), r, commitChan, false)
-		}()
-		j := 0
-		for commit := range commitChan {
-			if len(expected) <= i {
-				t.Errorf("Missing expected case for commit: %+v", commit)
-				break
-			}
-
-			// Assert
-			if !commit.Equal(&expected[i]) {
-				t.Errorf("Commit does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[j].Message.String(), commit, commit.Message.String())
-			}
-			j++
-		}
-		//for _, pass := range test.passes {
-		//	if !test.function(false, pass.latestState, pass.line) {
-		//		t.Errorf("%s: Parser did not recognize correct line. (%s)", name, string(pass.line))
-		//	}
-		//}
-		//for _, fail := range test.fails {
-		//	if test.function(false, fail.latestState, fail.line) {
-		//		t.Errorf("%s: Parser did not recognize incorrect line. (%s)", name, string(fail.line))
-		//	}
-		//}
-	}
+func newBufferWithContent(content []byte) *bufferwriter.BufferWriter {
+	b := bufferwriter.New()
+	_, _ = b.Write(content) // Using Write method to add content
+	return b
 }
 
 func TestStagedDiffParsing(t *testing.T) {
-	expected := []Commit{
+	expected := []*Diff{
 		{
-			Hash:    "",
-			Author:  "",
-			Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
-			Message: strings.Builder{},
-			Diffs: []Diff{
-				{
-					PathB:     "aws",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "aws2",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
-					LineStart: 3,
-					Content:   *bytes.NewBuffer([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
-					IsBinary: true,
-				},
-				{
-					PathB:     "tzu",
-					LineStart: 11,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "lao",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "tzu",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
-					IsBinary:  false,
-				},
-				//{
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				//},
-				//{
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				//},
-				//{
-				//	PathB:     "",
-				//	LineStart: 0,
-				//	Content:   *bytes.NewBuffer([]byte("\n")),
-				//	IsBinary:  false,
-				//},
+			PathB:     "aws",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
 			},
+			contentWriter: newBufferWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "aws2",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
+			LineStart: 3,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
+			IsBinary: true,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent(nil),
+		},
+		{
+			PathB:     "tzu",
+			LineStart: 11,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "lao",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "tzu",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+			IsBinary:      false,
 		},
 	}
 
 	r := bytes.NewReader([]byte(stagedDiffs))
-	commitChan := make(chan Commit)
+	diffChan := make(chan *Diff)
 	parser := NewParser()
 	go func() {
-		parser.FromReader(context.Background(), r, commitChan, true)
+		parser.FromReader(context.Background(), r, diffChan, true)
 	}()
 	i := 0
-	for commit := range commitChan {
+	for diff := range diffChan {
 		if len(expected) <= i {
-			t.Errorf("Missing expected case for commit: %+v", commit)
+			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
-			t.Errorf("Commit does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], commit)
+		if !diff.Equal(context.Background(), expected[i]) {
+			t.Errorf("Diff does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], diff)
+		}
+		i++
+	}
+}
+
+func TestStagedDiffParsingBufferedFileWriter(t *testing.T) {
+	expected := []*Diff{
+		{
+			PathB:     "aws",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferedFileWriterWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "aws2",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferedFileWriterWithContent([]byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
+			LineStart: 3,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferedFileWriterWithContent([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
+			IsBinary: true,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferedFileWriterWithContent(nil),
+		},
+		{
+			PathB:     "tzu",
+			LineStart: 11,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "lao",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferedFileWriterWithContent([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "tzu",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferedFileWriterWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+			IsBinary:      false,
+		},
+	}
+
+	r := bytes.NewReader([]byte(stagedDiffs))
+	diffChan := make(chan *Diff)
+	parser := NewParser()
+	go func() {
+		parser.FromReader(context.Background(), r, diffChan, true)
+	}()
+	i := 0
+	for diff := range diffChan {
+		if len(expected) <= i {
+			t.Errorf("Missing expected case for commit: %+v", diff)
+			break
+		}
+
+		if !diff.Equal(context.Background(), expected[i]) {
+			t.Errorf("Diff does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], diff)
 		}
 		i++
 	}
 }
 
 func TestCommitParseFailureRecovery(t *testing.T) {
-	expected := []Commit{
+	expected := []*Diff{
 		{
-			Hash:    "df393b4125c2aa217211b2429b8963d0cefcee27",
-			Author:  "Stephen <stephen@egroat.com>",
-			Date:    newTime("Wed Dec 06 14:44:41 2017 -0800"),
-			Message: newStringBuilderValue("Add travis testing\n"),
-			Diffs: []Diff{
-				{
-					PathB:     ".travis.yml",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("language: python\npython:\n  - \"2.6\"\n  - \"2.7\"\n  - \"3.2\"\n  - \"3.3\"\n  - \"3.4\"\n  - \"3.5\"\n  - \"3.5-dev\" # 3.5 development branch\n  - \"3.6\"\n  - \"3.6-dev\" # 3.6 development branch\n  - \"3.7-dev\" # 3.7 development branch\n  - \"nightly\"\n")),
-					IsBinary:  false,
-				},
+			PathB:     ".travis.yml",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:      "df393b4125c2aa217211b2429b8963d0cefcee27",
+				Author:    "Stephen <stephen@egroat.com>",
+				Committer: "Stephen <stephen@egroat.com>",
+				Date:      newTime("Wed Dec 06 14:44:41 2017 -0800"),
+				Message:   newStringBuilderValue("Add travis testing\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("language: python\npython:\n  - \"2.6\"\n  - \"2.7\"\n  - \"3.2\"\n  - \"3.3\"\n  - \"3.4\"\n  - \"3.5\"\n  - \"3.5-dev\" # 3.5 development branch\n  - \"3.6\"\n  - \"3.6-dev\" # 3.6 development branch\n  - \"3.7-dev\" # 3.7 development branch\n  - \"nightly\"\n")),
+			IsBinary:      false,
+		},
+		{
+			Commit: &Commit{
+				Hash:      "3d76a97faad96e0f326afb61c232b9c2a18dca35",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:03:54 2023 -0400"),
+				Message:   strings.Builder{},
 			},
 		},
 		{
-			Hash:    "3d76a97faad96e0f326afb61c232b9c2a18dca35",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Tue Jul 11 18:03:54 2023 -0400"),
-			Message: strings.Builder{},
-			Diffs:   []Diff{},
-		},
-		{
-			Hash:    "7bd16429f1f708746dabf970e54b05d2b4734997",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Tue Jul 11 18:10:49 2023 -0400"),
-			Message: newStringBuilderValue("Change file\n"),
-			Diffs: []Diff{
-				{
-					PathB:     "tzu",
-					LineStart: 11,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
-					IsBinary:  false,
-				},
+			PathB:     "tzu",
+			LineStart: 11,
+			Commit: &Commit{
+				Hash:      "7bd16429f1f708746dabf970e54b05d2b4734997",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:10:49 2023 -0400"),
+				Message:   newStringBuilderValue("Change file\n"),
 			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			IsBinary:      false,
 		},
 	}
 
 	r := bytes.NewReader([]byte(recoverableCommits))
-	commitChan := make(chan Commit)
+	diffChan := make(chan *Diff)
 	parser := NewParser()
 	go func() {
-		parser.FromReader(context.Background(), r, commitChan, false)
+		parser.FromReader(context.Background(), r, diffChan, false)
 	}()
 	i := 0
-	for commit := range commitChan {
+	for diff := range diffChan {
+		if !diff.Equal(context.Background(), expected[i]) {
+			t.Errorf("Diff does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], diff)
+		}
+		i++
+	}
+}
+
+func TestCommitParseFailureRecoveryBufferedFileWriter(t *testing.T) {
+	expected := []*Diff{
+		{
+			PathB:     ".travis.yml",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:      "df393b4125c2aa217211b2429b8963d0cefcee27",
+				Author:    "Stephen <stephen@egroat.com>",
+				Committer: "Stephen <stephen@egroat.com>",
+				Date:      newTime("Wed Dec 06 14:44:41 2017 -0800"),
+				Message:   newStringBuilderValue("Add travis testing\n"),
+			},
+			contentWriter: newBufferedFileWriterWithContent([]byte("language: python\npython:\n  - \"2.6\"\n  - \"2.7\"\n  - \"3.2\"\n  - \"3.3\"\n  - \"3.4\"\n  - \"3.5\"\n  - \"3.5-dev\" # 3.5 development branch\n  - \"3.6\"\n  - \"3.6-dev\" # 3.6 development branch\n  - \"3.7-dev\" # 3.7 development branch\n  - \"nightly\"\n")),
+			IsBinary:      false,
+		},
+		{
+			Commit: &Commit{
+				Hash:      "3d76a97faad96e0f326afb61c232b9c2a18dca35",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:03:54 2023 -0400"),
+				Message:   strings.Builder{},
+			},
+		},
+		{
+			PathB:     "tzu",
+			LineStart: 11,
+			Commit: &Commit{
+				Hash:      "7bd16429f1f708746dabf970e54b05d2b4734997",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:10:49 2023 -0400"),
+				Message:   newStringBuilderValue("Change file\n"),
+			},
+			contentWriter: newBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			IsBinary:      false,
+		},
+	}
+
+	r := bytes.NewReader([]byte(recoverableCommits))
+	diffChan := make(chan *Diff)
+	parser := NewParser()
+	go func() {
+		parser.FromReader(context.Background(), r, diffChan, false)
+	}()
+	i := 0
+	for diff := range diffChan {
 		if len(expected) <= i {
-			t.Errorf("Missing expected case for commit: %+v", commit)
+			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
-			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
+		if !diff.Equal(context.Background(), expected[i]) {
+			t.Errorf("Diff does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], diff)
 		}
 		i++
 	}
@@ -884,7 +1155,9 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 
 const recoverableCommits = `commit df393b4125c2aa217211b2429b8963d0cefcee27
 Author: Stephen <stephen@egroat.com>
-Date:   Wed Dec 06 14:44:41 2017 -0800
+AuthorDate:   Wed Dec 06 14:44:41 2017 -0800
+Commit: Stephen <stephen@egroat.com>
+CommitDate:   Wed Dec 06 14:44:41 2017 -0800
 
     Add travis testing
 
@@ -924,7 +1197,9 @@ index 00000000..e69de29b
 
 commit 3d76a97faad96e0f326afb61c232b9c2a18dca35 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:03:54 2023 -0400
+AuthorDate:   Tue Jul 11 18:03:54 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:03:54 2023 -0400
 
 diff --git a/sample.txt b/sample.txt
 new file mode 100644
@@ -936,7 +1211,9 @@ index 0000000..af5626b
 
 commit 7bd16429f1f708746dabf970e54b05d2b4734997 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:10:49 2023 -0400
+AuthorDate:   Tue Jul 11 18:10:49 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:10:49 2023 -0400
 
     Change file
 
@@ -953,50 +1230,120 @@ index 5af88a8..c729cdb 100644
 `
 
 func TestDiffParseFailureRecovery(t *testing.T) {
-	expected := []Commit{
+	expected := []*Diff{
 		{
-			Hash:    "",
-			Author:  "",
-			Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
-			Message: strings.Builder{},
-			Diffs: []Diff{
-				{
-					PathB:     "aws",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "tzu",
-					LineStart: 11,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "tzu",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
-					IsBinary:  false,
-				},
+			PathB:     "aws",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
 			},
+			contentWriter: newBufferWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "tzu",
+			LineStart: 11,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "tzu",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+			IsBinary:      false,
 		},
 	}
 
 	r := bytes.NewReader([]byte(recoverableDiffs))
-	commitChan := make(chan Commit)
+	diffChan := make(chan *Diff)
 	parser := NewParser()
 	go func() {
-		parser.FromReader(context.Background(), r, commitChan, true)
+		parser.FromReader(context.Background(), r, diffChan, true)
 	}()
 	i := 0
-	for commit := range commitChan {
+	for diff := range diffChan {
 		if len(expected) <= i {
-			t.Errorf("Missing expected case for commit: %+v", commit)
+			t.Errorf("Missing expected case for commit: %+v", diff)
 			break
 		}
 
-		if !commit.Equal(&expected[i]) {
-			t.Errorf("Commit does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], commit)
+		if !diff.Equal(context.Background(), expected[i]) {
+			t.Errorf("Diff does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], diff)
+		}
+		i++
+	}
+}
+
+func TestDiffParseFailureRecoveryBufferedFileWriter(t *testing.T) {
+	expected := []*Diff{
+		{
+			PathB:     "aws",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("[default]\naws_access_key_id = AKIAXYZDQCEN4B6JSJQI\naws_secret_access_key = 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\noutput = json\nregion = us-east-2\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "tzu",
+			LineStart: 11,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "tzu",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:    "",
+				Author:  "",
+				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
+				Message: strings.Builder{},
+			},
+			contentWriter: newBufferWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+			IsBinary:      false,
+		},
+	}
+
+	r := bytes.NewReader([]byte(recoverableDiffs))
+	diffChan := make(chan *Diff)
+	parser := NewParser()
+	go func() {
+		parser.FromReader(context.Background(), r, diffChan, true)
+	}()
+	i := 0
+	for diff := range diffChan {
+		if len(expected) <= i {
+			t.Errorf("Missing expected case for commit: %+v", diff)
+			break
+		}
+
+		if !diff.Equal(context.Background(), expected[i]) {
+			t.Errorf("Diff does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], diff)
 		}
 		i++
 	}
@@ -1091,62 +1438,139 @@ index 0000000..5af88a8
 
 func TestMaxDiffSize(t *testing.T) {
 	parser := NewParser()
-	bigBytes := bytes.Buffer{}
-	bigBytes.WriteString(singleCommitSingleDiff)
-	for i := 0; i <= parser.maxDiffSize/1024+10; i++ {
-		bigBytes.WriteString("+")
-		for n := 0; n < 1024; n++ {
-			bigBytes.Write([]byte("0"))
-		}
-		bigBytes.WriteString("\n")
-	}
-	bigReader := bytes.NewReader(bigBytes.Bytes())
+	builder := strings.Builder{}
+	builder.WriteString(singleCommitSingleDiff)
 
-	commitChan := make(chan Commit)
+	// Generate a diff that is larger than the maxDiffSize.
+	for i := 0; i <= parser.maxDiffSize/1024+10; i++ {
+		builder.WriteString("+" + strings.Repeat("0", 1024) + "\n")
+	}
+	bigReader := strings.NewReader(builder.String())
+
+	diffChan := make(chan *Diff, 1)                                          // Buffer to prevent blocking
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second) // Timeout to prevent long wait
+	defer cancel()
+
 	go func() {
-		parser.FromReader(context.Background(), bigReader, commitChan, false)
+		parser.FromReader(ctx, bigReader, diffChan, false)
 	}()
 
-	commit := <-commitChan
-	if commit.Diffs[0].Content.Len() > parser.maxDiffSize+1024 {
-		t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", commit.Diffs[0].Content.Len(), parser.maxDiffSize+1024)
+	select {
+	case diff := <-diffChan:
+		if diff.Len() > parser.maxDiffSize+1024 {
+			t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", diff.Len(), parser.maxDiffSize+1024)
+		}
+	case <-ctx.Done():
+		t.Fatal("Test timed out")
 	}
-
 }
 
 func TestMaxCommitSize(t *testing.T) {
 	parser := NewParser(WithMaxCommitSize(1))
 	commitText := bytes.Buffer{}
 	commitText.WriteString(singleCommitMultiDiff)
-	commitChan := make(chan Commit)
+	diffChan := make(chan *Diff)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1)*time.Second)
 	defer cancel()
 	go func() {
-		parser.FromReader(ctx, &commitText, commitChan, false)
+		parser.FromReader(ctx, &commitText, diffChan, false)
 	}()
-	commitCount := 0
-	for range commitChan {
-		commitCount++
+	diffCount := 0
+	for range diffChan {
+		diffCount++
 	}
-	if commitCount != 2 {
-		t.Errorf("Commit count does not match. Got: %d, expected: %d", commitCount, 2)
+	if diffCount != 2 {
+		t.Errorf("Commit count does not match. Got: %d, expected: %d", diffCount, 2)
 	}
 
 }
 
-const commitLog = `commit 4727ffb7ad6dc5130bf4b4dd166e00705abdd018 (HEAD -> master)
+const commitLog = `commit e50b135fd29e91b2fbb25923797f5ecffe59f359
+Author: lionzxy <nikita@kulikof.ru>
+AuthorDate:   Wed Mar 1 18:20:04 2017 +0300
+Commit: lionzxy <nikita@kulikof.ru>
+CommitDate:   Wed Mar 1 18:20:04 2017 +0300
+
+    Все работает, но он не принимает :(
+
+diff --git "a/C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml" "b/C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml"
+index 85bfb17..89b08b5 100644
+--- "a/C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml"
++++ "b/C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml"
+@@ -29,8 +29,8 @@
+       <file leaf-file-name="CMakeLists.txt" pinned="false" current-in-tab="false">
+         <entry file="file://$PROJECT_DIR$/CMakeLists.txt">
+           <provider selected="true" editor-type-id="text-editor">
+-            <state relative-caret-position="0">
+-              <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
++            <state relative-caret-position="72">
++              <caret line="4" column="0" lean-forward="false" selection-start-line="4" selection-start-column="0" selection-end-line="4" selection-end-column="0" />
+               <folding />
+             </state>
+           </provider>
+
+commit fd6e99e7a80199b76a694603be57c5ade1de18e7
+Author: Jaliborc <jaliborc@gmail.com>
+AuthorDate:   Mon Apr 25 16:28:06 2011 +0100
+Commit: Jaliborc <jaliborc@gmail.com>
+CommitDate:   Mon Apr 25 16:28:06 2011 +0100
+
+    Added Unusable coloring
+
+Notes:
+    Message-Id: <1264640755-22447-1-git-send-email-user@example.de>
+
+diff --git a/components/item.lua b/components/item.lua
+index fc74534..f8d7d50 100755
+--- a/components/item.lua
++++ b/components/item.lua
+@@ -9,6 +9,7 @@ ItemSlot:Hide()
+ Bagnon.ItemSlot = ItemSlot
+
+ local ItemSearch = LibStub('LibItemSearch-1.0')
++local Unfit = LibStub('Unfit-1.0')
+
+ local function hasBlizzQuestHighlight()
+        return GetContainerItemQuestInfo and true or false
+diff --git a/embeds.xml b/embeds.xml
+index d3f4e7c..0c2df69 100755
+--- a/embeds.xml
++++ b/embeds.xml
+@@ -6,6 +6,7 @@
+        <Include file="libs\AceConsole-3.0\AceConsole-3.0.xml"/>
+        <Include file="libs\AceLocale-3.0\AceLocale-3.0.xml"/>
+
++       <Script file="libs\Unfit-1.0\Unfit-1.0.lua"/>
+        <Script file="libs\LibDataBroker-1.1.lua"/>
+        <Script file="libs\LibItemSearch-1.0\LibItemSearch-1.0.lua"/>
+ </Ui>
+\ No newline at end of file
+diff --git a/libs/Unfit-1.0 b/libs/Unfit-1.0
+new file mode 160000
+--- /dev/null
++++ b/libs/Unfit-1.0
+@@ -0,0 +1 @@
++Subproject commit 0000000000000000000000000000000000000000
+
+commit 4727ffb7ad6dc5130bf4b4dd166e00705abdd018 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 22:26:11 2023 -0400
+AuthorDate:   Tue Jul 11 22:26:11 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 22:26:11 2023 -0400
 
 commit c904e0f5cd9f30ae520c66bd5f70806219fe7ca2 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 10:17:11 2023 -0400
+AuthorDate:   Mon Jul 10 10:17:11 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 10:17:11 2023 -0400
 
     Empty Commit
 
 commit 3d76a97faad96e0f326afb61c232b9c2a18dca35 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:03:54 2023 -0400
+AuthorDate:   Tue Jul 11 18:03:54 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:03:54 2023 -0400
 
 diff --git a/sample.txt b/sample.txt
 new file mode 100644
@@ -1158,7 +1582,9 @@ index 0000000..af5626b
 
 commit df393b4125c2aa217211b2429b8963d0cefcee27
 Author: Stephen <stephen@egroat.com>
-Date:   Wed Dec 06 14:44:41 2017 -0800
+AuthorDate:   Wed Dec 06 14:44:41 2017 -0800
+Commit: Stephen <stephen@egroat.com>
+CommitDate:   Wed Dec 06 14:44:41 2017 -0800
 
     Add travis testing
 
@@ -1198,7 +1624,9 @@ index 00000000..e69de29b
 
 commit 4218c39d99b5f30153f62471c1be1c1596f0a4d4
 Author: Dustin Decker <dustin@trufflesec.com>
-Date:   Thu Jan 13 12:02:24 2022 -0800
+AuthorDate:   Thu Jan 13 12:02:24 2022 -0800
+Commit: Dustin Decker <dustin@trufflesec.com>
+CommitDate:   Thu Jan 13 12:02:24 2022 -0800
 
     Initial CLI w/ partially implemented Git source and demo detector (#1)
 
@@ -1254,7 +1682,9 @@ index 00000000..7fb2f73c
 
 commit 934cf5d255fd8e28b33f5a6ba64276caf0b284bf (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:43:22 2023 -0400
+AuthorDate:   Tue Jul 11 18:43:22 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:43:22 2023 -0400
 
     Test toFile/plusLine parsing
 
@@ -1270,7 +1700,9 @@ index 0000000..451be67
 
 commit 2a5d703b02b52d65c65ee9f7928f158b919ab741
 Author: Sergey Beryozkin <sberyozkin@gmail.com>
-Date:   Fri Jul 7 17:44:26 2023 +0100
+AuthorDate:   Fri Jul 7 17:44:26 2023 +0100
+Commit: Sergey Beryozkin <sberyozkin@gmail.com>
+CommitDate:   Fri Jul 7 17:44:26 2023 +0100
 
     Do not refresh OIDC session if the user is requesting logout
 
@@ -1378,7 +1810,9 @@ index 51e1b9a932d..472c2743bc4 100644
 
 commit 2a057632d7f5fa3d1c77b9aa037263211c0e0290
 Author: rjtmahinay <rjt.mahinay@gmail.com>
-Date:   Mon Jul 10 01:22:32 2023 +0800
+AuthorDate:   Mon Jul 10 01:22:32 2023 +0800
+Commit: rjtmahinay <rjt.mahinay@gmail.com>
+CommitDate:   Mon Jul 10 01:22:32 2023 +0800
 
     Add QuarkusApplication javadoc
     
@@ -1396,7 +1830,9 @@ index 350685123d5..87d2220eb98 100644
 
 commit bca2d17491015ea1522f34517223b5a366aea73c (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:12:21 2023 -0400
+AuthorDate:   Tue Jul 11 18:12:21 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:12:21 2023 -0400
 
     Delete binary file
 
@@ -1407,7 +1843,9 @@ Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and /dev/null differ
 
 commit afc6dc5d47f28366638da877ecb6b819c69e659b
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 12:21:33 2023 -0400
+AuthorDate:   Mon Jul 10 12:21:33 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 12:21:33 2023 -0400
 
     Change binary file
 
@@ -1417,7 +1855,9 @@ Binary files a/trufflehog_3.42.0_linux_arm64.tar.gz and b/trufflehog_3.42.0_linu
 
 commit 638595917417c5c8a956937b28c5127719023363
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 12:20:35 2023 -0400
+AuthorDate:   Mon Jul 10 12:20:35 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 12:20:35 2023 -0400
 
     Add binary file
 
@@ -1428,7 +1868,9 @@ Binary files /dev/null and b/trufflehog_3.42.0_linux_arm64.tar.gz differ
 
 commit ce0f5d1fe0272f180ccb660196f439c0c2f4ec8e (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:08:52 2023 -0400
+AuthorDate:   Tue Jul 11 18:08:52 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:08:52 2023 -0400
 
     Delete file
 
@@ -1452,7 +1894,9 @@ index 635ef2c..0000000
 
 commit d606a729383371558473b70a6a7b1ca264b0d205
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 14:17:04 2023 -0400
+AuthorDate:   Mon Jul 10 14:17:04 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 14:17:04 2023 -0400
 
     Rename file
 
@@ -1463,7 +1907,9 @@ rename to tzu.txt
 
 commit 7bd16429f1f708746dabf970e54b05d2b4734997 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Tue Jul 11 18:10:49 2023 -0400
+AuthorDate:   Tue Jul 11 18:10:49 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Tue Jul 11 18:10:49 2023 -0400
 
     Change file
 
@@ -1480,7 +1926,9 @@ index 5af88a8..c729cdb 100644
 
 commit c7062674c17192caa284615ab2fa9778c6602164 (HEAD -> master)
 Author: John Smith <john.smith@example.com>
-Date:   Mon Jul 10 10:15:18 2023 -0400
+AuthorDate:   Mon Jul 10 10:15:18 2023 -0400
+Commit: John Smith <john.smith@example.com>
+CommitDate:   Mon Jul 10 10:15:18 2023 -0400
 
     Create files
 
@@ -1522,55 +1970,127 @@ index 0000000..5af88a8
 +The door of all subtleties!
 `
 
+func newTime(timestamp string) time.Time {
+	date, _ := time.Parse(defaultDateFormat, timestamp)
+	return date
+}
+
+func newStringBuilderValue(value string) strings.Builder {
+	builder := strings.Builder{}
+	builder.Write([]byte(value))
+	return builder
+}
+
 // This throws a nasty panic if it's a top-level var.
-func expectedCommits() []Commit {
-	return []Commit{
-		// Empty commit and message. Lord help us.
+func expectedDiffs() []*Diff {
+	return []*Diff{
 		{
-			Hash:    "4727ffb7ad6dc5130bf4b4dd166e00705abdd018",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Tue Jul 11 22:26:11 2023 -0400"),
-			Message: strings.Builder{},
-			Diffs:   []Diff{},
-		},
-		// Empty commit.
-		{
-			Hash:    "c904e0f5cd9f30ae520c66bd5f70806219fe7ca2",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Mon Jul 10 10:17:11 2023 -0400"),
-			Message: newStringBuilderValue("Empty Commit\n"),
-			Diffs:   []Diff{},
+			PathB:     "C++/1 \320\243\321\200\320\276\320\272/.idea/workspace.xml",
+			LineStart: 29,
+			Commit: &Commit{
+				Hash:      "e50b135fd29e91b2fbb25923797f5ecffe59f359",
+				Author:    "lionzxy <nikita@kulikof.ru>",
+				Committer: "lionzxy <nikita@kulikof.ru>",
+				Date:      newTime("Wed Mar 1 18:20:04 2017 +0300"),
+				Message:   newStringBuilderValue("Все работает, но он не принимает :(\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n            <state relative-caret-position=\"72\">\n              <caret line=\"4\" column=\"0\" lean-forward=\"false\" selection-start-line=\"4\" selection-start-column=\"0\" selection-end-line=\"4\" selection-end-column=\"0\" />\n\n\n\n")),
+			IsBinary:      false,
 		},
 		{
-			Hash:    "3d76a97faad96e0f326afb61c232b9c2a18dca35",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Tue Jul 11 18:03:54 2023 -0400"),
-			Message: strings.Builder{},
-			Diffs: []Diff{
-				{
-					PathB:     "sample.txt",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("Hello, world!\n")),
-					IsBinary:  false,
-				},
+			PathB:     "components/item.lua",
+			LineStart: 9,
+			Commit: &Commit{
+				Hash:      "fd6e99e7a80199b76a694603be57c5ade1de18e7",
+				Author:    "Jaliborc <jaliborc@gmail.com>",
+				Committer: "Jaliborc <jaliborc@gmail.com>",
+				Date:      newTime("Mon Apr 25 16:28:06 2011 +0100"),
+				Message:   newStringBuilderValue("Added Unusable coloring\n\nNotes:\nMessage-Id: <1264640755-22447-1-git-send-email-user@example.de>\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("\n\nlocal Unfit = LibStub('Unfit-1.0')\n\n\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:         "embeds.xml",
+			LineStart:     6,
+			contentWriter: newBufferWithContent([]byte("\n\n       <Script file=\"libs\\Unfit-1.0\\Unfit-1.0.lua\"/>\n\n\n\n")),
+			Commit: &Commit{
+				Hash:      "fd6e99e7a80199b76a694603be57c5ade1de18e7",
+				Author:    "Jaliborc <jaliborc@gmail.com>",
+				Committer: "Jaliborc <jaliborc@gmail.com>",
+				Date:      newTime("Mon Apr 25 16:28:06 2011 +0100"),
+				Message:   newStringBuilderValue("Added Unusable coloring\n\nNotes:\nMessage-Id: <1264640755-22447-1-git-send-email-user@example.de>\n"),
+			},
+			IsBinary: false,
+		},
+		{
+			PathB:         "libs/Unfit-1.0",
+			LineStart:     1,
+			contentWriter: newBufferWithContent([]byte("Subproject commit 0000000000000000000000000000000000000000\n")),
+			Commit: &Commit{
+				Hash:      "fd6e99e7a80199b76a694603be57c5ade1de18e7",
+				Author:    "Jaliborc <jaliborc@gmail.com>",
+				Committer: "Jaliborc <jaliborc@gmail.com>",
+				Date:      newTime("Mon Apr 25 16:28:06 2011 +0100"),
+				Message:   newStringBuilderValue("Added Unusable coloring\n\nNotes:\nMessage-Id: <1264640755-22447-1-git-send-email-user@example.de>\n"),
+			},
+			IsBinary: false,
+		},
+		{
+			Commit: &Commit{
+				Hash:      "4727ffb7ad6dc5130bf4b4dd166e00705abdd018",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 22:26:11 2023 -0400"),
+				Message:   strings.Builder{},
 			},
 		},
 		{
-			Hash:    "df393b4125c2aa217211b2429b8963d0cefcee27",
-			Author:  "Stephen <stephen@egroat.com>",
-			Date:    newTime("Wed Dec 06 14:44:41 2017 -0800"),
-			Message: newStringBuilderValue("Add travis testing\n"),
-			Diffs: []Diff{
-				{
-					PathB:     ".gitignore",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n**/__pycache__/\n**/*.pyc\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     ".travis.yml",
-					LineStart: 1,
-					Content: *bytes.NewBuffer([]byte(`language: python
+			Commit: &Commit{
+				Hash:      "c904e0f5cd9f30ae520c66bd5f70806219fe7ca2",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 10:17:11 2023 -0400"),
+				Message:   newStringBuilderValue("Empty Commit\n"),
+			},
+		},
+		{
+			PathB:         "sample.txt",
+			LineStart:     1,
+			contentWriter: newBufferWithContent([]byte("Hello, world!\n")),
+			Commit: &Commit{
+				Hash:      "3d76a97faad96e0f326afb61c232b9c2a18dca35",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:03:54 2023 -0400"),
+				Message:   strings.Builder{},
+			},
+			IsBinary: false,
+		},
+		{
+			PathB:         ".gitignore",
+			LineStart:     1,
+			contentWriter: newBufferWithContent([]byte("\n\n\n**/__pycache__/\n**/*.pyc\n")),
+			Commit: &Commit{
+				Hash:      "df393b4125c2aa217211b2429b8963d0cefcee27",
+				Author:    "Stephen <stephen@egroat.com>",
+				Committer: "Stephen <stephen@egroat.com>",
+				Date:      newTime("Wed Dec 06 14:44:41 2017 -0800"),
+				Message:   newStringBuilderValue("Add travis testing\n"),
+			},
+			IsBinary: false,
+		},
+		{
+			PathB:     ".travis.yml",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:      "df393b4125c2aa217211b2429b8963d0cefcee27",
+				Author:    "Stephen <stephen@egroat.com>",
+				Committer: "Stephen <stephen@egroat.com>",
+				Date:      newTime("Wed Dec 06 14:44:41 2017 -0800"),
+				Message:   newStringBuilderValue("Add travis testing\n"),
+			},
+			contentWriter: newBufferWithContent([]byte(`language: python
 python:
   - "2.6"
   - "2.7"
@@ -1584,20 +2104,19 @@ python:
   - "3.7-dev" # 3.7 development branch
   - "nightly"
 `)),
-					IsBinary: false,
-				},
-			},
+			IsBinary: false,
 		},
 		{
-			Hash:    "4218c39d99b5f30153f62471c1be1c1596f0a4d4",
-			Author:  "Dustin Decker <dustin@trufflesec.com>",
-			Date:    newTime("Thu Jan 13 12:02:24 2022 -0800"),
-			Message: newStringBuilderValue("Initial CLI w/ partially implemented Git source and demo detector (#1)\n"),
-			Diffs: []Diff{
-				{
-					PathB:     "Makefile",
-					LineStart: 1,
-					Content: *bytes.NewBuffer([]byte(`PROTOS_IMAGE=us-docker.pkg.dev/thog-artifacts/public/go-ci-1.17-1
+			PathB:     "Makefile",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:      "4218c39d99b5f30153f62471c1be1c1596f0a4d4",
+				Author:    "Dustin Decker <dustin@trufflesec.com>",
+				Committer: "Dustin Decker <dustin@trufflesec.com>",
+				Date:      newTime("Thu Jan 13 12:02:24 2022 -0800"),
+				Message:   newStringBuilderValue("Initial CLI w/ partially implemented Git source and demo detector (#1)\n"),
+			},
+			contentWriter: newBufferWithContent([]byte(`PROTOS_IMAGE=us-docker.pkg.dev/thog-artifacts/public/go-ci-1.17-1
 
 .PHONY: check
 .PHONY: test
@@ -1630,161 +2149,202 @@ run:
 protos:
        docker run -u "$(shell id -u)" -v "$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; /pwd/scripts/gen_proto.sh"
 `)),
-					IsBinary: false,
-				},
+			IsBinary: false,
+		},
+		{
+			PathB:     "plusLine.txt",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:      "934cf5d255fd8e28b33f5a6ba64276caf0b284bf",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:43:22 2023 -0400"),
+				Message:   newStringBuilderValue("Test toFile/plusLine parsing\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("-- test\n++ test\n\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/BackChannelLogoutTokenCache.java",
+			LineStart: 45,
+			Commit: &Commit{
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n    public boolean containsTokenVerification(String token) {\n        return cacheMap.containsKey(token);\n    }\n\n\n\n\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
+			LineStart: 1023,
+			Commit: &Commit{
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n    private boolean isRpInitiatedLogout(RoutingContext context, TenantConfigContext configContext) {\n\n\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
+			LineStart: 1214,
+			Commit: &Commit{
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n\n    private class LogoutCall implements Function<SecurityIdentity, Uni<?>> {\n        RoutingContext context;\n        TenantConfigContext configContext;\n        String idToken;\n\n        LogoutCall(RoutingContext context, TenantConfigContext configContext, String idToken) {\n            this.context = context;\n            this.configContext = configContext;\n            this.idToken = idToken;\n        }\n\n        @Override\n        public Uni<Void> apply(SecurityIdentity identity) {\n            if (isRpInitiatedLogout(context, configContext)) {\n                LOG.debug(\"Performing an RP initiated logout\");\n                fireEvent(SecurityEvent.Type.OIDC_LOGOUT_RP_INITIATED, identity);\n                return buildLogoutRedirectUriUni(context, configContext, idToken);\n            }\n            if (isBackChannelLogoutPendingAndValid(configContext, identity)\n                    || isFrontChannelLogoutValid(context, configContext,\n                            identity)) {\n                return removeSessionCookie(context, configContext.oidcConfig)\n                        .map(new Function<Void, Void>() {\n                            @Override\n                            public Void apply(Void t) {\n                                throw new LogoutException();\n                            }\n                        });\n\n            }\n            return VOID_UNI;\n        }\n    }\n\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "integration-tests/oidc-wiremock/src/main/resources/application.properties",
+			LineStart: 20,
+			Commit: &Commit{
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n\nquarkus.oidc.code-flow.token.refresh-expired=true\nquarkus.oidc.code-flow.token.refresh-token-time-skew=5M\n\n\n")),
+			IsBinary:      false,
+		},
+		// WTF, shouldn't this be filtered out?
+		{
+			PathB:     "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
+			LineStart: 6,
+			Commit: &Commit{
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n\n\n\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
+			LineStart: 76,
+			Commit: &Commit{
+				Hash:      "2a5d703b02b52d65c65ee9f7928f158b919ab741",
+				Author:    "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Committer: "Sergey Beryozkin <sberyozkin@gmail.com>",
+				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
+				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("\n\n            // Logout\n\n\n\n")),
+			IsBinary:      false,
+		},
+		{
+			PathB:     "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
+			LineStart: 3,
+			Commit: &Commit{
+				Hash:      "2a057632d7f5fa3d1c77b9aa037263211c0e0290",
+				Author:    "rjtmahinay <rjt.mahinay@gmail.com>",
+				Committer: "rjtmahinay <rjt.mahinay@gmail.com>",
+				Date:      newTime("Mon Jul 10 01:22:32 2023 +0800"),
+				Message:   newStringBuilderValue("Add QuarkusApplication javadoc\n\n* Fix #34463\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
+			IsBinary:      false,
+		},
+		{
+			Commit: &Commit{
+				Hash:      "bca2d17491015ea1522f34517223b5a366aea73c",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:12:21 2023 -0400"),
+				Message:   newStringBuilderValue("Delete binary file\n"),
 			},
 		},
 		{
-			Hash:    "934cf5d255fd8e28b33f5a6ba64276caf0b284bf",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Tue Jul 11 18:43:22 2023 -0400"),
-			Message: newStringBuilderValue("Test toFile/plusLine parsing\n"),
-			Diffs: []Diff{
-				{
-					PathB:     "plusLine.txt",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("-- test\n++ test\n\n")),
-					IsBinary:  false,
-				},
+			PathB: "trufflehog_3.42.0_linux_arm64.tar.gz",
+			Commit: &Commit{
+				Hash:      "afc6dc5d47f28366638da877ecb6b819c69e659b",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 12:21:33 2023 -0400"),
+				Message:   newStringBuilderValue("Change binary file\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("")),
+			IsBinary:      true,
+		},
+		{
+			PathB: "trufflehog_3.42.0_linux_arm64.tar.gz",
+			Commit: &Commit{
+				Hash:      "638595917417c5c8a956937b28c5127719023363",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 12:20:35 2023 -0400"),
+				Message:   newStringBuilderValue("Add binary file\n"),
+			},
+			contentWriter: newBufferWithContent([]byte("")),
+			IsBinary:      true,
+		},
+		{
+			Commit: &Commit{
+				Hash:      "ce0f5d1fe0272f180ccb660196f439c0c2f4ec8e",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:08:52 2023 -0400"),
+				Message:   newStringBuilderValue("Delete file\n"),
 			},
 		},
 		{
-			Hash:    "2a5d703b02b52d65c65ee9f7928f158b919ab741",
-			Author:  "Sergey Beryozkin <sberyozkin@gmail.com>",
-			Date:    newTime("Fri Jul 7 17:44:26 2023 +0100"),
-			Message: newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
-			Diffs: []Diff{
-				{
-					PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/BackChannelLogoutTokenCache.java",
-					LineStart: 45,
-					Content:   *bytes.NewBuffer([]byte("\n\n    public boolean containsTokenVerification(String token) {\n        return cacheMap.containsKey(token);\n    }\n\n\n\n\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
-					LineStart: 1023,
-					Content:   *bytes.NewBuffer([]byte("\n\n    private boolean isRpInitiatedLogout(RoutingContext context, TenantConfigContext configContext) {\n\n\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "extensions/oidc/runtime/src/main/java/io/quarkus/oidc/runtime/CodeAuthenticationMechanism.java",
-					LineStart: 1214,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\n    private class LogoutCall implements Function<SecurityIdentity, Uni<?>> {\n        RoutingContext context;\n        TenantConfigContext configContext;\n        String idToken;\n\n        LogoutCall(RoutingContext context, TenantConfigContext configContext, String idToken) {\n            this.context = context;\n            this.configContext = configContext;\n            this.idToken = idToken;\n        }\n\n        @Override\n        public Uni<Void> apply(SecurityIdentity identity) {\n            if (isRpInitiatedLogout(context, configContext)) {\n                LOG.debug(\"Performing an RP initiated logout\");\n                fireEvent(SecurityEvent.Type.OIDC_LOGOUT_RP_INITIATED, identity);\n                return buildLogoutRedirectUriUni(context, configContext, idToken);\n            }\n            if (isBackChannelLogoutPendingAndValid(configContext, identity)\n                    || isFrontChannelLogoutValid(context, configContext,\n                            identity)) {\n                return removeSessionCookie(context, configContext.oidcConfig)\n                        .map(new Function<Void, Void>() {\n                            @Override\n                            public Void apply(Void t) {\n                                throw new LogoutException();\n                            }\n                        });\n\n            }\n            return VOID_UNI;\n        }\n    }\n\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "integration-tests/oidc-wiremock/src/main/resources/application.properties",
-					LineStart: 20,
-					Content:   *bytes.NewBuffer([]byte("\n\n\nquarkus.oidc.code-flow.token.refresh-expired=true\nquarkus.oidc.code-flow.token.refresh-token-time-skew=5M\n\n\n")),
-					IsBinary:  false,
-				},
-				// WTF, shouldn't this be filtered out?
-				{
-					PathB:     "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
-					LineStart: 6,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\n\n\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "integration-tests/oidc-wiremock/src/test/java/io/quarkus/it/keycloak/CodeFlowAuthorizationTest.java",
-					LineStart: 76,
-					Content:   *bytes.NewBuffer([]byte("\n\n            // Logout\n\n\n\n")),
-					IsBinary:  false,
-				},
+			Commit: &Commit{
+				Hash:      "d606a729383371558473b70a6a7b1ca264b0d205",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 14:17:04 2023 -0400"),
+				Message:   newStringBuilderValue("Rename file\n"),
 			},
 		},
 		{
-			Hash:    "2a057632d7f5fa3d1c77b9aa037263211c0e0290",
-			Author:  "rjtmahinay <rjt.mahinay@gmail.com>",
-			Date:    newTime("Mon Jul 10 01:22:32 2023 +0800"),
-			Message: newStringBuilderValue("Add QuarkusApplication javadoc\n\n* Fix #34463\n"),
-			Diffs: []Diff{
-				{
-					PathB:     "core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java",
-					LineStart: 3,
-					Content:   *bytes.NewBuffer([]byte("/**\n * This is usually used for command mode applications with a startup logic. The logic is executed inside\n * {@link QuarkusApplication#run} method before the main application exits.\n */\n")),
-					IsBinary:  false,
-				},
+			PathB:     "tzu",
+			LineStart: 11,
+			Commit: &Commit{
+				Hash:      "7bd16429f1f708746dabf970e54b05d2b4734997",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Tue Jul 11 18:10:49 2023 -0400"),
+				Message:   newStringBuilderValue("Change file\n"),
 			},
+			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			IsBinary:      false,
 		},
 		{
-			Hash:    "bca2d17491015ea1522f34517223b5a366aea73c",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Tue Jul 11 18:12:21 2023 -0400"),
-			Message: newStringBuilderValue("Delete binary file\n"),
-			Diffs:   []Diff{},
-		},
-		{
-			Hash:    "afc6dc5d47f28366638da877ecb6b819c69e659b",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Mon Jul 10 12:21:33 2023 -0400"),
-			Message: newStringBuilderValue("Change binary file\n"),
-			Diffs: []Diff{
-				{
-					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
-					IsBinary: true,
-				},
+			PathB:     "lao",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:      "c7062674c17192caa284615ab2fa9778c6602164",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 10:15:18 2023 -0400"),
+				Message:   newStringBuilderValue("Create files\n"),
 			},
+			contentWriter: newBufferWithContent([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
+			IsBinary:      false,
 		},
 		{
-			Hash:    "638595917417c5c8a956937b28c5127719023363",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Mon Jul 10 12:20:35 2023 -0400"),
-			Message: newStringBuilderValue("Add binary file\n"),
-			Diffs: []Diff{
-				{
-					PathB:    "trufflehog_3.42.0_linux_arm64.tar.gz",
-					IsBinary: true,
-				},
+			PathB:     "tzu",
+			LineStart: 1,
+			Commit: &Commit{
+				Hash:      "c7062674c17192caa284615ab2fa9778c6602164",
+				Author:    "John Smith <john.smith@example.com>",
+				Committer: "John Smith <john.smith@example.com>",
+				Date:      newTime("Mon Jul 10 10:15:18 2023 -0400"),
+				Message:   newStringBuilderValue("Create files\n"),
 			},
-		},
-		{
-			Hash:    "ce0f5d1fe0272f180ccb660196f439c0c2f4ec8e",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Tue Jul 11 18:08:52 2023 -0400"),
-			Message: newStringBuilderValue("Delete file\n"),
-			Diffs:   []Diff{},
-		},
-		{
-			Hash:    "d606a729383371558473b70a6a7b1ca264b0d205",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Mon Jul 10 14:17:04 2023 -0400"),
-			Message: newStringBuilderValue("Rename file\n"),
-			Diffs:   []Diff{},
-		},
-		{
-			Hash:    "7bd16429f1f708746dabf970e54b05d2b4734997",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Tue Jul 11 18:10:49 2023 -0400"),
-			Message: newStringBuilderValue("Change file\n"),
-			Diffs: []Diff{
-				{
-					PathB:     "tzu",
-					LineStart: 11,
-					Content:   *bytes.NewBuffer([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
-					IsBinary:  false,
-				},
-			},
-		},
-		{
-			Hash:    "c7062674c17192caa284615ab2fa9778c6602164",
-			Author:  "John Smith <john.smith@example.com>",
-			Date:    newTime("Mon Jul 10 10:15:18 2023 -0400"),
-			Message: newStringBuilderValue("Create files\n"),
-			Diffs: []Diff{
-				{
-					PathB:     "lao",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\nThe Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\n")),
-					IsBinary:  false,
-				},
-				{
-					PathB:     "tzu",
-					LineStart: 1,
-					Content:   *bytes.NewBuffer([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
-					IsBinary:  false,
-				},
-			},
+			contentWriter: newBufferWithContent([]byte("The Nameless is the origin of Heaven and Earth;\nThe named is the mother of all things.\n\nTherefore let there always be non-being,\n  so we may see their subtlety,\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.\nThey both may be called deep and profound.\nDeeper and more profound,\nThe door of all subtleties!\n")),
+			IsBinary:      false,
 		},
 	}
 }
@@ -1916,7 +2476,9 @@ index 0000000..5af88a8
 
 const singleCommitMultiDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
-Date:   Mon Mar 15 23:27:16 2021 -0700
+AuthorDate:   Mon Mar 15 23:27:16 2021 -0700
+Commit: Dustin Decker <humanatcomputer@gmail.com>
+CommitDate:   Mon Mar 15 23:27:16 2021 -0700
 
     Update aws
 
@@ -1957,7 +2519,9 @@ index 239b415..2ee133b 100644
 
 const singleCommitSingleDiff = `commit 70001020fab32b1fcf2f1f0e5c66424eae649826 (HEAD -> master, origin/master, origin/HEAD)
 Author: Dustin Decker <humanatcomputer@gmail.com>
-Date:   Mon Mar 15 23:27:16 2021 -0700
+AuthorDate:   Mon Mar 15 23:27:16 2021 -0700
+Commit: Dustin Decker <humanatcomputer@gmail.com>
+CommitDate:   Mon Mar 15 23:27:16 2021 -0700
 
     Update aws
 

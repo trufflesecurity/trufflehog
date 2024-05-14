@@ -2,9 +2,11 @@ package myfreshworks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -62,10 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
 			results = append(results, s1)
 		}
 
@@ -82,7 +80,7 @@ func (s Scanner) getClient() *http.Client {
 }
 
 func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resIdMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resIdMatch+".myfreshworks.com/crm/sales/api/sales_accounts/filters", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+resIdMatch+".myfreshworks.com/crm/sales/api/sales_accounts/filters", nil)
 	if err != nil {
 		return false, err
 	}
@@ -95,7 +93,12 @@ func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resI
 	defer res.Body.Close()
 
 	if res.StatusCode == http.StatusOK {
-		return true, nil
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+
+		return json.Valid(body), nil
 	} else if !(res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden) {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}

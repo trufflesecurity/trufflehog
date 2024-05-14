@@ -3,8 +3,8 @@ package redis
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/go-redis/redis"
@@ -73,10 +73,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
-
 		results = append(results, s)
 	}
 
@@ -114,10 +110,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if strings.HasPrefix(password, "$") {
 				continue
 			}
-		}
-
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-			continue
 		}
 
 		results = append(results, s)

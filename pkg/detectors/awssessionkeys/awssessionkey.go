@@ -8,9 +8,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -143,10 +144,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if !s1.Verified {
-					// Unverified results that contain common test words are probably not secrets
-					if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 					// Unverified results that look like hashes are probably not secrets
 					if falsePositiveSecretCheck.MatchString(resSecretMatch) {
 						continue

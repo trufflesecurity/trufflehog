@@ -2,13 +2,16 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/felixge/fgprof"
@@ -47,19 +50,24 @@ var (
 	concurrency         = cli.Flag("concurrency", "Number of concurrent workers.").Default(strconv.Itoa(runtime.NumCPU())).Int()
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
-	filterUnverified    = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
-	filterEntropy       = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
-	configFilename      = cli.Flag("config", "Path to configuration file.").ExistingFile()
+	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified. Defaults to all types.").Hidden().String()
+
+	allowVerificationOverlap = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
+	filterUnverified         = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	filterEntropy            = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	configFilename           = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
 	fail                 = cli.Flag("fail", "Exit with code 183 if results are found.").Bool()
 	verifiers            = cli.Flag("verifier", "Set custom verification endpoints.").StringMap()
+	customVerifiersOnly  = cli.Flag("custom-verifiers-only", "Only use custom verification endpoints.").Bool()
 	archiveMaxSize       = cli.Flag("archive-max-size", "Maximum size of archive to scan. (Byte units eg. 512B, 2KB, 4MB)").Bytes()
 	archiveMaxDepth      = cli.Flag("archive-max-depth", "Maximum depth of archive to scan.").Int()
 	archiveTimeout       = cli.Flag("archive-timeout", "Maximum time to spend extracting an archive.").Duration()
 	includeDetectors     = cli.Flag("include-detectors", "Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.").Default("all").String()
 	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.").String()
+	jobReportFile        = cli.Flag("output-report", "Write a scan report to the provided path.").Hidden().OpenFile(os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -75,22 +83,23 @@ var (
 	_                   = gitScan.Flag("entropy", "No-op flag for backwards compat.").Bool()
 	_                   = gitScan.Flag("regex", "No-op flag for backwards compat.").Bool()
 
-	githubScan              = cli.Command("github", "Find credentials in GitHub repositories.")
-	githubScanEndpoint      = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
-	githubScanRepos         = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
-	githubScanOrgs          = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
-	githubScanToken         = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
-	githubIncludeForks      = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
-	githubIncludeMembers    = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
-	githubIncludeRepos      = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	githubScan           = cli.Command("github", "Find credentials in GitHub repositories.")
+	githubScanEndpoint   = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
+	githubScanRepos      = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
+	githubScanOrgs       = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanToken      = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
+	githubIncludeForks   = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
+	githubIncludeMembers = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
+	githubIncludeRepos   = githubScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	githubIncludeWikis   = githubScan.Flag("include-wikis", "Include repository wikisin scan.").Bool()
+
 	githubExcludeRepos      = githubScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Github repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 	githubScanIncludePaths  = githubScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	githubScanExcludePaths  = githubScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 	githubScanIssueComments = githubScan.Flag("issue-comments", "Include issue descriptions and comments in scan.").Bool()
 	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
-	// githubScanMaxDepth     = githubScan.Flag("max-depth", "Maximum depth of commits to scan.").Int()
-	githubScanSinceDate = githubScan.Flag("since", "Scan commits more recent than a specific date.").String()
+	githubScanSinceDate     = githubScan.Flag("since", "Scan commits more recent than a specific date.").String()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -115,7 +124,8 @@ var (
 	s3ScanSecret        = s3Scan.Flag("secret", "S3 secret used to authenticate. Can be provided with environment variable AWS_SECRET_ACCESS_KEY.").Envar("AWS_SECRET_ACCESS_KEY").String()
 	s3ScanSessionToken  = s3Scan.Flag("session-token", "S3 session token used to authenticate temporary credentials. Can be provided with environment variable AWS_SESSION_TOKEN.").Envar("AWS_SESSION_TOKEN").String()
 	s3ScanCloudEnv      = s3Scan.Flag("cloud-environment", "Use IAM credentials in cloud environment.").Bool()
-	s3ScanBuckets       = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag.").Strings()
+	s3ScanBuckets       = s3Scan.Flag("bucket", "Name of S3 bucket to scan. You can repeat this flag. Incompatible with --ignore-bucket.").Strings()
+	s3ScanIgnoreBuckets = s3Scan.Flag("ignore-bucket", "Name of S3 bucket to ignore. You can repeat this flag. Incompatible with --bucket.").Strings()
 	s3ScanMaxObjectSize = s3Scan.Flag("max-object-size", "Maximum size of objects to scan. Objects larger than this will be skipped. (Byte units eg. 512B, 2KB, 4MB)").Default("250MB").Bytes()
 
 	gcsScan           = cli.Command("gcs", "Find credentials in GCS buckets.")
@@ -145,6 +155,31 @@ var (
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
+
+	// Postman is hidden for now until we get more feedback from the community.
+	postmanScan  = cli.Command("postman", "Scan Postman")
+	postmanToken = postmanScan.Flag("token", "Postman token. Can also be provided with environment variable").Envar("POSTMAN_TOKEN").String()
+
+	postmanWorkspaces   = postmanScan.Flag("workspace", "Postman workspace to scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanWorkspaceIDs = postmanScan.Flag("workspace-id", "Postman workspace ID to scan. You can repeat this flag.").Strings()
+
+	postmanCollections   = postmanScan.Flag("collection", "Postman collection to scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanCollectionIDs = postmanScan.Flag("collection-id", "Postman collection ID to scan. You can repeat this flag.").Strings()
+
+	postmanEnvironments = postmanScan.Flag("environment", "Postman environment to scan. You can repeat this flag.").Strings()
+
+	postmanIncludeCollections   = postmanScan.Flag("include-collections", "Collections to include in scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanIncludeCollectionIDs = postmanScan.Flag("include-collection-id", "Collection ID to include in scan. You can repeat this flag.").Strings()
+
+	postmanIncludeEnvironments = postmanScan.Flag("include-environments", "Environments to include in scan. You can repeat this flag.").Strings()
+
+	postmanExcludeCollections   = postmanScan.Flag("exclude-collections", "Collections to exclude from scan. You can repeat this flag. Deprecated flag.").Hidden().Strings()
+	postmanExcludeCollectionIDs = postmanScan.Flag("exclude-collection-id", "Collection ID to exclude from scan. You can repeat this flag.").Strings()
+
+	postmanExcludeEnvironments = postmanScan.Flag("exclude-environments", "Environments to exclude from scan. You can repeat this flag.").Strings()
+	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
+	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
+	postmanEnvironmentPaths    = postmanScan.Flag("environment-paths", "Path to Postman environments.").Strings()
 )
 
 func init() {
@@ -219,17 +254,38 @@ func main() {
 	if err != nil {
 		logFatal(err, "error occurred with trufflehog updater 🐷")
 	}
-
-	ctx := context.Background()
-
-	go cleantemp.RunCleanupLoop(ctx)
-
 }
 
 func run(state overseer.State) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+
+	go func() {
+		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+			ctx.Logger().Error(err, "error cleaning temporary artifacts")
+		}
+	}()
+
 	logger := ctx.Logger()
 	logFatal := logFatalFunc(logger)
+
+	killSignal := make(chan os.Signal, 1)
+	signal.Notify(killSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		<-killSignal
+		logger.Info("Received signal, shutting down.")
+		cancel(fmt.Errorf("canceling context due to signal"))
+
+		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+			logger.Error(err, "error cleaning temporary artifacts")
+		} else {
+			logger.Info("cleaned temporary artifacts")
+		}
+
+		time.Sleep(time.Second * 10)
+		logger.Info("10 seconds elapsed. Forcing shutdown.")
+		os.Exit(0)
+	}()
 
 	logger.V(2).Info(fmt.Sprintf("trufflehog %s", version.BuildVersion))
 
@@ -299,13 +355,13 @@ func run(state overseer.State) {
 	// Verify that all the user-provided detectors support the optional
 	// detector features.
 	{
-		if err, id := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
+		if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
 			logFatal(err, "invalid include list detector configuration", "detector", id)
 		}
-		if err, id := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
+		if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
 			logFatal(err, "invalid exclude list detector configuration", "detector", id)
 		}
-		if err, id := verifyDetectorsAreVersioner(detectorsWithCustomVerifierEndpoints); err != nil {
+		if id, err := verifyDetectorsAreVersioner(detectorsWithCustomVerifierEndpoints); err != nil {
 			logFatal(err, "invalid verifier detector configuration", "detector", id)
 		}
 		// Extra check for endpoint customization.
@@ -345,8 +401,9 @@ func run(state overseer.State) {
 				"detector", id,
 			)
 		}
-		// TODO: Add flag to ignore the default endpoint.
-		urls = append(urls, customizer.DefaultEndpoint())
+		if !*customVerifiersOnly || len(urls) == 0 {
+			urls = append(urls, customizer.DefaultEndpoint())
+		}
 		if err := customizer.SetEndpoints(urls...); err != nil {
 			logFatal(err, "failed configuring custom endpoint for detector", "detector", id)
 		}
@@ -373,8 +430,23 @@ func run(state overseer.State) {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
+	var jobReportWriter io.WriteCloser
+	if *jobReportFile != nil {
+		jobReportWriter = *jobReportFile
+	}
+
+	// Parse --results flag.
+	if *onlyVerified {
+		r := "verified"
+		results = &r
+	}
+	parsedResults, err := parseResults(results)
+	if err != nil {
+		logFatal(err, "failed to configure results flag")
+	}
+
 	e, err := engine.Start(ctx,
-		engine.WithConcurrency(uint8(*concurrency)),
+		engine.WithConcurrency(*concurrency),
 		engine.WithDecoders(decoders.DefaultDecoders()...),
 		engine.WithDetectors(engine.DefaultDetectors()...),
 		engine.WithDetectors(conf.Detectors...),
@@ -383,10 +455,12 @@ func run(state overseer.State) {
 		engine.WithFilterDetectors(excludeFilter),
 		engine.WithFilterDetectors(endpointCustomizer),
 		engine.WithFilterUnverified(*filterUnverified),
-		engine.WithOnlyVerified(*onlyVerified),
+		engine.WithResults(parsedResults),
 		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
 		engine.WithPrinter(printer),
 		engine.WithFilterEntropy(*filterEntropy),
+		engine.WithVerificationOverlap(*allowVerificationOverlap),
+		engine.WithJobReportWriter(jobReportWriter),
 	)
 	if err != nil {
 		logFatal(err, "error initializing engine")
@@ -422,6 +496,7 @@ func run(state overseer.State) {
 			Token:                      *githubScanToken,
 			IncludeForks:               *githubIncludeForks,
 			IncludeMembers:             *githubIncludeMembers,
+			IncludeWikis:               *githubIncludeWikis,
 			Concurrency:                *concurrency,
 			ExcludeRepos:               *githubExcludeRepos,
 			IncludeRepos:               *githubIncludeRepos,
@@ -431,8 +506,7 @@ func run(state overseer.State) {
 			IncludePullRequestComments: *githubScanPRComments,
 			IncludeGistComments:        *githubScanGistComments,
 			Filter:                     filter,
-			// MaxDepth:       *githubScanMaxDepth,
-			SinceDate: *githubScanSinceDate,
+			SinceDate:                  *githubScanSinceDate,
 		}
 		if err := e.ScanGitHub(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Github.")
@@ -453,10 +527,6 @@ func run(state overseer.State) {
 			logFatal(err, "Failed to scan GitLab.")
 		}
 	case filesystemScan.FullCommand():
-		filter, err := common.FilterFromFiles(*filesystemScanIncludePaths, *filesystemScanExcludePaths)
-		if err != nil {
-			logFatal(err, "could not create filter")
-		}
 		if len(*filesystemDirectories) > 0 {
 			ctx.Logger().Info("--directory flag is deprecated, please pass directories as arguments")
 		}
@@ -464,8 +534,9 @@ func run(state overseer.State) {
 		paths = append(paths, *filesystemPaths...)
 		paths = append(paths, *filesystemDirectories...)
 		cfg := sources.FilesystemConfig{
-			Paths:  paths,
-			Filter: filter,
+			Paths:            paths,
+			IncludePathsFile: *filesystemScanIncludePaths,
+			ExcludePathsFile: *filesystemScanExcludePaths,
 		}
 		if err = e.ScanFileSystem(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan filesystem")
@@ -476,6 +547,7 @@ func run(state overseer.State) {
 			Secret:        *s3ScanSecret,
 			SessionToken:  *s3ScanSessionToken,
 			Buckets:       *s3ScanBuckets,
+			IgnoreBuckets: *s3ScanIgnoreBuckets,
 			Roles:         *s3ScanRoleArns,
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
@@ -534,11 +606,53 @@ func run(state overseer.State) {
 		if err := e.ScanDocker(ctx, anyConn); err != nil {
 			logFatal(err, "Failed to scan Docker.")
 		}
+	case postmanScan.FullCommand():
+		// handle deprecated flag
+		workspaceIDs := make([]string, 0, len(*postmanWorkspaceIDs)+len(*postmanWorkspaces))
+		workspaceIDs = append(workspaceIDs, *postmanWorkspaceIDs...)
+		workspaceIDs = append(workspaceIDs, *postmanWorkspaces...)
+
+		// handle deprecated flag
+		collectionIDs := make([]string, 0, len(*postmanCollectionIDs)+len(*postmanCollections))
+		collectionIDs = append(collectionIDs, *postmanCollectionIDs...)
+		collectionIDs = append(collectionIDs, *postmanCollections...)
+
+		// handle deprecated flag
+		includeCollectionIDs := make([]string, 0, len(*postmanIncludeCollectionIDs)+len(*postmanIncludeCollections))
+		includeCollectionIDs = append(includeCollectionIDs, *postmanIncludeCollectionIDs...)
+		includeCollectionIDs = append(includeCollectionIDs, *postmanIncludeCollections...)
+
+		// handle deprecated flag
+		excludeCollectionIDs := make([]string, 0, len(*postmanExcludeCollectionIDs)+len(*postmanExcludeCollections))
+		excludeCollectionIDs = append(excludeCollectionIDs, *postmanExcludeCollectionIDs...)
+		excludeCollectionIDs = append(excludeCollectionIDs, *postmanExcludeCollections...)
+
+		cfg := sources.PostmanConfig{
+			Token:               *postmanToken,
+			Workspaces:          workspaceIDs,
+			Collections:         collectionIDs,
+			Environments:        *postmanEnvironments,
+			IncludeCollections:  includeCollectionIDs,
+			IncludeEnvironments: *postmanIncludeEnvironments,
+			ExcludeCollections:  excludeCollectionIDs,
+			ExcludeEnvironments: *postmanExcludeEnvironments,
+			CollectionPaths:     *postmanCollectionPaths,
+			WorkspacePaths:      *postmanWorkspacePaths,
+			EnvironmentPaths:    *postmanEnvironmentPaths,
+		}
+		if err := e.ScanPostman(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan Postman.")
+		}
+	default:
+		logFatal(fmt.Errorf("invalid command"), "Command not recognized.")
 	}
 
 	// Wait for all workers to finish.
 	if err = e.Finish(ctx); err != nil {
 		logFatal(err, "engine failed to finish execution")
+	}
+	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+		ctx.Logger().Error(err, "error cleaning temp artifacts")
 	}
 
 	metrics := e.GetMetrics()
@@ -549,6 +663,7 @@ func run(state overseer.State) {
 		"verified_secrets", metrics.VerifiedSecretsFound,
 		"unverified_secrets", metrics.UnverifiedSecretsFound,
 		"scan_duration", metrics.ScanDuration.String(),
+		"trufflehog_version", version.BuildVersion,
 	)
 
 	if *printAvgDetectorTime {
@@ -559,6 +674,30 @@ func run(state overseer.State) {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
+}
+
+// parseResults ensures that users provide valid CSV input to `--results`.
+//
+// This is a work-around to kingpin not supporting CSVs.
+// See: https://github.com/trufflesecurity/trufflehog/pull/2372#issuecomment-1983868917
+func parseResults(input *string) (map[string]struct{}, error) {
+	if *input == "" {
+		return nil, nil
+	}
+
+	var (
+		values  = strings.Split(strings.ToLower(*input), ",")
+		results = make(map[string]struct{}, 3)
+	)
+	for _, value := range values {
+		switch value {
+		case "verified", "unknown", "unverified", "filtered_unverified":
+			results[value] = struct{}{}
+		default:
+			return nil, fmt.Errorf("invalid value '%s', valid values are 'verified,unknown,unverified,filtered_unverified'", value)
+		}
+	}
+	return results, nil
 }
 
 // logFatalFunc returns a log.Fatal style function. Calling the returned
@@ -589,7 +728,10 @@ func commaSeparatedToSlice(s []string) []string {
 }
 
 func printAverageDetectorTime(e *engine.Engine) {
-	fmt.Fprintln(os.Stderr, "Average detector time is the measurement of average time spent on each detector when results are returned.")
+	fmt.Fprintln(
+		os.Stderr,
+		"Average detector time is the measurement of average time spent on each detector when results are returned.",
+	)
 	for detectorName, duration := range e.GetDetectorsMetrics() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
@@ -622,7 +764,7 @@ func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T
 
 // verifyDetectorsAreVersioner checks all keys in a provided map to verify the
 // provided type is actually a Versioner.
-func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (error, config.DetectorID) {
+func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (config.DetectorID, error) {
 	isVersioner := engine.DefaultDetectorTypesImplementing[detectors.Versioner]()
 	for id := range data {
 		if id.Version == 0 {
@@ -634,7 +776,7 @@ func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (error, co
 			continue
 		}
 		// Version provided on a non-Versioner detector.
-		return fmt.Errorf("version provided but detector does not have a version"), id
+		return id, fmt.Errorf("version provided but detector does not have a version")
 	}
-	return nil, config.DetectorID{}
+	return config.DetectorID{}, nil
 }

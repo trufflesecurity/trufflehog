@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
 	"golang.org/x/crypto/ssh"
@@ -24,10 +25,11 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	// TODO: add base64 encoded key support
-	client = common.RetryableHttpClient()
+	client = common.RetryableHTTPClient()
 	keyPat = regexp.MustCompile(`(?i)-----\s*?BEGIN[ A-Z0-9_-]*?PRIVATE KEY\s*?-----[\s\S]*?----\s*?END[ A-Z0-9_-]*? PRIVATE KEY\s*?-----`)
 )
 
@@ -143,6 +145,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	return results, nil
 }
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) bool { return false }
 
 type result struct {
 	CertificateURLs []string

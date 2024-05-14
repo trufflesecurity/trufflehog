@@ -2,9 +2,9 @@ package linearapi
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -66,11 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				body := string(bodyBytes)
 				if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, `"data":`) {
 					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}

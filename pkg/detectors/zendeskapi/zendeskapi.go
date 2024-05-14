@@ -4,8 +4,8 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -58,10 +58,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				resEmail := strings.TrimSpace(email[1])
-
-				if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-					continue
-				}
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZendeskApi,

@@ -4,6 +4,8 @@ package source_metadata;
 
 option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb";
 
+import "google/protobuf/timestamp.proto";
+
 message Azure {
   string container = 1;
   string file = 2;
@@ -118,6 +120,9 @@ message Gitlab {
   string repository = 5;
   string timestamp = 6;
   int64 line = 7;
+  int64 project_id = 8;
+  string project_name = 9;
+  string project_owner = 10;
 }
 
 message GCS {
@@ -277,6 +282,38 @@ message AzureRepos {
   string organization = 11;
 }
 
+message Postman {
+  string link = 1;
+  string workspace_uuid = 2;
+  string workspace_name = 3;
+  string globals_id = 4;
+  string collection_id = 5;
+  string collection_name = 6;
+  string environment_id = 7;
+  string environment_name = 8;
+  string request_id =  9;
+  string request_name = 10;
+  string folder_id = 11;
+  string folder_name = 12;
+  string field_type = 13;
+  string field_name = 14;
+  string variable_type = 15;
+}
+
+
+
+message Vector {
+  google.protobuf.Timestamp timestamp = 1;
+  string source_type = 2;
+  string host = 3;
+}
+
+message Webhook {
+  oneof data {
+    Vector vector = 1;
+  }
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -307,5 +344,7 @@ message MetaData {
     GoogleDrive googleDrive = 26;
     AzureRepos azureRepos = 27;
     TravisCI travisCI = 28;
+    Postman postman = 29;
+    Webhook webhook = 30;
   }
 }

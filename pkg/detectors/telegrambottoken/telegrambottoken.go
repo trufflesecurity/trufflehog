@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 
 	//	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -71,10 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.ExtraData = map[string]string{
 							"username": apiRes.Result.Username,
 						}
-					}
-				} else {
-					if detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
-						continue
 					}
 				}
 			}

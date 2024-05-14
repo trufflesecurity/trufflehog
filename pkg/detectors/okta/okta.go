@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -27,7 +28,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"okta"}
+	return []string{".okta"}
 }
 
 // FromData will find and optionally verify Okta secrets in a given set of bytes.
@@ -71,12 +72,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if strings.Contains(string(body), "activated") {
 						s.Verified = true
 					}
-				}
-			}
-
-			if !s.Verified {
-				if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-					continue
 				}
 			}
 

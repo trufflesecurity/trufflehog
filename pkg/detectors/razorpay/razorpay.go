@@ -3,9 +3,9 @@ package razorpay
 import (
 	"context"
 	"encoding/json"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -68,10 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 					}
 				}
-			}
-
-			if !s1.Verified && detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s1)

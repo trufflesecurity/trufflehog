@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -16,6 +17,7 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -74,11 +76,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 						res.Body.Close()
 					}
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 
@@ -90,6 +87,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	return results, nil
 
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
+	return false
 }
 
 type shopifyTokenAccessScopes struct {

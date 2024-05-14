@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	regexp "github.com/wasilibs/go-re2"
 )
 
 type Scanner struct {
@@ -24,7 +24,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`(https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{23,25})`)
+	keyPats = map[string]*regexp.Regexp{
+		"Slack Service Web Hook":   regexp.MustCompile(`(https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{23,25})`),
+		"Slack Workflow Web Hook ": regexp.MustCompile(`(https://hooks\.slack\.com/workflows/T[A-Z0-9]+/A[A-Z0-9]+/[0-9]{17,19}/[A-Za-z0-9]{23,25})`),
+	}
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -37,59 +40,69 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	for _, keyPat := range keyPats {
+		matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
-
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_SlackWebhook,
-			Raw:          []byte(resMatch),
-		}
-		s1.ExtraData = map[string]string{
-			"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/",
-		}
-
-		if verify {
-
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-
-			payload := strings.NewReader(`{"text": ""}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
-			if err != nil {
+		for _, match := range matches {
+			if len(match) != 2 {
 				continue
 			}
-			req.Header.Add("Content-Type", "application/json")
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
+			resMatch := strings.TrimSpace(match[1])
+
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_SlackWebhook,
+				Raw:          []byte(resMatch),
+			}
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/",
+			}
+
+			if verify {
+
+				client := s.client
+				if client == nil {
+					client = defaultClient
+				}
+
+				// We don't want to actually send anything to webhooks we find. To verify them without spamming them, we
+				// send an intentionally malformed message and look for a particular expected error message.
+				payload := strings.NewReader(`intentionally malformed JSON from TruffleHog scan`)
+				req, err := http.NewRequestWithContext(ctx, "POST", resMatch, payload)
 				if err != nil {
 					continue
 				}
+				req.Header.Add("Content-Type", "application/json")
+				res, err := client.Do(req)
+				if err == nil {
+					defer res.Body.Close()
+					bodyBytes, err := io.ReadAll(res.Body)
+					if err != nil {
+						continue
+					}
 
-				defer res.Body.Close()
+					defer res.Body.Close()
 
-				if res.StatusCode >= 200 && res.StatusCode < 300 || (res.StatusCode == 400 && (bytes.Equal(bodyBytes, []byte("no_text")) || bytes.Equal(bodyBytes, []byte("missing_text")))) {
-					s1.Verified = true
-				} else if res.StatusCode == 401 || res.StatusCode == 403 {
-					// The secret is determinately not verified (nothing to do)
+					switch {
+					case res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices:
+						// Hopefully this never happens - it means we actually sent something to a channel somewhere. But
+						// we at least know the secret is verified.
+						s1.Verified = true
+					case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
+						s1.Verified = true
+					case res.StatusCode == http.StatusNotFound:
+						// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
+						// You might want to handle this case or log it.
+					default:
+						err = fmt.Errorf("unexpected HTTP response status %d: %s", res.StatusCode, bodyBytes)
+						s1.SetVerificationError(err, resMatch)
+					}
 				} else {
-					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 					s1.SetVerificationError(err, resMatch)
 				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
 			}
-		}
 
-		results = append(results, s1)
+			results = append(results, s1)
+		}
 	}
 
 	return results, nil

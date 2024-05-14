@@ -2,8 +2,8 @@ package circleci
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -56,12 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			if res != nil && res.StatusCode >= 200 && res.StatusCode < 300 {
 				s.Verified = true
-			}
-		}
-
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-				continue
 			}
 		}
 

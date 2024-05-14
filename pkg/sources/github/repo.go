@@ -2,17 +2,55 @@ package github
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v42/github"
+	"github.com/google/go-github/v61/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
+
+type repoInfoCache struct {
+	mu    sync.RWMutex
+	cache map[string]repoInfo
+}
+
+func newRepoInfoCache() repoInfoCache {
+	return repoInfoCache{
+		cache: make(map[string]repoInfo),
+	}
+}
+
+func (r *repoInfoCache) put(repoURL string, info repoInfo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cache[repoURL] = info
+}
+
+func (r *repoInfoCache) get(repoURL string) (repoInfo, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	info, ok := r.cache[repoURL]
+	return info, ok
+}
+
+type repoInfo struct {
+	owner      string
+	name       string
+	fullName   string
+	hasWiki    bool // the repo is _likely_ to have a wiki (see the comment on wikiIsReachable func).
+	size       int
+	visibility source_metadatapb.Visibility
+}
 
 func (s *Source) cloneRepo(
 	ctx context.Context,
@@ -97,12 +135,11 @@ func (s *Source) userAndToken(ctx context.Context, installationClient *github.Cl
 	case *sourcespb.GitHub_Token:
 		var (
 			ghUser *github.User
-			resp   *github.Response
 			err    error
 		)
 		for {
-			ghUser, resp, err = s.apiClient.Users.Get(ctx, "")
-			if handled := s.handleRateLimit(err, resp); handled {
+			ghUser, _, err = s.apiClient.Users.Get(ctx, "")
+			if s.handleRateLimit(err) {
 				continue
 			}
 			if err != nil {
@@ -149,7 +186,7 @@ func (s *Source) appListReposWrapper(ctx context.Context, _ string, opts repoLis
 }
 
 type userListOptions struct {
-	github.RepositoryListOptions
+	github.RepositoryListByUserOptions
 }
 
 func (u *userListOptions) getListOptions() *github.ListOptions {
@@ -158,7 +195,7 @@ func (u *userListOptions) getListOptions() *github.ListOptions {
 
 func (s *Source) getReposByUser(ctx context.Context, user string) error {
 	return s.processRepos(ctx, user, s.userListReposWrapper, &userListOptions{
-		RepositoryListOptions: github.RepositoryListOptions{
+		RepositoryListByUserOptions: github.RepositoryListByUserOptions{
 			ListOptions: github.ListOptions{
 				PerPage: defaultPagination,
 			},
@@ -167,7 +204,7 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 }
 
 func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	return s.apiClient.Repositories.List(ctx, user, &opts.(*userListOptions).RepositoryListOptions)
+	return s.apiClient.Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
 }
 
 type orgListOptions struct {
@@ -198,35 +235,26 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 	var (
 		numRepos, numForks int
+		uniqueOrgs         = map[string]struct{}{}
 	)
-
-	uniqueOrgs := map[string]struct{}{}
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if err == nil {
-			res.Body.Close()
-		}
-		if handled := s.handleRateLimit(err, res); handled {
+		if s.handleRateLimit(err) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
-		if res == nil {
-			break
-		}
 
 		s.log.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
-			if r.GetFork() && !s.conn.IncludeForks {
-				continue
-			}
-
 			if r.GetFork() {
+				if !s.conn.IncludeForks {
+					continue
+				}
 				numForks++
 			}
-
 			numRepos++
 
 			if r.GetOwner().GetType() == "Organization" {
@@ -234,9 +262,10 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			}
 
 			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
-			s.repoSizes.addRepo(repoURL, r.GetSize())
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
+
+			s.cacheRepoInfo(r)
 			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
@@ -247,9 +276,58 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 	}
 
 	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_orgs", len(uniqueOrgs))
-	githubOrgsEnumerated.WithLabelValues(s.name).Set(float64(len(uniqueOrgs)))
+	githubOrgsEnumerated.WithLabelValues(s.name).Add(float64(len(uniqueOrgs)))
 
 	return nil
+}
+
+func (s *Source) cacheRepoInfo(r *github.Repository) {
+	info := repoInfo{
+		owner:    r.GetOwner().GetLogin(),
+		name:     r.GetName(),
+		fullName: r.GetFullName(),
+		hasWiki:  r.GetHasWiki(),
+		size:     r.GetSize(),
+	}
+	if r.GetPrivate() {
+		info.visibility = source_metadatapb.Visibility_private
+	} else {
+		info.visibility = source_metadatapb.Visibility_public
+	}
+	s.repoInfoCache.put(r.GetCloneURL(), info)
+}
+
+func (s *Source) cacheGistInfo(g *github.Gist) {
+	info := repoInfo{
+		owner: g.GetOwner().GetLogin(),
+	}
+	if g.GetPublic() {
+		info.visibility = source_metadatapb.Visibility_public
+	} else {
+		info.visibility = source_metadatapb.Visibility_private
+	}
+	s.repoInfoCache.put(g.GetGitPullURL(), info)
+}
+
+// wikiIsReachable returns true if https://github.com/$org/$repo/wiki is not redirected.
+// Unfortunately, this isn't 100% accurate. Some repositories have `has_wiki: true` and don't redirect their wiki page,
+// but still don't have a cloneable wiki.
+func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
+	wikiURL := strings.TrimSuffix(repoURL, ".git") + "/wiki"
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, wikiURL, nil)
+	if err != nil {
+		return false
+	}
+
+	res, err := s.httpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	_, _ = io.Copy(io.Discard, res.Body)
+	_ = res.Body.Close()
+
+	// If the wiki is disabled, or is enabled but has no content, the request should be redirected.
+	return wikiURL == res.Request.URL.String()
 }
 
 // commitQuery represents the details required to fetch a commit.
@@ -263,12 +341,19 @@ type commitQuery struct {
 // getDiffForFileInCommit retrieves the diff for a specified file in a commit.
 // If the file or its diff is not found, it returns an error.
 func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
-	commit, resp, err := s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
-	if handled := s.handleRateLimit(err, resp); handled {
-		return "", fmt.Errorf("error fetching commit %s due to rate limit: %w", query.sha, err)
-	}
-	if err != nil {
-		return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+	var (
+		commit *github.RepositoryCommit
+		err    error
+	)
+	for {
+		commit, _, err = s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
+		if s.handleRateLimit(err) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+		}
+		break
 	}
 
 	if len(commit.Files) == 0 {

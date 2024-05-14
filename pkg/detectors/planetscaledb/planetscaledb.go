@@ -3,7 +3,7 @@ package planetscaledb
 import (
 	"context"
 	"database/sql"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/go-sql-driver/mysql"

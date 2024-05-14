@@ -8,13 +8,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sns"
 )
 
 type scanner struct {
@@ -37,6 +43,39 @@ var resourceTypes = map[string]string{
 	"ASCA": "Certificate",
 	"ASIA": "Temporary (AWS STS) access key IDs",
 }
+
+var thinkstCanaryList = map[string]struct{}{
+	"052310077262": {},
+	"171436882533": {},
+	"534261010715": {},
+	"595918472158": {},
+	"717712589309": {},
+	"819147034852": {},
+	"992382622183": {},
+}
+
+const thinkstMessage = "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries"
+
+var thinkstKnockoffsCanaryList = map[string]struct{}{
+	"044858866125": {},
+	"251535659677": {},
+	"344043088457": {},
+	"351906852752": {},
+	"390477818340": {},
+	"426127672474": {},
+	"427150556519": {},
+	"439872796651": {},
+	"445142720921": {},
+	"465867158099": {},
+	"637958123769": {},
+	"693412236332": {},
+	"732624840810": {},
+	"735421457923": {},
+	"959235150393": {},
+	"982842642351": {},
+}
+
+const thinkstKnockoffsMessage = "This is an off brand AWS Canary inspired by canarytokens.org. It wasn't set off; learn more here: https://trufflesecurity.com/canaries"
 
 func New(opts ...func(*scanner)) *scanner {
 	scanner := &scanner{
@@ -84,7 +123,6 @@ func (s scanner) Keywords() []string {
 		"AKIA",
 		"ABIA",
 		"ACCA",
-		"ASIA",
 	}
 }
 
@@ -136,7 +174,44 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				},
 			}
 
-			if verify {
+			account, err := common.GetAccountNumFromAWSID(resIDMatch)
+			if err == nil {
+				s1.ExtraData["account"] = account
+			}
+			if _, ok := thinkstCanaryList[account]; ok {
+				s1.ExtraData["is_canary"] = "true"
+				s1.ExtraData["message"] = thinkstMessage
+				if verify {
+					verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
+					if verified {
+						s1.Verified = true
+					}
+					if arn != "" {
+						s1.ExtraData["arn"] = arn
+					}
+					if err != nil {
+						s1.SetVerificationError(err, resSecretMatch)
+					}
+				}
+			}
+			if _, ok := thinkstKnockoffsCanaryList[account]; ok {
+				s1.ExtraData["is_canary"] = "true"
+				s1.ExtraData["message"] = thinkstKnockoffsMessage
+				if verify {
+					verified, arn, err := s.verifyCanary(resIDMatch, resSecretMatch)
+					if verified {
+						s1.Verified = true
+					}
+					if arn != "" {
+						s1.ExtraData["arn"] = arn
+					}
+					if err != nil {
+						s1.SetVerificationError(err, resSecretMatch)
+					}
+				}
+			}
+
+			if verify && (s1.ExtraData["is_canary"] != "true") {
 				isVerified, extraData, verificationErr := s.verifyMatch(ctx, resIDMatch, resSecretMatch, true)
 				s1.Verified = isVerified
 				// It'd be good to log when calculated account value does not match
@@ -154,21 +229,9 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if !s1.Verified {
-				// Unverified results that contain common test words are probably not secrets
-				if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-					continue
-				}
 				// Unverified results that look like hashes are probably not secrets
 				if falsePositiveSecretCheck.MatchString(resSecretMatch) {
 					continue
-				}
-			}
-
-			// If we haven't already found an account number for this ID (via API), calculate one.
-			if _, ok := s1.ExtraData["account"]; !ok {
-				account, err := common.GetAccountNumFromAWSID(resIDMatch)
-				if err == nil {
-					s1.ExtraData["account"] = account
 				}
 			}
 
@@ -298,6 +361,38 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 		}
 	} else {
 		return false, nil, err
+	}
+}
+
+func (s scanner) verifyCanary(resIDMatch, resSecretMatch string) (bool, string, error) {
+	// Prep AWS Creds for SNS
+	sess := session.Must(session.NewSession(&aws.Config{
+		Region: aws.String("us-east-1"), // any region seems to work
+		Credentials: credentials.NewStaticCredentials(
+			resIDMatch,
+			resSecretMatch,
+			"",
+		),
+		HTTPClient: s.verificationClient,
+	}))
+	svc := sns.New(sess)
+
+	// Prep vars and Publish to SNS
+	_, err := svc.Publish(&sns.PublishInput{
+		Message:     aws.String("foo"),
+		PhoneNumber: aws.String("1"),
+	})
+
+	if strings.Contains(err.Error(), "not authorized to perform") {
+		arn := strings.Split(err.Error(), "User: ")[1]
+		arn = strings.Split(arn, " is not authorized to perform: ")[0]
+		return true, arn, nil
+	} else if strings.Contains(err.Error(), "does not match the signature you provided") {
+		return false, "", nil
+	} else if strings.Contains(err.Error(), "status code: 403") {
+		return false, "", nil
+	} else {
+		return false, "", err
 	}
 }
 

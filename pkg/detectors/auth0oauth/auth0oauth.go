@@ -2,10 +2,10 @@ package auth0oauth
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -100,12 +100,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 						if !strings.Contains(body, "access_denied") {
 							s1.Verified = true
-						} else {
-							if detectors.IsKnownFalsePositive(clientIdRes, detectors.DefaultFalsePositives, true) {
-								continue
-							}
-						}
-
+						} 
 					}
 				}
 

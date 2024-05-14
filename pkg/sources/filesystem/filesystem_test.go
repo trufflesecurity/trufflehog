@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -52,6 +53,7 @@ func TestSource_Scan(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
@@ -70,16 +72,23 @@ func TestSource_Scan(t *testing.T) {
 			// TODO: this is kind of bad, if it errors right away we don't see it as a test failure.
 			// Debugging this usually requires setting a breakpoint on L78 and running test w/ debug.
 			go func() {
+				defer close(chunksCh)
 				err = s.Chunks(ctx, chunksCh)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 			}()
-			gotChunk := <-chunksCh
-			if diff := pretty.Compare(gotChunk.SourceMetadata, tt.wantSourceMetadata); diff != "" {
-				t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+			var counter int
+			for chunk := range chunksCh {
+				if chunk.SourceMetadata.GetFilesystem().GetFile() == "filesystem.go" {
+					counter++
+					if diff := pretty.Compare(chunk.SourceMetadata, tt.wantSourceMetadata); diff != "" {
+						t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
+					}
+				}
 			}
+			assert.Equal(t, 1, counter)
 		})
 	}
 }
@@ -115,13 +124,35 @@ func TestScanFile(t *testing.T) {
 }
 
 func TestEnumerate(t *testing.T) {
+	// TODO: refactor to allow a virtual filesystem.
 	t.Parallel()
 	ctx := context.Background()
 
 	// Setup the connection to test enumeration.
+	dir, err := os.MkdirTemp("", "trufflehog-test-enumerate")
+	assert.NoError(t, err)
+	defer os.RemoveAll(dir)
+
 	units := []string{
 		"/one", "/two", "/three",
 		"/path/to/dir/", "/path/to/another/dir/",
+	}
+	// Prefix the units with the tempdir and create files on disk.
+	for i, unit := range units {
+		fullPath := filepath.Join(dir, unit)
+		units[i] = fullPath
+		if i < 3 {
+			f, err := os.Create(fullPath)
+			assert.NoError(t, err)
+			f.Close()
+		} else {
+			assert.NoError(t, os.MkdirAll(fullPath, 0755))
+			// Create a file in the directory for enumeration to find.
+			f, err := os.CreateTemp(fullPath, "file")
+			assert.NoError(t, err)
+			units[i] = f.Name()
+			f.Close()
+		}
 	}
 	conn, err := anypb.New(&sourcespb.Filesystem{
 		Paths:       units[0:3],
@@ -141,7 +172,8 @@ func TestEnumerate(t *testing.T) {
 	assert.Equal(t, len(units), len(reporter.Units))
 	assert.Equal(t, 0, len(reporter.UnitErrs))
 	for _, unit := range reporter.Units {
-		assert.Contains(t, units, unit.SourceUnitID())
+		path, _ := unit.SourceUnitID()
+		assert.Contains(t, units, path)
 	}
 	for _, unit := range units {
 		assert.Contains(t, reporter.Units, sources.CommonSourceUnit{ID: unit})

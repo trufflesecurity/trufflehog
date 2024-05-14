@@ -3,18 +3,24 @@ package datadogtoken
 import (
 	"context"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.EndpointSetter
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+
+func (Scanner) DefaultEndpoint() string { return "https://api.datadoghq.com" }
 
 var (
 	client = common.SaneHttpClient()
@@ -59,23 +65,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.datadoghq.com/api/v2/users", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("DD-API-KEY", resApiMatch)
-				req.Header.Add("DD-APPLICATION-KEY", resAppMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resApiMatch, detectors.DefaultFalsePositives, true) {
-							continue
+				for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
+					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v2/users", nil)
+					if err != nil {
+						continue
+					}
+					req.Header.Add("Content-Type", "application/json")
+					req.Header.Add("DD-API-KEY", resApiMatch)
+					req.Header.Add("DD-APPLICATION-KEY", resAppMatch)
+					res, err := client.Do(req)
+					if err == nil {
+						defer res.Body.Close()
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							s1.Verified = true
 						}
 					}
 				}
@@ -96,21 +98,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.datadoghq.com/api/v1/validate", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("DD-API-KEY", resApiMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resApiMatch, detectors.DefaultFalsePositives, true) {
-							continue
+				for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
+					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v1/validate", nil)
+					if err != nil {
+						continue
+					}
+					req.Header.Add("Content-Type", "application/json")
+					req.Header.Add("DD-API-KEY", resApiMatch)
+					res, err := client.Do(req)
+					if err == nil {
+						defer res.Body.Close()
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							s1.Verified = true
 						}
 					}
 				}

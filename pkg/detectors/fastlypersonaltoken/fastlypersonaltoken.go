@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -82,10 +82,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						"role":                    userRes.Role,
 						"locked":                  fmt.Sprintf("%t", userRes.Locked),
 						"two_factor_auth_enabled": fmt.Sprintf("%t", userRes.TwoFactorAuthEnabled),
-					}
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
 					}
 				}
 			}

@@ -7,6 +7,7 @@ on:
 
 jobs:
   test-detectors:
+    if: ${{ github.repository == 'trufflesecurity/trufflehog' }}
     runs-on: ubuntu-latest
     permissions:
       actions: "read"
@@ -14,9 +15,9 @@ jobs:
       id-token: "write"
     steps:
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
       - name: Checkout code
         uses: actions/checkout@v4
       - id: "auth"

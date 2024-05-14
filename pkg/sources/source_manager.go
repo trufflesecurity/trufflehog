@@ -2,6 +2,7 @@ package sources
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -15,16 +16,20 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
+// SourceManager provides an interface for starting and managing running
+// sources.
 type SourceManager struct {
 	api   apiClient
 	hooks []JobProgressHook
 	// Pool limiting the amount of concurrent sources running.
-	sem semaphore.Semaphore
-	wg  sync.WaitGroup
+	sem         semaphore.Semaphore
+	prioritySem semaphore.Semaphore
+	wg          sync.WaitGroup
 	// Max number of units to scan concurrently per source.
 	concurrentUnits int
 	// Run the sources using source unit enumeration / chunking if available.
-	useSourceUnits bool
+	// Checked at runtime to allow feature flagging.
+	useSourceUnitsFunc func() bool
 	// Downstream chunks channel to be scanned.
 	outputChunks chan *Chunk
 	// Set when Wait() returns.
@@ -46,6 +51,8 @@ func WithAPI(api apiClient) func(*SourceManager) {
 	return func(mgr *SourceManager) { mgr.api = api }
 }
 
+// WithReportHook adds a hook to the SourceManager's reporting feature for
+// customizing data aggregation.
 func WithReportHook(hook JobProgressHook) func(*SourceManager) {
 	return func(mgr *SourceManager) {
 		mgr.hooks = append(mgr.hooks, hook)
@@ -59,6 +66,13 @@ func WithConcurrentSources(concurrency int) func(*SourceManager) {
 	}
 }
 
+// WithConcurrentTargets limits the concurrent number of targets a manager can run.
+func WithConcurrentTargets(concurrency int) func(*SourceManager) {
+	return func(mgr *SourceManager) {
+		mgr.prioritySem.SetLimit(concurrency)
+	}
+}
+
 // WithBufferedOutput sets the size of the buffer used for the Chunks() channel.
 func WithBufferedOutput(size int) func(*SourceManager) {
 	return func(mgr *SourceManager) { mgr.outputChunks = make(chan *Chunk, size) }
@@ -67,7 +81,17 @@ func WithBufferedOutput(size int) func(*SourceManager) {
 // WithSourceUnits enables using source unit enumeration and chunking if the
 // source supports it.
 func WithSourceUnits() func(*SourceManager) {
-	return func(mgr *SourceManager) { mgr.useSourceUnits = true }
+	return func(mgr *SourceManager) {
+		mgr.useSourceUnitsFunc = func() bool { return true }
+	}
+}
+
+// WithSourceUnitsFunc dynamically configures whether to use source unit
+// enumeration and chunking if the source supports it. If the function returns
+// true and the source supports it, then units will be used. Otherwise, the
+// legacy scanning method will be used.
+func WithSourceUnitsFunc(f func() bool) func(*SourceManager) {
+	return func(mgr *SourceManager) { mgr.useSourceUnitsFunc = f }
 }
 
 // WithConcurrentUnits limits the number of units to be scanned concurrently.
@@ -76,13 +100,17 @@ func WithConcurrentUnits(n int) func(*SourceManager) {
 	return func(mgr *SourceManager) { mgr.concurrentUnits = n }
 }
 
+// The default channel size for all the channels that are used to transport chunks.
+const defaultChannelSize = 64
+
 // NewManager creates a new manager with the provided options.
 func NewManager(opts ...func(*SourceManager)) *SourceManager {
 	mgr := SourceManager{
 		// Default to the headless API. Can be overwritten by the WithAPI option.
 		api:          &headlessAPI{},
 		sem:          semaphore.New(runtime.NumCPU()),
-		outputChunks: make(chan *Chunk),
+		prioritySem:  semaphore.New(runtime.NumCPU()),
+		outputChunks: make(chan *Chunk, defaultChannelSize),
 		firstErr:     make(chan error, 1),
 	}
 	for _, opt := range opts {
@@ -109,9 +137,13 @@ func (s *SourceManager) Run(ctx context.Context, sourceName string, source Sourc
 		}, err
 	}
 	// Create a JobProgress object for tracking progress.
+	sem := s.sem
+	if len(targets) > 0 {
+		sem = s.prioritySem
+	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
-	if err := s.sem.Acquire(ctx, 1); err != nil {
+	if err := sem.Acquire(ctx, 1); err != nil {
 		// Context cancelled.
 		progress.ReportError(Fatal{err})
 		return progress.Ref(), Fatal{err}
@@ -120,7 +152,7 @@ func (s *SourceManager) Run(ctx context.Context, sourceName string, source Sourc
 	go func() {
 		// Call Finish after the semaphore has been released.
 		defer progress.Finish()
-		defer s.sem.Release(1)
+		defer sem.Release(1)
 		defer s.wg.Done()
 		ctx := context.WithValues(ctx,
 			"source_manager_worker_id", common.RandomID(5),
@@ -162,6 +194,11 @@ func (s *SourceManager) Wait() error {
 	}
 	close(s.outputChunks)
 	close(s.firstErr)
+	for _, hook := range s.hooks {
+		if hookCloser, ok := hook.(io.Closer); ok {
+			_ = hookCloser.Close()
+		}
+	}
 	return s.waitErr
 }
 
@@ -222,16 +259,30 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 	}()
 
 	report.TrackProgress(source.GetProgress())
-	ctx = context.WithValues(ctx,
-		"job_id", report.JobID,
-		"source_id", report.SourceID,
-		"source_name", report.SourceName,
-		"source_type", source.Type().String(),
-	)
+	if ctx.Value("job_id") == "" {
+		ctx = context.WithValue(ctx, "job_id", report.JobID)
+	}
+	if ctx.Value("source_id") == "" {
+		ctx = context.WithValue(ctx, "source_id", report.SourceID)
+	}
+	if ctx.Value("source_name") == "" {
+		ctx = context.WithValue(ctx, "source_name", report.SourceName)
+	}
+	if ctx.Value("source_type") == "" {
+		ctx = context.WithValue(ctx, "source_type", source.Type().String())
+	}
+
 	// Check for the preferred method of tracking source units.
-	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && s.useSourceUnits && len(targets) == 0 {
+	canUseSourceUnits := len(targets) == 0 && s.useSourceUnitsFunc != nil
+	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
+		ctx.Logger().Info("running source",
+			"with_units", true)
 		return s.runWithUnits(ctx, enumChunker, report)
 	}
+	ctx.Logger().Info("running source",
+		"with_units", false,
+		"target_count", len(targets),
+		"source_manager_units_configurable", s.useSourceUnitsFunc != nil)
 	return s.runWithoutUnits(ctx, source, report, targets...)
 }
 
@@ -239,7 +290,7 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 // job reporting.
 func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
 	// Introspect on the chunks we get from the Chunks method.
-	ch := make(chan *Chunk, 1)
+	ch := make(chan *Chunk, defaultChannelSize)
 	var wg sync.WaitGroup
 	// Consume chunks and export chunks.
 	wg.Add(1)
@@ -304,7 +355,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 		unit := unit
 		chunkReporter := &mgrChunkReporter{
 			unit:    unit,
-			chunkCh: make(chan *Chunk, 1),
+			chunkCh: make(chan *Chunk, defaultChannelSize),
 			report:  report,
 		}
 		// Consume units and produce chunks.
@@ -312,10 +363,11 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 			report.StartUnitChunking(unit, time.Now())
 			// TODO: Catch panics and add to report.
 			defer close(chunkReporter.chunkCh)
-			ctx := context.WithValue(ctx, "unit", unit.SourceUnitID())
+			id, kind := unit.SourceUnitID()
+			ctx := context.WithValues(ctx, "unit", id, "unit_kind", kind)
 			ctx.Logger().V(3).Info("chunking unit")
 			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
-				report.ReportError(Fatal{err})
+				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
 				catchFirstFatal(Fatal{err})
 			}
 			return nil
@@ -354,33 +406,45 @@ func (api *headlessAPI) GetIDs(context.Context, string, sourcespb.SourceType) (S
 }
 
 // mgrUnitReporter implements the UnitReporter interface.
+var _ UnitReporter = (*mgrUnitReporter)(nil)
+
 type mgrUnitReporter struct {
 	unitCh chan SourceUnit
 	report *JobProgress
 }
 
+// UnitOk implements the UnitReporter interface by recording the unit in the
+// report and sending it on the SourceUnit channel.
 func (s *mgrUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
 	s.report.ReportUnit(unit)
 	return common.CancellableWrite(ctx, s.unitCh, unit)
 }
 
+// UnitErr implements the UnitReporter interface by recording the error in the
+// report.
 func (s *mgrUnitReporter) UnitErr(ctx context.Context, err error) error {
 	s.report.ReportError(err)
 	return nil
 }
 
 // mgrChunkReporter implements the ChunkReporter interface.
+var _ ChunkReporter = (*mgrChunkReporter)(nil)
+
 type mgrChunkReporter struct {
 	unit    SourceUnit
 	chunkCh chan *Chunk
 	report  *JobProgress
 }
 
+// ChunkOk implements the ChunkReporter interface by recording the chunk and
+// its associated unit in the report and sending it on the Chunk channel.
 func (s *mgrChunkReporter) ChunkOk(ctx context.Context, chunk Chunk) error {
 	s.report.ReportChunk(s.unit, &chunk)
 	return common.CancellableWrite(ctx, s.chunkCh, &chunk)
 }
 
+// ChunkErr implements the ChunkReporter interface by recording the error and
+// its associated unit in the report.
 func (s *mgrChunkReporter) ChunkErr(ctx context.Context, err error) error {
 	s.report.ReportError(ChunkError{s.unit, err})
 	return nil
