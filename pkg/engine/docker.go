@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"fmt"
 	"runtime"
 
 	"google.golang.org/protobuf/proto"
@@ -23,7 +22,7 @@ func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) error {
 	case len(c.BearerToken) > 0:
 		connection.Credential = &sourcespb.Docker_BearerToken{BearerToken: c.BearerToken}
 	default:
-		return fmt.Errorf("must provide docker keychain or bearer token")
+		connection.Credential = &sourcespb.Docker_Unauthenticated{}
 	}
 
 	var conn anypb.Any
