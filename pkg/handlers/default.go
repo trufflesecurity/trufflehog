@@ -157,7 +157,7 @@ func (h *defaultHandler) openArchive(ctx logContext.Context, depth int, reader i
 
 	switch archive := format.(type) {
 	case archiver.Decompressor:
-		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
+		// Decompress the archive and feed the decompressed data back into the archive handler to extract any nested archives.
 		compReader, err := archive.OpenReader(arReader)
 		if err != nil {
 			return fmt.Errorf("error opening decompressor with format %q: %w", format.Name(), err)

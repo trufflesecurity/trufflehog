@@ -349,7 +349,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				}
 				nErr = nErr.(int) + 1
 				errorCount.Store(prefix, nErr)
-				// too many consective errors on this page
+				// too many consecutive errors on this page
 				if nErr.(int) > 3 {
 					s.log.V(2).Info("Too many consecutive errors, excluding prefix", "prefix", prefix)
 				}
