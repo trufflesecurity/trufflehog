@@ -298,18 +298,12 @@ func processSearchedDocuments(
 ) (int, error) {
 	pitID, err := createPITForSearch(ctx, client, docSearch)
 	if err != nil {
-		fmt.Println("1")
 		return 0, err
 	}
 
 	documentsFetched := 0
 
 	for documentsFetched < docSearch.documentCount {
-		fmt.Printf(
-			"documentsFetched/docSearch.documentCount: %d/%d\n",
-			documentsFetched,
-			docSearch.documentCount,
-		)
 		searchReqBody := SearchRequestBody{
 			PIT: PointInTime{
 				ID:        pitID,
@@ -325,7 +319,6 @@ func processSearchedDocuments(
 
 		query, err := docSearch.filterParams.Query(docSearch.index.latestTimestamp)
 		if err != nil {
-			fmt.Println("2")
 			return 0, err
 		}
 
@@ -333,65 +326,42 @@ func processSearchedDocuments(
 
 		body, err := json.MarshalIndent(searchReqBody, "", "  ")
 		if err != nil {
-			fmt.Println("3")
 			return 0, err
 		}
-
-		fmt.Println("A")
 
 		req := esapi.SearchRequest{
 			Body:           strings.NewReader(string(body)),
 			SourceIncludes: []string{"@timestamp", "message"},
 		}
 
-		fmt.Println("B")
-
 		// If we're still in the "skip" phase of scanning, don't actually fetch the
 		// documents.
 		percentFetched :=
 			float64(documentsFetched+10) / float64(docSearch.documentCount)
-		fmt.Printf(
-			"percentFetched/docSearch.skipPercent: %f/%f (%d)\n",
-			percentFetched,
-			docSearch.skipPercent,
-			documentsFetched,
-		)
 		if percentFetched <= docSearch.skipPercent {
 			zero := 0
 			req.Size = &zero
 			req.SearchType = "query_then_fetch"
 		}
 
-		fmt.Println("C")
-
 		searchResults, err := makeElasticSearchRequest(ctx, client, req)
 		if err != nil {
-			fmt.Println("4")
 			return 0, err
 		}
-
-		fmt.Println("D")
 
 		topLevelHits, ok := searchResults["hits"].(map[string]any)
 		if !ok {
 			apiErr, ok := searchResults["error"].(map[string]any)
 			if ok {
-				fmt.Println("5")
 				return 0, fmt.Errorf("Error fetching search results: %v\n", apiErr)
 			}
-			fmt.Printf("No topLevelHits: %v\n", searchResults)
 			continue
 		}
-
-		fmt.Println("E")
 
 		hits, ok := topLevelHits["hits"].([]any)
 		if !ok {
-			fmt.Printf("No hits: %v\n", topLevelHits)
 			continue
 		}
-
-		fmt.Println("F")
 
 		if percentFetched <= docSearch.skipPercent {
 			documentsFetched += 10
@@ -400,8 +370,6 @@ func processSearchedDocuments(
 		} else {
 			documentsFetched += len(hits)
 		}
-
-		fmt.Println("G")
 
 		for _, jsonHit := range hits {
 			hit, ok := jsonHit.(map[string]any)
@@ -451,7 +419,6 @@ func processSearchedDocuments(
 				message:   message,
 			}
 			if err = sendDocument(&document); err != nil {
-				fmt.Println("6")
 				return 0, nil
 			}
 		}
