@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -32,7 +32,9 @@ func TestHandleFile(t *testing.T) {
 	// TODO: Embed a zip without making an HTTP request.
 	resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip")
 	assert.NoError(t, err)
-	defer resp.Body.Close()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 
 	assert.Equal(t, 0, len(reporter.Ch))
 	assert.NoError(t, HandleFile(context.Background(), resp.Body, &sources.Chunk{}, reporter))
@@ -40,13 +42,10 @@ func TestHandleFile(t *testing.T) {
 }
 
 func BenchmarkHandleFile(b *testing.B) {
-	file, err := os.Open("testdata/test.tgz")
-	assert.Nil(b, err)
-	defer file.Close()
-
-	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sourceChan := make(chan *sources.Chunk, 1)
+		file, err := os.Open("testdata/test.tgz")
+		assert.Nil(b, err)
 
 		b.StartTimer()
 		go func() {
@@ -58,21 +57,17 @@ func BenchmarkHandleFile(b *testing.B) {
 		for range sourceChan {
 		}
 		b.StopTimer()
-
-		_, err = file.Seek(0, io.SeekStart)
-		assert.NoError(b, err)
 	}
 }
 
 func TestSkipArchive(t *testing.T) {
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(t, err)
-	defer file.Close()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
 		assert.NoError(t, err)
 	}()
 
@@ -87,12 +82,11 @@ func TestSkipArchive(t *testing.T) {
 func TestHandleNestedArchives(t *testing.T) {
 	file, err := os.Open("testdata/nested-dirs.zip")
 	assert.Nil(t, err)
-	defer file.Close()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -107,12 +101,11 @@ func TestHandleNestedArchives(t *testing.T) {
 func TestHandleCompressedZip(t *testing.T) {
 	file, err := os.Open("testdata/example.zip.gz")
 	assert.Nil(t, err)
-	defer file.Close()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -127,12 +120,11 @@ func TestHandleCompressedZip(t *testing.T) {
 func TestHandleNestedCompressedArchive(t *testing.T) {
 	file, err := os.Open("testdata/nested-compressed-archive.tar.gz")
 	assert.Nil(t, err)
-	defer file.Close()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -147,12 +139,11 @@ func TestHandleNestedCompressedArchive(t *testing.T) {
 func TestExtractTarContent(t *testing.T) {
 	file, err := os.Open("testdata/test.tgz")
 	assert.Nil(t, err)
-	defer file.Close()
 
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -167,7 +158,6 @@ func TestExtractTarContent(t *testing.T) {
 func TestNestedDirArchive(t *testing.T) {
 	file, err := os.Open("testdata/dir-archive.zip")
 	assert.Nil(t, err)
-	defer file.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -193,7 +183,6 @@ func TestHandleFileRPM(t *testing.T) {
 
 	file, err := os.Open("testdata/test.rpm")
 	assert.Nil(t, err)
-	defer file.Close()
 
 	assert.Equal(t, 0, len(reporter.Ch))
 	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
@@ -206,9 +195,23 @@ func TestHandleFileAR(t *testing.T) {
 
 	file, err := os.Open("testdata/test.deb")
 	assert.Nil(t, err)
-	defer file.Close()
 
 	assert.Equal(t, 0, len(reporter.Ch))
 	assert.NoError(t, HandleFile(context.Background(), file, &sources.Chunk{}, reporter))
+	assert.Equal(t, wantChunkCount, len(reporter.Ch))
+}
+
+func TestHandleFileNonArchive(t *testing.T) {
+	wantChunkCount := 6
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
+
+	file, err := os.Open("testdata/nonarchive.txt")
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	assert.NoError(t, HandleFile(ctx, file, &sources.Chunk{}, reporter))
+	assert.NoError(t, err)
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
