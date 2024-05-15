@@ -95,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							token := tokenResponse.Items[0]
 							s1.ExtraData["name"] = token.Name
 							s1.ExtraData["role"] = token.Role
-							s1.ExtraData["total_count"] = fmt.Sprintf("%d", tokenResponse.TotalCount)
+							s1.ExtraData["total_token_count"] = fmt.Sprintf("%d", tokenResponse.TotalCount)
 						}
 					} else if res.StatusCode == 401 {
 						// 401 is expected for an invalid token, so there is nothing to do here.
