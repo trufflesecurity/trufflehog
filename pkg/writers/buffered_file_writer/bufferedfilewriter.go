@@ -88,6 +88,10 @@ func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
 		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
 	}
 
+	if writer.buf == nil {
+		return nil, fmt.Errorf("reader was empty; no data written to buffered file writer")
+	}
+
 	return writer, nil
 }
 
