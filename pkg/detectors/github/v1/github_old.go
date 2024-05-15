@@ -40,6 +40,8 @@ type UserRes struct {
 	Name      string `json:"name"`
 	Company   string `json:"company"`
 	UserURL   string `json:"html_url"`
+	Email     string `json:"email"`
+	Location  string `json:"location"`
 	// Included in GitHub Enterprise Server.
 	LdapDN string `json:"ldap_dn"`
 }
@@ -156,6 +158,14 @@ func SetUserResponse(userResponse *UserRes, s1 *detectors.Result) {
 	}
 	if userResponse.LdapDN != "" {
 		s1.ExtraData["ldap_dn"] = userResponse.LdapDN
+	}
+
+	// email & location if user has made them public
+	if userResponse.Email != "" {
+		s1.ExtraData["email"] = userResponse.Email
+	}
+	if userResponse.Location != "" {
+		s1.ExtraData["location"] = userResponse.Location
 	}
 }
 
