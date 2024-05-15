@@ -16,7 +16,7 @@
 
 ---
 
-# :mag*right: \_Now Scanning*
+# :mag_right: *Now Scanning*
 
 <div align="center">
 
