@@ -248,7 +248,10 @@ func (s *Source) Chunks(
 			})
 		}
 
-		workerPool.Wait()
+		err = workerPool.Wait()
+		if err != nil {
+			s.log.V(2).Info(fmt.Sprintf("Error waiting on worker pool: %s\n", err))
+		}
 
 		if !s.bestEffortScan {
 			break

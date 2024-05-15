@@ -17,12 +17,6 @@ import (
 
 type IndexStatus int
 
-const (
-	indexRemoved IndexStatus = iota
-	indexExists
-	indexAdded
-)
-
 type FilterParams struct {
 	indexPattern   string
 	queryJSON      string
@@ -418,7 +412,7 @@ func processSearchedDocuments(
 
 			sort, ok := hit["sort"].([]any)
 			if ok {
-				docID := -1
+				var docID int
 
 				if len(sort) == 1 {
 					docID = int(sort[0].(float64))
