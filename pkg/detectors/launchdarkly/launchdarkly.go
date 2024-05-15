@@ -45,8 +45,10 @@ type tokenResponse struct {
 }
 
 type token struct {
-	Name string `json:"name"`
-	Role string `json:"role"`
+	Name           string `json:"name"`
+	Role           string `json:"role"`
+	Token          string `json:"token"`
+	IsServiceToken bool   `json:"serviceToken"`
 }
 
 // We are not including "mob-" because client keys are not sensitive.
@@ -75,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			if strings.HasPrefix(resMatch, "api-") {
-				s1.ExtraData["token_type"] = "api"
+				s1.ExtraData["type"] = "API"
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://app.launchdarkly.com/api/v2/tokens", nil)
 				if err != nil {
 					continue
@@ -92,9 +94,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = true
 						var tokenResponse tokenResponse
 						if err := json.NewDecoder(res.Body).Decode(&tokenResponse); err == nil && len(tokenResponse.Items) > 0 { // no error in parsing and have atleast one item
+							// set first token information only
 							token := tokenResponse.Items[0]
-							s1.ExtraData["name"] = token.Name
-							s1.ExtraData["role"] = token.Role
+							s1.ExtraData["token_name"] = token.Name
+							s1.ExtraData["token_role"] = token.Role
+							s1.ExtraData["token_value"] = token.Token
+							if token.IsServiceToken {
+								s1.ExtraData["token_type"] = "service"
+							} else {
+								s1.ExtraData["token_type"] = "personal"
+							}
 							s1.ExtraData["total_token_count"] = fmt.Sprintf("%d", tokenResponse.TotalCount)
 						}
 					} else if res.StatusCode == 401 {
@@ -108,7 +117,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			} else {
 				// This is a server SDK key. Try to initialize using the SDK.
-				s1.ExtraData["token_type"] = "sdk"
+				s1.ExtraData["type"] = "SDK"
 				_, err := ldclient.MakeCustomClient(resMatch, defaultSDKConfig, defaultSDKTimeout)
 				if err == nil {
 					s1.Verified = true
