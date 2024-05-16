@@ -35,6 +35,8 @@ type fileReader struct {
 	isGenericArchive bool
 }
 
+var ErrEmptyReader = errors.New("reader is empty")
+
 func newFileReader(r io.ReadCloser) (fileReader, error) {
 	defer r.Close()
 
@@ -56,6 +58,11 @@ func newFileReader(r io.ReadCloser) (fileReader, error) {
 			_ = rdr.Close()
 		}
 	}()
+
+	// Check if the reader is empty.
+	if rdr.Size() == 0 {
+		return reader, ErrEmptyReader
+	}
 
 	format, arReader, err := archiver.Identify("", rdr)
 	switch {
@@ -172,6 +179,10 @@ func HandleFile(
 
 	rdr, err := newFileReader(reader)
 	if err != nil {
+		if errors.Is(err, ErrEmptyReader) {
+			ctx.Logger().V(5).Info("empty reader, skipping file")
+			return nil
+		}
 		return fmt.Errorf("error creating custom reader: %w", err)
 	}
 	defer rdr.Close()
