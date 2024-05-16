@@ -171,7 +171,7 @@ func TestFindDetectorMatches(t *testing.T) {
                  eget ultricies ugue ugue id ugue. Meens liquet libero
                  c libero molestie, nec mlesud ugue ugue eget. This is the second occurrence of the letter a.`,
 			expectedResult: map[DetectorKey][][]int64{
-				CreateDetectorKey(testDetectorV2{}): {{43, 343}, {854, 856}},
+				CreateDetectorKey(testDetectorV2{}): {{43, 555}, {854, 856}},
 			},
 		},
 		{
