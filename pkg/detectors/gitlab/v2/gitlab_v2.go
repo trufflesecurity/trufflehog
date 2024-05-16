@@ -27,13 +27,8 @@ func (Scanner) Version() int            { return 2 }
 func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (
-<<<<<<< HEAD
-	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
-=======
 	defaultClient = common.SaneHttpClient()
 	keyPat        = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
->>>>>>> main
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
