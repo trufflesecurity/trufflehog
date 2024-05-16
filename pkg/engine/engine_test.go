@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
@@ -674,7 +675,7 @@ func BenchmarkPopulateMatchingDetectors(b *testing.B) {
 	for _, chunkSize := range chunkSizes {
 		b.Run(fmt.Sprintf("ChunkSize_%d", chunkSize), func(b *testing.B) {
 			b.ReportAllocs()
-			b.SetBytes(int64(dataSize))
+			b.SetBytes(int64(chunkSize))
 
 			for i := 0; i < b.N; i++ {
 				offset := 0
