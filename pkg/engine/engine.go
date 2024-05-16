@@ -611,43 +611,41 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 8
 	chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, avgDetectorsPerChunk)
-	for originalChunk := range e.ChunksChan() {
-		for chunk := range sources.Chunker(originalChunk) {
-			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
-			for _, decoder := range e.decoders {
-				decoded := decoder.FromChunk(chunk)
-				if decoded == nil {
-					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
-					continue
-				}
+	for chunk := range e.ChunksChan() {
+		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
+		for _, decoder := range e.decoders {
+			decoded := decoder.FromChunk(chunk)
+			if decoded == nil {
+				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+				continue
+			}
 
-				matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
-				if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
-					wgVerificationOverlap.Add(1)
-					e.verificationOverlapChunksChan <- verificationOverlapChunk{
-						chunk:                       *decoded.Chunk,
-						detectors:                   matchingDetectors,
-						decoder:                     decoded.DecoderType,
-						verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
-					}
-					// Empty the map.
-					for k := range chunkSpecificDetectors {
-						delete(chunkSpecificDetectors, k)
-					}
-					continue
+			matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
+			if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
+				wgVerificationOverlap.Add(1)
+				e.verificationOverlapChunksChan <- verificationOverlapChunk{
+					chunk:                       *decoded.Chunk,
+					detectors:                   matchingDetectors,
+					decoder:                     decoded.DecoderType,
+					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
 				}
-
-				for k, detector := range chunkSpecificDetectors {
-					decoded.Chunk.Verify = e.verify
-					wgDetect.Add(1)
-					e.detectableChunksChan <- detectableChunk{
-						chunk:    *decoded.Chunk,
-						detector: detector,
-						decoder:  decoded.DecoderType,
-						wgDoneFn: wgDetect.Done,
-					}
+				// Empty the map.
+				for k := range chunkSpecificDetectors {
 					delete(chunkSpecificDetectors, k)
 				}
+				continue
+			}
+
+			for k, detector := range chunkSpecificDetectors {
+				decoded.Chunk.Verify = e.verify
+				wgDetect.Add(1)
+				e.detectableChunksChan <- detectableChunk{
+					chunk:    *decoded.Chunk,
+					detector: detector,
+					decoder:  decoded.DecoderType,
+					wgDoneFn: wgDetect.Done,
+				}
+				delete(chunkSpecificDetectors, k)
 			}
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
