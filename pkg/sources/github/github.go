@@ -19,7 +19,7 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
-	"github.com/google/go-github/v61/github"
+	"github.com/google/go-github/v62/github"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
