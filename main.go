@@ -18,7 +18,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
-	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -30,7 +29,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
@@ -150,6 +148,7 @@ var (
 
 	dockerScan       = cli.Command("docker", "Scan Docker Image")
 	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+	dockerScanToken  = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
@@ -589,17 +588,12 @@ func run(state overseer.State) {
 			logFatal(err, "Failed to scan GCS.")
 		}
 	case dockerScan.FullCommand():
-		dockerConn := sourcespb.Docker{
-			Images: *dockerScanImages,
-			Credential: &sourcespb.Docker_DockerKeychain{
-				DockerKeychain: true,
-			},
+		cfg := sources.DockerConfig{
+			BearerToken:       *dockerScanToken,
+			Images:            *dockerScanImages,
+			UseDockerKeychain: *dockerScanToken == "",
 		}
-		anyConn, err := anypb.New(&dockerConn)
-		if err != nil {
-			logFatal(err, "Failed to marshal Docker connection")
-		}
-		if err := e.ScanDocker(ctx, anyConn); err != nil {
+		if err := e.ScanDocker(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Docker.")
 		}
 	case postmanScan.FullCommand():

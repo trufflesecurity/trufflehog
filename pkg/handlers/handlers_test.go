@@ -215,3 +215,22 @@ func TestHandleFileNonArchive(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
+
+func TestExtractTarContentWithEmptyFile(t *testing.T) {
+	file, err := os.Open("testdata/testdir.zip")
+	assert.Nil(t, err)
+
+	chunkCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 4
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}

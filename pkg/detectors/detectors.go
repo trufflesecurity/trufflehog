@@ -3,12 +3,11 @@ package detectors
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"math/big"
 	"net/url"
 	"strings"
 	"unicode"
-
-	"errors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -154,10 +153,10 @@ func CleanResults(results []Result) []Result {
 }
 
 // PrefixRegex ensures that at least one of the given keywords is within
-// 20 characters of the capturing group that follows.
+// 40 characters of the capturing group that follows.
 // This can help prevent false positives.
 func PrefixRegex(keywords []string) string {
-	pre := `(?i)(?:`
+	pre := `(?i:`
 	middle := strings.Join(keywords, "|")
 	post := `)(?:.|[\n\r]){0,40}?`
 	return pre + middle + post
