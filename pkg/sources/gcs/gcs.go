@@ -12,7 +12,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
@@ -20,7 +19,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -355,49 +353,5 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 		},
 	}
 
-	data, err := s.readObjectData(ctx, o, chunkSkel)
-	if err != nil {
-		return fmt.Errorf("error reading object data: %w", err)
-	}
-
-	// If data is nil, it means that the file was handled by a handler.
-	if data == nil {
-		return nil
-	}
-
-	chunkSkel.Data = data
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case s.chunksCh <- chunkSkel:
-	}
-
-	return nil
-}
-
-func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Chunk) ([]byte, error) {
-	bufferName := cleantemp.MkFilename()
-	reader, err := diskbufferreader.New(o, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return nil, fmt.Errorf("error creating disk buffer reader: %w", err)
-	}
-	defer reader.Close()
-
-	if handlers.HandleFile(ctx, reader, chunk, sources.ChanReporter{Ch: s.chunksCh}) {
-		ctx.Logger().V(3).Info("File was handled", "name", s.name, "bucket", o.bucket, "object", o.name)
-		return nil, nil
-	}
-
-	if err := reader.Reset(); err != nil {
-		return nil, fmt.Errorf("error resetting reader: %w", err)
-	}
-
-	reader.Stop()
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("error reading object: %w", err)
-	}
-
-	return data, nil
+	return handlers.HandleFile(ctx, io.NopCloser(o), chunkSkel, sources.ChanReporter{Ch: s.chunksCh})
 }

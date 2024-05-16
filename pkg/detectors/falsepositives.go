@@ -57,7 +57,7 @@ func GetFalsePositiveCheck(detector Detector) func(Result) bool {
 }
 
 // IsKnownFalsePositive will not return a valid secret finding if any of the disqualifying conditions are met
-// Currently that includes: No number, english word in key, or matches common example pattens.
+// Currently that includes: No number, english word in key, or matches common example patterns.
 // Only the secret key material should be passed into this function
 func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) bool {
 	if !utf8.ValidString(match) {

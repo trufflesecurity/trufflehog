@@ -2,9 +2,11 @@ package twilio
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -24,6 +26,16 @@ var (
 	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
 	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
 )
+
+type serviceResponse struct {
+	Services []service `json:"services"`
+}
+
+type service struct {
+	FriendlyName string `json:"friendly_name"` // friendly name of a service
+	SID          string `json:"sid"`           // object id of service
+	AccountSID   string `json:"account_sid"`   // account sid
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -73,10 +85,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.SetBasicAuth(sid, key)
 				res, err := client.Do(req)
 				if err == nil {
-					res.Body.Close() // The request body is unused.
+					defer res.Body.Close()
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
+						var serviceResponse serviceResponse
+						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have at least one service
+							service := serviceResponse.Services[0]
+							s1.ExtraData["friendly_name"] = service.FriendlyName
+							s1.ExtraData["account_sid"] = service.AccountSID
+						}
 					} else if res.StatusCode == 401 || res.StatusCode == 403 {
 						// The secret is determinately not verified (nothing to do)
 					} else {
