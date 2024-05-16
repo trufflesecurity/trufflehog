@@ -32,6 +32,9 @@ func TestHandleFile(t *testing.T) {
 	// TODO: Embed a zip without making an HTTP request.
 	resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip")
 	assert.NoError(t, err)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 
 	assert.Equal(t, 0, len(reporter.Ch))
 	assert.NoError(t, HandleFile(context.Background(), resp.Body, &sources.Chunk{}, reporter))
@@ -211,4 +214,23 @@ func TestHandleFileNonArchive(t *testing.T) {
 	assert.NoError(t, HandleFile(ctx, file, &sources.Chunk{}, reporter))
 	assert.NoError(t, err)
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
+}
+
+func TestExtractTarContentWithEmptyFile(t *testing.T) {
+	file, err := os.Open("testdata/testdir.zip")
+	assert.Nil(t, err)
+
+	chunkCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 4
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
 }

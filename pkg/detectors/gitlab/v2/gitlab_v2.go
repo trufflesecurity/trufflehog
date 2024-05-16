@@ -27,15 +27,18 @@ func (Scanner) Version() int            { return 2 }
 func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
 
 var (
+<<<<<<< HEAD
 	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
+=======
+	defaultClient = common.SaneHttpClient()
+	keyPat        = regexp.MustCompile(`\b(glpat-[a-zA-Z0-9\-=_]{20,22})\b`)
+>>>>>>> main
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"gitlab"}
-}
+func (s Scanner) Keywords() []string { return []string{"glpat-"} }
 
 // FromData will find and optionally verify Gitlab secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {

@@ -21,7 +21,7 @@ const (
 
 var (
 	maxDepth   = 5
-	maxSize    = 250 * 1024 * 1024 // 250 MB
+	maxSize    = 2 << 30 // 2 GB
 	maxTimeout = time.Duration(30) * time.Second
 )
 
@@ -38,7 +38,7 @@ func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 type archiveHandler struct{ *defaultHandler }
 
 func newArchiveHandler() *archiveHandler {
-	return &archiveHandler{defaultHandler: newNonArchiveHandler(archiveHandlerType)}
+	return &archiveHandler{defaultHandler: newDefaultHandler(archiveHandlerType)}
 }
 
 // HandleFile processes the input as either an archive or non-archive based on its content,
@@ -85,7 +85,6 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		return ErrMaxDepthReached
 	}
 
-	// format, arReader, err := archiver.Identify("", reader)
 	arReader := reader.BufferedFileReader
 	if reader.format == nil && depth > 0 {
 		return h.handleNonArchiveContent(ctx, arReader, archiveChan)
@@ -102,6 +101,10 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 
 		rdr, err := newFileReader(compReader)
 		if err != nil {
+			if errors.Is(err, ErrEmptyReader) {
+				ctx.Logger().V(5).Info("empty reader, skipping file")
+				return nil
+			}
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
 		defer rdr.Close()
@@ -114,7 +117,7 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		}
 		return nil
 	default:
-		return fmt.Errorf("unknown archive type: %s", reader.format.Name())
+		return fmt.Errorf("unknown archive type: %s", reader.mimeType)
 	}
 }
 
@@ -147,7 +150,8 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 
 		fileSize := file.Size()
 		if int(fileSize) > maxSize {
-			lCtx.Logger().V(3).Info("skipping file due to size")
+			lCtx.Logger().V(3).Info("skipping file due to size", "size", fileSize)
+			h.metrics.incFilesSkipped()
 			return nil
 		}
 
@@ -181,6 +185,10 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 
 		rdr, err := newFileReader(f)
 		if err != nil {
+			if errors.Is(err, ErrEmptyReader) {
+				lCtx.Logger().V(5).Info("empty reader, skipping file")
+				return nil
+			}
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
 		defer rdr.Close()

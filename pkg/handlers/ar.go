@@ -16,7 +16,7 @@ type arHandler struct{ *defaultHandler }
 
 // newARHandler creates an arHandler.
 func newARHandler() *arHandler {
-	return &arHandler{defaultHandler: newNonArchiveHandler(arHandlerType)}
+	return &arHandler{defaultHandler: newDefaultHandler(arHandlerType)}
 }
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
@@ -37,6 +37,7 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan [
 			h.metrics.incFilesProcessed()
 		}()
 
+		// Defer a panic recovery to handle any panics that occur during the AR processing.
 		defer func() {
 			if r := recover(); r != nil {
 				// Return the panic as an error.

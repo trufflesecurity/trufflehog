@@ -22,11 +22,11 @@ import (
 // the common functionality provided by the defaultHandler for processing the extracted content.
 type defaultHandler struct{ metrics *metrics }
 
-// newNonArchiveHandler creates a defaultHandler with metrics configured based on the provided handlerType.
+// newDefaultHandler creates a defaultHandler with metrics configured based on the provided handlerType.
 // The handlerType parameter is used to initialize the metrics instance with the appropriate handler type,
 // ensuring that the metrics recorded within the defaultHandler methods are correctly attributed to the
 // specific handler that invoked them.
-func newNonArchiveHandler(handlerType handlerType) *defaultHandler {
+func newDefaultHandler(handlerType handlerType) *defaultHandler {
 	return &defaultHandler{metrics: newHandlerMetrics(handlerType)}
 }
 
@@ -95,8 +95,7 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 	}
 
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, bufReader)
-	for data := range chunkResChan {
+	for data := range chunkReader(ctx, bufReader) {
 		if err := data.Error(); err != nil {
 			ctx.Logger().Error(err, "error reading chunk")
 			h.metrics.incErrors()
@@ -108,6 +107,5 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 		}
 		h.metrics.incBytesProcessed(len(data.Bytes()))
 	}
-
 	return nil
 }

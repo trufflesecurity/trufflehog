@@ -518,9 +518,8 @@ func TestNewFromReader(t *testing.T) {
 			wantData: "hello world",
 		},
 		{
-			name:    "Empty reader",
-			reader:  strings.NewReader(""),
-			wantErr: true,
+			name:   "Empty reader",
+			reader: strings.NewReader(""),
 		},
 		{
 			name:    "Error reader",
@@ -550,6 +549,10 @@ func TestNewFromReader(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+
+			if rdr == nil {
+				return
+			}
 			defer rdr.Close()
 
 			_, err = b.ReadFrom(rdr)

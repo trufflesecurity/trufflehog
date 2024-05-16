@@ -261,7 +261,7 @@ enum DetectorType {
   Wrike = 248;
   Float = 249;
   Imagekit = 250;
-  Integromat = 251;
+  Integromat = 251 [deprecated = true];
   Salesblink = 252;
   Bored = 253;
   Campayn = 254;
@@ -996,6 +996,7 @@ enum DetectorType {
   Wiz = 984;
   Pagarme = 985;
   Onfleet = 986;
+  Intra42 = 987;
 }
 
 message Result {

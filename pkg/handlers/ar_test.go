@@ -18,7 +18,7 @@ func TestHandleARFile(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	rdr, err := newFileReader(ctx, file)
+	rdr, err := newFileReader(file)
 	assert.NoError(t, err)
 	defer rdr.Close()
 

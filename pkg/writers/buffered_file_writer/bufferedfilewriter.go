@@ -122,7 +122,7 @@ func New(opts ...Option) *BufferedFileWriter {
 func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
 	opts = append(opts, WithBufferSize(Large))
 	writer := New(opts...)
-	if _, err := io.Copy(writer, r); err != nil {
+	if _, err := io.Copy(writer, r); err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
 	}
 
@@ -312,7 +312,7 @@ func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
 	}
 
 	if w.buf == nil {
-		return nil, fmt.Errorf("buffer is empty")
+		return nil, nil
 	}
 
 	// Data is in memory.
