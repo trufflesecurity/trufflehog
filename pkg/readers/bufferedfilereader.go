@@ -79,3 +79,6 @@ func (b *BufferedFileReader) ReadAt(p []byte, off int64) (n int, err error) {
 	}
 	return b.reader.Read(p)
 }
+
+// Size returns the total size of the data stored in the BufferedFileReader.
+func (b *BufferedFileReader) Size() int { return b.bufWriter.Len() }

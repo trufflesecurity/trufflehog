@@ -8,14 +8,14 @@ replace github.com/snowflakedb/gosnowflake => github.com/trufflesecurity/gosnowf
 
 require (
 	cloud.google.com/go/secretmanager v1.13.0
-	cloud.google.com/go/storage v1.40.0
+	cloud.google.com/go/storage v1.41.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/aws/aws-sdk-go v1.52.6
+	github.com/aws/aws-sdk-go v1.53.3
 	github.com/aymanbagabas/go-osc52 v1.2.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
@@ -29,7 +29,7 @@ require (
 	github.com/couchbase/gocb/v2 v2.8.1
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/envoyproxy/protoc-gen-validate v1.0.4
-	github.com/fatih/color v1.16.0
+	github.com/fatih/color v1.17.0
 	github.com/felixge/fgprof v0.9.4
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/getsentry/sentry-go v0.27.0
@@ -46,6 +46,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.19.1
 	github.com/google/go-github/v61 v61.0.0
+	github.com/google/go-github/v62 v62.0.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.12.4
 	github.com/hashicorp/go-retryablehttp v0.7.6
@@ -68,19 +69,19 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.1
 	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/sassoftware/go-rpmutils v0.3.0
+	github.com/sassoftware/go-rpmutils v0.4.0
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 	github.com/shuheiktgw/go-travis v0.3.1
 	github.com/snowflakedb/gosnowflake v1.10.0
 	github.com/stretchr/testify v1.9.0
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
-	github.com/testcontainers/testcontainers-go v0.30.0
-	github.com/testcontainers/testcontainers-go/modules/mssql v0.30.0
-	github.com/testcontainers/testcontainers-go/modules/mysql v0.30.0
-	github.com/testcontainers/testcontainers-go/modules/postgres v0.30.0
+	github.com/testcontainers/testcontainers-go v0.31.0
+	github.com/testcontainers/testcontainers-go/modules/mssql v0.31.0
+	github.com/testcontainers/testcontainers-go/modules/mysql v0.31.0
+	github.com/testcontainers/testcontainers-go/modules/postgres v0.31.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.5.2
-	github.com/xanzy/go-gitlab v0.104.1
+	github.com/xanzy/go-gitlab v0.105.0
 	go.mongodb.org/mongo-driver v1.15.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
@@ -90,7 +91,7 @@ require (
 	golang.org/x/oauth2 v0.20.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/text v0.15.0
-	google.golang.org/api v0.178.0
+	google.golang.org/api v0.180.0
 	google.golang.org/protobuf v1.34.1
 	gopkg.in/h2non/gock.v1 v1.1.2
 	pault.ag/go/debian v0.16.0
@@ -100,11 +101,11 @@ require (
 
 require (
 	cloud.google.com/go v0.112.2 // indirect
-	cloud.google.com/go/auth v0.3.0 // indirect
+	cloud.google.com/go/auth v0.4.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
-	cloud.google.com/go/iam v1.1.7 // indirect
-	cloud.google.com/go/longrunning v0.5.6 // indirect
+	cloud.google.com/go/iam v1.1.8 // indirect
+	cloud.google.com/go/longrunning v0.5.7 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
@@ -137,8 +138,8 @@ require (
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cloudflare/circl v1.3.7 // indirect
-	github.com/containerd/containerd v1.7.12 // indirect
+	github.com/cloudflare/circl v1.3.8 // indirect
+	github.com/containerd/containerd v1.7.15 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/couchbase/gocbcore/v10 v10.4.1 // indirect
@@ -199,7 +200,7 @@ require (
 	github.com/jpillora/s3 v1.1.4 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/kjk/lzma v0.0.0-20161016003348-3fd93898850d // indirect
-	github.com/klauspost/compress v1.17.4 // indirect
+	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/launchdarkly/ccache v1.1.0 // indirect
@@ -252,7 +253,7 @@ require (
 	github.com/therootcompany/xz v1.0.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/ulikunitz/xz v0.5.11 // indirect
+	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/vbatts/tar-split v0.11.3 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
@@ -281,7 +282,7 @@ require (
 	golang.org/x/tools v0.21.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/genproto v0.0.0-20240401170217-c3f982113cda // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240429193739-8cf5692501f6 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240506185236-b8a5c65736ae // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240429193739-8cf5692501f6 // indirect
 	google.golang.org/grpc v1.63.2 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect

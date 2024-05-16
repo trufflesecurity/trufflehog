@@ -11,8 +11,7 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-// rpmHandler specializes archiveHandler to manage RPM package files. It leverages shared behaviors
-// from archiveHandler and introduces additional logic specific to RPM packages.
+// rpmHandler specializes archiveHandler to manage RPM package files.
 type rpmHandler struct{ *defaultHandler }
 
 // newRPMHandler creates an rpmHandler with the provided metrics.
