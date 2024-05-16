@@ -267,7 +267,7 @@ func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
 	}
 
 	if w.buf == nil {
-		return nil, fmt.Errorf("BufferedFileWriter has no data to read")
+		return nil, nil
 	}
 
 	// Data is in memory.
