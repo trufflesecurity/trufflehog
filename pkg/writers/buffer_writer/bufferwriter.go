@@ -1,4 +1,4 @@
-// Package bufferwritter provides a contentWriter implementation using a shared buffer pool for memory management.
+// Package bufferwriter provides a contentWriter implementation using a shared buffer pool for memory management.
 package bufferwriter
 
 import (
@@ -6,7 +6,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
 )
 
 type metrics struct{}
@@ -16,11 +17,12 @@ func (metrics) recordDataProcessed(size int64, dur time.Duration) {
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func init() { bufferPool = buffer.NewBufferPool() }
+const defaultBufferSize = 1 << 12 // 4KB
+func init()                       { bufferPool = pool.NewBufferPool(defaultBufferSize) }
 
 // bufferPool is the shared Buffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
-var bufferPool *buffer.Pool
+var bufferPool *pool.Pool
 
 // state represents the current mode of buffer.
 type state uint8
@@ -35,7 +37,7 @@ const (
 // BufferWriter implements contentWriter, using a shared buffer pool for memory management.
 type BufferWriter struct {
 	buf     *buffer.Buffer // The current buffer in use.
-	bufPool *buffer.Pool   // The buffer pool used to manage the buffer.
+	bufPool *pool.Pool     // The buffer pool used to manage the buffer.
 	size    int            // The total size of the content written to the buffer.
 	state   state          // The current state of the buffer.
 
@@ -43,14 +45,15 @@ type BufferWriter struct {
 }
 
 // New creates a new instance of BufferWriter.
-func New() *BufferWriter { return &BufferWriter{state: writeOnly, bufPool: bufferPool} }
+func New() *BufferWriter {
+	return &BufferWriter{state: writeOnly, bufPool: bufferPool}
+}
 
 // Write delegates the writing operation to the underlying bytes.Buffer.
 func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.state != writeOnly {
 		return 0, fmt.Errorf("buffer must be in write-only mode to write data; current state: %d", b.state)
 	}
-
 	if b.buf == nil {
 		b.buf = b.bufPool.Get()
 		if b.buf == nil {
@@ -63,8 +66,8 @@ func (b *BufferWriter) Write(data []byte) (int, error) {
 	start := time.Now()
 	defer func(start time.Time) {
 		b.metrics.recordDataProcessed(int64(size), time.Since(start))
-
 	}(start)
+
 	return b.buf.Write(data)
 }
 

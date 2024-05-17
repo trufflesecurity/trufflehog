@@ -90,7 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 						var serviceResponse serviceResponse
-						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have atleast one service
+						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have at least one service
 							service := serviceResponse.Services[0]
 							s1.ExtraData["friendly_name"] = service.FriendlyName
 							s1.ExtraData["account_sid"] = service.AccountSID

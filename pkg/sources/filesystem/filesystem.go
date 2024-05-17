@@ -163,7 +163,6 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		return fmt.Errorf("unable to open file: %w", err)
 	}
 
-	defer inputFile.Close()
 	logger.V(3).Info("scanning file")
 
 	chunkSkel := &sources.Chunk{

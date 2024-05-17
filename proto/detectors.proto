@@ -261,7 +261,7 @@ enum DetectorType {
   Wrike = 248;
   Float = 249;
   Imagekit = 250;
-  Integromat = 251;
+  Integromat = 251 [deprecated = true];
   Salesblink = 252;
   Bored = 253;
   Campayn = 254;
