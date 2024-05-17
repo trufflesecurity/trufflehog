@@ -144,6 +144,16 @@ type SourceUnit interface {
 	Display() string
 }
 
+// DockerConfig defines the optional configuration for a Docker source.
+type DockerConfig struct {
+	// Images is the list of images to scan.
+	Images []string
+	// BearerToken is the token to use to authenticate with the source.
+	BearerToken string
+	// UseDockerKeychain determines whether to use the Docker keychain.
+	UseDockerKeychain bool
+}
+
 // GCSConfig defines the optional configuration for a GCS source.
 type GCSConfig struct {
 	// CloudCred determines whether to use cloud credentials.

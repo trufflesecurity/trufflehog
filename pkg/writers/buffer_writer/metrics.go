@@ -12,7 +12,7 @@ var (
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,
 		Name:      "buffer_writer_write_size_bytes",
-		Help:      "Size of data written by the BufferWriter in bytes.",
+		Help:      "Total size of data written by the BufferWriter in bytes.",
 		Buckets:   prometheus.ExponentialBuckets(100, 10, 7),
 	})
 
