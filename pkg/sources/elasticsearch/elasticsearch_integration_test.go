@@ -241,29 +241,6 @@ func TestSource_ElasticAPI(t *testing.T) {
 	)
 
 	t.Run(
-		"New indexes have only 1 primary shard",
-		func(t *testing.T) {
-			primaryShardsByIndex, err := fetchIndexPrimaryShards(ctx, es, []string{indexName})
-			if err != nil {
-				t.Error(err)
-			}
-
-			if len(primaryShardsByIndex) != 1 {
-				t.Errorf("wanted 1 primary shard count, got %d\n", len(primaryShardsByIndex))
-			}
-
-			primaryShards, found := primaryShardsByIndex[indexName]
-			if !found {
-				t.Errorf("index \"%s\" not found in primary shard counts", indexName)
-			}
-
-			if len(primaryShards) != 1 {
-				t.Errorf("wanted primary shard count of 1, got %d\n", primaryShards)
-			}
-		},
-	)
-
-	t.Run(
 		"Adding a document to a new index creates a document count of 1",
 		func(t *testing.T) {
 			query := make(map[string]any)
@@ -289,10 +266,8 @@ func TestSource_ElasticAPI(t *testing.T) {
 		func(t *testing.T) {
 			docSearch := DocumentSearch{
 				index: &Index{
-					name:             indexName,
-					primaryShards:    []int{0},
-					documentCount:    1,
-					latestDocumentID: -1,
+					name:          indexName,
+					documentCount: 1,
 				},
 				documentCount: 1,
 				offset:        0,
@@ -322,9 +297,9 @@ func TestSource_ElasticAPI(t *testing.T) {
 				t.Fatalf("wanted 1 document, got %d\n", len(docs))
 			}
 
-			if docSearch.index.latestDocumentID != 0 {
-				t.Errorf("Wanted latestDocumentID 0, got %d\n", docSearch.index.latestDocumentID)
-			}
+			// if docSearch.index.latestDocumentID != 0 {
+			// 	t.Errorf("Wanted latestDocumentID 0, got %d\n", docSearch.index.latestDocumentID)
+			// }
 
 			doc := docs[0]
 			if doc.timestamp != now.Format(time.RFC3339) {
@@ -347,16 +322,16 @@ func TestSource_ElasticAPI(t *testing.T) {
 	t.Run(
 		"Correct number of documents is skipped given a skipPercent",
 		func(t *testing.T) {
-			messagesFound := 0
+			messagesProcessed := 0
 
 			for i := 0; i < 40; i++ {
 				pl := make(map[string]string)
 				pl["message"] = gofakeit.Word()
 				pl["@timestamp"] = time.Now().Format(time.RFC3339)
 
-				index := indexName2
-				if i < 20 {
-					index = indexName
+				index := indexName
+				if i > 19 {
+					index = indexName2
 				}
 
 				jsonMsg, err := json.Marshal(pl)
@@ -379,23 +354,21 @@ func TestSource_ElasticAPI(t *testing.T) {
 
 			docSearch := DocumentSearch{
 				index: &Index{
-					name:             indexName,
-					primaryShards:    []int{0},
-					documentCount:    21,
-					latestDocumentID: -1,
+					name:          indexName,
+					documentCount: 21,
 				},
 				documentCount: 21,
 				offset:        0,
 				filterParams:  &FilterParams{},
-				skipPercent:   .5,
+				skipCount:     10,
 			}
 
-			docsProcessed, err := processSearchedDocuments(
+			documentsProcessed, err := processSearchedDocuments(
 				ctx,
 				es,
 				&docSearch,
 				func(document *Document) error {
-					messagesFound += 1
+					messagesProcessed += 1
 					return nil
 				},
 			)
@@ -403,29 +376,31 @@ func TestSource_ElasticAPI(t *testing.T) {
 				t.Error(err)
 			}
 
-			if docsProcessed != 21 {
-				t.Errorf("wanted 21 documents processed, got %d\n", docsProcessed)
+			if documentsProcessed != 11 {
+				t.Errorf("wanted 11 documents processed, got %d\n", documentsProcessed)
+			}
+
+			if messagesProcessed != 11 {
+				t.Errorf("wanted 11 messages processed, got %d\n", messagesProcessed)
 			}
 
 			docSearch = DocumentSearch{
 				index: &Index{
-					name:             indexName2,
-					primaryShards:    []int{0},
-					documentCount:    21,
-					latestDocumentID: -1,
+					name:          indexName2,
+					documentCount: 21,
 				},
 				documentCount: 21,
 				offset:        0,
 				filterParams:  &FilterParams{},
-				skipPercent:   .5,
+				skipCount:     10,
 			}
 
-			docsProcessed, err = processSearchedDocuments(
+			documentsProcessed, err = processSearchedDocuments(
 				ctx,
 				es,
 				&docSearch,
 				func(document *Document) error {
-					messagesFound += 1
+					messagesProcessed += 1
 					return nil
 				},
 			)
@@ -433,12 +408,12 @@ func TestSource_ElasticAPI(t *testing.T) {
 				t.Error(err)
 			}
 
-			if docsProcessed != 21 {
-				t.Errorf("wanted 21 documents processed, got %d\n", docsProcessed)
+			if documentsProcessed != 11 {
+				t.Errorf("wanted 11 documents processed, got %d\n", documentsProcessed)
 			}
 
-			if messagesFound != 22 {
-				t.Errorf("wanted 22 messages found, got %d\n", messagesFound)
+			if messagesProcessed != 22 {
+				t.Errorf("wanted 22 messages processed, got %d\n", messagesProcessed)
 			}
 		},
 	)

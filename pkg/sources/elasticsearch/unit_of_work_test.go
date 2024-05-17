@@ -9,9 +9,9 @@ import (
 func TestSource_distributeDocumentScans(t *testing.T) {
 	indices := Indices{
 		indices: []*Index{
-			&Index{name: "index", primaryShards: []int{}, documentCount: 20},
-			&Index{name: "index2", primaryShards: []int{}, documentCount: 9},
-			&Index{name: "index3", primaryShards: []int{}, documentCount: 0},
+			&Index{name: "index", documentCount: 20},
+			&Index{name: "index2", documentCount: 9},
+			&Index{name: "index3", documentCount: 0},
 		},
 		filterParams: &FilterParams{},
 	}
@@ -30,7 +30,7 @@ func TestSource_distributeDocumentScans(t *testing.T) {
 			assert.Equal(t, "index", uows[0].documentSearches[0].index.name)
 			assert.Equal(t, 0, uows[0].documentSearches[0].offset)
 			assert.Equal(t, 14, uows[0].documentSearches[0].documentCount)
-			assert.Equal(t, 0.09999999999999998, uows[0].documentSearches[0].skipPercent)
+			assert.Equal(t, 1, uows[0].documentSearches[0].skipCount)
 
 			assert.Equal(t, 15, uows[1].maxDocumentCount)
 			assert.Equal(t, 15, uows[1].documentCount)
@@ -39,20 +39,20 @@ func TestSource_distributeDocumentScans(t *testing.T) {
 			assert.Equal(t, "index", uows[1].documentSearches[0].index.name)
 			assert.Equal(t, 14, uows[1].documentSearches[0].offset)
 			assert.Equal(t, 6, uows[1].documentSearches[0].documentCount)
-			assert.Equal(t, 0.09999999999999998, uows[1].documentSearches[0].skipPercent)
+			assert.Equal(t, 0, uows[1].documentSearches[0].skipCount)
 
 			assert.Equal(t, "index2", uows[1].documentSearches[1].index.name)
 			assert.Equal(t, 0, uows[1].documentSearches[1].offset)
 			assert.Equal(t, 9, uows[1].documentSearches[1].documentCount)
-			assert.Equal(t, 0.09999999999999998, uows[1].documentSearches[1].skipPercent)
+			assert.Equal(t, 0, uows[1].documentSearches[1].skipCount)
 		},
 	)
 }
 
 func TestSource_AddSearch(t *testing.T) {
-	index := Index{name: "index1", primaryShards: []int{1, 4, 3}, documentCount: 20}
-	index2 := Index{name: "index2", primaryShards: []int{1, 2, 8}, documentCount: 10}
-	index3 := Index{name: "index3", primaryShards: []int{9, 7, 5}, documentCount: 0}
+	index := Index{name: "index1", documentCount: 20}
+	index2 := Index{name: "index2", documentCount: 10}
+	index3 := Index{name: "index3", documentCount: 0}
 
 	uow := NewUnitOfWork(10)
 
@@ -63,7 +63,6 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, uow.maxDocumentCount, uow.documentCount)
 	assert.Equal(t, 1, len(uow.documentSearches))
 	assert.Equal(t, index.name, uow.documentSearches[0].index.name)
-	assert.Equal(t, index.primaryShards, uow.documentSearches[0].index.primaryShards)
 	assert.Equal(t, 0, uow.documentSearches[0].offset)
 	assert.Equal(t, uow.maxDocumentCount, uow.documentSearches[0].documentCount)
 
@@ -74,7 +73,6 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, uow.maxDocumentCount, uow.documentCount)
 	assert.Equal(t, 1, len(uow.documentSearches))
 	assert.Equal(t, index.name, uow.documentSearches[0].index.name)
-	assert.Equal(t, index.primaryShards, uow.documentSearches[0].index.primaryShards)
 	assert.Equal(t, 0, uow.documentSearches[0].offset)
 	assert.Equal(t, uow.maxDocumentCount, uow.documentSearches[0].documentCount)
 
@@ -85,7 +83,6 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, uow.maxDocumentCount, uow.documentCount)
 	assert.Equal(t, 1, len(uow.documentSearches))
 	assert.Equal(t, index.name, uow.documentSearches[0].index.name)
-	assert.Equal(t, index.primaryShards, uow.documentSearches[0].index.primaryShards)
 	assert.Equal(t, 0, uow.documentSearches[0].offset)
 	assert.Equal(t, uow.maxDocumentCount, uow.documentSearches[0].documentCount)
 
@@ -98,7 +95,6 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, uow2.maxDocumentCount, uow2.documentCount)
 	assert.Equal(t, 1, len(uow2.documentSearches))
 	assert.Equal(t, index.name, uow2.documentSearches[0].index.name)
-	assert.Equal(t, index.primaryShards, uow2.documentSearches[0].index.primaryShards)
 	assert.Equal(t, 10, uow2.documentSearches[0].offset)
 	assert.Equal(t, uow2.maxDocumentCount, uow2.documentSearches[0].documentCount)
 
@@ -111,7 +107,6 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, 1, uow3.documentCount)
 	assert.Equal(t, 1, len(uow3.documentSearches))
 	assert.Equal(t, index.name, uow3.documentSearches[0].index.name)
-	assert.Equal(t, index.primaryShards, uow3.documentSearches[0].index.primaryShards)
 	assert.Equal(t, 19, uow3.documentSearches[0].offset)
 	assert.Equal(t, 1, uow3.documentSearches[0].documentCount)
 
@@ -129,7 +124,6 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, 20, offset)
 	assert.Equal(t, 1, len(uow.documentSearches))
 	assert.Equal(t, index.name, uow.documentSearches[0].index.name)
-	assert.Equal(t, index.primaryShards, uow.documentSearches[0].index.primaryShards)
 	assert.Equal(t, 0, uow.documentSearches[0].offset)
 	assert.Equal(t, 20, uow.documentSearches[0].documentCount)
 
@@ -138,11 +132,9 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, 1, offset)
 	assert.Equal(t, 2, len(uow.documentSearches))
 	assert.Equal(t, index.name, uow.documentSearches[0].index.name)
-	assert.Equal(t, index.primaryShards, uow.documentSearches[0].index.primaryShards)
 	assert.Equal(t, 0, uow.documentSearches[0].offset)
 	assert.Equal(t, 20, uow.documentSearches[0].documentCount)
 	assert.Equal(t, index2.name, uow.documentSearches[1].index.name)
-	assert.Equal(t, index2.primaryShards, uow.documentSearches[1].index.primaryShards)
 	assert.Equal(t, 0, uow.documentSearches[1].offset)
 	assert.Equal(t, 1, uow.documentSearches[1].documentCount)
 }

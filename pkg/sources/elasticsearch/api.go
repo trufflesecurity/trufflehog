@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
+	"log"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,8 @@ import (
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
+
+const PAGE_SIZE = 10
 
 type IndexStatus int
 
@@ -42,12 +45,12 @@ type Document struct {
 }
 
 type Index struct {
-	name             string
-	primaryShards    []int
-	documentCount    int
-	latestTimestamp  time.Time
-	latestDocumentID int
-	lock             sync.RWMutex
+	name                   string
+	documentCount          int
+	latestTimestamp        time.Time
+	latestTimestampLastRun time.Time
+	latestDocumentIDs      []string
+	lock                   sync.RWMutex
 }
 
 type Indices struct {
@@ -97,19 +100,37 @@ func (fp *FilterParams) Query(latestTimestamp time.Time) (map[string]any, error)
 }
 
 func NewIndex() *Index {
-	return &Index{latestDocumentID: -1}
+	return &Index{}
 }
 
-func (i *Index) DocumentIDAlreadySeen(docID int) bool {
+func (i *Index) DocumentAlreadySeen(document *Document) bool {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
-	if docID > i.latestDocumentID {
-		i.latestDocumentID = docID
+	parsedTimestamp, err := time.Parse(time.RFC3339, document.timestamp)
+	if err != nil {
 		return false
 	}
 
-	return true
+	if parsedTimestamp.After(i.latestTimestamp) {
+		i.latestTimestamp = parsedTimestamp
+		i.latestDocumentIDs = i.latestDocumentIDs[:0]
+		return false
+	}
+
+	if i.latestTimestamp.Equal(i.latestTimestampLastRun) &&
+		slices.Contains(i.latestDocumentIDs, document.id) {
+		return true
+	}
+
+	i.latestDocumentIDs = append(i.latestDocumentIDs, document.id)
+	return false
+}
+
+func (i *Index) UpdateLatestTimestampLastRun() {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	i.latestTimestampLastRun = i.latestTimestamp
 }
 
 func makeElasticSearchRequest(
@@ -139,24 +160,6 @@ func makeElasticSearchRequest(
 	return data, nil
 }
 
-func getShardListPreference(primaryShards []int) string {
-	if len(primaryShards) == 0 {
-		return ""
-	}
-
-	shardList := &strings.Builder{}
-	shardList.WriteString("_shards:")
-
-	for i, n := range primaryShards {
-		if i > 0 {
-			shardList.WriteString(",")
-		}
-		shardList.WriteString(strconv.Itoa(n))
-	}
-
-	return shardList.String()
-}
-
 func fetchIndexNames(
 	ctx context.Context,
 	client *es.TypedClient,
@@ -180,43 +183,6 @@ func fetchIndexNames(
 	}
 
 	return names, nil
-}
-
-func fetchIndexPrimaryShards(
-	ctx context.Context,
-	client *es.TypedClient,
-	indexNames []string,
-) (map[string][]int, error) {
-	primaryShards := make(map[string][]int)
-
-	req := esapi.SearchShardsRequest{
-		Index: indexNames,
-	}
-
-	data, err := makeElasticSearchRequest(ctx, client, req)
-	if err != nil {
-		return nil, err
-	}
-
-	shardArrays := data["shards"].([]any)
-
-	for _, jsonShardArray := range shardArrays {
-		shardArray := jsonShardArray.([]any)
-		shard := shardArray[0].(map[string]any)
-		shardIndex := shard["index"].(string)
-		isPrimary := shard["primary"].(bool)
-		if !isPrimary {
-			continue
-		}
-		shardNumber := int(shard["shard"].(float64))
-		_, found := primaryShards[shardIndex]
-		if !found {
-			primaryShards[shardIndex] = []int{}
-		}
-		primaryShards[shardIndex] = append(primaryShards[shardIndex], shardNumber)
-	}
-
-	return primaryShards, nil
 }
 
 func fetchIndexDocumentCount(
@@ -270,9 +236,8 @@ func createPITForSearch(
 	docSearch *DocumentSearch,
 ) (string, error) {
 	req := esapi.OpenPointInTimeRequest{
-		Index:      []string{docSearch.index.name},
-		KeepAlive:  "1m",
-		Preference: getShardListPreference(docSearch.index.primaryShards),
+		Index:     []string{docSearch.index.name},
+		KeepAlive: "1m",
 	}
 
 	data, err := makeElasticSearchRequest(ctx, client, req)
@@ -294,7 +259,7 @@ func processSearchedDocuments(
 	ctx context.Context,
 	client *es.TypedClient,
 	docSearch *DocumentSearch,
-	sendDocument func(document *Document) error,
+	processDocument func(document *Document) error,
 ) (int, error) {
 	pitID, err := createPITForSearch(ctx, client, docSearch)
 	if err != nil {
@@ -302,19 +267,16 @@ func processSearchedDocuments(
 	}
 
 	documentsFetched := 0
+	documentsProcessed := 0
+	sort := []int{}
 
-	for documentsFetched < docSearch.documentCount {
+	for documentsProcessed < docSearch.documentCount {
 		searchReqBody := SearchRequestBody{
 			PIT: PointInTime{
 				ID:        pitID,
 				KeepAlive: "1m",
 			},
-			Sort: []string{"_doc"},
-		}
-
-		searchAfter := ((docSearch.offset + documentsFetched) - 1)
-		if searchAfter > -1 {
-			searchReqBody.SearchAfter = []int{searchAfter}
+			Sort: []string{"_shard_doc"},
 		}
 
 		query, err := docSearch.filterParams.Query(docSearch.index.latestTimestamp)
@@ -324,23 +286,27 @@ func processSearchedDocuments(
 
 		searchReqBody.Query = query["query"].(map[string]any)
 
+		if len(sort) > 0 {
+			searchReqBody.SearchAfter = sort
+		}
+
 		body, err := json.MarshalIndent(searchReqBody, "", "  ")
 		if err != nil {
 			return 0, err
 		}
 
 		req := esapi.SearchRequest{
-			Body:           strings.NewReader(string(body)),
-			SourceIncludes: []string{"@timestamp", "message"},
+			Body: strings.NewReader(string(body)),
 		}
 
-		// If we're still in the "skip" phase of scanning, don't actually fetch the
-		// documents.
-		percentFetched :=
-			float64(documentsFetched+10) / float64(docSearch.documentCount)
-		if percentFetched <= docSearch.skipPercent {
-			zero := 0
-			req.Size = &zero
+		// If we've yet to reach our offset, or if we're still in the "skip" phase
+		// of scanning, don't actually fetch any document bodies.
+		skipCount := docSearch.offset + docSearch.skipCount
+		processingDocuments := documentsFetched+PAGE_SIZE > skipCount
+		if processingDocuments {
+			req.SourceIncludes = []string{"@timestamp", "message"}
+		} else {
+			req.SourceExcludes = []string{"*"}
 			req.SearchType = "query_then_fetch"
 		}
 
@@ -363,34 +329,31 @@ func processSearchedDocuments(
 			continue
 		}
 
-		if percentFetched <= docSearch.skipPercent {
-			documentsFetched += 10
-		} else if len(hits) == 0 {
+		if len(hits) == 0 {
 			break
-		} else {
-			documentsFetched += len(hits)
 		}
 
 		for _, jsonHit := range hits {
-			hit, ok := jsonHit.(map[string]any)
+			documentsFetched++
 
+			hit, ok := jsonHit.(map[string]any)
 			if !ok {
 				continue
 			}
 
-			sort, ok := hit["sort"].([]any)
-			if ok {
-				var docID int
+			jsonSort, found := hit["sort"].([]any)
+			if !found {
+				continue
+			}
 
-				if len(sort) == 1 {
-					docID = int(sort[0].(float64))
-				} else {
-					docID = int(sort[1].(float64))
-				}
+			sort = sort[:0]
+			for _, elem := range jsonSort {
+				sort = append(sort, int(elem.(float64)))
+			}
 
-				if docSearch.index.DocumentIDAlreadySeen(docID) {
-					continue
-				}
+			log.Printf("(%d/%d) Got a hit\n", documentsProcessed, documentsFetched)
+			if documentsFetched <= skipCount {
+				continue
 			}
 
 			id, ok := hit["_id"].(string)
@@ -418,13 +381,16 @@ func processSearchedDocuments(
 				timestamp: timestamp,
 				message:   message,
 			}
-			if err = sendDocument(&document); err != nil {
+
+			if err = processDocument(&document); err != nil {
 				return 0, nil
 			}
+
+			documentsProcessed++
 		}
 	}
 
-	return documentsFetched, nil
+	return documentsProcessed, nil
 }
 
 // Returns the number of documents processed within these indices
@@ -475,22 +441,16 @@ func (indices *Indices) Update(
 		}
 	}
 
-	indexPrimaryShards, err := fetchIndexPrimaryShards(ctx, client, indexNames)
-	if err != nil {
-		return err
-	}
-
-	for name, primaryShards := range indexPrimaryShards {
+	for _, indexName := range indexNames {
 		// This can't be an index we don't know about because we passed indexNames
-		index := newIndicesByName[name]
-		index.primaryShards = primaryShards
+		index := newIndicesByName[indexName]
 
 		query, err := indices.filterParams.Query(index.latestTimestamp)
 		if err != nil {
 			return err
 		}
 
-		documentCount, err := fetchIndexDocumentCount(ctx, client, name, query)
+		documentCount, err := fetchIndexDocumentCount(ctx, client, indexName, query)
 		if err != nil {
 			return err
 		}

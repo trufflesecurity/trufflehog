@@ -2,7 +2,6 @@ package elasticsearch
 
 import (
 	"fmt"
-	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/go-errors/errors"
@@ -170,11 +169,8 @@ func (s *Source) Chunks(
 						client,
 						&docSearch,
 						func(document *Document) error {
-							parsedTimestamp, err := time.Parse(time.RFC3339, document.timestamp)
-							if err == nil {
-								if parsedTimestamp.After(docSearch.index.latestTimestamp) {
-									docSearch.index.latestTimestamp = parsedTimestamp
-								}
+							if docSearch.index.DocumentAlreadySeen(document) {
+								return nil
 							}
 
 							chunk := sources.Chunk{
@@ -203,6 +199,13 @@ func (s *Source) Chunks(
 						return err
 					}
 
+					fmt.Printf(
+						"[Worker %d] Scanned %d documents from index %s\n",
+						uowIndex,
+						documentsProcessed,
+						docSearch.index.name,
+					)
+
 					s.log.V(2).Info(fmt.Sprintf(
 						"[Worker %d] Scanned %d documents from index %s",
 						uowIndex,
@@ -210,12 +213,14 @@ func (s *Source) Chunks(
 						docSearch.index.name,
 					))
 
-					// [TODO] Warn if documentsProcessed != docSearch.documentCount
-					s.log.V(1).Info(fmt.Sprintf(
-						"documentsProcessed != docSearch.documentCount (%d != %d)",
-						documentsProcessed,
-						docSearch.documentCount,
-					))
+					if documentsProcessed != docSearch.documentCount-docSearch.skipCount {
+						s.log.V(1).Info(fmt.Sprintf(
+							"documentsProcessed != docSearch.documentCount = docSearch.skipCount (%d != %d)",
+							documentsProcessed,
+							docSearch.documentCount-docSearch.skipCount,
+						))
+					}
+
 					uowDocumentsProcessed += documentsProcessed
 					indices.UpdateProcessedDocumentCount(documentsProcessed)
 					s.SetProgressComplete(
@@ -230,18 +235,21 @@ func (s *Source) Chunks(
 						"",
 					)
 
-					// When we use the Elastic API in this way, we can't tell it to only
-					// return a specific number of documents. We can only say "return a
-					// page of documents after this offset". So we might have reached the
-					// limit of how many documents we're supposed to process with this
-					// worker in the middle of a page, so check for that here.
+					// When we use the Elastic API in this way, we can't tell
+					// it to only return a specific number of documents. We can
+					// only say "return a page of documents after this offset".
+					// So we might have reached the limit of how many documents
+					// we're supposed to process with this worker in the middle
+					// of a page, so check for that here.
 					//
-					// (We could use the API in a different way to get a precise number
-					// of documents back, but that use is limited to 10000 documents
-					// which we could well exceed)
+					// (We could use the API in a different way to get a
+					// precise number of documents back, but that use is
+					// limited to 10000 documents which we could well exceed)
 					if uowDocumentsProcessed >= uow.documentCount {
 						break
 					}
+
+					docSearch.index.UpdateLatestTimestampLastRun()
 				}
 
 				return nil

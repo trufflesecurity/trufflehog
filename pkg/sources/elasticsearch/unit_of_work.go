@@ -6,8 +6,8 @@ type DocumentSearch struct {
 	index         *Index
 	offset        int
 	documentCount int
+	skipCount     int
 	filterParams  *FilterParams
-	skipPercent   float64
 }
 
 type UnitOfWork struct {
@@ -45,8 +45,8 @@ func (uow *UnitOfWork) AddSearch(
 			index:         index,
 			offset:        offset,
 			documentCount: addedDocumentCount,
+			skipCount:     int(float64(addedDocumentCount) * (1.0 - scanCoverageRate)),
 			filterParams:  filterParams,
-			skipPercent:   1.0 - scanCoverageRate,
 		})
 
 		uow.documentCount += addedDocumentCount
