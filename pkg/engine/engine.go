@@ -78,6 +78,9 @@ type Engine struct {
 	logFilteredUnverified   bool
 	verificationOverlap     bool
 	printAvgDetectorTime    bool
+	// By default, the engine will only scan a subset of the chunk if a detector matches the chunk.
+	// If this flag is set to true, the engine will scan the entire chunk.
+	scanEntireChunk bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *ahocorasick.AhoCorasickCore
@@ -256,6 +259,11 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 	return out
 }
 
+// WithEntireChunkScan sets the flag to configure AhoCorasickCore to scan entire chunks.
+func WithEntireChunkScan(enabled bool) Option {
+	return func(e *Engine) { e.scanEntireChunk = enabled }
+}
+
 // HasFoundResults returns true if any results are found.
 func (e *Engine) HasFoundResults() bool {
 	return atomic.LoadUint32(&e.numFoundResults) > 0
@@ -399,8 +407,14 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	}
 	ctx.Logger().V(4).Info("engine initialized")
 
+	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
+	var ahoCOptions []ahocorasick.AhoCorasickCoreOption
+	if e.scanEntireChunk {
+		ahoCOptions = append(ahoCOptions, ahocorasick.WithSpanCalculator(new(ahocorasick.EntireChunkSpanCalculator)))
+	}
+
 	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors)
+	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil

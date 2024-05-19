@@ -26,6 +26,61 @@ type DetectorKey struct {
 // Type returns the detector type of the key.
 func (k DetectorKey) Type() detectorspb.DetectorType { return k.detectorType }
 
+// spanCalculator is an interface that defines a method for calculating the end index
+// of a match span in the chunk data. This allows for different strategies to be used
+// without changing the core logic.
+type spanCalculator interface {
+	calculateEndIdx(startIdx int64, chunkData string, detector detectors.Detector) int64
+}
+
+// EntireChunkSpanCalculator is a strategy that calculates the end index to use the entire chunk data.
+// This is used when we want to match against the full length of the provided chunk.
+type EntireChunkSpanCalculator struct{}
+
+// CalculateEndIdx returns the end index as the length of the chunk data,
+// effectively using the entire chunk for matching.
+func (e *EntireChunkSpanCalculator) calculateEndIdx(_ int64, chunkData string, _ detectors.Detector) int64 {
+	return int64(len(chunkData))
+}
+
+// maxMatchLengthSpanCalculator is a strategy that calculates the end index based on a default max
+// match length or values provided by detectors.
+// This allows for more granular control over the match span.
+type maxMatchLengthSpanCalculator struct{ maxMatchLength int64 }
+
+// newMaxMatchLengthSpanCalculator creates a new instance of maxMatchLengthSpanCalculator with the
+// specified max match length.
+func newMaxMatchLengthSpanCalculator(maxMatchLength int64) *maxMatchLengthSpanCalculator {
+	return &maxMatchLengthSpanCalculator{maxMatchLength: maxMatchLength}
+}
+
+// CalculateEndIdx computes the end index based on the start index and the max match length.
+// If the detector provides an override value, it uses that instead of the default max match length.
+func (m *maxMatchLengthSpanCalculator) calculateEndIdx(startIdx int64, chunkData string, detector detectors.Detector) int64 {
+	maxSize := m.maxMatchLength
+
+	switch d := detector.(type) {
+	case detectors.MultiPartCredentialProvider:
+		maxSize = d.MaxCredentialSpan()
+	case detectors.MaxSecretSizeProvider:
+		maxSize = d.MaxSecretSize()
+	default: // Use the default max match length
+	}
+	endIdx := startIdx + maxSize
+	if endIdx > int64(len(chunkData)) {
+		endIdx = int64(len(chunkData))
+	}
+	return endIdx
+}
+
+// AhoCorasickCoreOption is a functional option type for configuring an AhoCorasickCore instance.
+type AhoCorasickCoreOption func(*AhoCorasickCore)
+
+// WithSpanCalculator sets the span calculator for AhoCorasickCore.
+func WithSpanCalculator(spanCalculator spanCalculator) AhoCorasickCoreOption {
+	return func(ac *AhoCorasickCore) { ac.spanCalculator = spanCalculator }
+}
+
 // AhoCorasickCore encapsulates the operations and data structures used for keyword matching via the
 // Aho-Corasick algorithm. It is responsible for constructing and managing the trie for efficient
 // substring searches, as well as mapping keywords to their associated detectors for rapid lookups.
@@ -40,12 +95,13 @@ type AhoCorasickCore struct {
 	// some consuming code a little cleaner.)
 	keywordsToDetectors map[string][]DetectorKey
 	detectorsByKey      map[DetectorKey]detectors.Detector
+	spanCalculator      spanCalculator // Strategy for calculating match spans
 }
 
 // NewAhoCorasickCore allocates and initializes a new instance of AhoCorasickCore. It uses the
 // provided detector slice to create a map from keywords to detectors and build the Aho-Corasick
 // prefilter trie.
-func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
+func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...AhoCorasickCoreOption) *AhoCorasickCore {
 	keywordsToDetectors := make(map[string][]DetectorKey)
 	detectorsByKey := make(map[DetectorKey]detectors.Detector, len(allDetectors))
 	var keywords []string
@@ -59,11 +115,19 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 		}
 	}
 
-	return &AhoCorasickCore{
+	const maxMatchLength int64 = 512
+	ac := &AhoCorasickCore{
 		keywordsToDetectors: keywordsToDetectors,
 		detectorsByKey:      detectorsByKey,
 		prefilter:           *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
+		spanCalculator:      newMaxMatchLengthSpanCalculator(maxMatchLength), // Default span calculator
 	}
+
+	for _, opt := range opts {
+		opt(ac)
+	}
+
+	return ac
 }
 
 // DetectorMatch represents a detected pattern's metadata in a data chunk.
@@ -92,15 +156,12 @@ func (d *DetectorMatch) Matches(chunkData []byte) [][]byte {
 	return matches
 }
 
-const maxMatchLength int64 = 512
-
 // FindDetectorMatches finds the matching detectors for a given chunk of data using the Aho-Corasick algorithm.
 // It returns a slice of DetectorMatch instances, each containing the detector key, detector,
 // and a slice of matches.
 // Each matchSpan represents a position in the chunk data where a keyword was found,
 // along with a corresponding end position.
-// The end position is determined based on the detector's MaxSecretSize if it implements the
-// MaxSecretSizeProvider interface, or falls back to the default maxMatchLength.
+// The end position is determined based on the configured spanCalculator strategy.
 // Adjacent or overlapping matches are merged to avoid duplicating or overlapping the matched
 // portions of the chunk data.
 func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch {
@@ -127,21 +188,11 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 
 			detectorMatch := detectorMatches[k]
 			startIdx := m.Pos()
-			maxSize := maxMatchLength
-
-			switch detector := detectorMatch.Detector.(type) {
-			case detectors.MultiPartCredentialProvider:
-				maxSize = detector.MaxCredentialSpan()
-			case detectors.MaxSecretSizeProvider:
-				maxSize = detector.MaxSecretSize()
-			default: // Use default maxMatchLength
-			}
-
-			endIdx := startIdx + maxSize
-			if endIdx > int64(len(chunkData)) {
-				endIdx = int64(len(chunkData))
-			}
-			detectorMatch.matchSpans = append(detectorMatch.matchSpans, matchSpan{startOffset: startIdx, endOffset: endIdx})
+			endIdx := ac.spanCalculator.calculateEndIdx(startIdx, chunkData, detectorMatch.Detector)
+			detectorMatch.matchSpans = append(
+				detectorMatch.matchSpans,
+				matchSpan{startOffset: startIdx, endOffset: endIdx},
+			)
 		}
 	}
 
