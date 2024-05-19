@@ -26,6 +26,7 @@ import (
 type scanner struct {
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // resourceTypes derived from: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
@@ -102,6 +103,7 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 
 // Ensure the scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*scanner)(nil)
+var _ detectors.MultiPartCredentialProvider = (*scanner)(nil)
 
 var (
 	defaultVerificationClient = common.SaneHttpClient()

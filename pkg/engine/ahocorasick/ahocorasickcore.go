@@ -99,7 +99,7 @@ const maxMatchLength int64 = 512
 // and a slice of matches.
 // Each matchSpan represents a position in the chunk data where a keyword was found,
 // along with a corresponding end position.
-// The end position is determined based on the detector's ProvideMaxSecretSize if it implements the
+// The end position is determined based on the detector's MaxSecretSize if it implements the
 // MaxSecretSizeProvider interface, or falls back to the default maxMatchLength.
 // Adjacent or overlapping matches are merged to avoid duplicating or overlapping the matched
 // portions of the chunk data.
@@ -128,8 +128,13 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 			detectorMatch := detectorMatches[k]
 			startIdx := m.Pos()
 			maxSize := maxMatchLength
-			if sizeProvider, ok := detectorMatch.Detector.(detectors.MaxSecretSizeProvider); ok {
-				maxSize = sizeProvider.ProvideMaxSecretSize()
+
+			switch detector := detectorMatch.Detector.(type) {
+			case detectors.MultiPartCredentialProvider:
+				maxSize = detector.MaxCredentialSpan()
+			case detectors.MaxSecretSizeProvider:
+				maxSize = detector.MaxSecretSize()
+			default: // Use default maxMatchLength
 			}
 
 			endIdx := startIdx + maxSize

@@ -49,7 +49,7 @@ func (s Scanner) Keywords() []string {
 const maxGCPADCKeySize = 1024
 
 // ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
-func (s Scanner) ProvideMaxSecretSize() int64 { return maxGCPADCKeySize }
+func (s Scanner) MaxSecretSize() int64 { return maxGCPADCKeySize }
 
 // FromData will find and optionally verify Gcpapplicationdefaultcredentials secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {

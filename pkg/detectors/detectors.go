@@ -35,7 +35,16 @@ type Versioner interface {
 // MaxSecretSizeProvider is an optional interface that a detector can implement to
 // provide a custom max size for the secret it finds.
 type MaxSecretSizeProvider interface {
-	ProvideMaxSecretSize() int64
+	MaxSecretSize() int64
+}
+
+// MultiPartCredentialProvider is an optional interface that a detector can implement
+// to indicate its compatibility with multi-part credentials and provide the maximum
+// secret size for the credential it finds.
+type MultiPartCredentialProvider interface {
+	// MaxCredentialSpan returns the maximum span or range of characters that the
+	// detector should consider when searching for a multi-part credential.
+	MaxCredentialSpan() int64
 }
 
 // EndpointCustomizer is an optional interface that a detector can implement to
