@@ -814,14 +814,12 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	defer common.Recover(ctx)
 	defer cancel()
 
-	// To reduce the overhead of regex calls in the detector, we limit the amount of data passed to each detector.
-	// The Matches method of the DetectorMatch struct is used to extract the relevant portions of the chunk data
-	// based on the start and end positions of each match. The end position is determined by taking the minimum
-	// of the keyword position + maxMatchLength and the length of the chunk data.
-	// This optimization is based on the assumption that most secrets shouldn't exceed maxMatchLength (300)
-	// characters in length from the keyword's position.
-	// The value of maxMatchLength is a constant and can be adjusted based on further analysis and requirements.
-	matchedBytes := data.detector.Matches(data.chunk.Data)
+	// To reduce the overhead of regex calls in the detector,
+	// we limit the amount of data passed to each detector.
+	// The matches field of the DetectorMatch struct contains the
+	// relevant portions of the chunk data that were matched.
+	// This avoids the need for additional regex processing on the entire chunk data.
+	matchedBytes := data.detector.Matches()
 	for _, match := range matchedBytes {
 		results, err := data.detector.FromData(ctx, data.chunk.Verify, match)
 		if err != nil {

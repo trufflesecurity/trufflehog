@@ -132,11 +132,14 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...AhoCorasickCo
 
 // DetectorMatch represents a detected pattern's metadata in a data chunk.
 // It encapsulates the key identifying a specific detector, the detector instance itself,
-// and the start and end offsets of the matched keyword in the chunk.
+// the start and end offsets of the matched keyword in the chunk, and the matched portions of the chunk data.
 type DetectorMatch struct {
 	Key DetectorKey
 	detectors.Detector
 	matchSpans []matchSpan
+
+	// matches is a slice of byte slices, each representing a matched portion of the chunk data.
+	matches [][]byte
 }
 
 // MatchSpan represents a single occurrence of a matched keyword in the chunk.
@@ -147,23 +150,17 @@ type matchSpan struct {
 }
 
 // Matches returns a slice of byte slices, each representing a matched portion of the chunk data.
-func (d *DetectorMatch) Matches(chunkData []byte) [][]byte {
-	matches := make([][]byte, len(d.matchSpans))
-	for i, m := range d.matchSpans {
-		end := min(m.endOffset, int64(len(chunkData)))
-		matches[i] = chunkData[m.startOffset:end]
-	}
-	return matches
-}
+func (d *DetectorMatch) Matches() [][]byte { return d.matches }
 
 // FindDetectorMatches finds the matching detectors for a given chunk of data using the Aho-Corasick algorithm.
 // It returns a slice of DetectorMatch instances, each containing the detector key, detector,
-// and a slice of matches.
+// a slice of matchSpans, and the corresponding matched portions of the chunk data.
 // Each matchSpan represents a position in the chunk data where a keyword was found,
 // along with a corresponding end position.
 // The end position is determined based on the configured spanCalculator strategy.
 // Adjacent or overlapping matches are merged to avoid duplicating or overlapping the matched
 // portions of the chunk data.
+// The matches field contains the actual byte slices of the matched portions from the chunk data.
 func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch {
 	matches := ac.prefilter.MatchString(strings.ToLower(chunkData))
 
@@ -198,7 +195,14 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 
 	uniqueDetectors := make([]DetectorMatch, 0, len(detectorMatches))
 	for _, detectorMatch := range detectorMatches {
+		// Merge overlapping or adjacent match spans.
 		detectorMatch.matchSpans = mergeMatches(detectorMatch.matchSpans)
+		detectorMatch.matches = make([][]byte, len(detectorMatch.matchSpans))
+		for i, m := range detectorMatch.matchSpans {
+			// Extract the matched portion from the chunk data and store it.
+			detectorMatch.matches[i] = []byte(chunkData[m.startOffset:m.endOffset])
+		}
+
 		uniqueDetectors = append(uniqueDetectors, *detectorMatch)
 	}
 
