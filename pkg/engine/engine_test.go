@@ -683,7 +683,7 @@ func BenchmarkPopulateMatchingDetectors(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				ac.FindDetectorMatches(chunk) // Match against the single chunk
+				ac.FindDetectorMatches([]byte(chunk)) // Match against the single chunk
 			}
 		})
 	}
