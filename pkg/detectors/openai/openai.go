@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strconv"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -20,7 +21,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 // The magic string T3BlbkFJ is the base64-encoded string: OpenAI
-var keyPat = regexp.MustCompile(`\b(sk-[[:alnum:]]{20}T3BlbkFJ[[:alnum:]]{20})\b`)
+var keyPat = regexp.MustCompile(`\b(sk-[a-zA-Z0-9-]{0,50}[[:alnum:]]{20}T3BlbkFJ[[:alnum:]]{20})\b`)
 
 // TODO: Add secret context?? Information about access, ownership etc
 type orgResponse struct {
