@@ -88,7 +88,7 @@ func TestAhoCorasickCore_MultipleCustomDetectorsMatchable(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	dts := ac.FindDetectorMatches("a")
+	dts := ac.FindDetectorMatches([]byte("a"))
 	matchingDetectors := make([]detectors.Detector, 0, 2)
 	for _, d := range dts {
 		matchingDetectors = append(matchingDetectors, d.Detector)
@@ -103,7 +103,7 @@ func TestAhoCorasickCore_MultipleDetectorVersionsMatchable(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	dts := ac.FindDetectorMatches("a")
+	dts := ac.FindDetectorMatches([]byte("a"))
 	matchingDetectors := make([]detectors.Detector, 0, 2)
 	for _, d := range dts {
 		matchingDetectors = append(matchingDetectors, d.Detector)
@@ -117,7 +117,7 @@ func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
 
 	ac := NewAhoCorasickCore(allDetectors)
 
-	dts := ac.FindDetectorMatches("a a b b")
+	dts := ac.FindDetectorMatches([]byte("a a b b"))
 	matchingDetectors := make([]detectors.Detector, 0, 2)
 	for _, d := range dts {
 		matchingDetectors = append(matchingDetectors, d.Detector)
@@ -191,7 +191,7 @@ func TestFindDetectorMatches(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ac := NewAhoCorasickCore(tc.detectors)
-			detectorMatches := ac.FindDetectorMatches(tc.sampleData)
+			detectorMatches := ac.FindDetectorMatches([]byte(tc.sampleData))
 
 			// Verify that all matching detectors and their matches are returned.
 			for _, detectorMatch := range detectorMatches {

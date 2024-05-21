@@ -631,7 +631,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				continue
 			}
 
-			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(string(decoded.Chunk.Data))
+			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{

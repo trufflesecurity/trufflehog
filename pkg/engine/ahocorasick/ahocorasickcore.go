@@ -1,6 +1,7 @@
 package ahocorasick
 
 import (
+	"bytes"
 	"strings"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
@@ -30,7 +31,7 @@ func (k DetectorKey) Type() detectorspb.DetectorType { return k.detectorType }
 // of a match span in the chunk data. This allows for different strategies to be used
 // without changing the core logic.
 type spanCalculator interface {
-	calculateEndIdx(startIdx int64, chunkData string, detector detectors.Detector) int64
+	calculateEndIdx(startIdx int64, chunkData []byte, detector detectors.Detector) int64
 }
 
 // EntireChunkSpanCalculator is a strategy that calculates the end index to use the entire chunk data.
@@ -39,7 +40,7 @@ type EntireChunkSpanCalculator struct{}
 
 // CalculateEndIdx returns the end index as the length of the chunk data,
 // effectively using the entire chunk for matching.
-func (e *EntireChunkSpanCalculator) calculateEndIdx(_ int64, chunkData string, _ detectors.Detector) int64 {
+func (e *EntireChunkSpanCalculator) calculateEndIdx(_ int64, chunkData []byte, _ detectors.Detector) int64 {
 	return int64(len(chunkData))
 }
 
@@ -56,7 +57,7 @@ func newMaxMatchLengthSpanCalculator(maxMatchLength int64) *maxMatchLengthSpanCa
 
 // CalculateEndIdx computes the end index based on the start index and the max match length.
 // If the detector provides an override value, it uses that instead of the default max match length.
-func (m *maxMatchLengthSpanCalculator) calculateEndIdx(startIdx int64, chunkData string, detector detectors.Detector) int64 {
+func (m *maxMatchLengthSpanCalculator) calculateEndIdx(startIdx int64, chunkData []byte, detector detectors.Detector) int64 {
 	maxSize := m.maxMatchLength
 
 	switch d := detector.(type) {
@@ -155,17 +156,18 @@ func (d *DetectorMatch) Matches() [][]byte { return d.matches }
 // FindDetectorMatches finds the matching detectors for a given chunk of data using the Aho-Corasick algorithm.
 // It returns a slice of DetectorMatch instances, each containing the detector key, detector,
 // a slice of matchSpans, and the corresponding matched portions of the chunk data.
+//
 // Each matchSpan represents a position in the chunk data where a keyword was found,
 // along with a corresponding end position.
 // The end position is determined based on the configured spanCalculator strategy.
 // Adjacent or overlapping matches are merged to avoid duplicating or overlapping the matched
 // portions of the chunk data.
+//
 // The matches field contains the actual byte slices of the matched portions from the chunk data.
-func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch {
-	matches := ac.prefilter.MatchString(strings.ToLower(chunkData))
+func (ac *AhoCorasickCore) FindDetectorMatches(chunkData []byte) []DetectorMatch {
+	matches := ac.prefilter.Match(bytes.ToLower(chunkData))
 
 	matchCount := len(matches)
-
 	if matchCount == 0 {
 		return nil
 	}
@@ -200,7 +202,7 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData string) []DetectorMatch
 		detectorMatch.matches = make([][]byte, len(detectorMatch.matchSpans))
 		for i, m := range detectorMatch.matchSpans {
 			// Extract the matched portion from the chunk data and store it.
-			detectorMatch.matches[i] = []byte(chunkData[m.startOffset:m.endOffset])
+			detectorMatch.matches[i] = chunkData[m.startOffset:m.endOffset]
 		}
 
 		uniqueDetectors = append(uniqueDetectors, *detectorMatch)
