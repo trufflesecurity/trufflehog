@@ -82,7 +82,7 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init returns an initialized Gitlab source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceID = sourceId
 	s.jobID = jobId
@@ -102,6 +102,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 	s.repos = conn.Repositories
 	s.ignoreRepos = conn.IgnoreRepos
+	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
 
 	switch cred := conn.GetCredential().(type) {
 	case *sourcespb.GitLab_Token:
