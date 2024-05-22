@@ -311,6 +311,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphhopper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groovehq"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gtmetrix"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/guardianapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gumroad"
@@ -1604,6 +1605,7 @@ func DefaultDetectors() []detectors.Detector {
 		wiz.Scanner{},
 		onfleet.Scanner{},
 		intra42.Scanner{},
+		groq.Scanner{},
 	}
 }
 
