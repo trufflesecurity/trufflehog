@@ -26,7 +26,7 @@ var (
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"groq"}
+	return []string{"gsk_"}
 }
 
 // FromData will find and optionally verify Groq secrets in a given set of bytes.
