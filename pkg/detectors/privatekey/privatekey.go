@@ -154,7 +154,7 @@ type result struct {
 }
 
 func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
 	if err != nil {
 		return nil, err
 	}

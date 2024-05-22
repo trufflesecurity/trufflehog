@@ -87,7 +87,7 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 }
 
 func constructRequest(secret, keyID string) (*http.Request, error) {
-	req, err := http.NewRequest("POST", baseURL+accountDetail, &bytes.Buffer{})
+	req, err := http.NewRequestWithContext(ctx, "POST", baseURL+accountDetail, &bytes.Buffer{})
 	if err != nil {
 		return nil, err
 	}

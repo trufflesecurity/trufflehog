@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, err := http.NewRequest("GET", fmt.Sprintf("https://api.diffbot.com/v4/account?token=%s", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.diffbot.com/v4/account?token=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
