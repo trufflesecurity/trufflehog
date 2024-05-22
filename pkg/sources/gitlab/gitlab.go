@@ -419,12 +419,11 @@ func (s *Source) getAllProjectRepos(
 			}
 			// Skip projects configured to be ignored.
 			if ignoreRepo(proj.PathWithNamespace) {
-				ctx.Logger().V(3).Info("skipping project", "reason", "ignore glob")
+				ctx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
 				continue
 			}
 			// Record that we've seen this project.
 			uniqueProjects[proj.ID] = proj
-			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
 			// Report an error if we could not convert the project into a URL.
 			if _, err := url.Parse(proj.HTTPURLToRepo); err != nil {
 				ctx.Logger().V(3).Info("skipping project",
@@ -441,6 +440,7 @@ func (s *Source) getAllProjectRepos(
 			// Report the unit.
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
+			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
