@@ -409,12 +409,17 @@ func (s *Source) getAllProjectRepos(
 	// Used to filter out duplicate projects.
 	processProjects := func(projList []*gitlab.Project) error {
 		for _, proj := range projList {
+			ctx := context.WithValues(ctx,
+				"project_id", proj.ID,
+				"project_name", proj.NameWithNamespace)
 			// Skip projects we've already seen.
 			if _, exists := uniqueProjects[proj.ID]; exists {
+				ctx.Logger().V(3).Info("skipping project", "reason", "ID already seen")
 				continue
 			}
 			// Skip projects configured to be ignored.
 			if ignoreRepo(proj.PathWithNamespace) {
+				ctx.Logger().V(3).Info("skipping project", "reason", "ignore glob")
 				continue
 			}
 			// Record that we've seen this project.
@@ -422,6 +427,11 @@ func (s *Source) getAllProjectRepos(
 			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
 			// Report an error if we could not convert the project into a URL.
 			if _, err := url.Parse(proj.HTTPURLToRepo); err != nil {
+				ctx.Logger().V(3).Info("skipping project",
+					"reason", "URL parse failure",
+					"url", proj.HTTPURLToRepo,
+					"parse_error", err)
+
 				err = fmt.Errorf("could not parse url %q given by project: %w", proj.HTTPURLToRepo, err)
 				if err := reporter.UnitErr(ctx, err); err != nil {
 					return err
