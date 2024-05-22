@@ -90,7 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
+				data, err := lookupFingerprint(ctx, fingerprint, s.IncludeExpired)
 				if err == nil {
 					if data != nil {
 						extraData.Add("certificate_urls", strings.Join(data.CertificateURLs, ", "))
@@ -153,7 +153,7 @@ type result struct {
 	GitHubUsername  string
 }
 
-func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
+func lookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
 	if err != nil {
 		return nil, err
