@@ -68,7 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					payload := strings.NewReader(fmt.Sprintf(`grant_type=client_credentials&client_id=%s&client_secret=%s`, resIdMatch, resMatch))
-					req, err := http.NewRequest("POST", fmt.Sprintf("https://%s.caspio.com/oauth/token", resDomainMatch), payload)
+					req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://%s.caspio.com/oauth/token", resDomainMatch), payload)
 					if err != nil {
 						continue
 					}
