@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequest("GET", "https://dashboard.chatfuel.com/api/bots", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://dashboard.chatfuel.com/api/bots", nil)
 			if err != nil {
 				continue
 			}

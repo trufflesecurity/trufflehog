@@ -77,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				h := hmac.New(sha256.New, key)
 				h.Write([]byte(stringToSign))
 				signature := base64.StdEncoding.EncodeToString(h.Sum(nil))
-				req, err := http.NewRequest("GET", url, nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
 				}

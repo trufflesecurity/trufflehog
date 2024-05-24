@@ -84,7 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyAeroworkflow(ctx context.Context, client *http.Client, resMatch, resIdMatch string) (bool, error) {
-	req, err := http.NewRequest(http.MethodGet, aeroworkflowURL+"/api/"+resIdMatch+"/v1/AeroAppointments", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aeroworkflowURL+"/api/"+resIdMatch+"/v1/AeroAppointments", nil)
 	if err != nil {
 		return false, err
 	}
