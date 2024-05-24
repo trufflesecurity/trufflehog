@@ -85,6 +85,7 @@ func TestAddReposByOrg(t *testing.T) {
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -94,27 +95,28 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
-		JSON([]map[string]string{
-			{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "secret/super-secret-repo"},
-			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
-			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/not-super-secret-repo"},
-		})
+		JSON(`[
+			{"full_name": "super-secret-org/super-secret-repo", "clone_url": "https://github.com/super-secret-org/super-secret-repo.git", "size": 1},
+			{"full_name": "super-secret-org/super-secret-repo2", "clone_url": "https://github.com/super-secret-org/super-secret-repo2.git", "size": 1},
+			{"full_name": "super-secret-org/not-super-secret-repo", "clone_url": "https://github.com/super-secret-org/not-super-secret-repo.git", "size": 1}
+		]`)
 
 	s := initTestSource(&sourcespb.GitHub{
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		Repositories:  []string{"secret/super*"},
+		IncludeRepos:  []string{"super-secret-org/super*"},
 		Organizations: []string{"super-secret-org"},
 	})
 	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.getReposByOrg(context.Background(), "super-secret-org")
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("secret/super-secret-repo")
+	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
 	assert.True(t, ok)
-	ok = s.filteredRepoCache.Exists("secret/super-secret-repo2")
+	ok = s.filteredRepoCache.Exists("super-secret-org/super-secret-repo2")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -125,21 +127,22 @@ func TestAddReposByUser(t *testing.T) {
 		Get("/users/super-secret-user/repos").
 		Reply(200).
 		JSON([]map[string]string{
-			{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"},
-			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
+			{"full_name": "super-secret-user/super-secret-repo", "clone_url": "https://github.com/super-secret-user/super-secret-repo.git"},
+			{"full_name": "super-secret-user/super-secret-repo2", "clone_url": "https://github.com/super-secret-user/super-secret-repo2.git"},
 		})
 
 	s := initTestSource(&sourcespb.GitHub{
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IgnoreRepos: []string{"secret/super-secret-repo2"},
+		IgnoreRepos: []string{"super-secret-user/super-secret-repo2"},
 	})
 	err := s.getReposByUser(context.Background(), "super-secret-user")
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-repo")
+	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -149,14 +152,15 @@ func TestAddGistsByUser(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://githug.com/super-secret-gist.git", "id": "super-secret-gist"}})
+		JSON([]map[string]string{{"id": "aa5a315d61ae9438b18d", "git_pull_url": "https://gist.github.com/aa5a315d61ae9438b18d.git"}})
 
 	s := initTestSource(nil)
 	err := s.addUserGistsToCache(context.Background(), "super-secret-user")
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-gist")
+	ok := s.filteredRepoCache.Exists("aa5a315d61ae9438b18d")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -179,6 +183,7 @@ func TestAddMembersByOrg(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = s.memberCache["testman2"]
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -210,6 +215,7 @@ func TestAddMembersByApp(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = s.memberCache["ssm3"]
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -234,6 +240,7 @@ func TestAddReposByApp(t *testing.T) {
 	assert.True(t, ok)
 	ok = s.filteredRepoCache.Exists("ssr2")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -254,6 +261,7 @@ func TestAddOrgsByUser(t *testing.T) {
 	assert.Equal(t, 1, s.orgsCache.Count())
 	ok := s.orgsCache.Exists("sso2")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -369,15 +377,16 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 	gock.New(apiEndpoint).
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
+		JSON([]map[string]string{{"full_name": "super-secret-org/super-secret-repo", "clone_url": "https://github.com/super-secret-org/super-secret-repo.git"}})
 
 	s := initTestSource(nil)
 	s.orgsCache = memory.New()
 	s.orgsCache.Set("super-secret-org", "super-secret-org")
 	s.enumerateUnauthenticated(context.Background(), apiEndpoint)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-repo")
+	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -392,7 +401,7 @@ func TestEnumerateWithToken(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "full_name": "super-secret-user/super-secret-repo"}})
 
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
@@ -403,16 +412,17 @@ func TestEnumerateWithToken(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git", "id": "super-secret-gist"}})
+		JSON([]map[string]string{{"id": "super-secret-gist", "git_pull_url": "https://gist.github.com/super-secret-gist.git"}})
 
 	s := initTestSource(nil)
 	err := s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-repo")
+	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
 	assert.True(t, ok)
 	ok = s.filteredRepoCache.Exists("super-secret-gist")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -525,6 +535,7 @@ func TestEnumerate(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = s.repoInfoCache.get("https://gist.github.com/2801a2b0523099d0614a951579d99ba9.git")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -598,6 +609,7 @@ func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"some-special-repo"}, s.repos)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -644,7 +656,7 @@ func TestEnumerateWithApp(t *testing.T) {
 	)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(s.repos))
-
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -750,7 +762,7 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 		},
 		{
 			name:         "one valid repo",
-			repos:        []string{"a"},
+			repos:        []string{"https://github.com/super-secret-user/super-secret-repo.git"},
 			wantComplete: true,
 			wantErr:      true,
 		},
