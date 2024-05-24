@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
@@ -241,14 +242,16 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(DefaultDetectors()...),
-		WithVerify(false),
-		WithPrinter(new(discardPrinter)),
-	)
-	assert.Nil(t, err)
+	conf := Config{
+		Concurrency: 1,
+		Decoders:    decoders.DefaultDecoders(),
+		Detectors:   DefaultDetectors(),
+		Verify:      false,
+		Dispatcher:  NewPrinterNotifier(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
@@ -275,13 +278,15 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	_, err = tmpFile.WriteString(fmt.Sprintf("test data using keyword %s", fakeDetectorKeyword))
 	assert.NoError(t, err)
 
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(&fakeDetectorV1{}, &fakeDetectorV2{}),
-		WithVerify(true),
-		WithPrinter(new(discardPrinter)),
-	)
+	conf := Config{
+		Concurrency: 1,
+		Decoders:    decoders.DefaultDecoders(),
+		Detectors:   []detectors.Detector{new(fakeDetectorV1), new(fakeDetectorV2)},
+		Verify:      true,
+		Dispatcher:  NewPrinterNotifier(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
 	assert.NoError(t, err)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
@@ -331,14 +336,17 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(allDetectors...),
-		WithVerify(true),
-		WithPrinter(new(discardPrinter)),
-	)
-	assert.Nil(t, err)
+
+	conf := Config{
+		Concurrency: 1,
+		Decoders:    decoders.DefaultDecoders(),
+		Detectors:   allDetectors,
+		Verify:      true,
+		Dispatcher:  NewPrinterNotifier(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
@@ -365,15 +373,18 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	conf, err := config.Read(confPath)
 	assert.Nil(t, err)
 
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(conf.Detectors...),
-		WithVerify(false),
-		WithPrinter(new(discardPrinter)),
-		withVerificationOverlapTracking(),
-	)
-	assert.Nil(t, err)
+	c := Config{
+		Concurrency: 1,
+		Decoders:    decoders.DefaultDecoders(),
+		Detectors:   conf.Detectors,
+		Verify:      false,
+		Dispatcher:  NewPrinterNotifier(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &c)
+	assert.NoError(t, err)
+
+	e.verificationOverlapTracker = new(verificationOverlapTracker)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {

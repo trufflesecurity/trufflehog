@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,7 +24,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -340,88 +340,6 @@ func run(state overseer.State) {
 		handlers.SetArchiveMaxTimeout(*archiveTimeout)
 	}
 
-	// Build include and exclude detector sets for filtering on engine initialization.
-	// Exit if there was an error to inform the user of the misconfiguration.
-	var includeDetectorSet, excludeDetectorSet map[config.DetectorID]struct{}
-	var detectorsWithCustomVerifierEndpoints map[config.DetectorID][]string
-	{
-		includeList, err := config.ParseDetectors(*includeDetectors)
-		if err != nil {
-			logFatal(err, "invalid include list detector configuration")
-		}
-		excludeList, err := config.ParseDetectors(*excludeDetectors)
-		if err != nil {
-			logFatal(err, "invalid exclude list detector configuration")
-		}
-		detectorsWithCustomVerifierEndpoints, err = config.ParseVerifierEndpoints(*verifiers)
-		if err != nil {
-			logFatal(err, "invalid verifier detector configuration")
-		}
-		includeDetectorSet = detectorTypeToSet(includeList)
-		excludeDetectorSet = detectorTypeToSet(excludeList)
-	}
-
-	// Verify that all the user-provided detectors support the optional
-	// detector features.
-	{
-		if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
-			logFatal(err, "invalid include list detector configuration", "detector", id)
-		}
-		if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
-			logFatal(err, "invalid exclude list detector configuration", "detector", id)
-		}
-		if id, err := verifyDetectorsAreVersioner(detectorsWithCustomVerifierEndpoints); err != nil {
-			logFatal(err, "invalid verifier detector configuration", "detector", id)
-		}
-		// Extra check for endpoint customization.
-		isEndpointCustomizer := engine.DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
-		for id := range detectorsWithCustomVerifierEndpoints {
-			if _, ok := isEndpointCustomizer[id.ID]; !ok {
-				logFatal(
-					fmt.Errorf("endpoint provided but detector does not support endpoint customization"),
-					"invalid custom verifier endpoint detector configuration",
-					"detector", id,
-				)
-			}
-		}
-	}
-
-	includeFilter := func(d detectors.Detector) bool {
-		_, ok := getWithDetectorID(d, includeDetectorSet)
-		return ok
-	}
-	excludeFilter := func(d detectors.Detector) bool {
-		_, ok := getWithDetectorID(d, excludeDetectorSet)
-		return !ok
-	}
-	// Abuse filter to cause a side-effect.
-	endpointCustomizer := func(d detectors.Detector) bool {
-		urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
-		if !ok {
-			return true
-		}
-		id := config.GetDetectorID(d)
-		customizer, ok := d.(detectors.EndpointCustomizer)
-		if !ok {
-			// NOTE: We should never reach here due to validation above.
-			logFatal(
-				fmt.Errorf("failed to configure a detector endpoint"),
-				"the provided detector does not support endpoint configuration",
-				"detector", id,
-			)
-		}
-		if !*customVerifiersOnly || len(urls) == 0 {
-			urls = append(urls, customizer.DefaultEndpoint())
-		}
-		if err := customizer.SetEndpoints(urls...); err != nil {
-			logFatal(err, "failed configuring custom endpoint for detector", "detector", id)
-		}
-		logger.Info("configured detector with verification urls",
-			"detector", id, "urls", urls,
-		)
-		return true
-	}
-
 	// Set how the engine will print its results.
 	var printer engine.Printer
 	switch {
@@ -444,6 +362,50 @@ func run(state overseer.State) {
 		jobReportWriter = *jobReportFile
 	}
 
+	handleFinishedMetrics := func(ctx context.Context, finishedMetrics <-chan sources.UnitMetrics, jobReportWriter io.WriteCloser) {
+		go func() {
+			defer func() {
+				jobReportWriter.Close()
+				if namer, ok := jobReportWriter.(interface{ Name() string }); ok {
+					ctx.Logger().Info("report written", "path", namer.Name())
+				} else {
+					ctx.Logger().Info("report written")
+				}
+			}()
+
+			for metrics := range finishedMetrics {
+				metrics.Errors = common.ExportErrors(metrics.Errors...)
+				details, err := json.Marshal(map[string]any{
+					"version": 1,
+					"data":    metrics,
+				})
+				if err != nil {
+					ctx.Logger().Error(err, "error marshalling job details")
+					continue
+				}
+				if _, err := jobReportWriter.Write(append(details, '\n')); err != nil {
+					ctx.Logger().Error(err, "error writing to file")
+				}
+			}
+		}()
+	}
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithConcurrentSources(*concurrency),
+		sources.WithConcurrentUnits(*concurrency),
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	if jobReportWriter != nil {
+		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
+		opts = append(opts, sources.WithReportHook(unitHook))
+		handleFinishedMetrics(ctx, finishedMetrics, jobReportWriter)
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
 	// Parse --results flag.
 	if *onlyVerified {
 		r := "verified"
@@ -454,26 +416,27 @@ func run(state overseer.State) {
 		logFatal(err, "failed to configure results flag")
 	}
 
-	e, err := engine.Start(ctx,
-		engine.WithConcurrency(*concurrency),
-		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(engine.DefaultDetectors()...),
-		engine.WithDetectors(conf.Detectors...),
-		engine.WithVerify(!*noVerification),
-		engine.WithFilterDetectors(includeFilter),
-		engine.WithFilterDetectors(excludeFilter),
-		engine.WithFilterDetectors(endpointCustomizer),
-		engine.WithFilterUnverified(*filterUnverified),
-		engine.WithResults(parsedResults),
-		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
-		engine.WithPrinter(printer),
-		engine.WithFilterEntropy(*filterEntropy),
-		engine.WithVerificationOverlap(*allowVerificationOverlap),
-		engine.WithJobReportWriter(jobReportWriter),
-	)
+	engConf := engine.Config{
+		Concurrency:          *concurrency,
+		Detectors:            append(conf.Detectors, engine.DefaultDetectors()...),
+		Verify:               !*noVerification,
+		IncludeDetectors:     *includeDetectors,
+		ExcludeDetectors:     *excludeDetectors,
+		VerifierEndpoints:    *verifiers,
+		Dispatcher:           engine.NewPrinterNotifier(printer),
+		FilterUnverified:     *filterUnverified,
+		FilterEntropy:        *filterEntropy,
+		VerificationOverlap:  *allowVerificationOverlap,
+		Results:              parsedResults,
+		PrintAvgDetectorTime: *printAvgDetectorTime,
+		SourceManager:        sourceManager,
+	}
+
+	e, err := engine.NewEngine(ctx, &engConf)
 	if err != nil {
 		logFatal(err, "error initializing engine")
 	}
+	e.Start(ctx)
 
 	switch cmd {
 	case gitScan.FullCommand():
