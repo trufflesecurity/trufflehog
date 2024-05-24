@@ -317,12 +317,13 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
 
+			s.cacheRepoInfo(r)
+
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: repoURL}
 			if err := s.unitReporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
 
-			s.cacheRepoInfo(r)
 			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
