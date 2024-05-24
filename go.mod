@@ -28,6 +28,7 @@ require (
 	github.com/coinbase/waas-client-library-go v1.0.8
 	github.com/couchbase/gocb/v2 v2.8.1
 	github.com/crewjam/rfc5424 v0.1.0
+	github.com/elastic/go-elasticsearch/v8 v8.13.0
 	github.com/envoyproxy/protoc-gen-validate v1.0.4
 	github.com/fatih/color v1.17.0
 	github.com/felixge/fgprof v0.9.4
@@ -75,6 +76,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/testcontainers/testcontainers-go v0.31.0
+	github.com/testcontainers/testcontainers-go/modules/elasticsearch v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/mssql v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.31.0
@@ -160,6 +162,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.5.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -211,7 +214,6 @@ require (
 	github.com/launchdarkly/go-server-sdk-evaluation/v3 v3.0.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
-	github.com/magefile/mage v1.14.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

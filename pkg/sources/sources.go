@@ -329,6 +329,19 @@ type PostmanConfig struct {
 	Filter *common.Filter
 }
 
+type ElasticsearchConfig struct {
+	Nodes          []string
+	Username       string
+	Password       string
+	CloudID        string
+	APIKey         string
+	ServiceToken   string
+	IndexPattern   string
+	QueryJSON      string
+	SinceTimestamp string
+	BestEffortScan bool
+}
+
 // Progress is used to update job completion progress across sources.
 type Progress struct {
 	mut               sync.Mutex
