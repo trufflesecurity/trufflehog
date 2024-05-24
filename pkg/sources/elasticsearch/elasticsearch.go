@@ -98,7 +98,7 @@ func (s *Source) Init(
 
 	s.bestEffortScan = conn.BestEffortScan
 
-	client, err := s.buildElasticClient()
+	client, err := es.NewTypedClient(s.esConfig)
 	if err != nil {
 		return err
 	}
@@ -106,10 +106,6 @@ func (s *Source) Init(
 	s.client = client
 
 	return nil
-}
-
-func (s *Source) buildElasticClient() (*es.TypedClient, error) {
-	return es.NewTypedClient(s.esConfig)
 }
 
 func (s *Source) Type() sourcespb.SourceType {
@@ -171,7 +167,7 @@ func (s *Source) Chunks(
 
 			workerPool.Go(func() error {
 				// Give each worker its own client
-				client, err := s.buildElasticClient()
+				client, err := es.NewTypedClient(s.esConfig)
 				if err != nil {
 					return err
 				}
