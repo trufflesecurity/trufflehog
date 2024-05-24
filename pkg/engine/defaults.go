@@ -311,6 +311,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphcms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/graphhopper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groovehq"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/groq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gtmetrix"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/guardianapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gumroad"
@@ -344,7 +345,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/insightly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/instabot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/instamojo"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/integromat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intercom"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/interseller"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/intra42"
@@ -965,7 +965,6 @@ func DefaultDetectors() []detectors.Detector {
 		&smartsheets.Scanner{},
 		// &wepay.Scanner{},
 		// &artifactory.Scanner{},
-		&integromat.Scanner{},
 		&linenotify.Scanner{},
 		&float.Scanner{},
 		&monday.Scanner{},
@@ -1606,6 +1605,7 @@ func DefaultDetectors() []detectors.Detector {
 		wiz.Scanner{},
 		onfleet.Scanner{},
 		intra42.Scanner{},
+		groq.Scanner{},
 	}
 }
 

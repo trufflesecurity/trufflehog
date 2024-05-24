@@ -15,11 +15,15 @@ func TestHandleRPMFile(t *testing.T) {
 	assert.Nil(t, err)
 	defer file.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	rdr, err := newFileReader(file)
+	assert.NoError(t, err)
+	defer rdr.Close()
+
 	handler := newRPMHandler()
-	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), file)
+	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 
 	wantChunkCount := 179

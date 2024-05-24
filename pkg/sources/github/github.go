@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"golang.org/x/exp/rand"
+	"golang.org/x/oauth2"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
-	"github.com/google/go-github/v61/github"
-	"golang.org/x/oauth2"
+	"github.com/google/go-github/v62/github"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -480,8 +480,17 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, apiEndpoint string, bas
 	s.apiClient = ghClient
 
 	for _, org := range s.orgsCache.Keys() {
-		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+		orgCtx := context.WithValue(ctx, "account", org)
+		userType, err := s.getReposByOrgOrUser(ctx, org)
+		if err != nil {
+			orgCtx.Logger().Error(err, "error fetching repos for org or user")
+			continue
+		}
+
+		if userType == organization && s.conn.ScanUsers {
+			if err := s.addMembersByOrg(ctx, org); err != nil {
+				orgCtx.Logger().Error(err, "Unable to add members by org")
+			}
 		}
 	}
 
@@ -499,17 +508,15 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint strin
 	}
 
 	for _, org := range s.orgsCache.Keys() {
-		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org")
+		orgCtx := context.WithValue(ctx, "account", org)
+		userType, err := s.getReposByOrgOrUser(ctx, org)
+		if err != nil {
+			orgCtx.Logger().Error(err, "error fetching repos for org or user")
+			continue
 		}
 
-		// We probably don't need to do this, since getting repos by org makes more sense?
-		if err := s.getReposByUser(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for user")
-		}
-
-		if s.conn.ScanUsers {
-			s.log.Info("Enumerating unauthenticated does not support scanning organization members")
+		if userType == organization && s.conn.ScanUsers {
+			orgCtx.Logger().Info("WARNING: Enumerating unauthenticated does not support scanning organization members (--include-members)")
 		}
 	}
 }
@@ -562,16 +569,16 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	if s.orgsCache.Count() > 0 {
 		specificScope = true
 		for _, org := range s.orgsCache.Keys() {
-			logger := s.log.WithValues("org", org)
-			if err := s.getReposByOrg(ctx, org); err != nil {
-				logger.Error(err, "error fetching repos for org")
+			orgCtx := context.WithValue(ctx, "account", org)
+			userType, err := s.getReposByOrgOrUser(ctx, org)
+			if err != nil {
+				orgCtx.Logger().Error(err, "error fetching repos for org or user")
+				continue
 			}
 
-			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, org)
-				if err != nil {
-					logger.Error(err, "Unable to add members by org")
-					continue
+			if userType == organization && s.conn.ScanUsers {
+				if err := s.addMembersByOrg(ctx, org); err != nil {
+					orgCtx.Logger().Error(err, "Unable to add members by org")
 				}
 			}
 		}
@@ -593,27 +600,28 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		}
 
 		for _, org := range s.orgsCache.Keys() {
-			logger := s.log.WithValues("org", org)
-			if err := s.getReposByOrg(ctx, org); err != nil {
-				logger.Error(err, "error fetching repos by org")
+			orgCtx := context.WithValue(ctx, "account", org)
+			userType, err := s.getReposByOrgOrUser(ctx, org)
+			if err != nil {
+				orgCtx.Logger().Error(err, "error fetching repos for org or user")
+				continue
 			}
 
-			if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-				logger.Error(err, "error fetching repos by user")
-			}
-
-			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, org)
-				if err != nil {
-					logger.Error(err, "Unable to add members by org for org")
+			if userType == organization && s.conn.ScanUsers {
+				if err := s.addMembersByOrg(ctx, org); err != nil {
+					orgCtx.Logger().Error(err, "Unable to add members by org for org")
 				}
 			}
+		}
+
+		if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
+			s.log.Error(err, "error fetching repos for the current user", "user", ghUser.GetLogin())
 		}
 
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
 		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
-			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
+			s.log.Error(err, "error fetching gists for the current user", "user", ghUser.GetLogin())
 		}
 
 		return nil
@@ -693,7 +701,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 			s.log.Info("Scanning repos", "org_members", len(s.memberCache))
 			for member := range s.memberCache {
 				logger := s.log.WithValues("member", member)
-				if err := s.getReposByUser(ctx, member); err != nil {
+				if err := s.addUserGistsToCache(ctx, member); err != nil {
 					logger.Error(err, "error fetching gists by user")
 				}
 				if err := s.getReposByUser(ctx, member); err != nil {
