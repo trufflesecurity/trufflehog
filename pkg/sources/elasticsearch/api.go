@@ -103,13 +103,16 @@ func NewIndex() *Index {
 }
 
 func (i *Index) DocumentAlreadySeen(document *Document) bool {
-	i.lock.Lock()
-	defer i.lock.Unlock()
-
 	parsedTimestamp, err := time.Parse(time.RFC3339, document.timestamp)
 	if err != nil {
 		return false
 	}
+
+	// We mutate the index in different ways depending on whether the timestamp
+	// is newer, equal, or older than the its current latest timestamp, so
+	// everything at this point must be write synchronized.
+	i.lock.Lock()
+	defer i.lock.Unlock()
 
 	if parsedTimestamp.After(i.latestTimestamp) {
 		i.latestTimestamp = parsedTimestamp
@@ -128,8 +131,8 @@ func (i *Index) DocumentAlreadySeen(document *Document) bool {
 
 func (i *Index) UpdateLatestTimestampLastRun() {
 	i.lock.Lock()
-	defer i.lock.Unlock()
 	i.latestTimestampLastRun = i.latestTimestamp
+	i.lock.Unlock()
 }
 
 func makeElasticSearchRequest(
@@ -394,17 +397,17 @@ func processSearchedDocuments(
 // Returns the number of documents processed within these indices
 func (indices *Indices) GetProcessedDocumentCount() int {
 	indices.lock.RLock()
-	defer indices.lock.RUnlock()
+	processedDocumentsCount := indices.processedDocumentsCount
+	indices.lock.RUnlock()
 
-	return indices.processedDocumentsCount
+	return processedDocumentsCount
 }
 
 // Adds documents processed to the count, used for progress
 func (indices *Indices) UpdateProcessedDocumentCount(additionalDocumentsProcessed int) {
 	indices.lock.Lock()
-	defer indices.lock.Unlock()
-
 	indices.processedDocumentsCount += additionalDocumentsProcessed
+	indices.lock.Unlock()
 }
 
 // Updates a set of indices from an Elasticsearch cluster. If an index has been
