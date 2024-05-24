@@ -997,6 +997,7 @@ enum DetectorType {
   Pagarme = 985;
   Onfleet = 986;
   Intra42 = 987;
+  Groq = 988;
 }
 
 message Result {

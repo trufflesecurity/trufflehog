@@ -79,7 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					signature := getKucoinSignature(resSecretMatch, timestamp, method, endpoint, bodyStr)
 					passPhrase := getKucoinPassphrase(resSecretMatch, resPassphraseMatch)
 
-					req, err := http.NewRequest(method, "https://api.kucoin.com"+endpoint, nil)
+					req, err := http.NewRequestWithContext(ctx, method, "https://api.kucoin.com"+endpoint, nil)
 					if err != nil {
 						continue
 					}

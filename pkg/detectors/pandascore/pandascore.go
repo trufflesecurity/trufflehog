@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequest("GET", "https://api.pandascore.co/videogames", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.pandascore.co/videogames", nil)
 			if err != nil {
 				continue
 			}

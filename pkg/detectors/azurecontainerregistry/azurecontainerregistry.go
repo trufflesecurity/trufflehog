@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 				url := fmt.Sprintf("https://%s/v2/", endpoint)
-				req, err := http.NewRequest("GET", url, nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
 				}

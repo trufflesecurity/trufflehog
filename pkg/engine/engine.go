@@ -638,6 +638,19 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 					decoder:  decoded.DecoderType,
 					wgDoneFn: wgDetect.Done,
 				}
+				continue
+			}
+
+			for k, detector := range chunkSpecificDetectors {
+				decoded.Chunk.Verify = e.verify
+				wgDetect.Add(1)
+				e.detectableChunksChan <- detectableChunk{
+					chunk:    *decoded.Chunk,
+					detector: detector,
+					decoder:  decoded.DecoderType,
+					wgDoneFn: wgDetect.Done,
+				}
+				delete(chunkSpecificDetectors, k)
 			}
 			continue
 		}
@@ -781,7 +794,6 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	}
 
 	wgDetect.Wait()
-	ctx.Logger().V(4).Info("finished verificationOverlap chunks")
 }
 
 func (e *Engine) detectChunks(ctx context.Context) {

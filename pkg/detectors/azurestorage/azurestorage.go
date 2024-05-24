@@ -5,11 +5,14 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/xml"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -25,6 +28,16 @@ var (
 	defaultClient = http.DefaultClient
 	keyPat        = regexp.MustCompile(`DefaultEndpointsProtocol=https;AccountName=(?P<account_name>[^;]+);AccountKey=(?P<account_key>[^;]+);EndpointSuffix=core\.windows\.net`)
 )
+
+type storageResponse struct {
+	Containers struct {
+		Container []container `xml:"Container"`
+	} `xml:"Containers"`
+}
+
+type container struct {
+	Name string `xml:"Name"`
+}
 
 func (s Scanner) Keywords() []string {
 	return []string{"DefaultEndpointsProtocol=https;AccountName="}
@@ -60,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			client := s.getClient()
 
-			isVerified, verificationErr := verifyAzureStorageKey(ctx, client, accountName, accountKey)
+			isVerified, verificationErr := verifyAzureStorageKey(ctx, client, accountName, accountKey, s1.ExtraData)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, accountKey)
 		}
@@ -71,7 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName, accountKey string) (bool, error) {
+func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName, accountKey string, extraData map[string]string) (bool, error) {
 	now := time.Now().UTC().Format(http.TimeFormat)
 	stringToSign := "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:" + now + "\nx-ms-version:2019-12-12\n/" + accountName + "/\ncomp:list"
 	accountKeyBytes, _ := base64.StdEncoding.DecodeString(accountKey)
@@ -100,6 +113,21 @@ func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName
 
 	switch res.StatusCode {
 	case http.StatusOK:
+		body, err := io.ReadAll(res.Body)
+		// ignore the error if failed because our keys has been verified.
+		if err == nil {
+			// parse response
+			response := storageResponse{}
+			if err := xml.Unmarshal(body, &response); err == nil {
+				// update the extra data with container names only
+				var containerNames []string
+				for _, c := range response.Containers.Container {
+					containerNames = append(containerNames, c.Name)
+				}
+				extraData["container_names"] = strings.Join(containerNames, ", ")
+			}
+		}
+
 		return true, nil
 	case http.StatusForbidden:
 		// 403 if account id or key is invalid, or if the account is disabled
