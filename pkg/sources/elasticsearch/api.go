@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"slices"
 	"strings"
 	"sync"
@@ -351,7 +350,6 @@ func processSearchedDocuments(
 				sort = append(sort, int(elem.(float64)))
 			}
 
-			log.Printf("(%d/%d) Got a hit\n", documentsProcessed, documentsFetched)
 			if documentsFetched <= skipCount {
 				continue
 			}
