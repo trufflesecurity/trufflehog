@@ -31,7 +31,7 @@ func (ds *DocumentSearch) String() string {
 	}
 }
 
-func (uow *UnitOfWork) AddSearch(
+func (uow *UnitOfWork) addSearch(
 	index *Index,
 	filterParams *FilterParams,
 	offset int,
@@ -86,14 +86,14 @@ func distributeDocumentScans(
 	unitOfWorkIndex := 0
 	for _, i := range indices.indices {
 		uow := &unitsOfWork[unitOfWorkIndex]
-		offset := uow.AddSearch(i, indices.filterParams, 0, scanCoverageRate)
+		offset := uow.addSearch(i, indices.filterParams, 0, scanCoverageRate)
 
 		// If we've yet to distribute all the documents in the index, go into the
 		// next unit of work, and the next, and the next....
 		for offset < i.documentCount {
 			unitOfWorkIndex++
 			uow := &unitsOfWork[unitOfWorkIndex]
-			offset += uow.AddSearch(i, indices.filterParams, offset, scanCoverageRate)
+			offset += uow.addSearch(i, indices.filterParams, offset, scanCoverageRate)
 		}
 	}
 

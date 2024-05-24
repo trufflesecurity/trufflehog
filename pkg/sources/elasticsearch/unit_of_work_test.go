@@ -49,7 +49,7 @@ func TestSource_distributeDocumentScans(t *testing.T) {
 	)
 }
 
-func TestSource_AddSearch(t *testing.T) {
+func TestSource_addSearch(t *testing.T) {
 	index := Index{name: "index1", documentCount: 20}
 	index2 := Index{name: "index2", documentCount: 10}
 	index3 := Index{name: "index3", documentCount: 0}
@@ -57,7 +57,7 @@ func TestSource_AddSearch(t *testing.T) {
 	uow := NewUnitOfWork(10)
 
 	// Does filling up a UOW with a larger index work?
-	offset := uow.AddSearch(&index, &FilterParams{}, 0, 1.0)
+	offset := uow.addSearch(&index, &FilterParams{}, 0, 1.0)
 	assert.Equal(t, 10, offset)
 	assert.Equal(t, 10, uow.maxDocumentCount)
 	assert.Equal(t, uow.maxDocumentCount, uow.documentCount)
@@ -67,7 +67,7 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, uow.maxDocumentCount, uow.documentSearches[0].documentCount)
 
 	// Does trying to add another range into a full UOW leave it unchanged?
-	offset2 := uow.AddSearch(&index2, &FilterParams{}, 0, 1.0)
+	offset2 := uow.addSearch(&index2, &FilterParams{}, 0, 1.0)
 	assert.Equal(t, 0, offset2)
 	assert.Equal(t, 10, uow.maxDocumentCount)
 	assert.Equal(t, uow.maxDocumentCount, uow.documentCount)
@@ -77,7 +77,7 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, uow.maxDocumentCount, uow.documentSearches[0].documentCount)
 
 	// Does trying to add an index with no documents leave it unchanged?
-	offset += uow.AddSearch(&index3, &FilterParams{}, 0, 1.0)
+	offset += uow.addSearch(&index3, &FilterParams{}, 0, 1.0)
 	assert.Equal(t, 10, offset)
 	assert.Equal(t, 10, uow.maxDocumentCount)
 	assert.Equal(t, uow.maxDocumentCount, uow.documentCount)
@@ -89,7 +89,7 @@ func TestSource_AddSearch(t *testing.T) {
 	// Does filling up another UOW with a larger index work?
 	uow2 := NewUnitOfWork(9)
 
-	offset += uow2.AddSearch(&index, &FilterParams{}, offset, 1.0)
+	offset += uow2.addSearch(&index, &FilterParams{}, offset, 1.0)
 	assert.Equal(t, 19, offset)
 	assert.Equal(t, 9, uow2.maxDocumentCount)
 	assert.Equal(t, uow2.maxDocumentCount, uow2.documentCount)
@@ -101,7 +101,7 @@ func TestSource_AddSearch(t *testing.T) {
 	// Does finishing off an index into a UOW with room to spare work?
 	uow3 := NewUnitOfWork(9)
 
-	offset += uow3.AddSearch(&index, &FilterParams{}, offset, 1.0)
+	offset += uow3.addSearch(&index, &FilterParams{}, offset, 1.0)
 	assert.Equal(t, 20, offset)
 	assert.Equal(t, 9, uow3.maxDocumentCount)
 	assert.Equal(t, 1, uow3.documentCount)
@@ -113,14 +113,14 @@ func TestSource_AddSearch(t *testing.T) {
 	uow = NewUnitOfWork(21)
 
 	// Does adding an empty range into a new UOW leave it unchanged?
-	offset = uow.AddSearch(&index3, &FilterParams{}, 0, 1.0)
+	offset = uow.addSearch(&index3, &FilterParams{}, 0, 1.0)
 	assert.Equal(t, 0, offset)
 	assert.Equal(t, 21, uow.maxDocumentCount)
 	assert.Equal(t, 0, uow.documentCount)
 	assert.Equal(t, 0, len(uow.documentSearches))
 
 	// Does adding a range into a larger UOW work?
-	offset = uow.AddSearch(&index, &FilterParams{}, 0, 1.0)
+	offset = uow.addSearch(&index, &FilterParams{}, 0, 1.0)
 	assert.Equal(t, 20, offset)
 	assert.Equal(t, 1, len(uow.documentSearches))
 	assert.Equal(t, index.name, uow.documentSearches[0].index.name)
@@ -128,7 +128,7 @@ func TestSource_AddSearch(t *testing.T) {
 	assert.Equal(t, 20, uow.documentSearches[0].documentCount)
 
 	// Does filling up a UOW that already has a range in it work?
-	offset = uow.AddSearch(&index2, &FilterParams{}, 0, 1.0)
+	offset = uow.addSearch(&index2, &FilterParams{}, 0, 1.0)
 	assert.Equal(t, 1, offset)
 	assert.Equal(t, 2, len(uow.documentSearches))
 	assert.Equal(t, index.name, uow.documentSearches[0].index.name)
