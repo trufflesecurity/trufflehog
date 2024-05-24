@@ -7,6 +7,8 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -17,7 +19,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{ client *http.Client }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -50,6 +52,13 @@ func trimCarrots(s string) string {
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"provider_x509"}
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return client
 }
 
 // FromData will find and optionally verify GCP secrets in a given set of bytes.
@@ -93,23 +102,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		credBytes, _ := json.Marshal(creds)
 
-		s := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GCP,
 			Raw:          raw,
 			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
 		}
 		// Set the RotationGuideURL in the ExtraData.
-		s.ExtraData = map[string]string{
+		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
 			"project":        creds.ProjectID,
 		}
 
 		if verify {
-			s.Verified = isValidGCPServiceAccountKey(ctx, client, creds)
+			client := s.getClient()
+			isVerified, verificationErr := isValidGCPServiceAccountKey(ctx, client, creds)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, creds.ClientEmail)
 		}
 
-		results = append(results, s)
+		results = append(results, s1)
 	}
 
 	return
@@ -123,54 +135,65 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // Note: If the service account is expired or disabled, the request to fetch the certificate from the
 // `ClientX509CertURL` will fail with a 404 status code. In this case, the function will return false,
 // indicating that the service account key is invalid, regardless of the public key comparison.
-func isValidGCPServiceAccountKey(ctx context.Context, client *http.Client, key gcpKey) bool {
-	certPEM, ok := fetchCert(ctx, client, key.ClientX509CertURL)
+func isValidGCPServiceAccountKey(ctx context.Context, client *http.Client, key gcpKey) (bool, error) {
+	certPEM, ok, err := fetchCert(ctx, client, key.ClientX509CertURL, key.PrivateKeyID)
+	if err != nil {
+		return false, err
+	}
 	if !ok {
-		return false
+		return false, nil
 	}
 
 	publicKey, ok := extractPublicKeyFromCert(certPEM)
 	if !ok {
-		return false
+		return false, nil
 	}
 
 	privateKey, ok := extractPrivateKey(key.PrivateKey)
 	if !ok {
-		return false
+		return false, nil
 	}
 
 	k, ok := privateKey.Public().(*rsa.PublicKey)
 	if !ok {
-		return false
+		return false, nil
 	}
 
-	return publicKey.Equal(k)
+	return publicKey.Equal(k), nil
 }
 
 // fetchCert downloads the certificate from the specified URL and returns its PEM-encoded string.
-func fetchCert(ctx context.Context, client *http.Client, url string) (string, bool) {
+func fetchCert(ctx context.Context, client *http.Client, url, privKeyID string) (string, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return "", false
+		return "", false, err
 	}
 
 	res, err := client.Do(req)
-	if err != nil || res.StatusCode != http.StatusOK {
-		return "", false
+	if err != nil {
+		return "", false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
-	var resp map[string]string
-	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-		return "", false
+	switch {
+	case res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices:
+		var resp map[string]string
+		if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+			return "", false, err
+		}
+
+		cert, ok := resp[privKeyID]
+		return cert, ok, nil
+	case res.StatusCode == http.StatusNotFound:
+		// The service account is expired or disabled.
+		return "", false, nil
+	default:
+		return "", false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 
-	// Assuming the certificate is the first value in the response.
-	for _, certPEM := range resp {
-		return strings.TrimSpace(certPEM), true
-	}
-
-	return "", false
 }
 
 // extractPublicKeyFromCert decodes the PEM-encoded certificate to extract the RSA public key.
