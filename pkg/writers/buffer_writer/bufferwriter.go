@@ -5,13 +5,9 @@ import (
 	"fmt"
 	"io"
 	"time"
-<<<<<<< HEAD
-=======
->>>>>>> main
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type metrics struct{}
