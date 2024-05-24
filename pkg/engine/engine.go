@@ -640,19 +640,6 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 				}
 				continue
 			}
-
-			for k, detector := range chunkSpecificDetectors {
-				decoded.Chunk.Verify = e.verify
-				wgDetect.Add(1)
-				e.detectableChunksChan <- detectableChunk{
-					chunk:    *decoded.Chunk,
-					detector: detector,
-					decoder:  decoded.DecoderType,
-					wgDoneFn: wgDetect.Done,
-				}
-				delete(chunkSpecificDetectors, k)
-			}
-			continue
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
 	}
