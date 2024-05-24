@@ -147,7 +147,7 @@ func (s *Source) Chunks(
 		if previousDocumentCount > 0 && indices.documentCount > 0 && previousDocumentCount < indices.documentCount {
 			scanCoverageRate =
 				float64(previousDocumentCount) / float64(indices.documentCount)
-			s.log.V(2).Info(fmt.Sprintf(
+			s.log.V(1).Info(fmt.Sprintf(
 				"Scan coverage rate is %f%% (%d/%d); skipping documents to catch up",
 				scanCoverageRate,
 				previousDocumentCount,
@@ -157,7 +157,8 @@ func (s *Source) Chunks(
 
 		unitsOfWork := distributeDocumentScans(&indices, s.concurrency, scanCoverageRate)
 
-		for uowIndex, outerUOW := range unitsOfWork {
+		for outerUOWIndex, outerUOW := range unitsOfWork {
+			uowIndex := outerUOWIndex
 			uow := outerUOW
 
 			workerPool.Go(func() error {
