@@ -65,10 +65,10 @@ type elasticSearchRequest interface {
 }
 
 func (fp *FilterParams) Query(latestTimestamp time.Time) (map[string]any, error) {
-	range_ := make(map[string]any)
+	timestampRangeQueryClause := make(map[string]any)
 
 	if fp.queryJSON != "" {
-		err := json.Unmarshal([]byte(fp.queryJSON), &range_)
+		err := json.Unmarshal([]byte(fp.queryJSON), &timestampRangeQueryClause)
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +81,7 @@ func (fp *FilterParams) Query(latestTimestamp time.Time) (map[string]any, error)
 		timestamp := make(map[string]map[string]string)
 		timestamp["@timestamp"] = gte
 
-		range_["range"] = timestamp
+		timestampRangeQueryClause["range"] = timestamp
 	} else if fp.sinceTimestamp != "" {
 		gte := make(map[string]string)
 		gte["gte"] = fp.sinceTimestamp
@@ -89,11 +89,11 @@ func (fp *FilterParams) Query(latestTimestamp time.Time) (map[string]any, error)
 		timestamp := make(map[string]map[string]string)
 		timestamp["@timestamp"] = gte
 
-		range_["range"] = timestamp
+		timestampRangeQueryClause["range"] = timestamp
 	}
 
 	query := make(map[string]any)
-	query["query"] = range_
+	query["query"] = timestampRangeQueryClause
 
 	return query, nil
 }
