@@ -9,12 +9,10 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -165,16 +163,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		return fmt.Errorf("unable to open file: %w", err)
 	}
 
-	bufferName := cleantemp.MkFilename()
-
-	defer inputFile.Close()
 	logger.V(3).Info("scanning file")
-
-	reReader, err := diskbufferreader.New(inputFile, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return fmt.Errorf("could not create re-readable reader: %w", err)
-	}
-	defer reReader.Close()
 
 	chunkSkel := &sources.Chunk{
 		SourceType: s.Type(),
@@ -190,44 +179,8 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		},
 		Verify: s.verify,
 	}
-	if handlers.HandleFile(ctx, reReader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
-		return nil
-	}
 
-	if err := reReader.Reset(); err != nil {
-		return err
-	}
-	reReader.Stop()
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, reReader)
-	for data := range chunkResChan {
-		if err := data.Error(); err != nil {
-			s.log.Error(err, "error reading chunk.")
-			continue
-		}
-
-		chunk := &sources.Chunk{
-			SourceType: s.Type(),
-			SourceName: s.name,
-			SourceID:   s.SourceID(),
-			JobID:      s.JobID(),
-			Data:       data.Bytes(),
-			SourceMetadata: &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Filesystem{
-					Filesystem: &source_metadatapb.Filesystem{
-						File: sanitizer.UTF8(path),
-					},
-				},
-			},
-			Verify: s.verify,
-		}
-		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return handlers.HandleFile(ctx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 }
 
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply

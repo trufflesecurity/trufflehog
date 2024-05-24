@@ -1,6 +1,7 @@
 package github
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,7 +10,7 @@ import (
 	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v62/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -169,14 +170,6 @@ func (a *appListOptions) getListOptions() *github.ListOptions {
 	return &a.ListOptions
 }
 
-func (s *Source) getReposByApp(ctx context.Context) error {
-	return s.processRepos(ctx, "", s.appListReposWrapper, &appListOptions{
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-		},
-	})
-}
-
 func (s *Source) appListReposWrapper(ctx context.Context, _ string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
 	someRepos, res, err := s.apiClient.Apps.ListRepos(ctx, opts.getListOptions())
 	if someRepos != nil {
@@ -185,12 +178,24 @@ func (s *Source) appListReposWrapper(ctx context.Context, _ string, opts repoLis
 	return nil, res, err
 }
 
+func (s *Source) getReposByApp(ctx context.Context) error {
+	return s.processRepos(ctx, "", s.appListReposWrapper, &appListOptions{
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+		},
+	})
+}
+
 type userListOptions struct {
 	github.RepositoryListByUserOptions
 }
 
 func (u *userListOptions) getListOptions() *github.ListOptions {
 	return &u.ListOptions
+}
+
+func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
+	return s.apiClient.Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
 }
 
 func (s *Source) getReposByUser(ctx context.Context, user string) error {
@@ -203,16 +208,16 @@ func (s *Source) getReposByUser(ctx context.Context, user string) error {
 	})
 }
 
-func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	return s.apiClient.Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
-}
-
 type orgListOptions struct {
 	github.RepositoryListByOrgOptions
 }
 
 func (o *orgListOptions) getListOptions() *github.ListOptions {
 	return &o.ListOptions
+}
+
+func (s *Source) orgListReposWrapper(ctx context.Context, org string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
+	return s.apiClient.Repositories.ListByOrg(ctx, org, &opts.(*orgListOptions).RepositoryListByOrgOptions)
 }
 
 func (s *Source) getReposByOrg(ctx context.Context, org string) error {
@@ -225,8 +230,55 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) error {
 	})
 }
 
-func (s *Source) orgListReposWrapper(ctx context.Context, org string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	return s.apiClient.Repositories.ListByOrg(ctx, org, &opts.(*orgListOptions).RepositoryListByOrgOptions)
+// userType indicates whether an account belongs to a person or organization.
+//
+// See:
+// - https://docs.github.com/en/get-started/learning-about-github/types-of-github-accounts
+// - https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-a-user
+type userType int
+
+const (
+	// Default invalid state.
+	unknown userType = iota
+	// The account is a person (https://docs.github.com/en/rest/users/users).
+	user
+	// The account is an organization (https://docs.github.com/en/rest/orgs/orgs).
+	organization
+)
+
+func (s *Source) getReposByOrgOrUser(ctx context.Context, name string) (userType, error) {
+	var err error
+
+	// List repositories for the organization |name|.
+	err = s.getReposByOrg(ctx, name)
+	if err == nil {
+		return organization, nil
+	} else if !isGitHub404Error(err) {
+		return unknown, err
+	}
+
+	// List repositories for the user |name|.
+	err = s.getReposByUser(ctx, name)
+	if err == nil {
+		if err := s.addUserGistsToCache(ctx, name); err != nil {
+			ctx.Logger().Error(err, "Unable to add user to cache")
+		}
+		return user, nil
+	} else if !isGitHub404Error(err) {
+		return unknown, err
+	}
+
+	return unknown, fmt.Errorf("account '%s' not found", name)
+}
+
+// isGitHub404Error returns true if |err| is a `github.ErrorResponse` and has the status code `404`.
+func isGitHub404Error(err error) bool {
+	var ghErr *github.ErrorResponse
+	if !errors.As(err, &ghErr) {
+		return false
+	}
+
+	return ghErr.Response.StatusCode == http.StatusNotFound
 }
 
 func (s *Source) processRepos(ctx context.Context, target string, listRepos repoLister, listOpts repoListOptions) error {
@@ -276,7 +328,7 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 	}
 
 	logger.V(2).Info("found repos", "total", numRepos, "num_forks", numForks, "num_orgs", len(uniqueOrgs))
-	githubOrgsEnumerated.WithLabelValues(s.name).Set(float64(len(uniqueOrgs)))
+	githubOrgsEnumerated.WithLabelValues(s.name).Add(float64(len(uniqueOrgs)))
 
 	return nil
 }
@@ -295,6 +347,18 @@ func (s *Source) cacheRepoInfo(r *github.Repository) {
 		info.visibility = source_metadatapb.Visibility_public
 	}
 	s.repoInfoCache.put(r.GetCloneURL(), info)
+}
+
+func (s *Source) cacheGistInfo(g *github.Gist) {
+	info := repoInfo{
+		owner: g.GetOwner().GetLogin(),
+	}
+	if g.GetPublic() {
+		info.visibility = source_metadatapb.Visibility_public
+	} else {
+		info.visibility = source_metadatapb.Visibility_private
+	}
+	s.repoInfoCache.put(g.GetGitPullURL(), info)
 }
 
 // wikiIsReachable returns true if https://github.com/$org/$repo/wiki is not redirected.
@@ -329,12 +393,19 @@ type commitQuery struct {
 // getDiffForFileInCommit retrieves the diff for a specified file in a commit.
 // If the file or its diff is not found, it returns an error.
 func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
-	commit, _, err := s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
-	if s.handleRateLimit(err) {
-		return "", fmt.Errorf("error fetching commit %s due to rate limit: %w", query.sha, err)
-	}
-	if err != nil {
-		return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+	var (
+		commit *github.RepositoryCommit
+		err    error
+	)
+	for {
+		commit, _, err = s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
+		if s.handleRateLimit(err) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
+		}
+		break
 	}
 
 	if len(commit.Files) == 0 {

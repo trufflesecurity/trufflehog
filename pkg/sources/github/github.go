@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"golang.org/x/exp/rand"
+	"golang.org/x/oauth2"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
-	"github.com/google/go-github/v57/github"
-	"golang.org/x/oauth2"
+	"github.com/google/go-github/v62/github"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -404,31 +404,59 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 	}
 
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
+
+RepoLoop:
 	for _, repo := range s.filteredRepoCache.Values() {
+		repoCtx := context.WithValue(ctx, "repo", repo)
+
 		r, ok := repo.(string)
 		if !ok {
-			ctx.Logger().Error(fmt.Errorf("type assertion failed"), "unexpected value in cache", "repo", repo)
+			repoCtx.Logger().Error(fmt.Errorf("type assertion failed"), "Unexpected value in cache")
 			continue
 		}
 
-		_, urlParts, err := getRepoURLParts(r)
-		if err != nil {
-			ctx.Logger().Error(err, "failed to parse repository URL")
-			continue
-		}
+		// Ensure that |s.repoInfoCache| contains an entry for |repo|.
+		// This compensates for differences in enumeration logic between `--org` and `--repo`.
+		// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
+		if _, ok := s.repoInfoCache.get(r); !ok {
+			repoCtx.Logger().V(2).Info("Caching repository info")
 
-		// Ignore any gists in |s.filteredRepoCache|.
-		// Repos have three parts (github.com, owner, name), gists have two.
-		if len(urlParts) == 3 {
-			// Ensure that individual repos specified in --repo are cached.
-			// Gists should be cached elsewhere.
-			// https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
-			ghRepo, _, err := s.apiClient.Repositories.Get(ctx, urlParts[1], urlParts[2])
+			_, urlParts, err := getRepoURLParts(r)
 			if err != nil {
-				ctx.Logger().Error(err, "failed to fetch repository")
+				repoCtx.Logger().Error(err, "Failed to parse repository URL")
 				continue
 			}
-			s.cacheRepoInfo(ghRepo)
+
+			if strings.EqualFold(urlParts[0], "gist.github.com") {
+				// Cache gist info.
+				for {
+					gistID := extractGistID(urlParts)
+					gist, _, err := s.apiClient.Gists.Get(repoCtx, gistID)
+					if s.handleRateLimit(err) {
+						continue
+					}
+					if err != nil {
+						repoCtx.Logger().Error(err, "Failed to fetch gist")
+						continue RepoLoop
+					}
+					s.cacheGistInfo(gist)
+					break
+				}
+			} else {
+				// Cache repository info.
+				for {
+					ghRepo, _, err := s.apiClient.Repositories.Get(repoCtx, urlParts[1], urlParts[2])
+					if s.handleRateLimit(err) {
+						continue
+					}
+					if err != nil {
+						repoCtx.Logger().Error(err, "Failed to fetch repository")
+						continue RepoLoop
+					}
+					s.cacheRepoInfo(ghRepo)
+					break
+				}
+			}
 		}
 		s.repos = append(s.repos, r)
 	}
@@ -452,8 +480,17 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, apiEndpoint string, bas
 	s.apiClient = ghClient
 
 	for _, org := range s.orgsCache.Keys() {
-		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+		orgCtx := context.WithValue(ctx, "account", org)
+		userType, err := s.getReposByOrgOrUser(ctx, org)
+		if err != nil {
+			orgCtx.Logger().Error(err, "error fetching repos for org or user")
+			continue
+		}
+
+		if userType == organization && s.conn.ScanUsers {
+			if err := s.addMembersByOrg(ctx, org); err != nil {
+				orgCtx.Logger().Error(err, "Unable to add members by org")
+			}
 		}
 	}
 
@@ -471,17 +508,15 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint strin
 	}
 
 	for _, org := range s.orgsCache.Keys() {
-		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org")
+		orgCtx := context.WithValue(ctx, "account", org)
+		userType, err := s.getReposByOrgOrUser(ctx, org)
+		if err != nil {
+			orgCtx.Logger().Error(err, "error fetching repos for org or user")
+			continue
 		}
 
-		// We probably don't need to do this, since getting repos by org makes more sense?
-		if err := s.getReposByUser(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for user")
-		}
-
-		if s.conn.ScanUsers {
-			s.log.Info("Enumerating unauthenticated does not support scanning organization members")
+		if userType == organization && s.conn.ScanUsers {
+			orgCtx.Logger().Info("WARNING: Enumerating unauthenticated does not support scanning organization members (--include-members)")
 		}
 	}
 }
@@ -534,16 +569,16 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	if s.orgsCache.Count() > 0 {
 		specificScope = true
 		for _, org := range s.orgsCache.Keys() {
-			logger := s.log.WithValues("org", org)
-			if err := s.getReposByOrg(ctx, org); err != nil {
-				logger.Error(err, "error fetching repos for org")
+			orgCtx := context.WithValue(ctx, "account", org)
+			userType, err := s.getReposByOrgOrUser(ctx, org)
+			if err != nil {
+				orgCtx.Logger().Error(err, "error fetching repos for org or user")
+				continue
 			}
 
-			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, org)
-				if err != nil {
-					logger.Error(err, "Unable to add members by org")
-					continue
+			if userType == organization && s.conn.ScanUsers {
+				if err := s.addMembersByOrg(ctx, org); err != nil {
+					orgCtx.Logger().Error(err, "Unable to add members by org")
 				}
 			}
 		}
@@ -565,27 +600,28 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		}
 
 		for _, org := range s.orgsCache.Keys() {
-			logger := s.log.WithValues("org", org)
-			if err := s.getReposByOrg(ctx, org); err != nil {
-				logger.Error(err, "error fetching repos by org")
+			orgCtx := context.WithValue(ctx, "account", org)
+			userType, err := s.getReposByOrgOrUser(ctx, org)
+			if err != nil {
+				orgCtx.Logger().Error(err, "error fetching repos for org or user")
+				continue
 			}
 
-			if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-				logger.Error(err, "error fetching repos by user")
-			}
-
-			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, org)
-				if err != nil {
-					logger.Error(err, "Unable to add members by org for org")
+			if userType == organization && s.conn.ScanUsers {
+				if err := s.addMembersByOrg(ctx, org); err != nil {
+					orgCtx.Logger().Error(err, "Unable to add members by org for org")
 				}
 			}
+		}
+
+		if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
+			s.log.Error(err, "error fetching repos for the current user", "user", ghUser.GetLogin())
 		}
 
 		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
 		// So if we don't have ScanUsers enabled, add the user gists as normal.
 		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
-			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
+			s.log.Error(err, "error fetching gists for the current user", "user", ghUser.GetLogin())
 		}
 
 		return nil
@@ -665,7 +701,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 			s.log.Info("Scanning repos", "org_members", len(s.memberCache))
 			for member := range s.memberCache {
 				logger := s.log.WithValues("member", member)
-				if err := s.getReposByUser(ctx, member); err != nil {
+				if err := s.addUserGistsToCache(ctx, member); err != nil {
 					logger.Error(err, "error fetching gists by user")
 				}
 				if err := s.getReposByUser(ctx, member); err != nil {
@@ -902,16 +938,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 
 		for _, gist := range gists {
 			s.filteredRepoCache.Set(gist.GetID(), gist.GetGitPullURL())
-
-			info := repoInfo{
-				owner: gist.GetOwner().GetLogin(),
-			}
-			if gist.GetPublic() {
-				info.visibility = source_metadatapb.Visibility_public
-			} else {
-				info.visibility = source_metadatapb.Visibility_private
-			}
-			s.repoInfoCache.put(gist.GetGitPullURL(), info)
+			s.cacheGistInfo(gist)
 		}
 
 		if res == nil || res.NextPage == 0 {
@@ -998,7 +1025,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	logger := s.log.WithValues("user", user)
 	for {
 		orgs, resp, err := s.apiClient.Organizations.List(ctx, "", orgOpts)
-		if handled := s.handleRateLimit(err); handled {
+		if s.handleRateLimit(err) {
 			continue
 		}
 		if err != nil {

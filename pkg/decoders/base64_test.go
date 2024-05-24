@@ -123,7 +123,14 @@ func TestBase64_FromChunk(t *testing.T) {
 				Data: []byte(`b64urlsafe-test-secret-underscores??`),
 			},
 		},
+		{
+			name: "invalid base64 string",
+			chunk: &sources.Chunk{
+				Data: []byte(`a3d3fa7c2bb99e469ba55e5834ce79ee4853a8a3`),
+			},
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := &Base64{}

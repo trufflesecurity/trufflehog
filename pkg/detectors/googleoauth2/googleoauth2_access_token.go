@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -65,11 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.SetVerificationError(vErr)
 		}
 
-		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-		if !s1.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
-			continue
-		}
-
 		results = append(results, s1)
 	}
 	return
@@ -122,7 +118,7 @@ func (s Scanner) verify(ctx context.Context, token string) (bool, map[string]str
 			return false, nil, fmt.Errorf("unexpected error description '%s' for %s", errInfo.Error, req.URL)
 		}
 	} else {
-		return false, nil, fmt.Errorf("unexpected respones %d for %s", res.StatusCode, req.URL)
+		return false, nil, fmt.Errorf("unexpected response %d for %s", res.StatusCode, req.URL)
 	}
 }
 

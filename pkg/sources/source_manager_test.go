@@ -242,7 +242,7 @@ func TestSourceManagerNonFatalError(t *testing.T) {
 }
 
 func TestSourceManagerContextCancelled(t *testing.T) {
-	mgr := NewManager(WithBufferedOutput(8))
+	mgr := NewManager(WithBufferedOutput(16))
 	source, err := buildDummy(&counterChunker{count: 100})
 	assert.NoError(t, err)
 

@@ -16,7 +16,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v62/github"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -451,20 +451,17 @@ func BenchmarkEnumerateWithToken(b *testing.B) {
 func TestEnumerate(t *testing.T) {
 	defer gock.Off()
 
+	// Arrange
 	gock.New("https://api.github.com").
 		Get("/user").
 		Reply(200).
 		JSON(map[string]string{"login": "super-secret-user"})
 
+	//
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "full_name": "super-secret-user/super-secret-repo"}})
-
-	gock.New("https://api.github.com").
-		Get("/repos/super-secret-user/super-secret-repo").
-		Reply(200).
-		JSON(`{"owner": {"login": "super-secret-user"}, "name": "super-secret-repo", "full_name": "super-secret-user/super-secret-repo", "has_wiki": false, "size": 1}`)
+		JSON(`[{"name": "super-secret-repo", "full_name": "super-secret-user/super-secret-repo", "owner": {"login": "super-secret-user"}, "clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "has_wiki": false, "size": 1}]`)
 
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
@@ -483,12 +480,50 @@ func TestEnumerate(t *testing.T) {
 		},
 	})
 
+	// Manually cache a repository to ensure that enumerate
+	// doesn't make duplicate API calls.
+	// See https://github.com/trufflesecurity/trufflehog/pull/2625
+	repo := func() *github.Repository {
+		var (
+			name     = "cached-repo"
+			fullName = "cached-user/cached-repo"
+			login    = "cached-user"
+			cloneUrl = "https://github.com/cached-user/cached-repo.git"
+			owner    = &github.User{
+				Login: &login,
+			}
+			hasWiki = false
+			size    = 1234
+		)
+		return &github.Repository{
+			Name:     &name,
+			FullName: &fullName,
+			Owner:    owner,
+			HasWiki:  &hasWiki,
+			Size:     &size,
+			CloneURL: &cloneUrl,
+		}
+	}()
+	s.cacheRepoInfo(repo)
+	s.filteredRepoCache.Set(repo.GetFullName(), repo.GetCloneURL())
+
+	// Act
 	_, err := s.enumerate(context.Background(), "https://api.github.com")
+
+	// Assert
 	assert.Nil(t, err)
-	assert.Equal(t, 2, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
+	// Enumeration found all repos.
+	assert.Equal(t, 3, s.filteredRepoCache.Count())
+	assert.True(t, s.filteredRepoCache.Exists("super-secret-user/super-secret-repo"))
+	assert.True(t, s.filteredRepoCache.Exists("cached-user/cached-repo"))
+	assert.True(t, s.filteredRepoCache.Exists("2801a2b0523099d0614a951579d99ba9"))
+	// Enumeration cached all repos.
+	assert.Equal(t, 3, len(s.repoInfoCache.cache))
+	_, ok := s.repoInfoCache.get("https://github.com/super-secret-user/super-secret-repo.git")
 	assert.True(t, ok)
-	ok = s.filteredRepoCache.Exists("2801a2b0523099d0614a951579d99ba9")
+	_, ok = s.repoInfoCache.get("https://github.com/cached-user/cached-repo.git")
+	assert.True(t, ok)
+	_, ok = s.repoInfoCache.get("https://gist.github.com/2801a2b0523099d0614a951579d99ba9.git")
 	assert.True(t, ok)
 	assert.True(t, gock.IsDone())
 }
@@ -745,7 +780,6 @@ func TestGetRepoURLParts(t *testing.T) {
 	tests := []string{
 		"https://github.com/trufflesecurity/trufflehog.git",
 		"git+https://github.com/trufflesecurity/trufflehog.git",
-		//"git@github.com:trufflesecurity/trufflehog.git",
 		"ssh://github.com/trufflesecurity/trufflehog.git",
 		"ssh://git@github.com/trufflesecurity/trufflehog.git",
 		"git+ssh://git@github.com/trufflesecurity/trufflehog.git",

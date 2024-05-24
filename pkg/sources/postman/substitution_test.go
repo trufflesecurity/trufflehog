@@ -46,9 +46,9 @@ func TestSource_KeywordCombinations(t *testing.T) {
 		},
 		keywords: make(map[string]struct{}),
 	}
-	s.addKeyword("keyword1")
-	s.addKeyword("keyword2")
-	s.addKeyword("keyword3")
+	s.attemptToAddKeyword("keyword1")
+	s.attemptToAddKeyword("keyword2")
+	s.attemptToAddKeyword("keyword3")
 
 	// remove that \n from the end of the string
 	got := strings.Split(strings.TrimSuffix(s.keywordCombinations("test"), "\n"), "\n")
@@ -68,6 +68,9 @@ func TestSource_BuildSubstituteSet(t *testing.T) {
 	}
 	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "var1", "value1")
 	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "var2", "value2")
+	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "", "value2")
+	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "continuation_token", "'{{continuation_token}}'")     // this caused an infinite loop in the original implementation
+	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "continuation_token2", "'{{{continuation_token2}}}'") // this caused an infinite loop in the original implementation
 
 	metadata := Metadata{
 		Type: GLOBAL_TYPE,
@@ -81,6 +84,8 @@ func TestSource_BuildSubstituteSet(t *testing.T) {
 		{"{{var2}}", []string{"value2"}},
 		{"{{var1}}:{{var2}}", []string{"value1:value2"}},
 		{"no variables", []string{"no variables"}},
+		{"{{var1}}:{{continuation_token}}", []string{"value1:'continuation_token'"}},
+		{"{{var1}}:{{continuation_token2}}", []string{"value1:'{continuation_token2}'"}},
 	}
 
 	for _, tc := range testCases {
@@ -117,9 +122,9 @@ func TestSource_FormatAndInjectKeywords(t *testing.T) {
 		},
 		keywords: make(map[string]struct{}),
 	}
-	s.addKeyword("keyword1")
-	s.addKeyword("keyword2")
-	s.addKeyword("keyword3")
+	s.attemptToAddKeyword("keyword1")
+	s.attemptToAddKeyword("keyword2")
+	s.attemptToAddKeyword("keyword3")
 
 	testCases := []struct {
 		input    []string

@@ -17,12 +17,11 @@ import (
 )
 
 var (
-	boldYellowPrinter = color.New(color.Bold, color.FgYellow)
-	yellowPrinter     = color.New(color.FgHiYellow)
-	greenPrinter      = color.New(color.FgHiGreen)
-	boldGreenPrinter  = color.New(color.Bold, color.FgHiGreen)
-	whitePrinter      = color.New(color.FgWhite)
-	boldWhitePrinter  = color.New(color.Bold, color.FgWhite)
+	yellowPrinter    = color.New(color.FgYellow)
+	greenPrinter     = color.New(color.FgHiGreen)
+	boldGreenPrinter = color.New(color.Bold, color.FgHiGreen)
+	whitePrinter     = color.New(color.FgWhite)
+	boldWhitePrinter = color.New(color.Bold, color.FgWhite)
 )
 
 // PlainPrinter is a printer that prints results in plain text format.
@@ -49,13 +48,12 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 
 	if out.Verified {
 		boldGreenPrinter.Print("✅ Found verified result 🐷🔑\n")
-	} else if out.VerificationError != nil {
-		printer = yellowPrinter
-		boldYellowPrinter.Print("⚠️ Found result - unable to verify due to error 🐷🔑❗️\n")
-		printer.Printf("Verification Error: %s\n", out.VerificationError)
 	} else {
 		printer = whitePrinter
 		boldWhitePrinter.Print("Found unverified result 🐷🔑❓\n")
+		if out.VerificationError != nil {
+			yellowPrinter.Printf("Verification issue: %s\n", out.VerificationError)
+		}
 	}
 	printer.Printf("Detector Type: %s\n", out.DetectorType)
 	printer.Printf("Decoder Type: %s\n", out.DecoderType)

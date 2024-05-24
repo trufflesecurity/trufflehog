@@ -19,13 +19,11 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v62/github"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -562,29 +560,55 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			break
 		}
 
-		fullHash := diff.Commit.Hash
+		commit := diff.Commit
+		fullHash := commit.Hash
 		if scanOptions.BaseHash != "" && scanOptions.BaseHash == fullHash {
 			logger.V(1).Info("reached base commit", "commit", fullHash)
 			break
 		}
+
+		email := commit.Author
+		when := commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
 
 		if fullHash != lastCommitHash {
 			depth++
 			lastCommitHash = fullHash
 			atomic.AddUint64(&s.metrics.commitsScanned, 1)
 			logger.V(5).Info("scanning commit", "commit", fullHash)
-		}
 
-		if !scanOptions.Filter.Pass(diff.PathB) {
-			continue
+			// Scan the commit metadata.
+			// See https://github.com/trufflesecurity/trufflehog/issues/2683
+			var (
+				metadata = s.sourceMetadataFunc("", email, fullHash, when, remoteURL, 0)
+				sb       strings.Builder
+			)
+			sb.WriteString(email)
+			sb.WriteString("\n")
+			sb.WriteString(commit.Committer)
+			sb.WriteString("\n")
+			sb.WriteString(commit.Message.String())
+			chunk := sources.Chunk{
+				SourceName:     s.sourceName,
+				SourceID:       s.sourceID,
+				JobID:          s.jobID,
+				SourceType:     s.sourceType,
+				SourceMetadata: metadata,
+				Data:           []byte(sb.String()),
+				Verify:         s.verify,
+			}
+			if err := reporter.ChunkOk(ctx, chunk); err != nil {
+				return err
+			}
 		}
 
 		fileName := diff.PathB
 		if fileName == "" {
 			continue
 		}
-		email := diff.Commit.Author
-		when := diff.Commit.Date.UTC().Format("2006-01-02 15:04:05 -0700")
+
+		if !scanOptions.Filter.Pass(fileName) {
+			continue
+		}
 
 		// Handle binary files by reading the entire file rather than using the diff.
 		if diff.IsBinary {
@@ -1186,71 +1210,30 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	var handlerOpts []handlers.Option
-
-	if s.skipArchives {
-		handlerOpts = append(handlerOpts, handlers.WithSkipArchives(true))
-	}
-
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	fileReader, err := cmd.StdoutPipe()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	if err := cmd.Start(); err != nil {
-		return err
-	}
 	defer func() {
-		if err := fileReader.Close(); err != nil {
-			ctx.Logger().Error(err, "error closing fileReader")
-		}
-		if err := cmd.Wait(); err != nil {
-			ctx.Logger().Error(
-				err, "error waiting for command",
-				"command", cmd.String(),
-				"stderr", stderr.String(),
-				"commit", commitHash,
-			)
+		if err = cmd.Wait(); err != nil {
+			ctx.Logger().Error(fmt.Errorf(
+				"error waiting for command: command=%s, stderr=%s, commit=%s: %w",
+				cmd.String(), stderr.String(), commitHash.String(), err,
+			), "waiting for command failed")
 		}
 	}()
 
-	bufferName := cleantemp.MkFilename()
-
-	reader, err := diskbufferreader.New(fileReader, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
-		return nil
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	fileCtx.Logger().V(1).Info("binary file not handled, chunking raw")
-	if err := reader.Reset(); err != nil {
-		return err
-	}
-	reader.Stop()
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(fileCtx, reader)
-	for data := range chunkResChan {
-		chunk := *chunkSkel
-		chunk.Data = data.Bytes()
-		if err := data.Error(); err != nil {
-			return err
-		}
-		if err := reporter.ChunkOk(fileCtx, chunk); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return handlers.HandleFile(fileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {

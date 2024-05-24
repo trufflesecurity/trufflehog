@@ -261,7 +261,7 @@ enum DetectorType {
   Wrike = 248;
   Float = 249;
   Imagekit = 250;
-  Integromat = 251;
+  Integromat = 251 [deprecated = true];
   Salesblink = 252;
   Bored = 253;
   Campayn = 254;
@@ -991,6 +991,13 @@ enum DetectorType {
   AzureSQL = 979;
   FlyIO = 980;
   BuiltWith = 981;
+  JupiterOne = 982;
+  GCPApplicationDefaultCredentials = 983;
+  Wiz = 984;
+  Pagarme = 985;
+  Onfleet = 986;
+  Intra42 = 987;
+  Groq = 988;
 }
 
 message Result {
@@ -1006,6 +1013,13 @@ message Result {
   // This field should only be populated if the verification process itself failed in a way that provides no information
   // about the verification status of the candidate secret, such as if the verification request timed out.
   string verification_error_message = 10;
+
+  FalsePositiveInfo false_positive_info = 11;
+}
+
+message FalsePositiveInfo {
+  bool word_match = 1;
+  bool low_entropy = 2;
 }
 
 message StructuredData {

@@ -1,4 +1,4 @@
-// Package bufferwritter provides a contentWriter implementation using a shared buffer pool for memory management.
+// Package bufferwriter provides a contentWriter implementation using a shared buffer pool for memory management.
 package bufferwriter
 
 import (
@@ -6,22 +6,23 @@ import (
 	"io"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
 )
 
 type metrics struct{}
 
-func (metrics) recordDataProcessed(size uint64, dur time.Duration) {
-	totalWriteSize.Add(float64(size))
+func (metrics) recordDataProcessed(size int64, dur time.Duration) {
+	writeSize.Observe(float64(size))
 	totalWriteDuration.Add(float64(dur.Microseconds()))
 }
 
-func init() { bufferPool = buffer.NewBufferPool() }
+const defaultBufferSize = 1 << 12 // 4KB
+func init()                       { bufferPool = pool.NewBufferPool(defaultBufferSize) }
 
 // bufferPool is the shared Buffer pool used by all BufferedFileWriters.
 // This allows for efficient reuse of buffers across multiple writers.
-var bufferPool *buffer.Pool
+var bufferPool *pool.Pool
 
 // state represents the current mode of buffer.
 type state uint8
@@ -36,7 +37,7 @@ const (
 // BufferWriter implements contentWriter, using a shared buffer pool for memory management.
 type BufferWriter struct {
 	buf     *buffer.Buffer // The current buffer in use.
-	bufPool *buffer.Pool   // The buffer pool used to manage the buffer.
+	bufPool *pool.Pool     // The buffer pool used to manage the buffer.
 	size    int            // The total size of the content written to the buffer.
 	state   state          // The current state of the buffer.
 
@@ -44,37 +45,30 @@ type BufferWriter struct {
 }
 
 // New creates a new instance of BufferWriter.
-func New(ctx context.Context) *BufferWriter {
-	buf := bufferPool.Get(ctx)
-	if buf == nil {
-		buf = buffer.NewBuffer()
-	}
-	return &BufferWriter{buf: buf, state: writeOnly, bufPool: bufferPool}
+func New() *BufferWriter {
+	return &BufferWriter{state: writeOnly, bufPool: bufferPool}
 }
 
-// Write delegates the writing operation to the underlying bytes.Buffer, ignoring the context.
-// The context is included to satisfy the contentWriter interface, allowing for future extensions
-// where context handling might be necessary (e.g., for timeouts or cancellation).
-func (b *BufferWriter) Write(ctx context.Context, data []byte) (int, error) {
+// Write delegates the writing operation to the underlying bytes.Buffer.
+func (b *BufferWriter) Write(data []byte) (int, error) {
 	if b.state != writeOnly {
 		return 0, fmt.Errorf("buffer must be in write-only mode to write data; current state: %d", b.state)
+	}
+	if b.buf == nil {
+		b.buf = b.bufPool.Get()
+		if b.buf == nil {
+			b.buf = buffer.NewBuffer()
+		}
 	}
 
 	size := len(data)
 	b.size += size
 	start := time.Now()
 	defer func(start time.Time) {
-		bufferLength := uint64(b.buf.Len())
-		b.metrics.recordDataProcessed(bufferLength, time.Since(start))
-
-		ctx.Logger().V(4).Info(
-			"write complete",
-			"data_size", size,
-			"buffer_len", bufferLength,
-			"buffer_size", b.buf.Cap(),
-		)
+		b.metrics.recordDataProcessed(int64(size), time.Since(start))
 	}(start)
-	return b.buf.Write(ctx, data)
+
+	return b.buf.Write(data)
 }
 
 // ReadCloser provides a read-closer for the buffer's content.
@@ -83,6 +77,9 @@ func (b *BufferWriter) Write(ctx context.Context, data []byte) (int, error) {
 func (b *BufferWriter) ReadCloser() (io.ReadCloser, error) {
 	if b.state != readOnly {
 		return nil, fmt.Errorf("buffer is in read-only mode")
+	}
+	if b.buf == nil {
+		return nil, fmt.Errorf("writer buffer is nil")
 	}
 
 	return buffer.ReadCloser(b.buf.Bytes(), func() { b.bufPool.Put(b.buf) }), nil

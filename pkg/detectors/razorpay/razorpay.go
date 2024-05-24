@@ -50,7 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequest("GET", "https://api.razorpay.com/v1/items?count=1", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.razorpay.com/v1/items?count=1", nil)
 				if err != nil {
 					continue
 				}
@@ -68,10 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						}
 					}
 				}
-			}
-
-			if !s1.Verified && detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s1)

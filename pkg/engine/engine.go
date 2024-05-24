@@ -30,7 +30,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-var overlapError = errors.New("More than one detector has found this result. For your safety, verification has been disabled. You can override this behavior by using the --allow-verification-overlap flag.")
+var errOverlap = errors.New(
+	"More than one detector has found this result. For your safety, verification has been disabled." +
+		"You can override this behavior by using the --allow-verification-overlap flag.",
+)
 
 // Metrics for the scan engine for external consumption.
 type Metrics struct {
@@ -72,6 +75,7 @@ type Engine struct {
 	notifyVerifiedResults   bool
 	notifyUnverifiedResults bool
 	notifyUnknownResults    bool
+	logFilteredUnverified   bool
 	verificationOverlap     bool
 	printAvgDetectorTime    bool
 
@@ -181,6 +185,9 @@ func WithResults(results map[string]struct{}) Option {
 
 		_, ok = results["unverified"]
 		e.notifyUnverifiedResults = ok
+
+		_, ok = results["filtered_unverified"]
+		e.logFilteredUnverified = ok
 	}
 }
 
@@ -379,7 +386,9 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	e.notifyVerifiedResults = true
 	e.notifyUnknownResults = true
 	e.notifyUnverifiedResults = true
-	e.verificationOverlapChunksChan = make(chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier)
+	e.verificationOverlapChunksChan = make(
+		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
+	)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
 	e.dedupeCache = cache
 	e.printer = new(output.PlainPrinter)
@@ -398,11 +407,13 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 }
 
 func (e *Engine) initSourceManager(ctx context.Context) {
+	const defaultOutputBufferSize = 64
+
 	opts := []func(*sources.SourceManager){
-		sources.WithConcurrentSources(int(e.concurrency)),
-		sources.WithConcurrentUnits(int(e.concurrency)),
+		sources.WithConcurrentSources(e.concurrency),
+		sources.WithConcurrentUnits(e.concurrency),
 		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultChannelBuffer),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
 	}
 	if e.jobReportWriter != nil {
 		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
@@ -522,7 +533,7 @@ func (e *Engine) startWorkers(ctx context.Context) {
 	const notifierWorkerRatio = 4
 	maxNotifierWorkers := 1
 	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
-		maxNotifierWorkers = int(numWorkers)
+		maxNotifierWorkers = numWorkers
 	}
 	ctx.Logger().V(2).Info("starting notifier workers", "count", maxNotifierWorkers)
 	for worker := 0; worker < maxNotifierWorkers; worker++ {
@@ -600,43 +611,41 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	// Reuse the same map to avoid allocations.
 	const avgDetectorsPerChunk = 8
 	chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, avgDetectorsPerChunk)
-	for originalChunk := range e.ChunksChan() {
-		for chunk := range sources.Chunker(originalChunk) {
-			atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
-			for _, decoder := range e.decoders {
-				decoded := decoder.FromChunk(chunk)
-				if decoded == nil {
-					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
-					continue
-				}
+	for chunk := range e.ChunksChan() {
+		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
+		for _, decoder := range e.decoders {
+			decoded := decoder.FromChunk(chunk)
+			if decoded == nil {
+				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+				continue
+			}
 
-				matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
-				if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
-					wgVerificationOverlap.Add(1)
-					e.verificationOverlapChunksChan <- verificationOverlapChunk{
-						chunk:                       *decoded.Chunk,
-						detectors:                   matchingDetectors,
-						decoder:                     decoded.DecoderType,
-						verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
-					}
-					// Empty the map.
-					for k := range chunkSpecificDetectors {
-						delete(chunkSpecificDetectors, k)
-					}
-					continue
+			matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
+			if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
+				wgVerificationOverlap.Add(1)
+				e.verificationOverlapChunksChan <- verificationOverlapChunk{
+					chunk:                       *decoded.Chunk,
+					detectors:                   matchingDetectors,
+					decoder:                     decoded.DecoderType,
+					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
 				}
-
-				for k, detector := range chunkSpecificDetectors {
-					decoded.Chunk.Verify = e.verify
-					wgDetect.Add(1)
-					e.detectableChunksChan <- detectableChunk{
-						chunk:    *decoded.Chunk,
-						detector: detector,
-						decoder:  decoded.DecoderType,
-						wgDoneFn: wgDetect.Done,
-					}
+				// Empty the map.
+				for k := range chunkSpecificDetectors {
 					delete(chunkSpecificDetectors, k)
 				}
+				continue
+			}
+
+			for k, detector := range chunkSpecificDetectors {
+				decoded.Chunk.Verify = e.verify
+				wgDetect.Add(1)
+				e.detectableChunksChan <- detectableChunk{
+					chunk:    *decoded.Chunk,
+					detector: detector,
+					decoder:  decoded.DecoderType,
+					wgDoneFn: wgDetect.Done,
+				}
+				delete(chunkSpecificDetectors, k)
 			}
 		}
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
@@ -739,7 +748,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					if e.verificationOverlapTracker != nil {
 						e.verificationOverlapTracker.increment()
 					}
-					res.SetVerificationError(overlapError)
+					res.SetVerificationError(errOverlap)
 					e.processResult(ctx, detectableChunk{
 						chunk:    chunk.chunk,
 						detector: detector,
@@ -785,7 +794,6 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	}
 
 	wgDetect.Wait()
-	ctx.Logger().V(4).Info("finished verificationOverlap chunks")
 }
 
 func (e *Engine) detectChunks(ctx context.Context) {
@@ -827,8 +835,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results = detectors.CleanResults(results)
 	}
 
+	results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
+
 	if e.filterEntropy != nil {
-		results = detectors.FilterResultsWithEntropy(results, *e.filterEntropy)
+		results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, e.logFilteredUnverified)
 	}
 
 	for _, res := range results {

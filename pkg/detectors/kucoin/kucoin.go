@@ -79,7 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					signature := getKucoinSignature(resSecretMatch, timestamp, method, endpoint, bodyStr)
 					passPhrase := getKucoinPassphrase(resSecretMatch, resPassphraseMatch)
 
-					req, err := http.NewRequest(method, "https://api.kucoin.com"+endpoint, nil)
+					req, err := http.NewRequestWithContext(ctx, method, "https://api.kucoin.com"+endpoint, nil)
 					if err != nil {
 						continue
 					}
@@ -94,15 +94,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						defer res.Body.Close()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
-						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resKeyMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
-
-							if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}

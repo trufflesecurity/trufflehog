@@ -16,13 +16,23 @@
 
 ---
 
-# :mag_right: _Now Scanning_
+# :mag_right: *Now Scanning*
 
 <div align="center">
 
 <img src="assets/scanning_logos.svg">
 
 **...and more**
+
+To learn more about about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
+
+</div>
+
+# :globe_with_meridians: TruffleHog Enterprise
+
+Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint, and more..** for credentials? We have an enterprise product that can help! Learn more at <https://trufflesecurity.com/trufflehog-enterprise>.
+
+We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
 
 </div>
 
@@ -46,30 +56,68 @@ docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --or
 
 Several options available for you:
 
+### MacOS users
+
 ```bash
-# MacOS users
 brew install trufflehog
+```
 
-# Docker
+### Docker:
+
+<sub><i>_Ensure Docker engine is running before executing the following commands:_</i></sub>
+
+#### &nbsp;&nbsp;&nbsp;&nbsp;Unix
+
+```bash
 docker run --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+```
 
-# Docker for M1 and M2 Mac
+#### &nbsp;&nbsp;&nbsp;&nbsp;Windows Command Prompt
+
+```bash
+docker run --rm -it -v "%cd:/=\%:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+```
+
+#### &nbsp;&nbsp;&nbsp;&nbsp;Windows PowerShell
+
+```bash
+docker run --rm -it -v "${PWD}:/pwd" trufflesecurity/trufflehog github --repo https://github.com/trufflesecurity/test_keys
+```
+
+#### &nbsp;&nbsp;&nbsp;&nbsp;M1 and M2 Mac
+
+```bash
 docker run --platform linux/arm64 --rm -it -v "$PWD:/pwd" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys
+```
 
-# Binary releases
+### Binary releases
+
+```bash
 Download and unpack from https://github.com/trufflesecurity/trufflehog/releases
+```
 
-# Compile from source
+### Compile from source
+
+```bash
 git clone https://github.com/trufflesecurity/trufflehog.git
 cd trufflehog; go install
+```
 
-# Using installation script
+### Using installation script
+
+```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+```
 
-# Using installation script, verify checksum signature (requires cosign to be installed)
+### Using installation script, verify checksum signature (requires cosign to be installed)
+
+```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -v -b /usr/local/bin
+```
 
-# Using installation script to install a specific version
+### Using installation script to install a specific version
+
+```bash
 curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin <ReleaseTag like v3.56.0>
 ```
 
@@ -159,7 +207,7 @@ Expected output:
 ...
 ```
 
-## 4: Scan a GitHub Repo + its Issues and Pull Requests.
+## 4: Scan a GitHub Repo + its Issues and Pull Requests
 
 ```bash
 trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments
@@ -189,13 +237,13 @@ docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest 
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 9: Scan GCS buckets for verified secrets.
+## 9: Scan GCS buckets for verified secrets
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
-## 10: Scan a Docker image for verified secrets.
+## 10: Scan a Docker image for verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
@@ -209,6 +257,14 @@ Set the `--since-commit` flag to your default branch that people merge into (ex:
 
 ```bash
 trufflehog git file://. --since-commit main --branch feature-1 --only-verified --fail
+```
+
+## 12: Scan a Postman workspace
+
+Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
+
+```bash
+trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
 
 # :question: FAQ
@@ -244,12 +300,13 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - github
 - gitlab
 - docker
-- S3
+- s3
 - filesystem (files and directories)
 - syslog
 - circleci
 - travisci
-- GCS (Google Cloud Storage)
+- gcs (Google Cloud Storage)
+- postman
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
@@ -311,7 +368,7 @@ Args:
 For example, to scan a `git` repository, start with
 
 ```
-$ trufflehog git https://github.com/trufflesecurity/trufflehog.git
+trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
 
 ## S3
@@ -371,7 +428,6 @@ jobs:
 
 In the example config above, we're scanning for live secrets in all PRs and Pushes to `main`. Only code changes in the referenced commits are scanned. If you'd like to scan an entire branch, please see the "Advanced Usage" section below.
 
-
 ### Shallow Cloning
 
 If you're incorporating TruffleHog into a standalone workflow and aren't running any other CI/CD tooling alongside TruffleHog, then we recommend using [Shallow Cloning](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt---depthltdepthgt) to speed up your workflow. Here's an example for how to do it:
@@ -401,6 +457,7 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
 Depending on the event type (push or PR), we calculate the number of commits present. Then we add 2, so that we can reference a base commit before our code changes. We pass that integer value to the `fetch-depth` flag in the checkout action in addition to the relevant branch. Now our checkout process should be much shorter.
 
 ### Canary detection
+
 TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/) and lets you know when they're present without setting them off. You can learn more here: [https://trufflesecurity.com/canaries](https://trufflesecurity.com/canaries)
 
 ![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/74ace530-08c5-4eaf-a169-84a73e328f6f)
@@ -424,6 +481,7 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
 If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
 
 #### Advanced Usage: Scan entire branch
+
 ```
 - name: scan-push
         uses: trufflesecurity/trufflehog@main
@@ -432,6 +490,31 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
           head: ${{ github.ref_name }}
           extra_args: --only-verified
 ```
+
+## TruffleHog GitLab CI
+
+### Example Usage
+
+```yaml
+stages:
+  - security
+
+security-secrets:
+  stage: security
+  allow_failure: false
+  image: alpine:latest
+  variables:
+    SCAN_PATH: "." # Set the relative path in the repo to scan
+  before_script:
+    - apk add --no-cache git curl jq
+    - curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+  script:
+    - trufflehog filesystem "$SCAN_PATH" --only-verified --fail --json | jq
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+```
+
+In the example pipeline above, we're scanning for live secrets in all repository directories and files. This job runs only when the pipeline source is a merge request event, meaning it's triggered when a new merge request is created.
 
 ## Pre-commit Hook
 
@@ -491,7 +574,6 @@ detectors:
           - "Authorization: super secret authorization header"
 ```
 
-
 ```
 $ trufflehog filesystem /tmp --config config.yaml --only-verified
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
@@ -502,6 +584,7 @@ Decoder Type: PLAIN
 Raw result: HOGAAIUNNWHAHJJWUQYR
 File: /tmp/hog-facts.txt
 ```
+
 Data structure sent to the custom verification server:
 
 ```
@@ -544,7 +627,7 @@ class Verifier(BaseHTTPRequestHandler):
             self.log_message("%s", request)
 
             # check the match, you'll need to implement validateToken, which takes an array of ID's and Secrets
-            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']): 
+            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']):
                 self.send_response(200)
                 self.end_headers()
             else:
@@ -590,8 +673,3 @@ the stability of the public APIs at this time.
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
 
-# :money_with_wings: Enterprise product
-
-Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more https://trufflesecurity.com/contact/
-
-We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.

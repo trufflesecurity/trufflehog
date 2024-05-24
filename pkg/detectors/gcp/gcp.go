@@ -23,6 +23,7 @@ type Scanner struct{ client *http.Client }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -238,4 +239,8 @@ func extractPrivateKey(privateKeyPEM string) (*rsa.PrivateKey, bool) {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GCP
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
+	return false
 }

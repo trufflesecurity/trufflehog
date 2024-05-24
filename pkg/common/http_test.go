@@ -24,6 +24,10 @@ func TestRetryableHTTPClientCheckRetry(t *testing.T) {
 			name:           "Retry on 500 status, give up after 3 retries",
 			responseStatus: http.StatusInternalServerError, // Server error status
 			checkRetry: func(ctx context.Context, resp *http.Response, err error) (bool, error) {
+				if err != nil {
+					t.Errorf("expected response with 500 status, got error: %v", err)
+					return false, err
+				}
 				// The underlying transport will retry on 500 status.
 				if resp.StatusCode == http.StatusInternalServerError {
 					return true, nil
@@ -45,6 +49,10 @@ func TestRetryableHTTPClientCheckRetry(t *testing.T) {
 			name:           "Retry on 429 status, give up after 3 retries",
 			responseStatus: http.StatusTooManyRequests,
 			checkRetry: func(ctx context.Context, resp *http.Response, err error) (bool, error) {
+				if err != nil {
+					t.Errorf("expected response with 429 status, got error: %v", err)
+					return false, err
+				}
 				// The underlying transport will retry on 429 status.
 				if resp.StatusCode == http.StatusTooManyRequests {
 					return true, nil
@@ -79,7 +87,7 @@ func TestRetryableHTTPClientCheckRetry(t *testing.T) {
 
 			// Bad linter, there is no body to close.
 			_, err = client.Do(req) //nolint:bodyclose
-			if err != nil && slices.Contains([]int{http.StatusInternalServerError, http.StatusTooManyRequests}, tc.responseStatus) {
+			if slices.Contains([]int{http.StatusInternalServerError, http.StatusTooManyRequests}, tc.responseStatus) {
 				// The underlying transport will retry on 500 and 429 status.
 				assert.Error(t, err)
 			}
