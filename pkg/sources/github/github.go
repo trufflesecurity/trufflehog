@@ -14,12 +14,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/exp/rand"
-	"golang.org/x/oauth2"
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v62/github"
+	"golang.org/x/exp/rand"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -907,7 +907,9 @@ func (s *Source) cloneAndScanRepoWithReporter(ctx context.Context, client *githu
 	defer os.RemoveAll(path)
 
 	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
-	s.setScanOptions(s.conn.Base, s.conn.Head)
+	if s.scanOptions != nil {
+		s.setScanOptions(s.conn.Base, s.conn.Head)
+	}
 
 	// Repo size is not collected for wikis.
 	var logger logr.Logger
