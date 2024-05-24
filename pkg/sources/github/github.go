@@ -612,25 +612,22 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		specificScope = true
 		for _, org := range s.orgsCache.Keys() {
 			org := org
-			s.jobPool.Go(func() error {
-				logger := s.log.WithValues("org", org)
-				if err := s.getReposByOrg(ctx, org); err != nil {
-					logger.Error(err, "error fetching repos for org")
-				}
+			logger := s.log.WithValues("org", org)
+			if err := s.getReposByOrg(ctx, org); err != nil {
+				logger.Error(err, "error fetching repos for org")
+			}
 
-				if s.conn.ScanUsers {
-					err := s.addMembersByOrg(ctx, org)
-					if err != nil {
-						logger.Error(err, "Unable to add members by org")
-						return nil
-					}
+			if s.conn.ScanUsers {
+				err := s.addMembersByOrg(ctx, org)
+				if err != nil {
+					logger.Error(err, "Unable to add members by org")
+					return nil
 				}
+			}
 
-				return nil
-			})
+			return nil
 		}
 
-		_ = s.jobPool.Wait()
 	}
 
 	// If no scope was provided, enumerate them.
