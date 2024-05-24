@@ -2,6 +2,7 @@ package elasticsearch
 
 import (
 	"fmt"
+	"time"
 
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/go-errors/errors"
@@ -139,6 +140,13 @@ func (s *Source) Chunks(
 		err := indices.Update(s.ctx, s.client)
 		if err != nil {
 			return err
+		}
+
+		// Don't burn up the ES API with rapid requests if there's no work to do
+		if previousDocumentCount > 0 && indices.documentCount == 0 {
+			duration, _ := time.ParseDuration("5s")
+			time.Sleep(duration)
+			continue
 		}
 
 		// The scanCoverageRate is documentsScanned / documentsAdded. If it's < 1 we
