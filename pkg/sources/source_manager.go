@@ -320,7 +320,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, repo
 // scanned and any errors encountered.
 func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumChunker, report *JobProgress) error {
 	unitReporter := &mgrUnitReporter{
-		unitCh: make(chan SourceUnit, 1),
+		unitCh: make(chan SourceUnit, defaultChannelSize),
 		report: report,
 	}
 	// Create a function that will save the first error encountered (if
