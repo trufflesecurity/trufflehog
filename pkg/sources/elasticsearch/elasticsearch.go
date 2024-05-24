@@ -141,12 +141,18 @@ func (s *Source) Chunks(
 			return err
 		}
 
-		// The scanCoverageRate is documentsScanned / documentsAdded. If it's not 1,
-		// we need each DocumentSearch to skip some records.
+		// The scanCoverageRate is documentsScanned / documentsAdded. If it's < 1 we
+		// need each DocumentSearch to skip some records.
 		scanCoverageRate := 1.0
-		if previousDocumentCount > 0 && indices.documentCount > 0 {
+		if previousDocumentCount > 0 && indices.documentCount > 0 && previousDocumentCount < indices.documentCount {
 			scanCoverageRate =
 				float64(previousDocumentCount) / float64(indices.documentCount)
+			s.log.V(2).Info(fmt.Sprintf(
+				"Scan coverage rate is %f%% (%d/%d); skipping documents to catch up",
+				scanCoverageRate,
+				previousDocumentCount,
+				indices.documentCount,
+			))
 		}
 
 		unitsOfWork := distributeDocumentScans(&indices, s.concurrency, scanCoverageRate)
@@ -198,13 +204,6 @@ func (s *Source) Chunks(
 					if err != nil {
 						return err
 					}
-
-					fmt.Printf(
-						"[Worker %d] Scanned %d documents from index %s\n",
-						uowIndex,
-						documentsProcessed,
-						docSearch.index.name,
-					)
 
 					s.log.V(2).Info(fmt.Sprintf(
 						"[Worker %d] Scanned %d documents from index %s",
