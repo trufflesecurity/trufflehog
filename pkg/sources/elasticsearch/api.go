@@ -247,8 +247,8 @@ func createPITForSearch(
 		return "", err
 	}
 
-	pitID, found := data["id"].(string)
-	if !found {
+	pitID, ok := data["id"].(string)
+	if !ok {
 		return "", errors.New("No id in response")
 	}
 
@@ -343,8 +343,8 @@ func processSearchedDocuments(
 				continue
 			}
 
-			jsonSort, found := hit["sort"].([]any)
-			if !found {
+			jsonSort, ok := hit["sort"].([]any)
+			if !ok {
 				continue
 			}
 
@@ -432,8 +432,8 @@ func (indices *Indices) Update(
 
 	newIndicesByName := make(map[string]*Index)
 	for _, name := range indexNames {
-		index, found := indicesByName[name]
-		if found {
+		index, ok := indicesByName[name]
+		if ok {
 			newIndicesByName[name] = index
 		} else {
 			index = NewIndex()
