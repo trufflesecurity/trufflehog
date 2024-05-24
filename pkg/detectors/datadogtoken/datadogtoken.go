@@ -2,6 +2,7 @@ package datadogtoken
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -29,6 +30,27 @@ var (
 	appPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{40})\b`)
 	apiPat = regexp.MustCompile(detectors.PrefixRegex([]string{"datadog", "dd"}) + `\b([a-zA-Z-0-9]{32})\b`)
 )
+
+type userServiceResponse struct {
+	Data []*user `json:"data"`
+}
+
+type user struct {
+	Type       string     `json:"type"`
+	Attributes attributes `json:"attributes"`
+}
+
+type attributes struct {
+	Email string `json:"email"`
+}
+
+func getUserEmails(data []*user) string {
+	var emails []string
+	for _, user := range data {
+		emails = append(emails, user.Attributes.Email)
+	}
+	return strings.Join(emails, ", ")
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -78,6 +100,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						defer res.Body.Close()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
+							var serviceResponse userServiceResponse
+							if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Data) > 0 { // no error in parsing and have at least one data item
+								s1.ExtraData["user_emails"] = getUserEmails(serviceResponse.Data)
+							}
 						}
 					}
 				}
