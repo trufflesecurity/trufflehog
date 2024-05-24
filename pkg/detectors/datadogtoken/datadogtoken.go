@@ -36,7 +36,6 @@ type userServiceResponse struct {
 }
 
 type user struct {
-	Type       string     `json:"type"`
 	Attributes attributes `json:"attributes"`
 }
 
