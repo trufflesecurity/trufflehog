@@ -77,6 +77,7 @@ type Source struct {
 	resumeInfoMutex sync.Mutex
 	resumeInfoSlice []string
 	apiClient       *github.Client
+	apiEndpoint     string
 
 	includePRComments    bool
 	includeIssueComments bool
@@ -84,6 +85,9 @@ type Source struct {
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+
+	unitReporter  sources.UnitReporter
+	chunkReporter sources.ChunkReporter
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -103,6 +107,7 @@ func (s *Source) setScanOptions(base, head string) {
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+var _ sources.SourceUnitEnumChunker = (*Source)(nil)
 
 var endsWithGithub = regexp.MustCompile(`github\.com/?$`)
 
@@ -199,15 +204,20 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
-	s.httpClient = common.RetryableHTTPClientTimeout(60)
-	s.apiClient = github.NewClient(s.httpClient)
-
 	var conn sourcespb.GitHub
 	err = anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 	s.conn = &conn
+
+	s.httpClient = common.RetryableHTTPClientTimeout(60)
+	s.apiClient = github.NewClient(s.httpClient)
+
+	s.apiEndpoint = s.conn.Endpoint
+	if len(s.apiEndpoint) == 0 || endsWithGithub.MatchString(s.apiEndpoint) {
+		s.apiEndpoint = cloudEndpoint
+	}
 
 	s.orgsCache = memory.New()
 	for _, org := range s.conn.Organizations {
@@ -233,6 +243,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includeIssueComments = s.conn.IncludeIssueComments
 	s.includePRComments = s.conn.IncludePullRequestComments
 	s.includeGistComments = s.conn.IncludeGistComments
+
+	apiEndpoint := s.conn.Endpoint
+	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
+		apiEndpoint = cloudEndpoint
+	}
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -352,11 +367,6 @@ const cloudEndpoint = "https://api.github.com"
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
-	apiEndpoint := s.conn.Endpoint
-	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
-		apiEndpoint = cloudEndpoint
-	}
-
 	// If targets are provided, we're only scanning the data in those targets.
 	// Otherwise, we're scanning all data.
 	// This allows us to only scan the commit where a vulnerability was found.
@@ -369,12 +379,42 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
 	githubReposScanned.WithLabelValues(s.name).Set(0)
 
-	installationClient, err := s.enumerate(ctx, apiEndpoint)
+	installationClient, err := s.enumerate(ctx, s.apiEndpoint)
 	if err != nil {
 		return err
 	}
 
 	return s.scan(ctx, installationClient, chunksChan)
+}
+
+func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
+	s.unitReporter = reporter
+
+	fmt.Println("WE ENUMERATE")
+
+	_, err := s.enumerate(ctx, s.apiEndpoint)
+	return err
+}
+
+func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
+	repoURL, _ := unit.SourceUnitID()
+
+	if !strings.HasSuffix(repoURL, ".git") {
+		return fmt.Errorf("repo %s does not end in .git", repoURL)
+	}
+
+	// Scan the repository
+	repoInfo, ok := s.repoInfoCache.get(repoURL)
+	if !ok {
+		// This should never happen.
+		err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
+		s.log.Error(err, "failed to scan repository")
+		return nil
+	}
+	repoCtx := context.WithValues(ctx, "repo", repoURL)
+
+	_, err := s.cloneAndScanRepoWithReporter(repoCtx, nil, repoURL, repoInfo, reporter)
+	return err
 }
 
 func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Client, error) {
@@ -841,6 +881,36 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, re
 
 	start := time.Now()
 	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
+		return duration, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
+	}
+	duration = time.Since(start)
+	return duration, nil
+}
+
+func (s *Source) cloneAndScanRepoWithReporter(ctx context.Context, client *github.Client, repoURL string, repoInfo repoInfo, reporter sources.ChunkReporter) (time.Duration, error) {
+	var duration time.Duration
+
+	ctx.Logger().V(2).Info("attempting to clone repo")
+	path, repo, err := s.cloneRepo(ctx, repoURL, client)
+	if err != nil {
+		return duration, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+	}
+	defer os.RemoveAll(path)
+
+	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
+	s.setScanOptions(s.conn.Base, s.conn.Head)
+
+	// Repo size is not collected for wikis.
+	var logger logr.Logger
+	if !strings.HasSuffix(repoURL, ".wiki.git") && repoInfo.size > 0 {
+		logger = ctx.Logger().WithValues("repo_size_kb", repoInfo.size)
+	} else {
+		logger = ctx.Logger()
+	}
+	logger.V(2).Info("scanning repo")
+
+	start := time.Now()
+	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter); err != nil {
 		return duration, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
 	}
 	duration = time.Since(start)
