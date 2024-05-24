@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
@@ -663,34 +664,26 @@ func BenchmarkPopulateMatchingDetectors(b *testing.B) {
 	dataSize := 1 << 20 // 1 MB
 	sampleData := generateRandomDataWithKeywords(dataSize, allDetectors)
 
-	smallChunk := 1 << 10     // 1 KB
-	mediumChunk := 1 << 12    // 4 KB
-	currentChunk := 1024 * 10 // 10 KB
-	largeChunk := 1 << 14     // 16 KB
-	xlChunk := 1 << 15        // 32 KB
-	xxlChunk := 1 << 16       // 64 KB
-	xxxlChunk := 1 << 18      // 256 KB
-	chunkSizes := []int{smallChunk, mediumChunk, currentChunk, largeChunk, xlChunk, xxlChunk, xxxlChunk}
+	smallChunk := 1 << 10  // 1 KB
+	mediumChunk := 1 << 12 // 4 KB
+	current := sources.TotalChunkSize
+	largeChunk := 1 << 14 // 16 KB
+	xlChunk := 1 << 15    // 32 KB
+	xxlChunk := 1 << 16   // 64 KB
+	xxxlChunk := 1 << 18  // 256 KB
+	chunkSizes := []int{smallChunk, mediumChunk, current, largeChunk, xlChunk, xxlChunk, xxxlChunk}
 
 	for _, chunkSize := range chunkSizes {
 		b.Run(fmt.Sprintf("ChunkSize_%d", chunkSize), func(b *testing.B) {
 			b.ReportAllocs()
-			b.SetBytes(int64(dataSize))
+			b.SetBytes(int64(chunkSize))
 
+			// Create a single chunk of the desired size.
+			chunk := sampleData[:chunkSize]
+
+			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				offset := 0
-
-				for offset < dataSize {
-					end := offset + chunkSize
-					if end > dataSize {
-						end = dataSize
-					}
-					chunk := sampleData[offset:end]
-					b.StartTimer()
-					ac.FindDetectorMatches(chunk)
-					b.StopTimer()
-					offset = end
-				}
+				ac.FindDetectorMatches([]byte(chunk)) // Match against the single chunk
 			}
 		})
 	}
@@ -700,19 +693,31 @@ func generateRandomDataWithKeywords(size int, detectors []detectors.Detector) st
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	data := make([]byte, size)
 
-	r := rand.New(rand.NewSource(42))
+	r := rand.New(rand.NewSource(42)) // Seed for reproducibility
 
 	for i := range data {
 		data[i] = charset[r.Intn(len(charset))]
 	}
 
-	// Insert keywords from detectors at random positions.
+	totalKeywords := 0
 	for _, d := range detectors {
-		keywords := d.Keywords()
-		for _, keyword := range keywords {
-			insertPosition := r.Intn(size - len(keyword))
-			copy(data[insertPosition:], keyword)
-		}
+		totalKeywords += len(d.Keywords())
+	}
+
+	// Target keyword density (keywords per character)
+	// This ensures that the generated data has a reasonable number of keywords and is consistent
+	// across different data sizes.
+	keywordDensity := 0.01
+
+	targetKeywords := int(float64(size) * keywordDensity)
+
+	for i := 0; i < targetKeywords; i++ {
+		detectorIndex := r.Intn(len(detectors))
+		keywordIndex := r.Intn(len(detectors[detectorIndex].Keywords()))
+		keyword := detectors[detectorIndex].Keywords()[keywordIndex]
+
+		insertPosition := r.Intn(size - len(keyword))
+		copy(data[insertPosition:], keyword)
 	}
 
 	return string(data)

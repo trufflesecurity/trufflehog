@@ -78,6 +78,9 @@ type Engine struct {
 	logFilteredUnverified   bool
 	verificationOverlap     bool
 	printAvgDetectorTime    bool
+	// By default, the engine will only scan a subset of the chunk if a detector matches the chunk.
+	// If this flag is set to true, the engine will scan the entire chunk.
+	scanEntireChunk bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *ahocorasick.AhoCorasickCore
@@ -256,6 +259,11 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 	return out
 }
 
+// WithEntireChunkScan sets the flag to configure AhoCorasickCore to scan entire chunks.
+func WithEntireChunkScan(enabled bool) Option {
+	return func(e *Engine) { e.scanEntireChunk = enabled }
+}
+
 // HasFoundResults returns true if any results are found.
 func (e *Engine) HasFoundResults() bool {
 	return atomic.LoadUint32(&e.numFoundResults) > 0
@@ -399,8 +407,14 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	}
 	ctx.Logger().V(4).Info("engine initialized")
 
+	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
+	var ahoCOptions []ahocorasick.AhoCorasickCoreOption
+	if e.scanEntireChunk {
+		ahoCOptions = append(ahoCOptions, ahocorasick.WithSpanCalculator(new(ahocorasick.EntireChunkSpanCalculator)))
+	}
+
 	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors)
+	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
@@ -610,38 +624,47 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	for chunk := range e.ChunksChan() {
 		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
-		for _, decoder := range e.decoders {
-			decoded := decoder.FromChunk(chunk)
-			if decoded == nil {
-				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
-				continue
-			}
+		func() {
+			// Nil out the chunk data so it can be GC'd.
+			// The chunk data is no longer needed after FindDetectorMatches constructs
+			// the matched sections of data, which are stored in the DetectorMatch instances.
+			// This helps in reducing memory usage.
+			defer func() { chunk.Data = nil }()
 
-			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(string(decoded.Chunk.Data))
-			if len(matchingDetectors) > 1 && !e.verificationOverlap {
-				wgVerificationOverlap.Add(1)
-				e.verificationOverlapChunksChan <- verificationOverlapChunk{
-					chunk:                       *decoded.Chunk,
-					detectors:                   matchingDetectors,
-					decoder:                     decoded.DecoderType,
-					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+			for _, decoder := range e.decoders {
+				decoded := decoder.FromChunk(chunk)
+				if decoded == nil {
+					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+					continue
+				}
+
+				matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+				if len(matchingDetectors) > 1 && !e.verificationOverlap {
+					wgVerificationOverlap.Add(1)
+					e.verificationOverlapChunksChan <- verificationOverlapChunk{
+						chunk:                       *decoded.Chunk,
+						detectors:                   matchingDetectors,
+						decoder:                     decoded.DecoderType,
+						verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+					}
+					continue
+				}
+
+				for _, detector := range matchingDetectors {
+					decoded.Chunk.Verify = e.verify
+					wgDetect.Add(1)
+					e.detectableChunksChan <- detectableChunk{
+						chunk:    *decoded.Chunk,
+						detector: detector,
+						decoder:  decoded.DecoderType,
+						wgDoneFn: wgDetect.Done,
+					}
 				}
 				continue
 			}
 
-			for _, detector := range matchingDetectors {
-				decoded.Chunk.Verify = e.verify
-				wgDetect.Add(1)
-				e.detectableChunksChan <- detectableChunk{
-					chunk:    *decoded.Chunk,
-					detector: detector,
-					decoder:  decoded.DecoderType,
-					wgDoneFn: wgDetect.Done,
-				}
-				continue
-			}
-		}
-		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
+			atomic.AddUint64(&e.metrics.ChunksScanned, 1)
+		}()
 	}
 
 	wgVerificationOverlap.Wait()
@@ -706,55 +729,58 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	for chunk := range e.verificationOverlapChunksChan {
 		for _, detector := range chunk.detectors {
 			// DO NOT VERIFY at this stage of the pipeline.
-			results, err := detector.FromData(ctx, false, chunk.chunk.Data)
-			if err != nil {
-				ctx.Logger().Error(err, "error verifying chunk")
-			}
-
-			if len(results) == 0 {
-				continue
-			}
-			if _, ok := detectorKeysWithResults[detector.Key]; !ok {
-				detectorKeysWithResults[detector.Key] = detector
-			}
-
-			for _, res := range results {
-				var val []byte
-				if res.RawV2 != nil {
-					val = res.RawV2
-				} else {
-					val = res.Raw
+			matchedBytes := detector.Matches()
+			for _, match := range matchedBytes {
+				results, err := detector.FromData(ctx, false, match)
+				if err != nil {
+					ctx.Logger().Error(err, "error verifying chunk")
 				}
 
-				// Use levenstein distance to determine if the secret is likely the same.
-				// Ex:
-				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
-				if _, ok := chunkSecrets[key]; ok {
+				if len(results) == 0 {
 					continue
 				}
-
-				if likelyDuplicate(ctx, key, chunkSecrets) {
-					// This indicates that the same secret was found by multiple detectors.
-					// We should NOT VERIFY this chunk's data.
-					if e.verificationOverlapTracker != nil {
-						e.verificationOverlapTracker.increment()
-					}
-					res.SetVerificationError(errOverlap)
-					e.processResult(ctx, detectableChunk{
-						chunk:    chunk.chunk,
-						detector: detector,
-						decoder:  chunk.decoder,
-						wgDoneFn: wgDetect.Done,
-					}, res)
-
-					// Remove the detector key from the list of detector keys with results.
-					// This is to ensure that the chunk is not reprocessed with verification enabled
-					// for this detector.
-					delete(detectorKeysWithResults, detector.Key)
+				if _, ok := detectorKeysWithResults[detector.Key]; !ok {
+					detectorKeysWithResults[detector.Key] = detector
 				}
-				chunkSecrets[key] = struct{}{}
+
+				for _, res := range results {
+					var val []byte
+					if res.RawV2 != nil {
+						val = res.RawV2
+					} else {
+						val = res.Raw
+					}
+
+					// Use levenstein distance to determine if the secret is likely the same.
+					// Ex:
+					// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+					// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+					key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
+					if _, ok := chunkSecrets[key]; ok {
+						continue
+					}
+
+					if likelyDuplicate(ctx, key, chunkSecrets) {
+						// This indicates that the same secret was found by multiple detectors.
+						// We should NOT VERIFY this chunk's data.
+						if e.verificationOverlapTracker != nil {
+							e.verificationOverlapTracker.increment()
+						}
+						res.SetVerificationError(errOverlap)
+						e.processResult(ctx, detectableChunk{
+							chunk:    chunk.chunk,
+							detector: detector,
+							decoder:  chunk.decoder,
+							wgDoneFn: wgDetect.Done,
+						}, res)
+
+						// Remove the detector key from the list of detector keys with results.
+						// This is to ensure that the chunk is not reprocessed with verification enabled
+						// for this detector.
+						delete(detectorKeysWithResults, detector.Key)
+					}
+					chunkSecrets[key] = struct{}{}
+				}
 			}
 		}
 
@@ -798,14 +824,12 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	defer common.Recover(ctx)
 	defer cancel()
 
-	// To reduce the overhead of regex calls in the detector, we limit the amount of data passed to each detector.
-	// The Matches method of the DetectorMatch struct is used to extract the relevant portions of the chunk data
-	// based on the start and end positions of each match. The end position is determined by taking the minimum
-	// of the keyword position + maxMatchLength and the length of the chunk data.
-	// This optimization is based on the assumption that most secrets shouldn't exceed maxMatchLength (300)
-	// characters in length from the keyword's position.
-	// The value of maxMatchLength is a constant and can be adjusted based on further analysis and requirements.
-	matchedBytes := data.detector.Matches(data.chunk.Data)
+	// To reduce the overhead of regex calls in the detector,
+	// we limit the amount of data passed to each detector.
+	// The matches field of the DetectorMatch struct contains the
+	// relevant portions of the chunk data that were matched.
+	// This avoids the need for additional regex processing on the entire chunk data.
+	matchedBytes := data.detector.Matches()
 	for _, match := range matchedBytes {
 		results, err := data.detector.FromData(ctx, data.chunk.Verify, match)
 		if err != nil {

@@ -11,11 +11,12 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 )
 
 type Scanner struct {
@@ -24,6 +25,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient(common.WithDetectorTransport())
@@ -43,6 +45,11 @@ type gcpApplicationDefaultCredentials struct {
 func (s Scanner) Keywords() []string {
 	return []string{".apps.googleusercontent.com"}
 }
+
+const maxGCPADCKeySize = 1024
+
+// ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
+func (s Scanner) MaxSecretSize() int64 { return maxGCPADCKeySize }
 
 // FromData will find and optionally verify Gcpapplicationdefaultcredentials secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
