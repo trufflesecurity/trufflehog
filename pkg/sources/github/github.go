@@ -624,8 +624,6 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 					return nil
 				}
 			}
-
-			return nil
 		}
 
 	}
