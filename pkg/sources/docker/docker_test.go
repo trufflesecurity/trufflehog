@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"strings"
 	"sync"
 	"testing"
 
@@ -32,12 +33,21 @@ func TestDockerImageScan(t *testing.T) {
 	var wg sync.WaitGroup
 	chunksChan := make(chan *sources.Chunk, 1)
 	chunkCounter := 0
+	layerCounter := 0
+	historyCounter := 0
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for chunk := range chunksChan {
 			assert.NotEmpty(t, chunk)
 			chunkCounter++
+
+			if isHistoryChunk(t, chunk) {
+				historyCounter++
+			} else {
+				layerCounter++
+			}
 		}
 	}()
 
@@ -47,7 +57,9 @@ func TestDockerImageScan(t *testing.T) {
 	close(chunksChan)
 	wg.Wait()
 
-	assert.Equal(t, 1, chunkCounter)
+	assert.Equal(t, 2, chunkCounter)
+	assert.Equal(t, 1, layerCounter)
+	assert.Equal(t, 1, historyCounter)
 }
 
 func TestDockerImageScanWithDigest(t *testing.T) {
@@ -69,12 +81,21 @@ func TestDockerImageScanWithDigest(t *testing.T) {
 	var wg sync.WaitGroup
 	chunksChan := make(chan *sources.Chunk, 1)
 	chunkCounter := 0
+	layerCounter := 0
+	historyCounter := 0
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for chunk := range chunksChan {
 			assert.NotEmpty(t, chunk)
 			chunkCounter++
+
+			if isHistoryChunk(t, chunk) {
+				historyCounter++
+			} else {
+				layerCounter++
+			}
 		}
 	}()
 
@@ -84,7 +105,9 @@ func TestDockerImageScanWithDigest(t *testing.T) {
 	close(chunksChan)
 	wg.Wait()
 
-	assert.Equal(t, 1, chunkCounter)
+	assert.Equal(t, 2, chunkCounter)
+	assert.Equal(t, 1, layerCounter)
+	assert.Equal(t, 1, historyCounter)
 }
 
 func TestBaseAndTagFromImage(t *testing.T) {
@@ -109,4 +132,13 @@ func TestBaseAndTagFromImage(t *testing.T) {
 				tt.image, gotBase, gotTag, gotDigest, tt.wantBase, tt.wantTag, tt.wantDigest)
 		}
 	}
+}
+
+func isHistoryChunk(t *testing.T, chunk *sources.Chunk) bool {
+	t.Helper()
+
+	metadata := chunk.SourceMetadata.GetDocker()
+
+	return metadata != nil &&
+		strings.HasPrefix(metadata.File, "image://config-file/history/")
 }

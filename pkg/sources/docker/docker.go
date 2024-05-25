@@ -108,7 +108,24 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			}
 
 			ctx = context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
-			ctx.Logger().V(2).Info("scanning image")
+
+			ctx.Logger().V(2).Info("scanning image history")
+
+			config, err := imgInfo.image.ConfigFile()
+			if err != nil {
+				scanErrs.Add(err)
+				return nil
+			}
+
+			for idx, historyEntry := range config.History {
+				if err := s.processHistoryEntry(ctx, idx, historyEntry, imgInfo, chunksChan); err != nil {
+					scanErrs.Add(err)
+					return nil
+				}
+				dockerHistoryEntriesScanned.WithLabelValues(s.name).Inc()
+			}
+
+			ctx.Logger().V(2).Info("scanning image layers")
 
 			layers, err := imgInfo.image.Layers()
 			if err != nil {
@@ -179,6 +196,35 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 	ctx.Logger().WithValues("image", imgInfo.base, "tag", imgInfo.tag).V(2).Info("scanning image")
 
 	return imgInfo, nil
+}
+
+// processHistoryEntry processes a history entry from the image configuration metadata.
+func (s *Source) processHistoryEntry(ctx context.Context, entryIndex int, entry v1.History, imgInfo imageInfo, chunksChan chan *sources.Chunk) error {
+	chunk := &sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Docker{
+				Docker: &source_metadatapb.Docker{
+					File:  fmt.Sprintf("image://config-file/history/%d", entryIndex),
+					Image: imgInfo.base,
+					Tag:   imgInfo.tag,
+					Layer: "",
+				},
+			},
+		},
+		Verify: s.verify,
+		Data:   []byte(entry.CreatedBy),
+	}
+
+	ctx.Logger().V(2).Info("scanning image history entry", "index", entryIndex)
+
+	if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // processLayer processes an individual layer of an image.
