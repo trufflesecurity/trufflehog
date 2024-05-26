@@ -124,7 +124,7 @@ func createReaderFn(config *chunkReaderConfig) ChunkReader {
 }
 
 func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConfig) <-chan ChunkResult {
-	const channelSize = 1
+	const channelSize = 64
 	chunkReader := bufio.NewReaderSize(reader, config.chunkSize)
 	chunkResultChan := make(chan ChunkResult, channelSize)
 
