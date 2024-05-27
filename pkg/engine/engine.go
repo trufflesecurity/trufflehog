@@ -62,9 +62,9 @@ func (m *Metrics) getScanDuration() time.Duration {
 	return m.ScanDuration
 }
 
-// Dispatcher is an interface for sending findings of detected results.
+// ResultsDispatcher is an interface for dispatching findings of detected results.
 // Implementations can vary from printing results to the console to sending results to an external system.
-type Dispatcher interface {
+type ResultsDispatcher interface {
 	Dispatch(ctx context.Context, result detectors.ResultWithMetadata) error
 }
 
@@ -74,7 +74,7 @@ type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
-// PrinterDispatcher wraps an existing Printer implementation and adapts it to the Dispatcher interface.
+// PrinterDispatcher wraps an existing Printer implementation and adapts it to the ResultsDispatcher interface.
 type PrinterDispatcher struct{ printer Printer }
 
 // NewPrinterNotifier creates a new PrinterDispatcher instance with the provided Printer.
@@ -111,7 +111,7 @@ type Config struct {
 	// true, the engine will only return the first unverified result for a chunk for a detector.
 	FilterUnverified bool
 
-	Dispatcher Dispatcher
+	Dispatcher ResultsDispatcher
 
 	// SourceManager is used to manage the sources and units.
 	// TODO (ahrav): Update this comment, i'm dumb and don't really know what else it does.
@@ -171,8 +171,8 @@ type Engine struct {
 	// numFoundResults is used to keep track of the number of results found.
 	numFoundResults uint32
 
-	// Dispatcher is used to send results.
-	dispatcher Dispatcher
+	// ResultsDispatcher is used to send results.
+	dispatcher ResultsDispatcher
 
 	// dedupeCache is used to deduplicate results by comparing the
 	// detector type, raw result, and source metadata
@@ -539,7 +539,7 @@ func (e *Engine) startWorkers(ctx context.Context) {
 	// They ensure that verification is disabled for any secrets that have been detected by multiple detectors.
 	e.startVerificationOverlapWorkers(ctx)
 
-	// Dispatcher workers communicate detected issues to the user or any downstream systems.
+	// ResultsDispatcher workers communicate detected issues to the user or any downstream systems.
 	// We want 1/4th of the notifier workers as the number of scanner workers.
 	e.startNotifierWorkers(ctx)
 }
