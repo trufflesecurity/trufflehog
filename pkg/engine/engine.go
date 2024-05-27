@@ -187,7 +187,7 @@ type Engine struct {
 
 // NewEngine creates a new Engine instance with the provided configuration.
 func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
-	cngine := &Engine{
+	engine := &Engine{
 		concurrency:           cfg.Concurrency,
 		decoders:              cfg.Decoders,
 		detectors:             cfg.Detectors,
@@ -200,11 +200,11 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		verificationOverlap:   cfg.VerificationOverlap,
 		sourceManager:         cfg.SourceManager,
 	}
-	if cngine.sourceManager == nil {
+	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
 	}
 
-	cngine.setDefaults(ctx)
+	engine.setDefaults(ctx)
 
 	// Build include and exclude detector sets for filtering on engine initialization.
 	includeDetectorSet, excludeDetectorSet, detectorsWithCustomVerifierEndpoints, err := buildDetectorSets(cfg)
@@ -239,27 +239,27 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		return true
 	}
 
-	cngine.applyFilters(includeFilter, excludeFilter, endpointCustomizer)
+	engine.applyFilters(includeFilter, excludeFilter, endpointCustomizer)
 
 	if results := cfg.Results; len(results) > 0 {
 		_, ok := results["verified"]
-		cngine.notifyVerifiedResults = ok
+		engine.notifyVerifiedResults = ok
 
 		_, ok = results["unknown"]
-		cngine.notifyUnknownResults = ok
+		engine.notifyUnknownResults = ok
 
 		_, ok = results["unverified"]
-		cngine.notifyUnverifiedResults = ok
+		engine.notifyUnverifiedResults = ok
 
 		_, ok = results["filtered_unverified"]
-		cngine.logFilteredUnverified = ok
+		engine.logFilteredUnverified = ok
 	}
 
-	if err := cngine.initialize(ctx); err != nil {
+	if err := engine.initialize(ctx); err != nil {
 		return nil, err
 	}
 
-	return cngine, nil
+	return engine, nil
 }
 
 // setDefaults ensures that if specific engine properties aren't provided,
