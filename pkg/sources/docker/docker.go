@@ -220,11 +220,7 @@ func (s *Source) processHistoryEntry(ctx context.Context, entryIndex int, entry 
 
 	ctx.Logger().V(2).Info("scanning image history entry", "index", entryIndex)
 
-	if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
-		return err
-	}
-
-	return nil
+	return common.CancellableWrite(ctx, chunksChan, chunk)
 }
 
 // processLayer processes an individual layer of an image.
