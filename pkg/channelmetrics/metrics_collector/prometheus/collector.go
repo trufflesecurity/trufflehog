@@ -1,6 +1,8 @@
 package prometheus
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,6 +17,11 @@ type MetricsCollector struct {
 	channelLen      prometheus.Gauge
 	channelCap      prometheus.Gauge
 }
+
+var (
+	collectors   = make(map[string]*MetricsCollector)
+	collectorsMu sync.Mutex
+)
 
 // NewMetricsCollector creates a new MetricsCollector with
 // histograms for produce and consume durations, and gauges for channel length and capacity.
@@ -42,34 +49,46 @@ type MetricsCollector struct {
 // By tracking the durations of item production and consumption, as well as the buffer size and capacity,
 // you can identify bottlenecks, optimize performance, and ensure that the ObservableChan is operating efficiently.
 func NewMetricsCollector(chanName, namespace, subsystem string) *MetricsCollector {
-	return &MetricsCollector{
+	key := fmt.Sprintf("%s_%s_%s", namespace, subsystem, chanName)
+
+	collectorsMu.Lock()
+	defer collectorsMu.Unlock()
+
+	if collector, exists := collectors[key]; exists {
+		return collector
+	}
+
+	collector := &MetricsCollector{
 		produceDuration: promauto.NewHistogram(prometheus.HistogramOpts{
-			Name:      metricName(chanName, "_produce_duration_microseconds"),
+			Name:      metricName(chanName, "produce_duration_microseconds"),
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Help:      "Duration of producing an item.",
-			Buckets:   prometheus.ExponentialBuckets(1, 10, 10),
+			Help:      "Duration of producing an item in microseconds.",
+			Buckets:   prometheus.ExponentialBuckets(1, 2, 20),
 		}),
 		consumeDuration: promauto.NewHistogram(prometheus.HistogramOpts{
-			Name:      metricName(chanName, "_consume_duration_microseconds"),
+			Name:      metricName(chanName, "consume_duration_microseconds"),
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Help:      "Duration of consuming an item.",
-			Buckets:   prometheus.ExponentialBuckets(1, 10, 10),
+			Help:      "Duration of consuming an item in microseconds.",
+			Buckets:   prometheus.ExponentialBuckets(1, 2, 20),
 		}),
 		channelLen: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      metricName(chanName, "_channel_length"),
+			Name:      metricName(chanName, "channel_length"),
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Help:      "Current size of the channel buffer.",
 		}),
 		channelCap: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      metricName(chanName, "_channel_capacity"),
+			Name:      metricName(chanName, "channel_capacity"),
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Help:      "Capacity of the channel buffer.",
 		}),
 	}
+
+	collectors[key] = collector
+	return collector
 }
 
 // metricName constructs a full metric name by combining the channel name with the specific metric.
