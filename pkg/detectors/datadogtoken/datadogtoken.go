@@ -32,23 +32,62 @@ var (
 )
 
 type userServiceResponse struct {
-	Data []*user `json:"data"`
+	Data     []*user    `json:"data"`
+	Included []*options `json:"included"`
 }
 
 type user struct {
-	Attributes attributes `json:"attributes"`
+	Attributes userAttributes `json:"attributes"`
 }
 
-type attributes struct {
-	Email string `json:"email"`
+type userAttributes struct {
+	Email            string `json:"email"`
+	IsServiceAccount bool   `json:"service_account"`
+	Verified         bool   `json:"verified"`
+	Disabled         bool   `json:"disabled"`
 }
 
-func getUserEmails(data []*user) string {
+type options struct {
+	Type       string          `json:"type"`
+	Attributes optionAttribute `json:"attributes"`
+}
+
+type optionAttribute struct {
+	Url      string `json:"url"`
+	Name     string `json:"name"`
+	Disabled bool   `json:"disabled"`
+}
+
+func setUserEmails(data []*user, s1 *detectors.Result) {
 	var emails []string
 	for _, user := range data {
-		emails = append(emails, user.Attributes.Email)
+		// filter out non verified emails, disabled emails, service accounts
+		if user.Attributes.Verified && !user.Attributes.Disabled && !user.Attributes.IsServiceAccount {
+			emails = append(emails, user.Attributes.Email)
+		}
 	}
-	return strings.Join(emails, ", ")
+
+	if len(emails) == 0 && len(data) > 0 {
+		emails = append(emails, data[0].Attributes.Email)
+	}
+
+	s1.ExtraData["user_emails"] = strings.Join(emails, ", ")
+}
+
+func setOrganizationInfo(opt []*options, s1 *detectors.Result) {
+	var orgs *options
+	for _, option := range opt {
+		if option.Type == "orgs" && !option.Attributes.Disabled {
+			orgs = option
+			break
+		}
+	}
+
+	if orgs != nil {
+		s1.ExtraData["org_name"] = orgs.Attributes.Name
+		s1.ExtraData["org_url"] = orgs.Attributes.Url
+	}
+
 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -100,8 +139,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 							var serviceResponse userServiceResponse
-							if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Data) > 0 { // no error in parsing and have at least one data item
-								s1.ExtraData["user_emails"] = getUserEmails(serviceResponse.Data)
+							if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil {
+								// setup emails
+								if len(serviceResponse.Data) > 0 {
+									setUserEmails(serviceResponse.Data, &s1)
+								}
+								// setup organizations
+								if len(serviceResponse.Included) > 0 {
+									setOrganizationInfo(serviceResponse.Included, &s1)
+								}
 							}
 						}
 					}
