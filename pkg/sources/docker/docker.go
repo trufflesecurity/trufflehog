@@ -80,6 +80,14 @@ type imageInfo struct {
 	tag   string
 }
 
+type historyEntryInfo struct {
+	index       int
+	entry       v1.History
+	layerDigest string
+	base        string
+	tag         string
+}
+
 type layerInfo struct {
 	digest v1.Hash
 	base   string
@@ -111,14 +119,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 			ctx.Logger().V(2).Info("scanning image history")
 
-			config, err := imgInfo.image.ConfigFile()
+			historyEntries, err := getHistoryEntries(ctx, imgInfo)
 			if err != nil {
 				scanErrs.Add(err)
 				return nil
 			}
 
-			for idx, historyEntry := range config.History {
-				if err := s.processHistoryEntry(ctx, idx, historyEntry, imgInfo, chunksChan); err != nil {
+			for _, historyEntry := range historyEntries {
+				if err := s.processHistoryEntry(ctx, historyEntry, chunksChan); err != nil {
 					scanErrs.Add(err)
 					return nil
 				}
@@ -198,8 +206,63 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 	return imgInfo, nil
 }
 
+// getHistoryEntries collates an image's configuration history together with the
+// corresponding layer digests for any non-empty layers.
+func getHistoryEntries(ctx context.Context, imgInfo imageInfo) ([]historyEntryInfo, error) {
+	config, err := imgInfo.image.ConfigFile()
+	if err != nil {
+		return nil, err
+	}
+
+	layers, err := imgInfo.image.Layers()
+	if err != nil {
+		return nil, err
+	}
+
+	history := config.History
+	entries := make([]historyEntryInfo, len(history))
+
+	layerIndex := 0
+	for historyIndex, entry := range history {
+		e := historyEntryInfo{
+			base:  imgInfo.base,
+			tag:   imgInfo.tag,
+			entry: entry,
+			index: historyIndex,
+		}
+
+		// Associate with a layer if possible -- failing to do this will not affect
+		// the scan, just remove some traceability.
+		if !entry.EmptyLayer {
+			if layerIndex < len(layers) {
+				digest, err := layers[layerIndex].Digest()
+
+				if err == nil {
+					e.layerDigest = digest.String()
+				} else {
+					ctx.Logger().V(2).Error(err, "cannot associate layer with history entry: layer digest failed",
+						"layerIndex", layerIndex, "historyIndex", historyIndex)
+				}
+			} else {
+				ctx.Logger().V(2).Info("cannot associate layer with history entry: no correlated layer exists at this index",
+					"layerIndex", layerIndex, "historyIndex", historyIndex)
+			}
+
+			layerIndex++
+		}
+
+		entries[historyIndex] = e
+	}
+
+	return entries, nil
+}
+
 // processHistoryEntry processes a history entry from the image configuration metadata.
-func (s *Source) processHistoryEntry(ctx context.Context, entryIndex int, entry v1.History, imgInfo imageInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processHistoryEntry(ctx context.Context, historyInfo historyEntryInfo, chunksChan chan *sources.Chunk) error {
+	// Make up an identifier for this entry that is moderately sensible. There is
+	// no file name to use here, so the path tries to be a little descriptive.
+	entryPath := fmt.Sprintf("image-metadata:history:%d:created-by", historyInfo.index)
+
 	chunk := &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
@@ -207,18 +270,18 @@ func (s *Source) processHistoryEntry(ctx context.Context, entryIndex int, entry 
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Docker{
 				Docker: &source_metadatapb.Docker{
-					File:  fmt.Sprintf("image://config-file/history/%d", entryIndex),
-					Image: imgInfo.base,
-					Tag:   imgInfo.tag,
-					Layer: "",
+					File:  entryPath,
+					Image: historyInfo.base,
+					Tag:   historyInfo.tag,
+					Layer: historyInfo.layerDigest,
 				},
 			},
 		},
 		Verify: s.verify,
-		Data:   []byte(entry.CreatedBy),
+		Data:   []byte(historyInfo.entry.CreatedBy),
 	}
 
-	ctx.Logger().V(2).Info("scanning image history entry", "index", entryIndex)
+	ctx.Logger().V(2).Info("scanning image history entry", "index", historyInfo.index, "layer", historyInfo.layerDigest)
 
 	return common.CancellableWrite(ctx, chunksChan, chunk)
 }
