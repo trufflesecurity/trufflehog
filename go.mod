@@ -28,7 +28,7 @@ require (
 	github.com/coinbase/waas-client-library-go v1.0.8
 	github.com/couchbase/gocb/v2 v2.8.1
 	github.com/crewjam/rfc5424 v0.1.0
-	github.com/elastic/go-elasticsearch/v8 v8.13.0
+	github.com/elastic/go-elasticsearch/v8 v8.13.1
 	github.com/envoyproxy/protoc-gen-validate v1.0.4
 	github.com/fatih/color v1.17.0
 	github.com/felixge/fgprof v0.9.4
