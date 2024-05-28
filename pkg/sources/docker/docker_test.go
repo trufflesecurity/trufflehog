@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"strings"
 	"sync"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
@@ -32,12 +34,21 @@ func TestDockerImageScan(t *testing.T) {
 	var wg sync.WaitGroup
 	chunksChan := make(chan *sources.Chunk, 1)
 	chunkCounter := 0
+	layerCounter := 0
+	historyCounter := 0
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for chunk := range chunksChan {
 			assert.NotEmpty(t, chunk)
 			chunkCounter++
+
+			if isHistoryChunk(t, chunk) {
+				historyCounter++
+			} else {
+				layerCounter++
+			}
 		}
 	}()
 
@@ -47,7 +58,9 @@ func TestDockerImageScan(t *testing.T) {
 	close(chunksChan)
 	wg.Wait()
 
-	assert.Equal(t, 1, chunkCounter)
+	assert.Equal(t, 2, chunkCounter)
+	assert.Equal(t, 1, layerCounter)
+	assert.Equal(t, 1, historyCounter)
 }
 
 func TestDockerImageScanWithDigest(t *testing.T) {
@@ -69,12 +82,27 @@ func TestDockerImageScanWithDigest(t *testing.T) {
 	var wg sync.WaitGroup
 	chunksChan := make(chan *sources.Chunk, 1)
 	chunkCounter := 0
+	layerCounter := 0
+	historyCounter := 0
+
+	var historyChunk *source_metadatapb.Docker
+	var layerChunk *source_metadatapb.Docker
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for chunk := range chunksChan {
 			assert.NotEmpty(t, chunk)
 			chunkCounter++
+
+			if isHistoryChunk(t, chunk) {
+				// save last for later comparison
+				historyChunk = chunk.SourceMetadata.GetDocker()
+				historyCounter++
+			} else {
+				layerChunk = chunk.SourceMetadata.GetDocker()
+				layerCounter++
+			}
 		}
 	}()
 
@@ -84,7 +112,26 @@ func TestDockerImageScanWithDigest(t *testing.T) {
 	close(chunksChan)
 	wg.Wait()
 
-	assert.Equal(t, 1, chunkCounter)
+	// Since this test pins the layer by digest, layers will have consistent
+	// hashes. This allows layer digest comparison as they will be stable for
+	// given image digest.
+	assert.Equal(t, &source_metadatapb.Docker{
+		Image: "trufflesecurity/secrets",
+		Tag:   "sha256:864f6d41209462d8e37fc302ba1532656e265f7c361f11e29fed6ca1f4208e11",
+		File:  "image-metadata:history:0:created-by",
+		Layer: "sha256:a794864de8c4ff087813fd66cff74601b84cbef8fe1a1f17f9923b40cf051b59",
+	}, historyChunk)
+
+	assert.Equal(t, &source_metadatapb.Docker{
+		Image: "trufflesecurity/secrets",
+		Tag:   "sha256:864f6d41209462d8e37fc302ba1532656e265f7c361f11e29fed6ca1f4208e11",
+		File:  "/aws",
+		Layer: "sha256:a794864de8c4ff087813fd66cff74601b84cbef8fe1a1f17f9923b40cf051b59",
+	}, layerChunk)
+
+	assert.Equal(t, 2, chunkCounter)
+	assert.Equal(t, 1, layerCounter)
+	assert.Equal(t, 1, historyCounter)
 }
 
 func TestBaseAndTagFromImage(t *testing.T) {
@@ -109,4 +156,13 @@ func TestBaseAndTagFromImage(t *testing.T) {
 				tt.image, gotBase, gotTag, gotDigest, tt.wantBase, tt.wantTag, tt.wantDigest)
 		}
 	}
+}
+
+func isHistoryChunk(t *testing.T, chunk *sources.Chunk) bool {
+	t.Helper()
+
+	metadata := chunk.SourceMetadata.GetDocker()
+
+	return metadata != nil &&
+		strings.HasPrefix(metadata.File, "image-metadata:history:")
 }
