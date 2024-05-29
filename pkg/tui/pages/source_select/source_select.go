@@ -64,8 +64,9 @@ func New(c common.Common) *SourceSelect {
 		// Open source sources.
 		OssItem("Git", "Scan git repositories."),
 		OssItem("GitHub", "Scan GitHub repositories and/or organizations."),
-		OssItem("GitLab", "Scan GitLab repositories."),
 		OssItem("Filesystem", "Scan your filesystem by selecting what directories to scan."),
+		OssItem("Postman", "Scan a collection, workspace, or environment from Postman, the API platform."),
+		OssItem("GitLab", "Scan GitLab repositories."),
 		OssItem("AWS S3", "Scan Amazon S3 buckets."),
 		OssItem("CircleCI", "Scan CircleCI, a CI/CD platform."),
 		OssItem("Syslog", "Scan syslog, event data logs."),
