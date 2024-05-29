@@ -12,6 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/circleci"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/jenkins"
 )
 
 type JenkinsConfig struct {
@@ -68,10 +69,10 @@ func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) e
 	sourceName := "trufflehog - Jenkins"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, circleci.SourceType)
 
-	circleSource := &circleci.Source{}
-	if err := circleSource.Init(ctx, "trufflehog - Jenkins", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+	jenkinsSource := &jenkins.Source{}
+	if err := jenkinsSource.Init(ctx, "trufflehog - Jenkins", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, circleSource)
+	_, err = e.sourceManager.Run(ctx, sourceName, jenkinsSource)
 	return err
 }

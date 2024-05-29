@@ -669,7 +669,7 @@ func run(state overseer.State) {
 		}
 	case jenkinsScan.FullCommand():
 		cfg := engine.JenkinsConfig{
-			Endpoint:              *jenkinsEndpoint,
+			Endpoint:              *jenkinsURL,
 			InsecureSkipVerifyTLS: *jenkinsInsecureSkipVerifyTLS,
 			Username:              *jenkinsUsername,
 			Password:              *jenkinsPassword,
