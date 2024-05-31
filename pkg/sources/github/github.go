@@ -545,19 +545,8 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	}
 	s.apiClient = ghClient
 
-	// TODO: this should support scanning users too
-
-	specificScope := false
-
-	if len(s.repos) > 0 {
-		specificScope = true
-	}
-
-	var (
-		ghUser *github.User
-	)
-
 	ctx.Logger().V(1).Info("Enumerating with token", "endpoint", apiEndpoint)
+	var ghUser *github.User
 	for {
 		ghUser, _, err = s.apiClient.Users.Get(ctx, "")
 		if s.handleRateLimit(err) {
@@ -569,71 +558,46 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		break
 	}
 
-	if s.orgsCache.Count() > 0 {
-		specificScope = true
-		for _, org := range s.orgsCache.Keys() {
-			orgCtx := context.WithValue(ctx, "account", org)
-			userType, err := s.getReposByOrgOrUser(ctx, org)
-			if err != nil {
-				orgCtx.Logger().Error(err, "error fetching repos for org or user")
-				continue
-			}
-
-			if userType == organization && s.conn.ScanUsers {
-				if err := s.addMembersByOrg(ctx, org); err != nil {
-					orgCtx.Logger().Error(err, "Unable to add members by org")
-				}
-			}
-		}
-	}
-
-	// If no scope was provided, enumerate them.
+	specificScope := len(s.repos) > 0 || s.orgsCache.Count() > 0
 	if !specificScope {
+		// Enumerate the user's orgs and repos if none were specified.
 		if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-			s.log.Error(err, "error fetching repos by user")
+			s.log.Error(err, "Unable to fetch repos for the current user", "user", ghUser.GetLogin())
+		}
+		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
+			s.log.Error(err, "Unable to fetch gists for the current user", "user", ghUser.GetLogin())
 		}
 
 		isGHE := !strings.EqualFold(apiEndpoint, cloudEndpoint)
 		if isGHE {
 			s.addAllVisibleOrgs(ctx)
 		} else {
-			// Scan for orgs is default with a token. GitHub App enumerates the repositories
-			// that were assigned to it in GitHub App settings.
+			// Scan for orgs is default with a token.
+			// GitHub App enumerates the repos that were assigned to it in GitHub App settings.
 			s.addOrgsByUser(ctx, ghUser.GetLogin())
 		}
+	}
 
+	if len(s.orgsCache.Keys()) > 0 {
 		for _, org := range s.orgsCache.Keys() {
 			orgCtx := context.WithValue(ctx, "account", org)
 			userType, err := s.getReposByOrgOrUser(ctx, org)
 			if err != nil {
-				orgCtx.Logger().Error(err, "error fetching repos for org or user")
+				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
 				continue
 			}
 
 			if userType == organization && s.conn.ScanUsers {
 				if err := s.addMembersByOrg(ctx, org); err != nil {
-					orgCtx.Logger().Error(err, "Unable to add members by org for org")
+					orgCtx.Logger().Error(err, "Unable to add members for org")
 				}
 			}
 		}
 
-		if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-			s.log.Error(err, "error fetching repos for the current user", "user", ghUser.GetLogin())
+		if s.conn.ScanUsers && len(s.memberCache) > 0 {
+			s.log.Info("Fetching repos for org members", "org_count", s.orgsCache.Count(), "member_count", len(s.memberCache))
+			s.addReposForMembers(ctx)
 		}
-
-		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
-		// So if we don't have ScanUsers enabled, add the user gists as normal.
-		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
-			s.log.Error(err, "error fetching gists for the current user", "user", ghUser.GetLogin())
-		}
-
-		return nil
-	}
-
-	if s.conn.ScanUsers {
-		s.log.Info("Adding repos", "orgs", s.orgsCache.Count(), "members", len(s.memberCache))
-		s.addReposForMembers(ctx)
-		return nil
 	}
 
 	return nil
