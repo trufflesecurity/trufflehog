@@ -38,7 +38,7 @@ func setupACLConfigFile(redisUser, redisPass string) (*os.File, error) {
 	return aclFile, nil
 }
 
-func TestRedis_FromChunk(t *testing.T) {
+func TestRedisIntegration_FromChunk(t *testing.T) {
 	redisUser := gofakeit.Username()
 	redisPass := gofakeit.Password(true, true, true, false, false, 10)
 
@@ -51,7 +51,7 @@ func TestRedis_FromChunk(t *testing.T) {
 	defer aclFile.Close()
 
 	redisContainerRequest := testcontainers.ContainerRequest{
-		Image:        "redis:6.2-alpine",
+		Image:        "redis:7-alpine",
 		ExposedPorts: []string{"6379/tcp"},
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.BindMount(aclFile.Name(), "/usr/local/etc/redis/users.acl"),
