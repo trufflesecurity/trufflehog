@@ -2,6 +2,7 @@ package detectors
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 	"net/http"
@@ -11,8 +12,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
-var DetectorHttpClientWithNoLocalAddresses *http.Client
-var DetectorHttpClientWithLocalAddresses *http.Client
+var (
+	clientWithNoLocalAddresses *http.Client
+	noLocalOnce                sync.Once
+	clientWithLocalAddresses   *http.Client
+	localOnce                  sync.Once
+)
 
 // DefaultResponseTimeout is the default timeout for HTTP requests.
 const DefaultResponseTimeout = 10 * time.Second
@@ -24,18 +29,31 @@ func userAgent() string {
 	return "TruffleHog"
 }
 
-func init() {
-	DetectorHttpClientWithLocalAddresses = NewDetectorHttpClient(
-		WithTransport(NewDetectorTransport(nil)),
-		WithTimeout(DefaultResponseTimeout),
-		WithNoFollowRedirects(),
-	)
-	DetectorHttpClientWithNoLocalAddresses = NewDetectorHttpClient(
-		WithTransport(NewDetectorTransport(nil)),
-		WithTimeout(DefaultResponseTimeout),
-		WithNoFollowRedirects(),
-		WithNoLocalIP(),
-	)
+func GetHttpClientWithNoLocalAddresses() *http.Client {
+	if clientWithNoLocalAddresses == nil {
+		noLocalOnce.Do(func() {
+			clientWithNoLocalAddresses = NewDetectorHttpClient(
+				WithTransport(NewDetectorTransport(nil)),
+				WithTimeout(DefaultResponseTimeout),
+				WithNoFollowRedirects(),
+				WithNoLocalIP(),
+			)
+		})
+	}
+	return clientWithNoLocalAddresses
+}
+
+func GetHttpClientWithLocalAddresses() *http.Client {
+	if clientWithLocalAddresses == nil {
+		localOnce.Do(func() {
+			clientWithLocalAddresses = NewDetectorHttpClient(
+				WithTransport(NewDetectorTransport(nil)),
+				WithTimeout(DefaultResponseTimeout),
+				WithNoFollowRedirects(),
+			)
+		})
+	}
+	return clientWithLocalAddresses
 }
 
 var overrideOnce sync.Once
@@ -44,13 +62,11 @@ var overrideOnce sync.Once
 // It is guaranteed to only run once, subsequent calls will have no effect.
 // This should be called before any scans are started.
 func OverrideDetectorTimeout(timeout time.Duration) {
-    overrideOnce.Do(func() {
-        DetectorHttpClientWithLocalAddresses.Timeout = timeout
-        DetectorHttpClientWithNoLocalAddresses.Timeout = timeout
-    })
+	overrideOnce.Do(func() {
+		clientWithLocalAddresses.Timeout = timeout
+		clientWithNoLocalAddresses.Timeout = timeout
+	})
 }
-
-
 
 // ClientOption defines a function type that modifies an http.Client.
 type ClientOption func(*http.Client)
@@ -80,7 +96,7 @@ var defaultDialer = &net.Dialer{
 
 func NewDetectorTransport(T http.RoundTripper) http.RoundTripper {
 	if T == nil {
-		T = &http.Transport{
+		t := &http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,
 			DialContext:           defaultDialer.DialContext,
 			MaxIdleConns:          100,
@@ -89,6 +105,11 @@ func NewDetectorTransport(T http.RoundTripper) http.RoundTripper {
 			TLSHandshakeTimeout:   3 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		}
+		// Disable TLS certificate validation.
+		if feature.NoVerifySsl.Load() {
+			t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		}
+		T = t
 	}
 	return &detectorTransport{T: T}
 }
