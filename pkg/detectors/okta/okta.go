@@ -20,9 +20,8 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
-	domainPat     = regexp.MustCompile(`\b[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com\b`)
-	tokenPat      = regexp.MustCompile(`\b00[a-zA-Z0-9_-]{40}\b`)
+	domainPat = regexp.MustCompile(`\b[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com\b`)
+	tokenPat  = regexp.MustCompile(`\b00[a-zA-Z0-9_-]{40}\b`)
 	// TODO: Oauth client secrets
 )
 
@@ -56,8 +55,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				client := s.client
-				if client == nil {
-					client = defaultClient
+				if s.client == nil {
+					s.client = detectors.GetHttpClientWithNoLocalAddresses()
 				}
 
 				isVerified, verificationErr := verifyOktaToken(ctx, client, domain, token)
