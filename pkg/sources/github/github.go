@@ -749,7 +749,12 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 				_, err := s.cloneAndScanRepo(wikiCtx, installationClient, wikiURL, repoInfo, chunksChan)
 				if err != nil {
-					scanErrs.Add(fmt.Errorf("error scanning wiki: %s", wikiURL))
+					// Ignore "Repository not found" errors.
+					// It's common for GitHub's API to say a repo has a wiki when it doesn't.
+					if !strings.Contains(err.Error(), "not found") {
+						scanErrs.Add(fmt.Errorf("error scanning wiki: %w", err))
+					}
+
 					// Don't return, it still might be possible to scan comments.
 				}
 			}
@@ -784,7 +789,7 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, re
 	ctx.Logger().V(2).Info("attempting to clone repo")
 	path, repo, err := s.cloneRepo(ctx, repoURL, client)
 	if err != nil {
-		return duration, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+		return duration, err
 	}
 	defer os.RemoveAll(path)
 

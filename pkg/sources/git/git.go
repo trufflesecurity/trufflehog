@@ -415,7 +415,12 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		cloneURL.User = params.userInfo
 	}
 
-	gitArgs := []string{"clone", cloneURL.String(), params.clonePath}
+	gitArgs := []string{
+		"clone",
+		cloneURL.String(),
+		params.clonePath,
+		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
+	}
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
@@ -440,15 +445,14 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	}
 
 	if err != nil {
-		err = fmt.Errorf("error executing git clone: %w", err)
+		err = fmt.Errorf("error executing git clone: %w, %s", err, output)
 	}
 	logger.V(3).Info("git subcommand finished", "output", output)
 
 	if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
-	}
-	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "output", output, "error", err)
+	} else if cloneCmd.ProcessState.ExitCode() != 0 {
+		logger.V(1).Info("git clone failed", "error", err)
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
