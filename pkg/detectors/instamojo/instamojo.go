@@ -14,6 +14,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -79,7 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						continue
 					}
 					body := string(bodyBytes)
-					if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "access_token") {
+					if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.contains(body, "access_token") {
 						s1.Verified = true
 					} else {
 						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)

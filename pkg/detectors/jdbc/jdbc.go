@@ -14,6 +14,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	ignorePatterns []regexp.Regexp
 }
 
@@ -142,7 +143,7 @@ func tryRedactBasicAuth(conn string) (string, bool) {
 // URL param "?password=password" style
 func tryRedactURLParams(conn string) (string, bool) {
 	prefix, paramString, found := strings.Cut(conn, "?")
-	if !found {
+	if (!found) {
 		return "", false
 	}
 	var newParams []string
@@ -227,7 +228,7 @@ func newJDBC(conn string) (jdbc, error) {
 	}
 	// get the subprotocol parser
 	parser, ok := supportedSubprotocols[strings.ToLower(subprotocol)]
-	if !ok {
+	if (!ok) {
 		return nil, errors.New("unsupported subprotocol")
 	}
 	return parser(subname)
