@@ -714,6 +714,8 @@ github.com/testcontainers/testcontainers-go v0.31.0 h1:W0VwIhcEVhRflwL9as3dhY6jX
 github.com/testcontainers/testcontainers-go v0.31.0/go.mod h1:D2lAoA0zUFiSY+eAflqK5mcUx/A5hrrORaEQrd0SefI=
 github.com/testcontainers/testcontainers-go/modules/elasticsearch v0.31.0 h1:KBbU/rVL3RhrFYcrVGY+NDw3x3Ho2YlJUnjbIOsL6jk=
 github.com/testcontainers/testcontainers-go/modules/elasticsearch v0.31.0/go.mod h1:7YQbgJUoNDztnXWAdCRtI+gUqBM+URd83JzwYlzwGhQ=
+github.com/testcontainers/testcontainers-go/modules/mongodb v0.31.0 h1:0ZAEX50NNK/TVRqDls4aQUmokRcYzstKzmF3DCfFK+Y=
+github.com/testcontainers/testcontainers-go/modules/mongodb v0.31.0/go.mod h1:n5KbYAdzD8xJrNVGdPvSacJtwZ4D0Q/byTMI5vR/dk8=
 github.com/testcontainers/testcontainers-go/modules/mssql v0.31.0 h1:X4MRxswzZJov/X5a5FYGzNmMRAKlnErE+5euMoMJGzM=
 github.com/testcontainers/testcontainers-go/modules/mssql v0.31.0/go.mod h1:GsGFz4tcxka1meZdBBHdqZCYdpHQaa/pORXW/ELWZV0=
 github.com/testcontainers/testcontainers-go/modules/mysql v0.31.0 h1:790+S8ewZYCbG+o8IiFlZ8ZZ33XbNO6zV9qhU6xhlRk=
