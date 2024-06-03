@@ -3,12 +3,14 @@ package githubapp
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"time"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/golang-jwt/jwt"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -70,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				iat := time.Now().Add(-60 * time.Second)
 				exp := time.Now().Add(9 * 60 * time.Second)
 
-				iss = appResMatch
+				iss := appResMatch
 				token := jwt.New(jwt.SigningMethodRS256)
 				claims := token.Claims.(jwt.MapClaims)
 				claims["iat"] = iat.Unix()
