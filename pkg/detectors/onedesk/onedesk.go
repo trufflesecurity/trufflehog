@@ -3,10 +3,11 @@ package onedesk
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -72,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						continue
 					}
 					body := string(bodyBytes)
-					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.contains(body, `"code":"SUCCESS"`) {
+					if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, `"code":"SUCCESS"`) {
 						s1.Verified = true
 					}
 				}

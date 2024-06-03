@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	secretMatches := make(map[string]struct{})
-	for _, match := secretPat.FindAllStringSubmatch(dataStr, -1) {
+	for _, match := range secretPat.FindAllStringSubmatch(dataStr, -1) {
 		secretMatches[match[1]] = struct{}{}
 	}
 
