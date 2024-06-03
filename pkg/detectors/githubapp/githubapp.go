@@ -14,7 +14,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -68,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				iat := time.Now().Add(-60 * time.Second)
 				exp := time.Now().Add(9 * 60 * time.Second)
 
-				iss := appResMatch
+				iss = appResMatch
 				token := jwt.New(jwt.SigningMethodRS256)
 				claims := token.Claims.(jwt.MapClaims)
 				claims["iat"] = iat.Unix()
