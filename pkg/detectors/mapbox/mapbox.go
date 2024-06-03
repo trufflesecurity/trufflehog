@@ -11,7 +11,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -34,7 +36,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-	for _, match := range matches {
+	for _, match := matches {
 
 		resMatch := strings.TrimSpace(match[1])
 		for i, idMatch := range idMatches {

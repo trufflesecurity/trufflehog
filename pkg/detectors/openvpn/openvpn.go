@@ -14,6 +14,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -57,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					client := s.client
-					if client == nil {
+					if (client == nil) {
 						client = defaultClient
 					}
 

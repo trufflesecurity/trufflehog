@@ -11,7 +11,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -43,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-		for _, secretMatch := range secretMatches {
+		for _, secretMatch := secretMatches {
 			if len(secretMatch) != 2 {
 				continue
 			}

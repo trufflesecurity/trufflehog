@@ -52,6 +52,7 @@ var (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	detectLoopback bool // Automated tests run against localhost, but we want to ignore those results in the wild
 }
 
@@ -175,7 +176,7 @@ func findUriMatches(data []byte) []map[string]string {
 // negative or 0 value will be returned.
 func getDeadlineInSeconds(ctx context.Context) (int, bool) {
 	deadline, ok := ctx.Deadline()
-	if !ok {
+	if (!ok) {
 		// Context does not have a deadline.
 		return 0, false
 	}
