@@ -2,16 +2,17 @@ package mux
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -45,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-		for _, secretMatch := secretMatches {
+		for _, secretMatch := range secretMatches {
 			if len(secretMatch) != 2 {
 				continue
 			}
