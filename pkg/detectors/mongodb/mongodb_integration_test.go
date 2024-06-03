@@ -51,15 +51,6 @@ func TestIntegrationMongoDB_FromChunk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	// defer cancel()
-	// testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
-	// if err != nil {
-	// 	t.Fatalf("could not get test secrets from GCP: %s", err)
-	// }
-	// secret := testSecrets.MustGetField("MONGODB_URI")
-	// inactiveSecret := testSecrets.MustGetField("MONGODB_INACTIVE_URI")
-
 	// mongodb+srv://mongotester:Risa0y3t35Si1qT3@cluster0.z8js2ni.mongodb.net/?retryWrites=true&w=majority
 	// mongodb+srv://mongotester:risa0y3t35Si1qT3@cluster0.z8js2ni.mongodb.net/?retryWrites=true&w=majority
 
@@ -95,76 +86,76 @@ func TestIntegrationMongoDB_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		// {
-		// 	name: "found, unverified",
-		// 	s:    Scanner{},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte(fmt.Sprintf("You can find a mongodb secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
-		// 		verify: true,
-		// 	},
-		// 	want: []detectors.Result{
-		// 		{
-		// 			DetectorType: detectorspb.DetectorType_MongoDB,
-		// 			Verified:     false,
-		// 			ExtraData: map[string]string{
-		// 				"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
-		// 			},
-		// 		},
-		// 	},
-		// 	wantErr: false,
-		// },
-		// {
-		// 	name: "found, would be verified but for connection timeout",
-		// 	s:    Scanner{timeout: 1 * time.Microsecond},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte(fmt.Sprintf("You can find a mongodb secret %s within", secret)),
-		// 		verify: true,
-		// 	},
-		// 	want: []detectors.Result{
-		// 		{
-		// 			DetectorType: detectorspb.DetectorType_MongoDB,
-		// 			Verified:     false,
-		// 			ExtraData: map[string]string{
-		// 				"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
-		// 			},
-		// 		},
-		// 	},
-		// 	wantErr:             false,
-		// 	wantVerificationErr: true,
-		// },
-		// {
-		// 	name: "found, bad host",
-		// 	s:    Scanner{},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte(fmt.Sprintf("You can find a mongodb secret %s within", strings.ReplaceAll(secret, ".mongodb.net", ".mongodb.net.bad"))),
-		// 		verify: true,
-		// 	},
-		// 	want: []detectors.Result{
-		// 		{
-		// 			DetectorType: detectorspb.DetectorType_MongoDB,
-		// 			Verified:     false,
-		// 			ExtraData: map[string]string{
-		// 				"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
-		// 			},
-		// 		},
-		// 	},
-		// 	wantErr:             false,
-		// 	wantVerificationErr: true,
-		// },
-		// {
-		// 	name: "not found",
-		// 	s:    Scanner{},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte("You cannot find the secret within"),
-		// 		verify: true,
-		// 	},
-		// 	want:    nil,
-		// 	wantErr: false,
-		// },
+		{
+			name: "found, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("mongodb://%s:%s@%s:%s/?retryWrites=true&w=majority", mongoDbUser, "invalidPassword", host, port)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_MongoDB,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, would be verified but for connection timeout",
+			s:    Scanner{timeout: 1 * time.Microsecond},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("mongodb://%s:%s@%s:%s/?retryWrites=true&w=majority", mongoDbUser, mongoDbPass, host, port.Port())),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_MongoDB,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+					},
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, bad host",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("mongodb://%s:%s@%s:%s/?retryWrites=true&w=majority", mongoDbUser, mongoDbPass, "bad.host", port.Port())),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_MongoDB,
+					Verified:     false,
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+					},
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "not found",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("You cannot find the secret within"),
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
