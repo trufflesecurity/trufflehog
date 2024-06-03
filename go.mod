@@ -57,7 +57,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0
 	github.com/launchdarkly/go-server-sdk/v7 v7.4.0
 	github.com/lib/pq v1.10.9
-	github.com/lrstanley/bubblezone v0.0.0-20240125042004-b7bafc493195
+	github.com/lrstanley/bubblezone v0.0.0-20240602193536-d14e6b69d7f9
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
