@@ -91,11 +91,12 @@ type Config struct {
 	// also serves as a multiplier for other worker types (e.g., detector workers, notifier workers)
 	Concurrency int
 
-	Decoders          []decoders.Decoder
-	Detectors         []detectors.Detector
-	IncludeDetectors  string
-	ExcludeDetectors  string
-	VerifierEndpoints map[string]string
+	Decoders            []decoders.Decoder
+	Detectors           []detectors.Detector
+	IncludeDetectors    string
+	ExcludeDetectors    string
+	CustomVerifiersOnly bool
+	VerifierEndpoints   map[string]string
 
 	// Verify determines whether the scanner will verify candidate secrets.
 	Verify bool
@@ -206,23 +207,35 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 
 	engine.setDefaults(ctx)
 
-	// Build include and exclude detector sets for filtering on engine initialization.
-	includeDetectorSet, excludeDetectorSet, detectorsWithCustomVerifierEndpoints, err := buildDetectorSets(cfg)
+	// If detectors are provided, use them directly and skip the filtering process.
+	if len(cfg.Detectors) == 0 {
+		// Build include and exclude detector sets for filtering on engine initialization.
+		includeDetectorSet, excludeDetectorSet, err := buildDetectorSets(cfg)
+		if err != nil {
+			return nil, err
+		}
+
+		// Apply include/exclude filters and verifier endpoints customization
+		includeFilter := func(d detectors.Detector) bool {
+			_, ok := getWithDetectorID(d, includeDetectorSet)
+			return ok
+		}
+		excludeFilter := func(d detectors.Detector) bool {
+			_, ok := getWithDetectorID(d, excludeDetectorSet)
+			return !ok
+		}
+
+		engine.applyFilters(includeFilter, excludeFilter)
+	}
+
+	// Apply custom verifier endpoints to detectors that support it.
+	detectorsWithCustomVerifierEndpoints, err := parseCustomVerifierEndpoints(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	// Apply include/exclude filters and verifier endpoints customization
-	includeFilter := func(d detectors.Detector) bool {
-		_, ok := includeDetectorSet[config.GetDetectorID(d)]
-		return ok
-	}
-	excludeFilter := func(d detectors.Detector) bool {
-		_, ok := excludeDetectorSet[config.GetDetectorID(d)]
-		return !ok
-	}
 	endpointCustomizer := func(d detectors.Detector) bool {
-		urls, ok := detectorsWithCustomVerifierEndpoints[config.GetDetectorID(d)]
+		urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
 		if !ok {
 			return true
 		}
@@ -230,7 +243,8 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		if !ok {
 			return false
 		}
-		if len(urls) == 0 {
+
+		if !cfg.CustomVerifiersOnly || len(urls) == 0 {
 			urls = append(urls, customizer.DefaultEndpoint())
 		}
 		if err := customizer.SetEndpoints(urls...); err != nil {
@@ -238,8 +252,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		}
 		return true
 	}
-
-	engine.applyFilters(includeFilter, excludeFilter, endpointCustomizer)
+	engine.applyFilters(endpointCustomizer)
 
 	if results := cfg.Results; len(results) > 0 {
 		_, ok := results["verified"]
@@ -292,43 +305,77 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	ctx.Logger().V(4).Info("default engine options set")
 }
 
-func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.DetectorID]struct{}, map[config.DetectorID][]string, error) {
+func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.DetectorID]struct{}, error) {
 	includeList, err := config.ParseDetectors(cfg.IncludeDetectors)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid include list detector configuration: %w", err)
+		return nil, nil, fmt.Errorf("invalid include list detector configuration: %w", err)
 	}
 	excludeList, err := config.ParseDetectors(cfg.ExcludeDetectors)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid exclude list detector configuration: %w", err)
+		return nil, nil, fmt.Errorf("invalid exclude list detector configuration: %w", err)
 	}
-	detectorsWithCustomVerifierEndpoints, err := config.ParseVerifierEndpoints(cfg.VerifierEndpoints)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid verifier detector configuration: %w", err)
-	}
+
 	includeDetectorSet := detectorTypeToSet(includeList)
 	excludeDetectorSet := detectorTypeToSet(excludeList)
 
 	// Verify that all the user-provided detectors support the optional
 	// detector features.
 	if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid include list detector configuration id %v: %w", id, err)
+		return nil, nil, fmt.Errorf("invalid include list detector configuration id %v: %w", id, err)
 	}
 	if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid exclude list detector configuration id %v: %w", id, err)
+		return nil, nil, fmt.Errorf("invalid exclude list detector configuration id %v: %w", id, err)
 	}
-	if id, err := verifyDetectorsAreVersioner(detectorsWithCustomVerifierEndpoints); err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid verifier detector configuration id %v: %w", id, err)
+
+	return includeDetectorSet, excludeDetectorSet, nil
+}
+
+func parseCustomVerifierEndpoints(cfg *Config) (map[config.DetectorID][]string, error) {
+	customVerifierEndpoints, err := config.ParseVerifierEndpoints(cfg.VerifierEndpoints)
+	if err != nil {
+		return nil, fmt.Errorf("invalid verifier detector configuration: %w", err)
+	}
+
+	if id, err := verifyDetectorsAreVersioner(customVerifierEndpoints); err != nil {
+		return nil, fmt.Errorf("invalid verifier detector configuration id %v: %w", id, err)
 	}
 	// Extra check for endpoint customization.
 	isEndpointCustomizer := DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
-	for id := range detectorsWithCustomVerifierEndpoints {
+	for id := range customVerifierEndpoints {
 		if _, ok := isEndpointCustomizer[id.ID]; !ok {
-			return nil, nil, nil, fmt.Errorf("endpoint provided but detector does not support endpoint customization: %w", err)
+			return nil, fmt.Errorf("endpoint provided but detector does not support endpoint customization: %w", err)
 		}
 	}
-
-	return includeDetectorSet, excludeDetectorSet, detectorsWithCustomVerifierEndpoints, nil
+	return customVerifierEndpoints, nil
 }
+
+// func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.DetectorID]struct{}, map[config.DetectorID][]string, error) {
+// 	includeList, err := config.ParseDetectors(cfg.IncludeDetectors)
+// 	if err != nil {
+// 		return nil, nil, nil, fmt.Errorf("invalid include list detector configuration: %w", err)
+// 	}
+// 	excludeList, err := config.ParseDetectors(cfg.ExcludeDetectors)
+// 	if err != nil {
+// 		return nil, nil, nil, fmt.Errorf("invalid exclude list detector configuration: %w", err)
+// 	}
+// 	detectorsWithCustomVerifierEndpoints, err := config.ParseVerifierEndpoints(cfg.VerifierEndpoints)
+// 	if err != nil {
+// 		return nil, nil, nil, fmt.Errorf("invalid verifier detector configuration: %w", err)
+// 	}
+// 	includeDetectorSet := detectorTypeToSet(includeList)
+// 	excludeDetectorSet := detectorTypeToSet(excludeList)
+//
+// 	// Verify that all the user-provided detectors support the optional
+// 	// detector features.
+// 	if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
+// 		return nil, nil, nil, fmt.Errorf("invalid include list detector configuration id %v: %w", id, err)
+// 	}
+// 	if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
+// 		return nil, nil, nil, fmt.Errorf("invalid exclude list detector configuration id %v: %w", id, err)
+// 	}
+//
+// 	return includeDetectorSet, excludeDetectorSet, detectorsWithCustomVerifierEndpoints, nil
+// }
 
 // detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
 func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
@@ -337,6 +384,22 @@ func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]stru
 		out[d] = struct{}{}
 	}
 	return out
+}
+
+// getWithDetectorID is a helper function to get a value from a map using a
+// detector's ID. This function behaves like a normal map lookup, with an extra
+// step of checking for the non-specific version of a detector.
+func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T) (T, bool) {
+	key := config.GetDetectorID(d)
+	// Check if the specific ID is provided.
+	if t, ok := data[key]; ok || key.Version == 0 {
+		return t, ok
+	}
+	// Check if the generic type is provided without a version.
+	// This means "all" versions of a type.
+	key.Version = 0
+	t, ok := data[key]
+	return t, ok
 }
 
 // verifyDetectorsAreVersioner checks all keys in a provided map to verify the
@@ -358,11 +421,11 @@ func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (config.De
 	return config.DetectorID{}, nil
 }
 
-// applyFilters applies the include, exclude, and endpoint customizer filters to the detectors.
-func (e *Engine) applyFilters(includeFilter, excludeFilter, endpointCustomizer func(detectors.Detector) bool) {
-	e.detectors = filterDetectors(includeFilter, e.detectors)
-	e.detectors = filterDetectors(excludeFilter, e.detectors)
-	e.detectors = filterDetectors(endpointCustomizer, e.detectors)
+// applyFilters applies a variable number of filters to the detectors.
+func (e *Engine) applyFilters(filters ...func(detectors.Detector) bool) {
+	for _, filter := range filters {
+		e.detectors = filterDetectors(filter, e.detectors)
+	}
 }
 
 func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors.Detector) []detectors.Detector {

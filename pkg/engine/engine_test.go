@@ -242,16 +242,27 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
 	conf := Config{
-		Concurrency: 1,
-		Decoders:    decoders.DefaultDecoders(),
-		Detectors:   DefaultDetectors(),
-		Verify:      false,
-		Dispatcher:  NewPrinterNotifier(new(discardPrinter)),
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     DefaultDetectors(),
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &conf)
 	assert.NoError(t, err)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
@@ -278,16 +289,27 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	_, err = tmpFile.WriteString(fmt.Sprintf("test data using keyword %s", fakeDetectorKeyword))
 	assert.NoError(t, err)
 
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
 	conf := Config{
-		Concurrency: 1,
-		Decoders:    decoders.DefaultDecoders(),
-		Detectors:   []detectors.Detector{new(fakeDetectorV1), new(fakeDetectorV2)},
-		Verify:      true,
-		Dispatcher:  NewPrinterNotifier(new(discardPrinter)),
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     []detectors.Detector{new(fakeDetectorV1), new(fakeDetectorV2)},
+		Verify:        true,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &conf)
 	assert.NoError(t, err)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
@@ -337,16 +359,27 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
 	conf := Config{
-		Concurrency: 1,
-		Decoders:    decoders.DefaultDecoders(),
-		Detectors:   allDetectors,
-		Verify:      true,
-		Dispatcher:  NewPrinterNotifier(new(discardPrinter)),
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     allDetectors,
+		Verify:        true,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &conf)
 	assert.NoError(t, err)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
@@ -373,18 +406,29 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	conf, err := config.Read(confPath)
 	assert.Nil(t, err)
 
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
 	c := Config{
-		Concurrency: 1,
-		Decoders:    decoders.DefaultDecoders(),
-		Detectors:   conf.Detectors,
-		Verify:      false,
-		Dispatcher:  NewPrinterNotifier(new(discardPrinter)),
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     conf.Detectors,
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &c)
 	assert.NoError(t, err)
 
 	e.verificationOverlapTracker = new(verificationOverlapTracker)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {

@@ -24,7 +24,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
@@ -418,10 +417,11 @@ func run(state overseer.State) {
 
 	engConf := engine.Config{
 		Concurrency:          *concurrency,
-		Detectors:            append(conf.Detectors, engine.DefaultDetectors()...),
+		Detectors:            conf.Detectors,
 		Verify:               !*noVerification,
 		IncludeDetectors:     *includeDetectors,
 		ExcludeDetectors:     *excludeDetectors,
+		CustomVerifiersOnly:  *customVerifiersOnly,
 		VerifierEndpoints:    *verifiers,
 		Dispatcher:           engine.NewPrinterNotifier(printer),
 		FilterUnverified:     *filterUnverified,
@@ -716,48 +716,4 @@ func printAverageDetectorTime(e *engine.Engine) {
 	for detectorName, duration := range e.GetDetectorsMetrics() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
-}
-
-// detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
-func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
-	out := make(map[config.DetectorID]struct{}, len(detectors))
-	for _, d := range detectors {
-		out[d] = struct{}{}
-	}
-	return out
-}
-
-// getWithDetectorID is a helper function to get a value from a map using a
-// detector's ID. This function behaves like a normal map lookup, with an extra
-// step of checking for the non-specific version of a detector.
-func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T) (T, bool) {
-	key := config.GetDetectorID(d)
-	// Check if the specific ID is provided.
-	if t, ok := data[key]; ok || key.Version == 0 {
-		return t, ok
-	}
-	// Check if the generic type is provided without a version.
-	// This means "all" versions of a type.
-	key.Version = 0
-	t, ok := data[key]
-	return t, ok
-}
-
-// verifyDetectorsAreVersioner checks all keys in a provided map to verify the
-// provided type is actually a Versioner.
-func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (config.DetectorID, error) {
-	isVersioner := engine.DefaultDetectorTypesImplementing[detectors.Versioner]()
-	for id := range data {
-		if id.Version == 0 {
-			// Version not provided.
-			continue
-		}
-		if _, ok := isVersioner[id.ID]; ok {
-			// Version provided for a Versioner detector.
-			continue
-		}
-		// Version provided on a non-Versioner detector.
-		return id, fmt.Errorf("version provided but detector does not have a version")
-	}
-	return config.DetectorID{}, nil
 }

@@ -61,13 +61,16 @@ func TestScanGCS(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.TODO())
 			defer cancel()
 
-			e, err := Start(ctx,
-				WithConcurrency(1),
-				WithDecoders(decoders.DefaultDecoders()...),
-				WithDetectors(DefaultDetectors()...),
-				WithVerify(false),
-			)
-			assert.Nil(t, err)
+			conf := Config{
+				Concurrency: 1,
+				Decoders:    decoders.DefaultDecoders(),
+				Detectors:   DefaultDetectors(),
+				Verify:      false,
+				Dispatcher:  NewPrinterNotifier(new(discardPrinter)),
+			}
+
+			e, err := NewEngine(ctx, &conf)
+			assert.NoError(t, err)
 
 			go func() {
 				resultCount := 0
