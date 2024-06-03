@@ -205,8 +205,6 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		return nil, fmt.Errorf("source manager is required")
 	}
 
-	engine.setDefaults(ctx)
-
 	// If detectors are provided, use them directly and skip the filtering process.
 	if len(cfg.Detectors) == 0 {
 		// Build include and exclude detector sets for filtering on engine initialization.
@@ -267,6 +265,8 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		_, ok = results["filtered_unverified"]
 		engine.logFilteredUnverified = ok
 	}
+
+	engine.setDefaults(ctx)
 
 	if err := engine.initialize(ctx); err != nil {
 		return nil, err
