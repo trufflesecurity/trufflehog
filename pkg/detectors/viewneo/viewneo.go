@@ -3,9 +3,10 @@ package viewneo
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -29,6 +30,11 @@ var (
 func (s Scanner) Keywords() []string {
 	return []string{"viewneo"}
 }
+
+const maxKeySize = 1500
+
+// MaxSecretSize returns the maximum size of a secret that this detector can find.
+func (s Scanner) MaxSecretSize() int64 { return maxKeySize }
 
 // FromData will find and optionally verify Viewneo secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
