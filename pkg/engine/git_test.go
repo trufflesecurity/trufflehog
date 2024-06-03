@@ -82,6 +82,8 @@ func TestGitEngine(t *testing.T) {
 			e, err := NewEngine(ctx, &conf)
 			assert.NoError(t, err)
 
+			e.Start(ctx)
+
 			cfg := sources.GitConfig{
 				URI:      path,
 				HeadRef:  tTest.branch,
