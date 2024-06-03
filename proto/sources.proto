@@ -320,6 +320,7 @@ message Jenkins {
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
     credentials.Header header = 3;
+    credentials.Unauthenticated unauthenticated = 5;
   }
   bool insecure_skip_verify_tls = 4;
 }

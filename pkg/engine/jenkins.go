@@ -11,7 +11,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/circleci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/jenkins"
 )
 
@@ -53,7 +52,11 @@ func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) e
 			},
 		}
 	default:
-		return errors.New("invalid Jenkins configuration")
+		connection = &sourcespb.Jenkins{
+			Credential: &sourcespb.Jenkins_Unauthenticated{
+				Unauthenticated: &credentialspb.Unauthenticated{},
+			},
+		}
 	}
 
 	connection.Endpoint = jenkinsConfig.Endpoint
@@ -67,7 +70,7 @@ func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) e
 	}
 
 	sourceName := "trufflehog - Jenkins"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, circleci.SourceType)
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, jenkins.SourceType)
 
 	jenkinsSource := &jenkins.Source{}
 	if err := jenkinsSource.Init(ctx, "trufflehog - Jenkins", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {

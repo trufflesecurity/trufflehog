@@ -23,6 +23,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_JENKINS
+)
+
 type Source struct {
 	name     string
 	sourceId sources.SourceID
@@ -113,6 +117,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 			key:   cred.Header.Key,
 			value: cred.Header.Value,
 		}
+	case *sourcespb.Jenkins_Unauthenticated:
+		unparsedURL = conn.Endpoint
 	default:
 		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", name, s.Type())
 	}
@@ -136,7 +142,9 @@ func (s *Source) NewRequest(method, url string, body io.Reader) (*http.Request, 
 		return request, nil
 	}
 
-	request.SetBasicAuth(s.user, s.token)
+	if s.user != "" && s.token != "" {
+		request.SetBasicAuth(s.user, s.token)
+	}
 	return request, nil
 }
 
