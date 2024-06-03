@@ -61,7 +61,7 @@ require (
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
-	github.com/microsoft/go-mssqldb v1.7.1
+	github.com/microsoft/go-mssqldb v1.7.2
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/muesli/reflow v0.3.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -77,6 +77,7 @@ require (
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/testcontainers/testcontainers-go v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/elasticsearch v0.31.0
+	github.com/testcontainers/testcontainers-go/modules/mongodb v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/mssql v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.31.0
@@ -254,7 +255,6 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
-	github.com/testcontainers/testcontainers-go/modules/mongodb v0.31.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/redis v0.31.0 // indirect
 	github.com/tetratelabs/wazero v1.7.1 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
