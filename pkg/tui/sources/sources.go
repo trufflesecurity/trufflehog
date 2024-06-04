@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/circleci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/docker"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/elasticsearch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/filesystem"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/gcs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/git"
@@ -23,6 +24,8 @@ func GetSourceNotes(sourceName string) string {
 		return github.GetNote()
 	case "postman":
 		return postman.GetNote()
+	case "elasticsearch":
+		return elasticsearch.GetNote()
 
 	default:
 		return ""
@@ -45,6 +48,8 @@ func GetSourceFields(sourceName string) CmdModel {
 		return circleci.GetFields()
 	case "docker":
 		return docker.GetFields()
+	case "elasticsearch":
+		return elasticsearch.GetFields()
 	case "filesystem":
 		return filesystem.GetFields()
 	case "gcs (google cloud storage)":
