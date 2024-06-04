@@ -273,6 +273,34 @@ trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 trufflehog jenkins --url https://jenkins.example.com --username admin --password admin
 ```
 
+## 14: Scan an Elasticsearch server
+
+### Scan a Local Cluster
+
+There are two ways to authenticate to a local cluster with TruffleHog: (1) username and password, (2) service token.
+
+#### Connect to a local cluster with username and password
+
+```bash
+trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --username truffle --password hog
+```
+
+#### Connect to a local cluster with a service token
+
+```bash
+trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --service-token ‘AAEWVaWM...Rva2VuaSDZ’
+```
+
+### Scan an Elastic Cloud Cluster
+
+To scan a cluster on Elastic Cloud, you’ll need a Cloud ID and API key.
+
+```bash
+trufflehog elasticsearch \
+  --cloud-id 'search-prod:dXMtY2Vx...YjM1ODNlOWFiZGRlNjI0NA==' \
+  --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
