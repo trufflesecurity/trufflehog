@@ -16,7 +16,7 @@
 
 ---
 
-# :mag_right: *Now Scanning*
+# :mag_right: _Now Scanning_
 
 <div align="center">
 
@@ -267,6 +267,40 @@ Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple time
 trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
 
+## 13: Scan a Jenkins server
+
+```bash
+trufflehog jenkins --url https://jenkins.example.com --username admin --password admin
+```
+
+## 14: Scan an Elasticsearch server
+
+### Scan a Local Cluster
+
+There are two ways to authenticate to a local cluster with TruffleHog: (1) username and password, (2) service token.
+
+#### Connect to a local cluster with username and password
+
+```bash
+trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --username truffle --password hog
+```
+
+#### Connect to a local cluster with a service token
+
+```bash
+trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --service-token ‘AAEWVaWM...Rva2VuaSDZ’
+```
+
+### Scan an Elastic Cloud Cluster
+
+To scan a cluster on Elastic Cloud, you’ll need a Cloud ID and API key.
+
+```bash
+trufflehog elasticsearch \
+  --cloud-id 'search-prod:dXMtY2Vx...YjM1ODNlOWFiZGRlNjI0NA==' \
+  --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
@@ -307,6 +341,8 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - travisci
 - gcs (Google Cloud Storage)
 - postman
+- jenkins
+- elasticsearch
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
@@ -672,4 +708,3 @@ the stability of the public APIs at this time.
 # License Change
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
-
