@@ -205,52 +205,58 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		return nil, fmt.Errorf("source manager is required")
 	}
 
-	// If detectors are provided, use them directly and skip the filtering process.
-	if len(cfg.Detectors) == 0 {
-		// Build include and exclude detector sets for filtering on engine initialization.
-		includeDetectorSet, excludeDetectorSet, err := buildDetectorSets(cfg)
-		if err != nil {
-			return nil, err
-		}
+	engine.setDefaults(ctx)
 
-		// Apply include/exclude filters and verifier endpoints customization
-		includeFilter := func(d detectors.Detector) bool {
-			_, ok := getWithDetectorID(d, includeDetectorSet)
-			return ok
-		}
-		excludeFilter := func(d detectors.Detector) bool {
-			_, ok := getWithDetectorID(d, excludeDetectorSet)
-			return !ok
-		}
-
-		engine.applyFilters(includeFilter, excludeFilter)
-	}
-
-	// Apply custom verifier endpoints to detectors that support it.
-	detectorsWithCustomVerifierEndpoints, err := parseCustomVerifierEndpoints(cfg)
+	// Build include and exclude detector sets for filtering on engine initialization.
+	includeDetectorSet, excludeDetectorSet, err := buildDetectorSets(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	endpointCustomizer := func(d detectors.Detector) bool {
-		urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
-		if !ok {
-			return true
-		}
-		customizer, ok := d.(detectors.EndpointCustomizer)
-		if !ok {
-			return false
-		}
+	// Apply include/exclude filters.
+	var filters []func(detectors.Detector) bool
 
-		if !cfg.CustomVerifiersOnly || len(urls) == 0 {
-			urls = append(urls, customizer.DefaultEndpoint())
-		}
-		if err := customizer.SetEndpoints(urls...); err != nil {
-			return false
-		}
-		return true
+	if len(includeDetectorSet) > 0 {
+		filters = append(filters, func(d detectors.Detector) bool {
+			_, ok := getWithDetectorID(d, includeDetectorSet)
+			return ok
+		})
 	}
-	engine.applyFilters(endpointCustomizer)
+
+	if len(excludeDetectorSet) > 0 {
+		filters = append(filters, func(d detectors.Detector) bool {
+			_, ok := getWithDetectorID(d, excludeDetectorSet)
+			return !ok
+		})
+	}
+
+	// Apply custom verifier endpoints to detectors that support it.
+	detectorsWithCustomVerifierEndpoints, err := parseCustomVerifierEndpoints(cfg.VerifierEndpoints)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(detectorsWithCustomVerifierEndpoints) > 0 {
+		filters = append(filters, func(d detectors.Detector) bool {
+			urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
+			if !ok {
+				return true
+			}
+			customizer, ok := d.(detectors.EndpointCustomizer)
+			if !ok {
+				return false
+			}
+
+			if !cfg.CustomVerifiersOnly || len(urls) == 0 {
+				urls = append(urls, customizer.DefaultEndpoint())
+			}
+			if err := customizer.SetEndpoints(urls...); err != nil {
+				return false
+			}
+			return true
+		})
+	}
+	engine.applyFilters(filters...)
 
 	if results := cfg.Results; len(results) > 0 {
 		_, ok := results["verified"]
@@ -265,8 +271,6 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		_, ok = results["filtered_unverified"]
 		engine.logFilteredUnverified = ok
 	}
-
-	engine.setDefaults(ctx)
 
 	if err := engine.initialize(ctx); err != nil {
 		return nil, err
@@ -323,6 +327,7 @@ func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.
 	if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
 		return nil, nil, fmt.Errorf("invalid include list detector configuration id %v: %w", id, err)
 	}
+
 	if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
 		return nil, nil, fmt.Errorf("invalid exclude list detector configuration id %v: %w", id, err)
 	}
@@ -330,8 +335,12 @@ func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.
 	return includeDetectorSet, excludeDetectorSet, nil
 }
 
-func parseCustomVerifierEndpoints(cfg *Config) (map[config.DetectorID][]string, error) {
-	customVerifierEndpoints, err := config.ParseVerifierEndpoints(cfg.VerifierEndpoints)
+func parseCustomVerifierEndpoints(endpoints map[string]string) (map[config.DetectorID][]string, error) {
+	if len(endpoints) == 0 {
+		return nil, nil
+	}
+
+	customVerifierEndpoints, err := config.ParseVerifierEndpoints(endpoints)
 	if err != nil {
 		return nil, fmt.Errorf("invalid verifier detector configuration: %w", err)
 	}
@@ -348,34 +357,6 @@ func parseCustomVerifierEndpoints(cfg *Config) (map[config.DetectorID][]string, 
 	}
 	return customVerifierEndpoints, nil
 }
-
-// func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.DetectorID]struct{}, map[config.DetectorID][]string, error) {
-// 	includeList, err := config.ParseDetectors(cfg.IncludeDetectors)
-// 	if err != nil {
-// 		return nil, nil, nil, fmt.Errorf("invalid include list detector configuration: %w", err)
-// 	}
-// 	excludeList, err := config.ParseDetectors(cfg.ExcludeDetectors)
-// 	if err != nil {
-// 		return nil, nil, nil, fmt.Errorf("invalid exclude list detector configuration: %w", err)
-// 	}
-// 	detectorsWithCustomVerifierEndpoints, err := config.ParseVerifierEndpoints(cfg.VerifierEndpoints)
-// 	if err != nil {
-// 		return nil, nil, nil, fmt.Errorf("invalid verifier detector configuration: %w", err)
-// 	}
-// 	includeDetectorSet := detectorTypeToSet(includeList)
-// 	excludeDetectorSet := detectorTypeToSet(excludeList)
-//
-// 	// Verify that all the user-provided detectors support the optional
-// 	// detector features.
-// 	if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
-// 		return nil, nil, nil, fmt.Errorf("invalid include list detector configuration id %v: %w", id, err)
-// 	}
-// 	if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
-// 		return nil, nil, nil, fmt.Errorf("invalid exclude list detector configuration id %v: %w", id, err)
-// 	}
-//
-// 	return includeDetectorSet, excludeDetectorSet, detectorsWithCustomVerifierEndpoints, nil
-// }
 
 // detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
 func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
