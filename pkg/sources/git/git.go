@@ -550,7 +550,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	gitDir := filepath.Join(path, gitDirName)
 
-	logger.V(1).Info("scanning repo", logValues...)
+	logger.Info("scanning repo", logValues...)
 
 	var depth int64
 	var lastCommitHash string
@@ -790,7 +790,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	if scanOptions.MaxDepth > 0 {
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
-	logger.V(1).Info("scanning repo", logValues...)
+	logger.Info("scanning repo", logValues...)
 
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 
