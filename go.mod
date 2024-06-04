@@ -15,7 +15,7 @@ require (
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/aws/aws-sdk-go v1.53.14
+	github.com/aws/aws-sdk-go v1.53.15
 	github.com/aymanbagabas/go-osc52 v1.2.2
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
@@ -77,6 +77,7 @@ require (
 	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
 	github.com/testcontainers/testcontainers-go v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/elasticsearch v0.31.0
+	github.com/testcontainers/testcontainers-go/modules/mongodb v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/mssql v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.31.0
@@ -254,7 +255,6 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
-	github.com/testcontainers/testcontainers-go/modules/mongodb v0.31.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/redis v0.31.0 // indirect
 	github.com/tetratelabs/wazero v1.7.1 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
