@@ -189,6 +189,14 @@ var (
 	elasticsearchQueryJSON      = elasticsearchScan.Flag("query-json", "Filters the documents to search").Envar("ELASTICSEARCH_QUERY_JSON").String()
 	elasticsearchSinceTimestamp = elasticsearchScan.Flag("since-timestamp", "Filters the documents to search to those created since this timestamp; overrides any timestamp from --query-json").Envar("ELASTICSEARCH_SINCE_TIMESTAMP").String()
 	elasticsearchBestEffortScan = elasticsearchScan.Flag("best-effort-scan", "Attempts to continuously scan a cluster").Envar("ELASTICSEARCH_BEST_EFFORT_SCAN").Bool()
+
+	jenkinsScan                  = cli.Command("jenkins", "Scan Jenkins")
+	jenkinsURL                   = jenkinsScan.Flag("url", "Jenkins URL").Envar("JENKINS_URL").Required().String()
+	jenkinsUsername              = jenkinsScan.Flag("username", "Jenkins username").Envar("JENKINS_USERNAME").String()
+	jenkinsPassword              = jenkinsScan.Flag("password", "Jenkins password").Envar("JENKINS_PASSWORD").String()
+	jenkinsInsecureSkipVerifyTLS = jenkinsScan.Flag("insecure-skip-verify-tls", "Skip TLS verification").Envar("JENKINS_INSECURE_SKIP_VERIFY_TLS").Bool()
+
+	usingTUI = false
 )
 
 func init() {
@@ -214,6 +222,7 @@ func init() {
 		// Overwrite the Args slice so overseer works properly.
 		os.Args = os.Args[:1]
 		os.Args = append(os.Args, args...)
+		usingTUI = true
 	}
 
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
@@ -253,7 +262,7 @@ func main() {
 	}
 
 	if !*noUpdate {
-		updateCfg.Fetcher = updater.Fetcher(version.BuildVersion)
+		updateCfg.Fetcher = updater.Fetcher(usingTUI)
 	}
 	if version.BuildVersion == "dev" {
 		updateCfg.Fetcher = nil
@@ -660,6 +669,16 @@ func run(state overseer.State) {
 		}
 		if err := e.ScanElasticsearch(ctx, cfg); err != nil {
 			logFatal(err, "Failed to scan Elasticsearch.")
+		}
+	case jenkinsScan.FullCommand():
+		cfg := engine.JenkinsConfig{
+			Endpoint:              *jenkinsURL,
+			InsecureSkipVerifyTLS: *jenkinsInsecureSkipVerifyTLS,
+			Username:              *jenkinsUsername,
+			Password:              *jenkinsPassword,
+		}
+		if err := e.ScanJenkins(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan Jenkins.")
 		}
 	default:
 		logFatal(fmt.Errorf("invalid command"), "Command not recognized.")

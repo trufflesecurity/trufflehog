@@ -4393,6 +4393,47 @@ func (m *Jenkins) validate(all bool) error {
 			}
 		}
 
+	case *Jenkins_Unauthenticated:
+		if v == nil {
+			err := JenkinsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetUnauthenticated()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, JenkinsValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, JenkinsValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return JenkinsValidationError{
+					field:  "Unauthenticated",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
