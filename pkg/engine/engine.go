@@ -152,6 +152,8 @@ type Config struct {
 
 	VerificationResultCache  verificationcache.ResultCache
 	VerificationCacheMetrics verificationcache.MetricsReporter
+
+	CompareDetectionStrategies bool
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -182,6 +184,12 @@ type Engine struct {
 	// By default, the engine will only scan a subset of the chunk if a detector matches the chunk.
 	// If this flag is set to true, the engine will scan the entire chunk.
 	scanEntireChunk bool
+	// If this flag is set to true, the engine will run two scans per chunk:
+	//  1. the entire chunk (old)
+	//  2. a subset of the chunk (new)
+	//
+	// Any discrepancies between methods will be logged.
+	compareScanStrategies bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	AhoCorasickCore *ahocorasick.Core
@@ -244,6 +252,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		detectorWorkerMultiplier:            cfg.DetectorWorkerMultiplier,
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
 		verificationOverlapWorkerMultiplier: cfg.VerificationOverlapWorkerMultiplier,
+		compareScanStrategies:               cfg.CompareDetectionStrategies,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
@@ -520,14 +529,8 @@ func (e *Engine) initialize(ctx context.Context) error {
 	e.dedupeCache = cache
 	ctx.Logger().V(4).Info("engine initialized")
 
-	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
-	var ahoCOptions []ahocorasick.CoreOption
-	if e.scanEntireChunk {
-		ahoCOptions = append(ahoCOptions, ahocorasick.WithSpanCalculator(new(ahocorasick.EntireChunkSpanCalculator)))
-	}
-
 	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.AhoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
+	e.AhoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors)
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
@@ -1036,12 +1039,25 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for data := range e.detectableChunksChan {
 		start := time.Now()
-		e.detectChunk(ctx, data)
+
+		if !e.compareScanStrategies {
+			// Typical use case: scan the chunk.
+			_ = e.detectChunk(ctx, data, e.scanEntireChunk)
+		} else {
+			// --compare-detection-strategies is enabled, scan with both methods and compare results.
+			customSpanResultCount := e.detectChunk(ctx, data, false)
+			entireChunkResultCount := e.detectChunk(ctx, data, true)
+
+			if customSpanResultCount != entireChunkResultCount {
+				err := fmt.Errorf("mismatch between custom span and entire chunk: %d vs %d", customSpanResultCount, entireChunkResultCount)
+				ctx.Logger().Error(err, "Scan results do not match", "detector", data.detector.Type().String())
+			}
+		}
 		chunksDetectedLatency.Observe(float64(time.Since(start).Milliseconds()))
 	}
 }
 
-func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
+func (e *Engine) detectChunk(ctx context.Context, data detectableChunk, scanEntireChunk bool) int {
 	var start time.Time
 	if e.printAvgDetectorTime {
 		start = time.Now()
@@ -1065,8 +1081,14 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	// The matches field of the DetectorMatch struct contains the
 	// relevant portions of the chunk data that were matched.
 	// This avoids the need for additional regex processing on the entire chunk data.
-	matches := data.detector.Matches()
-	for _, matchBytes := range matches {
+	var matchedBytes [][]byte
+	if scanEntireChunk {
+		matchedBytes = [][]byte{data.chunk.Data}
+	} else {
+		matchedBytes = data.detector.Matches()
+	}
+	resultCount := 0
+	for _, matchBytes := range matchedBytes {
 		matchCount++
 		detectBytesPerMatch.Observe(float64(len(matchBytes)))
 
@@ -1099,13 +1121,23 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		if e.printAvgDetectorTime && len(results) > 0 {
 			elapsed := time.Since(start)
 			detectorName := results[0].DetectorType.String()
+
 			avgTimeI, ok := e.metrics.detectorAvgTime.Load(detectorName)
-			var avgTime []time.Duration
-			if ok {
-				avgTime, ok = avgTimeI.([]time.Duration)
-				if !ok {
-					return
-				}
+			if !ok {
+				ctx.Logger().Error(
+					errors.New("failed to load metric"),
+					"Unable to track detector time",
+					"detector", detectorName)
+				goto HandleResults
+			}
+
+			avgTime, ok := avgTimeI.([]time.Duration)
+			if !ok {
+				ctx.Logger().Error(
+					errors.New("failed to cast metric as []time.Duration"),
+					"Unable to track detector time",
+					"detector", detectorName)
+				goto HandleResults
 			}
 			avgTime = append(avgTime, elapsed)
 			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
@@ -1120,6 +1152,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			results = e.filterResults(ctx, data.detector, results)
 		}
 
+	HandleResults:
+		results = e.filterResults(ctx, data.detector, results)
+
+		resultCount += len(results)
 		for _, res := range results {
 			e.processResult(ctx, data, res, isFalsePositive)
 		}
@@ -1127,9 +1163,15 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 	matchesPerChunk.Observe(float64(matchCount))
 
-	ctx.Logger().V(5).Info("Finished detecting chunk")
+	// If `e.compareScanStrategies` is enabled, two scans will be run.
+	// Don't decrement the WaitGroup until both have been completed.
+	if (!e.compareScanStrategies) || (e.compareScanStrategies && !scanEntireChunk) {
+		ctx.Logger().V(5).Info("Finished detecting chunk")
 
-	data.wgDoneFn()
+		data.wgDoneFn()
+	}
+
+	return resultCount
 }
 
 func (e *Engine) filterResults(

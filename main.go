@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -518,115 +517,67 @@ func run(state overseer.State) {
 		// default detectors, which can be further filtered by the
 		// user. The filters are applied by the engine and are only
 		// subtractive.
-		Detectors:                append(defaults.DefaultDetectors(), conf.Detectors...),
-		Verify:                   !*noVerification,
-		IncludeDetectors:         *includeDetectors,
-		ExcludeDetectors:         *excludeDetectors,
-		CustomVerifiersOnly:      *customVerifiersOnly,
-		VerifierEndpoints:        *verifiers,
-		Dispatcher:               engine.NewPrinterDispatcher(printer),
-		FilterUnverified:         *filterUnverified,
-		FilterEntropy:            *filterEntropy,
-		VerificationOverlap:      *allowVerificationOverlap,
-		Results:                  parsedResults,
-		PrintAvgDetectorTime:     *printAvgDetectorTime,
-		ShouldScanEntireChunk:    *scanEntireChunk,
-		VerificationCacheMetrics: &verificationCacheMetrics,
+		Detectors:                  append(defaults.DefaultDetectors(), conf.Detectors...),
+		Verify:                     !*noVerification,
+		IncludeDetectors:           *includeDetectors,
+		ExcludeDetectors:           *excludeDetectors,
+		CustomVerifiersOnly:        *customVerifiersOnly,
+		VerifierEndpoints:          *verifiers,
+		Dispatcher:                 engine.NewPrinterDispatcher(printer),
+		FilterUnverified:           *filterUnverified,
+		FilterEntropy:              *filterEntropy,
+		VerificationOverlap:        *allowVerificationOverlap,
+		Results:                    parsedResults,
+		PrintAvgDetectorTime:       *printAvgDetectorTime,
+		ShouldScanEntireChunk:      *scanEntireChunk,
+		CompareDetectionStrategies: *compareDetectionStrategies,
+		VerificationCacheMetrics:   &verificationCacheMetrics,
 	}
 
 	if !*noVerificationCache {
 		engConf.VerificationResultCache = simple.NewCache[detectors.Result]()
 	}
 
-	if *compareDetectionStrategies {
-		if err := compareScans(ctx, cmd, engConf); err != nil {
-			logFatal(err, "error comparing detection strategies")
-		}
-		return
-	}
-
-	metrics, err := runSingleScan(ctx, cmd, engConf)
-	if err != nil {
-		logFatal(err, "error running scan")
-	}
-
-	verificationCacheMetricsSnapshot := struct {
-		Hits                    int32
-		Misses                  int32
-		HitsWasted              int32
-		AttemptsSaved           int32
-		VerificationTimeSpentMS int64
-	}{
-		Hits:                    verificationCacheMetrics.ResultCacheHits.Load(),
-		Misses:                  verificationCacheMetrics.ResultCacheMisses.Load(),
-		HitsWasted:              verificationCacheMetrics.ResultCacheHitsWasted.Load(),
-		AttemptsSaved:           verificationCacheMetrics.CredentialVerificationsSaved.Load(),
-		VerificationTimeSpentMS: verificationCacheMetrics.FromDataVerifyTimeSpentMS.Load(),
-	}
-
-	// Print results.
-	logger.Info("finished scanning",
-		"chunks", metrics.ChunksScanned,
-		"bytes", metrics.BytesScanned,
-		"verified_secrets", metrics.VerifiedSecretsFound,
-		"unverified_secrets", metrics.UnverifiedSecretsFound,
-		"scan_duration", metrics.ScanDuration.String(),
-		"trufflehog_version", version.BuildVersion,
-		"verification_caching", verificationCacheMetricsSnapshot,
-	)
-
-	if metrics.hasFoundResults && *fail {
-		logger.V(2).Info("exiting with code 183 because results were found")
-		os.Exit(183)
-	}
-}
-
-func compareScans(ctx context.Context, cmd string, cfg engine.Config) error {
-	var (
-		entireMetrics    metrics
-		maxLengthMetrics metrics
-		err              error
-	)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		// Run scan with entire chunk span calculator.
-		cfg.ShouldScanEntireChunk = true
-		entireMetrics, err = runSingleScan(ctx, cmd, cfg)
+	topLevelSubCommand, _, _ := strings.Cut(cmd, " ")
+	switch topLevelSubCommand {
+	case analyzeCmd.FullCommand():
+		analyzer.Run(cmd)
+	default:
+		metrics, err := runSingleScan(ctx, cmd, engConf)
 		if err != nil {
-			ctx.Logger().Error(err, "error running scan with entire chunk span calculator")
+			logFatal(err, "error running scan")
 		}
-	}()
 
-	// Run scan with max-length span calculator.
-	maxLengthMetrics, err = runSingleScan(ctx, cmd, cfg)
-	if err != nil {
-		return fmt.Errorf("error running scan with custom span calculator: %v", err)
+		verificationCacheMetricsSnapshot := struct {
+			Hits                    int32
+			Misses                  int32
+			HitsWasted              int32
+			AttemptsSaved           int32
+			VerificationTimeSpentMS int64
+		}{
+			Hits:                    verificationCacheMetrics.ResultCacheHits.Load(),
+			Misses:                  verificationCacheMetrics.ResultCacheMisses.Load(),
+			HitsWasted:              verificationCacheMetrics.ResultCacheHitsWasted.Load(),
+			AttemptsSaved:           verificationCacheMetrics.CredentialVerificationsSaved.Load(),
+			VerificationTimeSpentMS: verificationCacheMetrics.FromDataVerifyTimeSpentMS.Load(),
+		}
+
+		// Print results.
+		logger.Info("finished scanning",
+			"chunks", metrics.ChunksScanned,
+			"bytes", metrics.BytesScanned,
+			"verified_secrets", metrics.VerifiedSecretsFound,
+			"unverified_secrets", metrics.UnverifiedSecretsFound,
+			"scan_duration", metrics.ScanDuration.String(),
+			"trufflehog_version", version.BuildVersion,
+			"verification_caching", verificationCacheMetricsSnapshot,
+		)
+
+		if metrics.hasFoundResults && *fail {
+			logger.V(2).Info("exiting with code 183 because results were found")
+			os.Exit(183)
+		}
 	}
-
-	wg.Wait()
-
-	return compareMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
-}
-
-func compareMetrics(customMetrics, entireMetrics engine.Metrics) error {
-	fmt.Printf("Comparison of scan results: \n")
-	fmt.Printf("Custom span - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
-		customMetrics.ChunksScanned, customMetrics.BytesScanned, customMetrics.VerifiedSecretsFound, customMetrics.UnverifiedSecretsFound, customMetrics.ScanDuration.String())
-	fmt.Printf("Entire chunk - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
-		entireMetrics.ChunksScanned, entireMetrics.BytesScanned, entireMetrics.VerifiedSecretsFound, entireMetrics.UnverifiedSecretsFound, entireMetrics.ScanDuration.String())
-
-	// Check for differences in scan metrics.
-	if customMetrics.ChunksScanned != entireMetrics.ChunksScanned ||
-		customMetrics.BytesScanned != entireMetrics.BytesScanned ||
-		customMetrics.VerifiedSecretsFound != entireMetrics.VerifiedSecretsFound {
-		return fmt.Errorf("scan metrics do not match")
-	}
-
-	return nil
 }
 
 type metrics struct {
