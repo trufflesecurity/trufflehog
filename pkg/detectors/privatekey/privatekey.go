@@ -9,9 +9,8 @@ import (
 	"sync"
 	"time"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
+	regexp "github.com/wasilibs/go-re2"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -26,6 +25,7 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 
 var (
 	// TODO: add base64 encoded key support
@@ -38,6 +38,11 @@ var (
 func (s Scanner) Keywords() []string {
 	return []string{"private key"}
 }
+
+const maxPrivateKeySize = 4096
+
+// ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
+func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
 
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
