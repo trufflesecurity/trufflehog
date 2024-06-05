@@ -27,3 +27,22 @@ func CancellableWrite[T any](ctx context.Context, ch chan<- T, item T) error {
 		}
 	}
 }
+
+// CancellableRecv blocks on receiving an item from the channel but can be
+// cancelled by the context. If both the context is cancelled and the channel
+// read would succeed, either operation will be performed randomly.
+func CancellableRecv[T any](ctx context.Context, ch <-chan T) (T, error) {
+	var zero T // zero value of type T
+
+	select {
+	case <-ctx.Done(): // priority to context cancellation
+		return zero, ctx.Err()
+	default:
+		select {
+		case <-ctx.Done():
+			return zero, ctx.Err()
+		case item := <-ch:
+			return item, nil
+		}
+	}
+}
