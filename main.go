@@ -466,7 +466,7 @@ func run(state overseer.State) {
 	if *compareDetectionStrategies {
 		err := compareScans(ctx, scanConfig)
 		if err != nil {
-			logFatal(err, "error comparing span calculators")
+			logFatal(err, "error comparing detection strategies")
 		}
 		return
 	}
@@ -525,17 +525,25 @@ func compareScans(ctx context.Context, cfg scanConfig) error {
 		return fmt.Errorf("error running scan with entire chunk span calculator: %v", err)
 	}
 
-	logComparisonMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
-
-	return nil
+	return compareMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
 }
 
-func logComparisonMetrics(customMetrics, entireMetrics engine.Metrics) {
+func compareMetrics(customMetrics, entireMetrics engine.Metrics) error {
 	fmt.Printf("Comparison of scan results: \n")
 	fmt.Printf("Custom span - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
 		customMetrics.ChunksScanned, customMetrics.BytesScanned, customMetrics.VerifiedSecretsFound, customMetrics.UnverifiedSecretsFound, customMetrics.ScanDuration.String())
-	fmt.Printf("Entire chunk - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s",
+	fmt.Printf("Entire chunk - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
 		entireMetrics.ChunksScanned, entireMetrics.BytesScanned, entireMetrics.VerifiedSecretsFound, entireMetrics.UnverifiedSecretsFound, entireMetrics.ScanDuration.String())
+
+	// Check for differences in scan metrics.
+	if customMetrics.ChunksScanned != entireMetrics.ChunksScanned ||
+		customMetrics.BytesScanned != entireMetrics.BytesScanned ||
+		customMetrics.VerifiedSecretsFound != entireMetrics.VerifiedSecretsFound ||
+		customMetrics.UnverifiedSecretsFound != entireMetrics.UnverifiedSecretsFound {
+		return fmt.Errorf("scan metrics do not match")
+	}
+
+	return nil
 }
 
 type metrics struct {
