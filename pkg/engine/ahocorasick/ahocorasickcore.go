@@ -177,10 +177,10 @@ func (d *DetectorMatch) mergeMatches() {
 			if d.matchSpans[i].endOffset > current.endOffset {
 				current.endOffset = d.matchSpans[i].endOffset
 			}
-		} else {
-			merged = append(merged, current)
-			current = d.matchSpans[i]
+			continue
 		}
+		merged = append(merged, current)
+		current = d.matchSpans[i]
 	}
 
 	merged = append(merged, current)
