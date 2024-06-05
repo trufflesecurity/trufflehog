@@ -6,6 +6,7 @@ package channelmetrics
 import (
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -50,13 +51,15 @@ func (oc *ObservableChan[T]) Close() {
 
 // Send sends an item into the channel and records the duration taken to do so.
 // It also updates the current size of the channel buffer.
-func (oc *ObservableChan[T]) Send(_ context.Context, item T) {
+func (oc *ObservableChan[T]) Send(ctx context.Context, item T) {
 	startTime := time.Now()
 	defer func() {
 		oc.metrics.RecordProduceDuration(time.Since(startTime))
 		oc.RecordChannelLen()
 	}()
-	oc.ch <- item
+	if err := common.CancellableWrite(ctx, oc.ch, item); err != nil {
+		ctx.Logger().Error(err, "failed to write item to observable channel")
+	}
 }
 
 // Recv receives an item from the channel and records the duration taken to do so.
