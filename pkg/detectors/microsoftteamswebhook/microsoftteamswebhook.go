@@ -17,7 +17,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
-	detectors.MultiPartCredentialProvider
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
