@@ -460,8 +460,14 @@ func (e *Engine) initialize(ctx context.Context) error {
 	e.dedupeCache = cache
 	ctx.Logger().V(4).Info("engine initialized")
 
+	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
+	var ahoCOptions []ahocorasick.AhoCorasickCoreOption
+	if e.scanEntireChunk {
+		ahoCOptions = append(ahoCOptions, ahocorasick.WithSpanCalculator(new(ahocorasick.EntireChunkSpanCalculator)))
+	}
+
 	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors)
+	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
@@ -941,7 +947,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 		results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
 
-		if e.filterEntropy != nil {
+		if e.filterEntropy != 0 {
 			results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.logFilteredUnverified)
 		}
 

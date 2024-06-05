@@ -368,55 +368,6 @@ func run(state overseer.State) {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
-	var jobReportWriter io.WriteCloser
-	if *jobReportFile != nil {
-		jobReportWriter = *jobReportFile
-	}
-
-	handleFinishedMetrics := func(ctx context.Context, finishedMetrics <-chan sources.UnitMetrics, jobReportWriter io.WriteCloser) {
-		go func() {
-			defer func() {
-				jobReportWriter.Close()
-				if namer, ok := jobReportWriter.(interface{ Name() string }); ok {
-					ctx.Logger().Info("report written", "path", namer.Name())
-				} else {
-					ctx.Logger().Info("report written")
-				}
-			}()
-
-			for metrics := range finishedMetrics {
-				metrics.Errors = common.ExportErrors(metrics.Errors...)
-				details, err := json.Marshal(map[string]any{
-					"version": 1,
-					"data":    metrics,
-				})
-				if err != nil {
-					ctx.Logger().Error(err, "error marshalling job details")
-					continue
-				}
-				if _, err := jobReportWriter.Write(append(details, '\n')); err != nil {
-					ctx.Logger().Error(err, "error writing to file")
-				}
-			}
-		}()
-	}
-
-	const defaultOutputBufferSize = 64
-	opts := []func(*sources.SourceManager){
-		sources.WithConcurrentSources(*concurrency),
-		sources.WithConcurrentUnits(*concurrency),
-		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultOutputBufferSize),
-	}
-
-	if jobReportWriter != nil {
-		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
-		opts = append(opts, sources.WithReportHook(unitHook))
-		handleFinishedMetrics(ctx, finishedMetrics, jobReportWriter)
-	}
-
-	sourceManager := sources.NewManager(opts...)
-
 	// Parse --results flag.
 	if *onlyVerified {
 		r := "verified"
@@ -428,37 +379,30 @@ func run(state overseer.State) {
 	}
 
 	engConf := engine.Config{
-		Concurrency:          *concurrency,
-		Detectors:            conf.Detectors,
-		Verify:               !*noVerification,
-		IncludeDetectors:     *includeDetectors,
-		ExcludeDetectors:     *excludeDetectors,
-		CustomVerifiersOnly:  *customVerifiersOnly,
-		VerifierEndpoints:    *verifiers,
-		Dispatcher:           engine.NewPrinterNotifier(printer),
-		FilterUnverified:     *filterUnverified,
-		FilterEntropy:        *filterEntropy,
-		VerificationOverlap:  *allowVerificationOverlap,
-		Results:              parsedResults,
-		PrintAvgDetectorTime: *printAvgDetectorTime,
-		SourceManager:        sourceManager,
+		Concurrency:           *concurrency,
+		Detectors:             conf.Detectors,
+		Verify:                !*noVerification,
+		IncludeDetectors:      *includeDetectors,
+		ExcludeDetectors:      *excludeDetectors,
+		CustomVerifiersOnly:   *customVerifiersOnly,
+		VerifierEndpoints:     *verifiers,
+		Dispatcher:            engine.NewPrinterNotifier(printer),
+		FilterUnverified:      *filterUnverified,
+		FilterEntropy:         *filterEntropy,
+		VerificationOverlap:   *allowVerificationOverlap,
+		Results:               parsedResults,
+		PrintAvgDetectorTime:  *printAvgDetectorTime,
+		ShouldScanEntireChunk: *scanEntireChunk,
 	}
-
-	e, err := engine.NewEngine(ctx, &engConf)
-	if err != nil {
-		logFatal(err, "error initializing engine")
-	}
-	e.Start(ctx)
 
 	if *compareDetectionStrategies {
-		err := compareScans(ctx, cmd, &engConf)
-		if err != nil {
+		if err := compareScans(ctx, cmd, engConf); err != nil {
 			logFatal(err, "error comparing detection strategies")
 		}
 		return
 	}
 
-	metrics, err := runSingleScan(ctx, cmd, &engConf)
+	metrics, err := runSingleScan(ctx, cmd, engConf)
 	if err != nil {
 		logFatal(err, "error running scan")
 	}
@@ -479,7 +423,7 @@ func run(state overseer.State) {
 	}
 }
 
-func compareScans(ctx context.Context, cmd string, cfg *engine.Config) error {
+func compareScans(ctx context.Context, cmd string, cfg engine.Config) error {
 	var (
 		entireMetrics    metrics
 		maxLengthMetrics metrics
@@ -532,10 +476,60 @@ type metrics struct {
 	hasFoundResults bool
 }
 
-func runSingleScan(ctx context.Context, cmd string, cfg *engine.Config) (metrics, error) {
+func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics, error) {
 	var scanMetrics metrics
 
-	eng, err := engine.NewEngine(ctx, cfg)
+	// Setup job report writer if provided
+	var jobReportWriter io.WriteCloser
+	if *jobReportFile != nil {
+		jobReportWriter = *jobReportFile
+	}
+
+	handleFinishedMetrics := func(ctx context.Context, finishedMetrics <-chan sources.UnitMetrics, jobReportWriter io.WriteCloser) {
+		go func() {
+			defer func() {
+				jobReportWriter.Close()
+				if namer, ok := jobReportWriter.(interface{ Name() string }); ok {
+					ctx.Logger().Info("report written", "path", namer.Name())
+				} else {
+					ctx.Logger().Info("report written")
+				}
+			}()
+
+			for metrics := range finishedMetrics {
+				metrics.Errors = common.ExportErrors(metrics.Errors...)
+				details, err := json.Marshal(map[string]any{
+					"version": 1,
+					"data":    metrics,
+				})
+				if err != nil {
+					ctx.Logger().Error(err, "error marshalling job details")
+					continue
+				}
+				if _, err := jobReportWriter.Write(append(details, '\n')); err != nil {
+					ctx.Logger().Error(err, "error writing to file")
+				}
+			}
+		}()
+	}
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithConcurrentSources(cfg.Concurrency),
+		sources.WithConcurrentUnits(cfg.Concurrency),
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	if jobReportWriter != nil {
+		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
+		opts = append(opts, sources.WithReportHook(unitHook))
+		handleFinishedMetrics(ctx, finishedMetrics, jobReportWriter)
+	}
+
+	cfg.SourceManager = sources.NewManager(opts...)
+
+	eng, err := engine.NewEngine(ctx, &cfg)
 	if err != nil {
 		return scanMetrics, fmt.Errorf("error initializing engine: %v", err)
 	}
