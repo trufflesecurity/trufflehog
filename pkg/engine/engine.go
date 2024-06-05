@@ -624,47 +624,39 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 
 	for chunk := range e.ChunksChan() {
 		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
-		func() {
-			// Nil out the chunk data so it can be GC'd.
-			// The chunk data is no longer needed after FindDetectorMatches constructs
-			// the matched sections of data, which are stored in the DetectorMatch instances.
-			// This helps in reducing memory usage.
-			defer func() { chunk.Data = nil }()
+		for _, decoder := range e.decoders {
+			decoded := decoder.FromChunk(chunk)
+			if decoded == nil {
+				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+				continue
+			}
 
-			for _, decoder := range e.decoders {
-				decoded := decoder.FromChunk(chunk)
-				if decoded == nil {
-					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
-					continue
-				}
-
-				matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
-				if len(matchingDetectors) > 1 && !e.verificationOverlap {
-					wgVerificationOverlap.Add(1)
-					e.verificationOverlapChunksChan <- verificationOverlapChunk{
-						chunk:                       *decoded.Chunk,
-						detectors:                   matchingDetectors,
-						decoder:                     decoded.DecoderType,
-						verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
-					}
-					continue
-				}
-
-				for _, detector := range matchingDetectors {
-					decoded.Chunk.Verify = e.verify
-					wgDetect.Add(1)
-					e.detectableChunksChan <- detectableChunk{
-						chunk:    *decoded.Chunk,
-						detector: detector,
-						decoder:  decoded.DecoderType,
-						wgDoneFn: wgDetect.Done,
-					}
+			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+			if len(matchingDetectors) > 1 && !e.verificationOverlap {
+				wgVerificationOverlap.Add(1)
+				e.verificationOverlapChunksChan <- verificationOverlapChunk{
+					chunk:                       *decoded.Chunk,
+					detectors:                   matchingDetectors,
+					decoder:                     decoded.DecoderType,
+					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
 				}
 				continue
 			}
 
-			atomic.AddUint64(&e.metrics.ChunksScanned, 1)
-		}()
+			for _, detector := range matchingDetectors {
+				decoded.Chunk.Verify = e.verify
+				wgDetect.Add(1)
+				e.detectableChunksChan <- detectableChunk{
+					chunk:    *decoded.Chunk,
+					detector: detector,
+					decoder:  decoded.DecoderType,
+					wgDoneFn: wgDetect.Done,
+				}
+			}
+			continue
+		}
+
+		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
 	}
 
 	wgVerificationOverlap.Wait()
