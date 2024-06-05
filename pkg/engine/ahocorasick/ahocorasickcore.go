@@ -27,26 +27,28 @@ type DetectorKey struct {
 // Type returns the detector type of the key.
 func (k DetectorKey) Type() detectorspb.DetectorType { return k.detectorType }
 
-// spanCalculator is an interface that defines a method for calculating the end index
-// of a match span in the chunk data. This allows for different strategies to be used
-// without changing the core logic.
+// spanCalculator is an interface that defines a method for calculating a match span
+// in the chunk data. This allows for different strategies to be used without changing the core logic.
 type spanCalculator interface {
-	calculateEndIdx(startIdx int64, chunkData []byte, detector detectors.Detector) int64
+	calculateSpan(startIdx int64, chunkData []byte, detector detectors.Detector) matchSpan
 }
 
-// EntireChunkSpanCalculator is a strategy that calculates the end index to use the entire chunk data.
+// EntireChunkSpanCalculator is a strategy that calculates the match span to use the entire chunk data.
 // This is used when we want to match against the full length of the provided chunk.
 type EntireChunkSpanCalculator struct{}
 
-// CalculateEndIdx returns the end index as the length of the chunk data,
+// calculateSpans returns the match span as the length of the chunk data,
 // effectively using the entire chunk for matching.
-func (e *EntireChunkSpanCalculator) calculateEndIdx(_ int64, chunkData []byte, _ detectors.Detector) int64 {
-	return int64(len(chunkData))
+func (e *EntireChunkSpanCalculator) calculateSpan(
+	startIdx int64,
+	chunkData []byte,
+	_ detectors.Detector,
+) matchSpan {
+	return matchSpan{startOffset: startIdx, endOffset: int64(len(chunkData))}
 }
 
-// maxMatchLengthSpanCalculator is a strategy that calculates the end index based on a default max
-// match length or values provided by detectors.
-// This allows for more granular control over the match span.
+// maxMatchLengthSpanCalculator is a strategy that calculates match spans based on a default max
+// match length or values provided by detectors. This allows for more granular control over the match span.
 type maxMatchLengthSpanCalculator struct{ maxMatchLength int64 }
 
 // newMaxMatchLengthSpanCalculator creates a new instance of maxMatchLengthSpanCalculator with the
@@ -55,9 +57,13 @@ func newMaxMatchLengthSpanCalculator(maxMatchLength int64) *maxMatchLengthSpanCa
 	return &maxMatchLengthSpanCalculator{maxMatchLength: maxMatchLength}
 }
 
-// CalculateEndIdx computes the end index based on the start index and the max match length.
+// calculateSpans computes the match spans based on the start index and the max match length.
 // If the detector provides an override value, it uses that instead of the default max match length.
-func (m *maxMatchLengthSpanCalculator) calculateEndIdx(startIdx int64, chunkData []byte, detector detectors.Detector) int64 {
+func (m *maxMatchLengthSpanCalculator) calculateSpan(
+	startIdx int64,
+	chunkData []byte,
+	detector detectors.Detector,
+) matchSpan {
 	maxSize := m.maxMatchLength
 
 	switch d := detector.(type) {
@@ -71,7 +77,8 @@ func (m *maxMatchLengthSpanCalculator) calculateEndIdx(startIdx int64, chunkData
 	if endIdx > int64(len(chunkData)) {
 		endIdx = int64(len(chunkData))
 	}
-	return endIdx
+
+	return matchSpan{startOffset: startIdx, endOffset: endIdx}
 }
 
 // AhoCorasickCoreOption is a functional option type for configuring an AhoCorasickCore instance.
@@ -150,6 +157,44 @@ type matchSpan struct {
 	endOffset   int64
 }
 
+// addMatchSpan adds a match span to the DetectorMatch instance.
+func (d *DetectorMatch) addMatchSpan(spans ...matchSpan) {
+	d.matchSpans = append(d.matchSpans, spans...)
+}
+
+// mergeMatches merges overlapping or adjacent matchSpans into a single matchSpan.
+// It updates the matchSpans field with the merged spans.
+func (d *DetectorMatch) mergeMatches() {
+	if len(d.matchSpans) <= 1 {
+		return
+	}
+
+	merged := make([]matchSpan, 0, len(d.matchSpans))
+	current := d.matchSpans[0]
+
+	for i := 1; i < len(d.matchSpans); i++ {
+		if d.matchSpans[i].startOffset <= current.endOffset {
+			if d.matchSpans[i].endOffset > current.endOffset {
+				current.endOffset = d.matchSpans[i].endOffset
+			}
+		} else {
+			merged = append(merged, current)
+			current = d.matchSpans[i]
+		}
+	}
+
+	merged = append(merged, current)
+	d.matchSpans = merged
+}
+
+// extractMatches extracts the matched portions from the chunk data and stores them in the matches field.
+func (d *DetectorMatch) extractMatches(chunkData []byte) {
+	d.matches = make([][]byte, len(d.matchSpans))
+	for i, m := range d.matchSpans {
+		d.matches[i] = chunkData[m.startOffset:m.endOffset]
+	}
+}
+
 // Matches returns a slice of byte slices, each representing a matched portion of the chunk data.
 func (d *DetectorMatch) Matches() [][]byte { return d.matches }
 
@@ -158,8 +203,8 @@ func (d *DetectorMatch) Matches() [][]byte { return d.matches }
 // a slice of matchSpans, and the corresponding matched portions of the chunk data.
 //
 // Each matchSpan represents a position in the chunk data where a keyword was found,
-// along with a corresponding end position.
-// The end position is determined based on the configured spanCalculator strategy.
+// along with the corresponding span (start and end positions).
+// The span is determined based on the configured spanCalculator strategy.
 // Adjacent or overlapping matches are merged to avoid duplicating or overlapping the matched
 // portions of the chunk data.
 //
@@ -187,53 +232,21 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData []byte) []DetectorMatch
 
 			detectorMatch := detectorMatches[k]
 			startIdx := m.Pos()
-			endIdx := ac.spanCalculator.calculateEndIdx(startIdx, chunkData, detectorMatch.Detector)
-			detectorMatch.matchSpans = append(
-				detectorMatch.matchSpans,
-				matchSpan{startOffset: startIdx, endOffset: endIdx},
-			)
+			span := ac.spanCalculator.calculateSpan(startIdx, chunkData, detectorMatch.Detector)
+			detectorMatch.addMatchSpan(span)
 		}
 	}
 
 	uniqueDetectors := make([]DetectorMatch, 0, len(detectorMatches))
 	for _, detectorMatch := range detectorMatches {
 		// Merge overlapping or adjacent match spans.
-		detectorMatch.matchSpans = mergeMatches(detectorMatch.matchSpans)
-		detectorMatch.matches = make([][]byte, len(detectorMatch.matchSpans))
-		for i, m := range detectorMatch.matchSpans {
-			// Extract the matched portion from the chunk data and store it.
-			detectorMatch.matches[i] = chunkData[m.startOffset:m.endOffset]
-		}
+		detectorMatch.mergeMatches()
+		detectorMatch.extractMatches(chunkData)
 
 		uniqueDetectors = append(uniqueDetectors, *detectorMatch)
 	}
 
 	return uniqueDetectors
-}
-
-// mergeMatches merges overlapping or adjacent matchSpans into a single matchSpan.
-// It takes a slice of matchSpans and returns a new slice with merged matchSpans.
-func mergeMatches(matches []matchSpan) []matchSpan {
-	if len(matches) <= 1 {
-		return matches
-	}
-
-	merged := make([]matchSpan, 0, len(matches))
-	current := matches[0]
-
-	for i := 1; i < len(matches); i++ {
-		if matches[i].startOffset <= current.endOffset {
-			if matches[i].endOffset > current.endOffset {
-				current.endOffset = matches[i].endOffset
-			}
-		} else {
-			merged = append(merged, current)
-			current = matches[i]
-		}
-	}
-
-	merged = append(merged, current)
-	return merged
 }
 
 // CreateDetectorKey creates a unique key for each detector from its type, version, and, for
