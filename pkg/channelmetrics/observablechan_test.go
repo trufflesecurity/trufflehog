@@ -27,7 +27,7 @@ func TestObservableChanSend(t *testing.T) {
 	bufferCap := 10
 
 	mockMetrics.On("RecordProduceDuration", mock.Anything).Once()
-	mockMetrics.On("RecordChannelLen", mock.AnythingOfType("int")).Once()
+	mockMetrics.On("RecordChannelLen", mock.AnythingOfType("int")).Twice()
 	mockMetrics.On("RecordChannelCap", bufferCap).Once()
 
 	ch := make(chan int, bufferCap)
@@ -47,7 +47,7 @@ func TestObservableChanRecv(t *testing.T) {
 
 	mockMetrics.On("RecordConsumeDuration", mock.Anything).Once() // For the send
 	mockMetrics.On("RecordProduceDuration", mock.Anything).Once()
-	mockMetrics.On("RecordChannelLen", mock.AnythingOfType("int")).Twice() // For the send and recv
+	mockMetrics.On("RecordChannelLen", mock.AnythingOfType("int")).Times(3) // For the send and recv
 	mockMetrics.On("RecordChannelCap", bufferCap).Once()
 
 	ch := make(chan int, bufferCap)
@@ -72,6 +72,7 @@ func TestObservableChanRecordChannelCapacity(t *testing.T) {
 	bufferCap := 10
 
 	mockMetrics.On("RecordChannelCap", bufferCap).Twice()
+	mockMetrics.On("RecordChannelLen", mock.AnythingOfType("int")).Once()
 
 	ch := make(chan int, bufferCap)
 	oc := NewObservableChan(ch, mockMetrics)
@@ -87,7 +88,7 @@ func TestObservableChanRecordChannelLen(t *testing.T) {
 	mockMetrics := new(MockMetricsCollector)
 	bufferCap := 10
 
-	mockMetrics.On("RecordChannelLen", mock.AnythingOfType("int")).Once()
+	mockMetrics.On("RecordChannelLen", mock.AnythingOfType("int")).Twice()
 	mockMetrics.On("RecordChannelCap", bufferCap).Once()
 
 	ch := make(chan int, bufferCap)
@@ -105,7 +106,7 @@ func TestObservableChan_Close(t *testing.T) {
 	bufferCap := 1
 
 	mockMetrics.On("RecordChannelCap", bufferCap).Once()
-	mockMetrics.On("RecordChannelLen", mock.AnythingOfType("int")).Once()
+	mockMetrics.On("RecordChannelLen", mock.AnythingOfType("int")).Twice()
 
 	ch := make(chan int, bufferCap)
 	oc := NewObservableChan(ch, mockMetrics)
