@@ -2,16 +2,21 @@ package github_oauth2
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
+
+	"golang.org/x/oauth2/clientcredentials"
+	"golang.org/x/oauth2/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/oauth2/clientcredentials"
-	"golang.org/x/oauth2/github"
 )
 
-type Scanner struct{ detectors.EndpointSetter }
+type Scanner struct {
+	detectors.EndpointSetter
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)

@@ -52,6 +52,7 @@ var (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	detectLoopback bool // Automated tests run against localhost, but we want to ignore those results in the wild
 }
 
