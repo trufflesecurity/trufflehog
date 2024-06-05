@@ -826,6 +826,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results, err := data.detector.FromData(ctx, data.chunk.Verify, match)
 		if err != nil {
 			ctx.Logger().Error(err, "error scanning chunk")
+			continue
 		}
 
 		if e.printAvgDetectorTime && len(results) > 0 {
