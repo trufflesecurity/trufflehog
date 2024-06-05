@@ -490,7 +490,6 @@ func run(state overseer.State) {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
-
 }
 
 type scanConfig struct {
