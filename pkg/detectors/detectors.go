@@ -32,6 +32,21 @@ type Versioner interface {
 	Version() int
 }
 
+// MaxSecretSizeProvider is an optional interface that a detector can implement to
+// provide a custom max size for the secret it finds.
+type MaxSecretSizeProvider interface {
+	MaxSecretSize() int64
+}
+
+// MultiPartCredentialProvider is an optional interface that a detector can implement
+// to indicate its compatibility with multi-part credentials and provide the maximum
+// secret size for the credential it finds.
+type MultiPartCredentialProvider interface {
+	// MaxCredentialSpan returns the maximum span or range of characters that the
+	// detector should consider when searching for a multi-part credential.
+	MaxCredentialSpan() int64
+}
+
 // EndpointCustomizer is an optional interface that a detector can implement to
 // support verifying against user-supplied endpoints.
 type EndpointCustomizer interface {
@@ -63,7 +78,7 @@ type Result struct {
 	verificationError error
 }
 
-// SetVerificationError is the only way to set a verification error. Any sensetive values should be passed-in as secrets to be redacted.
+// SetVerificationError is the only way to set a verification error. Any sensitive values should be passed-in as secrets to be redacted.
 func (r *Result) SetVerificationError(err error, secrets ...string) {
 	if err != nil {
 		r.verificationError = redactSecrets(err, secrets...)

@@ -1,6 +1,7 @@
 package ahocorasick
 
 import (
+	"bytes"
 	"strings"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
@@ -26,6 +27,68 @@ type DetectorKey struct {
 // Type returns the detector type of the key.
 func (k DetectorKey) Type() detectorspb.DetectorType { return k.detectorType }
 
+// spanCalculator is an interface that defines a method for calculating a match span
+// in the chunk data. This allows for different strategies to be used without changing the core logic.
+type spanCalculator interface {
+	calculateSpan(startIdx int64, chunkData []byte, detector detectors.Detector) matchSpan
+}
+
+// EntireChunkSpanCalculator is a strategy that calculates the match span to use the entire chunk data.
+// This is used when we want to match against the full length of the provided chunk.
+type EntireChunkSpanCalculator struct{}
+
+// calculateSpans returns the match span as the length of the chunk data,
+// effectively using the entire chunk for matching.
+func (e *EntireChunkSpanCalculator) calculateSpan(
+	startIdx int64,
+	chunkData []byte,
+	_ detectors.Detector,
+) matchSpan {
+	return matchSpan{startOffset: startIdx, endOffset: int64(len(chunkData))}
+}
+
+// maxMatchLengthSpanCalculator is a strategy that calculates match spans based on a default max
+// match length or values provided by detectors. This allows for more granular control over the match span.
+type maxMatchLengthSpanCalculator struct{ maxMatchLength int64 }
+
+// newMaxMatchLengthSpanCalculator creates a new instance of maxMatchLengthSpanCalculator with the
+// specified max match length.
+func newMaxMatchLengthSpanCalculator(maxMatchLength int64) *maxMatchLengthSpanCalculator {
+	return &maxMatchLengthSpanCalculator{maxMatchLength: maxMatchLength}
+}
+
+// calculateSpans computes the match spans based on the start index and the max match length.
+// If the detector provides an override value, it uses that instead of the default max match length.
+func (m *maxMatchLengthSpanCalculator) calculateSpan(
+	startIdx int64,
+	chunkData []byte,
+	detector detectors.Detector,
+) matchSpan {
+	maxSize := m.maxMatchLength
+
+	switch d := detector.(type) {
+	case detectors.MultiPartCredentialProvider:
+		maxSize = d.MaxCredentialSpan()
+	case detectors.MaxSecretSizeProvider:
+		maxSize = d.MaxSecretSize()
+	default: // Use the default max match length
+	}
+	endIdx := startIdx + maxSize
+	if endIdx > int64(len(chunkData)) {
+		endIdx = int64(len(chunkData))
+	}
+
+	return matchSpan{startOffset: startIdx, endOffset: endIdx}
+}
+
+// AhoCorasickCoreOption is a functional option type for configuring an AhoCorasickCore instance.
+type AhoCorasickCoreOption func(*AhoCorasickCore)
+
+// WithSpanCalculator sets the span calculator for AhoCorasickCore.
+func WithSpanCalculator(spanCalculator spanCalculator) AhoCorasickCoreOption {
+	return func(ac *AhoCorasickCore) { ac.spanCalculator = spanCalculator }
+}
+
 // AhoCorasickCore encapsulates the operations and data structures used for keyword matching via the
 // Aho-Corasick algorithm. It is responsible for constructing and managing the trie for efficient
 // substring searches, as well as mapping keywords to their associated detectors for rapid lookups.
@@ -40,12 +103,13 @@ type AhoCorasickCore struct {
 	// some consuming code a little cleaner.)
 	keywordsToDetectors map[string][]DetectorKey
 	detectorsByKey      map[DetectorKey]detectors.Detector
+	spanCalculator      spanCalculator // Strategy for calculating match spans
 }
 
 // NewAhoCorasickCore allocates and initializes a new instance of AhoCorasickCore. It uses the
 // provided detector slice to create a map from keywords to detectors and build the Aho-Corasick
 // prefilter trie.
-func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
+func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...AhoCorasickCoreOption) *AhoCorasickCore {
 	keywordsToDetectors := make(map[string][]DetectorKey)
 	detectorsByKey := make(map[DetectorKey]detectors.Detector, len(allDetectors))
 	var keywords []string
@@ -59,51 +123,127 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector) *AhoCorasickCore {
 		}
 	}
 
-	return &AhoCorasickCore{
+	const maxMatchLength int64 = 512
+	ac := &AhoCorasickCore{
 		keywordsToDetectors: keywordsToDetectors,
 		detectorsByKey:      detectorsByKey,
 		prefilter:           *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
+		spanCalculator:      newMaxMatchLengthSpanCalculator(maxMatchLength), // Default span calculator
+	}
+
+	for _, opt := range opts {
+		opt(ac)
+	}
+
+	return ac
+}
+
+// DetectorMatch represents a detected pattern's metadata in a data chunk.
+// It encapsulates the key identifying a specific detector, the detector instance itself,
+// the start and end offsets of the matched keyword in the chunk, and the matched portions of the chunk data.
+type DetectorMatch struct {
+	Key DetectorKey
+	detectors.Detector
+	matchSpans []matchSpan
+
+	// matches is a slice of byte slices, each representing a matched portion of the chunk data.
+	matches [][]byte
+}
+
+// MatchSpan represents a single occurrence of a matched keyword in the chunk.
+// It contains the start and end byte offsets of the matched keyword within the chunk.
+type matchSpan struct {
+	startOffset int64
+	endOffset   int64
+}
+
+// addMatchSpan adds a match span to the DetectorMatch instance.
+func (d *DetectorMatch) addMatchSpan(spans ...matchSpan) {
+	d.matchSpans = append(d.matchSpans, spans...)
+}
+
+// mergeMatches merges overlapping or adjacent matchSpans into a single matchSpan.
+// It updates the matchSpans field with the merged spans.
+func (d *DetectorMatch) mergeMatches() {
+	if len(d.matchSpans) <= 1 {
+		return
+	}
+
+	merged := make([]matchSpan, 0, len(d.matchSpans))
+	current := d.matchSpans[0]
+
+	for i := 1; i < len(d.matchSpans); i++ {
+		if d.matchSpans[i].startOffset <= current.endOffset {
+			if d.matchSpans[i].endOffset > current.endOffset {
+				current.endOffset = d.matchSpans[i].endOffset
+			}
+			continue
+		}
+		merged = append(merged, current)
+		current = d.matchSpans[i]
+	}
+
+	merged = append(merged, current)
+	d.matchSpans = merged
+}
+
+// extractMatches extracts the matched portions from the chunk data and stores them in the matches field.
+func (d *DetectorMatch) extractMatches(chunkData []byte) {
+	d.matches = make([][]byte, len(d.matchSpans))
+	for i, m := range d.matchSpans {
+		d.matches[i] = chunkData[m.startOffset:m.endOffset]
 	}
 }
 
-// GetDetectorByKey returns the detector associated with the given key. If no detector is found, it
-// returns nil.
-func (ac *AhoCorasickCore) GetDetectorByKey(key DetectorKey) detectors.Detector {
-	return ac.detectorsByKey[key]
-}
+// Matches returns a slice of byte slices, each representing a matched portion of the chunk data.
+func (d *DetectorMatch) Matches() [][]byte { return d.matches }
 
-// DetectorInfo represents a detected pattern's metadata in a data chunk.
-// It encapsulates the key identifying a specific detector and the detector instance itself.
-type DetectorInfo struct {
-	Key DetectorKey
-	detectors.Detector
-}
+// FindDetectorMatches finds the matching detectors for a given chunk of data using the Aho-Corasick algorithm.
+// It returns a slice of DetectorMatch instances, each containing the detector key, detector,
+// a slice of matchSpans, and the corresponding matched portions of the chunk data.
+//
+// Each matchSpan represents a position in the chunk data where a keyword was found,
+// along with the corresponding span (start and end positions).
+// The span is determined based on the configured spanCalculator strategy.
+// Adjacent or overlapping matches are merged to avoid duplicating or overlapping the matched
+// portions of the chunk data.
+//
+// The matches field contains the actual byte slices of the matched portions from the chunk data.
+func (ac *AhoCorasickCore) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
+	matches := ac.prefilter.Match(bytes.ToLower(chunkData))
 
-// PopulateMatchingDetectors populates the given detector slice with all the detectors matching the
-// provided input. This method populates an existing map rather than allocating a new one because
-// it will be called once per chunk and that many allocations has a noticeable performance cost.
-// It returns a slice of unique 'DetectorInfo' corresponding to the matched detectors. This slice is
-// constructed to prevent duplications by utilizing an internal map to track already processed detectors.
-func (ac *AhoCorasickCore) PopulateMatchingDetectors(chunkData string, dts map[DetectorKey]detectors.Detector) []DetectorInfo {
-	matches := ac.prefilter.MatchString(strings.ToLower(chunkData))
+	matchCount := len(matches)
+	if matchCount == 0 {
+		return nil
+	}
 
-	// Use a map to avoid adding duplicate detectors to the slice.
-	addedDetectors := make(map[DetectorKey]struct{})
-	uniqueDetectors := make([]DetectorInfo, 0, len(matches))
+	detectorMatches := make(map[DetectorKey]*DetectorMatch)
 
 	for _, m := range matches {
 		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
-			if _, exists := addedDetectors[k]; exists {
-				continue
+			if _, exists := detectorMatches[k]; !exists {
+				detector := ac.detectorsByKey[k]
+				detectorMatches[k] = &DetectorMatch{
+					Key:        k,
+					Detector:   detector,
+					matchSpans: make([]matchSpan, 0),
+				}
 			}
-			// Add to the map to track already added detectors.
-			addedDetectors[k] = struct{}{}
 
-			// Add the detector to the map and slice.
-			detector := ac.detectorsByKey[k]
-			dts[k] = detector
-			uniqueDetectors = append(uniqueDetectors, DetectorInfo{Key: k, Detector: detector})
+			detectorMatch := detectorMatches[k]
+			startIdx := m.Pos()
+			span := ac.spanCalculator.calculateSpan(startIdx, chunkData, detectorMatch.Detector)
+			detectorMatch.addMatchSpan(span)
 		}
+	}
+
+	uniqueDetectors := make([]*DetectorMatch, 0, len(detectorMatches))
+	for _, detectorMatch := range detectorMatches {
+		// Merge overlapping or adjacent match spans.
+		detectorMatch.mergeMatches()
+		detectorMatch.extractMatches(chunkData)
+
+		uniqueDetectors = append(uniqueDetectors, detectorMatch)
 	}
 
 	return uniqueDetectors

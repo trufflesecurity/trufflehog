@@ -68,12 +68,12 @@ func (s *Source) cloneRepo(
 	case *sourcespb.GitHub_BasicAuth:
 		path, repo, err = git.CloneRepoUsingToken(ctx, s.conn.GetBasicAuth().GetPassword(), repoURL, s.conn.GetBasicAuth().GetUsername())
 		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+			return "", nil, err
 		}
 	case *sourcespb.GitHub_Unauthenticated:
 		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
 		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+			return "", nil, err
 		}
 
 	case *sourcespb.GitHub_GithubApp:
@@ -84,7 +84,7 @@ func (s *Source) cloneRepo(
 
 		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
 		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+			return "", nil, err
 		}
 
 	case *sourcespb.GitHub_Token:
@@ -93,10 +93,10 @@ func (s *Source) cloneRepo(
 		}
 		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
 		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+			return "", nil, err
 		}
 	default:
-		return "", nil, fmt.Errorf("unhandled credential type for repo %s", repoURL)
+		return "", nil, fmt.Errorf("unhandled credential type for repo %s: %T", repoURL, s.conn.GetCredential())
 	}
 	return path, repo, nil
 }

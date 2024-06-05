@@ -3,6 +3,7 @@ package engine
 import (
 	aCtx "context"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -634,11 +635,11 @@ func TestSetLink(t *testing.T) {
 func TestLikelyDuplicate(t *testing.T) {
 	// Initialize detectors
 	// (not actually calling detector FromData or anything, just using detector struct for key creation)
-	detectorA := ahocorasick.DetectorInfo{
+	detectorA := ahocorasick.DetectorMatch{
 		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[0]),
 		Detector: DefaultDetectors()[0],
 	}
-	detectorB := ahocorasick.DetectorInfo{
+	detectorB := ahocorasick.DetectorMatch{
 		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[1]),
 		Detector: DefaultDetectors()[1],
 	}
@@ -707,4 +708,71 @@ func TestLikelyDuplicate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func BenchmarkPopulateMatchingDetectors(b *testing.B) {
+	allDetectors := DefaultDetectors()
+	ac := ahocorasick.NewAhoCorasickCore(allDetectors)
+
+	// Generate sample data with keywords from detectors.
+	dataSize := 1 << 20 // 1 MB
+	sampleData := generateRandomDataWithKeywords(dataSize, allDetectors)
+
+	smallChunk := 1 << 10  // 1 KB
+	mediumChunk := 1 << 12 // 4 KB
+	current := sources.TotalChunkSize
+	largeChunk := 1 << 14 // 16 KB
+	xlChunk := 1 << 15    // 32 KB
+	xxlChunk := 1 << 16   // 64 KB
+	xxxlChunk := 1 << 18  // 256 KB
+	chunkSizes := []int{smallChunk, mediumChunk, current, largeChunk, xlChunk, xxlChunk, xxxlChunk}
+
+	for _, chunkSize := range chunkSizes {
+		b.Run(fmt.Sprintf("ChunkSize_%d", chunkSize), func(b *testing.B) {
+			b.ReportAllocs()
+			b.SetBytes(int64(chunkSize))
+
+			// Create a single chunk of the desired size.
+			chunk := sampleData[:chunkSize]
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				ac.FindDetectorMatches([]byte(chunk)) // Match against the single chunk
+			}
+		})
+	}
+}
+
+func generateRandomDataWithKeywords(size int, detectors []detectors.Detector) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	data := make([]byte, size)
+
+	r := rand.New(rand.NewSource(42)) // Seed for reproducibility
+
+	for i := range data {
+		data[i] = charset[r.Intn(len(charset))]
+	}
+
+	totalKeywords := 0
+	for _, d := range detectors {
+		totalKeywords += len(d.Keywords())
+	}
+
+	// Target keyword density (keywords per character)
+	// This ensures that the generated data has a reasonable number of keywords and is consistent
+	// across different data sizes.
+	keywordDensity := 0.01
+
+	targetKeywords := int(float64(size) * keywordDensity)
+
+	for i := 0; i < targetKeywords; i++ {
+		detectorIndex := r.Intn(len(detectors))
+		keywordIndex := r.Intn(len(detectors[detectorIndex].Keywords()))
+		keyword := detectors[detectorIndex].Keywords()[keywordIndex]
+
+		insertPosition := r.Intn(size - len(keyword))
+		copy(data[insertPosition:], keyword)
+	}
+
+	return string(data)
 }

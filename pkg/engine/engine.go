@@ -110,7 +110,8 @@ type Config struct {
 	FilterEntropy float64
 	// FilterUnverified sets the filterUnverified flag on the engine. If set to
 	// true, the engine will only return the first unverified result for a chunk for a detector.
-	FilterUnverified bool
+	FilterUnverified      bool
+	ShouldScanEntireChunk bool
 
 	Dispatcher ResultsDispatcher
 
@@ -153,6 +154,9 @@ type Engine struct {
 	logFilteredUnverified   bool
 	verificationOverlap     bool
 	printAvgDetectorTime    bool
+	// By default, the engine will only scan a subset of the chunk if a detector matches the chunk.
+	// If this flag is set to true, the engine will scan the entire chunk.
+	scanEntireChunk bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
 	ahoCorasickCore *ahocorasick.AhoCorasickCore
@@ -200,6 +204,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		logFilteredUnverified: cfg.LogFilteredUnverified,
 		verificationOverlap:   cfg.VerificationOverlap,
 		sourceManager:         cfg.SourceManager,
+		scanEntireChunk:       cfg.ShouldScanEntireChunk,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
@@ -689,7 +694,7 @@ func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
-	detector detectors.Detector
+	detector *ahocorasick.DetectorMatch
 	chunk    sources.Chunk
 	decoder  detectorspb.DecoderType
 	wgDoneFn func()
@@ -701,7 +706,7 @@ type detectableChunk struct {
 type verificationOverlapChunk struct {
 	chunk                       sources.Chunk
 	decoder                     detectorspb.DecoderType
-	detectors                   []ahocorasick.DetectorInfo
+	detectors                   []*ahocorasick.DetectorMatch
 	verificationOverlapWgDoneFn func()
 }
 
@@ -709,9 +714,6 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
 
-	// Reuse the same map to avoid allocations.
-	const avgDetectorsPerChunk = 8
-	chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, avgDetectorsPerChunk)
 	for chunk := range e.ChunksChan() {
 		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 		for _, decoder := range e.decoders {
@@ -721,8 +723,8 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 				continue
 			}
 
-			matchingDetectors := e.ahoCorasickCore.PopulateMatchingDetectors(string(decoded.Chunk.Data), chunkSpecificDetectors)
-			if len(chunkSpecificDetectors) > 1 && !e.verificationOverlap {
+			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
 					chunk:                       *decoded.Chunk,
@@ -730,14 +732,10 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 					decoder:                     decoded.DecoderType,
 					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
 				}
-				// Empty the map.
-				for k := range chunkSpecificDetectors {
-					delete(chunkSpecificDetectors, k)
-				}
 				continue
 			}
 
-			for k, detector := range chunkSpecificDetectors {
+			for _, detector := range matchingDetectors {
 				decoded.Chunk.Verify = e.verify
 				wgDetect.Add(1)
 				e.detectableChunksChan <- detectableChunk{
@@ -746,9 +744,10 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 					decoder:  decoded.DecoderType,
 					wgDoneFn: wgDetect.Done,
 				}
-				delete(chunkSpecificDetectors, k)
 			}
+			continue
 		}
+
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
 	}
 
@@ -808,71 +807,68 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]struct{}, avgSecretsPerDetector)
+	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]*ahocorasick.DetectorMatch, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
 		for _, detector := range chunk.detectors {
 			// DO NOT VERIFY at this stage of the pipeline.
-			results, err := detector.FromData(ctx, false, chunk.chunk.Data)
-			if err != nil {
-				ctx.Logger().Error(err, "error verifying chunk")
-			}
-
-			if len(results) == 0 {
-				continue
-			}
-			if _, ok := detectorKeysWithResults[detector.Key]; !ok {
-				detectorKeysWithResults[detector.Key] = struct{}{}
-			}
-
-			for _, res := range results {
-				var val []byte
-				if res.RawV2 != nil {
-					val = res.RawV2
-				} else {
-					val = res.Raw
+			matchedBytes := detector.Matches()
+			for _, match := range matchedBytes {
+				results, err := detector.FromData(ctx, false, match)
+				if err != nil {
+					ctx.Logger().Error(err, "error verifying chunk")
 				}
 
-				// Use levenstein distance to determine if the secret is likely the same.
-				// Ex:
-				// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
-				key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
-				if _, ok := chunkSecrets[key]; ok {
+				if len(results) == 0 {
 					continue
 				}
-
-				if likelyDuplicate(ctx, key, chunkSecrets) {
-					// This indicates that the same secret was found by multiple detectors.
-					// We should NOT VERIFY this chunk's data.
-					if e.verificationOverlapTracker != nil {
-						e.verificationOverlapTracker.increment()
-					}
-					res.SetVerificationError(errOverlap)
-					e.processResult(ctx, detectableChunk{
-						chunk:    chunk.chunk,
-						detector: detector,
-						decoder:  chunk.decoder,
-						wgDoneFn: wgDetect.Done,
-					}, res)
-
-					// Remove the detector key from the list of detector keys with results.
-					// This is to ensure that the chunk is not reprocessed with verification enabled
-					// for this detector.
-					delete(detectorKeysWithResults, detector.Key)
+				if _, ok := detectorKeysWithResults[detector.Key]; !ok {
+					detectorKeysWithResults[detector.Key] = detector
 				}
-				chunkSecrets[key] = struct{}{}
+
+				for _, res := range results {
+					var val []byte
+					if res.RawV2 != nil {
+						val = res.RawV2
+					} else {
+						val = res.Raw
+					}
+
+					// Use levenstein distance to determine if the secret is likely the same.
+					// Ex:
+					// - postman api key: PMAK-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+					// - malicious detector "api key": qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r
+					key := chunkSecretKey{secret: string(val), detectorKey: detector.Key}
+					if _, ok := chunkSecrets[key]; ok {
+						continue
+					}
+
+					if likelyDuplicate(ctx, key, chunkSecrets) {
+						// This indicates that the same secret was found by multiple detectors.
+						// We should NOT VERIFY this chunk's data.
+						if e.verificationOverlapTracker != nil {
+							e.verificationOverlapTracker.increment()
+						}
+						res.SetVerificationError(errOverlap)
+						e.processResult(ctx, detectableChunk{
+							chunk:    chunk.chunk,
+							detector: detector,
+							decoder:  chunk.decoder,
+							wgDoneFn: wgDetect.Done,
+						}, res)
+
+						// Remove the detector key from the list of detector keys with results.
+						// This is to ensure that the chunk is not reprocessed with verification enabled
+						// for this detector.
+						delete(detectorKeysWithResults, detector.Key)
+					}
+					chunkSecrets[key] = struct{}{}
+				}
 			}
 		}
 
-		for key := range detectorKeysWithResults {
-			detector := e.ahoCorasickCore.GetDetectorByKey(key)
-			if detector == nil {
-				ctx.Logger().Info("detector not found", "key", key)
-				continue
-			}
-
+		for _, detector := range detectorKeysWithResults {
 			wgDetect.Add(1)
 			chunk.chunk.Verify = e.verify
 			e.detectableChunksChan <- detectableChunk{
@@ -912,38 +908,46 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	defer common.Recover(ctx)
 	defer cancel()
 
-	results, err := data.detector.FromData(ctx, data.chunk.Verify, data.chunk.Data)
-	if err != nil {
-		ctx.Logger().Error(err, "error scanning chunk")
-	}
-
-	if e.printAvgDetectorTime && len(results) > 0 {
-		elapsed := time.Since(start)
-		detectorName := results[0].DetectorType.String()
-		avgTimeI, ok := e.metrics.detectorAvgTime.Load(detectorName)
-		var avgTime []time.Duration
-		if ok {
-			avgTime, ok = avgTimeI.([]time.Duration)
-			if !ok {
-				return
-			}
+	// To reduce the overhead of regex calls in the detector,
+	// we limit the amount of data passed to each detector.
+	// The matches field of the DetectorMatch struct contains the
+	// relevant portions of the chunk data that were matched.
+	// This avoids the need for additional regex processing on the entire chunk data.
+	matchedBytes := data.detector.Matches()
+	for _, match := range matchedBytes {
+		results, err := data.detector.FromData(ctx, data.chunk.Verify, match)
+		if err != nil {
+			ctx.Logger().Error(err, "error scanning chunk")
 		}
-		avgTime = append(avgTime, elapsed)
-		e.metrics.detectorAvgTime.Store(detectorName, avgTime)
-	}
 
-	if e.filterUnverified {
-		results = detectors.CleanResults(results)
-	}
+		if e.printAvgDetectorTime && len(results) > 0 {
+			elapsed := time.Since(start)
+			detectorName := results[0].DetectorType.String()
+			avgTimeI, ok := e.metrics.detectorAvgTime.Load(detectorName)
+			var avgTime []time.Duration
+			if ok {
+				avgTime, ok = avgTimeI.([]time.Duration)
+				if !ok {
+					return
+				}
+			}
+			avgTime = append(avgTime, elapsed)
+			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
+		}
 
-	results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
+		if e.filterUnverified {
+			results = detectors.CleanResults(results)
+		}
 
-	if e.filterEntropy != 0 {
-		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.logFilteredUnverified)
-	}
+		results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
 
-	for _, res := range results {
-		e.processResult(ctx, data, res)
+		if e.filterEntropy != nil {
+			results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.logFilteredUnverified)
+		}
+
+		for _, res := range results {
+			e.processResult(ctx, data, res)
+		}
 	}
 	data.wgDoneFn()
 }

@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -49,10 +50,12 @@ var (
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified. Defaults to all types.").Hidden().String()
 
-	allowVerificationOverlap = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
-	filterUnverified         = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
-	filterEntropy            = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
-	configFilename           = cli.Flag("config", "Path to configuration file.").ExistingFile()
+	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
+	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
+	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
+	configFilename             = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
@@ -188,6 +191,14 @@ var (
 	elasticsearchQueryJSON      = elasticsearchScan.Flag("query-json", "Filters the documents to search").Envar("ELASTICSEARCH_QUERY_JSON").String()
 	elasticsearchSinceTimestamp = elasticsearchScan.Flag("since-timestamp", "Filters the documents to search to those created since this timestamp; overrides any timestamp from --query-json").Envar("ELASTICSEARCH_SINCE_TIMESTAMP").String()
 	elasticsearchBestEffortScan = elasticsearchScan.Flag("best-effort-scan", "Attempts to continuously scan a cluster").Envar("ELASTICSEARCH_BEST_EFFORT_SCAN").Bool()
+
+	jenkinsScan                  = cli.Command("jenkins", "Scan Jenkins")
+	jenkinsURL                   = jenkinsScan.Flag("url", "Jenkins URL").Envar("JENKINS_URL").Required().String()
+	jenkinsUsername              = jenkinsScan.Flag("username", "Jenkins username").Envar("JENKINS_USERNAME").String()
+	jenkinsPassword              = jenkinsScan.Flag("password", "Jenkins password").Envar("JENKINS_PASSWORD").String()
+	jenkinsInsecureSkipVerifyTLS = jenkinsScan.Flag("insecure-skip-verify-tls", "Skip TLS verification").Envar("JENKINS_INSECURE_SKIP_VERIFY_TLS").Bool()
+
+	usingTUI = false
 )
 
 func init() {
@@ -213,6 +224,7 @@ func init() {
 		// Overwrite the Args slice so overseer works properly.
 		os.Args = os.Args[:1]
 		os.Args = append(os.Args, args...)
+		usingTUI = true
 	}
 
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
@@ -252,7 +264,7 @@ func main() {
 	}
 
 	if !*noUpdate {
-		updateCfg.Fetcher = updater.Fetcher(version.BuildVersion)
+		updateCfg.Fetcher = updater.Fetcher(usingTUI)
 	}
 	if version.BuildVersion == "dev" {
 		updateCfg.Fetcher = nil
@@ -438,9 +450,107 @@ func run(state overseer.State) {
 	}
 	e.Start(ctx)
 
+	if *compareDetectionStrategies {
+		err := compareScans(ctx, cmd, &engConf)
+		if err != nil {
+			logFatal(err, "error comparing detection strategies")
+		}
+		return
+	}
+
+	metrics, err := runSingleScan(ctx, cmd, &engConf)
+	if err != nil {
+		logFatal(err, "error running scan")
+	}
+
+	// Print results.
+	logger.Info("finished scanning",
+		"chunks", metrics.ChunksScanned,
+		"bytes", metrics.BytesScanned,
+		"verified_secrets", metrics.VerifiedSecretsFound,
+		"unverified_secrets", metrics.UnverifiedSecretsFound,
+		"scan_duration", metrics.ScanDuration.String(),
+		"trufflehog_version", version.BuildVersion,
+	)
+
+	if metrics.hasFoundResults && *fail {
+		logger.V(2).Info("exiting with code 183 because results were found")
+		os.Exit(183)
+	}
+}
+
+func compareScans(ctx context.Context, cmd string, cfg *engine.Config) error {
+	var (
+		entireMetrics    metrics
+		maxLengthMetrics metrics
+		err              error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		// Run scan with entire chunk span calculator.
+		cfg.ShouldScanEntireChunk = true
+		entireMetrics, err = runSingleScan(ctx, cmd, cfg)
+		if err != nil {
+			ctx.Logger().Error(err, "error running scan with entire chunk span calculator")
+		}
+	}()
+
+	// Run scan with max-length span calculator.
+	maxLengthMetrics, err = runSingleScan(ctx, cmd, cfg)
+	if err != nil {
+		return fmt.Errorf("error running scan with custom span calculator: %v", err)
+	}
+
+	wg.Wait()
+
+	return compareMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
+}
+
+func compareMetrics(customMetrics, entireMetrics engine.Metrics) error {
+	fmt.Printf("Comparison of scan results: \n")
+	fmt.Printf("Custom span - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
+		customMetrics.ChunksScanned, customMetrics.BytesScanned, customMetrics.VerifiedSecretsFound, customMetrics.UnverifiedSecretsFound, customMetrics.ScanDuration.String())
+	fmt.Printf("Entire chunk - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
+		entireMetrics.ChunksScanned, entireMetrics.BytesScanned, entireMetrics.VerifiedSecretsFound, entireMetrics.UnverifiedSecretsFound, entireMetrics.ScanDuration.String())
+
+	// Check for differences in scan metrics.
+	if customMetrics.ChunksScanned != entireMetrics.ChunksScanned ||
+		customMetrics.BytesScanned != entireMetrics.BytesScanned ||
+		customMetrics.VerifiedSecretsFound != entireMetrics.VerifiedSecretsFound {
+		return fmt.Errorf("scan metrics do not match")
+	}
+
+	return nil
+}
+
+type metrics struct {
+	engine.Metrics
+	hasFoundResults bool
+}
+
+func runSingleScan(ctx context.Context, cmd string, cfg *engine.Config) (metrics, error) {
+	var scanMetrics metrics
+
+	eng, err := engine.NewEngine(ctx, cfg)
+	if err != nil {
+		return scanMetrics, fmt.Errorf("error initializing engine: %v", err)
+	}
+	eng.Start(ctx)
+
+	defer func() {
+		// Clean up temporary artifacts.
+		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+			ctx.Logger().Error(err, "error cleaning temp artifacts")
+		}
+	}()
+
 	switch cmd {
 	case gitScan.FullCommand():
-		cfg := sources.GitConfig{
+		gitCfg := sources.GitConfig{
 			URI:              *gitScanURI,
 			IncludePathsFile: *gitScanIncludePaths,
 			ExcludePathsFile: *gitScanExcludePaths,
@@ -450,16 +560,16 @@ func run(state overseer.State) {
 			Bare:             *gitScanBare,
 			ExcludeGlobs:     *gitScanExcludeGlobs,
 		}
-		if err = e.ScanGit(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Git.")
+		if err = eng.ScanGit(ctx, gitCfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
 		}
 	case githubScan.FullCommand():
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
 		if err != nil {
-			logFatal(err, "could not create filter")
+			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
 		}
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
-			logFatal(fmt.Errorf("invalid config"), "You must specify at least one organization or repository.")
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization or repository")
 		}
 
 		cfg := sources.GithubConfig{
@@ -478,13 +588,13 @@ func run(state overseer.State) {
 			IncludeGistComments:        *githubScanGistComments,
 			Filter:                     filter,
 		}
-		if err := e.ScanGitHub(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Github.")
+		if err := eng.ScanGitHub(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)
 		}
 	case gitlabScan.FullCommand():
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
 		if err != nil {
-			logFatal(err, "could not create filter")
+			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
 		}
 
 		cfg := sources.GitlabConfig{
@@ -493,8 +603,8 @@ func run(state overseer.State) {
 			Repos:    *gitlabScanRepos,
 			Filter:   filter,
 		}
-		if err := e.ScanGitLab(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan GitLab.")
+		if err := eng.ScanGitLab(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)
 		}
 	case filesystemScan.FullCommand():
 		if len(*filesystemDirectories) > 0 {
@@ -508,8 +618,8 @@ func run(state overseer.State) {
 			IncludePathsFile: *filesystemScanIncludePaths,
 			ExcludePathsFile: *filesystemScanExcludePaths,
 		}
-		if err = e.ScanFileSystem(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan filesystem")
+		if err = eng.ScanFileSystem(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
@@ -522,8 +632,8 @@ func run(state overseer.State) {
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
 		}
-		if err := e.ScanS3(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan S3.")
+		if err := eng.ScanS3(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)
 		}
 	case syslogScan.FullCommand():
 		cfg := sources.SyslogConfig{
@@ -534,16 +644,16 @@ func run(state overseer.State) {
 			KeyPath:     *syslogTLSKey,
 			Concurrency: *concurrency,
 		}
-		if err := e.ScanSyslog(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan syslog.")
+		if err := eng.ScanSyslog(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan syslog: %v", err)
 		}
 	case circleCiScan.FullCommand():
-		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
-			logFatal(err, "Failed to scan CircleCI.")
+		if err := eng.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan CircleCI: %v", err)
 		}
 	case travisCiScan.FullCommand():
-		if err := e.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
-			logFatal(err, "Failed to scan TravisCI.")
+		if err := eng.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan TravisCI: %v", err)
 		}
 	case gcsScan.FullCommand():
 		cfg := sources.GCSConfig{
@@ -559,8 +669,8 @@ func run(state overseer.State) {
 			Concurrency:    *concurrency,
 			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
-		if err := e.ScanGCS(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan GCS.")
+		if err := eng.ScanGCS(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan GCS: %v", err)
 		}
 	case dockerScan.FullCommand():
 		cfg := sources.DockerConfig{
@@ -568,8 +678,8 @@ func run(state overseer.State) {
 			Images:            *dockerScanImages,
 			UseDockerKeychain: *dockerScanToken == "",
 		}
-		if err := e.ScanDocker(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Docker.")
+		if err := eng.ScanDocker(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)
 		}
 	case postmanScan.FullCommand():
 		// handle deprecated flag
@@ -605,8 +715,8 @@ func run(state overseer.State) {
 			WorkspacePaths:      *postmanWorkspacePaths,
 			EnvironmentPaths:    *postmanEnvironmentPaths,
 		}
-		if err := e.ScanPostman(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Postman.")
+		if err := eng.ScanPostman(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Postman: %v", err)
 		}
 	case elasticsearchScan.FullCommand():
 		cfg := sources.ElasticsearchConfig{
@@ -621,40 +731,33 @@ func run(state overseer.State) {
 			SinceTimestamp: *elasticsearchSinceTimestamp,
 			BestEffortScan: *elasticsearchBestEffortScan,
 		}
-		if err := e.ScanElasticsearch(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Elasticsearch.")
+		if err := eng.ScanElasticsearch(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Elasticsearch: %v", err)
+		}
+	case jenkinsScan.FullCommand():
+		cfg := engine.JenkinsConfig{
+			Endpoint:              *jenkinsURL,
+			InsecureSkipVerifyTLS: *jenkinsInsecureSkipVerifyTLS,
+			Username:              *jenkinsUsername,
+			Password:              *jenkinsPassword,
+		}
+		if err := eng.ScanJenkins(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
 		}
 	default:
-		logFatal(fmt.Errorf("invalid command"), "Command not recognized.")
+		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
 	}
 
 	// Wait for all workers to finish.
-	if err = e.Finish(ctx); err != nil {
-		logFatal(err, "engine failed to finish execution")
+	if err = eng.Finish(ctx); err != nil {
+		return scanMetrics, fmt.Errorf("engine failed to finish execution: %v", err)
 	}
-	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
-		ctx.Logger().Error(err, "error cleaning temp artifacts")
-	}
-
-	metrics := e.GetMetrics()
-	// Print results.
-	logger.Info("finished scanning",
-		"chunks", metrics.ChunksScanned,
-		"bytes", metrics.BytesScanned,
-		"verified_secrets", metrics.VerifiedSecretsFound,
-		"unverified_secrets", metrics.UnverifiedSecretsFound,
-		"scan_duration", metrics.ScanDuration.String(),
-		"trufflehog_version", version.BuildVersion,
-	)
 
 	if *printAvgDetectorTime {
-		printAverageDetectorTime(e)
+		printAverageDetectorTime(eng)
 	}
 
-	if e.HasFoundResults() && *fail {
-		logger.V(2).Info("exiting with code 183 because results were found")
-		os.Exit(183)
-	}
+	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults()}, nil
 }
 
 // parseResults ensures that users provide valid CSV input to `--results`.
