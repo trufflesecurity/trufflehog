@@ -781,8 +781,8 @@ func runSingleScan(ctx context.Context, cfg scanConfig, scanEntireChunk bool) (m
 			SinceTimestamp: *elasticsearchSinceTimestamp,
 			BestEffortScan: *elasticsearchBestEffortScan,
 		}
-		if err := e.ScanElasticsearch(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Elasticsearch.")
+		if err := eng.ScanElasticsearch(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Elasticsearch: %v", err)
 		}
 	case jenkinsScan.FullCommand():
 		cfg := engine.JenkinsConfig{
@@ -791,8 +791,8 @@ func runSingleScan(ctx context.Context, cfg scanConfig, scanEntireChunk bool) (m
 			Username:              *jenkinsUsername,
 			Password:              *jenkinsPassword,
 		}
-		if err := e.ScanJenkins(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Jenkins.")
+		if err := eng.ScanJenkins(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
 		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cfg.Command)
