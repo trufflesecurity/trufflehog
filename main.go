@@ -468,27 +468,27 @@ func run(state overseer.State) {
 		if err != nil {
 			logFatal(err, "error comparing span calculators")
 		}
-	} else {
-		fmt.Println(*scanEntireChunk)
-		metrics, err := runSingleScan(ctx, scanConfig, *scanEntireChunk)
-		if err != nil {
-			logFatal(err, "error running scan")
-		}
+		return
+	}
 
-		// Print results.
-		logger.Info("finished scanning",
-			"chunks", metrics.ChunksScanned,
-			"bytes", metrics.BytesScanned,
-			"verified_secrets", metrics.VerifiedSecretsFound,
-			"unverified_secrets", metrics.UnverifiedSecretsFound,
-			"scan_duration", metrics.ScanDuration.String(),
-			"trufflehog_version", version.BuildVersion,
-		)
+	metrics, err := runSingleScan(ctx, scanConfig, *scanEntireChunk)
+	if err != nil {
+		logFatal(err, "error running scan")
+	}
 
-		if metrics.hasFoundResults && *fail {
-			logger.V(2).Info("exiting with code 183 because results were found")
-			os.Exit(183)
-		}
+	// Print results.
+	logger.Info("finished scanning",
+		"chunks", metrics.ChunksScanned,
+		"bytes", metrics.BytesScanned,
+		"verified_secrets", metrics.VerifiedSecretsFound,
+		"unverified_secrets", metrics.UnverifiedSecretsFound,
+		"scan_duration", metrics.ScanDuration.String(),
+		"trufflehog_version", version.BuildVersion,
+	)
+
+	if metrics.hasFoundResults && *fail {
+		logger.V(2).Info("exiting with code 183 because results were found")
+		os.Exit(183)
 	}
 
 }
