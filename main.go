@@ -179,6 +179,24 @@ var (
 	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
 	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
 	postmanEnvironmentPaths    = postmanScan.Flag("environment-paths", "Path to Postman environments.").Strings()
+
+	elasticsearchScan           = cli.Command("elasticsearch", "Scan Elasticsearch")
+	elasticsearchNodes          = elasticsearchScan.Flag("nodes", "Elasticsearch nodes").Envar("ELASTICSEARCH_NODES").Strings()
+	elasticsearchUsername       = elasticsearchScan.Flag("username", "Elasticsearch username").Envar("ELASTICSEARCH_USERNAME").String()
+	elasticsearchPassword       = elasticsearchScan.Flag("password", "Elasticsearch password").Envar("ELASTICSEARCH_PASSWORD").String()
+	elasticsearchServiceToken   = elasticsearchScan.Flag("service-token", "Elasticsearch service token").Envar("ELASTICSEARCH_SERVICE_TOKEN").String()
+	elasticsearchCloudId        = elasticsearchScan.Flag("cloud-id", "Elasticsearch cloud ID. Can also be provided with environment variable").Envar("ELASTICSEARCH_CLOUD_ID").String()
+	elasticsearchAPIKey         = elasticsearchScan.Flag("api-key", "Elasticsearch API key. Can also be provided with environment variable").Envar("ELASTICSEARCH_API_KEY").String()
+	elasticsearchIndexPattern   = elasticsearchScan.Flag("index-pattern", "Filters the indices to search").Default("*").Envar("ELASTICSEARCH_INDEX_PATTERN").String()
+	elasticsearchQueryJSON      = elasticsearchScan.Flag("query-json", "Filters the documents to search").Envar("ELASTICSEARCH_QUERY_JSON").String()
+	elasticsearchSinceTimestamp = elasticsearchScan.Flag("since-timestamp", "Filters the documents to search to those created since this timestamp; overrides any timestamp from --query-json").Envar("ELASTICSEARCH_SINCE_TIMESTAMP").String()
+	elasticsearchBestEffortScan = elasticsearchScan.Flag("best-effort-scan", "Attempts to continuously scan a cluster").Envar("ELASTICSEARCH_BEST_EFFORT_SCAN").Bool()
+
+	jenkinsScan                  = cli.Command("jenkins", "Scan Jenkins")
+	jenkinsURL                   = jenkinsScan.Flag("url", "Jenkins URL").Envar("JENKINS_URL").Required().String()
+	jenkinsUsername              = jenkinsScan.Flag("username", "Jenkins username").Envar("JENKINS_USERNAME").String()
+	jenkinsPassword              = jenkinsScan.Flag("password", "Jenkins password").Envar("JENKINS_PASSWORD").String()
+	jenkinsInsecureSkipVerifyTLS = jenkinsScan.Flag("insecure-skip-verify-tls", "Skip TLS verification").Envar("JENKINS_INSECURE_SKIP_VERIFY_TLS").Bool()
 )
 
 func init() {
@@ -749,6 +767,32 @@ func runSingleScan(ctx context.Context, cfg scanConfig, scanEntireChunk bool) (m
 		}
 		if err := eng.ScanPostman(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Postman: %v", err)
+		}
+	case elasticsearchScan.FullCommand():
+		cfg := sources.ElasticsearchConfig{
+			Nodes:          *elasticsearchNodes,
+			Username:       *elasticsearchUsername,
+			Password:       *elasticsearchPassword,
+			CloudID:        *elasticsearchCloudId,
+			APIKey:         *elasticsearchAPIKey,
+			ServiceToken:   *elasticsearchServiceToken,
+			IndexPattern:   *elasticsearchIndexPattern,
+			QueryJSON:      *elasticsearchQueryJSON,
+			SinceTimestamp: *elasticsearchSinceTimestamp,
+			BestEffortScan: *elasticsearchBestEffortScan,
+		}
+		if err := e.ScanElasticsearch(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan Elasticsearch.")
+		}
+	case jenkinsScan.FullCommand():
+		cfg := engine.JenkinsConfig{
+			Endpoint:              *jenkinsURL,
+			InsecureSkipVerifyTLS: *jenkinsInsecureSkipVerifyTLS,
+			Username:              *jenkinsUsername,
+			Password:              *jenkinsPassword,
+		}
+		if err := e.ScanJenkins(ctx, cfg); err != nil {
+			logFatal(err, "Failed to scan Jenkins.")
 		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cfg.Command)

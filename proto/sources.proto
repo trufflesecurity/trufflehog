@@ -47,6 +47,7 @@ enum SourceType {
   SOURCE_TYPE_TRAVISCI = 32;
   SOURCE_TYPE_POSTMAN = 33;
   SOURCE_TYPE_WEBHOOK = 34;
+  SOURCE_TYPE_ELASTICSEARCH = 35;
 }
 
 message LocalSource {
@@ -319,6 +320,7 @@ message Jenkins {
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
     credentials.Header header = 3;
+    credentials.Unauthenticated unauthenticated = 5;
   }
   bool insecure_skip_verify_tls = 4;
 }
@@ -406,4 +408,17 @@ message Webhook {
   oneof credential {
     credentials.Header header = 2;
   }
+}
+
+message Elasticsearch {
+  repeated string nodes = 1;
+  string username = 2;
+  string password = 3;
+  string cloud_id = 4;
+  string api_key = 5;
+  string service_token = 6;
+  string index_pattern = 7;
+  string query_json = 8;
+  string since_timestamp = 9;
+  bool best_effort_scan = 10;
 }

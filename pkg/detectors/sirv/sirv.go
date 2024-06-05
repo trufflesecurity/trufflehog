@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				timeout := 10 * time.Second
 				client.Timeout = timeout
 				payload := strings.NewReader(fmt.Sprintf(`{"clientId":"%s","clientSecret":"%s"}`, resIdMatch, resMatch))
-				req, err := http.NewRequest("POST", "https://api.sirv.com/v2/token", payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.sirv.com/v2/token", payload)
 				if err != nil {
 					continue
 				}

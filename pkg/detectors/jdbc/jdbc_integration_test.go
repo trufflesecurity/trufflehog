@@ -80,7 +80,7 @@ func TestJdbcVerified(t *testing.T) {
 	sqlServerDatabase := "master"
 
 	mssqlContainer, err := mssql.RunContainer(ctx,
-		testcontainers.WithImage("mcr.microsoft.com/mssql/server:2022-RTM-GDR1-ubuntu-20.04"),
+		testcontainers.WithImage("mcr.microsoft.com/azure-sql-edge"),
 		mssql.WithAcceptEULA(),
 		mssql.WithPassword(sqlServerPass),
 	)

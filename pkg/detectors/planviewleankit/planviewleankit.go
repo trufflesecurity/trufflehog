@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequest("GET", fmt.Sprintf("https://%s.leankit.com/io/account", resSubdomainMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.leankit.com/io/account", resSubdomainMatch), nil)
 				if err != nil {
 					continue
 				}

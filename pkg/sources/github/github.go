@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"golang.org/x/exp/rand"
+	"golang.org/x/oauth2"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v62/github"
-	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -427,11 +427,14 @@ RepoLoop:
 				continue
 			}
 
-			if strings.EqualFold(urlParts[0], "gist.github.com") {
+			if isGistUrl(urlParts) {
 				// Cache gist info.
 				for {
 					gistID := extractGistID(urlParts)
 					gist, _, err := s.apiClient.Gists.Get(repoCtx, gistID)
+					// Normalize the URL to the Gist's pull URL.
+					// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
+					r = gist.GetGitPullURL()
 					if s.handleRateLimit(err) {
 						continue
 					}
@@ -480,8 +483,17 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, apiEndpoint string, bas
 	s.apiClient = ghClient
 
 	for _, org := range s.orgsCache.Keys() {
-		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+		orgCtx := context.WithValue(ctx, "account", org)
+		userType, err := s.getReposByOrgOrUser(ctx, org)
+		if err != nil {
+			orgCtx.Logger().Error(err, "error fetching repos for org or user")
+			continue
+		}
+
+		if userType == organization && s.conn.ScanUsers {
+			if err := s.addMembersByOrg(ctx, org); err != nil {
+				orgCtx.Logger().Error(err, "Unable to add members by org")
+			}
 		}
 	}
 
@@ -499,17 +511,15 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint strin
 	}
 
 	for _, org := range s.orgsCache.Keys() {
-		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org")
+		orgCtx := context.WithValue(ctx, "account", org)
+		userType, err := s.getReposByOrgOrUser(ctx, org)
+		if err != nil {
+			orgCtx.Logger().Error(err, "error fetching repos for org or user")
+			continue
 		}
 
-		// We probably don't need to do this, since getting repos by org makes more sense?
-		if err := s.getReposByUser(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for user")
-		}
-
-		if s.conn.ScanUsers {
-			s.log.Info("Enumerating unauthenticated does not support scanning organization members")
+		if userType == organization && s.conn.ScanUsers {
+			orgCtx.Logger().Info("WARNING: Enumerating unauthenticated does not support scanning organization members (--include-members)")
 		}
 	}
 }
@@ -535,19 +545,8 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	}
 	s.apiClient = ghClient
 
-	// TODO: this should support scanning users too
-
-	specificScope := false
-
-	if len(s.repos) > 0 {
-		specificScope = true
-	}
-
-	var (
-		ghUser *github.User
-	)
-
 	ctx.Logger().V(1).Info("Enumerating with token", "endpoint", apiEndpoint)
+	var ghUser *github.User
 	for {
 		ghUser, _, err = s.apiClient.Users.Get(ctx, "")
 		if s.handleRateLimit(err) {
@@ -559,70 +558,46 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		break
 	}
 
-	if s.orgsCache.Count() > 0 {
-		specificScope = true
-		for _, org := range s.orgsCache.Keys() {
-			logger := s.log.WithValues("org", org)
-			if err := s.getReposByOrg(ctx, org); err != nil {
-				logger.Error(err, "error fetching repos for org")
-			}
-
-			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, org)
-				if err != nil {
-					logger.Error(err, "Unable to add members by org")
-					continue
-				}
-			}
-		}
-	}
-
-	// If no scope was provided, enumerate them.
+	specificScope := len(s.repos) > 0 || s.orgsCache.Count() > 0
 	if !specificScope {
+		// Enumerate the user's orgs and repos if none were specified.
 		if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-			s.log.Error(err, "error fetching repos by user")
+			s.log.Error(err, "Unable to fetch repos for the current user", "user", ghUser.GetLogin())
+		}
+		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
+			s.log.Error(err, "Unable to fetch gists for the current user", "user", ghUser.GetLogin())
 		}
 
 		isGHE := !strings.EqualFold(apiEndpoint, cloudEndpoint)
 		if isGHE {
 			s.addAllVisibleOrgs(ctx)
 		} else {
-			// Scan for orgs is default with a token. GitHub App enumerates the repositories
-			// that were assigned to it in GitHub App settings.
+			// Scan for orgs is default with a token.
+			// GitHub App enumerates the repos that were assigned to it in GitHub App settings.
 			s.addOrgsByUser(ctx, ghUser.GetLogin())
 		}
+	}
 
+	if len(s.orgsCache.Keys()) > 0 {
 		for _, org := range s.orgsCache.Keys() {
-			logger := s.log.WithValues("org", org)
-			if err := s.getReposByOrg(ctx, org); err != nil {
-				logger.Error(err, "error fetching repos by org")
+			orgCtx := context.WithValue(ctx, "account", org)
+			userType, err := s.getReposByOrgOrUser(ctx, org)
+			if err != nil {
+				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
+				continue
 			}
 
-			if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-				logger.Error(err, "error fetching repos by user")
-			}
-
-			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, org)
-				if err != nil {
-					logger.Error(err, "Unable to add members by org for org")
+			if userType == organization && s.conn.ScanUsers {
+				if err := s.addMembersByOrg(ctx, org); err != nil {
+					orgCtx.Logger().Error(err, "Unable to add members for org")
 				}
 			}
 		}
 
-		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
-		// So if we don't have ScanUsers enabled, add the user gists as normal.
-		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
-			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
+		if s.conn.ScanUsers && len(s.memberCache) > 0 {
+			s.log.Info("Fetching repos for org members", "org_count", s.orgsCache.Count(), "member_count", len(s.memberCache))
+			s.addReposForMembers(ctx)
 		}
-
-		return nil
-	}
-
-	if s.conn.ScanUsers {
-		s.log.Info("Adding repos", "orgs", s.orgsCache.Count(), "members", len(s.memberCache))
-		s.addReposForMembers(ctx)
-		return nil
 	}
 
 	return nil
@@ -693,7 +668,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 			s.log.Info("Scanning repos", "org_members", len(s.memberCache))
 			for member := range s.memberCache {
 				logger := s.log.WithValues("member", member)
-				if err := s.getReposByUser(ctx, member); err != nil {
+				if err := s.addUserGistsToCache(ctx, member); err != nil {
 					logger.Error(err, "error fetching gists by user")
 				}
 				if err := s.getReposByUser(ctx, member); err != nil {
@@ -774,7 +749,12 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 				_, err := s.cloneAndScanRepo(wikiCtx, installationClient, wikiURL, repoInfo, chunksChan)
 				if err != nil {
-					scanErrs.Add(fmt.Errorf("error scanning wiki: %s", wikiURL))
+					// Ignore "Repository not found" errors.
+					// It's common for GitHub's API to say a repo has a wiki when it doesn't.
+					if !strings.Contains(err.Error(), "not found") {
+						scanErrs.Add(fmt.Errorf("error scanning wiki: %w", err))
+					}
+
 					// Don't return, it still might be possible to scan comments.
 				}
 			}
@@ -809,7 +789,7 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, re
 	ctx.Logger().V(2).Info("attempting to clone repo")
 	path, repo, err := s.cloneRepo(ctx, repoURL, client)
 	if err != nil {
-		return duration, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+		return duration, err
 	}
 	defer os.RemoveAll(path)
 
@@ -1097,7 +1077,7 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 		return err
 	}
 
-	if s.includeGistComments && urlParts[0] == "gist.github.com" {
+	if s.includeGistComments && isGistUrl(urlParts) {
 		return s.processGistComments(ctx, urlString, urlParts, repoInfo, chunksChan)
 	} else if s.includeIssueComments || s.includePRComments {
 		return s.processRepoComments(ctx, repoInfo, chunksChan)
@@ -1112,29 +1092,50 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 // - "https://github.com/trufflesecurity/trufflehog" => ["github.com", "trufflesecurity", "trufflehog"]
 // - "https://gist.github.com/nat/5fdbb7f945d121f197fb074578e53948" => ["gist.github.com", "nat", "5fdbb7f945d121f197fb074578e53948"]
 // - "https://gist.github.com/ff0e5e8dc8ec22f7a25ddfc3492d3451.git" => ["gist.github.com", "ff0e5e8dc8ec22f7a25ddfc3492d3451"]
-func getRepoURLParts(repoURL string) (string, []string, error) {
+// - "https://github.company.org/gist/nat/5fdbb7f945d121f197fb074578e53948.git" => ["github.company.org", "gist", "nat", "5fdbb7f945d121f197fb074578e53948"]
+func getRepoURLParts(repoURLString string) (string, []string, error) {
 	// Support ssh and https URLs.
-	url, err := git.GitURLParse(repoURL)
+	repoURL, err := git.GitURLParse(repoURLString)
 	if err != nil {
-		return "", []string{}, err
+		return "", nil, err
 	}
 
 	// Remove the user information.
 	// e.g., `git@github.com` -> `github.com`
-	if url.User != nil {
-		url.User = nil
+	if repoURL.User != nil {
+		repoURL.User = nil
 	}
 
-	urlString := url.String()
-	trimmedURL := strings.TrimPrefix(urlString, url.Scheme+"://")
+	urlString := repoURL.String()
+	trimmedURL := strings.TrimPrefix(urlString, repoURL.Scheme+"://")
 	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
-	splitURL := strings.Split(trimmedURL, "/")
+	urlParts := strings.Split(trimmedURL, "/")
 
-	if len(splitURL) < 2 || len(splitURL) > 3 {
-		return "", []string{}, fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be 2 or 3", urlString)
+	// Validate
+	switch len(urlParts) {
+	case 2:
+		// gist.github.com/<gist_id>
+		if !strings.EqualFold(urlParts[0], "gist.github.com") {
+			err = fmt.Errorf("failed to parse repository or gist URL (%s): 2 path segments are only expected if the host is 'gist.github.com' ('gist.github.com', '<gist_id>')", urlString)
+		}
+	case 3:
+		// github.com/<user>/repo>
+		// gist.github.com/<user>/<gist_id>
+		// github.company.org/<user>/repo>
+		// github.company.org/gist/<gist_id>
+	case 4:
+		// github.company.org/gist/<user/<id>
+		if !strings.EqualFold(urlParts[1], "gist") || (strings.EqualFold(urlParts[0], "github.com") && strings.EqualFold(urlParts[1], "gist")) {
+			err = fmt.Errorf("failed to parse repository or gist URL (%s): 4 path segments are only expected if the host isn't 'github.com' and the path starts with 'gist' ('github.example.com', 'gist', '<owner>', '<gist_id>')", urlString)
+		}
+	default:
+		err = fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be between 2 and 4, not %d (%v)", urlString, len(urlParts), urlParts)
 	}
 
-	return urlString, splitURL, nil
+	if err != nil {
+		return "", nil, err
+	}
+	return urlString, urlParts, nil
 }
 
 const initialPage = 1 // page to start listing from
@@ -1172,6 +1173,10 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 
 func extractGistID(urlParts []string) string {
 	return urlParts[len(urlParts)-1]
+}
+
+func isGistUrl(urlParts []string) bool {
+	return strings.EqualFold(urlParts[0], "gist.github.com") || (len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist"))
 }
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, chunksChan chan *sources.Chunk) error {

@@ -300,8 +300,6 @@ message Postman {
   string variable_type = 15;
 }
 
-
-
 message Vector {
   google.protobuf.Timestamp timestamp = 1;
   string source_type = 2;
@@ -312,6 +310,12 @@ message Webhook {
   oneof data {
     Vector vector = 1;
   }
+}
+
+message Elasticsearch {
+  string index = 1;
+  string document_id = 2;
+  string timestamp = 3;
 }
 
 message MetaData {
@@ -346,5 +350,6 @@ message MetaData {
     TravisCI travisCI = 28;
     Postman postman = 29;
     Webhook webhook = 30;
+    Elasticsearch elasticsearch = 31;
   }
 }

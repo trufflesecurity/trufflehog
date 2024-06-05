@@ -8,10 +8,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -46,7 +47,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Gemini secrets in a given set of bytes.
-func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	idMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -68,7 +69,7 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 			}
 
 			if verify {
-				req, err := constructRequest(resSecretMatch, resMatch)
+				req, err := constructRequest(ctx, resSecretMatch, resMatch)
 				if err != nil {
 					continue
 				}
@@ -88,8 +89,8 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 	return results, nil
 }
 
-func constructRequest(secret, keyID string) (*http.Request, error) {
-	req, err := http.NewRequest("POST", baseURL+accountDetail, &bytes.Buffer{})
+func constructRequest(ctx context.Context, secret, keyID string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", baseURL+accountDetail, &bytes.Buffer{})
 	if err != nil {
 		return nil, err
 	}

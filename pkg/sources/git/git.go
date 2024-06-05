@@ -415,7 +415,12 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		cloneURL.User = params.userInfo
 	}
 
-	gitArgs := []string{"clone", cloneURL.String(), params.clonePath}
+	gitArgs := []string{
+		"clone",
+		cloneURL.String(),
+		params.clonePath,
+		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
+	}
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
@@ -440,15 +445,14 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	}
 
 	if err != nil {
-		err = fmt.Errorf("error executing git clone: %w", err)
+		err = fmt.Errorf("error executing git clone: %w, %s", err, output)
 	}
 	logger.V(3).Info("git subcommand finished", "output", output)
 
 	if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
-	}
-	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "output", output, "error", err)
+	} else if cloneCmd.ProcessState.ExitCode() != 0 {
+		logger.V(1).Info("git clone failed", "error", err)
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
@@ -550,7 +554,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 	gitDir := filepath.Join(path, gitDirName)
 
-	logger.V(1).Info("scanning repo", logValues...)
+	logger.Info("scanning repo", logValues...)
 
 	var depth int64
 	var lastCommitHash string
@@ -790,7 +794,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	if scanOptions.MaxDepth > 0 {
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
-	logger.V(1).Info("scanning repo", logValues...)
+	logger.Info("scanning repo", logValues...)
 
 	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
 

@@ -64,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				timeout := 10 * time.Second
 				client.Timeout = timeout
 				payload := strings.NewReader(`{"source":"abcde","destination":"+6512345678","text":"Hello World!","encoding":"AUTO"}`)
-				req, err := http.NewRequest("POST", fmt.Sprintf("https://sms.8x8.com/api/v1/subaccounts/%s/messages", resIdMatch), payload)
+				req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://sms.8x8.com/api/v1/subaccounts/%s/messages", resIdMatch), payload)
 				if err != nil {
 					continue
 				}

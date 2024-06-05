@@ -78,7 +78,7 @@ type Result struct {
 	verificationError error
 }
 
-// SetVerificationError is the only way to set a verification error. Any sensetive values should be passed-in as secrets to be redacted.
+// SetVerificationError is the only way to set a verification error. Any sensitive values should be passed-in as secrets to be redacted.
 func (r *Result) SetVerificationError(err error, secrets ...string) {
 	if err != nil {
 		r.verificationError = redactSecrets(err, secrets...)

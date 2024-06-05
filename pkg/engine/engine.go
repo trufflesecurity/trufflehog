@@ -799,7 +799,6 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	}
 
 	wgDetect.Wait()
-	ctx.Logger().V(4).Info("finished verificationOverlap chunks")
 }
 
 func (e *Engine) detectChunks(ctx context.Context) {
