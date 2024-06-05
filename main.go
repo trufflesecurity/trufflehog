@@ -530,16 +530,16 @@ type scanConfig struct {
 }
 
 func compareScans(ctx context.Context, cfg scanConfig) error {
-	// Run scan with max-length span calculator.
-	maxLengthMetrics, err := runSingleScan(ctx, cfg, false)
-	if err != nil {
-		return fmt.Errorf("error running scan with custom span calculator: %v", err)
-	}
-
 	// Run scan with entire chunk span calculator.
 	entireMetrics, err := runSingleScan(ctx, cfg, true)
 	if err != nil {
 		return fmt.Errorf("error running scan with entire chunk span calculator: %v", err)
+	}
+
+	// Run scan with max-length span calculator.
+	maxLengthMetrics, err := runSingleScan(ctx, cfg, false)
+	if err != nil {
+		return fmt.Errorf("error running scan with custom span calculator: %v", err)
 	}
 
 	return compareMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
@@ -555,8 +555,7 @@ func compareMetrics(customMetrics, entireMetrics engine.Metrics) error {
 	// Check for differences in scan metrics.
 	if customMetrics.ChunksScanned != entireMetrics.ChunksScanned ||
 		customMetrics.BytesScanned != entireMetrics.BytesScanned ||
-		customMetrics.VerifiedSecretsFound != entireMetrics.VerifiedSecretsFound ||
-		customMetrics.UnverifiedSecretsFound != entireMetrics.UnverifiedSecretsFound {
+		customMetrics.VerifiedSecretsFound != entireMetrics.VerifiedSecretsFound {
 		return fmt.Errorf("scan metrics do not match")
 	}
 

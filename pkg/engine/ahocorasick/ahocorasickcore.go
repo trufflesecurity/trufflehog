@@ -209,7 +209,7 @@ func (d *DetectorMatch) Matches() [][]byte { return d.matches }
 // portions of the chunk data.
 //
 // The matches field contains the actual byte slices of the matched portions from the chunk data.
-func (ac *AhoCorasickCore) FindDetectorMatches(chunkData []byte) []DetectorMatch {
+func (ac *AhoCorasickCore) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
 	matches := ac.prefilter.Match(bytes.ToLower(chunkData))
 
 	matchCount := len(matches)
@@ -237,13 +237,13 @@ func (ac *AhoCorasickCore) FindDetectorMatches(chunkData []byte) []DetectorMatch
 		}
 	}
 
-	uniqueDetectors := make([]DetectorMatch, 0, len(detectorMatches))
+	uniqueDetectors := make([]*DetectorMatch, 0, len(detectorMatches))
 	for _, detectorMatch := range detectorMatches {
 		// Merge overlapping or adjacent match spans.
 		detectorMatch.mergeMatches()
 		detectorMatch.extractMatches(chunkData)
 
-		uniqueDetectors = append(uniqueDetectors, *detectorMatch)
+		uniqueDetectors = append(uniqueDetectors, detectorMatch)
 	}
 
 	return uniqueDetectors

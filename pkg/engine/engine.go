@@ -602,7 +602,7 @@ func (e *Engine) ScanChunk(chunk *sources.Chunk) {
 
 // detectableChunk is a decoded chunk that is ready to be scanned by its detector.
 type detectableChunk struct {
-	detector ahocorasick.DetectorMatch
+	detector *ahocorasick.DetectorMatch
 	chunk    sources.Chunk
 	decoder  detectorspb.DecoderType
 	wgDoneFn func()
@@ -614,7 +614,7 @@ type detectableChunk struct {
 type verificationOverlapChunk struct {
 	chunk                       sources.Chunk
 	decoder                     detectorspb.DecoderType
-	detectors                   []ahocorasick.DetectorMatch
+	detectors                   []*ahocorasick.DetectorMatch
 	verificationOverlapWgDoneFn func()
 }
 
@@ -715,7 +715,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 	// Reuse the same map and slice to avoid allocations.
 	const avgSecretsPerDetector = 8
-	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]ahocorasick.DetectorMatch, avgSecretsPerDetector)
+	detectorKeysWithResults := make(map[ahocorasick.DetectorKey]*ahocorasick.DetectorMatch, avgSecretsPerDetector)
 	chunkSecrets := make(map[chunkSecretKey]struct{}, avgSecretsPerDetector)
 
 	for chunk := range e.verificationOverlapChunksChan {
