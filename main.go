@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -530,17 +531,31 @@ type scanConfig struct {
 }
 
 func compareScans(ctx context.Context, cfg scanConfig) error {
-	// Run scan with entire chunk span calculator.
-	entireMetrics, err := runSingleScan(ctx, cfg, true)
-	if err != nil {
-		return fmt.Errorf("error running scan with entire chunk span calculator: %v", err)
-	}
+	var (
+		entireMetrics    metrics
+		maxLengthMetrics metrics
+		err              error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		// Run scan with entire chunk span calculator.
+		entireMetrics, err = runSingleScan(ctx, cfg, true)
+		if err != nil {
+			ctx.Logger().Error(err, "error running scan with entire chunk span calculator")
+		}
+	}()
 
 	// Run scan with max-length span calculator.
-	maxLengthMetrics, err := runSingleScan(ctx, cfg, false)
+	maxLengthMetrics, err = runSingleScan(ctx, cfg, false)
 	if err != nil {
 		return fmt.Errorf("error running scan with custom span calculator: %v", err)
 	}
+
+	wg.Wait()
 
 	return compareMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
 }
