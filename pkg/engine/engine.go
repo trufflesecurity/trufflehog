@@ -461,7 +461,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 	ctx.Logger().V(4).Info("engine initialized")
 
 	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
-	var ahoCOptions []ahocorasick.AhoCorasickCoreOption
+	var ahoCOptions []ahocorasick.CoreOption
 	if e.scanEntireChunk {
 		ahoCOptions = append(ahoCOptions, ahocorasick.WithSpanCalculator(new(ahocorasick.EntireChunkSpanCalculator)))
 	}
