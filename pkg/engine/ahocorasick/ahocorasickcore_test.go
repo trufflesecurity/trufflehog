@@ -128,7 +128,7 @@ func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
 func TestFindDetectorMatches(t *testing.T) {
 	testCases := []struct {
 		name           string
-		opts           []AhoCorasickCoreOption
+		opts           []CoreOption
 		detectors      []detectors.Detector
 		sampleData     string
 		expectedResult map[DetectorKey][][]int64
@@ -177,7 +177,7 @@ func TestFindDetectorMatches(t *testing.T) {
 		},
 		{
 			name: "single matchSpan; entireSpanChunkCalculator",
-			opts: []AhoCorasickCoreOption{WithSpanCalculator(&EntireChunkSpanCalculator{})},
+			opts: []CoreOption{WithSpanCalculator(&EntireChunkSpanCalculator{})},
 			detectors: []detectors.Detector{
 				testDetectorV3{},
 			},
@@ -188,7 +188,7 @@ func TestFindDetectorMatches(t *testing.T) {
 		},
 		{
 			name: "Multiple matches overlapping; entireSpanChunkCalculator",
-			opts: []AhoCorasickCoreOption{WithSpanCalculator(&EntireChunkSpanCalculator{})},
+			opts: []CoreOption{WithSpanCalculator(&EntireChunkSpanCalculator{})},
 			detectors: []detectors.Detector{
 				testDetectorV1{},
 			},
@@ -199,7 +199,7 @@ func TestFindDetectorMatches(t *testing.T) {
 		},
 		{
 			name: "Multiple matches; entireSpanChunkCalculator",
-			opts: []AhoCorasickCoreOption{WithSpanCalculator(&EntireChunkSpanCalculator{})},
+			opts: []CoreOption{WithSpanCalculator(&EntireChunkSpanCalculator{})},
 			detectors: []detectors.Detector{
 				testDetectorV2{},
 			},
