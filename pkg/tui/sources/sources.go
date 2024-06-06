@@ -12,6 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/gitlab"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/jenkins"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/s3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/sources/syslog"
@@ -26,6 +27,8 @@ func GetSourceNotes(sourceName string) string {
 		return postman.GetNote()
 	case "elasticsearch":
 		return elasticsearch.GetNote()
+	case "jenkins":
+		return jenkins.GetNote()
 
 	default:
 		return ""
@@ -60,6 +63,8 @@ func GetSourceFields(sourceName string) CmdModel {
 		return github.GetFields()
 	case "gitlab":
 		return gitlab.GetFields()
+	case "jenkins":
+		return jenkins.GetFields()
 	case "postman":
 		return postman.GetFields()
 	case "syslog":
