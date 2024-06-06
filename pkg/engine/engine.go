@@ -91,12 +91,13 @@ type Config struct {
 	// also serves as a multiplier for other worker types (e.g., detector workers, notifier workers)
 	Concurrency int
 
-	Decoders            []decoders.Decoder
-	Detectors           []detectors.Detector
-	IncludeDetectors    string
-	ExcludeDetectors    string
-	CustomVerifiersOnly bool
-	VerifierEndpoints   map[string]string
+	Decoders                      []decoders.Decoder
+	Detectors                     []detectors.Detector
+	DetectorVerificationOverrides map[config.DetectorID]bool
+	IncludeDetectors              string
+	ExcludeDetectors              string
+	CustomVerifiersOnly           bool
+	VerifierEndpoints             map[string]string
 
 	// Verify determines whether the scanner will verify candidate secrets.
 	Verify bool
@@ -142,6 +143,9 @@ type Engine struct {
 	concurrency int
 	decoders    []decoders.Decoder
 	detectors   []detectors.Detector
+	// Any detectors configured to override sources' verification flags
+	detectorVerificationOverrides map[config.DetectorID]bool
+
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
@@ -721,6 +725,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgVerificationOverlap sync.WaitGroup
 
 	for chunk := range e.ChunksChan() {
+		sourceVerify := chunk.Verify
 		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 		for _, decoder := range e.decoders {
 			decoded := decoder.FromChunk(chunk)
@@ -742,7 +747,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			}
 
 			for _, detector := range matchingDetectors {
-				decoded.Chunk.Verify = e.verify
+				decoded.Chunk.Verify = shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
 				wgDetect.Add(1)
 				e.detectableChunksChan <- detectableChunk{
 					chunk:    *decoded.Chunk,
@@ -760,6 +765,36 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	wgVerificationOverlap.Wait()
 	wgDetect.Wait()
 	ctx.Logger().V(4).Info("finished scanning chunks")
+}
+
+func shouldVerifyChunk(
+	sourceVerify bool,
+	detector detectors.Detector,
+	detectorVerificationOverrides map[config.DetectorID]bool,
+) bool {
+	detectorId := config.DetectorID{ID: detector.Type(), Version: 0}
+
+	if v, ok := detector.(detectors.Versioner); ok {
+		detectorId.Version = v.Version()
+	}
+
+	if detectorVerify, ok := detectorVerificationOverrides[detectorId]; ok {
+		return detectorVerify
+	}
+
+	// If the user is running with a detector verification override that does not specify a particular detector version,
+	// then its override map entry will have version 0. We should check for that too, but if the detector being checked
+	// doesn't have any version information then its version is 0, so we've already done the check, and we don't need to
+	// do it a second time.
+	if detectorId.Version != 0 {
+		detectorId.Version = 0
+
+		if detectorVerify, ok := detectorVerificationOverrides[detectorId]; ok {
+			return detectorVerify
+		}
+	}
+
+	return sourceVerify
 }
 
 // chunkSecretKey ties secrets to the specific detector that found them. This allows identifying identical
@@ -876,7 +911,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 		for _, detector := range detectorKeysWithResults {
 			wgDetect.Add(1)
-			chunk.chunk.Verify = e.verify
+			chunk.chunk.Verify = shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
 			e.detectableChunksChan <- detectableChunk{
 				chunk:    chunk.chunk,
 				detector: detector,
