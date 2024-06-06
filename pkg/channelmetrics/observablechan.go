@@ -52,20 +52,30 @@ func (oc *ObservableChan[T]) Close() {
 
 // Send sends an item into the channel and records the duration taken to do so.
 // It also updates the current size of the channel buffer.
-func (oc *ObservableChan[T]) Send(ctx context.Context, item T) {
-	startTime := time.Now()
-	defer func() {
-		oc.metrics.RecordProduceDuration(time.Since(startTime))
+func (oc *ObservableChan[T]) Send(item T) { _ = oc.SendCtx(context.Background(), item) }
+
+// SendCtx sends an item into the channel with context and records the duration taken to do so.
+// It also updates the current size of the channel buffer and supports context cancellation.
+func (oc *ObservableChan[T]) SendCtx(ctx context.Context, item T) error {
+	defer func(start time.Time) {
+		oc.metrics.RecordProduceDuration(time.Since(start))
 		oc.RecordChannelLen()
-	}()
-	if err := common.CancellableWrite(ctx, oc.ch, item); err != nil {
-		ctx.Logger().Error(err, "failed to write item to observable channel")
-	}
+	}(time.Now())
+
+	return common.CancellableWrite(ctx, oc.ch, item)
 }
 
 // Recv receives an item from the channel and records the duration taken to do so.
 // It also updates the current size of the channel buffer.
-func (oc *ObservableChan[T]) Recv(ctx context.Context) T {
+func (oc *ObservableChan[T]) Recv() T {
+	v, _ := oc.RecvCtx(context.Background())
+	return v
+}
+
+// RecvCtx receives an item from the channel with context and records the duration taken to do so.
+// It also updates the current size of the channel buffer and supports context cancellation.
+// If an error occurs, it logs the error.
+func (oc *ObservableChan[T]) RecvCtx(ctx context.Context) (T, error) {
 	defer func(start time.Time) {
 		oc.metrics.RecordConsumeDuration(time.Since(start))
 		oc.RecordChannelLen()
@@ -76,7 +86,7 @@ func (oc *ObservableChan[T]) Recv(ctx context.Context) T {
 		ctx.Logger().Error(err, "failed to read item from observable channel")
 	}
 
-	return item
+	return item, nil
 }
 
 // RecordChannelCapacity records the capacity of the channel buffer.
