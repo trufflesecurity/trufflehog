@@ -83,12 +83,7 @@ func (oc *ObservableChan[T]) RecvCtx(ctx context.Context) (T, error) {
 		oc.RecordChannelLen()
 	}(time.Now())
 
-	item, err := common.CancellableRecv(ctx, oc.ch)
-	if err != nil {
-		ctx.Logger().Error(err, "failed to read item from observable channel")
-	}
-
-	return item, nil
+	return common.CancellableRecv(ctx, oc.ch)
 }
 
 // RecordChannelCapacity records the capacity of the channel buffer.
