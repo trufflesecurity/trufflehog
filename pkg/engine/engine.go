@@ -83,7 +83,7 @@ type Engine struct {
 	scanEntireChunk bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
-	ahoCorasickCore *ahocorasick.AhoCorasickCore
+	ahoCorasickCore *ahocorasick.Core
 
 	// Engine synchronization primitives.
 	sourceManager                 *sources.SourceManager
@@ -408,7 +408,7 @@ func (e *Engine) initialize(ctx context.Context, options ...Option) error {
 	ctx.Logger().V(4).Info("engine initialized")
 
 	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
-	var ahoCOptions []ahocorasick.AhoCorasickCoreOption
+	var ahoCOptions []ahocorasick.CoreOption
 	if e.scanEntireChunk {
 		ahoCOptions = append(ahoCOptions, ahocorasick.WithSpanCalculator(new(ahocorasick.EntireChunkSpanCalculator)))
 	}
