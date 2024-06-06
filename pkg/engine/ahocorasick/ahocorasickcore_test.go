@@ -128,6 +128,7 @@ func TestAhoCorasickCore_NoDuplicateDetectorsMatched(t *testing.T) {
 func TestFindDetectorMatches(t *testing.T) {
 	testCases := []struct {
 		name           string
+		opts           []CoreOption
 		detectors      []detectors.Detector
 		sampleData     string
 		expectedResult map[DetectorKey][][]int64
@@ -175,6 +176,50 @@ func TestFindDetectorMatches(t *testing.T) {
 			},
 		},
 		{
+			name: "single matchSpan; entireSpanChunkCalculator",
+			opts: []CoreOption{WithSpanCalculator(&EntireChunkSpanCalculator{})},
+			detectors: []detectors.Detector{
+				testDetectorV3{},
+			},
+			sampleData: "This is a sample data containing keyword truffle",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV3{}): {{0, 48}},
+			},
+		},
+		{
+			name: "Multiple matches overlapping; entireSpanChunkCalculator",
+			opts: []CoreOption{WithSpanCalculator(&EntireChunkSpanCalculator{})},
+			detectors: []detectors.Detector{
+				testDetectorV1{},
+			},
+			sampleData: "This is a sample data containing keyword a",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV1{}): {{0, 42}},
+			},
+		},
+		{
+			name: "Multiple matches; entireSpanChunkCalculator",
+			opts: []CoreOption{WithSpanCalculator(&EntireChunkSpanCalculator{})},
+			detectors: []detectors.Detector{
+				testDetectorV2{},
+			},
+			sampleData: `This is the first occurrence of the letter a.
+                 Lorem ipsum dolor sit met, consectetur dipiscing elit. Sed uctor,
+                 mgn bibendum bibendum, ugue ugue tincidunt ugue,
+                 eget ultricies ugue ugue id ugue. Meens liquet libero
+                 c libero molestie, nec mlesud ugue ugue eget. Donec
+                 sed ugue. Sed euismod, ugue sit met liqum lcini,
+                 ugue ugue tincidunt ugue, eget ultricies ugue ugue id
+                 ugue. Meens liquet libero c libero molestie, nec
+                 mlesud ugue ugue eget. Donec sed ugue. Sed euismod,
+                 ugue sit met liqum lcini, ugue ugue tincidunt ugue,
+                 eget ultricies ugue ugue id ugue. Meens liquet libero
+                 c libero molestie, nec mlesud ugue ugue eget. This is the second occurrence of the letter a.`,
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV2{}): {{0, 856}},
+			},
+		},
+		{
 			name: "No matches",
 			detectors: []detectors.Detector{
 				testDetectorV1{},
@@ -190,7 +235,7 @@ func TestFindDetectorMatches(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ac := NewAhoCorasickCore(tc.detectors)
+			ac := NewAhoCorasickCore(tc.detectors, tc.opts...)
 			detectorMatches := ac.FindDetectorMatches([]byte(tc.sampleData))
 
 			// Verify that all matching detectors and their matches are returned.

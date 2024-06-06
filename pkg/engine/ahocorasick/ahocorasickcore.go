@@ -30,21 +30,25 @@ func (k DetectorKey) Type() detectorspb.DetectorType { return k.detectorType }
 // spanCalculator is an interface that defines a method for calculating a match span
 // in the chunk data. This allows for different strategies to be used without changing the core logic.
 type spanCalculator interface {
-	calculateSpan(startIdx int64, chunkData []byte, detector detectors.Detector) matchSpan
+	calculateSpan(params spanCalculationParams) matchSpan
+}
+
+// spanCalculationParams provides the necessary context for calculating match spans,
+// including the starting index in the chunk, the chunk data itself, and the detector being used.
+type spanCalculationParams struct {
+	startIdx  int64
+	chunkData []byte
+	detector  detectors.Detector
 }
 
 // EntireChunkSpanCalculator is a strategy that calculates the match span to use the entire chunk data.
 // This is used when we want to match against the full length of the provided chunk.
 type EntireChunkSpanCalculator struct{}
 
-// calculateSpans returns the match span as the length of the chunk data,
+// calculateSpan returns the match span as the length of the chunk data,
 // effectively using the entire chunk for matching.
-func (e *EntireChunkSpanCalculator) calculateSpan(
-	startIdx int64,
-	chunkData []byte,
-	_ detectors.Detector,
-) matchSpan {
-	return matchSpan{startOffset: startIdx, endOffset: int64(len(chunkData))}
+func (e *EntireChunkSpanCalculator) calculateSpan(params spanCalculationParams) matchSpan {
+	return matchSpan{startOffset: 0, endOffset: int64(len(params.chunkData))}
 }
 
 // maxMatchLengthSpanCalculator is a strategy that calculates match spans based on a default max
@@ -59,26 +63,22 @@ func newMaxMatchLengthSpanCalculator(maxMatchLength int64) *maxMatchLengthSpanCa
 
 // calculateSpans computes the match spans based on the start index and the max match length.
 // If the detector provides an override value, it uses that instead of the default max match length.
-func (m *maxMatchLengthSpanCalculator) calculateSpan(
-	startIdx int64,
-	chunkData []byte,
-	detector detectors.Detector,
-) matchSpan {
+func (m *maxMatchLengthSpanCalculator) calculateSpan(params spanCalculationParams) matchSpan {
 	maxSize := m.maxMatchLength
 
-	switch d := detector.(type) {
+	switch d := params.detector.(type) {
 	case detectors.MultiPartCredentialProvider:
 		maxSize = d.MaxCredentialSpan()
 	case detectors.MaxSecretSizeProvider:
 		maxSize = d.MaxSecretSize()
 	default: // Use the default max match length
 	}
-	endIdx := startIdx + maxSize
-	if endIdx > int64(len(chunkData)) {
-		endIdx = int64(len(chunkData))
+	endIdx := params.startIdx + maxSize
+	if endIdx > int64(len(params.chunkData)) {
+		endIdx = int64(len(params.chunkData))
 	}
 
-	return matchSpan{startOffset: startIdx, endOffset: endIdx}
+	return matchSpan{startOffset: params.startIdx, endOffset: endIdx}
 }
 
 // CoreOption is a functional option type for configuring an AhoCorasickCore instance.
@@ -232,7 +232,13 @@ func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
 
 			detectorMatch := detectorMatches[k]
 			startIdx := m.Pos()
-			span := ac.spanCalculator.calculateSpan(startIdx, chunkData, detectorMatch.Detector)
+			span := ac.spanCalculator.calculateSpan(
+				spanCalculationParams{
+					startIdx:  startIdx,
+					chunkData: chunkData,
+					detector:  detectorMatch.Detector,
+				},
+			)
 			detectorMatch.addMatchSpan(span)
 		}
 	}
