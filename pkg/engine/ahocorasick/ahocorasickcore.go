@@ -81,18 +81,18 @@ func (m *maxMatchLengthSpanCalculator) calculateSpan(
 	return matchSpan{startOffset: startIdx, endOffset: endIdx}
 }
 
-// AhoCorasickCoreOption is a functional option type for configuring an AhoCorasickCore instance.
-type AhoCorasickCoreOption func(*AhoCorasickCore)
+// CoreOption is a functional option type for configuring an AhoCorasickCore instance.
+type CoreOption func(*Core)
 
 // WithSpanCalculator sets the span calculator for AhoCorasickCore.
-func WithSpanCalculator(spanCalculator spanCalculator) AhoCorasickCoreOption {
-	return func(ac *AhoCorasickCore) { ac.spanCalculator = spanCalculator }
+func WithSpanCalculator(spanCalculator spanCalculator) CoreOption {
+	return func(ac *Core) { ac.spanCalculator = spanCalculator }
 }
 
-// AhoCorasickCore encapsulates the operations and data structures used for keyword matching via the
+// Core encapsulates the operations and data structures used for keyword matching via the
 // Aho-Corasick algorithm. It is responsible for constructing and managing the trie for efficient
 // substring searches, as well as mapping keywords to their associated detectors for rapid lookups.
-type AhoCorasickCore struct {
+type Core struct {
 	// prefilter is a ahocorasick struct used for doing efficient string
 	// matching given a set of words. (keywords from the rules in the config)
 	prefilter ahocorasick.Trie
@@ -109,7 +109,7 @@ type AhoCorasickCore struct {
 // NewAhoCorasickCore allocates and initializes a new instance of AhoCorasickCore. It uses the
 // provided detector slice to create a map from keywords to detectors and build the Aho-Corasick
 // prefilter trie.
-func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...AhoCorasickCoreOption) *AhoCorasickCore {
+func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...CoreOption) *Core {
 	keywordsToDetectors := make(map[string][]DetectorKey)
 	detectorsByKey := make(map[DetectorKey]detectors.Detector, len(allDetectors))
 	var keywords []string
@@ -124,7 +124,7 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...AhoCorasickCo
 	}
 
 	const maxMatchLength int64 = 512
-	ac := &AhoCorasickCore{
+	ac := &Core{
 		keywordsToDetectors: keywordsToDetectors,
 		detectorsByKey:      detectorsByKey,
 		prefilter:           *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
@@ -209,7 +209,7 @@ func (d *DetectorMatch) Matches() [][]byte { return d.matches }
 // portions of the chunk data.
 //
 // The matches field contains the actual byte slices of the matched portions from the chunk data.
-func (ac *AhoCorasickCore) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
+func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
 	matches := ac.prefilter.Match(bytes.ToLower(chunkData))
 
 	matchCount := len(matches)
@@ -264,6 +264,6 @@ func CreateDetectorKey(d detectors.Detector) DetectorKey {
 	return DetectorKey{detectorType: detectorType, version: version, customDetectorName: customDetectorName}
 }
 
-func (ac *AhoCorasickCore) KeywordsToDetectors() map[string][]DetectorKey {
+func (ac *Core) KeywordsToDetectors() map[string][]DetectorKey {
 	return ac.keywordsToDetectors
 }

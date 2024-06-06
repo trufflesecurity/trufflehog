@@ -159,7 +159,7 @@ type Engine struct {
 	scanEntireChunk bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
-	ahoCorasickCore *ahocorasick.AhoCorasickCore
+	ahoCorasickCore *ahocorasick.Core
 
 	// Engine synchronization primitives.
 	sourceManager                 *sources.SourceManager
@@ -924,6 +924,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results, err := data.detector.FromData(ctx, data.chunk.Verify, match)
 		if err != nil {
 			ctx.Logger().Error(err, "error scanning chunk")
+			continue
 		}
 
 		if e.printAvgDetectorTime && len(results) > 0 {
