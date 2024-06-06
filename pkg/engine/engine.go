@@ -197,18 +197,19 @@ type Engine struct {
 // NewEngine creates a new Engine instance with the provided configuration.
 func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 	engine := &Engine{
-		concurrency:           cfg.Concurrency,
-		decoders:              cfg.Decoders,
-		detectors:             cfg.Detectors,
-		dispatcher:            cfg.Dispatcher,
-		verify:                cfg.Verify,
-		filterUnverified:      cfg.FilterUnverified,
-		filterEntropy:         cfg.FilterEntropy,
-		printAvgDetectorTime:  cfg.PrintAvgDetectorTime,
-		logFilteredUnverified: cfg.LogFilteredUnverified,
-		verificationOverlap:   cfg.VerificationOverlap,
-		sourceManager:         cfg.SourceManager,
-		scanEntireChunk:       cfg.ShouldScanEntireChunk,
+		concurrency:                   cfg.Concurrency,
+		decoders:                      cfg.Decoders,
+		detectors:                     cfg.Detectors,
+		dispatcher:                    cfg.Dispatcher,
+		verify:                        cfg.Verify,
+		filterUnverified:              cfg.FilterUnverified,
+		filterEntropy:                 cfg.FilterEntropy,
+		printAvgDetectorTime:          cfg.PrintAvgDetectorTime,
+		logFilteredUnverified:         cfg.LogFilteredUnverified,
+		verificationOverlap:           cfg.VerificationOverlap,
+		sourceManager:                 cfg.SourceManager,
+		scanEntireChunk:               cfg.ShouldScanEntireChunk,
+		detectorVerificationOverrides: cfg.DetectorVerificationOverrides,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
@@ -747,7 +748,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			}
 
 			for _, detector := range matchingDetectors {
-				decoded.Chunk.Verify = shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
+				decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
 				wgDetect.Add(1)
 				e.detectableChunksChan <- detectableChunk{
 					chunk:    *decoded.Chunk,
@@ -767,11 +768,16 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
-func shouldVerifyChunk(
+func (e *Engine) shouldVerifyChunk(
 	sourceVerify bool,
 	detector detectors.Detector,
 	detectorVerificationOverrides map[config.DetectorID]bool,
 ) bool {
+	// The verify flag takes precedence over the detector's verification flag.
+	if !e.verify {
+		return false
+	}
+
 	detectorId := config.DetectorID{ID: detector.Type(), Version: 0}
 
 	if v, ok := detector.(detectors.Versioner); ok {
@@ -911,7 +917,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 		for _, detector := range detectorKeysWithResults {
 			wgDetect.Add(1)
-			chunk.chunk.Verify = shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
+			chunk.chunk.Verify = e.shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
 			e.detectableChunksChan <- detectableChunk{
 				chunk:    chunk.chunk,
 				detector: detector,
