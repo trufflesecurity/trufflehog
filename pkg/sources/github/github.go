@@ -57,7 +57,7 @@ type Source struct {
 	sourceID          sources.SourceID
 	jobID             sources.JobID
 	verify            bool
-	orgsCache         cache.Cache
+	orgsCache         cache.Cache[string]
 	memberCache       map[string]struct{}
 	repos             []string
 	filteredRepoCache *filteredRepoCache
@@ -123,11 +123,11 @@ func (s *Source) JobID() sources.JobID {
 // filteredRepoCache is a wrapper around cache.Cache that filters out repos
 // based on include and exclude globs.
 type filteredRepoCache struct {
-	cache.Cache
+	cache.Cache[string]
 	include, exclude []glob.Glob
 }
 
-func (s *Source) newFilteredRepoCache(c cache.Cache, include, exclude []string) *filteredRepoCache {
+func (s *Source) newFilteredRepoCache(c cache.Cache[string], include, exclude []string) *filteredRepoCache {
 	includeGlobs := make([]glob.Glob, 0, len(include))
 	excludeGlobs := make([]glob.Glob, 0, len(exclude))
 	for _, ig := range include {
@@ -209,13 +209,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	s.orgsCache = memory.New()
+	s.orgsCache = memory.New[string]()
 	for _, org := range s.conn.Organizations {
 		s.orgsCache.Set(org, org)
 	}
 	s.memberCache = make(map[string]struct{})
 
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(),
+	s.filteredRepoCache = s.newFilteredRepoCache(memory.New[string](),
 		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
 	)
@@ -409,19 +409,13 @@ RepoLoop:
 	for _, repo := range s.filteredRepoCache.Values() {
 		repoCtx := context.WithValue(ctx, "repo", repo)
 
-		r, ok := repo.(string)
-		if !ok {
-			repoCtx.Logger().Error(fmt.Errorf("type assertion failed"), "Unexpected value in cache")
-			continue
-		}
-
 		// Ensure that |s.repoInfoCache| contains an entry for |repo|.
 		// This compensates for differences in enumeration logic between `--org` and `--repo`.
 		// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
-		if _, ok := s.repoInfoCache.get(r); !ok {
+		if _, ok := s.repoInfoCache.get(repo); !ok {
 			repoCtx.Logger().V(2).Info("Caching repository info")
 
-			_, urlParts, err := getRepoURLParts(r)
+			_, urlParts, err := getRepoURLParts(repo)
 			if err != nil {
 				repoCtx.Logger().Error(err, "Failed to parse repository URL")
 				continue
@@ -434,7 +428,7 @@ RepoLoop:
 					gist, _, err := s.apiClient.Gists.Get(repoCtx, gistID)
 					// Normalize the URL to the Gist's pull URL.
 					// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
-					r = gist.GetGitPullURL()
+					repo = gist.GetGitPullURL()
 					if s.handleRateLimit(err) {
 						continue
 					}
@@ -461,7 +455,7 @@ RepoLoop:
 				}
 			}
 		}
-		s.repos = append(s.repos, r)
+		s.repos = append(s.repos, repo)
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
