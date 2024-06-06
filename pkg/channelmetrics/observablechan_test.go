@@ -118,3 +118,22 @@ func TestObservableChan_Close(t *testing.T) {
 
 	mockMetrics.AssertExpectations(t)
 }
+
+func TestObservableChanClosed(t *testing.T) {
+	t.Parallel()
+
+	ch := make(chan int)
+	close(ch)
+	oc := NewObservableChan(ch, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// Closed channel should return with an error.
+	v, err := oc.RecvCtx(ctx)
+	assert.Error(t, err)
+	assert.Equal(t, 0, v)
+
+	// Cancelled context should also return with an error.
+	cancel()
+	_, err = oc.RecvCtx(ctx)
+	assert.Error(t, err)
+}
