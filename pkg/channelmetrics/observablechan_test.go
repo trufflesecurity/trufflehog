@@ -34,7 +34,8 @@ func TestObservableChanSend(t *testing.T) {
 	oc := NewObservableChan(ch, mockMetrics)
 	assert.Equal(t, bufferCap, cap(oc.ch))
 
-	oc.SendCtx(context.Background(), 1)
+	err := oc.SendCtx(context.Background(), 1)
+	assert.NoError(t, err)
 
 	mockMetrics.AssertExpectations(t)
 }
@@ -55,12 +56,14 @@ func TestObservableChanRecv(t *testing.T) {
 	assert.Equal(t, bufferCap, cap(oc.ch))
 
 	go func() {
-		oc.SendCtx(context.Background(), 1)
+		err := oc.SendCtx(context.Background(), 1)
+		assert.NoError(t, err)
 	}()
 
 	time.Sleep(100 * time.Millisecond) // Ensure Send happens before Recv
 
-	oc.RecvCtx(context.Background())
+	_, err := oc.RecvCtx(context.Background())
+	assert.NoError(t, err)
 
 	mockMetrics.AssertExpectations(t)
 }
