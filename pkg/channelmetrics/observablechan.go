@@ -52,6 +52,7 @@ func (oc *ObservableChan[T]) Close() {
 
 // Send sends an item into the channel and records the duration taken to do so.
 // It also updates the current size of the channel buffer.
+// This method blocks until the item is sent.
 func (oc *ObservableChan[T]) Send(item T) { _ = oc.SendCtx(context.Background(), item) }
 
 // SendCtx sends an item into the channel with context and records the duration taken to do so.
@@ -67,6 +68,7 @@ func (oc *ObservableChan[T]) SendCtx(ctx context.Context, item T) error {
 
 // Recv receives an item from the channel and records the duration taken to do so.
 // It also updates the current size of the channel buffer.
+// This method blocks until an item is available.
 func (oc *ObservableChan[T]) Recv() T {
 	v, _ := oc.RecvCtx(context.Background())
 	return v
