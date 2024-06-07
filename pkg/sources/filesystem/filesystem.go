@@ -109,7 +109,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 
 		if err != nil && !errors.Is(err, io.EOF) {
-			logger.Info("error scanning filesystem", "error", err)
+			if !errors.Is(err, skipSymlinkErr) {
+				logger.Error(err, "error scanning filesystem")
+			}
 		}
 	}
 
@@ -148,6 +150,8 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 	})
 }
 
+var skipSymlinkErr = errors.New("skipping symlink")
+
 func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	logger := ctx.Logger().WithValues("path", path)
 	fileStat, err := os.Lstat(path)
@@ -155,7 +159,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		return fmt.Errorf("unable to stat file: %w", err)
 	}
 	if fileStat.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("skipping symlink")
+		return skipSymlinkErr
 	}
 
 	inputFile, err := os.Open(path)
@@ -259,8 +263,10 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 	}
 
-	if scanErr != nil && scanErr != io.EOF {
-		logger.Info("error scanning filesystem", "error", scanErr)
+	if scanErr != nil && !errors.Is(scanErr, io.EOF) {
+		if !errors.Is(scanErr, skipSymlinkErr) {
+			logger.Error(scanErr, "error scanning filesystem")
+		}
 		return reporter.ChunkErr(ctx, scanErr)
 	}
 	return nil
