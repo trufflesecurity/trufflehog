@@ -33,13 +33,17 @@ type ObservableChan[T any] struct {
 // distinguish between metrics for different channels by incorporating it into
 // the metric names.
 func NewObservableChan[T any](ch chan T, metrics MetricsCollector) *ObservableChan[T] {
+	if metrics == nil {
+		metrics = noopCollector{}
+	}
 	oChan := &ObservableChan[T]{
 		ch:      ch,
 		metrics: metrics,
 	}
 	oChan.RecordChannelCapacity()
 	// Record the current length of the channel.
-	// Note: The channel is likely empty, but it may contain items if it was pre-existing.
+	// Note: The channel is likely empty, but it may contain items if it
+	// was pre-existing.
 	oChan.RecordChannelLen()
 	return oChan
 }
@@ -51,12 +55,13 @@ func (oc *ObservableChan[T]) Close() {
 }
 
 // Send sends an item into the channel and records the duration taken to do so.
-// It also updates the current size of the channel buffer.
-// This method blocks until the item is sent.
+// It also updates the current size of the channel buffer. This method blocks
+// until the item is sent.
 func (oc *ObservableChan[T]) Send(item T) { _ = oc.SendCtx(context.Background(), item) }
 
-// SendCtx sends an item into the channel with context and records the duration taken to do so.
-// It also updates the current size of the channel buffer and supports context cancellation.
+// SendCtx sends an item into the channel with context and records the duration
+// taken to do so. It also updates the current size of the channel buffer and
+// supports context cancellation.
 func (oc *ObservableChan[T]) SendCtx(ctx context.Context, item T) error {
 	defer func(start time.Time) {
 		oc.metrics.RecordProduceDuration(time.Since(start))
@@ -66,24 +71,25 @@ func (oc *ObservableChan[T]) SendCtx(ctx context.Context, item T) error {
 	return common.CancellableWrite(ctx, oc.ch, item)
 }
 
-// Recv receives an item from the channel and records the duration taken to do so.
-// It also updates the current size of the channel buffer.
-// This method blocks until an item is available.
+// Recv receives an item from the channel and records the duration taken to do
+// so. It also updates the current size of the channel buffer. This method
+// blocks until an item is available.
 func (oc *ObservableChan[T]) Recv() T {
 	v, _ := oc.RecvCtx(context.Background())
 	return v
 }
 
-// RecvCtx receives an item from the channel with context and records the duration taken to do so.
-// It also updates the current size of the channel buffer and supports context cancellation.
-// If an error occurs, it logs the error.
+// RecvCtx receives an item from the channel with context and records the
+// duration taken to do so. It also updates the current size of the channel
+// buffer and supports context cancellation. If an error occurs, it logs the
+// error.
 func (oc *ObservableChan[T]) RecvCtx(ctx context.Context) (T, error) {
 	defer func(start time.Time) {
 		oc.metrics.RecordConsumeDuration(time.Since(start))
 		oc.RecordChannelLen()
 	}(time.Now())
 
-	return common.CancellableRecv(ctx, oc.ch)
+	return common.CancellableRead(ctx, oc.ch)
 }
 
 // RecordChannelCapacity records the capacity of the channel buffer.
