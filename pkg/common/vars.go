@@ -12,6 +12,7 @@ var (
 		"apng": {},
 		"avif": {},
 		"bmp":  {},
+		"dia":  {}, // Open-source Visio clone
 		"gif":  {},
 		"icns": {}, // Apple icon image file
 		"ico":  {}, // Icon file
