@@ -115,6 +115,8 @@ func unwrapToLast(err error) error {
 }
 
 type ResultWithMetadata struct {
+	// IsWordlistFalsePositive indicates whether this secret was flagged as a false positive based on a wordlist check
+	IsWordlistFalsePositive bool
 	// SourceMetadata contains source-specific contextual information.
 	SourceMetadata *source_metadatapb.MetaData
 	// SourceID is the ID of the source that the API uses to map secrets to specific sources.

@@ -859,6 +859,8 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 	for chunk := range e.verificationOverlapChunksChan {
 		for _, detector := range chunk.detectors {
+			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
+
 			// DO NOT VERIFY at this stage of the pipeline.
 			matchedBytes := detector.Matches()
 			for _, match := range matchedBytes {
@@ -898,12 +900,17 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 							e.verificationOverlapTracker.increment()
 						}
 						res.SetVerificationError(errOverlap)
-						e.processResult(ctx, detectableChunk{
-							chunk:    chunk.chunk,
-							detector: detector,
-							decoder:  chunk.decoder,
-							wgDoneFn: wgDetect.Done,
-						}, res)
+						e.processResult(
+							ctx,
+							detectableChunk{
+								chunk:    chunk.chunk,
+								detector: detector,
+								decoder:  chunk.decoder,
+								wgDoneFn: wgDetect.Done,
+							},
+							res,
+							isFalsePositive,
+						)
 
 						// Remove the detector key from the list of detector keys with results.
 						// This is to ensure that the chunk is not reprocessed with verification enabled
@@ -955,6 +962,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	defer common.Recover(ctx)
 	defer cancel()
 
+	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
+
 	// To reduce the overhead of regex calls in the detector,
 	// we limit the amount of data passed to each detector.
 	// The matches field of the DetectorMatch struct contains the
@@ -994,13 +1003,18 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		}
 
 		for _, res := range results {
-			e.processResult(ctx, data, res)
+			e.processResult(ctx, data, res, isFalsePositive)
 		}
 	}
 	data.wgDoneFn()
 }
 
-func (e *Engine) processResult(ctx context.Context, data detectableChunk, res detectors.Result) {
+func (e *Engine) processResult(
+	ctx context.Context,
+	data detectableChunk,
+	res detectors.Result,
+	isFalsePositive func(detectors.Result) bool,
+) {
 	ignoreLinePresent := false
 	if SupportsLineNumbers(data.chunk.SourceType) {
 		copyChunk := data.chunk
@@ -1022,6 +1036,11 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 
 	secret := detectors.CopyMetadata(&data.chunk, res)
 	secret.DecoderType = data.decoder
+
+	if !res.Verified && res.Raw != nil {
+		secret.IsWordlistFalsePositive = isFalsePositive(res)
+	}
+
 	e.results <- secret
 }
 
