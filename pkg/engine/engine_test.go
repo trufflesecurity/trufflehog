@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
@@ -775,4 +776,61 @@ func generateRandomDataWithKeywords(size int, detectors []detectors.Detector) st
 	}
 
 	return string(data)
+}
+
+func TestEngine_ShouldVerifyChunk(t *testing.T) {
+	tests := []struct {
+		name        string
+		detector    detectors.Detector
+		overrideKey config.DetectorID
+		want        func(sourceVerify, detectorVerify bool) bool
+	}{
+		{
+			name:        "detector override by exact version",
+			detector:    &gitlab.Scanner{},
+			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 2},
+			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
+		},
+		{
+			name:        "detector override by versionless config",
+			detector:    &gitlab.Scanner{},
+			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 0},
+			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
+		},
+		{
+			name:        "no detector override because of detector type mismatch",
+			detector:    &gitlab.Scanner{},
+			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_NpmToken, Version: 2},
+			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
+		},
+		{
+			name:        "no detector override because of detector version mismatch",
+			detector:    &gitlab.Scanner{},
+			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 1},
+			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
+		},
+	}
+
+	booleanChoices := [2]bool{true, false}
+
+	engine := &Engine{verify: true}
+
+	for _, tt := range tests {
+		for _, sourceVerify := range booleanChoices {
+			for _, detectorVerify := range booleanChoices {
+
+				t.Run(fmt.Sprintf("%s (source verify = %v, detector verify = %v)", tt.name, sourceVerify, detectorVerify), func(t *testing.T) {
+					overrides := map[config.DetectorID]bool{
+						tt.overrideKey: detectorVerify,
+					}
+
+					want := tt.want(sourceVerify, detectorVerify)
+
+					got := engine.shouldVerifyChunk(sourceVerify, tt.detector, overrides)
+
+					assert.Equal(t, want, got)
+				})
+			}
+		}
+	}
 }
