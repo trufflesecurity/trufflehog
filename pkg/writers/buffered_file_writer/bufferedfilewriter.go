@@ -205,7 +205,6 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 				}
 				return 0, err
 			}
-			w.buf.Reset()
 		}
 	}
 
@@ -214,7 +213,6 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 		if _, err := w.buf.WriteTo(w.file); err != nil {
 			return 0, fmt.Errorf("error flushing buffer to file: %w", err)
 		}
-		w.buf.Reset()
 	}
 
 	n, err := w.file.Write(data)
