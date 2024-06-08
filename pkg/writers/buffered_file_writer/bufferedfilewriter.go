@@ -285,7 +285,6 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 			return err
 		}
 	}
-
 	return w.file.Close()
 }
 
@@ -312,7 +311,6 @@ func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		return newAutoDeletingFileReader(file), nil
 	}
 
