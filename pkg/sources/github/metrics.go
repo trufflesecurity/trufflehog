@@ -47,4 +47,25 @@ var (
 		Help:      "Total number of GitHub organizations enumerated.",
 	},
 		[]string{"source_name"})
+
+	githubDanglingCommitsEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "github_dangling_commits_enumerated",
+		Help:      "Total number of GitHub dangling commits enumerated.",
+	}, []string{"repo_name"})
+
+	githubDanglingCommitsClonedOk = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "github_dangling_commits_cloned_ok",
+		Help:      "Total number of GitHub dangling commits successfully retrieved.",
+	}, []string{"repo_name"})
+
+	githubDanglingCommitsClonedErr = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "github_dangling_commits_cloned_err",
+		Help:      "Total number of GitHub dangling commits unsuccessfully retrieved.",
+	}, []string{"repo_name"})
 )

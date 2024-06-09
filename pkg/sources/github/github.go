@@ -14,6 +14,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/shurcooL/githubv4"
 	"golang.org/x/exp/rand"
 	"golang.org/x/oauth2"
 
@@ -77,10 +80,12 @@ type Source struct {
 	resumeInfoMutex sync.Mutex
 	resumeInfoSlice []string
 	apiClient       *github.Client
+	graphqlClient   *githubv4.Client
 
-	includePRComments    bool
-	includeIssueComments bool
-	includeGistComments  bool
+	includePRComments      bool
+	includeIssueComments   bool
+	includeGistComments    bool
+	includeDanglingCommits bool
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
@@ -201,6 +206,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 	s.httpClient = common.RetryableHTTPClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
+	s.graphqlClient = githubv4.NewClient(s.httpClient)
 
 	var conn sourcespb.GitHub
 	err = anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -230,9 +236,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.repoInfoCache = newRepoInfoCache()
 
-	s.includeIssueComments = s.conn.IncludeIssueComments
-	s.includePRComments = s.conn.IncludePullRequestComments
-	s.includeGistComments = s.conn.IncludeGistComments
+	s.includeIssueComments = s.conn.GetIncludeIssueComments()
+	s.includePRComments = s.conn.GetIncludePullRequestComments()
+	s.includeGistComments = s.conn.GetIncludeGistComments()
+	s.includeDanglingCommits = s.conn.GetIncludeDanglingCommits()
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -502,20 +509,26 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint strin
 		s.log.Error(err, "error creating GitHub client")
 	}
 	s.apiClient = ghClient
+
+	// Warn about limitations.
 	if s.orgsCache.Count() > unauthGithubOrgRateLimt {
-		s.log.Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
+		s.log.Info("WARNING: Unauthenticated users are limited to 60 requests per hour. See: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#primary-rate-limit-for-unauthenticated-users")
+	}
+	if s.conn.ScanUsers {
+		s.log.Info("WARNING: Scanning organization members (--include-members) requires authentication.")
+	}
+	if s.includeDanglingCommits {
+		s.log.Info("WARNING: Scanning dangling commits (--dangling-commits) requires authentication.")
+		s.includeDanglingCommits = false
 	}
 
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
-		userType, err := s.getReposByOrgOrUser(ctx, org)
+
+		_, err := s.getReposByOrgOrUser(ctx, org)
 		if err != nil {
 			orgCtx.Logger().Error(err, "error fetching repos for org or user")
 			continue
-		}
-
-		if userType == organization && s.conn.ScanUsers {
-			orgCtx.Logger().Info("WARNING: Enumerating unauthenticated does not support scanning organization members (--include-members)")
 		}
 	}
 }
@@ -532,6 +545,8 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		Base:   s.httpClient.Transport,
 		Source: oauth2.ReuseTokenSource(nil, ts),
 	}
+
+	s.graphqlClient = githubv4.NewClient(s.httpClient)
 
 	// If we're using public GitHub, make a regular client.
 	// Otherwise, make an enterprise client.
@@ -644,6 +659,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	itr.BaseURL = apiEndpoint
 
 	s.httpClient.Transport = itr
+	s.graphqlClient = githubv4.NewClient(s.httpClient)
 	s.apiClient, err = github.NewClient(s.httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 	if err != nil {
 		return nil, err
@@ -780,7 +796,10 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 }
 
 func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, repoURL string, repoInfo repoInfo, chunksChan chan *sources.Chunk) (time.Duration, error) {
-	var duration time.Duration
+	var (
+		duration time.Duration
+		isWiki   = strings.HasSuffix(repoURL, ".wiki.git")
+	)
 
 	ctx.Logger().V(2).Info("attempting to clone repo")
 	path, repo, err := s.cloneRepo(ctx, repoURL, client)
@@ -789,9 +808,29 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, re
 	}
 	defer os.RemoveAll(path)
 
+	// Fetch dangling commits, if enabled.
+	if s.includeDanglingCommits && !isWiki && !strings.Contains(repoURL, "gist.github.com") {
+		danglingCommitsCh := make(chan string, 1000)
+
+		go func() {
+			if err := s.findDanglingCommits(ctx, repoInfo.owner, repoInfo.name, danglingCommitsCh); err != nil {
+				ctx.Logger().Error(err, "Failed to get dangling commits")
+			}
+		}()
+		for commit := range danglingCommitsCh {
+			s.fetchDanglingCommit(ctx, repoInfo, path, commit)
+		}
+
+		// TODO: Remove
+		enumerated := getGaugeValue(githubDanglingCommitsEnumerated, prometheus.Labels{"repo_name": repoInfo.fullName})
+		danglingOk := getGaugeValue(githubDanglingCommitsClonedOk, prometheus.Labels{"repo_name": repoInfo.fullName})
+		danglingErr := getGaugeValue(githubDanglingCommitsClonedErr, prometheus.Labels{"repo_name": repoInfo.fullName})
+		ctx.Logger().Info("Danling stats", "enumerated", enumerated, "ok", danglingOk, "err", danglingErr)
+	}
+
 	// Repo size is not collected for wikis.
 	var logger logr.Logger
-	if !strings.HasSuffix(repoURL, ".wiki.git") && repoInfo.size > 0 {
+	if !isWiki && repoInfo.size > 0 {
 		logger = ctx.Logger().WithValues("repo_size_kb", repoInfo.size)
 	} else {
 		logger = ctx.Logger()
@@ -807,6 +846,40 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, re
 	}
 	duration = time.Since(start)
 	return duration, nil
+}
+
+func getGaugeValue(gv *prometheus.GaugeVec, label prometheus.Labels) float64 {
+	metric, err := gv.GetMetricWith(label)
+	if err != nil {
+		fmt.Printf("error getting gauge value for %s: %v\n", label, err)
+		return -1
+	}
+
+	metricProto := &dto.Metric{}
+	err = metric.Write(metricProto)
+	if err != nil {
+		fmt.Printf("error getting gauge value for %s: %v\n", label, err)
+		return -1
+	}
+
+	return metricProto.GetGauge().GetValue()
+}
+
+func (s *Source) fetchDanglingCommit(ctx context.Context, repoInfo repoInfo, repoPath string, commit string) {
+	ctx.Logger().Info("Fetching danglign commit", "commit", commit[:7])
+	githubDanglingCommitsEnumerated.WithLabelValues(repoInfo.fullName).Inc()
+
+	fetchCtx, cancel := context.WithTimeout(ctx, time.Duration(5)*time.Second)
+	defer cancel()
+	err := git.FetchReference(fetchCtx, repoPath, "origin", fmt.Sprintf("%s:refs/heads/thg_ref/%s", commit, commit[:7]))
+	if err != nil {
+		if err != git.ErrRefNotFound {
+			ctx.Logger().Error(err, "Failed to fetch dangling commit", "commit", commit[:7])
+		}
+		githubDanglingCommitsClonedErr.WithLabelValues(repoInfo.fullName).Inc()
+	} else {
+		githubDanglingCommitsClonedOk.WithLabelValues(repoInfo.fullName).Inc()
+	}
 }
 
 var (
