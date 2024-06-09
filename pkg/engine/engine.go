@@ -735,6 +735,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					detectorKeysWithResults[detector.Key] = detector
 				}
 
+				results = e.filterResults(ctx, detector, results, e.logFilteredUnverified)
 				for _, res := range results {
 					var val []byte
 					if res.RawV2 != nil {
@@ -844,21 +845,33 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
 		}
 
-		if e.filterUnverified {
-			results = detectors.CleanResults(results)
-		}
-
-		results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
-
-		if e.filterEntropy != nil {
-			results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, e.logFilteredUnverified)
-		}
+		results = e.filterResults(ctx, data.detector, results, e.logFilteredUnverified)
 
 		for _, res := range results {
 			e.processResult(ctx, data, res)
 		}
 	}
 	data.wgDoneFn()
+}
+
+// filterResults applies multiple filters to the detection results to reduce false positives
+// and ensure the results meet specific criteria such as verification status and entropy level.
+// This function centralizes the filtering logic, making it reusable across different stages
+// of the detection pipeline.
+func (e *Engine) filterResults(
+	ctx context.Context,
+	detector detectors.Detector,
+	results []detectors.Result,
+	logFilteredUnverified bool,
+) []detectors.Result {
+	if e.filterUnverified {
+		results = detectors.CleanResults(results)
+	}
+	results = detectors.FilterKnownFalsePositives(ctx, detector, results, logFilteredUnverified)
+	if e.filterEntropy != nil {
+		results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, logFilteredUnverified)
+	}
+	return results
 }
 
 func (e *Engine) processResult(ctx context.Context, data detectableChunk, res detectors.Result) {
