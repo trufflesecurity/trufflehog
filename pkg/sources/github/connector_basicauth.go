@@ -5,6 +5,8 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
+	"github.com/shurcooL/githubv4"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -12,9 +14,10 @@ import (
 )
 
 type basicAuthConnector struct {
-	apiClient *github.Client
-	username  string
-	password  string
+	apiClient     *github.Client
+	graphQlClient *githubv4.Client
+	username      string
+	password      string
 }
 
 var _ connector = (*basicAuthConnector)(nil)
@@ -33,14 +36,19 @@ func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*
 	}
 
 	return &basicAuthConnector{
-		apiClient: apiClient,
-		username:  cred.Username,
-		password:  cred.Password,
+		apiClient:     apiClient,
+		graphQlClient: githubv4.NewClient(httpClient),
+		username:      cred.Username,
+		password:      cred.Password,
 	}, nil
 }
 
 func (c *basicAuthConnector) APIClient() *github.Client {
 	return c.apiClient
+}
+
+func (c *basicAuthConnector) GraphQLClient() *githubv4.Client {
+	return c.graphQlClient
 }
 
 func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {

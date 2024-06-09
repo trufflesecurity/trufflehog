@@ -420,13 +420,12 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	gitArgs := []string{
 		"clone", cloneURL.String(),
 		params.clonePath,
-		"-c", "remote.origin.fetch=+refs/*:refs/remotes/origin/*",
 		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
 	}
 	if !feature.SkipAdditionalRefs.Load() {
 		gitArgs = append(gitArgs,
 			"-c",
-			"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
+			"remote.origin.fetch=+refs/*:refs/*")
 	}
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
@@ -471,6 +470,48 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	logger.V(1).Info("successfully cloned repo")
 
 	return repo, nil
+}
+
+var ErrRefNotFound = errors.New("ref not found")
+
+func FetchReference(ctx context.Context, repoPath string, remote string, reference string) error {
+	cmd := exec.Command(
+		"git",
+		"-c", "fetch.parallel=0",
+		"fetch",
+		"--quiet",                 // https://git-scm.com/docs/git-fetch#Documentation/git-fetch.txt---quiet
+		"--no-auto-gc",            // https://git-scm.com/docs/git-fetch#Documentation/git-fetch.txt---no-auto-gc
+		"--no-recurse-submodules", // https://git-scm.com/docs/git-fetch#Documentation/git-fetch.txt---no-recurse-submodules
+		remote,
+		reference)
+	//"--recurse-submodules", "no")
+	absPath, err := filepath.Abs(repoPath)
+	cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
+
+	logger := ctx.Logger().WithValues(
+		"path", repoPath,
+		"command", cmd.String(),
+	)
+
+	// Execute command and wait for the stdout / stderr.
+	outputBytes, err := cmd.CombinedOutput()
+	output := string(outputBytes)
+	if err != nil {
+		if strings.HasPrefix(output, "fatal: remote error: upload-pack: not our ref") {
+			return ErrRefNotFound
+		}
+		err = fmt.Errorf("error executing git fetch: %w, %s", err, output)
+	}
+	logger.V(1).Info("git subcommand finished", "output", output)
+
+	if cmd.ProcessState == nil {
+		return fmt.Errorf("fetch command exited with no output")
+	} else if cmd.ProcessState.ExitCode() != 0 {
+		return err
+	}
+
+	logger.V(1).Info("successfully fetched reference", "repo", repoPath, "ref", reference)
+	return nil
 }
 
 // PingRepoUsingToken executes git ls-remote on a repo and returns any error that occurs. It can be used to validate
@@ -1224,7 +1265,7 @@ func (s *Git) handleBinary(
 	path string,
 ) (err error) {
 	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
-	fileCtx.Logger().V(5).Info("handling binary file")
+	fileCtx.Logger().V(5).Info("handling binary file", "gitDir", gitDir)
 
 	if common.SkipFile(path) {
 		fileCtx.Logger().V(5).Info("file contains ignored extension")

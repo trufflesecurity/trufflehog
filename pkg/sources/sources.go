@@ -262,6 +262,8 @@ type GithubConfig struct {
 	IncludeWikis bool
 	// CommentsTimeframeDays indicates how many days of comments to include in the scan.
 	CommentsTimeframeDays uint32
+	// IncludeDanglingCommits indicates whether to include dangling (i.e., unreachable) commits in the scan.
+	IncludeDanglingCommits bool
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.

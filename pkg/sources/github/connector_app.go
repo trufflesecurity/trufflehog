@@ -2,6 +2,7 @@ package github
 
 import (
 	"fmt"
+	"github.com/shurcooL/githubv4"
 	"strconv"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -15,6 +16,7 @@ import (
 
 type appConnector struct {
 	apiClient          *github.Client
+	graphQlClient      *githubv4.Client
 	installationClient *github.Client
 	installationID     int64
 }
@@ -69,13 +71,22 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 
 	return &appConnector{
 		apiClient:          apiClient,
+		graphQlClient:      githubv4.NewClient(httpClient),
 		installationClient: installationClient,
 		installationID:     installationID,
 	}, nil
 }
 
+func (c *appConnector) InstallationClient() *github.Client {
+	return c.installationClient
+}
+
 func (c *appConnector) APIClient() *github.Client {
 	return c.apiClient
+}
+
+func (c *appConnector) GraphQLClient() *githubv4.Client {
+	return c.graphQlClient
 }
 
 func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
@@ -89,8 +100,4 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogi
 	}
 
 	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token")
-}
-
-func (c *appConnector) InstallationClient() *github.Client {
-	return c.installationClient
 }
