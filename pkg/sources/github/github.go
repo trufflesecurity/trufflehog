@@ -13,8 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v67/github"
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -66,10 +69,11 @@ type Source struct {
 	resumeInfoSlice []string
 	connector       connector
 
-	includePRComments     bool
-	includeIssueComments  bool
-	includeGistComments   bool
-	commentsTimeframeDays uint32
+	includePRComments      bool
+	includeIssueComments   bool
+	includeGistComments    bool
+	includeDanglingCommits bool
+	commentsTimeframeDays  uint32
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
@@ -253,10 +257,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.repoInfoCache = newRepoInfoCache()
 
-	s.includeIssueComments = s.conn.IncludeIssueComments
-	s.includePRComments = s.conn.IncludePullRequestComments
-	s.includeGistComments = s.conn.IncludeGistComments
-	s.commentsTimeframeDays = s.conn.CommentsTimeframeDays
+	s.includeIssueComments = s.conn.GetIncludeIssueComments()
+	s.includePRComments = s.conn.GetIncludePullRequestComments()
+	s.includeGistComments = s.conn.GetIncludeGistComments()
+	s.includeDanglingCommits = s.conn.GetIncludeDanglingCommits()
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -502,20 +506,25 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitRe
 }
 
 func (s *Source) enumerateUnauthenticated(ctx context.Context, reporter sources.UnitReporter) {
+	// Warn about limitations.
 	if s.orgsCache.Count() > unauthGithubOrgRateLimt {
-		ctx.Logger().Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
+		ctx.Logger().Info("WARNING: Unauthenticated users are limited to 60 requests per hour. See: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#primary-rate-limit-for-unauthenticated-users")
+	}
+	if s.conn.ScanUsers {
+		ctx.Logger().Info("WARNING: Scanning organization members (--include-members) requires authentication.")
+	}
+	if s.includeDanglingCommits {
+		ctx.Logger().Info("WARNING: Scanning dangling commits (--dangling-commits) requires authentication.")
+		s.includeDanglingCommits = false
 	}
 
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
-		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+
+		_, err := s.getReposByOrgOrUser(ctx, org, reporter)
 		if err != nil {
 			orgCtx.Logger().Error(err, "error fetching repos for org or user")
 			continue
-		}
-
-		if userType == organization && s.conn.ScanUsers {
-			orgCtx.Logger().Info("WARNING: Enumerating unauthenticated does not support scanning organization members (--include-members)")
 		}
 	}
 }
@@ -715,7 +724,10 @@ func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.
 }
 
 func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo repoInfo, reporter sources.ChunkReporter) (time.Duration, error) {
-	var duration time.Duration
+	var (
+		duration time.Duration
+		isWiki   = strings.HasSuffix(repoURL, ".wiki.git")
+	)
 
 	ctx.Logger().V(2).Info("attempting to clone repo")
 	path, repo, err := s.cloneRepo(ctx, repoURL)
@@ -723,6 +735,36 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 		return duration, err
 	}
 	defer os.RemoveAll(path)
+
+	// Fetch dangling commits, if enabled.
+	if s.includeDanglingCommits && !isWiki && !strings.Contains(repoURL, "gist.github.com") {
+		danglingCommitsCh := make(chan string, 1000)
+
+		go func() {
+			if err := s.findDanglingCommits(ctx, repoInfo.owner, repoInfo.name, danglingCommitsCh); err != nil {
+				ctx.Logger().Error(err, "Failed to get dangling commits")
+			}
+		}()
+		for commit := range danglingCommitsCh {
+			s.fetchDanglingCommit(ctx, repoInfo, path, commit)
+		}
+
+		// TODO: Remove?
+		enumerated := getGaugeValue(githubDanglingCommitsEnumerated, prometheus.Labels{"repo_name": repoInfo.fullName})
+		danglingOk := getGaugeValue(githubDanglingCommitsClonedOk, prometheus.Labels{"repo_name": repoInfo.fullName})
+		danglingNotFound := getGaugeValue(githubDanglingCommitsClonedNotFound, prometheus.Labels{"repo_name": repoInfo.fullName})
+		danglingErr := getGaugeValue(githubDanglingCommitsClonedErr, prometheus.Labels{"repo_name": repoInfo.fullName})
+		ctx.Logger().Info("Dangling commits summary", "enumerated", enumerated, "ok", danglingOk, "not_found", danglingNotFound, "err", danglingErr)
+	}
+
+	// Repo size is not collected for wikis.
+	var logger logr.Logger
+	if !isWiki && repoInfo.size > 0 {
+		logger = ctx.Logger().WithValues("repo_size_kb", repoInfo.size)
+	} else {
+		logger = ctx.Logger()
+	}
+	logger.V(2).Info("scanning repo")
 
 	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
 	s.setScanOptions(s.conn.Base, s.conn.Head)
@@ -733,6 +775,46 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 	}
 	duration = time.Since(start)
 	return duration, nil
+}
+
+func getGaugeValue(gv *prometheus.GaugeVec, label prometheus.Labels) float64 {
+	metric, err := gv.GetMetricWith(label)
+	if err != nil {
+		fmt.Printf("error getting gauge value for %s: %v\n", label, err)
+		return -1
+	}
+
+	metricProto := &dto.Metric{}
+	err = metric.Write(metricProto)
+	if err != nil {
+		fmt.Printf("error getting gauge value for %s: %v\n", label, err)
+		return -1
+	}
+
+	return metricProto.GetGauge().GetValue()
+}
+
+func (s *Source) fetchDanglingCommit(ctx context.Context, repoInfo repoInfo, repoPath string, commit string) {
+	fetchCtx, cancel := context.WithTimeout(context.WithValue(ctx, "commit", commit[:7]), 1*time.Minute)
+	defer cancel()
+
+	fetchCtx.Logger().V(4).Info("Fetching dangling commit")
+	githubDanglingCommitsEnumerated.WithLabelValues(repoInfo.fullName).Inc()
+
+	// The refspec cannot be under `refs/heads`, otherwise you will encounter
+	// `trying to write non-commit object ... to branch` errors.
+	refSpec := fmt.Sprintf("%s:refs/thg_ref/%s", commit, commit[:7])
+	if err := git.FetchReference(fetchCtx, repoPath, "origin", refSpec); err != nil {
+		if errors.Is(err, git.ErrRefNotFound) {
+			fetchCtx.Logger().V(4).Info("Failed to fetch dangling commit: reference no longer exists at remote")
+			githubDanglingCommitsClonedNotFound.WithLabelValues(repoInfo.fullName).Inc()
+		} else {
+			fetchCtx.Logger().Error(err, "Failed to fetch dangling commit")
+			githubDanglingCommitsClonedErr.WithLabelValues(repoInfo.fullName).Inc()
+		}
+	} else {
+		githubDanglingCommitsClonedOk.WithLabelValues(repoInfo.fullName).Inc()
+	}
 }
 
 var (

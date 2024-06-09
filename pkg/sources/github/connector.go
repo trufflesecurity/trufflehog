@@ -5,9 +5,10 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
+	"github.com/shurcooL/githubv4"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
@@ -16,6 +17,7 @@ const cloudEndpoint = "https://api.github.com"
 type connector interface {
 	// APIClient returns a configured GitHub client that can be used for GitHub API operations.
 	APIClient() *github.Client
+	GraphQLClient() *githubv4.Client
 	// Clone clones a repository using the configured authentication information.
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
 }
