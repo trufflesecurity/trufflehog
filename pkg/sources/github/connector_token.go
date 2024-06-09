@@ -2,6 +2,7 @@ package github
 
 import (
 	"fmt"
+	"github.com/shurcooL/githubv4"
 	"strings"
 	"sync"
 
@@ -15,6 +16,7 @@ import (
 
 type tokenConnector struct {
 	apiClient          *github.Client
+	graphQlClient      *githubv4.Client
 	token              string
 	isGitHubEnterprise bool
 	handleRateLimit    func(context.Context, error) bool
@@ -40,6 +42,7 @@ func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(co
 
 	return &tokenConnector{
 		apiClient:          apiClient,
+		graphQlClient:      githubv4.NewClient(httpClient),
 		token:              token,
 		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudEndpoint),
 		handleRateLimit:    handleRateLimit,
@@ -48,6 +51,10 @@ func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(co
 
 func (c *tokenConnector) APIClient() *github.Client {
 	return c.apiClient
+}
+
+func (c *tokenConnector) GraphQLClient() *githubv4.Client {
+	return c.graphQlClient
 }
 
 func (c *tokenConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
