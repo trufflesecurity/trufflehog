@@ -13,13 +13,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+var _ detectors.MultiPartCredentialProvider = (*Scanner)(nil)
+var _ detectors.StartOffsetProvider = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -31,9 +33,11 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"shppa_", "shpat_"}
-}
+func (s Scanner) Keywords() []string { return []string{"shppa_", "shpat_", "myshopify.com"} }
+
+const startOffset = 256
+
+func (Scanner) StartOffset() int64 { return startOffset }
 
 // FromData will find and optionally verify Shopify secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -55,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/admin/oauth/access_scopes.json", nil)
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+domainRes+"/admin/oauth/access_scopes.json", nil)
 				if err != nil {
 					continue
 				}
@@ -69,7 +73,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							var handleArray []string
 							for _, handle := range shopifyTokenAccessScopes.AccessScopes {
 								handleArray = append(handleArray, handle.Handle)
-
 							}
 							s1.Verified = true
 							s1.ExtraData = map[string]string{
@@ -82,9 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			results = append(results, s1)
-
 		}
-
 	}
 
 	return results, nil
