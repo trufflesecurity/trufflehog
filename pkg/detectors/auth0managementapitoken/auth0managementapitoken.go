@@ -3,9 +3,10 @@ package auth0managementapitoken
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -18,27 +19,32 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.StartOffsetProvider = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
 	// long jwt token but note this is default 8640000 seconds = 24 hours but could be set to maximum 2592000 seconds = 720 hours = 30 days
 	// at https://manage.auth0.com/dashboard/us/dev-63memjo3/apis/management/explorer
-	managementApiTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"auth0"}) + `\b(ey[a-zA-Z0-9._-]+)\b`)
+	managementAPITokenPat = regexp.MustCompile(`\b(ey[a-zA-Z0-9._-]+)\b`)
 	domainPat             = regexp.MustCompile(`([a-zA-Z0-9\-]{2,16}\.[a-zA-Z0-9_-]{2,3}\.auth0\.com)`) // could be part of url
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"auth0"}
+	return []string{"auth0", "ey"}
 }
+
+const startOffset = 21
+
+func (Scanner) StartOffset() int64 { return startOffset }
 
 // FromData will find and optionally verify Auth0ManagementApiToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	managementApiTokenMatches := managementApiTokenPat.FindAllStringSubmatch(dataStr, -1)
+	managementApiTokenMatches := managementAPITokenPat.FindAllStringSubmatch(dataStr, -1)
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, managementApiTokenMatch := range managementApiTokenMatches {
