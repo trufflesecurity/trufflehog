@@ -205,7 +205,13 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 				}
 				return 0, err
 			}
-			w.buf.Reset()
+		}
+	}
+
+	// Write any remaining data in the buffer to the file before writing new data.
+	if w.buf.Len() > 0 {
+		if _, err := w.buf.WriteTo(w.file); err != nil {
+			return 0, fmt.Errorf("error flushing buffer to file: %w", err)
 		}
 	}
 
@@ -273,8 +279,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 	defer w.bufPool.Put(w.buf)
 
 	if w.buf.Len() > 0 {
-		_, err := w.buf.WriteTo(w.file)
-		if err != nil {
+		if _, err := w.buf.WriteTo(w.file); err != nil {
 			return err
 		}
 	}
