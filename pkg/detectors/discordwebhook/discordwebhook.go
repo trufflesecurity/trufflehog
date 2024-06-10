@@ -45,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, resMatch, nil)
 			if err != nil {
 				continue
 			}
