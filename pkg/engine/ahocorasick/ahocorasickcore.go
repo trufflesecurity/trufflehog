@@ -51,34 +51,40 @@ func (e *EntireChunkSpanCalculator) calculateSpan(params spanCalculationParams) 
 	return matchSpan{startOffset: 0, endOffset: int64(len(params.chunkData))}
 }
 
-// maxMatchLengthSpanCalculator is a strategy that calculates match spans based on a default max
-// match length or values provided by detectors. This allows for more granular control over the match span.
-type maxMatchLengthSpanCalculator struct{ maxMatchLength int64 }
+// adjustableSpanCalculator is a strategy that calculates match spans based on a default max
+// match length or values provided by detectors. This allows for more granular control over the match span,
+// including adjustments to the start index based on provided start offsets.
+type adjustableSpanCalculator struct{ maxMatchLength int64 }
 
-// newMaxMatchLengthSpanCalculator creates a new instance of maxMatchLengthSpanCalculator with the
+// newAdjustableSpanCalculator creates a new instance of adjustableSpanCalculator with the
 // specified max match length.
-func newMaxMatchLengthSpanCalculator(maxMatchLength int64) *maxMatchLengthSpanCalculator {
-	return &maxMatchLengthSpanCalculator{maxMatchLength: maxMatchLength}
+func newAdjustableSpanCalculator(maxMatchLength int64) *adjustableSpanCalculator {
+	return &adjustableSpanCalculator{maxMatchLength}
 }
 
-// calculateSpans computes the match spans based on the start index and the max match length.
+// calculateSpan computes the match spans based on the start index and the max match length.
 // If the detector provides an override value, it uses that instead of the default max match length.
-func (m *maxMatchLengthSpanCalculator) calculateSpan(params spanCalculationParams) matchSpan {
+// It also adjusts the start index if the detector provides a start offset.
+func (m *adjustableSpanCalculator) calculateSpan(params spanCalculationParams) matchSpan {
 	maxSize := m.maxMatchLength
+	startOffset := int64(0)
 
-	switch d := params.detector.(type) {
-	case detectors.MultiPartCredentialProvider:
-		maxSize = d.MaxCredentialSpan()
-	case detectors.MaxSecretSizeProvider:
-		maxSize = d.MaxSecretSize()
-	default: // Use the default max match length
+	// Check if the detector implements each interface and update values accordingly.
+	// This CAN'T be done in a switch statement because a detector can implement multiple interfaces.
+	if provider, ok := params.detector.(detectors.MultiPartCredentialProvider); ok {
+		maxSize = provider.MaxCredentialSpan()
 	}
-	endIdx := params.startIdx + maxSize
-	if endIdx > int64(len(params.chunkData)) {
-		endIdx = int64(len(params.chunkData))
+	if provider, ok := params.detector.(detectors.MaxSecretSizeProvider); ok {
+		maxSize = provider.MaxSecretSize()
+	}
+	if provider, ok := params.detector.(detectors.StartOffsetProvider); ok {
+		startOffset = provider.StartOffset()
 	}
 
-	return matchSpan{startOffset: params.startIdx, endOffset: endIdx}
+	startIdx := max(params.startIdx-startOffset, 0)
+	endIdx := min(params.startIdx+maxSize, int64(len(params.chunkData)))
+
+	return matchSpan{startOffset: startIdx, endOffset: endIdx}
 }
 
 // CoreOption is a functional option type for configuring an AhoCorasickCore instance.
@@ -128,7 +134,7 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...CoreOption) *
 		keywordsToDetectors: keywordsToDetectors,
 		detectorsByKey:      detectorsByKey,
 		prefilter:           *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
-		spanCalculator:      newMaxMatchLengthSpanCalculator(maxMatchLength), // Default span calculator
+		spanCalculator:      newAdjustableSpanCalculator(maxMatchLength), // Default span calculator
 	}
 
 	for _, opt := range opts {

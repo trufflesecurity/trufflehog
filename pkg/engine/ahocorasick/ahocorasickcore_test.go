@@ -63,6 +63,64 @@ func (testDetectorV3) Type() detectorspb.DetectorType {
 
 func (testDetectorV3) Version() int { return 1 }
 
+var _ detectors.Detector = (*testDetectorV4)(nil)
+var _ detectors.MultiPartCredentialProvider = (*testDetectorV4)(nil)
+var _ detectors.StartOffsetProvider = (*testDetectorV4)(nil)
+
+type testDetectorV4 struct{}
+
+func (testDetectorV4) FromData(context.Context, bool, []byte) ([]detectors.Result, error) {
+	return make([]detectors.Result, 0), nil
+}
+
+func (testDetectorV4) Keywords() []string { return []string{"password"} }
+
+func (testDetectorV4) Type() detectorspb.DetectorType { return TestDetectorType }
+
+func (testDetectorV4) Version() int { return 1 }
+
+func (testDetectorV4) MaxCredentialSpan() int64 { return 15 }
+
+func (testDetectorV4) StartOffset() int64 { return 5 }
+
+var _ detectors.Detector = (*testDetectorV5)(nil)
+var _ detectors.MaxSecretSizeProvider = (*testDetectorV5)(nil)
+var _ detectors.StartOffsetProvider = (*testDetectorV5)(nil)
+
+type testDetectorV5 struct{}
+
+func (testDetectorV5) FromData(context.Context, bool, []byte) ([]detectors.Result, error) {
+	return make([]detectors.Result, 0), nil
+}
+
+func (testDetectorV5) Keywords() []string { return []string{"password"} }
+
+func (testDetectorV5) Type() detectorspb.DetectorType { return TestDetectorType }
+
+func (testDetectorV5) Version() int { return 1 }
+
+func (testDetectorV5) MaxSecretSize() int64 { return 10 }
+
+func (testDetectorV5) StartOffset() int64 { return 3 }
+
+var _ detectors.Detector = (*testDetectorV6)(nil)
+var _ detectors.Detector = (*testDetectorV6)(nil)
+var _ detectors.StartOffsetProvider = (*testDetectorV6)(nil)
+
+type testDetectorV6 struct{}
+
+func (testDetectorV6) FromData(context.Context, bool, []byte) ([]detectors.Result, error) {
+	return make([]detectors.Result, 0), nil
+}
+
+func (testDetectorV6) Keywords() []string { return []string{"password"} }
+
+func (testDetectorV6) Type() detectorspb.DetectorType { return TestDetectorType }
+
+func (testDetectorV6) Version() int { return 1 }
+
+func (testDetectorV6) StartOffset() int64 { return 1 }
+
 var _ detectors.Detector = (*testDetectorV1)(nil)
 var _ detectors.Detector = (*testDetectorV2)(nil)
 var _ detectors.Versioner = (*testDetectorV1)(nil)
@@ -217,6 +275,106 @@ func TestFindDetectorMatches(t *testing.T) {
                  c libero molestie, nec mlesud ugue ugue eget. This is the second occurrence of the letter a.`,
 			expectedResult: map[DetectorKey][][]int64{
 				CreateDetectorKey(testDetectorV2{}): {{0, 856}},
+			},
+		},
+		{
+			name: "keyword in the middle of the credential; MultiPartCredentialProvider, StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV4{},
+			},
+			sampleData: "This is a password in the middle of some data; MultiPartCredentialProvider, StartOffsetProvider",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV4{}): {{5, 25}},
+			},
+		},
+		{
+			name: "keyword at the end of the credential; MultiPartCredentialProvider, StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV4{},
+			},
+			sampleData: "This data ends with a password",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV4{}): {{17, 30}},
+			},
+		},
+		{
+			name: "keyword near the start of the data; MultiPartCredentialProvider, StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV4{},
+			},
+			sampleData: "a password at the start",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV4{}): {{0, 17}},
+			},
+		},
+		{
+			name: "keyword in the middle of the credential; MaxSecretSizeProvider, StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV5{},
+			},
+			sampleData: "This is a password in the middle of some data",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV5{}): {{7, 20}},
+			},
+		},
+		{
+			name: "keyword at the end of the credential; MaxSecretSizeProvider, StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV5{},
+			},
+			sampleData: "This data ends with a password",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV5{}): {{19, 30}},
+			},
+		},
+		{
+			name: "keyword near the start of the data; MaxSecretSizeProvider, StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV5{},
+			},
+			sampleData: "a password at the start",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV5{}): {{0, 12}},
+			},
+		},
+		{
+			name: "keyword in the middle of the credential; StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV6{},
+			},
+			sampleData: "This is a password in the middle of some data",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV6{}): {{9, 45}},
+			},
+		},
+		{
+			name: "keyword at the end of the credential; StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV6{},
+			},
+			sampleData: "This data ends with a password",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV6{}): {{21, 30}},
+			},
+		},
+		{
+			name: "keyword near the start of the data; StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV6{},
+			},
+			sampleData: "a password at the start",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV6{}): {{1, 23}},
+			},
+		},
+		{
+			name: "multiple keyword in the middle of the credential; StartOffsetProvider",
+			detectors: []detectors.Detector{
+				testDetectorV6{},
+			},
+			sampleData: "This is a password in the middle of some data, and another password at the end!",
+			expectedResult: map[DetectorKey][][]int64{
+				CreateDetectorKey(testDetectorV6{}): {{9, 79}},
 			},
 		},
 		{
