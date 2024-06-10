@@ -19,6 +19,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 var _ detectors.StartOffsetProvider = (*Scanner)(nil)
 
 var (
@@ -36,6 +37,10 @@ func (s Scanner) Keywords() []string {
 	return []string{"auth0", "ey"}
 }
 
+const maxSecretSize = 5000
+
+func (Scanner) MaxSecretSize() int64 { return maxSecretSize }
+
 const startOffset = 21
 
 func (Scanner) StartOffset() int64 { return startOffset }
@@ -44,15 +49,15 @@ func (Scanner) StartOffset() int64 { return startOffset }
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	managementApiTokenMatches := managementAPITokenPat.FindAllStringSubmatch(dataStr, -1)
+	managementAPITokenMatches := managementAPITokenPat.FindAllStringSubmatch(dataStr, -1)
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, managementApiTokenMatch := range managementApiTokenMatches {
+	for _, managementApiTokenMatch := range managementAPITokenMatches {
 		if len(managementApiTokenMatch) != 2 {
 			continue
 		}
-		managementApiTokenRes := strings.TrimSpace(managementApiTokenMatch[1])
-		if len(managementApiTokenRes) < 2000 || len(managementApiTokenRes) > 5000 {
+		managementAPITokenRes := strings.TrimSpace(managementApiTokenMatch[1])
+		if len(managementAPITokenRes) < 2000 || len(managementAPITokenRes) > 5000 {
 			continue
 		}
 
@@ -65,8 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
 				Redacted:     domainRes,
-				Raw:          []byte(managementApiTokenRes),
-				RawV2:        []byte(managementApiTokenRes + domainRes),
+				Raw:          []byte(managementAPITokenRes),
+				RawV2:        []byte(managementAPITokenRes + domainRes),
 			}
 
 			if verify {
@@ -78,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", managementApiTokenRes))
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", managementAPITokenRes))
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
