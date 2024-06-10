@@ -21,6 +21,8 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.MultiPartCredentialProvider = (*Scanner)(nil)
+var _ detectors.StartOffsetProvider = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -32,9 +34,11 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"openvpn"}
-}
+func (s Scanner) Keywords() []string { return []string{"api.openvpn.com"} }
+
+const startOffset = 512
+
+func (Scanner) StartOffset() int64 { return startOffset }
 
 // FromData will find and optionally verify Openvpn secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {

@@ -2,28 +2,31 @@ package auth0oauth
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.MultiPartCredentialProvider = (*Scanner)(nil)
+var _ detectors.StartOffsetProvider = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	clientIdPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"auth0"}) + `\b([a-zA-Z0-9_-]{32,60})\b`)
+	clientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"auth0"}) + `\b([a-zA-Z0-9_-]{32,60})\b`)
 	clientSecretPat = regexp.MustCompile(`\b([a-zA-Z0-9_-]{64,})\b`)
 	domainPat       = regexp.MustCompile(`\b([a-zA-Z0-9][a-zA-Z0-9._-]*auth0\.com)\b`) // could be part of url
 )
@@ -34,19 +37,23 @@ func (s Scanner) Keywords() []string {
 	return []string{"auth0"}
 }
 
+const startOffset = 512
+
+func (Scanner) StartOffset() int64 { return startOffset }
+
 // FromData will find and optionally verify Auth0oauth secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	clientIdMatches := clientIdPat.FindAllStringSubmatch(dataStr, -1)
+	clientIdMatches := clientIDPat.FindAllStringSubmatch(dataStr, -1)
 	clientSecretMatches := clientSecretPat.FindAllStringSubmatch(dataStr, -1)
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, clientIdMatch := range clientIdMatches {
-		if len(clientIdMatch) != 2 {
+	for _, clientIDMatch := range clientIdMatches {
+		if len(clientIDMatch) != 2 {
 			continue
 		}
-		clientIdRes := strings.TrimSpace(clientIdMatch[1])
+		clientIdRes := strings.TrimSpace(clientIDMatch[1])
 
 		for _, clientSecretMatch := range clientSecretMatches {
 			if len(clientSecretMatch) != 2 {
@@ -102,7 +109,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 						if !strings.Contains(body, "access_denied") {
 							s1.Verified = true
-						} 
+						}
 					}
 				}
 
