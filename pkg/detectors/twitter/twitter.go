@@ -24,8 +24,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	// keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitter"}) + `\b([A-Z]{22}%[a-zA-Z-0-9]{23}%[a-zA-Z-0-9]{6}%[a-zA-Z-0-9]{3}%[a-zA-Z-0-9]{9}%[a-zA-Z-0-9]{52})\b`)
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitter"}) + `\b([a-zA-Z0-9]{20,59}%([a-zA-Z0-9]{3,26}%){0,4}[a-zA-Z0-9]{52})\b`)
+	bearerTokenPat = regexp.MustCompile(`\b([a-zA-Z0-9]{20,59}%([a-zA-Z0-9]{3,26}%){0,4}[a-zA-Z0-9]{52})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -38,13 +37,13 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueMatches := make(map[string]struct{})
+	for _, match := range bearerTokenPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueMatches[match[1]] = struct{}{}
+	}
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
+	for match := range uniqueMatches {
+		resMatch := strings.TrimSpace(match)
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Twitter,
