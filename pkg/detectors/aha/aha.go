@@ -20,7 +20,9 @@ type Scanner struct {
 
 var (
 	// Ensure the Scanner satisfies the interface at compile time.
-	_ detectors.Detector = (*Scanner)(nil)
+	_ detectors.Detector                    = (*Scanner)(nil)
+	_ detectors.MultiPartCredentialProvider = (*Scanner)(nil)
+	_ detectors.StartOffsetProvider         = (*Scanner)(nil)
 
 	defaultClient = common.SaneHttpClient()
 
@@ -31,9 +33,11 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"aha"}
-}
+func (s Scanner) Keywords() []string { return []string{"aha"} }
+
+const startOffset = 512
+
+func (Scanner) StartOffset() int64 { return startOffset }
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
