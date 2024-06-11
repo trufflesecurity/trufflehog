@@ -6,6 +6,8 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2
 
 replace github.com/snowflakedb/gosnowflake => github.com/trufflesecurity/gosnowflake v0.0.1
 
+replace github.com/mholt/archiver/v4 v4.0.0-alpha.8 => github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20240408183022-de08bfa4c558
+
 require (
 	cloud.google.com/go/secretmanager v1.13.1
 	cloud.google.com/go/storage v1.41.0
@@ -126,6 +128,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/Microsoft/hcsshim v0.11.4 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
+	github.com/STARRY-S/zip v0.1.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.8.0 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.6 // indirect
@@ -209,7 +212,7 @@ require (
 	github.com/kjk/lzma v0.0.0-20161016003348-3fd93898850d // indirect
 	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
-	github.com/klauspost/pgzip v1.2.5 // indirect
+	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/launchdarkly/ccache v1.1.0 // indirect
 	github.com/launchdarkly/eventsource v1.6.2 // indirect
 	github.com/launchdarkly/go-jsonstream/v3 v3.0.0 // indirect
@@ -255,6 +258,7 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
+	github.com/sorairolake/lzip-go v0.3.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tetratelabs/wazero v1.7.1 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
@@ -282,7 +286,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
+	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/term v0.20.0 // indirect
