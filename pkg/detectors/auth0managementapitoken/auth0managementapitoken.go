@@ -32,7 +32,7 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string { return []string{"auth0", "ey"} }
+func (s Scanner) Keywords() []string { return []string{"auth0"} }
 
 const maxSecretSize = 5000
 
