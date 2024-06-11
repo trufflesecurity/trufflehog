@@ -76,6 +76,7 @@ func (m *adjustableSpanCalculator) calculateSpan(params spanCalculationParams) m
 	// This CAN'T be done in a switch statement because a detector can implement multiple interfaces.
 	if provider, ok := params.detector.(detectors.MultiPartCredentialProvider); ok {
 		maxSize = provider.MaxCredentialSpan() + keywordIdx
+		startOffset = keywordIdx - provider.MaxCredentialSpan()
 	}
 	if provider, ok := params.detector.(detectors.MaxSecretSizeProvider); ok {
 		maxSize = provider.MaxSecretSize() + keywordIdx
