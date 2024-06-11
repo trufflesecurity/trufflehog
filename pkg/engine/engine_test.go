@@ -393,6 +393,41 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
 }
 
+func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
+	ctx := context.Background()
+
+	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	confPath, err := filepath.Abs("./testdata/verificationoverlap_detectors_fp.yaml")
+	assert.NoError(t, err)
+	conf, err := config.Read(confPath)
+	assert.NoError(t, err)
+
+	e, err := Start(ctx,
+		WithConcurrency(1),
+		WithDecoders(decoders.DefaultDecoders()...),
+		WithDetectors(conf.Detectors...),
+		WithVerify(false),
+		WithPrinter(new(discardPrinter)),
+		withVerificationOverlapTracking(),
+	)
+	assert.NoError(t, err)
+
+	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
+	err = e.ScanFileSystem(ctx, cfg)
+	assert.NoError(t, err)
+
+	// Wait for all the chunks to be processed.
+	assert.NoError(t, e.Finish(ctx))
+	// We want 0 because the secret is a false positive.
+	want := uint64(0)
+	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
 func TestFragmentFirstLineAndLink(t *testing.T) {
 	tests := []struct {
 		name         string
