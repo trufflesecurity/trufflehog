@@ -3,6 +3,7 @@ package maxmindlicense
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,21 +15,22 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
-	keyPat = regexp.MustCompile(`\b([0-9A-Za-z]{6}_[0-9A-Za-z]{29}_mmk)\b`)
+	defaultClient = common.SaneHttpClient()
+	keyPat        = regexp.MustCompile(`\b([a-zA-Z0-9]{6}_[a-zA-Z0-9]{29}_mmk)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"maxmind", "geoip"}
+	return []string{"_mmk"}
 }
 
 func (Scanner) Version() int { return 2 }
@@ -37,14 +39,15 @@ func (Scanner) Version() int { return 2 }
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueMatches := make(map[string]struct{})
+	for _, key := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueMatches[key[1]] = struct{}{}
+	}
 
-	for _, keyMatch := range keyMatches {
-		keyRes := keyMatch[1]
-
+	for key := range uniqueMatches {
 		r := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MaxMindLicense,
-			Raw:          []byte(keyRes),
+			Raw:          []byte(key),
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
 				"version":        fmt.Sprintf("%d", s.Version()),
@@ -52,32 +55,52 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			data := url.Values{}
-			data.Add("license_key", keyRes)
-			req, err := http.NewRequestWithContext(
-				ctx, "POST", "https://secret-scanning.maxmind.com/secrets/validate-license-key",
-				strings.NewReader(data.Encode()))
-			if err != nil {
-				r.SetVerificationError(err)
-				results = append(results, r)
-				continue
+			client := s.client
+			if client == nil {
+				client = defaultClient
 			}
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-			res, err := client.Do(req)
-			if err != nil {
-				r.SetVerificationError(err)
-			}
-			defer res.Body.Close()
-			if err == nil && res.StatusCode >= 200 && res.StatusCode < 300 {
-				r.Verified = true
-			}
+			verified, vErr := s.verify(ctx, client, key)
+			r.Verified = verified
+			r.SetVerificationError(vErr, key)
 		}
 
 		results = append(results, r)
 	}
 
 	return results, nil
+}
+
+func (s Scanner) verify(ctx context.Context, client *http.Client, key string) (bool, error) {
+	data := url.Values{}
+	data.Add("license_key", key)
+
+	// https://dev.maxmind.com/license-key-validation-api
+	req, err := http.NewRequestWithContext(
+		ctx, http.MethodPost, "https://secret-scanning.maxmind.com/secrets/validate-license-key",
+		strings.NewReader(data.Encode()))
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusNoContent:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
