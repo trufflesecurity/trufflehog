@@ -998,6 +998,7 @@ enum DetectorType {
   Onfleet = 986;
   Intra42 = 987;
   Groq = 988;
+  Eraser = 989;
 }
 
 message Result {
