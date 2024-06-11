@@ -6,8 +6,6 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2
 
 replace github.com/snowflakedb/gosnowflake => github.com/trufflesecurity/gosnowflake v0.0.1
 
-replace github.com/mholt/archiver/v4 v4.0.0-alpha.8 => github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20240408183022-de08bfa4c558
-
 require (
 	cloud.google.com/go/secretmanager v1.13.1
 	cloud.google.com/go/storage v1.41.0
@@ -62,7 +60,7 @@ require (
 	github.com/lrstanley/bubblezone v0.0.0-20240125042004-b7bafc493195
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
-	github.com/mholt/archiver/v4 v4.0.0-alpha.8
+	github.com/mholt/archiver/v4 v4.0.0-alpha.8.0.20240408183022-de08bfa4c558
 	github.com/microsoft/go-mssqldb v1.7.2
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/muesli/reflow v0.3.0
