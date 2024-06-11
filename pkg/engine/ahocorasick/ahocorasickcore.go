@@ -69,7 +69,7 @@ func newAdjustableSpanCalculator(offsetRadius int64) *adjustableSpanCalculator {
 func (m *adjustableSpanCalculator) calculateSpan(params spanCalculationParams) matchSpan {
 	keywordIdx := params.keywordIdx
 
-	maxSize := params.keywordIdx + m.offsetMagnitude
+	maxSize := keywordIdx + m.offsetMagnitude
 	startOffset := keywordIdx - m.offsetMagnitude
 
 	// Check if the detector implements each interface and update values accordingly.
