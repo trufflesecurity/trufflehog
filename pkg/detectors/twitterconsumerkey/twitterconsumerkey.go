@@ -57,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			secret := strings.TrimSpace(secret)
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Twitter,
+				DetectorType: detectorspb.DetectorType_TwitterConsumerkey,
 				Raw:          []byte(key),
 				RawV2:        []byte(key + secret),
 			}
@@ -71,10 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 					isVerified, err := verifyBearerToken(ctx, client, bearerToken)
 					s1.Verified = isVerified
-					s1.Redacted = "****" + bearerToken[len(bearerToken)-6:] // redacted bearer token for display purpose only
-					if err != nil {
-						s1.SetVerificationError(err, key)
-					}
+					s1.SetVerificationError(err, key)
 				} else {
 					s1.SetVerificationError(err, key)
 				}
