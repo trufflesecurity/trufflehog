@@ -78,7 +78,7 @@ func TestTwitterConsumerKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("You cannot find the kesecret within"),
+				data:   []byte("You cannot find the key & secret within"),
 				verify: true,
 			},
 			want:    nil,
