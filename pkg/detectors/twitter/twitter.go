@@ -14,6 +14,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -21,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	bearerTokenPat = regexp.MustCompile(`\b([a-zA-Z0-9]{20,59}%([a-zA-Z0-9]{3,26}%){0,4}[a-zA-Z0-9]{52})\b`)
@@ -33,16 +34,16 @@ func (s Scanner) Keywords() []string {
 	return []string{"twitter"}
 }
 
-// FromData will find and optionally verify Twitter secrets in a given set of bytes.
+// FromData will find and optionally verify Twitter bearer token in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	uniqueMatches := make(map[string]struct{})
+	tokenMatches := make(map[string]struct{})
 	for _, match := range bearerTokenPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueMatches[match[1]] = struct{}{}
+		tokenMatches[match[1]] = struct{}{}
 	}
 
-	for match := range uniqueMatches {
+	for match := range tokenMatches {
 		resMatch := strings.TrimSpace(match)
 
 		s1 := detectors.Result{
@@ -51,26 +52,45 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.twitter.com/2/tweets/20", nil)
-			if err != nil {
-				continue
+			client := s.client
+			if client == nil {
+				client = defaultClient
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
+			isVerified, err := verifyBearerToken(ctx, client, resMatch)
+			s1.Verified = isVerified
+			if err != nil {
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 
 		results = append(results, s1)
 	}
-
 	return results, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Twitter
+}
+
+func verifyBearerToken(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.twitter.com/2/tweets/20", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	res, err := client.Do(req)
+	if err == nil {
+		defer res.Body.Close()
+		switch res.StatusCode {
+		case http.StatusOK, http.StatusForbidden:
+			// 403 indicates lack of permission, but valid token (could be due to twitter free tier)
+			return true, nil
+		case http.StatusUnauthorized:
+			return false, nil
+		default:
+			return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		}
+	}
+
+	return false, err
 }
