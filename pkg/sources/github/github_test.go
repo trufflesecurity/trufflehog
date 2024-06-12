@@ -380,7 +380,7 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 		JSON([]map[string]string{{"full_name": "super-secret-org/super-secret-repo", "clone_url": "https://github.com/super-secret-org/super-secret-repo.git"}})
 
 	s := initTestSource(nil)
-	s.orgsCache = memory.New()
+	s.orgsCache = memory.New[string]()
 	s.orgsCache.Set("super-secret-org", "super-secret-org")
 	s.enumerateUnauthenticated(context.Background(), apiEndpoint)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())

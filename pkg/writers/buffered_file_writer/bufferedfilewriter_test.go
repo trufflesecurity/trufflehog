@@ -650,10 +650,18 @@ func TestBufferedFileWriter_ReadFrom(t *testing.T) {
 			expectedSize:   1 << 20,
 		},
 		{
-			name:           "Input greater than threshold",
+			name:           "Input slightly greater than threshold",
 			input:          string(make([]byte, defaultThreshold+1)),
 			expectedOutput: string(make([]byte, defaultThreshold+1)),
 			expectedSize:   defaultThreshold + 1,
+		},
+		// Test to ensure that anytime the buffer exceeds the threshold, the data is written to a file
+		// and the buffer is cleared.
+		{
+			name:           "Input much greater than threshold",
+			input:          string(make([]byte, (2*defaultThreshold)+largeBufferSize+1)),
+			expectedOutput: string(make([]byte, (2*defaultThreshold)+largeBufferSize+1)),
+			expectedSize:   (2 * defaultThreshold) + largeBufferSize + 1,
 		},
 	}
 
@@ -667,6 +675,10 @@ func TestBufferedFileWriter_ReadFrom(t *testing.T) {
 			reader := bytes.NewReader([]byte(tc.input))
 			size, err := writer.ReadFrom(reader)
 			assert.NoError(t, err)
+
+			if writer.buf != nil && writer.file != nil {
+				assert.Len(t, writer.buf.Bytes(), 0)
+			}
 
 			err = writer.CloseForWriting()
 			assert.NoError(t, err)

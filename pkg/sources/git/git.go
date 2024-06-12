@@ -526,10 +526,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 	// Get the remote URL for reporting (may be empty)
 	remoteURL := getSafeRemoteURL(repo, "origin")
 	var repoCtx context.Context
-	if remoteURL != "" {
-		repoCtx = context.WithValue(ctx, "repo", remoteURL)
+
+	if ctx.Value("repo") == nil {
+		if remoteURL != "" {
+			repoCtx = context.WithValue(ctx, "repo", remoteURL)
+		} else {
+			repoCtx = context.WithValue(ctx, "repo", path)
+		}
 	} else {
-		repoCtx = context.WithValue(ctx, "repo", path)
+		repoCtx = ctx
 	}
 
 	logger := repoCtx.Logger()
@@ -785,6 +790,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	logger := ctx.Logger()
 	var logValues []any
+	logValues = append(logValues, "path", path)
 	if scanOptions.BaseHash != "" {
 		logValues = append(logValues, "base", scanOptions.BaseHash)
 	}
@@ -794,9 +800,8 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	if scanOptions.MaxDepth > 0 {
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
-	logger.Info("scanning repo", logValues...)
 
-	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
+	logger.V(1).Info("scanning staged changes", logValues...)
 
 	var depth int64
 	var lastCommitHash string

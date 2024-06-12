@@ -38,6 +38,12 @@ type MaxSecretSizeProvider interface {
 	MaxSecretSize() int64
 }
 
+// StartOffsetProvider is an optional interface that a detector can implement to
+// provide a custom start offset for the secret it finds.
+type StartOffsetProvider interface {
+	StartOffset() int64
+}
+
 // MultiPartCredentialProvider is an optional interface that a detector can implement
 // to indicate its compatibility with multi-part credentials and provide the maximum
 // secret size for the credential it finds.
