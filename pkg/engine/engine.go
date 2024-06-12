@@ -876,6 +876,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					detectorKeysWithResults[detector.Key] = detector
 				}
 
+				results = e.filterResults(ctx, detector.Detector, results, e.logFilteredUnverified)
 				for _, res := range results {
 					var val []byte
 					if res.RawV2 != nil {
@@ -992,21 +993,29 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
 		}
 
-		if e.filterUnverified {
-			results = detectors.CleanResults(results)
-		}
-
-		results = detectors.FilterKnownFalsePositives(ctx, data.detector, results, e.logFilteredUnverified)
-
-		if e.filterEntropy != 0 {
-			results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.logFilteredUnverified)
-		}
+		results = e.filterResults(ctx, data.detector.Detector, results, e.logFilteredUnverified)
 
 		for _, res := range results {
 			e.processResult(ctx, data, res, isFalsePositive)
 		}
 	}
 	data.wgDoneFn()
+}
+
+func (e *Engine) filterResults(
+	ctx context.Context,
+	detector detectors.Detector,
+	results []detectors.Result,
+	logFilteredUnverified bool,
+) []detectors.Result {
+	if e.filterUnverified {
+		results = detectors.CleanResults(results)
+	}
+	results = detectors.FilterKnownFalsePositives(ctx, detector, results, logFilteredUnverified)
+	if e.filterEntropy != 0 {
+		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, logFilteredUnverified)
+	}
+	return results
 }
 
 func (e *Engine) processResult(
