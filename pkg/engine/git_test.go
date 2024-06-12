@@ -76,7 +76,7 @@ func TestGitEngine(t *testing.T) {
 				Detectors:     DefaultDetectors(),
 				Verify:        true,
 				SourceManager: sourceManager,
-				Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
+				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
 			}
 
 			e, err := NewEngine(ctx, &conf)
@@ -138,7 +138,7 @@ func BenchmarkGitEngine(b *testing.B) {
 		Detectors:     DefaultDetectors(),
 		Verify:        false,
 		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &conf)

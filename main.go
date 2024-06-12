@@ -386,7 +386,7 @@ func run(state overseer.State) {
 		ExcludeDetectors:      *excludeDetectors,
 		CustomVerifiersOnly:   *customVerifiersOnly,
 		VerifierEndpoints:     *verifiers,
-		Dispatcher:            engine.NewPrinterNotifier(printer),
+		Dispatcher:            engine.NewPrinterDispatcher(printer),
 		FilterUnverified:      *filterUnverified,
 		FilterEntropy:         *filterEntropy,
 		VerificationOverlap:   *allowVerificationOverlap,

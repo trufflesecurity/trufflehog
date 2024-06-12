@@ -258,7 +258,7 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 		Detectors:     DefaultDetectors(),
 		Verify:        false,
 		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &conf)
@@ -305,7 +305,7 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 		Detectors:     []detectors.Detector{new(fakeDetectorV1), new(fakeDetectorV2)},
 		Verify:        true,
 		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &conf)
@@ -375,7 +375,7 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 		Detectors:     allDetectors,
 		Verify:        true,
 		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &conf)
@@ -422,7 +422,7 @@ func TestVerificationOverlapChunk(t *testing.T) {
 		Detectors:     conf.Detectors,
 		Verify:        false,
 		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &c)

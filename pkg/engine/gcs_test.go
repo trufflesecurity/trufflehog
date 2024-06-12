@@ -75,7 +75,7 @@ func TestScanGCS(t *testing.T) {
 				Detectors:     DefaultDetectors(),
 				Verify:        false,
 				SourceManager: sourceManager,
-				Dispatcher:    NewPrinterNotifier(new(discardPrinter)),
+				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
 			}
 
 			e, err := NewEngine(ctx, &conf)

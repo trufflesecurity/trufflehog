@@ -77,8 +77,8 @@ type Printer interface {
 // PrinterDispatcher wraps an existing Printer implementation and adapts it to the ResultsDispatcher interface.
 type PrinterDispatcher struct{ printer Printer }
 
-// NewPrinterNotifier creates a new PrinterDispatcher instance with the provided Printer.
-func NewPrinterNotifier(printer Printer) *PrinterDispatcher { return &PrinterDispatcher{printer} }
+// NewPrinterDispatcher creates a new PrinterDispatcher instance with the provided Printer.
+func NewPrinterDispatcher(printer Printer) *PrinterDispatcher { return &PrinterDispatcher{printer} }
 
 // Dispatch sends the result to the printer.
 func (p *PrinterDispatcher) Dispatch(ctx context.Context, result detectors.ResultWithMetadata) error {
@@ -310,7 +310,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	}
 
 	if e.dispatcher == nil {
-		e.dispatcher = NewPrinterNotifier(new(output.PlainPrinter))
+		e.dispatcher = NewPrinterDispatcher(new(output.PlainPrinter))
 	}
 	e.notifyVerifiedResults = true
 	e.notifyUnverifiedResults = true
