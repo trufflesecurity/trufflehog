@@ -717,6 +717,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitterconsumerkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tyntec"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typetalk"
@@ -1606,6 +1607,7 @@ func DefaultDetectors() []detectors.Detector {
 		onfleet.Scanner{},
 		intra42.Scanner{},
 		groq.Scanner{},
+		twitterconsumerkey.Scanner{},
 	}
 }
 
