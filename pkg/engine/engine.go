@@ -972,7 +972,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	// This avoids the need for additional regex processing on the entire chunk data.
 	matchedBytes := data.detector.Matches()
 	for _, match := range matchedBytes {
-		results, err := data.detector.FromData(ctx, data.chunk.Verify, match)
+		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, match)
 		if err != nil {
 			ctx.Logger().Error(err, "error scanning chunk")
 			continue
