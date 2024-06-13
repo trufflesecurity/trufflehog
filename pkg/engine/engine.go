@@ -1022,7 +1022,7 @@ func (e *Engine) processResult(
 	ctx context.Context,
 	data detectableChunk,
 	res detectors.Result,
-	isFalsePositive func(detectors.Result) bool,
+	isFalsePositive func(detectors.Result) (bool, string),
 ) {
 	ignoreLinePresent := false
 	if SupportsLineNumbers(data.chunk.SourceType) {
@@ -1047,7 +1047,8 @@ func (e *Engine) processResult(
 	secret.DecoderType = data.decoder
 
 	if !res.Verified && res.Raw != nil {
-		secret.IsWordlistFalsePositive = isFalsePositive(res)
+		isFp, _ := isFalsePositive(res)
+		secret.IsWordlistFalsePositive = isFp
 	}
 
 	e.results <- secret

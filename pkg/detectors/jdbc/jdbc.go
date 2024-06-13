@@ -106,8 +106,8 @@ matchLoop:
 	return
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func tryRedactAnonymousJDBC(conn string) string {

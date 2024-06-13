@@ -17,7 +17,10 @@ var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcd
 type FalsePositive string
 
 type CustomFalsePositiveChecker interface {
-	IsFalsePositive(result Result) bool
+	// IsFalsePositive returns two values:
+	// 1. Whether the result is a false positive.
+	// 2. If #1 is `true`, the reason why.
+	IsFalsePositive(result Result) (bool, string)
 }
 
 //go:embed "badlist.txt"
@@ -46,38 +49,40 @@ func init() {
 	filter = builder.Build()
 }
 
-func GetFalsePositiveCheck(detector Detector) func(Result) bool {
+func GetFalsePositiveCheck(detector Detector) func(Result) (bool, string) {
 	checker, ok := detector.(CustomFalsePositiveChecker)
 	if ok {
 		return checker.IsFalsePositive
 	}
 
-	return func(res Result) bool {
+	return func(res Result) (bool, string) {
 		return IsKnownFalsePositive(string(res.Raw), DefaultFalsePositives, true)
 	}
 }
 
-// IsKnownFalsePositive will not return a valid secret finding if any of the disqualifying conditions are met
-// Currently that includes: No number, english word in key, or matches common example patterns.
+// IsKnownFalsePositive returns whether a finding is (likely) a known false positive, and the reason for the detection.
+//
+// Currently, this includes: english word in key or matches common example patterns.
 // Only the secret key material should be passed into this function
-func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) bool {
+func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) (bool, string) {
 	if !utf8.ValidString(match) {
-		return true
+		return true, "invalid utf8"
 	}
 	lower := strings.ToLower(match)
 	for _, fp := range falsePositives {
-		if strings.Contains(lower, string(fp)) {
-			return true
+		fps := string(fp)
+		if strings.Contains(lower, fps) {
+			return true, "matches term: " + fps
 		}
 	}
 
 	if wordCheck {
-		if filter.MatchFirstString(lower) != nil {
-			return true
+		if m := filter.MatchFirstString(lower); m != nil {
+			return true, "matches wordlist: " + m.MatchString()
 		}
 	}
 
-	return false
+	return false, ""
 }
 
 func HasDigit(key string) bool {
@@ -153,10 +158,11 @@ func FilterKnownFalsePositives(ctx context.Context, detector Detector, results [
 
 	for _, result := range results {
 		if !result.Verified && result.Raw != nil {
-			if !isFalsePositive(result) {
+			isFp, reason := isFalsePositive(result)
+			if !isFp {
 				filteredResults = append(filteredResults, result)
 			} else if shouldLog {
-				ctx.Logger().Info("Filtered out known false positive", "result", result)
+				ctx.Logger().Info("Filtered out known false positive", "result", result, "reason", reason)
 			}
 		} else {
 			filteredResults = append(filteredResults, result)
