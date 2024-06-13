@@ -497,6 +497,54 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
 
+func TestRetainFalsePositives(t *testing.T) {
+	ctx := context.Background()
+
+	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	confPath, err := filepath.Abs("./testdata/verificationoverlap_detectors_fp.yaml")
+	assert.NoError(t, err)
+	conf, err := config.Read(confPath)
+	assert.NoError(t, err)
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	c := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     conf.Detectors,
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+		Results:       map[string]struct{}{"retain_false_positives": {}},
+	}
+
+	e, err := NewEngine(ctx, &c)
+	assert.NoError(t, err)
+
+	e.Start(ctx)
+
+	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
+	err = e.ScanFileSystem(ctx, cfg)
+	assert.NoError(t, err)
+
+	// Wait for all the chunks to be processed.
+	assert.NoError(t, e.Finish(ctx))
+	// We want 1 because the secret is a false positive and we are retaining it.
+	want := uint64(1)
+	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
 func TestFragmentFirstLineAndLink(t *testing.T) {
 	tests := []struct {
 		name         string

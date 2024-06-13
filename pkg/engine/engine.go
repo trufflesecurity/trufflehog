@@ -103,7 +103,7 @@ type Config struct {
 	Verify bool
 
 	// Defines which results will be notified by the engine
-	// (e.g., verified, unverified, unknown)
+	// (e.g., verified, unverified, unknown, filter_false_positives)
 	Results               map[string]struct{}
 	LogFilteredUnverified bool
 
@@ -156,6 +156,7 @@ type Engine struct {
 	notifyUnverifiedResults bool
 	notifyUnknownResults    bool
 	logFilteredUnverified   bool
+	retainFalsePositives    bool
 	verificationOverlap     bool
 	printAvgDetectorTime    bool
 	// By default, the engine will only scan a subset of the chunk if a detector matches the chunk.
@@ -280,6 +281,12 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 
 		_, ok = results["filtered_unverified"]
 		engine.logFilteredUnverified = ok
+
+		// If retain_false_positives is set, we also need to notify unverified results.
+		if _, ok = results["retain_false_positives"]; ok {
+			engine.retainFalsePositives = ok
+			engine.notifyUnverifiedResults = ok
+		}
 	}
 
 	if err := engine.initialize(ctx); err != nil {
@@ -1011,7 +1018,9 @@ func (e *Engine) filterResults(
 	if e.filterUnverified {
 		results = detectors.CleanResults(results)
 	}
-	results = detectors.FilterKnownFalsePositives(ctx, detector, results, logFilteredUnverified)
+	if !e.retainFalsePositives {
+		results = detectors.FilterKnownFalsePositives(ctx, detector, results, logFilteredUnverified)
+	}
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, logFilteredUnverified)
 	}
