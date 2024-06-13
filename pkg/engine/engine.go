@@ -876,7 +876,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					detectorKeysWithResults[detector.Key] = detector
 				}
 
-				results = e.filterResults(ctx, detector.Detector, results, e.logFilteredUnverified)
+				results = e.filterResults(ctx, detector, results, e.logFilteredUnverified)
 				for _, res := range results {
 					var val []byte
 					if res.RawV2 != nil {
@@ -993,7 +993,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
 		}
 
-		results = e.filterResults(ctx, data.detector.Detector, results, e.logFilteredUnverified)
+		results = e.filterResults(ctx, data.detector, results, e.logFilteredUnverified)
 
 		for _, res := range results {
 			e.processResult(ctx, data, res, isFalsePositive)
