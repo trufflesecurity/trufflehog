@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -726,8 +727,8 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgVerificationOverlap sync.WaitGroup
 
 	for chunk := range e.ChunksChan() {
+		startTime := time.Now()
 		sourceVerify := chunk.Verify
-		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 		for _, decoder := range e.decoders {
 			decoded := decoder.FromChunk(chunk)
 			if decoded == nil {
@@ -760,7 +761,23 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			continue
 		}
 
+		dataSize := float64(len(chunk.Data))
+
+		scanBytesPerChunk.Observe(dataSize)
+		jobBytesScanned.WithLabelValues(
+			strconv.Itoa(int(chunk.JobID)),
+			chunk.SourceType.String(),
+			chunk.SourceName,
+		).Add(dataSize)
+		chunksScannedLatency.Observe(float64(time.Since(startTime).Microseconds()))
+		jobChunksScanned.WithLabelValues(
+			strconv.Itoa(int(chunk.JobID)),
+			chunk.SourceType.String(),
+			chunk.SourceName,
+		).Inc()
+
 		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
+		atomic.AddUint64(&e.metrics.BytesScanned, uint64(dataSize))
 	}
 
 	wgVerificationOverlap.Wait()
@@ -950,7 +967,9 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 func (e *Engine) detectorWorker(ctx context.Context) {
 	for data := range e.detectableChunksChan {
+		start := time.Now()
 		e.detectChunk(ctx, data)
+		chunksDetectedLatency.Observe(float64(time.Since(start).Milliseconds()))
 	}
 }
 
@@ -965,18 +984,30 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
 
+	var matchCount int
 	// To reduce the overhead of regex calls in the detector,
 	// we limit the amount of data passed to each detector.
 	// The matches field of the DetectorMatch struct contains the
 	// relevant portions of the chunk data that were matched.
 	// This avoids the need for additional regex processing on the entire chunk data.
-	matchedBytes := data.detector.Matches()
-	for _, match := range matchedBytes {
-		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, match)
+	matches := data.detector.Matches()
+	for _, matchBytes := range matches {
+		matchCount++
+		detectBytesPerMatch.Observe(float64(len(matchBytes)))
+		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
 		if err != nil {
 			ctx.Logger().Error(err, "error scanning chunk")
 			continue
 		}
+
+		detectorExecutionCount.WithLabelValues(
+			data.detector.Type().String(),
+			strconv.Itoa(int(data.chunk.JobID)),
+			data.chunk.SourceName,
+		).Inc()
+		detectorExecutionDuration.WithLabelValues(
+			data.detector.Type().String(),
+		).Observe(float64(time.Since(start).Milliseconds()))
 
 		if e.printAvgDetectorTime && len(results) > 0 {
 			elapsed := time.Since(start)
@@ -999,6 +1030,9 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			e.processResult(ctx, data, res, isFalsePositive)
 		}
 	}
+
+	matchesPerChunk.Observe(float64(matchCount))
+
 	data.wgDoneFn()
 }
 
@@ -1055,6 +1089,7 @@ func (e *Engine) processResult(
 
 func (e *Engine) notifierWorker(ctx context.Context) {
 	for result := range e.ResultsChan() {
+		startTime := time.Now()
 		// Filter unwanted results, based on `--results`.
 		if !result.Verified {
 			if result.VerificationError() != nil {
@@ -1095,6 +1130,8 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 		if err := e.dispatcher.Dispatch(ctx, result); err != nil {
 			ctx.Logger().Error(err, "error notifying result")
 		}
+
+		chunksNotifiedLatency.Observe(float64(time.Since(startTime).Milliseconds()))
 	}
 }
 
