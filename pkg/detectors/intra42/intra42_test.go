@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
@@ -39,9 +40,8 @@ intra_client_secret = 's-s4t2ud-d91c558a2ba6b47f60f690efc20a33d28c252d5bed840034
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, 2)
-			ahoCorasickCore.PopulateMatchingDetectors(test.input, chunkSpecificDetectors)
-			if len(chunkSpecificDetectors) == 0 {
+			detectorMatches := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(detectorMatches) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
