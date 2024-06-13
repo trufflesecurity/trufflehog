@@ -2,10 +2,8 @@ package engine
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -54,24 +52,106 @@ type runtimeMetrics struct {
 	detectorAvgTime sync.Map
 }
 
+// getScanDuration returns the duration of the scan.
+// If the scan is still running, it returns the time since the scan started.
+func (m *Metrics) getScanDuration() time.Duration {
+	if m.ScanDuration == 0 {
+		return time.Since(m.scanStartTime)
+	}
+
+	return m.ScanDuration
+}
+
+// ResultsDispatcher is an interface for dispatching findings of detected results.
+// Implementations can vary from printing results to the console to sending results to an external system.
+type ResultsDispatcher interface {
+	Dispatch(ctx context.Context, result detectors.ResultWithMetadata) error
+}
+
 // Printer is used to format found results and output them to the user. Ex JSON, plain text, etc.
 // Please note printer implementations SHOULD BE thread safe.
 type Printer interface {
 	Print(ctx context.Context, r *detectors.ResultWithMetadata) error
 }
 
+// PrinterDispatcher wraps an existing Printer implementation and adapts it to the ResultsDispatcher interface.
+type PrinterDispatcher struct{ printer Printer }
+
+// NewPrinterDispatcher creates a new PrinterDispatcher instance with the provided Printer.
+func NewPrinterDispatcher(printer Printer) *PrinterDispatcher { return &PrinterDispatcher{printer} }
+
+// Dispatch sends the result to the printer.
+func (p *PrinterDispatcher) Dispatch(ctx context.Context, result detectors.ResultWithMetadata) error {
+	return p.printer.Print(ctx, &result)
+}
+
+// Config used to configure the engine.
+type Config struct {
+	// Number of concurrent scanner workers,
+	// also serves as a multiplier for other worker types (e.g., detector workers, notifier workers)
+	Concurrency int
+
+	Decoders                      []decoders.Decoder
+	Detectors                     []detectors.Detector
+	DetectorVerificationOverrides map[config.DetectorID]bool
+	IncludeDetectors              string
+	ExcludeDetectors              string
+	CustomVerifiersOnly           bool
+	VerifierEndpoints             map[string]string
+
+	// Verify determines whether the scanner will verify candidate secrets.
+	Verify bool
+
+	// Defines which results will be notified by the engine
+	// (e.g., verified, unverified, unknown)
+	Results               map[string]struct{}
+	LogFilteredUnverified bool
+
+	// FilterEntropy filters out unverified results using Shannon entropy.
+	FilterEntropy float64
+	// FilterUnverified sets the filterUnverified flag on the engine. If set to
+	// true, the engine will only return the first unverified result for a chunk for a detector.
+	FilterUnverified      bool
+	ShouldScanEntireChunk bool
+
+	Dispatcher ResultsDispatcher
+
+	// SourceManager is used to manage the sources and units.
+	// TODO (ahrav): Update this comment, i'm dumb and don't really know what else it does.
+	SourceManager *sources.SourceManager
+
+	// PrintAvgDetectorTime sets the printAvgDetectorTime flag on the engine. If set to
+	// true, the engine will print the average time taken by each detector.
+	// This option allows us to measure the time taken for each detector ONLY if
+	// the engine is configured to print the results.
+	// Calculating the average time taken by each detector is an expensive operation
+	// and should be avoided unless specified by the user.
+	PrintAvgDetectorTime bool
+
+	// VerificationOverlap determines whether the scanner will attempt to verify candidate secrets
+	// that have been detected by multiple detectors.
+	// By default, it is set to true.
+	VerificationOverlap bool
+}
+
+// Engine represents the core scanning engine responsible for detecting secrets in input data.
+// It manages the lifecycle of the scanning process, including initialization, worker management,
+// and result notification. The engine is designed to be flexible and configurable, allowing for
+// customization through various options and configurations.
 type Engine struct {
 	// CLI flags.
-	concurrency     int
-	decoders        []decoders.Decoder
-	detectors       []detectors.Detector
-	jobReportWriter io.WriteCloser
+	concurrency int
+	decoders    []decoders.Decoder
+	detectors   []detectors.Detector
+	// Any detectors configured to override sources' verification flags
+	detectorVerificationOverrides map[config.DetectorID]bool
+
 	// filterUnverified is used to reduce the number of unverified results.
 	// If there are multiple unverified results for the same chunk for the same detector,
 	// only the first one will be kept.
 	filterUnverified bool
 	// entropyFilter is used to filter out unverified results using Shannon entropy.
-	filterEntropy           *float64
+	filterEntropy           float64
 	notifyVerifiedResults   bool
 	notifyUnverifiedResults bool
 	notifyUnknownResults    bool
@@ -100,152 +180,242 @@ type Engine struct {
 	// numFoundResults is used to keep track of the number of results found.
 	numFoundResults uint32
 
-	// printer provides a method for formatting and outputting search results.
-	// The specific implementation (e.g., JSON, plain text)
-	// should be set during initialization based on user preference or program requirements.
-	printer Printer
+	// ResultsDispatcher is used to send results.
+	dispatcher ResultsDispatcher
 
 	// dedupeCache is used to deduplicate results by comparing the
 	// detector type, raw result, and source metadata
 	dedupeCache *lru.Cache[string, detectorspb.DecoderType]
 
-	// verify determines whether the scanner will attempt to verify candidate secrets
+	// verify determines whether the scanner will attempt to verify candidate secrets.
 	verify bool
 
-	// Note: bad hack only used for testing
+	// Note: bad hack only used for testing.
 	verificationOverlapTracker *verificationOverlapTracker
 }
 
-type verificationOverlapTracker struct {
-	verificationOverlapDuplicateCount int
-	mu                                sync.Mutex
-}
-
-func (r *verificationOverlapTracker) increment() {
-	r.mu.Lock()
-	r.verificationOverlapDuplicateCount++
-	r.mu.Unlock()
-}
-
-// Option is used to configure the engine during initialization using functional options.
-type Option func(*Engine)
-
-func WithJobReportWriter(w io.WriteCloser) Option {
-	return func(e *Engine) {
-		e.jobReportWriter = w
+// NewEngine creates a new Engine instance with the provided configuration.
+func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
+	engine := &Engine{
+		concurrency:                   cfg.Concurrency,
+		decoders:                      cfg.Decoders,
+		detectors:                     cfg.Detectors,
+		dispatcher:                    cfg.Dispatcher,
+		verify:                        cfg.Verify,
+		filterUnverified:              cfg.FilterUnverified,
+		filterEntropy:                 cfg.FilterEntropy,
+		printAvgDetectorTime:          cfg.PrintAvgDetectorTime,
+		logFilteredUnverified:         cfg.LogFilteredUnverified,
+		verificationOverlap:           cfg.VerificationOverlap,
+		sourceManager:                 cfg.SourceManager,
+		scanEntireChunk:               cfg.ShouldScanEntireChunk,
+		detectorVerificationOverrides: cfg.DetectorVerificationOverrides,
 	}
-}
-
-func WithConcurrency(concurrency int) Option {
-	return func(e *Engine) {
-		e.concurrency = concurrency
+	if engine.sourceManager == nil {
+		return nil, fmt.Errorf("source manager is required")
 	}
-}
 
-const ignoreTag = "trufflehog:ignore"
+	engine.setDefaults(ctx)
 
-func WithDetectors(d ...detectors.Detector) Option {
-	return func(e *Engine) {
-		e.detectors = append(e.detectors, d...)
+	// Build include and exclude detector sets for filtering on engine initialization.
+	includeDetectorSet, excludeDetectorSet, err := buildDetectorSets(cfg)
+	if err != nil {
+		return nil, err
 	}
-}
 
-func WithDecoders(decoders ...decoders.Decoder) Option {
-	return func(e *Engine) {
-		e.decoders = decoders
+	// Apply include/exclude filters.
+	var filters []func(detectors.Detector) bool
+
+	if len(includeDetectorSet) > 0 {
+		filters = append(filters, func(d detectors.Detector) bool {
+			_, ok := getWithDetectorID(d, includeDetectorSet)
+			return ok
+		})
 	}
-}
 
-// WithFilterUnverified sets the filterUnverified flag on the engine. If set to
-// true, the engine will only return the first unverified result for a chunk for a detector.
-func WithFilterUnverified(filter bool) Option {
-	return func(e *Engine) {
-		e.filterUnverified = filter
+	if len(excludeDetectorSet) > 0 {
+		filters = append(filters, func(d detectors.Detector) bool {
+			_, ok := getWithDetectorID(d, excludeDetectorSet)
+			return !ok
+		})
 	}
-}
 
-// WithFilterEntropy filters out unverified results using Shannon entropy.
-func WithFilterEntropy(entropy float64) Option {
-	return func(e *Engine) {
-		if entropy > 0 {
-			e.filterEntropy = &entropy
-		}
+	// Apply custom verifier endpoints to detectors that support it.
+	detectorsWithCustomVerifierEndpoints, err := parseCustomVerifierEndpoints(cfg.VerifierEndpoints)
+	if err != nil {
+		return nil, err
 	}
-}
 
-// WithResults defines which results will be printed by the engine.
-func WithResults(results map[string]struct{}) Option {
-	return func(e *Engine) {
-		if len(results) == 0 {
-			return
-		}
+	if len(detectorsWithCustomVerifierEndpoints) > 0 {
+		filters = append(filters, func(d detectors.Detector) bool {
+			urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
+			if !ok {
+				return true
+			}
+			customizer, ok := d.(detectors.EndpointCustomizer)
+			if !ok {
+				return false
+			}
 
+			if !cfg.CustomVerifiersOnly || len(urls) == 0 {
+				urls = append(urls, customizer.DefaultEndpoint())
+			}
+			if err := customizer.SetEndpoints(urls...); err != nil {
+				return false
+			}
+			return true
+		})
+	}
+	engine.applyFilters(filters...)
+
+	if results := cfg.Results; len(results) > 0 {
 		_, ok := results["verified"]
-		e.notifyVerifiedResults = ok
+		engine.notifyVerifiedResults = ok
 
 		_, ok = results["unknown"]
-		e.notifyUnknownResults = ok
+		engine.notifyUnknownResults = ok
 
 		_, ok = results["unverified"]
-		e.notifyUnverifiedResults = ok
+		engine.notifyUnverifiedResults = ok
 
 		_, ok = results["filtered_unverified"]
-		e.logFilteredUnverified = ok
+		engine.logFilteredUnverified = ok
 	}
+
+	if err := engine.initialize(ctx); err != nil {
+		return nil, err
+	}
+
+	return engine, nil
 }
 
-// WithPrintAvgDetectorTime sets the printAvgDetectorTime flag on the engine. If set to
-// true, the engine will print the average time taken by each detector.
-// This option allows us to measure the time taken for each detector ONLY if
-// the engine is configured to print the results.
-// Calculating the average time taken by each detector is an expensive operation
-// and should be avoided unless specified by the user.
-func WithPrintAvgDetectorTime(printAvgDetectorTime bool) Option {
-	return func(e *Engine) {
-		e.printAvgDetectorTime = printAvgDetectorTime
+// setDefaults ensures that if specific engine properties aren't provided,
+// they're set to reasonable default values. It makes the engine robust to
+// incomplete configuration.
+func (e *Engine) setDefaults(ctx context.Context) {
+	if e.concurrency == 0 {
+		numCPU := runtime.NumCPU()
+		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
+		e.concurrency = numCPU
 	}
+	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
+
+	// Default decoders handle common encoding formats.
+	if len(e.decoders) == 0 {
+		e.decoders = decoders.DefaultDecoders()
+	}
+
+	if len(e.detectors) == 0 {
+		e.detectors = DefaultDetectors()
+	}
+
+	if e.dispatcher == nil {
+		e.dispatcher = NewPrinterDispatcher(new(output.PlainPrinter))
+	}
+	e.notifyVerifiedResults = true
+	e.notifyUnverifiedResults = true
+	e.notifyUnknownResults = true
+
+	ctx.Logger().V(4).Info("default engine options set")
 }
 
-// WithFilterDetectors applies a filter to the configured list of detectors. If
-// the filterFunc returns true, the detector will be included for scanning.
-// This option applies to the existing list of detectors configured, so the
-// order this option appears matters. All filtering happens before scanning.
-func WithFilterDetectors(filterFunc func(detectors.Detector) bool) Option {
-	return func(e *Engine) {
-		// If no detectors are configured, do nothing.
-		if e.detectors == nil {
-			return
+func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.DetectorID]struct{}, error) {
+	includeList, err := config.ParseDetectors(cfg.IncludeDetectors)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid include list detector configuration: %w", err)
+	}
+	excludeList, err := config.ParseDetectors(cfg.ExcludeDetectors)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid exclude list detector configuration: %w", err)
+	}
+
+	includeDetectorSet := detectorTypeToSet(includeList)
+	excludeDetectorSet := detectorTypeToSet(excludeList)
+
+	// Verify that all the user-provided detectors support the optional
+	// detector features.
+	if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
+		return nil, nil, fmt.Errorf("invalid include list detector configuration id %v: %w", id, err)
+	}
+
+	if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
+		return nil, nil, fmt.Errorf("invalid exclude list detector configuration id %v: %w", id, err)
+	}
+
+	return includeDetectorSet, excludeDetectorSet, nil
+}
+
+func parseCustomVerifierEndpoints(endpoints map[string]string) (map[config.DetectorID][]string, error) {
+	if len(endpoints) == 0 {
+		return nil, nil
+	}
+
+	customVerifierEndpoints, err := config.ParseVerifierEndpoints(endpoints)
+	if err != nil {
+		return nil, fmt.Errorf("invalid verifier detector configuration: %w", err)
+	}
+
+	if id, err := verifyDetectorsAreVersioner(customVerifierEndpoints); err != nil {
+		return nil, fmt.Errorf("invalid verifier detector configuration id %v: %w", id, err)
+	}
+	// Extra check for endpoint customization.
+	isEndpointCustomizer := DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
+	for id := range customVerifierEndpoints {
+		if _, ok := isEndpointCustomizer[id.ID]; !ok {
+			return nil, fmt.Errorf("endpoint provided but detector does not support endpoint customization: %w", err)
 		}
-		e.detectors = filterDetectors(filterFunc, e.detectors)
 	}
+	return customVerifierEndpoints, nil
 }
 
-// WithPrinter sets the Printer on the engine.
-func WithPrinter(printer Printer) Option {
-	return func(e *Engine) {
-		e.printer = printer
+// detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
+func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
+	out := make(map[config.DetectorID]struct{}, len(detectors))
+	for _, d := range detectors {
+		out[d] = struct{}{}
 	}
+	return out
 }
 
-// WithVerify configures whether the scanner will verify candidate secrets.
-func WithVerify(verify bool) Option {
-	return func(e *Engine) {
-		e.verify = verify
+// getWithDetectorID is a helper function to get a value from a map using a
+// detector's ID. This function behaves like a normal map lookup, with an extra
+// step of checking for the non-specific version of a detector.
+func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T) (T, bool) {
+	key := config.GetDetectorID(d)
+	// Check if the specific ID is provided.
+	if t, ok := data[key]; ok || key.Version == 0 {
+		return t, ok
 	}
+	// Check if the generic type is provided without a version.
+	// This means "all" versions of a type.
+	key.Version = 0
+	t, ok := data[key]
+	return t, ok
 }
 
-func withVerificationOverlapTracking() Option {
-	return func(e *Engine) {
-		e.verificationOverlapTracker = &verificationOverlapTracker{
-			verificationOverlapDuplicateCount: 0,
+// verifyDetectorsAreVersioner checks all keys in a provided map to verify the
+// provided type is actually a Versioner.
+func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (config.DetectorID, error) {
+	isVersioner := DefaultDetectorTypesImplementing[detectors.Versioner]()
+	for id := range data {
+		if id.Version == 0 {
+			// Version not provided.
+			continue
 		}
+		if _, ok := isVersioner[id.ID]; ok {
+			// Version provided for a Versioner detector.
+			continue
+		}
+		// Version provided on a non-Versioner detector.
+		return id, fmt.Errorf("version provided but detector does not have a version")
 	}
+	return config.DetectorID{}, nil
 }
 
-// WithVerificationOverlap
-func WithVerificationOverlap(verificationOverlap bool) Option {
-	return func(e *Engine) {
-		e.verificationOverlap = verificationOverlap
+// applyFilters applies a variable number of filters to the detectors.
+func (e *Engine) applyFilters(filters ...func(detectors.Detector) bool) {
+	for _, filter := range filters {
+		e.detectors = filterDetectors(filter, e.detectors)
 	}
 }
 
@@ -259,10 +429,67 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 	return out
 }
 
-// WithEntireChunkScan sets the flag to configure AhoCorasickCore to scan entire chunks.
-func WithEntireChunkScan(enabled bool) Option {
-	return func(e *Engine) { e.scanEntireChunk = enabled }
+// initialize prepares the engine's internal structures. The LRU cache optimizes
+// deduplication efforts, allowing the engine to quickly check if a chunk has
+// been processed before, thereby saving computational overhead.
+func (e *Engine) initialize(ctx context.Context) error {
+	// TODO (ahrav): Determine the optimal cache size.
+	const cacheSize = 512 // number of entries in the LRU cache
+
+	cache, err := lru.New[string, detectorspb.DecoderType](cacheSize)
+	if err != nil {
+		return fmt.Errorf("failed to initialize LRU cache: %w", err)
+	}
+	const (
+		// detectableChunksChanMultiplier is set to accommodate a high number of concurrent worker goroutines.
+		// This multiplier ensures that the detectableChunksChan channel has sufficient buffer capacity
+		// to hold messages from multiple worker groups (detector workers/ verificationOverlap workers) without blocking.
+		// A large buffer helps accommodate for the fact workers are producing data at a faster rate
+		// than it can be consumed.
+		detectableChunksChanMultiplier = 50
+		// verificationOverlapChunksChanMultiplier uses a smaller buffer compared to detectableChunksChanMultiplier.
+		// This reflects the anticipated lower volume of data that needs re-verification.
+		// The buffer size is a trade-off between memory usage and the need to prevent blocking.
+		verificationOverlapChunksChanMultiplier = 25
+	)
+
+	// Channels are used for communication between different parts of the engine,
+	// ensuring that data flows smoothly without race conditions.
+	// The buffer sizes for these channels are set to multiples of defaultChannelBuffer,
+	// considering the expected concurrency and workload in the system.
+	e.detectableChunksChan = make(chan detectableChunk, defaultChannelBuffer*detectableChunksChanMultiplier)
+	e.verificationOverlapChunksChan = make(
+		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
+	)
+	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
+	e.dedupeCache = cache
+	ctx.Logger().V(4).Info("engine initialized")
+
+	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
+	var ahoCOptions []ahocorasick.CoreOption
+	if e.scanEntireChunk {
+		ahoCOptions = append(ahoCOptions, ahocorasick.WithSpanCalculator(new(ahocorasick.EntireChunkSpanCalculator)))
+	}
+
+	ctx.Logger().V(4).Info("setting up aho-corasick core")
+	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
+	ctx.Logger().V(4).Info("set up aho-corasick core")
+
+	return nil
 }
+
+type verificationOverlapTracker struct {
+	verificationOverlapDuplicateCount int
+	mu                                sync.Mutex
+}
+
+func (r *verificationOverlapTracker) increment() {
+	r.mu.Lock()
+	r.verificationOverlapDuplicateCount++
+	r.mu.Unlock()
+}
+
+const ignoreTag = "trufflehog:ignore"
 
 // HasFoundResults returns true if any results are found.
 func (e *Engine) HasFoundResults() bool {
@@ -310,16 +537,6 @@ func (e *Engine) GetDetectorsMetrics() map[string]time.Duration {
 	return result
 }
 
-// getScanDuration returns the duration of the scan.
-// If the scan is still running, it returns the time since the scan started.
-func (m *Metrics) getScanDuration() time.Duration {
-	if m.ScanDuration == 0 {
-		return time.Since(m.scanStartTime)
-	}
-
-	return m.ScanDuration
-}
-
 // DetectorAvgTime returns the average time taken by each detector.
 func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 	logger := context.Background().Logger()
@@ -344,146 +561,15 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 
 // Start initializes and activates the engine's processing pipeline.
 // It sets up various default configurations, prepares lookup structures for
-// detectors, conducts basic sanity checks, and kickstarts all necessary workers.
-// Once started, the engine begins processing input data to identify secrets.
-func Start(ctx context.Context, options ...Option) (*Engine, error) {
-	e := &Engine{}
-
-	if err := e.initialize(ctx, options...); err != nil {
-		return nil, err
-	}
-	e.initSourceManager(ctx)
-	e.setDefaults(ctx)
+// detectors, and kickstarts all necessary workers. Once started, the engine
+// begins processing input data to identify secrets.
+func (e *Engine) Start(ctx context.Context) {
+	e.metrics = runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}}
 	e.sanityChecks(ctx)
 	e.startWorkers(ctx)
-
-	return e, nil
 }
 
 var defaultChannelBuffer = runtime.NumCPU()
-
-// initialize prepares the engine's internal structures. The LRU cache optimizes
-// deduplication efforts, allowing the engine to quickly check if a chunk has
-// been processed before, thereby saving computational overhead.
-func (e *Engine) initialize(ctx context.Context, options ...Option) error {
-	// TODO (ahrav): Determine the optimal cache size.
-	const cacheSize = 512 // number of entries in the LRU cache
-
-	cache, err := lru.New[string, detectorspb.DecoderType](cacheSize)
-	if err != nil {
-		return fmt.Errorf("failed to initialize LRU cache: %w", err)
-	}
-	const (
-		// detectableChunksChanMultiplier is set to accommodate a high number of concurrent worker goroutines.
-		// This multiplier ensures that the detectableChunksChan channel has sufficient buffer capacity
-		// to hold messages from multiple worker groups (detector workers/ verificationOverlap workers) without blocking.
-		// A large buffer helps accommodate for the fact workers are producing data at a faster rate
-		// than it can be consumed.
-		detectableChunksChanMultiplier = 50
-		// verificationOverlapChunksChanMultiplier uses a smaller buffer compared to detectableChunksChanMultiplier.
-		// This reflects the anticipated lower volume of data that needs re-verification.
-		// The buffer size is a trade-off between memory usage and the need to prevent blocking.
-		verificationOverlapChunksChanMultiplier = 25
-	)
-
-	// Channels are used for communication between different parts of the engine,
-	// ensuring that data flows smoothly without race conditions.
-	// The buffer sizes for these channels are set to multiples of defaultChannelBuffer,
-	// considering the expected concurrency and workload in the system.
-	e.detectableChunksChan = make(chan detectableChunk, defaultChannelBuffer*detectableChunksChanMultiplier)
-	e.notifyVerifiedResults = true
-	e.notifyUnknownResults = true
-	e.notifyUnverifiedResults = true
-	e.verificationOverlapChunksChan = make(
-		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
-	)
-	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
-	e.dedupeCache = cache
-	e.printer = new(output.PlainPrinter)
-	e.metrics = runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}}
-
-	for _, option := range options {
-		option(e)
-	}
-	ctx.Logger().V(4).Info("engine initialized")
-
-	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
-	var ahoCOptions []ahocorasick.CoreOption
-	if e.scanEntireChunk {
-		ahoCOptions = append(ahoCOptions, ahocorasick.WithSpanCalculator(new(ahocorasick.EntireChunkSpanCalculator)))
-	}
-
-	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
-	ctx.Logger().V(4).Info("set up aho-corasick core")
-
-	return nil
-}
-
-func (e *Engine) initSourceManager(ctx context.Context) {
-	const defaultOutputBufferSize = 64
-
-	opts := []func(*sources.SourceManager){
-		sources.WithConcurrentSources(e.concurrency),
-		sources.WithConcurrentUnits(e.concurrency),
-		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultOutputBufferSize),
-	}
-	if e.jobReportWriter != nil {
-		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
-		opts = append(opts, sources.WithReportHook(unitHook))
-		e.wgDetectorWorkers.Add(1)
-		go func() {
-			defer e.wgDetectorWorkers.Done()
-			defer func() {
-				e.jobReportWriter.Close()
-				// Add a bit of extra information if it's a *os.File.
-				if namer, ok := e.jobReportWriter.(interface{ Name() string }); ok {
-					ctx.Logger().Info("report written", "path", namer.Name())
-				} else {
-					ctx.Logger().Info("report written")
-				}
-			}()
-			for metrics := range finishedMetrics {
-				metrics.Errors = common.ExportErrors(metrics.Errors...)
-				details, err := json.Marshal(map[string]any{
-					"version": 1,
-					"data":    metrics,
-				})
-				if err != nil {
-					ctx.Logger().Error(err, "error marshalling job details")
-					continue
-				}
-				if _, err := e.jobReportWriter.Write(append(details, '\n')); err != nil {
-					ctx.Logger().Error(err, "error writing to file")
-				}
-			}
-		}()
-	}
-	e.sourceManager = sources.NewManager(opts...)
-}
-
-// setDefaults ensures that if specific engine properties aren't provided,
-// they're set to reasonable default values. It makes the engine robust to
-// incomplete configuration.
-func (e *Engine) setDefaults(ctx context.Context) {
-	if e.concurrency == 0 {
-		numCPU := runtime.NumCPU()
-		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
-		e.concurrency = numCPU
-	}
-	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
-
-	// Default decoders handle common encoding formats.
-	if len(e.decoders) == 0 {
-		e.decoders = decoders.DefaultDecoders()
-	}
-
-	if len(e.detectors) == 0 {
-		e.detectors = DefaultDetectors()
-	}
-	ctx.Logger().V(4).Info("default engine options set")
-}
 
 // Sanity check detectors for duplicate configuration. Only log in case
 // a detector has been configured in a way that isn't represented by
@@ -504,19 +590,36 @@ func (e *Engine) sanityChecks(ctx context.Context) {
 // workers helps in scalability and makes it easier to diagnose issues.
 func (e *Engine) startWorkers(ctx context.Context) {
 	// Scanner workers process input data and extract chunks for detectors.
+	e.startScannerWorkers(ctx)
+
+	// Detector workers apply keyword matching, regexes and API calls to detect secrets in chunks.
+	e.startDetectorWorkers(ctx)
+
+	// verificationOverlap workers handle verification of chunks that have been detected by multiple detectors.
+	// They ensure that verification is disabled for any secrets that have been detected by multiple detectors.
+	e.startVerificationOverlapWorkers(ctx)
+
+	// ResultsDispatcher workers communicate detected issues to the user or any downstream systems.
+	// We want 1/4th of the notifier workers as the number of scanner workers.
+	e.startNotifierWorkers(ctx)
+}
+
+func (e *Engine) startScannerWorkers(ctx context.Context) {
 	ctx.Logger().V(2).Info("starting scanner workers", "count", e.concurrency)
 	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.workersWg.Add(1)
 		go func() {
-			ctx := context.WithValue(ctx, "secret_worker_id", common.RandomID(5))
+			ctx := context.WithValue(ctx, "scanner_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
 			defer e.workersWg.Done()
-			e.detectorWorker(ctx)
+			e.scannerWorker(ctx)
 		}()
 	}
+}
 
-	// Detector workers apply keyword matching, regexes and API calls to detect secrets in chunks.
-	const detectorWorkerMultiplier = 50
+const detectorWorkerMultiplier = 50
+
+func (e *Engine) startDetectorWorkers(ctx context.Context) {
 	ctx.Logger().V(2).Info("starting detector workers", "count", e.concurrency*detectorWorkerMultiplier)
 	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
 		e.wgDetectorWorkers.Add(1)
@@ -524,12 +627,12 @@ func (e *Engine) startWorkers(ctx context.Context) {
 			ctx := context.WithValue(ctx, "detector_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
 			defer e.wgDetectorWorkers.Done()
-			e.detectChunks(ctx)
+			e.detectorWorker(ctx)
 		}()
 	}
+}
 
-	// verificationOverlap workers handle verification of chunks that have been detected by multiple detectors.
-	// They ensure that verification is disabled for any secrets that have been detected by multiple detectors.
+func (e *Engine) startVerificationOverlapWorkers(ctx context.Context) {
 	const verificationOverlapWorkerMultiplier = detectorWorkerMultiplier
 	ctx.Logger().V(2).Info("starting verificationOverlap workers", "count", e.concurrency)
 	for worker := uint64(0); worker < uint64(e.concurrency*verificationOverlapWorkerMultiplier); worker++ {
@@ -541,9 +644,9 @@ func (e *Engine) startWorkers(ctx context.Context) {
 			e.verificationOverlapWorker(ctx)
 		}()
 	}
+}
 
-	// Notifier workers communicate detected issues to the user or any downstream systems.
-	// We want 1/4th of the notifier workers as the number of scanner workers.
+func (e *Engine) startNotifierWorkers(ctx context.Context) {
 	const notifierWorkerRatio = 4
 	maxNotifierWorkers := 1
 	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
@@ -556,7 +659,7 @@ func (e *Engine) startWorkers(ctx context.Context) {
 			ctx := context.WithValue(ctx, "notifier_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
 			defer e.WgNotifier.Done()
-			e.notifyResults(ctx)
+			e.notifierWorker(ctx)
 		}()
 	}
 }
@@ -618,11 +721,12 @@ type verificationOverlapChunk struct {
 	verificationOverlapWgDoneFn func()
 }
 
-func (e *Engine) detectorWorker(ctx context.Context) {
+func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
 
 	for chunk := range e.ChunksChan() {
+		sourceVerify := chunk.Verify
 		atomic.AddUint64(&e.metrics.BytesScanned, uint64(len(chunk.Data)))
 		for _, decoder := range e.decoders {
 			decoded := decoder.FromChunk(chunk)
@@ -644,7 +748,7 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 			}
 
 			for _, detector := range matchingDetectors {
-				decoded.Chunk.Verify = e.verify
+				decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
 				wgDetect.Add(1)
 				e.detectableChunksChan <- detectableChunk{
 					chunk:    *decoded.Chunk,
@@ -662,6 +766,41 @@ func (e *Engine) detectorWorker(ctx context.Context) {
 	wgVerificationOverlap.Wait()
 	wgDetect.Wait()
 	ctx.Logger().V(4).Info("finished scanning chunks")
+}
+
+func (e *Engine) shouldVerifyChunk(
+	sourceVerify bool,
+	detector detectors.Detector,
+	detectorVerificationOverrides map[config.DetectorID]bool,
+) bool {
+	// The verify flag takes precedence over the detector's verification flag.
+	if !e.verify {
+		return false
+	}
+
+	detectorId := config.DetectorID{ID: detector.Type(), Version: 0}
+
+	if v, ok := detector.(detectors.Versioner); ok {
+		detectorId.Version = v.Version()
+	}
+
+	if detectorVerify, ok := detectorVerificationOverrides[detectorId]; ok {
+		return detectorVerify
+	}
+
+	// If the user is running with a detector verification override that does not specify a particular detector version,
+	// then its override map entry will have version 0. We should check for that too, but if the detector being checked
+	// doesn't have any version information then its version is 0, so we've already done the check, and we don't need to
+	// do it a second time.
+	if detectorId.Version != 0 {
+		detectorId.Version = 0
+
+		if detectorVerify, ok := detectorVerificationOverrides[detectorId]; ok {
+			return detectorVerify
+		}
+	}
+
+	return sourceVerify
 }
 
 // chunkSecretKey ties secrets to the specific detector that found them. This allows identifying identical
@@ -720,6 +859,8 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 	for chunk := range e.verificationOverlapChunksChan {
 		for _, detector := range chunk.detectors {
+			isFalsePositive := detectors.GetFalsePositiveCheck(detector.Detector)
+
 			// DO NOT VERIFY at this stage of the pipeline.
 			matchedBytes := detector.Matches()
 			for _, match := range matchedBytes {
@@ -760,12 +901,17 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 							e.verificationOverlapTracker.increment()
 						}
 						res.SetVerificationError(errOverlap)
-						e.processResult(ctx, detectableChunk{
-							chunk:    chunk.chunk,
-							detector: detector,
-							decoder:  chunk.decoder,
-							wgDoneFn: wgDetect.Done,
-						}, res)
+						e.processResult(
+							ctx,
+							detectableChunk{
+								chunk:    chunk.chunk,
+								detector: detector,
+								decoder:  chunk.decoder,
+								wgDoneFn: wgDetect.Done,
+							},
+							res,
+							isFalsePositive,
+						)
 
 						// Remove the detector key from the list of detector keys with results.
 						// This is to ensure that the chunk is not reprocessed with verification enabled
@@ -779,7 +925,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 
 		for _, detector := range detectorKeysWithResults {
 			wgDetect.Add(1)
-			chunk.chunk.Verify = e.verify
+			chunk.chunk.Verify = e.shouldVerifyChunk(chunk.chunk.Verify, detector, e.detectorVerificationOverrides)
 			e.detectableChunksChan <- detectableChunk{
 				chunk:    chunk.chunk,
 				detector: detector,
@@ -802,7 +948,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	wgDetect.Wait()
 }
 
-func (e *Engine) detectChunks(ctx context.Context) {
+func (e *Engine) detectorWorker(ctx context.Context) {
 	for data := range e.detectableChunksChan {
 		e.detectChunk(ctx, data)
 	}
@@ -817,6 +963,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	defer common.Recover(ctx)
 	defer cancel()
 
+	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
+
 	// To reduce the overhead of regex calls in the detector,
 	// we limit the amount of data passed to each detector.
 	// The matches field of the DetectorMatch struct contains the
@@ -824,7 +972,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	// This avoids the need for additional regex processing on the entire chunk data.
 	matchedBytes := data.detector.Matches()
 	for _, match := range matchedBytes {
-		results, err := data.detector.FromData(ctx, data.chunk.Verify, match)
+		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, match)
 		if err != nil {
 			ctx.Logger().Error(err, "error scanning chunk")
 			continue
@@ -848,16 +996,12 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results = e.filterResults(ctx, data.detector, results, e.logFilteredUnverified)
 
 		for _, res := range results {
-			e.processResult(ctx, data, res)
+			e.processResult(ctx, data, res, isFalsePositive)
 		}
 	}
 	data.wgDoneFn()
 }
 
-// filterResults applies multiple filters to the detection results to reduce false positives
-// and ensure the results meet specific criteria such as verification status and entropy level.
-// This function centralizes the filtering logic, making it reusable across different stages
-// of the detection pipeline.
 func (e *Engine) filterResults(
 	ctx context.Context,
 	detector detectors.Detector,
@@ -868,13 +1012,18 @@ func (e *Engine) filterResults(
 		results = detectors.CleanResults(results)
 	}
 	results = detectors.FilterKnownFalsePositives(ctx, detector, results, logFilteredUnverified)
-	if e.filterEntropy != nil {
-		results = detectors.FilterResultsWithEntropy(ctx, results, *e.filterEntropy, logFilteredUnverified)
+	if e.filterEntropy != 0 {
+		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, logFilteredUnverified)
 	}
 	return results
 }
 
-func (e *Engine) processResult(ctx context.Context, data detectableChunk, res detectors.Result) {
+func (e *Engine) processResult(
+	ctx context.Context,
+	data detectableChunk,
+	res detectors.Result,
+	isFalsePositive func(detectors.Result) bool,
+) {
 	ignoreLinePresent := false
 	if SupportsLineNumbers(data.chunk.SourceType) {
 		copyChunk := data.chunk
@@ -896,14 +1045,19 @@ func (e *Engine) processResult(ctx context.Context, data detectableChunk, res de
 
 	secret := detectors.CopyMetadata(&data.chunk, res)
 	secret.DecoderType = data.decoder
+
+	if !res.Verified && res.Raw != nil {
+		secret.IsWordlistFalsePositive = isFalsePositive(res)
+	}
+
 	e.results <- secret
 }
 
-func (e *Engine) notifyResults(ctx context.Context) {
-	for r := range e.ResultsChan() {
+func (e *Engine) notifierWorker(ctx context.Context) {
+	for result := range e.ResultsChan() {
 		// Filter unwanted results, based on `--results`.
-		if !r.Verified {
-			if r.VerificationError() != nil {
+		if !result.Verified {
+			if result.VerificationError() != nil {
 				if !e.notifyUnknownResults {
 					// Skip results with verification errors.
 					continue
@@ -925,21 +1079,21 @@ func (e *Engine) notifyResults(ctx context.Context) {
 		// Duplicate results with the same decoder type SHOULD have their own entry in the
 		// results list, this would happen if the same secret is found multiple times.
 		// Note: If the source type is postman, we dedupe the results regardless of decoder type.
-		key := fmt.Sprintf("%s%s%s%+v", r.DetectorType.String(), r.Raw, r.RawV2, r.SourceMetadata)
-		if val, ok := e.dedupeCache.Get(key); ok && (val != r.DecoderType ||
-			r.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
+		key := fmt.Sprintf("%s%s%s%+v", result.DetectorType.String(), result.Raw, result.RawV2, result.SourceMetadata)
+		if val, ok := e.dedupeCache.Get(key); ok && (val != result.DecoderType ||
+			result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
 			continue
 		}
-		e.dedupeCache.Add(key, r.DecoderType)
+		e.dedupeCache.Add(key, result.DecoderType)
 
-		if r.Verified {
+		if result.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
 		} else {
 			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
 		}
 
-		if err := e.printer.Print(ctx, &r); err != nil {
-			ctx.Logger().Error(err, "error printing result")
+		if err := e.dispatcher.Dispatch(ctx, result); err != nil {
+			ctx.Logger().Error(err, "error notifying result")
 		}
 	}
 }
