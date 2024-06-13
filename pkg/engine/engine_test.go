@@ -462,15 +462,29 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	conf, err := config.Read(confPath)
 	assert.NoError(t, err)
 
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(conf.Detectors...),
-		WithVerify(false),
-		WithPrinter(new(discardPrinter)),
-		withVerificationOverlapTracking(),
-	)
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	c := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     conf.Detectors,
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &c)
 	assert.NoError(t, err)
+
+	e.verificationOverlapTracker = new(verificationOverlapTracker)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
 	err = e.ScanFileSystem(ctx, cfg)
