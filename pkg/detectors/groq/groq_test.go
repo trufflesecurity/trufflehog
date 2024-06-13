@@ -35,9 +35,8 @@ func TestGroq_Pattern(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, 2)
-			ahoCorasickCore.PopulateMatchingDetectors(test.input, chunkSpecificDetectors)
-			if len(chunkSpecificDetectors) == 0 {
+			detectorMatches := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(detectorMatches) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
