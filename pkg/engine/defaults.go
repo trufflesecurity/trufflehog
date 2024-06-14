@@ -233,6 +233,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enablex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enigma"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eraser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ethplorer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eventbrite"
@@ -1608,6 +1609,7 @@ func DefaultDetectors() []detectors.Detector {
 		intra42.Scanner{},
 		groq.Scanner{},
 		twitterconsumerkey.Scanner{},
+		eraser.Scanner{},
 	}
 }
 
