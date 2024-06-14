@@ -279,8 +279,10 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		_, ok = results["unverified"]
 		engine.notifyUnverifiedResults = ok
 
-		_, ok = results["filtered_unverified"]
-		engine.retainFalsePositives = ok
+		if _, ok = results["filtered_unverified"]; ok {
+			engine.retainFalsePositives = ok
+			engine.notifyUnverifiedResults = ok
+		}
 	}
 
 	if err := engine.initialize(ctx); err != nil {
@@ -1038,13 +1040,13 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 func (e *Engine) filterResults(
 	ctx context.Context,
-	detector detectors.Detector,
+	detector *ahocorasick.DetectorMatch,
 	results []detectors.Result,
 ) []detectors.Result {
 	if e.filterUnverified {
 		results = detectors.CleanResults(results)
 	}
-	results = detectors.FilterKnownFalsePositives(ctx, detector, results, e.retainFalsePositives)
+	results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results, e.retainFalsePositives)
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
 	}
