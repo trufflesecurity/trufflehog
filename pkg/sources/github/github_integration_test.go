@@ -59,7 +59,7 @@ func TestSource_Token(t *testing.T) {
 		memberCache:   map[string]struct{}{},
 		repoInfoCache: newRepoInfoCache(),
 	}
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), nil, nil)
+	s.filteredRepoCache = s.newFilteredRepoCache(memory.New[string](), nil, nil)
 
 	installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
 	assert.NoError(t, err)

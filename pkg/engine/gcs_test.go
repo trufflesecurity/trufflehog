@@ -61,13 +61,27 @@ func TestScanGCS(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.TODO())
 			defer cancel()
 
-			e, err := Start(ctx,
-				WithConcurrency(1),
-				WithDecoders(decoders.DefaultDecoders()...),
-				WithDetectors(DefaultDetectors()...),
-				WithVerify(false),
-			)
-			assert.Nil(t, err)
+			const defaultOutputBufferSize = 64
+			opts := []func(*sources.SourceManager){
+				sources.WithSourceUnits(),
+				sources.WithBufferedOutput(defaultOutputBufferSize),
+			}
+
+			sourceManager := sources.NewManager(opts...)
+
+			conf := Config{
+				Concurrency:   1,
+				Decoders:      decoders.DefaultDecoders(),
+				Detectors:     DefaultDetectors(),
+				Verify:        false,
+				SourceManager: sourceManager,
+				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+			}
+
+			e, err := NewEngine(ctx, &conf)
+			assert.NoError(t, err)
+
+			e.Start(ctx)
 
 			go func() {
 				resultCount := 0
