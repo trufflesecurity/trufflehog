@@ -8,11 +8,12 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/sync/errgroup"
 )
 
 // The maximum number of matches from one chunk. This const is used when
@@ -110,8 +111,8 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	return results, nil
 }
 
-func (c *CustomRegexWebhook) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (c *CustomRegexWebhook) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string][]string, verify bool, results chan<- detectors.Result) error {
