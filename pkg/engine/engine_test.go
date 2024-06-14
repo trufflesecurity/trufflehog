@@ -526,7 +526,7 @@ func TestRetainFalsePositives(t *testing.T) {
 		Verify:        false,
 		SourceManager: sourceManager,
 		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
-		Results:       map[string]struct{}{"filter_unverified": {}},
+		Results:       map[string]struct{}{"filtered_unverified": {}},
 	}
 
 	e, err := NewEngine(ctx, &c)
