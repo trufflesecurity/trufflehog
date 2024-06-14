@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package azure
+package v2
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -107,6 +108,22 @@ func TestAzure_FromChunk(t *testing.T) {
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Azure.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
+func BenchmarkFromData(benchmark *testing.B) {
+	ctx := context.Background()
+	s := Scanner{}
+	for name, data := range detectors.MustGetBenchmarkData() {
+		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				_, err := s.FromData(ctx, false, data)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
