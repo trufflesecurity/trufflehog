@@ -999,6 +999,7 @@ enum DetectorType {
   Intra42 = 987;
   Groq = 988;
   TwitterConsumerkey = 989;
+  Eraser = 990;
 }
 
 message Result {
