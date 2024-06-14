@@ -448,6 +448,43 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
 }
 
+const (
+	TestDetectorType  = -1
+	TestDetectorType2 = -2
+)
+
+var _ detectors.Detector = (*testDetectorV1)(nil)
+
+type testDetectorV1 struct{}
+
+func (testDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	result := detectors.Result{
+		DetectorType: TestDetectorType,
+		Raw:          []byte("ssample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
+	}
+	return []detectors.Result{result}, nil
+}
+
+func (testDetectorV1) Keywords() []string { return []string{"sample"} }
+
+func (testDetectorV1) Type() detectorspb.DetectorType { return TestDetectorType }
+
+var _ detectors.Detector = (*testDetectorV2)(nil)
+
+type testDetectorV2 struct{}
+
+func (testDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	result := detectors.Result{
+		DetectorType: TestDetectorType,
+		Raw:          []byte("sample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
+	}
+	return []detectors.Result{result}, nil
+}
+
+func (testDetectorV2) Keywords() []string { return []string{"ample"} }
+
+func (testDetectorV2) Type() detectorspb.DetectorType { return TestDetectorType2 }
+
 func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	ctx := context.Background()
 
@@ -456,11 +493,6 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-
-	confPath, err := filepath.Abs("./testdata/verificationoverlap_detectors_fp.yaml")
-	assert.NoError(t, err)
-	conf, err := config.Read(confPath)
-	assert.NoError(t, err)
 
 	const defaultOutputBufferSize = 64
 	opts := []func(*sources.SourceManager){
@@ -473,7 +505,7 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	c := Config{
 		Concurrency:   1,
 		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     conf.Detectors,
+		Detectors:     []detectors.Detector{testDetectorV1{}, testDetectorV2{}},
 		Verify:        false,
 		SourceManager: sourceManager,
 		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
