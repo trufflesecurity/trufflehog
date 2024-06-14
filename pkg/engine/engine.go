@@ -156,7 +156,6 @@ type Engine struct {
 	notifyVerifiedResults   bool
 	notifyUnverifiedResults bool
 	notifyUnknownResults    bool
-	logFilteredUnverified   bool
 	retainFalsePositives    bool
 	verificationOverlap     bool
 	printAvgDetectorTime    bool
@@ -207,7 +206,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		filterUnverified:              cfg.FilterUnverified,
 		filterEntropy:                 cfg.FilterEntropy,
 		printAvgDetectorTime:          cfg.PrintAvgDetectorTime,
-		logFilteredUnverified:         cfg.LogFilteredUnverified,
+		retainFalsePositives:          cfg.LogFilteredUnverified,
 		verificationOverlap:           cfg.VerificationOverlap,
 		sourceManager:                 cfg.SourceManager,
 		scanEntireChunk:               cfg.ShouldScanEntireChunk,
@@ -281,13 +280,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		engine.notifyUnverifiedResults = ok
 
 		_, ok = results["filtered_unverified"]
-		engine.logFilteredUnverified = ok
-
-		// If retain_false_positives is set, we also need to notify unverified results.
-		if _, ok = results["retain_false_positives"]; ok {
-			engine.retainFalsePositives = ok
-			engine.notifyUnverifiedResults = ok
-		}
+		engine.retainFalsePositives = ok
 	}
 
 	if err := engine.initialize(ctx); err != nil {
@@ -900,7 +893,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					detectorKeysWithResults[detector.Key] = detector
 				}
 
-				results = e.filterResults(ctx, detector, results, e.logFilteredUnverified)
+				results = e.filterResults(ctx, detector, results)
 				for _, res := range results {
 					var val []byte
 					if res.RawV2 != nil {
@@ -1031,7 +1024,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
 		}
 
-		results = e.filterResults(ctx, data.detector, results, e.logFilteredUnverified)
+		results = e.filterResults(ctx, data.detector, results)
 
 		for _, res := range results {
 			e.processResult(ctx, data, res, isFalsePositive)
@@ -1047,16 +1040,13 @@ func (e *Engine) filterResults(
 	ctx context.Context,
 	detector detectors.Detector,
 	results []detectors.Result,
-	logFilteredUnverified bool,
 ) []detectors.Result {
 	if e.filterUnverified {
 		results = detectors.CleanResults(results)
 	}
-	if !e.retainFalsePositives {
-		results = detectors.FilterKnownFalsePositives(ctx, detector, results, logFilteredUnverified)
-	}
+	results = detectors.FilterKnownFalsePositives(ctx, detector, results, e.retainFalsePositives)
 	if e.filterEntropy != 0 {
-		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, logFilteredUnverified)
+		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
 	}
 	return results
 }

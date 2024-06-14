@@ -62,6 +62,23 @@ func TestFilterKnownFalsePositives_CustomLogic(t *testing.T) {
 	assert.ElementsMatch(t, expected, filtered)
 }
 
+func TestFilterKnownFalsePositives_CustomLogicRetainFalsePositives(t *testing.T) {
+	results := []Result{
+		{Raw: []byte("a specific magic string")}, // specific target
+		{Raw: []byte("00000")},                   // "default" false positive list
+		{Raw: []byte("number")},                  // from wordlist
+		{Raw: []byte("hga8adshla3434g")},         // real secret
+	}
+	expected := []Result{
+		{Raw: []byte("a specific magic string")}, // specific target
+		{Raw: []byte("00000")},
+		{Raw: []byte("number")},
+		{Raw: []byte("hga8adshla3434g")},
+	}
+	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results, true)
+	assert.ElementsMatch(t, expected, filtered)
+}
+
 func TestIsFalsePositive(t *testing.T) {
 	type args struct {
 		match          string

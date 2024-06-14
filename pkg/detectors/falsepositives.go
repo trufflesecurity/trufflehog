@@ -151,22 +151,22 @@ func FilterResultsWithEntropy(ctx context.Context, results []Result, entropy flo
 }
 
 // FilterKnownFalsePositives filters out known false positives from the results.
-func FilterKnownFalsePositives(ctx context.Context, detector Detector, results []Result, shouldLog bool) []Result {
+func FilterKnownFalsePositives(_ context.Context, detector Detector, results []Result, retainFalsePositives bool) []Result {
 	var filteredResults []Result
 
 	isFalsePositive := GetFalsePositiveCheck(detector)
 
 	for _, result := range results {
-		if !result.Verified && result.Raw != nil {
-			isFp, reason := isFalsePositive(result)
-			if !isFp {
-				filteredResults = append(filteredResults, result)
-			} else if shouldLog {
-				ctx.Logger().Info("Filtered out known false positive", "result", result, "reason", reason)
-			}
-		} else {
+		if result.Verified || result.Raw == nil {
+			filteredResults = append(filteredResults, result)
+			continue
+		}
+
+		isFp, _ := isFalsePositive(result)
+		if !isFp || retainFalsePositives {
 			filteredResults = append(filteredResults, result)
 		}
 	}
+
 	return filteredResults
 }
