@@ -12,6 +12,7 @@ type testCase struct {
 }
 
 func runPatTest(t *testing.T, tests map[string]testCase, matchFunc func(data string) map[string]struct{}) {
+	t.Helper()
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			matches := matchFunc(test.Input)
@@ -120,6 +121,41 @@ tenant_id = "57aabdfc-6ce0-4828-94a2-9abe277892ec"`,
   "iat": 1641799220,`,
 			Expected: map[string]struct{}{
 				"974fde14-c3a4-481b-9b03-cfce182c3a07": {},
+			},
+		},
+		"oauth paths": {
+			Input: `        "authPath": "/9b4bfaea-dd1c-4add-b1de-e10f51c65fd3/oauth2/v2.0/authorize",
+		/32896ed7-d559-401b-85cf-167143d61be0/B2C_1A_Tapio_Signin/v2.0
+		/461858f4-9c0d-46e0-a9e6-aefc4889aad6/B2C_1_sign_up_or_sign_in/SelfAsserted?tx=S
+		-ArgumentList "/3f548be2-31e9-4681-839e-bc80d461f367/common/oauth2/authorize"
+        "jwks_uri": "/6babcaad-604b-40ac-a9d7-9fd97c0b779f/discovery/keys",
+		MetadataLocation = "/b55f0c51-61a7-45c3-84df-33569b247796/federationmetadata/2007-06/federationmetadata.xml?appid=3245199b-1a5d-42df-93ce-e64ac7f5b938
+        "kerberos_endpoint": "/a4067d12-2fc0-4367-a213-9e4031cbc173/kerberos",
+		/b2326b8a-059d-48ca-96ac-8d8d5d841860/login
+		"userinfo_endpoint": "/6ba4caad-604b-40ac-a9d7-9fd97c0b779f/openid/userinfo"
+		…en-US","urlLogin":"/9673e9a8-aa57-4461-9336-5fd3f0034e18/reprocess?ctx=rQIIAZ2QvWvbQA…
+		/6c912b97-d9f0-4472-a96a-d82de2f1d438/resume?ctx=rQIIAZVTP
+		// /aa8306d8-5417-43cc-b8e8-7e77b918682c/v2.0/.well-known/openid-configuration
+		// /051aeb51-408b-403b-b95c-4ff3b303a08a/token
+		"/4a5378f9-29f4-4d3e-be89-669d03ada9d8/uxlogout"
+		/dc38a67a-f981-4e24-ba16-4443ada44484/wsfed
+`,
+			Expected: map[string]struct{}{
+				"051aeb51-408b-403b-b95c-4ff3b303a08a": {},
+				"32896ed7-d559-401b-85cf-167143d61be0": {},
+				"3f548be2-31e9-4681-839e-bc80d461f367": {},
+				"461858f4-9c0d-46e0-a9e6-aefc4889aad6": {},
+				"4a5378f9-29f4-4d3e-be89-669d03ada9d8": {},
+				"6ba4caad-604b-40ac-a9d7-9fd97c0b779f": {},
+				"6babcaad-604b-40ac-a9d7-9fd97c0b779f": {},
+				"6c912b97-d9f0-4472-a96a-d82de2f1d438": {},
+				"9673e9a8-aa57-4461-9336-5fd3f0034e18": {},
+				"9b4bfaea-dd1c-4add-b1de-e10f51c65fd3": {},
+				"a4067d12-2fc0-4367-a213-9e4031cbc173": {},
+				"aa8306d8-5417-43cc-b8e8-7e77b918682c": {},
+				"b2326b8a-059d-48ca-96ac-8d8d5d841860": {},
+				"b55f0c51-61a7-45c3-84df-33569b247796": {},
+				"dc38a67a-f981-4e24-ba16-4443ada44484": {},
 			},
 		},
 		"x-anchor-mailbox": {
