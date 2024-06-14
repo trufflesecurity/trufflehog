@@ -104,7 +104,7 @@ type Config struct {
 	Verify bool
 
 	// Defines which results will be notified by the engine
-	// (e.g., verified, unverified, unknown, filter_false_positives)
+	// (e.g., verified, unverified, unknown)
 	Results               map[string]struct{}
 	LogFilteredUnverified bool
 
