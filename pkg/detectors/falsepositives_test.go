@@ -29,7 +29,7 @@ func (d fakeDetector) Type() detectorspb.DetectorType {
 func (f fakeDetector) Description() string { return "" }
 
 func (d customFalsePositiveChecker) IsFalsePositive(result Result) (bool, string) {
-	return IsKnownFalsePositive(string(result.Raw), []FalsePositive{"a specific magic string"}, false)
+	return IsKnownFalsePositive(string(result.Raw), map[FalsePositive]struct{}{"a specific magic string": {}}, false)
 }
 
 func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
@@ -70,7 +70,7 @@ func TestFilterKnownFalsePositives_CustomLogic(t *testing.T) {
 func TestIsFalsePositive(t *testing.T) {
 	type args struct {
 		match          string
-		falsePositives []FalsePositive
+		falsePositives map[FalsePositive]struct{}
 		useWordlist    bool
 	}
 	tests := []struct {

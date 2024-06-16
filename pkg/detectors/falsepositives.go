@@ -14,8 +14,10 @@ import (
 )
 
 var (
-	DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "*****"}
-	UuidFalsePositives    []FalsePositive
+	DefaultFalsePositives = map[FalsePositive]struct{}{
+		"example": {}, "xxxxxx": {}, "aaaaaa": {}, "abcde": {}, "00000": {}, "sample": {}, "*****": {},
+	}
+	UuidFalsePositives map[FalsePositive]struct{}
 )
 
 type FalsePositive string
@@ -59,9 +61,9 @@ func init() {
 	filter = builder.Build()
 
 	// Populate custom FalsePositive list
-	UuidFalsePositives = make([]FalsePositive, len(uuidList))
-	for i, uuid := range uuidList {
-		UuidFalsePositives[i] = FalsePositive(uuid)
+	UuidFalsePositives = make(map[FalsePositive]struct{}, len(uuidList))
+	for _, uuid := range uuidList {
+		UuidFalsePositives[FalsePositive(uuid)] = struct{}{}
 	}
 }
 
@@ -80,15 +82,20 @@ func GetFalsePositiveCheck(detector Detector) func(Result) (bool, string) {
 //
 // Currently, this includes: english word in key or matches common example patterns.
 // Only the secret key material should be passed into this function
-func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) (bool, string) {
+func IsKnownFalsePositive(match string, falsePositives map[FalsePositive]struct{}, wordCheck bool) (bool, string) {
 	if !utf8.ValidString(match) {
 		return true, "invalid utf8"
 	}
 	lower := strings.ToLower(match)
-	for _, fp := range falsePositives {
+
+	if _, exists := falsePositives[FalsePositive(lower)]; exists {
+		return true, "matches term: " + lower
+	}
+
+	for fp := range falsePositives {
 		fps := string(fp)
 		if strings.Contains(lower, fps) {
-			return true, "matches term: " + fps
+			return true, "contains term: " + fps
 		}
 	}
 
