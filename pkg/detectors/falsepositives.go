@@ -13,7 +13,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "*****"}
+var (
+	DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "*****"}
+	UuidFalsePositives    []FalsePositive
+)
 
 type FalsePositive string
 
@@ -24,18 +27,21 @@ type CustomFalsePositiveChecker interface {
 	IsFalsePositive(result Result) (bool, string)
 }
 
-//go:embed "badlist.txt"
-var badList []byte
+var (
+	filter *ahocorasick.Trie
 
-//go:embed "words.txt"
-var wordList []byte
-
-//go:embed "programmingbooks.txt"
-var programmingBookWords []byte
-
-var filter *ahocorasick.Trie
+	//go:embed "fp_badlist.txt"
+	badList []byte
+	//go:embed "fp_words.txt"
+	wordList []byte
+	//go:embed "fp_programmingbooks.txt"
+	programmingBookWords []byte
+	//go:embed "fp_uuids.txt"
+	uuidList []byte
+)
 
 func init() {
+	// Populate trie.
 	builder := ahocorasick.NewTrieBuilder()
 
 	wordList := bytesToCleanWordList(wordList)
@@ -47,7 +53,16 @@ func init() {
 	programmingBookWords := bytesToCleanWordList(programmingBookWords)
 	builder.AddStrings(programmingBookWords)
 
+	uuidList := bytesToCleanWordList(uuidList)
+	builder.AddStrings(uuidList)
+
 	filter = builder.Build()
+
+	// Populate custom FalsePositive list
+	UuidFalsePositives = make([]FalsePositive, len(uuidList))
+	for i, uuid := range uuidList {
+		UuidFalsePositives[i] = FalsePositive(uuid)
+	}
 }
 
 func GetFalsePositiveCheck(detector Detector) func(Result) (bool, string) {

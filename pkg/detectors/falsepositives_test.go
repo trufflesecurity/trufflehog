@@ -1,6 +1,3 @@
-//go:build detectors
-// +build detectors
-
 package detectors
 
 import (
@@ -37,12 +34,18 @@ func (d customFalsePositiveChecker) IsFalsePositive(result Result) (bool, string
 
 func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
 	results := []Result{
-		{Raw: []byte("00000")},           // "default" false positive list
-		{Raw: []byte("number")},          // from wordlist
-		{Raw: []byte("hga8adshla3434g")}, // real secret
+		{Raw: []byte("00000")},  // "default" false positive list
+		{Raw: []byte("number")}, // from wordlist
+		// from uuid list
+		{Raw: []byte("00000000-0000-0000-0000-000000000000")},
+		{Raw: []byte("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")},
+		// real secrets
+		{Raw: []byte("hga8adshla3434g")},
+		{Raw: []byte("f795f7db-2dfe-4095-96f3-8f8370c735f9")},
 	}
 	expected := []Result{
 		{Raw: []byte("hga8adshla3434g")},
+		{Raw: []byte("f795f7db-2dfe-4095-96f3-8f8370c735f9")},
 	}
 	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results)
 	assert.ElementsMatch(t, expected, filtered)
