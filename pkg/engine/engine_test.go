@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
@@ -275,6 +276,56 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	assert.Nil(t, e.Finish(ctx))
 	want := uint64(5)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
+func TestEngine_GCP(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	secret := testSecrets.MustGetField("GCP_SECRET")
+
+	// Create a temporary file to scan.
+	tmpFile, err := os.CreateTemp("", "testfile")
+	assert.NoError(t, err)
+	defer tmpFile.Close()
+
+	_, err = tmpFile.WriteString(fmt.Sprintf("You can find a gcp secret %s within", secret))
+	assert.NoError(t, err)
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	conf := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     DefaultDetectors(),
+		Verify:        true,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
+
+	e.Start(ctx)
+
+	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	// Wait for all the chunks to be processed.
+	assert.Nil(t, e.Finish(ctx))
+	want := uint64(1)
+	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
 }
 
 // TestEngine_VersionedDetectorsVerifiedSecrets is a test that detects ALL verified secrets across
