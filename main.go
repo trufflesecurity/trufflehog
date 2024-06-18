@@ -833,6 +833,9 @@ func runSingleScan(ctx context.Context, cfg scanConfig, scanEntireChunk bool) (m
 			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
 		}
 	case huggingfaceScan.FullCommand():
+		if *huggingfaceEndpoint != "" {
+			*huggingfaceEndpoint = strings.TrimRight(*huggingfaceEndpoint, "/")
+		}
 		cfg := engine.HuggingfaceConfig{
 			Endpoint:           *huggingfaceEndpoint,
 			Models:             *huggingfaceModels,

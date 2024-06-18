@@ -51,11 +51,12 @@ type Source struct {
 	huggingfaceUser  string
 	huggingfaceToken string
 
-	sourceID   sources.SourceID
-	jobID      sources.JobID
-	verify     bool
-	orgsCache  cache.Cache[string]
-	usersCache cache.Cache[string]
+	sourceID               sources.SourceID
+	jobID                  sources.JobID
+	verify                 bool
+	useCustomContentWriter bool
+	orgsCache              cache.Cache[string]
+	usersCache             cache.Cache[string]
 
 	models   []string
 	spaces   []string
@@ -93,6 +94,9 @@ type Source struct {
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+
+// WithCustomContentWriter sets the useCustomContentWriter flag on the source.
+func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
@@ -246,13 +250,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includePrs = s.conn.IncludePrs
 
 	cfg := &git.Config{
-		SourceName: s.name,
-		JobID:      s.jobID,
-		SourceID:   s.sourceID,
-		SourceType: s.Type(),
-		Verify:     s.verify,
-		// SkipBinaries: conn.GetSkipBinaries(),
-		// SkipArchives: conn.GetSkipArchives(),
+		SourceName:  s.name,
+		JobID:       s.jobID,
+		SourceID:    s.sourceID,
+		SourceType:  s.Type(),
+		Verify:      s.verify,
 		Concurrency: concurrency,
 		SourceMetadataFunc: func(file, email, commit, timestamp, repository string, line int64) *source_metadatapb.MetaData {
 			return &source_metadatapb.MetaData{
@@ -271,7 +273,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 				},
 			}
 		},
-		//UseCustomContentWriter: s.useCustomContentWriter,
+		UseCustomContentWriter: s.useCustomContentWriter,
 	}
 	s.git = git.NewGit(cfg)
 
@@ -318,136 +320,37 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	// githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
 	// githubReposScanned.WithLabelValues(s.name).Set(0)
 
-	installationClient, err := s.enumerate(ctx, s.conn.Endpoint)
+	err := s.enumerate(ctx)
 	if err != nil {
 		return err
 	}
 
-	return s.scan(ctx, installationClient, chunksChan)
+	return s.scan(ctx, chunksChan)
 }
 
-func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*http.Client, error) {
-	var (
-		installationClient *http.Client
-		//err                error
-	)
-
-	// Todo: add back in when do org nad user enum
-	// switch cred := s.conn.GetCredential().(type) {
-	// case *sourcespb.HuggingFace_Unauthenticated:
-	// 	s.enumerateUnauthenticated(ctx, apiEndpoint)
-	// case *sourcespb.HuggingFace_Token:
-	// 	if err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
-	// 		return nil, err
-	// 	}
-	// default:
-	// 	// TODO: move this error to Init
-	// 	return nil, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
-	// }
+func (s *Source) enumerate(ctx context.Context) error {
+	fmt.Println("Running enumerate")
+	s.enumerateAuthors(ctx)
 
 	s.models = make([]string, 0, s.filteredModelsCache.Count())
-ModelsLoop:
 	for _, repo := range s.filteredModelsCache.Keys() {
-		repoURL, _ := s.filteredModelsCache.Get(repo)
-		repoCtx := context.WithValue(ctx, MODEL, repoURL)
-		if _, ok := s.repoInfoCache.get(repoURL); !ok {
-			repoCtx.Logger().V(2).Info("Caching " + MODEL + " info")
-			for {
-				model, err := GetRepo(repoCtx, repo, MODEL, s.huggingfaceToken, s.conn.Endpoint)
-				// if s.handleRateLimit(err) {
-				// 	continue
-				// }
-				if err != nil {
-					repoCtx.Logger().Error(err, "Failed to fetch model")
-					continue ModelsLoop
-				}
-				var visibility source_metadatapb.Visibility
-				if model.IsPrivate {
-					visibility = source_metadatapb.Visibility_private
-				} else {
-					visibility = source_metadatapb.Visibility_public
-				}
-				s.repoInfoCache.put(repoURL, repoInfo{
-					owner:        model.Owner,
-					name:         strings.Split(model.RepoID, "/")[1],
-					fullName:     model.RepoID,
-					visibility:   visibility,
-					resourceType: MODEL,
-				})
-				break
-			}
+		if err := s.cacheRepoInfo(ctx, repo, MODEL, s.filteredModelsCache); err != nil {
+			continue
 		}
-		s.models = append(s.models, repoURL)
 	}
 
 	s.spaces = make([]string, 0, s.filteredSpacesCache.Count())
-SpacesLoop:
 	for _, repo := range s.filteredSpacesCache.Keys() {
-		repoURL, _ := s.filteredSpacesCache.Get(repo)
-		repoCtx := context.WithValue(ctx, SPACE, repoURL)
-		if _, ok := s.repoInfoCache.get(repoURL); !ok {
-			repoCtx.Logger().V(2).Info("Caching " + SPACE + " info")
-			for {
-				space, err := GetRepo(repoCtx, repo, SPACE, s.huggingfaceToken, s.conn.Endpoint)
-				// if s.handleRateLimit(err) {
-				// 	continue
-				// }
-				if err != nil {
-					repoCtx.Logger().Error(err, "Failed to fetch space")
-					continue SpacesLoop
-				}
-				var visibility source_metadatapb.Visibility
-				if space.IsPrivate {
-					visibility = source_metadatapb.Visibility_private
-				} else {
-					visibility = source_metadatapb.Visibility_public
-				}
-				s.repoInfoCache.put(repoURL, repoInfo{
-					owner:        space.Owner,
-					name:         strings.Split(space.RepoID, "/")[1],
-					fullName:     space.RepoID,
-					visibility:   visibility,
-					resourceType: SPACE,
-				})
-				break
-			}
+		if err := s.cacheRepoInfo(ctx, repo, SPACE, s.filteredSpacesCache); err != nil {
+			continue
 		}
-		s.spaces = append(s.spaces, repoURL)
 	}
 
 	s.datasets = make([]string, 0, s.filteredDatasetsCache.Count())
-DatasetsLoop:
 	for _, repo := range s.filteredDatasetsCache.Keys() {
-		repoURL, _ := s.filteredDatasetsCache.Get(repo)
-		repoCtx := context.WithValue(ctx, DATASET, repoURL)
-		if _, ok := s.repoInfoCache.get(repoURL); !ok {
-			repoCtx.Logger().V(2).Info("Caching " + DATASET + " info")
-			for {
-				dataset, err := GetRepo(repoCtx, repo, DATASET, s.huggingfaceToken, s.conn.Endpoint)
-				// if s.handleRateLimit(err) {
-				// 	continue
-				// }
-				if err != nil {
-					repoCtx.Logger().Error(err, "Failed to fetch dataset")
-					continue DatasetsLoop
-				}
-				var visibility source_metadatapb.Visibility
-				if dataset.IsPrivate {
-					visibility = source_metadatapb.Visibility_private
-				} else {
-					visibility = source_metadatapb.Visibility_public
-				}
-				s.repoInfoCache.put(repoURL, repoInfo{
-					owner:        dataset.Owner,
-					name:         strings.Split(dataset.RepoID, "/")[1],
-					fullName:     dataset.RepoID,
-					visibility:   visibility,
-					resourceType: DATASET,
-				})
-				break
-			}
+		if err := s.cacheRepoInfo(ctx, repo, DATASET, s.filteredDatasetsCache); err != nil {
+			continue
 		}
-		s.datasets = append(s.datasets, repoURL)
 	}
 
 	// huggingfaceModelsEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
@@ -456,123 +359,147 @@ DatasetsLoop:
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.models)
-	return installationClient, nil
+	sort.Strings(s.datasets)
+	sort.Strings(s.spaces)
+	return nil
 }
 
-// func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint string) {
-// 	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
-// 	if err != nil {
-// 		s.log.Error(err, "error creating GitHub client")
-// 	}
-// 	s.apiClient = ghClient
-// 	if s.orgsCache.Count() > unauthGithubOrgRateLimt {
-// 		s.log.Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
-// 	}
+func (s *Source) cacheRepoInfo(ctx context.Context, repo string, repoType string, repoCache *filteredRepoCache) error {
+	repoURL, _ := repoCache.Get(repo)
+	repoCtx := context.WithValue(ctx, repoType, repoURL)
 
-// 	for _, org := range s.orgsCache.Keys() {
-// 		orgCtx := context.WithValue(ctx, "account", org)
-// 		userType, err := s.getReposByOrgOrUser(ctx, org)
-// 		if err != nil {
-// 			orgCtx.Logger().Error(err, "error fetching repos for org or user")
-// 			continue
-// 		}
+	if _, ok := s.repoInfoCache.get(repoURL); !ok {
+		repoCtx.Logger().V(2).Info("Caching " + repoType + " info")
+		for {
+			repo, err := GetRepo(repoCtx, repo, repoType, s.huggingfaceToken, s.conn.Endpoint)
+			// if s.handleRateLimit(err) {
+			// 	continue
+			// }
+			if err != nil {
+				repoCtx.Logger().Error(err, "Failed to fetch "+repoType)
+				return err
+			}
+			var visibility source_metadatapb.Visibility
+			if repo.IsPrivate {
+				visibility = source_metadatapb.Visibility_private
+			} else {
+				visibility = source_metadatapb.Visibility_public
+			}
+			s.repoInfoCache.put(repoURL, repoInfo{
+				owner:        repo.Owner,
+				name:         strings.Split(repo.RepoID, "/")[1],
+				fullName:     repo.RepoID,
+				visibility:   visibility,
+				resourceType: resourceType(repoType),
+			})
+			break
+		}
+	}
+	switch repoType {
+	case MODEL:
+		s.models = append(s.models, repoURL)
+	case SPACE:
+		s.spaces = append(s.spaces, repoURL)
+	case DATASET:
+		s.datasets = append(s.datasets, repoURL)
+	}
+	return nil
+}
 
-// 		if userType == organization && s.conn.ScanUsers {
-// 			orgCtx.Logger().Info("WARNING: Enumerating unauthenticated does not support scanning organization members (--include-members)")
-// 		}
-// 	}
-// }
+func (s *Source) enumerateAuthors(ctx context.Context) {
+	// ToDo: Deal with only-models, etc.
+	fmt.Println(s.orgsCache.Keys())
+	for _, org := range s.orgsCache.Keys() {
+		orgCtx := context.WithValue(ctx, "organization", org)
+		repos, err := GetReposByAuthor(orgCtx, s.huggingfaceToken, s.conn.Endpoint, MODEL, org)
+		if err != nil {
+			orgCtx.Logger().Error(err, "Failed to fetch repos for organization")
+			continue
+		}
+		for _, repo := range repos {
+			url := fmt.Sprintf(s.conn.Endpoint + "/" + repo.RepoID + ".git")
+			s.filteredModelsCache.Set(repo.RepoID, url)
+			if err := s.cacheRepoInfo(orgCtx, repo.RepoID, MODEL, s.filteredModelsCache); err != nil {
+				continue
+			}
+		}
 
-// func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token string) error {
-// 	// Needed for clones.
-// 	s.githubToken = token
+		repos, err = GetReposByAuthor(orgCtx, s.huggingfaceToken, s.conn.Endpoint, SPACE, org)
+		if err != nil {
+			orgCtx.Logger().Error(err, "Failed to fetch repos for organization")
+			continue
+		}
+		for _, repo := range repos {
+			url := fmt.Sprintf(s.conn.Endpoint + "/" + SpacesRoute + "/" + repo.RepoID + ".git")
+			s.filteredSpacesCache.Set(repo.RepoID, url)
+			if err := s.cacheRepoInfo(orgCtx, repo.RepoID, SPACE, s.filteredSpacesCache); err != nil {
+				continue
+			}
+		}
 
-// 	// Needed to list repos.
-// 	ts := oauth2.StaticTokenSource(
-// 		&oauth2.Token{AccessToken: token},
-// 	)
-// 	s.httpClient.Transport = &oauth2.Transport{
-// 		Base:   s.httpClient.Transport,
-// 		Source: oauth2.ReuseTokenSource(nil, ts),
-// 	}
+		repos, err = GetReposByAuthor(orgCtx, s.huggingfaceToken, s.conn.Endpoint, DATASET, org)
+		if err != nil {
+			orgCtx.Logger().Error(err, "Failed to fetch repos for organization")
+			continue
+		}
+		for _, repo := range repos {
+			url := fmt.Sprintf(s.conn.Endpoint + "/" + DatasetsRoute + "/" + repo.RepoID + ".git")
+			s.filteredDatasetsCache.Set(repo.RepoID, url)
+			if err := s.cacheRepoInfo(orgCtx, repo.RepoID, DATASET, s.filteredDatasetsCache); err != nil {
+				continue
+			}
+		}
 
-// 	// If we're using public GitHub, make a regular client.
-// 	// Otherwise, make an enterprise client.
-// 	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
-// 	if err != nil {
-// 		s.log.Error(err, "error creating GitHub client")
-// 	}
-// 	s.apiClient = ghClient
+	}
+	fmt.Println(s.usersCache.Keys())
+	for _, user := range s.usersCache.Keys() {
+		userCtx := context.WithValue(ctx, "user", user)
+		repos, err := GetReposByAuthor(userCtx, s.huggingfaceToken, s.conn.Endpoint, MODEL, user)
+		if err != nil {
+			userCtx.Logger().Error(err, "Failed to fetch repos for user")
+			continue
+		}
+		for _, repo := range repos {
+			// ToDo: refactor by splitting up the cacheRepoInfo function and directly calling sub part, since already have repo object
+			url := fmt.Sprintf(s.conn.Endpoint + "/" + repo.RepoID + ".git")
+			s.filteredModelsCache.Set(repo.RepoID, url)
+			if err := s.cacheRepoInfo(userCtx, repo.RepoID, MODEL, s.filteredModelsCache); err != nil {
+				fmt.Println(err)
+				continue
+			}
+		}
 
-// 	ctx.Logger().V(1).Info("Enumerating with token", "endpoint", apiEndpoint)
-// 	var ghUser *github.User
-// 	for {
-// 		ghUser, _, err = s.apiClient.Users.Get(ctx, "")
-// 		if s.handleRateLimit(err) {
-// 			continue
-// 		}
-// 		if err != nil {
-// 			return fmt.Errorf("error getting user: %w", err)
-// 		}
-// 		break
-// 	}
+		repos, err = GetReposByAuthor(userCtx, s.huggingfaceToken, s.conn.Endpoint, SPACE, user)
+		if err != nil {
+			userCtx.Logger().Error(err, "Failed to fetch repos for user")
+			continue
+		}
+		for _, repo := range repos {
+			url := fmt.Sprintf(s.conn.Endpoint + "/" + SpacesRoute + "/" + repo.RepoID + ".git")
+			s.filteredSpacesCache.Set(repo.RepoID, url)
+			if err := s.cacheRepoInfo(userCtx, repo.RepoID, SPACE, s.filteredSpacesCache); err != nil {
+				fmt.Println(err)
+				continue
+			}
+		}
 
-// 	specificScope := len(s.repos) > 0 || s.orgsCache.Count() > 0
-// 	if !specificScope {
-// 		// Enumerate the user's orgs and repos if none were specified.
-// 		if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-// 			s.log.Error(err, "Unable to fetch repos for the current user", "user", ghUser.GetLogin())
-// 		}
-// 		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
-// 			s.log.Error(err, "Unable to fetch gists for the current user", "user", ghUser.GetLogin())
-// 		}
+		repos, err = GetReposByAuthor(userCtx, s.huggingfaceToken, s.conn.Endpoint, DATASET, user)
+		if err != nil {
+			userCtx.Logger().Error(err, "Failed to fetch repos for user")
+			continue
+		}
+		for _, repo := range repos {
+			url := fmt.Sprintf(s.conn.Endpoint + "/" + DatasetsRoute + "/" + repo.RepoID + ".git")
+			s.filteredDatasetsCache.Set(repo.RepoID, url)
+			if err := s.cacheRepoInfo(userCtx, repo.RepoID, DATASET, s.filteredDatasetsCache); err != nil {
+				fmt.Println(err)
+				continue
+			}
+		}
+	}
+}
 
-// 		isGHE := !strings.EqualFold(apiEndpoint, cloudEndpoint)
-// 		if isGHE {
-// 			s.addAllVisibleOrgs(ctx)
-// 		} else {
-// 			// Scan for orgs is default with a token.
-// 			// GitHub App enumerates the repos that were assigned to it in GitHub App settings.
-// 			s.addOrgsByUser(ctx, ghUser.GetLogin())
-// 		}
-// 	}
-
-// 	if len(s.orgsCache.Keys()) > 0 {
-// 		for _, org := range s.orgsCache.Keys() {
-// 			orgCtx := context.WithValue(ctx, "account", org)
-// 			userType, err := s.getReposByOrgOrUser(ctx, org)
-// 			if err != nil {
-// 				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
-// 				continue
-// 			}
-
-// 			if userType == organization && s.conn.ScanUsers {
-// 				if err := s.addMembersByOrg(ctx, org); err != nil {
-// 					orgCtx.Logger().Error(err, "Unable to add members for org")
-// 				}
-// 			}
-// 		}
-
-// 		if s.conn.ScanUsers && len(s.memberCache) > 0 {
-// 			s.log.Info("Fetching repos for org members", "org_count", s.orgsCache.Count(), "member_count", len(s.memberCache))
-// 			s.addReposForMembers(ctx)
-// 		}
-// 	}
-
-// 	return nil
-// }
-
-// func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Client, error) {
-// 	// If we're using public GitHub, make a regular client.
-// 	// Otherwise, make an enterprise client.
-// 	if strings.EqualFold(apiEndpoint, cloudEndpoint) {
-// 		return github.NewClient(httpClient), nil
-// 	}
-
-// 	return github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
-// }
-
-func (s *Source) scanRepos(ctx context.Context, installationClient *http.Client, chunksChan chan *sources.Chunk, repos []string, resourceType string) error {
+func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, repos []string, resourceType string) error {
 	var scannedCount uint64 = 1
 
 	s.log.V(2).Info("Found "+resourceType+" to scan", "count", len(repos))
@@ -647,10 +574,10 @@ func (s *Source) scanRepos(ctx context.Context, installationClient *http.Client,
 	return nil
 }
 
-func (s *Source) scan(ctx context.Context, installationClient *http.Client, chunksChan chan *sources.Chunk) error {
-	s.scanRepos(ctx, installationClient, chunksChan, s.models, MODEL)
-	s.scanRepos(ctx, installationClient, chunksChan, s.spaces, SPACE)
-	s.scanRepos(ctx, installationClient, chunksChan, s.datasets, DATASET)
+func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk) error {
+	s.scanRepos(ctx, chunksChan, s.models, MODEL)
+	s.scanRepos(ctx, chunksChan, s.spaces, SPACE)
+	s.scanRepos(ctx, chunksChan, s.datasets, DATASET)
 	return nil
 }
 
@@ -742,117 +669,6 @@ var (
 // 	time.Sleep(retryAfter)
 // 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
 // 	return true
-// }
-
-// func (s *Source) addAllVisibleOrgs(ctx context.Context) {
-// 	s.log.V(2).Info("enumerating all visible organizations on GHE")
-// 	// Enumeration on this endpoint does not use pages it uses a since ID.
-// 	// The endpoint will return organizations with an ID greater than the given since ID.
-// 	// Empty org response is our cue to break the enumeration loop.
-// 	orgOpts := &github.OrganizationsListOptions{
-// 		Since: 0,
-// 		ListOptions: github.ListOptions{
-// 			PerPage: defaultPagination,
-// 		},
-// 	}
-// 	for {
-// 		orgs, _, err := s.apiClient.Organizations.ListAll(ctx, orgOpts)
-// 		if s.handleRateLimit(err) {
-// 			continue
-// 		}
-// 		if err != nil {
-// 			s.log.Error(err, "could not list all organizations")
-// 			return
-// 		}
-
-// 		if len(orgs) == 0 {
-// 			break
-// 		}
-
-// 		lastOrgID := *orgs[len(orgs)-1].ID
-// 		s.log.V(2).Info(fmt.Sprintf("listed organization IDs %d through %d", orgOpts.Since, lastOrgID))
-// 		orgOpts.Since = lastOrgID
-
-// 		for _, org := range orgs {
-// 			var name string
-// 			switch {
-// 			case org.Name != nil:
-// 				name = *org.Name
-// 			case org.Login != nil:
-// 				name = *org.Login
-// 			default:
-// 				continue
-// 			}
-// 			s.orgsCache.Set(name, name)
-// 			s.log.V(2).Info("adding organization for repository enumeration", "id", org.ID, "name", name)
-// 		}
-// 	}
-// }
-
-// func (s *Source) addOrgsByUser(ctx context.Context, user string) {
-// 	orgOpts := &github.ListOptions{
-// 		PerPage: defaultPagination,
-// 	}
-// 	logger := s.log.WithValues("user", user)
-// 	for {
-// 		orgs, resp, err := s.apiClient.Organizations.List(ctx, "", orgOpts)
-// 		if s.handleRateLimit(err) {
-// 			continue
-// 		}
-// 		if err != nil {
-// 			logger.Error(err, "Could not list organizations")
-// 			return
-// 		}
-
-// 		logger.V(2).Info("Listed orgs", "page", orgOpts.Page, "last_page", resp.LastPage)
-// 		for _, org := range orgs {
-// 			if org.Login == nil {
-// 				continue
-// 			}
-// 			s.orgsCache.Set(*org.Login, *org.Login)
-// 		}
-// 		if resp.NextPage == 0 {
-// 			break
-// 		}
-// 		orgOpts.Page = resp.NextPage
-// 	}
-// }
-
-// func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
-// 	opts := &github.ListMembersOptions{
-// 		PublicOnly: false,
-// 		ListOptions: github.ListOptions{
-// 			PerPage: membersAppPagination,
-// 		},
-// 	}
-
-// 	logger := s.log.WithValues("org", org)
-// 	for {
-// 		members, res, err := s.apiClient.Organizations.ListMembers(ctx, org, opts)
-// 		if s.handleRateLimit(err) {
-// 			continue
-// 		}
-// 		if err != nil || len(members) == 0 {
-// 			return fmt.Errorf("could not list organization members: account may not have access to list organization members %w", err)
-// 		}
-
-// 		logger.V(2).Info("Listed members", "page", opts.Page, "last_page", res.LastPage)
-// 		for _, m := range members {
-// 			usr := m.Login
-// 			if usr == nil || *usr == "" {
-// 				continue
-// 			}
-// 			if _, ok := s.memberCache[*usr]; !ok {
-// 				s.memberCache[*usr] = struct{}{}
-// 			}
-// 		}
-// 		if res.NextPage == 0 {
-// 			break
-// 		}
-// 		opts.Page = res.NextPage
-// 	}
-
-// 	return nil
 // }
 
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.

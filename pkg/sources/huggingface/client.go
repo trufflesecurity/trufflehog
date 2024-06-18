@@ -88,94 +88,56 @@ type Repo struct {
 	RepoID    string `json:"id"`
 }
 
-// GetModels retrieves repos from the Hugging Face API
-func GetRepo(ctx context.Context, repoName string, resourceType string, apiKey string, endpoint string) (Repo, error) {
-	var repo Repo
-
+// makeHuggingFaceAPIRequest makes a request to the Hugging Face API
+func makeHuggingFaceAPIRequest(ctx context.Context, apiKey string, url string, method string, target interface{}) error {
 	client := http.DefaultClient
-	url := buildAPIURL(endpoint, resourceType, repoName)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
-		return repo, err
+		return err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return repo, err
+		return err
 	}
-
 	defer resp.Body.Close()
 
-	err = json.NewDecoder(resp.Body).Decode(&repo)
-	if err != nil {
-		return repo, err
-	}
+	return json.NewDecoder(resp.Body).Decode(target)
+}
 
-	return repo, nil
+// GetModels retrieves repos from the Hugging Face API
+func GetRepo(ctx context.Context, repoName string, resourceType string, apiKey string, endpoint string) (Repo, error) {
+	var repo Repo
+	url := buildAPIURL(endpoint, resourceType, repoName)
+	err := makeHuggingFaceAPIRequest(ctx, apiKey, url, "GET", &repo)
+	return repo, err
 }
 
 // ListDiscussions retrieves discussions from the Hugging Face API
 func ListDiscussions(ctx context.Context, apiKey string, endpoint string, repoInfo repoInfo) (Discussions, error) {
 	var discussions Discussions
-
-	client := http.DefaultClient
-
 	baseURL := buildAPIURL(endpoint, string(repoInfo.resourceType), repoInfo.fullName)
 	url := baseURL + "/" + DiscussionsRoute
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return discussions, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return discussions, err
-	}
-
-	defer resp.Body.Close()
-
-	err = json.NewDecoder(resp.Body).Decode(&discussions)
-	if err != nil {
-		return discussions, err
-	}
-
-	return discussions, nil
+	err := makeHuggingFaceAPIRequest(ctx, apiKey, url, "GET", &discussions)
+	return discussions, err
 }
 
 func GetDiscussionByID(ctx context.Context, apiKey string, endpoint string, repoInfo repoInfo, discussionID string) (Discussion, error) {
 	var discussion Discussion
-
-	client := http.DefaultClient
-
 	baseURL := buildAPIURL(endpoint, string(repoInfo.resourceType), repoInfo.fullName)
 	url := baseURL + "/" + DiscussionsRoute + "/" + discussionID
+	err := makeHuggingFaceAPIRequest(ctx, apiKey, url, "GET", &discussion)
+	return discussion, err
+}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return discussion, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return discussion, err
-	}
-
-	defer resp.Body.Close()
-
-	err = json.NewDecoder(resp.Body).Decode(&discussion)
-	if err != nil {
-		return discussion, err
-	}
-
-	return discussion, nil
+func GetReposByAuthor(ctx context.Context, apiKey string, endpoint string, resourceType string, author string) ([]Repo, error) {
+	var repos []Repo
+	url := endpoint + "/" + APIRoute + "/" + getResourceAPIPath(resourceType) + "?limit=1000&author=" + author
+	err := makeHuggingFaceAPIRequest(ctx, apiKey, url, "GET", &repos)
+	return repos, err
 }
 
 func getResourceAPIPath(resourceType string) string {
