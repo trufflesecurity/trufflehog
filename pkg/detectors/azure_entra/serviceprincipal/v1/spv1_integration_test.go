@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package azure_entra_serviceprincipal
+package v1
 
 import (
 	"context"
