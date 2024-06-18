@@ -1,4 +1,4 @@
-package hubspotapikey
+package v1
 
 import (
 	"context"
@@ -17,11 +17,13 @@ type Scanner struct {
 	client *http.Client
 }
 
-func (s Scanner) Version() int { return 1 }
-
 // Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.Versioner = (*Scanner)(nil)
+var _ interface {
+	detectors.Detector
+	detectors.Versioner
+} = (*Scanner)(nil)
+
+func (s Scanner) Version() int { return 1 }
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -32,7 +34,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"hubspot", "hubapi", "hapikey", "hapi_key"}
+	return []string{"hubapi", "hapikey", "hapi_key", "hubspot"}
 }
 
 // FromData will find and optionally verify HubSpotApiKey secrets in a given set of bytes.
