@@ -36,7 +36,7 @@ require (
 	github.com/fatih/color v1.17.0
 	github.com/felixge/fgprof v0.9.4
 	github.com/gabriel-vasile/mimetype v1.4.4
-	github.com/getsentry/sentry-go v0.27.0
+	github.com/getsentry/sentry-go v0.28.1
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-ldap/ldap/v3 v3.4.8
@@ -132,7 +132,7 @@ require (
 	github.com/STARRY-S/zip v0.1.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.8.0 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
-	github.com/andybalholm/brotli v1.0.6 // indirect
+	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/apache/arrow/go/v14 v14.0.2 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/smithy-go v1.20.1 // indirect
