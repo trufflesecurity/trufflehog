@@ -42,7 +42,7 @@ func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
 	expected := []Result{
 		{Raw: []byte("hga8adshla3434g")},
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results, false)
+	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results)
 	assert.ElementsMatch(t, expected, filtered)
 }
 
@@ -58,24 +58,7 @@ func TestFilterKnownFalsePositives_CustomLogic(t *testing.T) {
 		{Raw: []byte("number")},
 		{Raw: []byte("hga8adshla3434g")},
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results, false)
-	assert.ElementsMatch(t, expected, filtered)
-}
-
-func TestFilterKnownFalsePositives_CustomLogicRetainFalsePositives(t *testing.T) {
-	results := []Result{
-		{Raw: []byte("a specific magic string")}, // specific target
-		{Raw: []byte("00000")},                   // "default" false positive list
-		{Raw: []byte("number")},                  // from wordlist
-		{Raw: []byte("hga8adshla3434g")},         // real secret
-	}
-	expected := []Result{
-		{Raw: []byte("a specific magic string")}, // specific target
-		{Raw: []byte("00000")},
-		{Raw: []byte("number")},
-		{Raw: []byte("hga8adshla3434g")},
-	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results, true)
+	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results)
 	assert.ElementsMatch(t, expected, filtered)
 }
 

@@ -1046,7 +1046,9 @@ func (e *Engine) filterResults(
 	if e.filterUnverified {
 		results = detectors.CleanResults(results)
 	}
-	results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results, e.retainFalsePositives)
+	if !e.retainFalsePositives {
+		results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results)
+	}
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
 	}
