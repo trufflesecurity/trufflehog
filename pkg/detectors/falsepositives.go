@@ -2,6 +2,7 @@ package detectors
 
 import (
 	_ "embed"
+	"fmt"
 	"math"
 	"strings"
 	"unicode"
@@ -151,22 +152,26 @@ func FilterResultsWithEntropy(ctx context.Context, results []Result, entropy flo
 }
 
 // FilterKnownFalsePositives filters out known false positives from the results.
-func FilterKnownFalsePositives(ctx context.Context, detector Detector, results []Result, shouldLog bool) []Result {
+func FilterKnownFalsePositives(ctx context.Context, detector Detector, results []Result) []Result {
 	var filteredResults []Result
 
 	isFalsePositive := GetFalsePositiveCheck(detector)
 
 	for _, result := range results {
-		if !result.Verified && result.Raw != nil {
-			isFp, reason := isFalsePositive(result)
-			if !isFp {
-				filteredResults = append(filteredResults, result)
-			} else if shouldLog {
-				ctx.Logger().Info("Filtered out known false positive", "result", result, "reason", reason)
-			}
-		} else {
+		if len(result.Raw) == 0 {
+			ctx.Logger().Error(fmt.Errorf("empty raw"), "invalid result; skipping")
+			continue
+		}
+
+		if result.Verified {
+			filteredResults = append(filteredResults, result)
+			continue
+		}
+
+		if isFp, _ := isFalsePositive(result); !isFp {
 			filteredResults = append(filteredResults, result)
 		}
 	}
+
 	return filteredResults
 }

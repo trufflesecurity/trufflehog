@@ -42,7 +42,7 @@ func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
 	expected := []Result{
 		{Raw: []byte("hga8adshla3434g")},
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results, false)
+	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results)
 	assert.ElementsMatch(t, expected, filtered)
 }
 
@@ -58,7 +58,7 @@ func TestFilterKnownFalsePositives_CustomLogic(t *testing.T) {
 		{Raw: []byte("number")},
 		{Raw: []byte("hga8adshla3434g")},
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results, false)
+	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results)
 	assert.ElementsMatch(t, expected, filtered)
 }
 

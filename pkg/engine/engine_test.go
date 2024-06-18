@@ -448,7 +448,88 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
 }
 
+const (
+	TestDetectorType  = -1
+	TestDetectorType2 = -2
+)
+
+var _ detectors.Detector = (*testDetectorV1)(nil)
+
+type testDetectorV1 struct{}
+
+func (testDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	result := detectors.Result{
+		DetectorType: TestDetectorType,
+		Raw:          []byte("ssample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
+	}
+	return []detectors.Result{result}, nil
+}
+
+func (testDetectorV1) Keywords() []string { return []string{"sample"} }
+
+func (testDetectorV1) Type() detectorspb.DetectorType { return TestDetectorType }
+
+var _ detectors.Detector = (*testDetectorV2)(nil)
+
+type testDetectorV2 struct{}
+
+func (testDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	result := detectors.Result{
+		DetectorType: TestDetectorType,
+		Raw:          []byte("sample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
+	}
+	return []detectors.Result{result}, nil
+}
+
+func (testDetectorV2) Keywords() []string { return []string{"ample"} }
+
+func (testDetectorV2) Type() detectorspb.DetectorType { return TestDetectorType2 }
+
 func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
+	ctx := context.Background()
+
+	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	c := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     []detectors.Detector{testDetectorV1{}, testDetectorV2{}},
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &c)
+	assert.NoError(t, err)
+
+	e.verificationOverlapTracker = new(verificationOverlapTracker)
+
+	e.Start(ctx)
+
+	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
+	err = e.ScanFileSystem(ctx, cfg)
+	assert.NoError(t, err)
+
+	// Wait for all the chunks to be processed.
+	assert.NoError(t, e.Finish(ctx))
+	// We want 0 because the secret is a false positive.
+	want := uint64(0)
+	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
+func TestRetainFalsePositives(t *testing.T) {
 	ctx := context.Background()
 
 	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
@@ -477,12 +558,11 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 		Verify:        false,
 		SourceManager: sourceManager,
 		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+		Results:       map[string]struct{}{"filtered_unverified": {}},
 	}
 
 	e, err := NewEngine(ctx, &c)
 	assert.NoError(t, err)
-
-	e.verificationOverlapTracker = new(verificationOverlapTracker)
 
 	e.Start(ctx)
 
@@ -492,8 +572,8 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 
 	// Wait for all the chunks to be processed.
 	assert.NoError(t, e.Finish(ctx))
-	// We want 0 because the secret is a false positive.
-	want := uint64(0)
+	// We want 1 because the secret is a false positive and we are retaining it.
+	want := uint64(1)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
 
