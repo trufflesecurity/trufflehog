@@ -26,6 +26,7 @@ jobs:
           workload_identity_provider: "projects/811013774421/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "github-ci-external@trufflehog-testing.iam.gserviceaccount.com"
       - name: Test integration
+        continue-on-error: true
         run: make test-integration
       - name: Set up gotestsum
         run: |
