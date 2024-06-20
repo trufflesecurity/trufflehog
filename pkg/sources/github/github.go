@@ -361,7 +361,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	// Otherwise, we're scanning all data.
 	// This allows us to only scan the commit where a vulnerability was found.
 	if len(targets) > 0 {
-		return s.scanTargets(ctx, targets, chunksChan)
+		targetedErrs := s.scanTargets(ctx, targets, chunksChan)
+		errs := make([]error, 0, len(targetedErrs))
+		for _, e := range targetedErrs {
+			errs = append(errs, e)
+		}
+		return errors.Join(errs...)
 	}
 
 	// Reset consumption and rate limit metrics on each run.
@@ -1514,20 +1519,16 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 	return nil
 }
 
-func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) *sources.TargetedScanErrorGroup {
-	errs := make(map[int64]error)
+func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) []*sources.TargetedScanError {
+	var errs []*sources.TargetedScanError
 	for _, tgt := range targets {
 		if err := s.scanTarget(ctx, tgt, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning target")
-			errs[tgt.SecretID] = err
+			errs = append(errs, &sources.TargetedScanError{Err: err, SecretID: tgt.SecretID})
 		}
 	}
 
-	if len(errs) > 0 {
-		return (*sources.TargetedScanErrorGroup)(&errs)
-	}
-
-	return nil
+	return errs
 }
 
 func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {

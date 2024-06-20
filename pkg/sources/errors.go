@@ -58,16 +58,15 @@ func (s *ScanErrors) Errors() error {
 	return errors.Join(s.errors...)
 }
 
-// TargetedScanErrorGroup maps secret IDs to errors. It can be used by targeted scans to return error information for
-// multiple targets together.
-type TargetedScanErrorGroup map[int64]error
+// TargetedScanError is an error with a secret ID attached. Collections of them can be returned by targeted scans that
+// scan multiple targets in order to associate individual errors with individual scan targets.
+type TargetedScanError struct {
+	Err      error
+	SecretID int64
+}
 
-var _ error = (*TargetedScanErrorGroup)(nil)
+var _ error = (*TargetedScanError)(nil)
 
-func (t TargetedScanErrorGroup) Error() string {
-	var errs []error
-	for _, e := range t {
-		errs = append(errs, e)
-	}
-	return errors.Join(errs...).Error()
+func (t TargetedScanError) Error() string {
+	return t.Err.Error()
 }
