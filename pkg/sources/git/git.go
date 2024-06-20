@@ -419,6 +419,8 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		"clone",
 		cloneURL.String(),
 		params.clonePath,
+		"-c",
+		"remote.origin.fetch=+refs/*:refs/remotes/origin/*",
 		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
 	}
 	gitArgs = append(gitArgs, params.args...)
