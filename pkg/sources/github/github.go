@@ -1514,11 +1514,17 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 	return nil
 }
 
-func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) *sources.TargetedScanErrorGroup {
+	errs := make(map[int64]error)
 	for _, tgt := range targets {
 		if err := s.scanTarget(ctx, tgt, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning target")
+			errs[tgt.SecretID] = err
 		}
+	}
+
+	if len(errs) > 0 {
+		return (*sources.TargetedScanErrorGroup)(&errs)
 	}
 
 	return nil

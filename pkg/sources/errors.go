@@ -57,3 +57,17 @@ func (s *ScanErrors) Errors() error {
 	defer s.mu.RUnlock()
 	return errors.Join(s.errors...)
 }
+
+// TargetedScanErrorGroup maps secret IDs to errors. It can be used by targeted scans to return error information for
+// multiple targets together.
+type TargetedScanErrorGroup map[int64]error
+
+var _ error = (*TargetedScanErrorGroup)(nil)
+
+func (t TargetedScanErrorGroup) Error() string {
+	var errs []error
+	for _, e := range t {
+		errs = append(errs, e)
+	}
+	return errors.Join(errs...).Error()
+}
