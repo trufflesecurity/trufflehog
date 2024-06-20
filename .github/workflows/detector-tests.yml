@@ -25,13 +25,13 @@ jobs:
         with:
           workload_identity_provider: "projects/811013774421/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "github-ci-external@trufflehog-testing.iam.gserviceaccount.com"
-      - name: Test
+      - name: Test integration
         run: make test-integration
       - name: Set up gotestsum
         run: |
           go install gotest.tools/gotestsum@latest
           mkdir -p tmp/test-results
-      - name: Test
+      - name: Test detectors
         run: |
           CGO_ENABLED=1 gotestsum --junitfile tmp/test-results/test.xml --raw-command -- go test -json -tags=detectors -timeout=15m $(go list ./... | grep pkg/detectors)
       - name: Upload test results to BuildPulse for flaky test detection
