@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
@@ -243,14 +244,27 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(DefaultDetectors()...),
-		WithVerify(false),
-		WithPrinter(new(discardPrinter)),
-	)
-	assert.Nil(t, err)
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	conf := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     DefaultDetectors(),
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
@@ -277,14 +291,27 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	_, err = tmpFile.WriteString(fmt.Sprintf("test data using keyword %s", fakeDetectorKeyword))
 	assert.NoError(t, err)
 
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(&fakeDetectorV1{}, &fakeDetectorV2{}),
-		WithVerify(true),
-		WithPrinter(new(discardPrinter)),
-	)
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	conf := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     []detectors.Detector{new(fakeDetectorV1), new(fakeDetectorV2)},
+		Verify:        true,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
 	assert.NoError(t, err)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
@@ -333,14 +360,28 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(allDetectors...),
-		WithVerify(true),
-		WithPrinter(new(discardPrinter)),
-	)
-	assert.Nil(t, err)
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	conf := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     allDetectors,
+		Verify:        true,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
@@ -367,15 +408,29 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	conf, err := config.Read(confPath)
 	assert.Nil(t, err)
 
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(conf.Detectors...),
-		WithVerify(false),
-		WithPrinter(new(discardPrinter)),
-		withVerificationOverlapTracking(),
-	)
-	assert.Nil(t, err)
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	c := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     conf.Detectors,
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &c)
+	assert.NoError(t, err)
+
+	e.verificationOverlapTracker = new(verificationOverlapTracker)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
 	if err := e.ScanFileSystem(ctx, cfg); err != nil {
@@ -393,7 +448,88 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	assert.Equal(t, wantDupe, e.verificationOverlapTracker.verificationOverlapDuplicateCount)
 }
 
+const (
+	TestDetectorType  = -1
+	TestDetectorType2 = -2
+)
+
+var _ detectors.Detector = (*testDetectorV1)(nil)
+
+type testDetectorV1 struct{}
+
+func (testDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	result := detectors.Result{
+		DetectorType: TestDetectorType,
+		Raw:          []byte("ssample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
+	}
+	return []detectors.Result{result}, nil
+}
+
+func (testDetectorV1) Keywords() []string { return []string{"sample"} }
+
+func (testDetectorV1) Type() detectorspb.DetectorType { return TestDetectorType }
+
+var _ detectors.Detector = (*testDetectorV2)(nil)
+
+type testDetectorV2 struct{}
+
+func (testDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
+	result := detectors.Result{
+		DetectorType: TestDetectorType,
+		Raw:          []byte("sample-qnwfsLyRSyfCwfpHaQP1UzDhrgpWvHjbYzjpRCMshjt417zWcrzyHUArs7r"),
+	}
+	return []detectors.Result{result}, nil
+}
+
+func (testDetectorV2) Keywords() []string { return []string{"ample"} }
+
+func (testDetectorV2) Type() detectorspb.DetectorType { return TestDetectorType2 }
+
 func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
+	ctx := context.Background()
+
+	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	c := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     []detectors.Detector{testDetectorV1{}, testDetectorV2{}},
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &c)
+	assert.NoError(t, err)
+
+	e.verificationOverlapTracker = new(verificationOverlapTracker)
+
+	e.Start(ctx)
+
+	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
+	err = e.ScanFileSystem(ctx, cfg)
+	assert.NoError(t, err)
+
+	// Wait for all the chunks to be processed.
+	assert.NoError(t, e.Finish(ctx))
+	// We want 0 because the secret is a false positive.
+	want := uint64(0)
+	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
+func TestRetainFalsePositives(t *testing.T) {
 	ctx := context.Background()
 
 	absPath, err := filepath.Abs("./testdata/verificationoverlap_secrets_fp.txt")
@@ -407,15 +543,28 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	conf, err := config.Read(confPath)
 	assert.NoError(t, err)
 
-	e, err := Start(ctx,
-		WithConcurrency(1),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(conf.Detectors...),
-		WithVerify(false),
-		WithPrinter(new(discardPrinter)),
-		withVerificationOverlapTracking(),
-	)
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	c := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     conf.Detectors,
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+		Results:       map[string]struct{}{"filtered_unverified": {}},
+	}
+
+	e, err := NewEngine(ctx, &c)
 	assert.NoError(t, err)
+
+	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
 	err = e.ScanFileSystem(ctx, cfg)
@@ -423,8 +572,8 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 
 	// Wait for all the chunks to be processed.
 	assert.NoError(t, e.Finish(ctx))
-	// We want 0 because the secret is a false positive.
-	want := uint64(0)
+	// We want 1 because the secret is a false positive and we are retaining it.
+	want := uint64(1)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
 
@@ -756,4 +905,61 @@ func generateRandomDataWithKeywords(size int, detectors []detectors.Detector) st
 	}
 
 	return string(data)
+}
+
+func TestEngine_ShouldVerifyChunk(t *testing.T) {
+	tests := []struct {
+		name        string
+		detector    detectors.Detector
+		overrideKey config.DetectorID
+		want        func(sourceVerify, detectorVerify bool) bool
+	}{
+		{
+			name:        "detector override by exact version",
+			detector:    &gitlab.Scanner{},
+			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 2},
+			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
+		},
+		{
+			name:        "detector override by versionless config",
+			detector:    &gitlab.Scanner{},
+			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 0},
+			want:        func(sourceVerify, detectorVerify bool) bool { return detectorVerify },
+		},
+		{
+			name:        "no detector override because of detector type mismatch",
+			detector:    &gitlab.Scanner{},
+			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_NpmToken, Version: 2},
+			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
+		},
+		{
+			name:        "no detector override because of detector version mismatch",
+			detector:    &gitlab.Scanner{},
+			overrideKey: config.DetectorID{ID: detectorspb.DetectorType_Gitlab, Version: 1},
+			want:        func(sourceVerify, detectorVerify bool) bool { return sourceVerify },
+		},
+	}
+
+	booleanChoices := [2]bool{true, false}
+
+	engine := &Engine{verify: true}
+
+	for _, tt := range tests {
+		for _, sourceVerify := range booleanChoices {
+			for _, detectorVerify := range booleanChoices {
+
+				t.Run(fmt.Sprintf("%s (source verify = %v, detector verify = %v)", tt.name, sourceVerify, detectorVerify), func(t *testing.T) {
+					overrides := map[config.DetectorID]bool{
+						tt.overrideKey: detectorVerify,
+					}
+
+					want := tt.want(sourceVerify, detectorVerify)
+
+					got := engine.shouldVerifyChunk(sourceVerify, tt.detector, overrides)
+
+					assert.Equal(t, want, got)
+				})
+			}
+		}
+	}
 }
