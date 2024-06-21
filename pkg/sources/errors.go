@@ -70,3 +70,7 @@ var _ error = (*TargetedScanError)(nil)
 func (t TargetedScanError) Error() string {
 	return t.Err.Error()
 }
+
+func (t TargetedScanError) Unwrap() error {
+	return t.Err
+}
