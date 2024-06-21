@@ -266,9 +266,9 @@ message Huggingface {
   repeated string include_spaces = 10;
   repeated string ignore_datasets = 13;
   repeated string include_datasets = 14;
-  bool  only_models = 16;
-  bool  only_spaces = 17;
-  bool  only_datasets = 18;
+  bool  skip_all_models = 16;
+  bool  skip_all_spaces = 17;
+  bool  skip_all_datasets = 18;
   bool include_discussions = 11;
   bool include_prs = 19;
 }

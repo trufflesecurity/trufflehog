@@ -2,24 +2,45 @@ package huggingface
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
+// Maps for API and HTML paths
+var apiPaths = map[string]string{
+	DATASET: DatasetsRoute,
+	MODEL:   ModelsAPIRoute,
+	SPACE:   SpacesRoute,
+}
+
+var htmlPaths = map[string]string{
+	DATASET: DatasetsRoute,
+	MODEL:   "",
+	SPACE:   SpacesRoute,
+}
+
+type Author struct {
+	Username string `json:"name"`
+}
+
+type Latest struct {
+	Raw string `json:"raw"`
+}
+
+type Data struct {
+	Latest Latest `json:"latest"`
+}
+
 type Event struct {
-	Type   string `json:"type"`
-	Author struct {
-		Username string `json:"name"`
-	} `json:"author"`
+	Type      string `json:"type"`
+	Author    Author `json:"author"`
 	CreatedAt string `json:"createdAt"`
-	Data      struct {
-		Latest struct {
-			Raw string `json:"raw"`
-		} `json:"latest"`
-	} `json:"data"`
-	ID string `json:"id"`
+	Data      Data   `json:"data"`
+	ID        string `json:"id"`
 }
 
 func (e Event) GetAuthor() string {
@@ -31,19 +52,21 @@ func (e Event) GetCreatedAt() string {
 }
 
 func (e Event) GetID() string {
-	return fmt.Sprint(e.ID)
+	return e.ID
+}
+
+type RepoData struct {
+	FullName     string `json:"name"`
+	ResourceType string `json:"type"`
 }
 
 type Discussion struct {
-	ID        int     `json:"num"`
-	IsPR      bool    `json:"isPullRequest"`
-	CreatedAt string  `json:"createdAt"`
-	Title     string  `json:"title"`
-	Events    []Event `json:"events"`
-	Repo      struct {
-		FullName     string `json:"name"`
-		ResourceType string `json:"type"`
-	} `json:"repo"`
+	ID        int      `json:"num"`
+	IsPR      bool     `json:"isPullRequest"`
+	CreatedAt string   `json:"createdAt"`
+	Title     string   `json:"title"`
+	Events    []Event  `json:"events"`
+	Repo      RepoData `json:"repo"`
 }
 
 func (d Discussion) GetID() string {
@@ -62,23 +85,25 @@ func (d Discussion) GetRepo() string {
 	return d.Repo.FullName
 }
 
-func (d Discussion) GetDiscussionHTMLPath() string {
-	basePath := d.GetRepo() + "/" + DiscussionsRoute + "/" + d.GetID()
+// GetDiscussionPath returns the path (ex: "/models/user/repo/discussions/1") for the discussion
+func (d Discussion) GetDiscussionPath() string {
+	basePath := fmt.Sprintf("%s/%s/%s", d.GetRepo(), DiscussionsRoute, d.GetID())
 	if d.Repo.ResourceType == "model" {
 		return basePath
 	}
-	return getResourceHTMLPath(d.Repo.ResourceType) + "/" + basePath
+	return fmt.Sprintf("%s/%s", getResourceHTMLPath(d.Repo.ResourceType), basePath)
 }
 
-func (d Discussion) GetRepoHTMLPath() string {
-	basePath := d.GetRepo() + ".git"
+// GetGitPath returns the path (ex: "/models/user/repo.git") for the repo's git directory
+func (d Discussion) GetGitPath() string {
+	basePath := fmt.Sprintf("%s.git", d.GetRepo())
 	if d.Repo.ResourceType == "model" {
 		return basePath
 	}
-	return getResourceHTMLPath(d.Repo.ResourceType) + "/" + basePath
+	return fmt.Sprintf("%s/%s", getResourceHTMLPath(d.Repo.ResourceType), basePath)
 }
 
-type Discussions struct {
+type DiscussionList struct {
 	Discussions []Discussion `json:"discussions"`
 }
 
@@ -88,84 +113,102 @@ type Repo struct {
 	RepoID    string `json:"id"`
 }
 
-// makeHuggingFaceAPIRequest makes a request to the Hugging Face API
-func makeHuggingFaceAPIRequest(ctx context.Context, apiKey string, url string, method string, target interface{}) error {
-	client := http.DefaultClient
+type HFClient struct {
+	BaseURL    string
+	APIKey     string
+	HTTPClient *http.Client
+}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+// NewClient creates a new API client
+func NewHFClient(baseURL, apiKey string, timeout time.Duration) *HFClient {
+	return &HFClient{
+		BaseURL: baseURL,
+		APIKey:  apiKey,
+		HTTPClient: &http.Client{
+			Timeout: timeout,
+		},
+	}
+}
+
+// get makes a GET request to the Hugging Face API
+// Note: not addressing rate limit, since it seems very permissive. (ex: "If \
+// your account suddenly sends 10k requests then you’re likely to receive 503")
+func (c *HFClient) get(ctx context.Context, url string, target interface{}) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("failed to create HuggingFace API request: %s", err))
 	}
 
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
-	resp, err := client.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("failed to make request to HuggingFace API: %s", err))
 	}
 	defer resp.Body.Close()
 
 	return json.NewDecoder(resp.Body).Decode(target)
 }
 
-// GetModels retrieves repos from the Hugging Face API
-func GetRepo(ctx context.Context, repoName string, resourceType string, apiKey string, endpoint string) (Repo, error) {
+// GetRepo retrieves repo from the Hugging Face API
+func (c *HFClient) GetRepo(ctx context.Context, repoName string, resourceType string) (Repo, error) {
 	var repo Repo
-	url := buildAPIURL(endpoint, resourceType, repoName)
-	err := makeHuggingFaceAPIRequest(ctx, apiKey, url, "GET", &repo)
+	url, err := buildAPIURL(c.BaseURL, resourceType, repoName)
+	if err != nil {
+		return repo, err
+	}
+	err = c.get(ctx, url, &repo)
 	return repo, err
 }
 
 // ListDiscussions retrieves discussions from the Hugging Face API
-func ListDiscussions(ctx context.Context, apiKey string, endpoint string, repoInfo repoInfo) (Discussions, error) {
-	var discussions Discussions
-	baseURL := buildAPIURL(endpoint, string(repoInfo.resourceType), repoInfo.fullName)
-	url := baseURL + "/" + DiscussionsRoute
-	err := makeHuggingFaceAPIRequest(ctx, apiKey, url, "GET", &discussions)
+func (c *HFClient) ListDiscussions(ctx context.Context, repoInfo repoInfo) (DiscussionList, error) {
+	var discussions DiscussionList
+	baseURL, err := buildAPIURL(c.BaseURL, string(repoInfo.resourceType), repoInfo.fullName)
+	if err != nil {
+		return discussions, err
+	}
+	url := fmt.Sprintf("%s/%s", baseURL, DiscussionsRoute)
+	err = c.get(ctx, url, &discussions)
 	return discussions, err
 }
 
-func GetDiscussionByID(ctx context.Context, apiKey string, endpoint string, repoInfo repoInfo, discussionID string) (Discussion, error) {
+func (c *HFClient) GetDiscussionByID(ctx context.Context, repoInfo repoInfo, discussionID string) (Discussion, error) {
 	var discussion Discussion
-	baseURL := buildAPIURL(endpoint, string(repoInfo.resourceType), repoInfo.fullName)
-	url := baseURL + "/" + DiscussionsRoute + "/" + discussionID
-	err := makeHuggingFaceAPIRequest(ctx, apiKey, url, "GET", &discussion)
+	baseURL, err := buildAPIURL(c.BaseURL, string(repoInfo.resourceType), repoInfo.fullName)
+	if err != nil {
+		return discussion, err
+	}
+	url := fmt.Sprintf("%s/%s/%s", baseURL, DiscussionsRoute, discussionID)
+	err = c.get(ctx, url, &discussion)
 	return discussion, err
 }
 
-func GetReposByAuthor(ctx context.Context, apiKey string, endpoint string, resourceType string, author string) ([]Repo, error) {
+// ListReposByAuthor retrieves repos from the Hugging Face API by author (user or org)
+// Note: not addressing pagination b/c allow by default 1000 results, which should be enough for 99.99% of cases
+func (c *HFClient) ListReposByAuthor(ctx context.Context, resourceType string, author string) ([]Repo, error) {
 	var repos []Repo
-	url := endpoint + "/" + APIRoute + "/" + getResourceAPIPath(resourceType) + "?limit=1000&author=" + author
-	err := makeHuggingFaceAPIRequest(ctx, apiKey, url, "GET", &repos)
+	url := fmt.Sprintf("%s/%s/%s?limit=1000&author=%s", c.BaseURL, APIRoute, getResourceAPIPath(resourceType), author)
+	err := c.get(ctx, url, &repos)
 	return repos, err
 }
 
+// getResourceAPIPath returns the API path for the given resource type
 func getResourceAPIPath(resourceType string) string {
-	switch resourceType {
-	case DATASET:
-		return DatasetsRoute
-	case MODEL:
-		return ModelsAPIRoute
-	case SPACE:
-		return SpacesRoute
-	default:
-		return ""
-	}
+	return apiPaths[resourceType]
 }
 
+// getResourceHTMLPath returns the HTML path for the given resource type
 func getResourceHTMLPath(resourceType string) string {
-	switch resourceType {
-	case DATASET:
-		return DatasetsRoute
-	case MODEL:
-		return "/"
-	case SPACE:
-		return SpacesRoute
-	default:
-		return ""
-	}
+	return htmlPaths[resourceType]
 }
 
-func buildAPIURL(endpoint string, resourceType string, repoName string) string {
-	return endpoint + "/" + APIRoute + "/" + getResourceAPIPath(resourceType) + "/" + repoName
+func buildAPIURL(endpoint string, resourceType string, repoName string) (string, error) {
+	if endpoint == "" || resourceType == "" || repoName == "" {
+		return "", errors.New("endpoint, resourceType, and repoName must not be empty")
+	}
+	return fmt.Sprintf("%s/%s/%s/%s", endpoint, APIRoute, getResourceAPIPath(resourceType), repoName), nil
 }

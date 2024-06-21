@@ -2,7 +2,6 @@ package huggingface
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -73,17 +72,16 @@ type Source struct {
 	scanOptMu   sync.Mutex // protects the scanOptions
 	scanOptions *git.ScanOptions
 
-	httpClient      *http.Client
+	apiClient       *HFClient
 	log             logr.Logger
 	conn            *sourcespb.Huggingface
 	jobPool         *errgroup.Group
 	resumeInfoMutex sync.Mutex
 	resumeInfoSlice []string
-	//apiClient       *Client
 
-	onlyModels         bool
-	onlySpaces         bool
-	onlyDatasets       bool
+	skipAllModels      bool
+	skipAllSpaces      bool
+	skipAllDatasets    bool
 	includeDiscussions bool
 	includePrs         bool
 
@@ -191,8 +189,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
-	s.httpClient = &http.Client{}
-
 	var conn sourcespb.Huggingface
 	err = anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
@@ -200,16 +196,21 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	// ToDo: Add in orgs enumerations
 	s.orgsCache = memory.New[string]()
 	for _, org := range s.conn.Organizations {
 		s.orgsCache.Set(org, org)
 	}
 
-	// ToDo: Add in users enumerations
 	s.usersCache = memory.New[string]()
 	for _, user := range s.conn.Users {
 		s.usersCache.Set(user, user)
+	}
+
+	//Verify ignore and include models, spaces, and datasets are valid
+	// this ensures that calling --org <org> --ignore-model <org/model> contains the proper
+	// repo format of org/model. Otherwise, we would scan the entire org.
+	if err := s.validateIgnoreIncludeRepos(); err != nil {
+		return err
 	}
 
 	s.filteredModelsCache = s.newFilteredRepoCache(memory.New[string](),
@@ -227,23 +228,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		s.conn.GetIgnoreDatasets(),
 	)
 
-	s.models = s.conn.Models
-	for _, model := range s.models {
-		url := fmt.Sprintf("https://huggingface.co/%s.git", model)
-		s.filteredModelsCache.Set(model, url)
-	}
-
-	s.spaces = s.conn.Spaces
-	for _, space := range s.spaces {
-		url := fmt.Sprintf("https://huggingface.co/%s/%s.git", SpacesRoute, space)
-		s.filteredSpacesCache.Set(space, url)
-	}
-
-	s.datasets = s.conn.Datasets
-	for _, dataset := range s.datasets {
-		url := fmt.Sprintf("https://huggingface.co/%s/%s.git", DatasetsRoute, dataset)
-		s.filteredDatasetsCache.Set(dataset, url)
-	}
+	s.models = initializeRepos(s.filteredModelsCache, s.conn.Models, fmt.Sprintf("%s/%s.git", s.conn.Endpoint, "%s"))
+	s.spaces = initializeRepos(s.filteredSpacesCache, s.conn.Spaces, fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, SpacesRoute, "%s"))
+	s.datasets = initializeRepos(s.filteredDatasetsCache, s.conn.Datasets, fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, DatasetsRoute, "%s"))
 	s.repoInfoCache = newRepoInfoCache()
 
 	s.includeDiscussions = s.conn.IncludeDiscussions
@@ -278,8 +265,56 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.git = git.NewGit(cfg)
 
 	s.huggingfaceToken = s.conn.GetToken()
+	s.apiClient = NewHFClient(s.conn.Endpoint, s.huggingfaceToken, 10*time.Second)
+
+	s.skipAllModels = s.conn.SkipAllModels
+	s.skipAllSpaces = s.conn.SkipAllSpaces
+	s.skipAllDatasets = s.conn.SkipAllDatasets
 
 	return nil
+}
+
+func (s *Source) validateIgnoreIncludeRepos() error {
+	if err := verifySlashSeparatedStrings(s.conn.IgnoreModels); err != nil {
+		return err
+	}
+	if err := verifySlashSeparatedStrings(s.conn.IncludeModels); err != nil {
+		return err
+	}
+	if err := verifySlashSeparatedStrings(s.conn.IgnoreSpaces); err != nil {
+		return err
+	}
+	if err := verifySlashSeparatedStrings(s.conn.IncludeSpaces); err != nil {
+		return err
+	}
+	if err := verifySlashSeparatedStrings(s.conn.IgnoreDatasets); err != nil {
+		return err
+	}
+	if err := verifySlashSeparatedStrings(s.conn.IncludeDatasets); err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifySlashSeparatedStrings(s []string) error {
+	for _, str := range s {
+		if !strings.Contains(str, "/") {
+			return fmt.Errorf("invalid owner/repo: %s", str)
+		}
+	}
+	return nil
+}
+
+func initializeRepos(cache *filteredRepoCache, repos []string, urlPattern string) []string {
+	returnRepos := make([]string, 0)
+	for _, repo := range repos {
+		if !cache.ignoreRepo(repo) {
+			url := fmt.Sprintf(urlPattern, repo)
+			cache.Set(repo, url)
+			returnRepos = append(returnRepos, repo)
+		}
+	}
+	return returnRepos
 }
 
 func (s *Source) getResourceType(ctx context.Context, repoURL string) string {
@@ -315,11 +350,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	// 	return s.scanTargets(ctx, targets, chunksChan)
 	// }
 
-	// Reset consumption and rate limit metrics on each run.
-	// githubNumRateLimitEncountered.WithLabelValues(s.name).Set(0)
-	// githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
-	// githubReposScanned.WithLabelValues(s.name).Set(0)
-
 	err := s.enumerate(ctx)
 	if err != nil {
 		return err
@@ -329,7 +359,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 }
 
 func (s *Source) enumerate(ctx context.Context) error {
-	fmt.Println("Running enumerate")
 	s.enumerateAuthors(ctx)
 
 	s.models = make([]string, 0, s.filteredModelsCache.Count())
@@ -353,9 +382,7 @@ func (s *Source) enumerate(ctx context.Context) error {
 		}
 	}
 
-	// huggingfaceModelsEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
-	//"num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache)
-	s.log.Info("Completed enumeration", "num_model", len(s.models), "num_space", len(s.spaces), "num_dataset", len(s.datasets))
+	s.log.Info("Completed enumeration", "num_models", len(s.models), "num_spaces", len(s.spaces), "num_datasets", len(s.datasets))
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.models)
@@ -371,30 +398,38 @@ func (s *Source) cacheRepoInfo(ctx context.Context, repo string, repoType string
 	if _, ok := s.repoInfoCache.get(repoURL); !ok {
 		repoCtx.Logger().V(2).Info("Caching " + repoType + " info")
 		for {
-			repo, err := GetRepo(repoCtx, repo, repoType, s.huggingfaceToken, s.conn.Endpoint)
-			// if s.handleRateLimit(err) {
-			// 	continue
-			// }
+			repo, err := s.apiClient.GetRepo(repoCtx, repo, repoType)
 			if err != nil {
 				repoCtx.Logger().Error(err, "Failed to fetch "+repoType)
 				return err
 			}
-			var visibility source_metadatapb.Visibility
-			if repo.IsPrivate {
-				visibility = source_metadatapb.Visibility_private
-			} else {
-				visibility = source_metadatapb.Visibility_public
+			// check if repo empty
+			if repo.RepoID == "" {
+				repoCtx.Logger().Error(fmt.Errorf("no repo found for repo"), repoURL)
+				return nil
 			}
 			s.repoInfoCache.put(repoURL, repoInfo{
 				owner:        repo.Owner,
 				name:         strings.Split(repo.RepoID, "/")[1],
 				fullName:     repo.RepoID,
-				visibility:   visibility,
+				visibility:   getVisibility(repo.IsPrivate),
 				resourceType: resourceType(repoType),
 			})
 			break
 		}
 	}
+	s.updateRepoLists(repoURL, repoType)
+	return nil
+}
+
+func getVisibility(isPrivate bool) source_metadatapb.Visibility {
+	if isPrivate {
+		return source_metadatapb.Visibility_private
+	}
+	return source_metadatapb.Visibility_public
+}
+
+func (s *Source) updateRepoLists(repoURL string, repoType string) {
 	switch repoType {
 	case MODEL:
 		s.models = append(s.models, repoURL)
@@ -403,104 +438,90 @@ func (s *Source) cacheRepoInfo(ctx context.Context, repo string, repoType string
 	case DATASET:
 		s.datasets = append(s.datasets, repoURL)
 	}
+}
+
+func (s *Source) fetchAndCacheRepos(ctx context.Context, resourceType string, org string) error {
+	var repos []Repo
+	var err error
+	var url string
+	var filteredCache *filteredRepoCache
+	switch resourceType {
+	case MODEL:
+		filteredCache = s.filteredModelsCache
+		url = fmt.Sprintf("%s/%s.git", s.conn.Endpoint, "%s")
+		repos, err = s.apiClient.ListReposByAuthor(ctx, MODEL, org)
+	case SPACE:
+		filteredCache = s.filteredSpacesCache
+		url = fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, SpacesRoute, "%s")
+		repos, err = s.apiClient.ListReposByAuthor(ctx, SPACE, org)
+	case DATASET:
+		filteredCache = s.filteredDatasetsCache
+		url = fmt.Sprintf("%s/%s/%s.git", s.conn.Endpoint, DatasetsRoute, "%s")
+		repos, err = s.apiClient.ListReposByAuthor(ctx, DATASET, org)
+	}
+	if err != nil {
+		return err
+	}
+
+	for _, repo := range repos {
+		repoURL := fmt.Sprintf(url, repo.RepoID)
+		filteredCache.Set(repo.RepoID, repoURL)
+		if err := s.cacheRepoInfo(ctx, repo.RepoID, resourceType, filteredCache); err != nil {
+			continue
+		}
+	}
 	return nil
 }
 
 func (s *Source) enumerateAuthors(ctx context.Context) {
-	// ToDo: Deal with only-models, etc.
-	fmt.Println(s.orgsCache.Keys())
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "organization", org)
-		repos, err := GetReposByAuthor(orgCtx, s.huggingfaceToken, s.conn.Endpoint, MODEL, org)
-		if err != nil {
-			orgCtx.Logger().Error(err, "Failed to fetch repos for organization")
-			continue
-		}
-		for _, repo := range repos {
-			url := fmt.Sprintf(s.conn.Endpoint + "/" + repo.RepoID + ".git")
-			s.filteredModelsCache.Set(repo.RepoID, url)
-			if err := s.cacheRepoInfo(orgCtx, repo.RepoID, MODEL, s.filteredModelsCache); err != nil {
+		if !s.skipAllModels {
+			if err := s.fetchAndCacheRepos(orgCtx, MODEL, org); err != nil {
+				orgCtx.Logger().Error(err, "Failed to fetch models for organization")
 				continue
 			}
 		}
-
-		repos, err = GetReposByAuthor(orgCtx, s.huggingfaceToken, s.conn.Endpoint, SPACE, org)
-		if err != nil {
-			orgCtx.Logger().Error(err, "Failed to fetch repos for organization")
-			continue
-		}
-		for _, repo := range repos {
-			url := fmt.Sprintf(s.conn.Endpoint + "/" + SpacesRoute + "/" + repo.RepoID + ".git")
-			s.filteredSpacesCache.Set(repo.RepoID, url)
-			if err := s.cacheRepoInfo(orgCtx, repo.RepoID, SPACE, s.filteredSpacesCache); err != nil {
+		if !s.skipAllSpaces {
+			if err := s.fetchAndCacheRepos(orgCtx, SPACE, org); err != nil {
+				orgCtx.Logger().Error(err, "Failed to fetch spaces for organization")
 				continue
 			}
 		}
-
-		repos, err = GetReposByAuthor(orgCtx, s.huggingfaceToken, s.conn.Endpoint, DATASET, org)
-		if err != nil {
-			orgCtx.Logger().Error(err, "Failed to fetch repos for organization")
-			continue
-		}
-		for _, repo := range repos {
-			url := fmt.Sprintf(s.conn.Endpoint + "/" + DatasetsRoute + "/" + repo.RepoID + ".git")
-			s.filteredDatasetsCache.Set(repo.RepoID, url)
-			if err := s.cacheRepoInfo(orgCtx, repo.RepoID, DATASET, s.filteredDatasetsCache); err != nil {
+		if !s.skipAllDatasets {
+			if err := s.fetchAndCacheRepos(orgCtx, DATASET, org); err != nil {
+				orgCtx.Logger().Error(err, "Failed to fetch datasets for organization")
 				continue
 			}
 		}
-
 	}
-	fmt.Println(s.usersCache.Keys())
 	for _, user := range s.usersCache.Keys() {
 		userCtx := context.WithValue(ctx, "user", user)
-		repos, err := GetReposByAuthor(userCtx, s.huggingfaceToken, s.conn.Endpoint, MODEL, user)
-		if err != nil {
-			userCtx.Logger().Error(err, "Failed to fetch repos for user")
-			continue
-		}
-		for _, repo := range repos {
-			// ToDo: refactor by splitting up the cacheRepoInfo function and directly calling sub part, since already have repo object
-			url := fmt.Sprintf(s.conn.Endpoint + "/" + repo.RepoID + ".git")
-			s.filteredModelsCache.Set(repo.RepoID, url)
-			if err := s.cacheRepoInfo(userCtx, repo.RepoID, MODEL, s.filteredModelsCache); err != nil {
-				fmt.Println(err)
+		if !s.skipAllModels {
+			if err := s.fetchAndCacheRepos(userCtx, MODEL, user); err != nil {
+				userCtx.Logger().Error(err, "Failed to fetch models for user")
 				continue
 			}
 		}
-
-		repos, err = GetReposByAuthor(userCtx, s.huggingfaceToken, s.conn.Endpoint, SPACE, user)
-		if err != nil {
-			userCtx.Logger().Error(err, "Failed to fetch repos for user")
-			continue
-		}
-		for _, repo := range repos {
-			url := fmt.Sprintf(s.conn.Endpoint + "/" + SpacesRoute + "/" + repo.RepoID + ".git")
-			s.filteredSpacesCache.Set(repo.RepoID, url)
-			if err := s.cacheRepoInfo(userCtx, repo.RepoID, SPACE, s.filteredSpacesCache); err != nil {
-				fmt.Println(err)
+		if !s.skipAllSpaces {
+			if err := s.fetchAndCacheRepos(userCtx, SPACE, user); err != nil {
+				userCtx.Logger().Error(err, "Failed to fetch spaces for user")
 				continue
 			}
 		}
-
-		repos, err = GetReposByAuthor(userCtx, s.huggingfaceToken, s.conn.Endpoint, DATASET, user)
-		if err != nil {
-			userCtx.Logger().Error(err, "Failed to fetch repos for user")
-			continue
-		}
-		for _, repo := range repos {
-			url := fmt.Sprintf(s.conn.Endpoint + "/" + DatasetsRoute + "/" + repo.RepoID + ".git")
-			s.filteredDatasetsCache.Set(repo.RepoID, url)
-			if err := s.cacheRepoInfo(userCtx, repo.RepoID, DATASET, s.filteredDatasetsCache); err != nil {
-				fmt.Println(err)
+		if !s.skipAllDatasets {
+			if err := s.fetchAndCacheRepos(userCtx, DATASET, user); err != nil {
+				userCtx.Logger().Error(err, "Failed to fetch datasets for user")
 				continue
 			}
 		}
 	}
 }
 
-func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, repos []string, resourceType string) error {
+func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, resourceType string) error {
 	var scannedCount uint64 = 1
+
+	repos := s.getReposListByType(resourceType)
 
 	s.log.V(2).Info("Found "+resourceType+" to scan", "count", len(repos))
 
@@ -509,7 +530,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 	repos = reposToScan
 
 	scanErrs := sources.NewScanErrors()
-	// Setup scan options if it wasn't provided.
+
 	if s.scanOptions == nil {
 		s.scanOptions = &git.ScanOptions{}
 	}
@@ -530,14 +551,8 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 				s.resumeInfoSlice = sources.RemoveRepoFromResumeInfo(s.resumeInfoSlice, repoURL)
 			}(s, repoURL)
 
-			if !strings.HasSuffix(repoURL, ".git") {
-				scanErrs.Add(fmt.Errorf("repo %s does not end in .git", repoURL))
-				return nil
-			}
-
 			// Scan the repository
 			repoInfo, ok := s.repoInfoCache.get(repoURL)
-
 			if !ok {
 				// This should never happen.
 				err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
@@ -560,7 +575,6 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 			}
 
 			repoCtx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d "+resourceType+"s", scannedCount, len(s.models)), "duration_seconds", duration)
-			//githubReposScanned.WithLabelValues(s.name).Inc()
 			atomic.AddUint64(&scannedCount, 1)
 			return nil
 		})
@@ -570,24 +584,34 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 	if scanErrs.Count() > 0 {
 		s.log.V(0).Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs.String())
 	}
-	s.SetProgressComplete(len(s.models), len(s.models), "Completed HuggingFace "+resourceType+" scan", "")
+	s.SetProgressComplete(len(repos), len(repos), "Completed HuggingFace "+resourceType+" scan", "")
+	return nil
+}
+
+func (s *Source) getReposListByType(resourceType string) []string {
+	switch resourceType {
+	case MODEL:
+		return s.models
+	case SPACE:
+		return s.spaces
+	case DATASET:
+		return s.datasets
+	}
 	return nil
 }
 
 func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	s.scanRepos(ctx, chunksChan, s.models, MODEL)
-	s.scanRepos(ctx, chunksChan, s.spaces, SPACE)
-	s.scanRepos(ctx, chunksChan, s.datasets, DATASET)
+	s.scanRepos(ctx, chunksChan, MODEL)
+	s.scanRepos(ctx, chunksChan, SPACE)
+	s.scanRepos(ctx, chunksChan, DATASET)
 	return nil
 }
 
 func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo repoInfo, chunksChan chan *sources.Chunk) (time.Duration, error) {
-	var duration time.Duration
-
 	ctx.Logger().V(2).Info("attempting to clone %s", repoInfo.resourceType)
 	path, repo, err := s.cloneRepo(ctx, repoURL)
 	if err != nil {
-		return duration, err
+		return 0, err
 	}
 	defer os.RemoveAll(path)
 
@@ -596,80 +620,15 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 
 	start := time.Now()
 	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
-		return duration, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
+		return 0, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
 	}
-	duration = time.Since(start)
-	return duration, nil
+	return time.Since(start), nil
 }
 
 var (
 	rateLimitMu         sync.RWMutex
 	rateLimitResumeTime time.Time
 )
-
-// handleRateLimit returns true if a rate limit was handled
-//
-// Unauthenticated users have a rate limit of 60 requests per hour.
-// Authenticated users have a rate limit of 5,000 requests per hour,
-// however, certain actions are subject to a stricter "secondary" limit.
-// https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
-// func (s *Source) handleRateLimit(errIn error) bool {
-// 	if errIn == nil {
-// 		return false
-// 	}
-
-// 	rateLimitMu.RLock()
-// 	resumeTime := rateLimitResumeTime
-// 	rateLimitMu.RUnlock()
-
-// 	var retryAfter time.Duration
-// 	if resumeTime.IsZero() || time.Now().After(resumeTime) {
-// 		rateLimitMu.Lock()
-
-// 		var (
-// 			now = time.Now()
-
-// 			// GitHub has both primary (RateLimit) and secondary (AbuseRateLimit) errors.
-// 			limitType  string
-// 			rateLimit  *github.RateLimitError
-// 			abuseLimit *github.AbuseRateLimitError
-// 		)
-// 		if errors.As(errIn, &rateLimit) {
-// 			limitType = "primary"
-// 			rate := rateLimit.Rate
-// 			if rate.Remaining == 0 { // TODO: Will we ever receive a |RateLimitError| when remaining > 0?
-// 				retryAfter = rate.Reset.Sub(now)
-// 			}
-// 		} else if errors.As(errIn, &abuseLimit) {
-// 			limitType = "secondary"
-// 			retryAfter = abuseLimit.GetRetryAfter()
-// 		} else {
-// 			rateLimitMu.Unlock()
-// 			return false
-// 		}
-
-// 		jitter := time.Duration(rand.Intn(10)+1) * time.Second
-// 		if retryAfter > 0 {
-// 			retryAfter = retryAfter + jitter
-// 			rateLimitResumeTime = now.Add(retryAfter)
-// 			s.log.V(0).Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
-// 		} else {
-// 			retryAfter = (5 * time.Minute) + jitter
-// 			rateLimitResumeTime = now.Add(retryAfter)
-// 			// TODO: Use exponential backoff instead of static retry time.
-// 			s.log.V(0).Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
-// 		}
-
-// 		rateLimitMu.Unlock()
-// 	} else {
-// 		retryAfter = time.Until(resumeTime)
-// 	}
-
-// 	githubNumRateLimitEncountered.WithLabelValues(s.name).Inc()
-// 	time.Sleep(retryAfter)
-// 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
-// 	return true
-// }
 
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
 func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL string, resourceType string, repos []string) {
@@ -682,39 +641,23 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 	// Make the resume info string from the slice.
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
-
 	s.SetProgressComplete(index+offset, len(repos)+offset, fmt.Sprintf("%ss: %s", resourceType, repoURL), encodedResumeInfo)
 }
 
 const initialPage = 1 // page to start listing from
 
 func (s *Source) scanDiscussions(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
-	// ToDo: Deal with rate limits + pagination
-	discussions, err := ListDiscussions(ctx, s.huggingfaceToken, s.conn.Endpoint, repoInfo)
+	discussions, err := s.apiClient.ListDiscussions(ctx, repoInfo)
 	if err != nil {
 		return err
 	}
-
 	for _, discussion := range discussions.Discussions {
-		if !discussion.IsPR && s.includeDiscussions {
-			d, err := GetDiscussionByID(ctx, s.huggingfaceToken, s.conn.Endpoint, repoInfo, discussion.GetID())
+		if (discussion.IsPR && s.includePrs) || (!discussion.IsPR && s.includeDiscussions) {
+			d, err := s.apiClient.GetDiscussionByID(ctx, repoInfo, discussion.GetID())
 			if err != nil {
 				return err
 			}
-
-			// chunk discussion and comments
 			// Note: there is no discussion "description" or similar to chunk, only comments
-			if err = s.chunkDiscussionComments(ctx, repoInfo, d, chunksChan); err != nil {
-				return err
-			}
-		} else if discussion.IsPR && s.includePrs {
-			// ToDo: Process PR file changes.
-			d, err := GetDiscussionByID(ctx, s.huggingfaceToken, s.conn.Endpoint, repoInfo, discussion.GetID())
-			if err != nil {
-				return err
-			}
-
-			// chunk discussion and comments
 			if err = s.chunkDiscussionComments(ctx, repoInfo, d, chunksChan); err != nil {
 				return err
 			}
@@ -733,9 +676,9 @@ func (s *Source) chunkDiscussionComments(ctx context.Context, repoInfo repoInfo,
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Huggingface{
 					Huggingface: &source_metadatapb.Huggingface{
-						Link:       sanitizer.UTF8(s.conn.Endpoint + "/" + discussion.GetDiscussionHTMLPath() + "#" + comment.GetID()),
+						Link:       sanitizer.UTF8(fmt.Sprintf("%s/%s#%s", s.conn.Endpoint, discussion.GetDiscussionPath(), comment.GetID())),
 						Username:   sanitizer.UTF8(comment.GetAuthor()),
-						Repository: sanitizer.UTF8(s.conn.Endpoint + "/" + discussion.GetRepoHTMLPath()),
+						Repository: sanitizer.UTF8(fmt.Sprintf("%s/%s", s.conn.Endpoint, discussion.GetGitPath())),
 						Timestamp:  sanitizer.UTF8(comment.GetCreatedAt()),
 						Visibility: repoInfo.visibility,
 					},

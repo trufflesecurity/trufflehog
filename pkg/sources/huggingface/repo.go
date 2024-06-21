@@ -70,11 +70,3 @@ func (s *Source) cloneRepo(
 	}
 	return path, repo, nil
 }
-
-// commitQuery represents the details required to fetch a commit.
-type commitQuery struct {
-	repo     string
-	owner    string
-	sha      string
-	filename string
-}

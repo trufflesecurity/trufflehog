@@ -214,9 +214,9 @@ var (
 	huggingfaceIgnoreModels       = huggingfaceScan.Flag("ignore-models", "Models to ignore in scan. You can repeat this flag. Must use HuggingFace model full name. Example: 'username/model' (Only used with --user or --org)").Strings()
 	huggingfaceIgnoreSpaces       = huggingfaceScan.Flag("ignore-spaces", "Spaces to ignore in scan. You can repeat this flag. Must use HuggingFace space full name. Example: 'username/space' (Only used with --user or --org)").Strings()
 	huggingfaceIgnoreDatasets     = huggingfaceScan.Flag("ignore-datasets", "Datasets to ignore in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)").Strings()
-	huggingfaceOnlyModels         = huggingfaceScan.Flag("only-models", "Only scan models. (Only used with --user or --org)").Bool()
-	huggingfaceOnlySpaces         = huggingfaceScan.Flag("only-spaces", "Only scan spaces. (Only used with --user or --org)").Bool()
-	huggingfaceOnlyDatasets       = huggingfaceScan.Flag("only-datasets", "Only scan datasets. (Only used with --user or --org)").Bool()
+	huggingfaceSkipAllModels      = huggingfaceScan.Flag("skip-all-models", "Skip all model scans. (Only used with --user or --org)").Bool()
+	huggingfaceSkipAllSpaces      = huggingfaceScan.Flag("skip-all-spaces", "Skip all space scans. (Only used with --user or --org)").Bool()
+	huggingfaceSkipAllDatasets    = huggingfaceScan.Flag("skip-all-datasets", "Skip all dataset scans. (Only used with --user or --org)").Bool()
 	huggingfaceIncludeDiscussions = huggingfaceScan.Flag("include-discussions", "Include discussions in scan.").Bool()
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
@@ -850,9 +850,9 @@ func runSingleScan(ctx context.Context, cfg scanConfig, scanEntireChunk bool) (m
 			IgnoreModels:       *huggingfaceIgnoreModels,
 			IgnoreSpaces:       *huggingfaceIgnoreSpaces,
 			IgnoreDatasets:     *huggingfaceIgnoreDatasets,
-			OnlyModels:         *huggingfaceOnlyModels,
-			OnlySpaces:         *huggingfaceOnlySpaces,
-			OnlyDatasets:       *huggingfaceOnlyDatasets,
+			SkipAllModels:      *huggingfaceSkipAllModels,
+			SkipAllSpaces:      *huggingfaceSkipAllSpaces,
+			SkipAllDatasets:    *huggingfaceSkipAllDatasets,
 			IncludeDiscussions: *huggingfaceIncludeDiscussions,
 			IncludePrs:         *huggingfaceIncludePrs,
 			Concurrency:        *concurrency,

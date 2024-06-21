@@ -2909,11 +2909,11 @@ func (m *Huggingface) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	// no validation rules for OnlyModels
+	// no validation rules for SkipAllModels
 
-	// no validation rules for OnlySpaces
+	// no validation rules for SkipAllSpaces
 
-	// no validation rules for OnlyDatasets
+	// no validation rules for SkipAllDatasets
 
 	// no validation rules for IncludeDiscussions
 

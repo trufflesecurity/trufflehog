@@ -23,9 +23,9 @@ type HuggingfaceConfig struct {
 	IgnoreSpaces       []string
 	IncludeDatasets    []string
 	IgnoreDatasets     []string
-	OnlyModels         bool
-	OnlySpaces         bool
-	OnlyDatasets       bool
+	SkipAllModels      bool
+	SkipAllSpaces      bool
+	SkipAllDatasets    bool
 	IncludeDiscussions bool
 	IncludePrs         bool
 	Token              string
@@ -47,9 +47,9 @@ func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) error
 		IgnoreSpaces:       c.IgnoreSpaces,
 		IncludeDatasets:    c.IncludeDatasets,
 		IgnoreDatasets:     c.IgnoreDatasets,
-		OnlyModels:         c.OnlyModels,
-		OnlySpaces:         c.OnlySpaces,
-		OnlyDatasets:       c.OnlyDatasets,
+		SkipAllModels:      c.SkipAllModels,
+		SkipAllSpaces:      c.SkipAllSpaces,
+		SkipAllDatasets:    c.SkipAllDatasets,
 		IncludeDiscussions: c.IncludeDiscussions,
 		IncludePrs:         c.IncludePrs,
 	}
