@@ -139,14 +139,14 @@ func (c *HFClient) get(ctx context.Context, url string, target interface{}) erro
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return errors.New(fmt.Sprintf("failed to create HuggingFace API request: %s", err))
+		return fmt.Errorf("failed to create HuggingFace API request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return errors.New(fmt.Sprintf("failed to make request to HuggingFace API: %s", err))
+		return fmt.Errorf("failed to make request to HuggingFace API: %w", err)
 	}
 	defer resp.Body.Close()
 

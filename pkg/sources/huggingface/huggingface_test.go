@@ -3,7 +3,6 @@ package huggingface
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -20,16 +19,6 @@ func createTestSource(src *sourcespb.Huggingface) (*Source, *anypb.Any) {
 		panic(err)
 	}
 	return s, conn
-}
-
-func initTestSource(src *sourcespb.Huggingface) *Source {
-	s, conn := createTestSource(src)
-	if err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1); err != nil {
-		panic(err)
-	}
-	s.apiClient = NewHFClient("https://huggingface.co", "super secret token", 10*time.Second)
-	gock.InterceptClient(s.apiClient.HTTPClient)
-	return s
 }
 
 // test include exclude ignore/include orgs, users
@@ -70,17 +59,8 @@ func TestInit(t *testing.T) {
 		assert.Equal(t, datasetURL, s.conn.Endpoint+"/"+getResourceHTMLPath(DATASET)+"/"+dataset+".git")
 	}
 
-	var orgsInCache []string
-	for _, org := range s.orgsCache.Keys() {
-		orgsInCache = append(orgsInCache, org)
-	}
-	assert.ElementsMatch(t, s.conn.Organizations, orgsInCache)
-
-	var usersInCache []string
-	for _, user := range s.usersCache.Keys() {
-		usersInCache = append(usersInCache, user)
-	}
-	assert.ElementsMatch(t, s.conn.Users, usersInCache)
+	assert.ElementsMatch(t, s.conn.Organizations, s.orgsCache.Keys())
+	assert.ElementsMatch(t, s.conn.Users, s.usersCache.Keys())
 }
 
 func TestGetResourceType(t *testing.T) {
@@ -107,7 +87,8 @@ func TestGetResourceType(t *testing.T) {
 			"private": true,
 		})
 
-	s.enumerate(context.Background())
+	err = s.enumerate(context.Background())
+	assert.Nil(t, err)
 	assert.Equal(t, MODEL, s.getResourceType(context.Background(), (s.conn.Endpoint+"/"+repo+".git")))
 }
 
@@ -135,7 +116,8 @@ func TestVisibilityOf(t *testing.T) {
 			"private": true,
 		})
 
-	s.enumerate(context.Background())
+	err = s.enumerate(context.Background())
+	assert.Nil(t, err)
 	assert.Equal(t, source_metadatapb.Visibility(1), s.visibilityOf(context.Background(), (s.conn.Endpoint+"/"+repo+".git")))
 }
 
@@ -183,7 +165,8 @@ func TestEnumerate(t *testing.T) {
 			"private": false,
 		})
 
-	s.enumerate(context.Background())
+	err = s.enumerate(context.Background())
+	assert.Nil(t, err)
 
 	modelGitURL := "https://huggingface.co/author/model1.git"
 	datasetGitURL := "https://huggingface.co/datasets/author/dataset1.git"
@@ -354,7 +337,8 @@ func TestEnumerateAuthorsOrg(t *testing.T) {
 			"private": true,
 		})
 
-	s.enumerate(context.Background())
+	err = s.enumerate(context.Background())
+	assert.Nil(t, err)
 
 	modelGitURL := "https://huggingface.co/org/model.git"
 	datasetGitURL := "https://huggingface.co/datasets/org/dataset.git"
@@ -479,7 +463,8 @@ func TestEnumerateAuthorsOrgSkipAll(t *testing.T) {
 			"private": true,
 		})
 
-	s.enumerate(context.Background())
+	err = s.enumerate(context.Background())
+	assert.Nil(t, err)
 
 	modelGitURL := "https://huggingface.co/org/model.git"
 	datasetGitURL := "https://huggingface.co/datasets/org/dataset.git"
@@ -586,7 +571,8 @@ func TestEnumerateAuthorsOrgIgnores(t *testing.T) {
 			"private": true,
 		})
 
-	s.enumerate(context.Background())
+	err = s.enumerate(context.Background())
+	assert.Nil(t, err)
 
 	modelGitURL := "https://huggingface.co/org/model.git"
 	datasetGitURL := "https://huggingface.co/datasets/org/dataset.git"
@@ -689,7 +675,8 @@ func TestEnumerateAuthorsUser(t *testing.T) {
 			"private": false,
 		})
 
-	s.enumerate(context.Background())
+	err = s.enumerate(context.Background())
+	assert.Nil(t, err)
 
 	modelGitURL := "https://huggingface.co/user/model.git"
 	datasetGitURL := "https://huggingface.co/datasets/user/dataset.git"
@@ -813,7 +800,8 @@ func TestEnumerateAuthorsUserSkipAll(t *testing.T) {
 			"private": false,
 		})
 
-	s.enumerate(context.Background())
+	err = s.enumerate(context.Background())
+	assert.Nil(t, err)
 
 	modelGitURL := "https://huggingface.co/user/model.git"
 	datasetGitURL := "https://huggingface.co/datasets/user/dataset.git"
@@ -919,7 +907,8 @@ func TestEnumerateAuthorsUserIgnores(t *testing.T) {
 			"private": false,
 		})
 
-	s.enumerate(context.Background())
+	err = s.enumerate(context.Background())
+	assert.Nil(t, err)
 
 	modelGitURL := "https://huggingface.co/user/model.git"
 	datasetGitURL := "https://huggingface.co/datasets/user/dataset.git"

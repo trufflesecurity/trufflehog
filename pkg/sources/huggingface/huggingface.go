@@ -46,8 +46,8 @@ type Source struct {
 	name string
 
 	// Protects the user and token.
-	userMu           sync.Mutex
-	huggingfaceUser  string
+	// userMu           sync.Mutex
+	// huggingfaceUser  string
 	huggingfaceToken string
 
 	sourceID               sources.SourceID
@@ -69,7 +69,7 @@ type Source struct {
 
 	git *git.Git
 
-	scanOptMu   sync.Mutex // protects the scanOptions
+	// scanOptMu   sync.Mutex // protects the scanOptions
 	scanOptions *git.ScanOptions
 
 	apiClient       *HFClient
@@ -397,26 +397,23 @@ func (s *Source) cacheRepoInfo(ctx context.Context, repo string, repoType string
 
 	if _, ok := s.repoInfoCache.get(repoURL); !ok {
 		repoCtx.Logger().V(2).Info("Caching " + repoType + " info")
-		for {
-			repo, err := s.apiClient.GetRepo(repoCtx, repo, repoType)
-			if err != nil {
-				repoCtx.Logger().Error(err, "Failed to fetch "+repoType)
-				return err
-			}
-			// check if repo empty
-			if repo.RepoID == "" {
-				repoCtx.Logger().Error(fmt.Errorf("no repo found for repo"), repoURL)
-				return nil
-			}
-			s.repoInfoCache.put(repoURL, repoInfo{
-				owner:        repo.Owner,
-				name:         strings.Split(repo.RepoID, "/")[1],
-				fullName:     repo.RepoID,
-				visibility:   getVisibility(repo.IsPrivate),
-				resourceType: resourceType(repoType),
-			})
-			break
+		repo, err := s.apiClient.GetRepo(repoCtx, repo, repoType)
+		if err != nil {
+			repoCtx.Logger().Error(err, "Failed to fetch "+repoType)
+			return err
 		}
+		// check if repo empty
+		if repo.RepoID == "" {
+			repoCtx.Logger().Error(fmt.Errorf("no repo found for repo"), repoURL)
+			return nil
+		}
+		s.repoInfoCache.put(repoURL, repoInfo{
+			owner:        repo.Owner,
+			name:         strings.Split(repo.RepoID, "/")[1],
+			fullName:     repo.RepoID,
+			visibility:   getVisibility(repo.IsPrivate),
+			resourceType: resourceType(repoType),
+		})
 	}
 	s.updateRepoLists(repoURL, repoType)
 	return nil
@@ -601,9 +598,15 @@ func (s *Source) getReposListByType(resourceType string) []string {
 }
 
 func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk) error {
-	s.scanRepos(ctx, chunksChan, MODEL)
-	s.scanRepos(ctx, chunksChan, SPACE)
-	s.scanRepos(ctx, chunksChan, DATASET)
+	if err := s.scanRepos(ctx, chunksChan, MODEL); err != nil {
+		return err
+	}
+	if err := s.scanRepos(ctx, chunksChan, SPACE); err != nil {
+		return err
+	}
+	if err := s.scanRepos(ctx, chunksChan, DATASET); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -625,10 +628,10 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 	return time.Since(start), nil
 }
 
-var (
-	rateLimitMu         sync.RWMutex
-	rateLimitResumeTime time.Time
-)
+// var (
+// 	rateLimitMu         sync.RWMutex
+// 	rateLimitResumeTime time.Time
+// )
 
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
 func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL string, resourceType string, repos []string) {
@@ -644,7 +647,7 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	s.SetProgressComplete(index+offset, len(repos)+offset, fmt.Sprintf("%ss: %s", resourceType, repoURL), encodedResumeInfo)
 }
 
-const initialPage = 1 // page to start listing from
+//const initialPage = 1 // page to start listing from
 
 func (s *Source) scanDiscussions(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
 	discussions, err := s.apiClient.ListDiscussions(ctx, repoInfo)
