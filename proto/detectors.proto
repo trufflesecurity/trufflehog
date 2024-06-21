@@ -1000,6 +1000,8 @@ enum DetectorType {
   Groq = 988;
   TwitterConsumerkey = 989;
   Eraser = 990;
+  LarkSuite = 991;
+  LarkSuiteApiKey = 992;
 }
 
 message Result {
