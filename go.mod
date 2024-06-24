@@ -9,6 +9,10 @@ replace github.com/snowflakedb/gosnowflake => github.com/trufflesecurity/gosnowf
 // Coinbase archived this library and it has some vulnerable dependencies so we've forked.
 replace github.com/coinbase/waas-client-library-go => github.com/trufflesecurity/waas-client-library-go v1.0.9
 
+// github.com/mholt/archiver/v4 is pinned to a specific commit hash. That commit depends on STARRY-S/zip 0.1.0
+// specifically - future tags won't build. So we have to pin STARRY-S/zip@v0.1.0
+replace github.com/STARRY-S/zip => github.com/STARRY-S/zip v0.1.0
+
 require (
 	cloud.google.com/go/secretmanager v1.13.1
 	cloud.google.com/go/storage v1.42.0
@@ -192,7 +196,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v23.5.26+incompatible // indirect
-	github.com/google/go-github/v60 v60.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20240227163752-401108e1b7e7 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
