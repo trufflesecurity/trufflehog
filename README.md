@@ -321,7 +321,6 @@ Optionally, skip scanning a type of resource with `--skip-models`, `--skip-datas
 ```bash
 trufflehog huggingface --model <username/modelname> --include-discussions --include-prs
 ```
-*Note: Currently, PR file changes are not scanned. Only PR comments are scanned. An update to include PR file data is coming soon.*
 
 # :question: FAQ
 
