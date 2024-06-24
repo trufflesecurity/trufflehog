@@ -377,6 +377,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/languagelayer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/larksuite"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/larksuiteapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/launchdarkly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ldap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/leadfeeder"
@@ -1610,6 +1612,8 @@ func DefaultDetectors() []detectors.Detector {
 		groq.Scanner{},
 		twitterconsumerkey.Scanner{},
 		eraser.Scanner{},
+		larksuite.Scanner{},
+		larksuiteapikey.Scanner{},
 	}
 }
 
