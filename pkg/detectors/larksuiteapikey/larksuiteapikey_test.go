@@ -7,9 +7,11 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -77,19 +79,15 @@ func TestLarksuiteApiKey_Pattern(t *testing.T) {
 }
 
 func TestLarksuiteApiKey_FromChunk(t *testing.T) {
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	// defer cancel()
-	// testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	// if err != nil {
-	// 	t.Fatalf("could not get test secrets from GCP: %s", err)
-	// }
-	// id := testSecrets.MustGetField("LARKSUITE_APP_ID")
-	// secret := testSecrets.MustGetField("LARKSUITE_APP_SECRET")
-	// inactiveSecret := testSecrets.MustGetField("LARKSUITE_APP_SECRET_INACTIVE")
-
-	id := "cli_a6e0628cd1789009"
-	secret := "2nuq0H1dZUqRpHMzQTYJFbwlgNWJq0VX"
-	inactiveSecret := "2nuq0H1dZUqRpHMzKMvbbwlgNWaJiokl"
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	id := testSecrets.MustGetField("LARKSUITE_APP_ID")
+	secret := testSecrets.MustGetField("LARKSUITE_APP_SECRET")
+	inactiveSecret := testSecrets.MustGetField("LARKSUITE_APP_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
