@@ -730,7 +730,6 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgVerificationOverlap sync.WaitGroup
 
 	for chunk := range e.ChunksChan() {
-		fmt.Println("chunk", chunk)
 		startTime := time.Now()
 		sourceVerify := chunk.Verify
 		for _, decoder := range e.decoders {
@@ -1095,6 +1094,7 @@ func (e *Engine) processResult(
 
 func (e *Engine) notifierWorker(ctx context.Context) {
 	for result := range e.ResultsChan() {
+		fmt.Println("NOTIFIER WORKER")
 		startTime := time.Now()
 		// Filter unwanted results, based on `--results`.
 		if !result.Verified {
@@ -1133,6 +1133,7 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 			atomic.AddUint64(&e.metrics.UnverifiedSecretsFound, 1)
 		}
 
+		fmt.Println("DISPATCHING RESULT: ", result)
 		if err := e.dispatcher.Dispatch(ctx, result); err != nil {
 			ctx.Logger().Error(err, "error notifying result")
 		}
