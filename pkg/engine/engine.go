@@ -1094,7 +1094,6 @@ func (e *Engine) processResult(
 
 func (e *Engine) notifierWorker(ctx context.Context) {
 	for result := range e.ResultsChan() {
-		fmt.Println("NOTIFIER WORKER")
 		startTime := time.Now()
 		// Filter unwanted results, based on `--results`.
 		if !result.Verified {
