@@ -524,6 +524,19 @@ func (s *Git) CommitsScanned() uint64 {
 
 const gitDirName = ".git"
 
+// getGitDir returns the likely path of the ".git" directory.
+// If the repository is bare, it will be at the top-level; otherwise, it
+// exists in the ".git" directory at the root of the working tree.
+//
+// See: https://git-scm.com/docs/gitrepository-layout#_description
+func getGitDir(path string, options *ScanOptions) string {
+	if options.Bare {
+		return path
+	} else {
+		return filepath.Join(path, gitDirName)
+	}
+}
+
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the remote URL for reporting (may be empty)
 	remoteURL := getSafeRemoteURL(repo, "origin")
@@ -559,12 +572,14 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return nil
 	}
 
-	gitDir := filepath.Join(path, gitDirName)
-
 	logger.Info("scanning repo", logValues...)
 
-	var depth int64
-	var lastCommitHash string
+	var (
+		gitDir         = getGitDir(path, scanOptions)
+		depth          int64
+		lastCommitHash string
+	)
+
 	for diff := range diffChan {
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			logger.V(1).Info("reached max depth", "depth", depth)
@@ -787,9 +802,6 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		return nil
 	}
 
-	reachedBase := false
-	gitDir := filepath.Join(path, gitDirName)
-
 	logger := ctx.Logger()
 	var logValues []any
 	logValues = append(logValues, "path", path)
@@ -805,8 +817,12 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 	logger.V(1).Info("scanning staged changes", logValues...)
 
-	var depth int64
-	var lastCommitHash string
+	var (
+		reachedBase    = false
+		gitDir         = getGitDir(path, scanOptions)
+		depth          int64
+		lastCommitHash string
+	)
 	for diff := range diffChan {
 		fullHash := diff.Commit.Hash
 		logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
