@@ -567,6 +567,7 @@ func (e *Engine) DetectorAvgTime() map[string][]time.Duration {
 // detectors, and kickstarts all necessary workers. Once started, the engine
 // begins processing input data to identify secrets.
 func (e *Engine) Start(ctx context.Context) {
+	fmt.Println("==================START ENGINE==================")
 	e.metrics = runtimeMetrics{Metrics: Metrics{scanStartTime: time.Now()}}
 	e.sanityChecks(ctx)
 	e.startWorkers(ctx)
@@ -729,6 +730,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgVerificationOverlap sync.WaitGroup
 
 	for chunk := range e.ChunksChan() {
+		fmt.Println("chunk", chunk)
 		startTime := time.Now()
 		sourceVerify := chunk.Verify
 		for _, decoder := range e.decoders {
