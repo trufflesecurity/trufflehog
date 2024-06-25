@@ -148,6 +148,11 @@ func (c *HFClient) get(ctx context.Context, url string, target interface{}) erro
 	if err != nil {
 		return fmt.Errorf("failed to make request to HuggingFace API: %w", err)
 	}
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return errors.New("access is restricted.")
+	}
+
 	defer resp.Body.Close()
 
 	return json.NewDecoder(resp.Body).Decode(target)

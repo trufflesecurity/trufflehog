@@ -399,7 +399,7 @@ func (s *Source) cacheRepoInfo(ctx context.Context, repo string, repoType string
 		repoCtx.Logger().V(2).Info("Caching " + repoType + " info")
 		repo, err := s.apiClient.GetRepo(repoCtx, repo, repoType)
 		if err != nil {
-			repoCtx.Logger().Error(err, "Failed to fetch "+repoType)
+			repoCtx.Logger().Error(err, "failed to fetch "+repoType)
 			return err
 		}
 		// check if repo empty
