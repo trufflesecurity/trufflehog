@@ -50,6 +50,7 @@ func getScopesAndType(key string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
+	defer resp.Body.Close()
 
 	// parse response headers
 	credentialType := resp.Header.Get("x-credential-type")
@@ -84,6 +85,7 @@ func getRepositories(key string, role string) (RepoJSON, error) {
 	if err != nil {
 		return repos, err
 	}
+	defer resp.Body.Close()
 
 	// parse response body
 	err = json.NewDecoder(resp.Body).Decode(&repos)

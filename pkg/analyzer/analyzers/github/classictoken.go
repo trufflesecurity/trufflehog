@@ -68,7 +68,7 @@ func processScopes(headerScopesSlice []string) map[string]bool {
 // The `gists` scope is required to update private gists. Anyone can access a private gist with the link.
 //  These tokens can seem to list out the private repos, but access will depend on scopes.
 
-func analyzeClassicToken(client *gh.Client, token string, show_all bool) {
+func analyzeClassicToken(client *gh.Client, _ string, show_all bool) {
 
 	// Issue GET request to /user
 	user, resp, err := client.Users.Get(context.Background(), "")
@@ -107,7 +107,7 @@ func analyzeClassicToken(client *gh.Client, token string, show_all bool) {
 	}
 
 	// Get all private gists
-	gists, err := getAllGistsForUser(client)
+	gists, _ := getAllGistsForUser(client)
 	printGists(gists, show_all)
 
 }
@@ -198,5 +198,5 @@ func printClassicGHPermissions(scopes map[string]bool, show_all bool) {
 		color.Green(fmt.Sprintf("[!] Found %v Scope(s) for the GitHub Token above\n", scopeCount))
 	}
 	t.Render()
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 }

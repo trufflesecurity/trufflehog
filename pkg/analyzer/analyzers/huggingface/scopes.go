@@ -1,5 +1,6 @@
 package huggingface
 
+//nolint:unused
 var repo_scopes = map[string]string{
 	"repo.content.read": "Read access to contents",
 	"discussion.write":  "Interact with discussions / Open pull requests",

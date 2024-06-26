@@ -82,6 +82,7 @@ func (h *HttpStatusTest) RunTest(headers map[string]string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer resp.Body.Close()
 
 	// Check response status code
 	switch {
@@ -147,6 +148,7 @@ func checkValidity(key string) (bool, error) {
 		color.Red("[x] Error sending request: %s", err.Error())
 		return false, err
 	}
+	defer resp.Body.Close()
 
 	// Check the response. Valid is 200 (secret/restricted) or 403 (restricted)
 	if resp.StatusCode == 200 || resp.StatusCode == 403 {

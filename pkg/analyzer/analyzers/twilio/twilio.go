@@ -53,6 +53,7 @@ func getAccountsStatusCode(sid string, secret string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	defer resp.Body.Close()
 	return resp.StatusCode, nil
 }
 
@@ -83,6 +84,7 @@ func getVerifyServicesStatusCode(sid string, secret string) (VerifyJSON, error) 
 	if err != nil {
 		return verifyJSON, err
 	}
+	defer resp.Body.Close()
 
 	// read response
 	if err := json.NewDecoder(resp.Body).Decode(&verifyJSON); err != nil {

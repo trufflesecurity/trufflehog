@@ -72,7 +72,7 @@ func printGitHubRepos(repos []*gh.Repository) {
 		}
 	}
 	t.Render()
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 }
 
 func printGists(gists []*gh.Gist, show_all bool) {
@@ -96,12 +96,12 @@ func printGists(gists []*gh.Gist, show_all bool) {
 		color.Yellow("[i] Found %v Total Gist(s) (%v private)\n", len(gists), privateCount)
 		t.Render()
 	} else if privateCount == 0 {
-		color.Red(fmt.Sprintf("[i] No Private Gist(s) Found\n"))
+		color.Red("[i] No Private Gist(s) Found\n")
 	} else {
 		color.Green(fmt.Sprintf("[!] Found %v Private Gist(s)\n", privateCount))
 		t.Render()
 	}
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 }
 
 func getRemainingTime(t string) string {
@@ -167,7 +167,7 @@ func checkFineGrained(resp *gh.Response, token string) (bool, error) {
 	// Catch-all for any other types
 	// If resp.Header "X-OAuth-Scopes" doesn't exist, then we have fine-grained permissions
 	color.Yellow("[i] Token Type: GitHub Token")
-	if len(resp.Header["X-OAuth-Scopes"]) > 0 {
+	if len(resp.Header.Values("X-Oauth-Scopes")) > 0 {
 		return false, nil
 	}
 	return true, nil
@@ -187,10 +187,10 @@ func AnalyzePermissions(key string, show_all bool) {
 		color.Red("[x] Invalid GitHub Token.")
 		return
 	} else if !fineGrained {
-		fmt.Println("\n")
+		fmt.Print("\n\n")
 		analyzeClassicToken(client, key, show_all)
 	} else {
-		fmt.Println("\n")
+		fmt.Print("\n\n")
 		analyzeFineGrainedToken(client, key, show_all)
 	}
 }
