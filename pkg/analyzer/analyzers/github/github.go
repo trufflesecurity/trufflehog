@@ -1,123 +1,16 @@
 package github
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
-	gh "github.com/google/go-github/v63/github"
+	gh "github.com/google/go-github/v59/github"
 	"github.com/jedib0t/go-pretty/v6/table"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
-
-var _ analyzers.Analyzer = (*Analyzer)(nil)
-
-type Analyzer struct {
-	Cfg *config.Config
-}
-
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_GitHub }
-
-func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
-	if err != nil {
-		return nil, err
-	}
-	return secretInfoToAnalyzerResult(info), nil
-}
-
-func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	if info == nil {
-		return nil
-	}
-	// Metadata        *TokenMetadata
-	//	Type        string
-	//	FineGrained bool
-	//	User        *gh.User
-	//	Expiration  time.Time
-	//	OauthScopes []analyzers.Permission
-	// Repos           []*gh.Repository
-	// Gists           []*gh.Gist
-	// AccessibleRepos []*gh.Repository
-	// RepoAccessMap   map[string]string
-	// UserAccessMap   map[string]string
-	result := &analyzers.AnalyzerResult{
-		Metadata: map[string]any{
-			"type":         info.Metadata.Type,
-			"fine_grained": info.Metadata.FineGrained,
-			"expiration":   info.Metadata.Expiration,
-		},
-	}
-	result.Bindings = append(result.Bindings, secretInfoToUserBindings(info)...)
-	result.Bindings = append(result.Bindings, secretInfoToRepoBindings(info)...)
-	result.Bindings = append(result.Bindings, secretInfoToGistBindings(info)...)
-	for _, repo := range append(info.Repos, info.AccessibleRepos...) {
-		if *repo.Owner.Type != "Organization" {
-			continue
-		}
-		name := *repo.Owner.Name
-		result.UnboundedResources = append(result.UnboundedResources, analyzers.Resource{
-			Name:               name,
-			FullyQualifiedName: fmt.Sprintf("github.com/%s", name),
-			Type:               "organization",
-		})
-	}
-	// TODO: Unbound resources
-	// - Repo owners
-	// - Gist owners
-	return result
-}
-
-func secretInfoToUserBindings(info *SecretInfo) []analyzers.Binding {
-	return analyzers.BindAllPermissions(*userToResource(info.Metadata.User), info.Metadata.OauthScopes...)
-}
-
-func userToResource(user *gh.User) *analyzers.Resource {
-	name := *user.Login
-	return &analyzers.Resource{
-		Name:               name,
-		FullyQualifiedName: fmt.Sprintf("github.com/%s", name),
-		Type:               strings.ToLower(*user.Type), // "user" or "organization"
-	}
-}
-
-func secretInfoToRepoBindings(info *SecretInfo) []analyzers.Binding {
-	repos := info.Repos
-	if len(info.AccessibleRepos) > 0 {
-		repos = info.AccessibleRepos
-	}
-	var bindings []analyzers.Binding
-	for _, repo := range repos {
-		resource := analyzers.Resource{
-			Name:               *repo.Name,
-			FullyQualifiedName: fmt.Sprintf("github.com/%s", *repo.FullName),
-			Type:               "repository",
-			Parent:             userToResource(repo.Owner),
-		}
-		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
-	}
-	return bindings
-}
-
-func secretInfoToGistBindings(info *SecretInfo) []analyzers.Binding {
-	var bindings []analyzers.Binding
-	for _, gist := range info.Gists {
-		resource := analyzers.Resource{
-			Name:               *gist.Description,
-			FullyQualifiedName: fmt.Sprintf("gist.github.com/%s/%s", *gist.Owner.Login, *gist.ID),
-			Type:               "gist",
-			Parent:             userToResource(gist.Owner),
-		}
-		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
-	}
-	return bindings
-}
 
 func getAllGistsForUser(client *gh.Client) ([]*gh.Gist, error) {
 	opt := &gh.GistListOptions{ListOptions: gh.ListOptions{PerPage: 100}}
@@ -179,17 +72,17 @@ func printGitHubRepos(repos []*gh.Repository) {
 		}
 	}
 	t.Render()
-	fmt.Print("\n\n")
+	fmt.Println("\n")
 }
 
-func printGists(gists []*gh.Gist, showAll bool) {
+func printGists(gists []*gh.Gist, show_all bool) {
 	privateCount := 0
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Gist ID", "Gist Link", "Description", "Private"})
 	for _, gist := range gists {
-		if showAll && *gist.Public {
+		if show_all && *gist.Public {
 			t.AppendRow([]interface{}{*gist.ID, *gist.HTMLURL, *gist.Description, "false"})
 		} else if !*gist.Public {
 			privateCount++
@@ -197,129 +90,107 @@ func printGists(gists []*gh.Gist, showAll bool) {
 			t.AppendRow([]interface{}{green(*gist.ID), green(*gist.HTMLURL), green(*gist.Description), green("true")})
 		}
 	}
-	if showAll && len(gists) == 0 {
+	if show_all && len(gists) == 0 {
 		color.Red("[i] No Gist(s) Found\n")
-	} else if showAll {
+	} else if show_all {
 		color.Yellow("[i] Found %v Total Gist(s) (%v private)\n", len(gists), privateCount)
 		t.Render()
 	} else if privateCount == 0 {
-		color.Red("[i] No Private Gist(s) Found\n")
+		color.Red(fmt.Sprintf("[i] No Private Gist(s) Found\n"))
 	} else {
 		color.Green(fmt.Sprintf("[!] Found %v Private Gist(s)\n", privateCount))
 		t.Render()
 	}
-	fmt.Print("\n\n")
+	fmt.Println("\n")
 }
 
-type TokenMetadata struct {
-	Type        string
-	FineGrained bool
-	User        *gh.User
-	Expiration  time.Time
-	OauthScopes []analyzers.Permission
+func getRemainingTime(t string) string {
+	targetTime, err := time.Parse("2006-01-02 15:04:05 MST", t)
+	if err != nil {
+		return ""
+	}
+
+	// Get the current time
+	currentTime := time.Now()
+
+	// Calculate the duration until the target time
+	durationUntilTarget := targetTime.Sub(currentTime)
+	durationUntilTarget = durationUntilTarget.Truncate(time.Minute)
+
+	// Print the duration
+	return fmt.Sprintf("%v", durationUntilTarget)
 }
 
 // getTokenMetadata gets the username, expiration date, and x-oauth-scopes headers for a given token
 // by sending a GET request to the /user endpoint
 // Returns a response object for usage in the checkFineGrained function
-func getTokenMetadata(token string, client *gh.Client) (*TokenMetadata, error) {
+func getTokenMetadata(token string, client *gh.Client) (resp *gh.Response, err error) {
 	user, resp, err := client.Users.Get(context.Background(), "")
 	if err != nil {
 		return nil, err
 	}
 
-	expiration, _ := time.Parse("2006-01-02 15:04:05 MST", resp.Header.Get("github-authentication-token-expiration"))
+	color.Yellow("[i] Token User: %v", *user.Login)
 
-	var oauthScopes []analyzers.Permission
-	for _, scope := range resp.Header.Values("X-OAuth-Scopes") {
-		for _, scope := range strings.Split(scope, ", ") {
-			oauthScopes = append(oauthScopes, analyzers.Permission{Value: scope})
-		}
+	expiry := resp.Header.Get("github-authentication-token-expiration")
+	timeRemaining := getRemainingTime(expiry)
+	if timeRemaining == "" {
+		color.Red("[i] Token Expiration: does not expire")
+	} else {
+		color.Yellow("[i] Token Expiration: %v (%v remaining)", expiry, timeRemaining)
 	}
-	tokenType, fineGrained := checkFineGrained(token, oauthScopes)
-	return &TokenMetadata{
-		Type:        tokenType,
-		FineGrained: fineGrained,
-		User:        user,
-		Expiration:  expiration,
-		OauthScopes: oauthScopes,
-	}, nil
+	return resp, nil
 }
 
-func checkFineGrained(token string, oauthScopes []analyzers.Permission) (string, bool) {
+func checkFineGrained(resp *gh.Response, token string) (bool, error) {
 	// For details on token prefixes, see:
 	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
 
 	// Special case for ghu_ prefix tokens (ex: in a codespace) that don't have the X-OAuth-Scopes header
 	if strings.HasPrefix(token, "ghu_") {
-		return "GitHub User-to-Server Token", true
+		color.Yellow("[i] Token Type: GitHub User-to-Server Token")
+		return true, nil
 	}
 
 	// Handle github_pat_ tokens
 	if strings.HasPrefix(token, "github_pat") {
-		return "Fine-Grained GitHub Personal Access Token", true
+		color.Yellow("[i] Token Type: Fine-Grained GitHub Personal Access Token")
+		return true, nil
 	}
 
 	// Handle classic PATs
 	if strings.HasPrefix(token, "ghp_") {
-		return "Classic GitHub Personal Access Token", false
+		color.Yellow("[i] Token Type: Classic GitHub Personal Access Token")
+		return false, nil
 	}
 
 	// Catch-all for any other types
 	// If resp.Header "X-OAuth-Scopes" doesn't exist, then we have fine-grained permissions
-	if len(oauthScopes) > 0 {
-		return "GitHub Token", false
+	color.Yellow("[i] Token Type: GitHub Token")
+	if len(resp.Header["X-OAuth-Scopes"]) > 0 {
+		return false, nil
 	}
-	return "GitHub Token", true
+	return true, nil
 }
 
-type SecretInfo struct {
-	Metadata *TokenMetadata
-	Repos    []*gh.Repository
-	Gists    []*gh.Gist
-	// AccessibleRepos, RepoAccessMap, and UserAccessMap are only set if
-	// the token has fine-grained access.
-	AccessibleRepos []*gh.Repository
-	RepoAccessMap   map[string]string
-	UserAccessMap   map[string]string
-}
+func AnalyzePermissions(key string, show_all bool) {
+	client := gh.NewClient(nil).WithAuthToken(key)
 
-func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
-	if cfg == nil {
-		cfg = &config.Config{}
-	}
-	client := gh.NewClient(analyzers.NewAnalyzeClient(cfg)).WithAuthToken(key)
-
-	md, err := getTokenMetadata(key, client)
+	resp, err := getTokenMetadata(key, client)
 	if err != nil {
-		return nil, err
-	}
-
-	if md.FineGrained {
-		return analyzeFineGrainedToken(client, md, cfg.Shallow)
-	}
-	return analyzeClassicToken(client, md)
-}
-
-func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-	info, err := AnalyzePermissions(cfg, key)
-	if err != nil {
-		color.Red("[x] %s", err.Error())
+		color.Red("[x] Invalid GitHub Token.")
 		return
 	}
 
-	color.Yellow("[i] Token User: %v", *info.Metadata.User.Login)
-	if expiry := info.Metadata.Expiration; expiry.IsZero() {
-		color.Red("[i] Token Expiration: does not expire")
+	// Check if the token is fine-grained or classic
+	if fineGrained, err := checkFineGrained(resp, key); err != nil {
+		color.Red("[x] Invalid GitHub Token.")
+		return
+	} else if !fineGrained {
+		fmt.Println("\n")
+		analyzeClassicToken(client, key, show_all)
 	} else {
-		timeRemaining := time.Until(expiry)
-		color.Yellow("[i] Token Expiration: %v (%v remaining)", expiry, timeRemaining)
+		fmt.Println("\n")
+		analyzeFineGrainedToken(client, key, show_all)
 	}
-	color.Yellow("[i] Token Type: %s\n\n", info.Metadata.Type)
-
-	if info.Metadata.FineGrained {
-		printFineGrainedToken(cfg, info)
-		return
-	}
-	printClassicToken(cfg, info)
 }

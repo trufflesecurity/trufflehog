@@ -12,7 +12,6 @@ import (
 	sg "github.com/sendgrid/sendgrid-go"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type ScopesJSON struct {
@@ -20,7 +19,7 @@ type ScopesJSON struct {
 }
 
 func printPermissions(show_all bool) {
-	fmt.Print("\n\n")
+	fmt.Println("\n")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	if show_all {
@@ -38,7 +37,7 @@ func printPermissions(show_all bool) {
 		}
 	}
 	t.Render()
-	fmt.Print("\n\n")
+	fmt.Println("\n")
 }
 
 // getCategoryFromScope returns the category for a given scope.
@@ -80,14 +79,7 @@ func processPermissions(rawScopes []string) {
 	}
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-
-	// ToDo: Add logging when rewrite to not use SG client.
-	if cfg.LoggingEnabled {
-		color.Red("[x] Logging not supported for GitHub Token Analysis.")
-		return
-	}
-
+func AnalyzePermissions(key string, show_all bool) {
 	req := sg.GetRequest(key, "/v3/scopes", "https://api.sendgrid.com")
 	req.Method = "GET"
 	resp, err := sg.API(req)
@@ -128,6 +120,6 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 	}
 
 	processPermissions(rawScopes)
-	printPermissions(cfg.ShowAll)
+	printPermissions(show_all)
 
 }

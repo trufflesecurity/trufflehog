@@ -2,22 +2,19 @@ package stripe
 
 import (
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"gopkg.in/yaml.v3"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -32,9 +29,6 @@ const (
 	LIVE               = "Live"
 	TEST               = "Test"
 )
-
-//go:embed restricted.yaml
-var restrictedConfig []byte
 
 type Permission struct {
 	Name  string
@@ -60,7 +54,7 @@ type Config struct {
 	Categories map[string]Category `yaml:"categories"`
 }
 
-func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) (bool, error) {
+func (h *HttpStatusTest) RunTest(headers map[string]string) (bool, error) {
 	// If body data, marshal to JSON
 	var data io.Reader
 	if h.Payload != nil {
@@ -72,7 +66,7 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 	}
 
 	// Create new HTTP request
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest(h.Method, h.Endpoint, data)
 	if err != nil {
 		return false, err
@@ -88,7 +82,6 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
 
 	// Check response status code
 	switch {
@@ -125,7 +118,7 @@ func checkKeyType(key string) (string, error) {
 }
 
 func checkKeyEnv(key string) (string, error) {
-	// remove first 3 characters
+	//remove first 3 characters
 	key = key[3:]
 	if strings.HasPrefix(key, LIVE_PREFIX) {
 		return LIVE, nil
@@ -136,9 +129,9 @@ func checkKeyEnv(key string) (string, error) {
 	return "", errors.New("invalid Stripe key format")
 }
 
-func checkValidity(cfg *config.Config, key string) (bool, error) {
+func checkValidity(key string) (bool, error) {
 	// Create a new request
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.stripe.com/v1/charges", nil)
 	if err != nil {
 		color.Red("[x] Error creating request: %s", err.Error())
@@ -154,7 +147,6 @@ func checkValidity(cfg *config.Config, key string) (bool, error) {
 		color.Red("[x] Error sending request: %s", err.Error())
 		return false, err
 	}
-	defer resp.Body.Close()
 
 	// Check the response. Valid is 200 (secret/restricted) or 403 (restricted)
 	if resp.StatusCode == 200 || resp.StatusCode == 403 {
@@ -163,7 +155,7 @@ func checkValidity(cfg *config.Config, key string) (bool, error) {
 	return false, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(key string, showAll bool) {
 
 	// Check if secret, publishable, or restricted key
 	var keyType, keyEnv string
@@ -186,7 +178,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 	}
 
 	// Check if key is valid
-	valid, err := checkValidity(cfg, key)
+	valid, err := checkValidity(key)
 	if err != nil {
 		color.Red("[x] ", err.Error())
 		return
@@ -218,20 +210,38 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 		return
 	}
 
-	permissions, err := getRestrictedPermissions(cfg, key)
+	permissions, err := getRestrictedPermissions(key)
 	if err != nil {
 		color.Red("[x] Error getting permissions: %s", err.Error())
 		return
 	}
-	printRestrictedPermissions(permissions, cfg.ShowAll)
+	printRestrictedPermissions(permissions, showAll)
 	// Additional details
 	// get total customers
 	// get total charges
 }
 
-func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCategory, error) {
+func getRestrictedPermissions(key string) ([]PermissionsCategory, error) {
+
+	// Determine the current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		color.Red("[x] Error getting current working directory: %s", err.Error())
+		return nil, err
+	}
+
+	// Construct the path to the config file
+	configFilePath := filepath.Join(cwd, "pkg/analyzers/stripe/restricted.yaml")
+
+	data, err := os.ReadFile(configFilePath)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return nil, err
+	}
+
 	var config Config
-	if err := yaml.Unmarshal(restrictedConfig, &config); err != nil {
+	err = yaml.Unmarshal(data, &config)
+	if err != nil {
 		fmt.Println("Error unmarshalling YAML:", err)
 		return nil, err
 	}
@@ -248,7 +258,7 @@ func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCate
 					continue
 				}
 				testCount++
-				status, err := test.RunTest(cfg, map[string]string{"Authorization": "Bearer " + key})
+				status, err := test.RunTest(map[string]string{"Authorization": "Bearer " + key})
 				if err != nil {
 					color.Red("[x] Error running test: %s", err.Error())
 					return nil, err

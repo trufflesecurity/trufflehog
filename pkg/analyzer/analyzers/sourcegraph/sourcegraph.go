@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type GraphQLError struct {
@@ -33,10 +31,10 @@ type UserInfoJSON struct {
 	} `json:"data"`
 }
 
-func getUserInfo(cfg *config.Config, key string) (UserInfoJSON, error) {
+func getUserInfo(key string) (UserInfoJSON, error) {
 	var userInfo UserInfoJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	payload := "{\"query\":\"query { currentUser { username, email, siteAdmin, createdAt } }\"}"
 	req, err := http.NewRequest("POST", "https://sourcegraph.com/.api/graphql", strings.NewReader(payload))
 	if err != nil {
@@ -59,7 +57,7 @@ func getUserInfo(cfg *config.Config, key string) (UserInfoJSON, error) {
 	return userInfo, nil
 }
 
-func checkSiteAdmin(cfg *config.Config, key string) (bool, error) {
+func checkSiteAdmin(key string) (bool, error) {
 	query := `
 	{
 	    "query": "query webhooks($first: Int, $after: String, $kind: ExternalServiceKind) { webhooks(first: $first, after: $after, kind: $kind) { totalCount } }",
@@ -70,7 +68,7 @@ func checkSiteAdmin(cfg *config.Config, key string) (bool, error) {
 	    }
 	}`
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("POST", "https://sourcegraph.com/.api/graphql", strings.NewReader(query))
 	if err != nil {
 		return false, err
@@ -98,16 +96,16 @@ func checkSiteAdmin(cfg *config.Config, key string) (bool, error) {
 	return true, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(key string, showAll bool) {
 
-	userInfo, err := getUserInfo(cfg, key)
+	userInfo, err := getUserInfo(key)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return
 	}
 
 	// second call
-	userInfo, err = getUserInfo(cfg, key)
+	userInfo, err = getUserInfo(key)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return
@@ -123,7 +121,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 	color.Green("Email: %s\n", userInfo.Data.CurrentUser.Email)
 	color.Green("Created At: %s\n\n", userInfo.Data.CurrentUser.CreatedAt)
 
-	isSiteAdmin, err := checkSiteAdmin(cfg, key)
+	isSiteAdmin, err := checkSiteAdmin(key)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return

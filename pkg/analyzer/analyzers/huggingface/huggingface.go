@@ -8,8 +8,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 const (
@@ -61,11 +59,11 @@ type Model struct {
 
 // getModelsByAuthor calls the HF API /models endpoint with the author query param
 // returns a list of models and an error
-func getModelsByAuthor(cfg *config.Config, key string, author string) ([]Model, error) {
+func getModelsByAuthor(key string, author string) ([]Model, error) {
 	var modelsJSON []Model
 
 	// create a new request
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://huggingface.co/api/models", nil)
 	if err != nil {
 		return modelsJSON, err
@@ -97,11 +95,11 @@ func getModelsByAuthor(cfg *config.Config, key string, author string) ([]Model, 
 
 // getTokenInfo calls the HF API /whoami-v2 endpoint to get the token info
 // returns the token info, a boolean indicating token validity, and an error
-func getTokenInfo(cfg *config.Config, key string) (HFTokenJSON, bool, error) {
+func getTokenInfo(key string) (HFTokenJSON, bool, error) {
 	var tokenJSON HFTokenJSON
 
 	// create a new request
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://huggingface.co/api/whoami-v2", nil)
 	if err != nil {
 		return tokenJSON, false, err
@@ -132,10 +130,10 @@ func getTokenInfo(cfg *config.Config, key string) (HFTokenJSON, bool, error) {
 }
 
 // AnalyzePermissions prints the permissions of a HuggingFace API key
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(key string, showAll bool) {
 
 	// get token info
-	tokenJSON, success, err := getTokenInfo(cfg, key)
+	tokenJSON, success, err := getTokenInfo(key)
 	if err != nil {
 		color.Red("[x] Error: " + err.Error())
 		return
@@ -159,7 +157,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 
 	// get all models by username
 	var allModels []Model
-	if userModels, err := getModelsByAuthor(cfg, key, tokenJSON.Username); err == nil {
+	if userModels, err := getModelsByAuthor(key, tokenJSON.Username); err == nil {
 		allModels = append(allModels, userModels...)
 	} else {
 		color.Red("[x] Error: " + err.Error())
@@ -168,7 +166,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 
 	// get all models from all orgs
 	for _, org := range tokenJSON.Orgs {
-		if orgModels, err := getModelsByAuthor(cfg, key, org.Name); err == nil {
+		if orgModels, err := getModelsByAuthor(key, org.Name); err == nil {
 			allModels = append(allModels, orgModels...)
 		} else {
 			color.Red("[x] Error: " + err.Error())

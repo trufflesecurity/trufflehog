@@ -10,8 +10,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 // Add in showAll to printScopes + deal with testing enterprise + add scope details
@@ -27,7 +25,7 @@ type SlackUserData struct {
 	IsEnterprise bool   `json:"is_enterprise"`
 }
 
-func getSlackOAuthScopes(cfg *config.Config, key string) (scopes string, userData SlackUserData, err error) {
+func getSlackOAuthScopes(key string) (scopes string, userData SlackUserData, err error) {
 	userData = SlackUserData{}
 	scopes = ""
 
@@ -35,7 +33,7 @@ func getSlackOAuthScopes(cfg *config.Config, key string) (scopes string, userDat
 	url := "https://slack.com/api/auth.test"
 
 	// Create a client to send the request
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 
 	// Create the request
 	req, err := http.NewRequest("GET", url, nil)
@@ -69,8 +67,8 @@ func getSlackOAuthScopes(cfg *config.Config, key string) (scopes string, userDat
 	return scopes, userData, err
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-	scopes, userData, err := getSlackOAuthScopes(cfg, key)
+func AnalyzePermissions(key string, showAll bool) {
+	scopes, userData, err := getSlackOAuthScopes(key)
 	if err != nil {
 		color.Red("[!] Error getting Slack OAuth scopes:", err)
 		return

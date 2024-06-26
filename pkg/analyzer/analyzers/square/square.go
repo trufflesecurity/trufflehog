@@ -9,8 +9,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type TeamJSON struct {
@@ -30,10 +28,10 @@ type PermissionsJSON struct {
 	MerchantID string   `json:"merchant_id"`
 }
 
-func getPermissions(cfg *config.Config, key string) (PermissionsJSON, error) {
+func getPermissions(key string) (PermissionsJSON, error) {
 	var permissions PermissionsJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("POST", "https://connect.squareup.com/oauth2/token/status", nil)
 	if err != nil {
 		return permissions, err
@@ -61,10 +59,10 @@ func getPermissions(cfg *config.Config, key string) (PermissionsJSON, error) {
 	return permissions, nil
 }
 
-func getUsers(cfg *config.Config, key string) (TeamJSON, error) {
+func getUsers(key string) (TeamJSON, error) {
 	var team TeamJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("POST", "https://connect.squareup.com/v2/team-members/search", nil)
 	if err != nil {
 		return team, err
@@ -96,8 +94,8 @@ func getUsers(cfg *config.Config, key string) (TeamJSON, error) {
 	return team, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-	permissions, err := getPermissions(cfg, key)
+func AnalyzePermissions(key string, showAll bool) {
+	permissions, err := getPermissions(key)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return
@@ -115,9 +113,9 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 	} else {
 		color.Yellow("Expires: %s\n\n", permissions.ExpiresAt)
 	}
-	printPermissions(permissions.Scopes, cfg.ShowAll)
+	printPermissions(permissions.Scopes, showAll)
 
-	team, err := getUsers(cfg, key)
+	team, err := getUsers(key)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return

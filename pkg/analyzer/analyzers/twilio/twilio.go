@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type VerifyJSON struct {
@@ -32,9 +30,9 @@ func splitKey(key string) (string, string, error) {
 
 // getAccountsStatusCode returns the status code from the Accounts endpoint
 // this is used to determine whether the key is scoped as main or standard, since standard has no access here.
-func getAccountsStatusCode(cfg *config.Config, sid string, secret string) (int, error) {
+func getAccountsStatusCode(sid string, secret string) (int, error) {
 	// create http client
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 
 	// create request
 	req, err := http.NewRequest("GET", "https://api.twilio.com/2010-04-01/Accounts", nil)
@@ -55,17 +53,16 @@ func getAccountsStatusCode(cfg *config.Config, sid string, secret string) (int, 
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
 	return resp.StatusCode, nil
 }
 
 // getVerifyServicesStatusCode returns the status code and the JSON response from the Verify Services endpoint
 // only the code value is captured in the JSON response and this is only shown when the key is invalid or has no permissions
-func getVerifyServicesStatusCode(cfg *config.Config, sid string, secret string) (VerifyJSON, error) {
+func getVerifyServicesStatusCode(sid string, secret string) (VerifyJSON, error) {
 	var verifyJSON VerifyJSON
 
 	// create http client
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 
 	// create request
 	req, err := http.NewRequest("GET", "https://verify.twilio.com/v2/Services", nil)
@@ -86,7 +83,6 @@ func getVerifyServicesStatusCode(cfg *config.Config, sid string, secret string) 
 	if err != nil {
 		return verifyJSON, err
 	}
-	defer resp.Body.Close()
 
 	// read response
 	if err := json.NewDecoder(resp.Body).Decode(&verifyJSON); err != nil {
@@ -96,14 +92,14 @@ func getVerifyServicesStatusCode(cfg *config.Config, sid string, secret string) 
 	return verifyJSON, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(key string, showAll bool) {
 	sid, secret, err := splitKey(key)
 	if err != nil {
 		color.Red("[x]" + err.Error())
 		return
 	}
 
-	verifyJSON, err := getVerifyServicesStatusCode(cfg, sid, secret)
+	verifyJSON, err := getVerifyServicesStatusCode(sid, secret)
 	if err != nil {
 		color.Red("[x]" + err.Error())
 		return
@@ -119,7 +115,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 		return
 	}
 
-	statusCode, err := getAccountsStatusCode(cfg, sid, secret)
+	statusCode, err := getAccountsStatusCode(sid, secret)
 	if err != nil {
 		color.Red("[x]" + err.Error())
 		return

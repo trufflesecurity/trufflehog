@@ -13,7 +13,6 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type DBPrivs struct {
@@ -45,6 +44,8 @@ type TableData struct {
 }
 
 const (
+	defaultPort = "5432"
+
 	pg_connect_timeout = "connect_timeout"
 	pg_dbname          = "dbname"
 	pg_host            = "host"
@@ -61,14 +62,7 @@ const (
 
 var connStrPartPattern = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
 
-func AnalyzePermissions(cfg *config.Config, connectionStr string) {
-
-	// ToDo: Add in logging
-	if cfg.LoggingEnabled {
-		color.Red("[x] Logging is not supported for this analyzer.")
-		return
-	}
-
+func AnalyzePermissions(connectionStr string, showAll bool) {
 	connStr, err := pq.ParseURL(string(connectionStr))
 	if err != nil {
 		color.Red("[x] Failed to parse Postgres connection string.\n    Error: " + err.Error())
@@ -268,7 +262,7 @@ func getDBPrivs(db *sql.DB) ([]string, error) {
 
 	// Print db privs
 	if len(dbs) > 0 {
-		fmt.Print("\n\n")
+		fmt.Println("\n")
 		color.Green("[i] User has the following database privileges:")
 		printDBPrivs(dbs, currentUser)
 		return buildSliceDBNames(dbs), nil
@@ -408,7 +402,7 @@ func getTablePrivs(params map[string]string, databases []string) error {
 
 	// Print table privs
 	if len(tablePrivileges) > 0 {
-		fmt.Print("\n\n")
+		fmt.Println("\n")
 		color.Green("[i] User has the following table privileges:")
 		printTablePrivs(tablePrivileges)
 	}

@@ -9,8 +9,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 var BASE_URL = "https://%s.api.mailchimp.com/3.0"
@@ -46,7 +44,7 @@ type DomainsJSON struct {
 	} `json:"domains"`
 }
 
-func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
+func getMetadata(key string) (MetadataJSON, error) {
 	var metadata MetadataJSON
 
 	// extract datacenter
@@ -56,7 +54,7 @@ func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
 	}
 	datacenter := keySplit[1]
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", fmt.Sprintf(BASE_URL, datacenter), nil)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
@@ -80,7 +78,7 @@ func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
 	return metadata, nil
 }
 
-func getDomains(cfg *config.Config, key string) (DomainsJSON, error) {
+func getDomains(key string) (DomainsJSON, error) {
 	var domains DomainsJSON
 
 	// extract datacenter
@@ -90,7 +88,7 @@ func getDomains(cfg *config.Config, key string) (DomainsJSON, error) {
 	}
 	datacenter := keySplit[1]
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", fmt.Sprintf(BASE_URL, datacenter)+"/verified-domains", nil)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
@@ -114,9 +112,9 @@ func getDomains(cfg *config.Config, key string) (DomainsJSON, error) {
 	return domains, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(key string, showAll bool) {
 	// get metadata
-	metadata, err := getMetadata(cfg, key)
+	metadata, err := getMetadata(key)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
 		return
@@ -133,7 +131,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 	color.Green("\n[i] Permissions: Full Access\n\n")
 
 	// get sending domains
-	domains, err := getDomains(cfg, key)
+	domains, err := getDomains(key)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
 		return

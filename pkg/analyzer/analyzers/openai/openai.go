@@ -7,77 +7,12 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
-
-var _ analyzers.Analyzer = (*Analyzer)(nil)
-
-type Analyzer struct {
-	Cfg *config.Config
-}
-
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_OpenAI }
-
-func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
-	if err != nil {
-		return nil, err
-	}
-	return secretInfoToAnalyzerResult(info), nil
-}
-
-func secretInfoToAnalyzerResult(info *AnalyzerJSON) *analyzers.AnalyzerResult {
-	result := analyzers.AnalyzerResult{
-		Metadata: map[string]any{
-			"user":          info.me.Name,
-			"email":         info.me.Email,
-			"phone":         info.me.Phone,
-			"mfa":           strconv.FormatBool(info.me.MfaEnabled),
-			"is_admin":      strconv.FormatBool(info.isAdmin),
-			"is_restricted": strconv.FormatBool(info.isRestricted),
-		},
-	}
-
-	perms := convertPermissions(info.isAdmin, info.perms)
-	for _, org := range info.me.Orgs.Data {
-		resource := analyzers.Resource{
-			Name:               org.Title,
-			FullyQualifiedName: org.ID,
-			Type:               "organization",
-			Metadata: map[string]any{
-				"description": org.Description,
-				"user":        org.User,
-			},
-		}
-		// Copy each permission into this resource.
-		result.Bindings = append(result.Bindings, analyzers.BindAllPermissions(resource, perms...)...)
-	}
-
-	return &result
-}
-
-func convertPermissions(isAdmin bool, perms []permissionData) []analyzers.Permission {
-	var permissions []analyzers.Permission
-
-	if isAdmin {
-		permissions = append(permissions, analyzers.Permission{Value: analyzers.FullAccess})
-	} else {
-		for _, perm := range perms {
-			permName := perm.name + ":" + string(perm.status)
-			permissions = append(permissions, analyzers.Permission{Value: permName})
-		}
-	}
-
-	return permissions
-}
 
 const (
 	BASE_URL      = "https://api.openai.com"
@@ -93,78 +28,37 @@ type MeJSON struct {
 	MfaEnabled bool   `json:"mfa_flag_enabled"`
 	Orgs       struct {
 		Data []struct {
-			ID          string `json:"id"`
-			Title       string `json:"title"`
-			User        string `json:"name"`
-			Description string `json:"description"`
-			Personal    bool   `json:"personal"`
-			Default     bool   `json:"is_default"`
-			Role        string `json:"role"`
+			Title string `json:"title"`
 		} `json:"data"`
 	} `json:"orgs"`
 }
 
-type permissionData struct {
-	name      string
-	endpoints []string
-	status    analyzers.PermissionType
-}
-
-type AnalyzerJSON struct {
-	me           MeJSON
-	isAdmin      bool
-	isRestricted bool
-	perms        []permissionData
-}
-
 var POST_PAYLOAD = map[string]interface{}{"speed": 1}
 
-func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string) {
-	data, err := AnalyzePermissions(cfg, apiKey)
-	if err != nil {
-		color.Red("[x] %s", err.Error())
-		return
-	}
-	color.Green("[!] Valid OpenAI Token\n\n")
-
-	printUserData(data.me)
-	if data.isAdmin {
-		color.Green("[!] Admin API Key. All permissions available.")
-	} else if data.isRestricted {
-		color.Yellow("[!] Restricted API Key. Limited permissions available.")
-		printPermissions(data.perms, cfg.ShowAll)
-	}
-}
-
 // AnalyzePermissions will analyze the permissions of an OpenAI API key
-func AnalyzePermissions(cfg *config.Config, key string) (*AnalyzerJSON, error) {
-	data := AnalyzerJSON{
-		isAdmin:      false,
-		isRestricted: false,
-	}
-
-	meJSON, err := getUserData(cfg, key)
-	if err != nil {
-		return nil, fmt.Errorf(err.Error())
-	}
-	data.me = meJSON
-
-	isAdmin, err := checkAdminKey(cfg, key)
-	if err != nil {
-		return nil, fmt.Errorf(err.Error())
-	}
-
-	if isAdmin {
-		data.isAdmin = true
+func AnalyzePermissions(key string, showAll bool) {
+	if meJSON, err := getUserData(key); err != nil {
+		color.Red("[x]" + err.Error())
+		return
 	} else {
-		data.isRestricted = true
-		if err := analyzeScopes(key); err != nil {
-			return nil, fmt.Errorf(err.Error())
-		}
-		data.perms = getPermissions()
+		printUserData(meJSON)
 	}
 
-	return &data, nil
+	if isAdmin, err := checkAdminKey(key); isAdmin {
+		color.Green("[!] Admin API Key. All permissions available.")
+		return
+	} else if err != nil {
+		color.Red("[x]" + err.Error())
+		return
+	} else {
+		color.Yellow("[!] Restricted API Key. Limited permissions available.")
+		if err := analyzeScopes(key); err != nil {
+			color.Red("[x]" + err.Error())
+			return
+		}
+		printPermissions(showAll)
+	}
+
 }
 
 func analyzeScopes(key string) error {
@@ -176,7 +70,7 @@ func analyzeScopes(key string) error {
 	return nil
 }
 
-func openAIRequest(cfg *config.Config, method string, url string, key string, data map[string]interface{}) ([]byte, *http.Response, error) {
+func openAIRequest(method string, url string, key string, data map[string]interface{}) ([]byte, *http.Response, error) {
 	var inBody io.Reader
 	if data != nil {
 		jsonData, err := json.Marshal(data)
@@ -186,7 +80,7 @@ func openAIRequest(cfg *config.Config, method string, url string, key string, da
 		inBody = bytes.NewBuffer(jsonData)
 	}
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest(method, url, inBody)
 	if err != nil {
 		return nil, nil, err
@@ -208,13 +102,9 @@ func openAIRequest(cfg *config.Config, method string, url string, key string, da
 	return outBody, resp, nil
 }
 
-func checkAdminKey(cfg *config.Config, key string) (bool, error) {
+func checkAdminKey(key string) (bool, error) {
 	// Check for all permissions
-	//nolint:bodyclose
-	_, resp, err := openAIRequest(cfg, "GET", BASE_URL+ORGS_ENDPOINT, key, nil)
-	if err != nil {
-		return false, err
-	}
+	_, resp, err := openAIRequest("GET", BASE_URL+ORGS_ENDPOINT, key, nil)
 	switch resp.StatusCode {
 	case 200:
 		return true, nil
@@ -225,17 +115,17 @@ func checkAdminKey(cfg *config.Config, key string) (bool, error) {
 	}
 }
 
-func getUserData(cfg *config.Config, key string) (MeJSON, error) {
+func getUserData(key string) (MeJSON, error) {
 	var meJSON MeJSON
-	//nolint:bodyclose
-	me, resp, err := openAIRequest(cfg, "GET", BASE_URL+ME_ENDPOINT, key, nil)
+	me, resp, err := openAIRequest("GET", BASE_URL+ME_ENDPOINT, key, nil)
 	if err != nil {
 		return meJSON, err
 	}
 
 	if resp.StatusCode != 200 {
-		return meJSON, fmt.Errorf("invalid OpenAI token")
+		return meJSON, fmt.Errorf("Invalid OpenAI Token")
 	}
+	color.Green("[!] Valid OpenAI Token\n\n")
 
 	// Marshall me into meJSON struct
 	if err := json.Unmarshal(me, &meJSON); err != nil {
@@ -256,7 +146,7 @@ func printUserData(meJSON MeJSON) {
 			color.Green("  - %v", org.Title)
 		}
 	}
-	fmt.Print("\n\n")
+	fmt.Println("\n")
 }
 
 func stringifyPermissionStatus(tests []analyzers.HttpStatusTest) analyzers.PermissionType {
@@ -287,37 +177,22 @@ func stringifyPermissionStatus(tests []analyzers.HttpStatusTest) analyzers.Permi
 	}
 }
 
-func getPermissions() []permissionData {
-	var perms []permissionData
-
-	for _, scope := range SCOPES {
-		status := stringifyPermissionStatus(scope.Tests)
-		perms = append(perms, permissionData{
-			name:      scope.Name,
-			endpoints: scope.Endpoints,
-			status:    status,
-		})
-	}
-
-	return perms
-}
-
-func printPermissions(perms []permissionData, show_all bool) {
-	fmt.Print("\n\n")
+func printPermissions(show_all bool) {
+	fmt.Println("\n")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Scope", "Endpoints", "Permission"})
 
-	for _, perm := range perms {
-		if show_all || perm.status != analyzers.NONE {
-			t.AppendRow([]interface{}{perm.name, perm.endpoints[0], perm.status})
-
-			for i := 1; i < len(perm.endpoints); i++ {
-				t.AppendRow([]interface{}{"", perm.endpoints[i], perm.status})
+	for _, scope := range SCOPES {
+		status := stringifyPermissionStatus(scope.Tests)
+		writer := analyzers.GetWriterFromStatus(status)
+		if show_all || status != analyzers.NONE {
+			t.AppendRow([]interface{}{writer(scope.Name), writer(scope.Endpoints[0]), writer(status)})
+			for i := 1; i < len(scope.Endpoints); i++ {
+				t.AppendRow([]interface{}{"", writer(scope.Endpoints[i]), writer(status)})
 			}
 		}
 	}
-
 	t.Render()
-	fmt.Print("\n\n")
+	fmt.Println("\n")
 }

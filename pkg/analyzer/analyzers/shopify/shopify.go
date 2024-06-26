@@ -1,21 +1,16 @@
 package shopify
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
-
-//go:embed scopes.json
-var scopesConfig []byte
 
 func sliceContains(slice []string, value string) bool {
 	for _, v := range slice {
@@ -96,10 +91,10 @@ type ShopInfoJSON struct {
 	} `json:"shop"`
 }
 
-func getShopInfo(cfg *config.Config, key string, store string) (ShopInfoJSON, error) {
+func getShopInfo(key string, store string) (ShopInfoJSON, error) {
 	var shopInfo ShopInfoJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/admin/api/2024-04/shop.json", store), nil)
 	if err != nil {
 		return shopInfo, err
@@ -135,10 +130,10 @@ func (a AccessScopesJSON) String() string {
 	return strings.Join(scopes, ", ")
 }
 
-func getAccessScopes(cfg *config.Config, key string, store string) (AccessScopesJSON, int, error) {
+func getAccessScopes(key string, store string) (AccessScopesJSON, int, error) {
 	var accessScopes AccessScopesJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/admin/oauth/access_scopes.json", store), nil)
 	if err != nil {
 		return accessScopes, -1, err
@@ -160,9 +155,9 @@ func getAccessScopes(cfg *config.Config, key string, store string) (AccessScopes
 	return accessScopes, resp.StatusCode, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string, storeURL string) {
+func AnalyzePermissions(key string, storeURL string, showAll bool) {
 
-	accessScopes, statusCode, err := getAccessScopes(cfg, key, storeURL)
+	accessScopes, statusCode, err := getAccessScopes(key, storeURL)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return
@@ -174,7 +169,7 @@ func AnalyzePermissions(cfg *config.Config, key string, storeURL string) {
 	}
 	color.Green("[i] Valid Shopify API Key\n\n")
 
-	shopInfo, err := getShopInfo(cfg, key, storeURL)
+	shopInfo, err := getShopInfo(key, storeURL)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return
@@ -185,8 +180,24 @@ func AnalyzePermissions(cfg *config.Config, key string, storeURL string) {
 	color.Yellow("Email: %s", shopInfo.Shop.Email)
 	color.Yellow("Created At: %s\n\n", shopInfo.Shop.CreatedAt)
 
+	// Determine the current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		color.Red("[x] Error getting current working directory: %s", err.Error())
+		return
+	}
+
+	// Construct the path to the config file
+	configFilePath := filepath.Join(cwd, "pkg/analyzers/shopify/scopes.json")
+	jsonData, err := os.ReadFile(configFilePath)
+	if err != nil {
+		color.Red("Error: %s", err)
+		return
+	}
+
 	var data ScopeDataJSON
-	if err := json.Unmarshal(scopesConfig, &data); err != nil {
+	err = json.Unmarshal([]byte(jsonData), &data)
+	if err != nil {
 		color.Red("Error: %s", err)
 		return
 	}

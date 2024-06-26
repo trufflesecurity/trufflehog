@@ -2,21 +2,16 @@ package opsgenie
 
 import (
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
-
-//go:embed scopes.json
-var scopesConfig []byte
 
 type User struct {
 	FullName string `json:"fullName"`
@@ -47,7 +42,7 @@ func StatusContains(status int, vals []int) bool {
 	return false
 }
 
-func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) (bool, error) {
+func (h *HttpStatusTest) RunTest(headers map[string]string) (bool, error) {
 	// If body data, marshal to JSON
 	var data io.Reader
 	if h.Payload != nil {
@@ -59,7 +54,7 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 	}
 
 	// Create new HTTP request
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest(h.Method, h.Endpoint, data)
 	if err != nil {
 		return false, err
@@ -75,7 +70,6 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
 
 	// Check response status code
 	switch {
@@ -94,15 +88,30 @@ type Scope struct {
 }
 
 func readInScopes() ([]Scope, error) {
+	// Determine the current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct the path to the config file
+	configFilePath := filepath.Join(cwd, "pkg/analyzers/opsgenie/scopes.json")
+
+	data, err := os.ReadFile(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
 	var scopes []Scope
-	if err := json.Unmarshal(scopesConfig, &scopes); err != nil {
+	err = json.Unmarshal(data, &scopes)
+	if err != nil {
 		return nil, err
 	}
 
 	return scopes, nil
 }
 
-func checkPermissions(cfg *config.Config, key string) []string {
+func checkPermissions(key string) []string {
 	scopes, err := readInScopes()
 	if err != nil {
 		color.Red("[x] Error reading in scopes: %s", err.Error())
@@ -111,7 +120,7 @@ func checkPermissions(cfg *config.Config, key string) []string {
 
 	permissions := make([]string, 0)
 	for _, scope := range scopes {
-		status, err := scope.HttpTest.RunTest(cfg, map[string]string{"Authorization": "GenieKey " + key})
+		status, err := scope.HttpTest.RunTest(map[string]string{"Authorization": "GenieKey " + key})
 		if err != nil {
 			color.Red("[x] Error running test: %s", err.Error())
 			return nil
@@ -133,9 +142,9 @@ func contains(s []string, e string) bool {
 	return false
 }
 
-func getUserList(cfg *config.Config, key string) ([]User, error) {
+func getUserList(key string) ([]User, error) {
 	// Create new HTTP request
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.opsgenie.com/v2/users", nil)
 	if err != nil {
 		return nil, err
@@ -149,7 +158,6 @@ func getUserList(cfg *config.Config, key string) ([]User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	// Decode response body
 	var userList UsersJSON
@@ -161,8 +169,8 @@ func getUserList(cfg *config.Config, key string) ([]User, error) {
 	return userList.Users, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-	permissions := checkPermissions(cfg, key)
+func AnalyzePermissions(key string, showAll bool) {
+	permissions := checkPermissions(key)
 	if len(permissions) == 0 {
 		color.Red("[x] Invalid OpsGenie API key")
 		return
@@ -171,7 +179,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 	printPermissions(permissions)
 
 	if contains(permissions, "Configuration Access") {
-		users, err := getUserList(cfg, key)
+		users, err := getUserList(key)
 		if err != nil {
 			color.Red("[x] Error getting user list: %s", err.Error())
 			return

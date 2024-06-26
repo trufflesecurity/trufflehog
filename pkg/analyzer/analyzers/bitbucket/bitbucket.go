@@ -9,8 +9,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type Repo struct {
@@ -33,10 +31,10 @@ type RepoJSON struct {
 	Values []Repo `json:"values"`
 }
 
-func getScopesAndType(cfg *config.Config, key string) (string, string, error) {
+func getScopesAndType(key string) (string, string, error) {
 
 	// client
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 
 	// request
 	req, err := http.NewRequest("GET", "https://api.bitbucket.org/2.0/repositories", nil)
@@ -52,7 +50,6 @@ func getScopesAndType(cfg *config.Config, key string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	defer resp.Body.Close()
 
 	// parse response headers
 	credentialType := resp.Header.Get("x-credential-type")
@@ -61,11 +58,11 @@ func getScopesAndType(cfg *config.Config, key string) (string, string, error) {
 	return credentialType, oauthScopes, nil
 }
 
-func getRepositories(cfg *config.Config, key string, role string) (RepoJSON, error) {
+func getRepositories(key string, role string) (RepoJSON, error) {
 	var repos RepoJSON
 
 	// client
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 
 	// request
 	req, err := http.NewRequest("GET", "https://api.bitbucket.org/2.0/repositories", nil)
@@ -87,7 +84,6 @@ func getRepositories(cfg *config.Config, key string, role string) (RepoJSON, err
 	if err != nil {
 		return repos, err
 	}
-	defer resp.Body.Close()
 
 	// parse response body
 	err = json.NewDecoder(resp.Body).Decode(&repos)
@@ -98,12 +94,12 @@ func getRepositories(cfg *config.Config, key string, role string) (RepoJSON, err
 	return repos, nil
 }
 
-func getAllRepos(cfg *config.Config, key string) (map[string]Repo, error) {
+func getAllRepos(key string) (map[string]Repo, error) {
 	roles := []string{"member", "contributor", "admin", "owner"}
 
 	var allRepos = make(map[string]Repo, 0)
 	for _, role := range roles {
-		repos, err := getRepositories(cfg, key, role)
+		repos, err := getRepositories(key, role)
 		if err != nil {
 			return allRepos, err
 		}
@@ -116,9 +112,9 @@ func getAllRepos(cfg *config.Config, key string) (map[string]Repo, error) {
 	return allRepos, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(key string, showAll bool) {
 
-	credentialType, oauthScopes, err := getScopesAndType(cfg, key)
+	credentialType, oauthScopes, err := getScopesAndType(key)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return
@@ -127,7 +123,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 
 	// get all repos available to user
 	// ToDo: pagination
-	repos, err := getAllRepos(cfg, key)
+	repos, err := getAllRepos(key)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return

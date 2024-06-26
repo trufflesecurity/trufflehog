@@ -9,8 +9,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type ProjectsJSON struct {
@@ -21,12 +19,12 @@ type ProjectsJSON struct {
 }
 
 // validateKey checks if the key is valid and returns the projects associated with the key
-func validateKey(cfg *config.Config, key string) (bool, ProjectsJSON, error) {
+func validateKey(key string) (bool, ProjectsJSON, error) {
 	// create struct to hold response
 	var projects ProjectsJSON
 
 	// create http client
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 
 	// create request
 	req, err := http.NewRequest("GET", "https://api.airbrake.io/api/v4/projects", nil)
@@ -58,9 +56,9 @@ func validateKey(cfg *config.Config, key string) (bool, ProjectsJSON, error) {
 	return false, projects, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(key string, showAll bool) {
 	// validate key
-	valid, projects, err := validateKey(cfg, key)
+	valid, projects, err := validateKey(key)
 	if err != nil {
 		color.Red("[x]" + err.Error())
 		return

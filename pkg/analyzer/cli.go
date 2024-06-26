@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airbrake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/asana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
@@ -23,14 +22,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/square"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/stripe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/twilio"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 var (
 	// TODO: Add list of supported key types.
 	list    *kingpin.CmdClause
 	showAll *bool
-	log     *bool
 
 	githubScan *kingpin.CmdClause
 	githubKey  *string
@@ -102,10 +99,9 @@ var (
 
 func Command(app *kingpin.Application) *kingpin.CmdClause {
 	// TODO: Add list of supported key types.
-	cli := app.Command("analyze", "Analyze API keys for fine-grained permissions information").Hidden()
+	cli := app.Command("analyze", "Analyze API keys for fine-grained permissions information")
 	list = cli.Command("list", "List supported API providers")
 	showAll = cli.Flag("show-all", "Show all data, including permissions not available to this account + publicly-available data related to this account.").Default("false").Bool()
-	log = cli.Flag("log", "Log all HTTP requests sent during analysis to a file").Default("false").Bool()
 
 	githubScan = cli.Command("github", "Scan a GitHub API key")
 	githubKey = githubScan.Arg("key", "GitHub Key.").Required().String()
@@ -178,73 +174,52 @@ func Command(app *kingpin.Application) *kingpin.CmdClause {
 }
 
 func Run(cmd string) {
-	// Initialize configuration
-	cfg := &config.Config{
-		LoggingEnabled: *log,
-		ShowAll:        *showAll,
-	}
 	switch cmd {
 	case list.FullCommand():
 		panic("todo")
 	case githubScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("github")
-		github.AnalyzeAndPrintPermissions(cfg, *githubKey)
+		github.AnalyzePermissions(*githubKey, *showAll)
 	case sendgridScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("sendgrid")
-		sendgrid.AnalyzePermissions(cfg, *sendgridKey)
+		sendgrid.AnalyzePermissions(*sendgridKey, *showAll)
 	case openAIScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("openai")
-		openai.AnalyzeAndPrintPermissions(cfg, *openaiKey)
+		openai.AnalyzePermissions(*openaiKey, *showAll)
 	case postgresScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("postgres")
-		postgres.AnalyzePermissions(cfg, *postgresConnectionStr)
+		postgres.AnalyzePermissions(*postgresConnectionStr, *showAll)
 	case mysqlScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("mysql")
-		mysql.AnalyzePermissions(cfg, *mysqlConnectionStr)
+		mysql.AnalyzePermissions(*mysqlConnectionStr, *showAll)
+	// case mongodbScan.FullCommand():
+	// 	mongodb.AnalyzePermissions(*mongodbConnectionStr, *showAll)
 	case slackScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("slack")
-		slack.AnalyzePermissions(cfg, *slackKey)
+		slack.AnalyzePermissions(*slackKey, *showAll)
 	case twilioScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("twilio")
-		twilio.AnalyzePermissions(cfg, *twilioKey)
+		twilio.AnalyzePermissions(*twilioKey, *showAll)
 	case airbrakeScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("airbrake")
-		airbrake.AnalyzePermissions(cfg, *airbrakeKey)
+		airbrake.AnalyzePermissions(*airbrakeKey, *showAll)
 	case huggingfaceScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("huggingface")
-		huggingface.AnalyzePermissions(cfg, *huggingfaceKey)
+		huggingface.AnalyzePermissions(*huggingfaceKey, *showAll)
 	case stripeScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("stripe")
-		stripe.AnalyzePermissions(cfg, *stripeKey)
+		stripe.AnalyzePermissions(*stripeKey, *showAll)
 	case gitlabScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("gitlab")
-		gitlab.AnalyzePermissions(cfg, *gitlabKey)
+		gitlab.AnalyzePermissions(*gitlabKey, *showAll)
 	case mailchimpScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("mailchimp")
-		mailchimp.AnalyzePermissions(cfg, *mailchimpKey)
+		mailchimp.AnalyzePermissions(*mailchimpKey, *showAll)
+		// case mandrillScan.FullCommand():
+		// 	mandrill.AnalyzePermissions(*mandrillKey, *showAll)
 	case postmanScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("postman")
-		postman.AnalyzePermissions(cfg, *postmanKey)
+		postman.AnalyzePermissions(*postmanKey, *showAll)
 	case bitbucketScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("bitbucket")
-		bitbucket.AnalyzePermissions(cfg, *bitbucketKey)
+		bitbucket.AnalyzePermissions(*bitbucketKey, *showAll)
 	case asanaScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("asana")
-		asana.AnalyzePermissions(cfg, *asanaKey)
+		asana.AnalyzePermissions(*asanaKey, *showAll)
 	case mailgunScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("mailgun")
-		mailgun.AnalyzePermissions(cfg, *mailgunKey)
+		mailgun.AnalyzePermissions(*mailgunKey, *showAll)
 	case squareScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("square")
-		square.AnalyzePermissions(cfg, *squareKey)
+		square.AnalyzePermissions(*squareKey, *showAll)
 	case sourcegraphScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("sourcegraph")
-		sourcegraph.AnalyzePermissions(cfg, *sourcegraphKey)
+		sourcegraph.AnalyzePermissions(*sourcegraphKey, *showAll)
 	case shopifyScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("shopify")
-		shopify.AnalyzePermissions(cfg, *shopifyKey, *shopifyStoreURL)
+		shopify.AnalyzePermissions(*shopifyKey, *shopifyStoreURL, *showAll)
 	case opsgenieScan.FullCommand():
-		cfg.LogFile = analyzers.CreateLogFileName("opsgenie")
-		opsgenie.AnalyzePermissions(cfg, *opsgenieKey)
+		opsgenie.AnalyzePermissions(*opsgenieKey, *showAll)
 	}
 }

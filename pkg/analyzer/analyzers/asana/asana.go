@@ -9,8 +9,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type MeJSON struct {
@@ -24,10 +22,10 @@ type MeJSON struct {
 	} `json:"data"`
 }
 
-func getMetadata(cfg *config.Config, key string) (MeJSON, error) {
+func getMetadata(key string) (MeJSON, error) {
 	var me MeJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://app.asana.com/api/1.0/users/me", nil)
 	if err != nil {
 		return me, err
@@ -52,8 +50,8 @@ func getMetadata(cfg *config.Config, key string) (MeJSON, error) {
 	return me, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-	me, err := getMetadata(cfg, key)
+func AnalyzePermissions(key string, showAll bool) {
+	me, err := getMetadata(key)
 	if err != nil {
 		color.Red("[x] ", err.Error())
 		return

@@ -11,8 +11,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 // consider calling /api/v4/metadata to learn about gitlab instance version and whether neterrprises is enabled
@@ -47,10 +45,10 @@ type MetadataJSON struct {
 	Enterprise bool   `json:"enterprise"`
 }
 
-func getPersonalAccessToken(cfg *config.Config, key string) (AcessTokenJSON, int, error) {
+func getPersonalAccessToken(key string) (AcessTokenJSON, int, error) {
 	var tokens AcessTokenJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/personal_access_tokens/self", nil)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
@@ -72,10 +70,10 @@ func getPersonalAccessToken(cfg *config.Config, key string) (AcessTokenJSON, int
 	return tokens, resp.StatusCode, nil
 }
 
-func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, error) {
+func getAccessibleProjects(key string) ([]ProjectsJSON, error) {
 	var projects []ProjectsJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/projects", nil)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
@@ -119,10 +117,10 @@ func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, erro
 	return projects, nil
 }
 
-func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
+func getMetadata(key string) (MetadataJSON, error) {
 	var metadata MetadataJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/metadata", nil)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
@@ -165,10 +163,10 @@ func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
 	return metadata, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(key string, showAll bool) {
 
 	// get personal_access_tokens accessible
-	token, statusCode, err := getPersonalAccessToken(cfg, key)
+	token, statusCode, err := getPersonalAccessToken(key)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
 		return
@@ -183,7 +181,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 	printTokenInfo(token)
 
 	// get metadata
-	metadata, err := getMetadata(cfg, key)
+	metadata, err := getMetadata(key)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
 		return
@@ -198,7 +196,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 	printTokenPermissions(token)
 
 	// get accessible projects
-	projects, err := getAccessibleProjects(cfg, key)
+	projects, err := getAccessibleProjects(key)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
 		return
