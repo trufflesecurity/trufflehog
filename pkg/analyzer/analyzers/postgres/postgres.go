@@ -44,8 +44,6 @@ type TableData struct {
 }
 
 const (
-	defaultPort = "5432"
-
 	pg_connect_timeout = "connect_timeout"
 	pg_dbname          = "dbname"
 	pg_host            = "host"
@@ -262,7 +260,7 @@ func getDBPrivs(db *sql.DB) ([]string, error) {
 
 	// Print db privs
 	if len(dbs) > 0 {
-		fmt.Println("\n")
+		fmt.Print("\n\n")
 		color.Green("[i] User has the following database privileges:")
 		printDBPrivs(dbs, currentUser)
 		return buildSliceDBNames(dbs), nil
@@ -402,7 +400,7 @@ func getTablePrivs(params map[string]string, databases []string) error {
 
 	// Print table privs
 	if len(tablePrivileges) > 0 {
-		fmt.Println("\n")
+		fmt.Print("\n\n")
 		color.Green("[i] User has the following table privileges:")
 		printTablePrivs(tablePrivileges)
 	}

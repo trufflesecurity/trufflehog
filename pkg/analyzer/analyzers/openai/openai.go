@@ -104,7 +104,11 @@ func openAIRequest(method string, url string, key string, data map[string]interf
 
 func checkAdminKey(key string) (bool, error) {
 	// Check for all permissions
+	//nolint:bodyclose
 	_, resp, err := openAIRequest("GET", BASE_URL+ORGS_ENDPOINT, key, nil)
+	if err != nil {
+		return false, err
+	}
 	switch resp.StatusCode {
 	case 200:
 		return true, nil
@@ -117,6 +121,7 @@ func checkAdminKey(key string) (bool, error) {
 
 func getUserData(key string) (MeJSON, error) {
 	var meJSON MeJSON
+	//nolint:bodyclose
 	me, resp, err := openAIRequest("GET", BASE_URL+ME_ENDPOINT, key, nil)
 	if err != nil {
 		return meJSON, err
@@ -146,7 +151,7 @@ func printUserData(meJSON MeJSON) {
 			color.Green("  - %v", org.Title)
 		}
 	}
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 }
 
 func stringifyPermissionStatus(tests []analyzers.HttpStatusTest) analyzers.PermissionType {
@@ -178,7 +183,7 @@ func stringifyPermissionStatus(tests []analyzers.HttpStatusTest) analyzers.Permi
 }
 
 func printPermissions(show_all bool) {
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Scope", "Endpoints", "Permission"})
@@ -194,5 +199,5 @@ func printPermissions(show_all bool) {
 		}
 	}
 	t.Render()
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 }

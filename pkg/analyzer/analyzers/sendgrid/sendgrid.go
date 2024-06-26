@@ -19,7 +19,7 @@ type ScopesJSON struct {
 }
 
 func printPermissions(show_all bool) {
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	if show_all {
@@ -37,7 +37,7 @@ func printPermissions(show_all bool) {
 		}
 	}
 	t.Render()
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 }
 
 // getCategoryFromScope returns the category for a given scope.

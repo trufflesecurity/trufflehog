@@ -70,6 +70,7 @@ func (h *HttpStatusTest) RunTest(headers map[string]string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer resp.Body.Close()
 
 	// Check response status code
 	switch {
@@ -158,6 +159,7 @@ func getUserList(key string) ([]User, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	// Decode response body
 	var userList UsersJSON

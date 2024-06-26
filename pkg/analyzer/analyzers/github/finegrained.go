@@ -249,6 +249,9 @@ func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, cur
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/code-scanning/alerts
 	_, resp, err := client.CodeScanning.ListAlertsForRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
@@ -1307,7 +1310,7 @@ func analyzeUserPermissions(client *gh.Client, user *gh.User, permissionType str
 	return access
 }
 
-func analyzeFineGrainedToken(client *gh.Client, token string, show_all bool) {
+func analyzeFineGrainedToken(client *gh.Client, _ string, show_all bool) {
 	// Get all private repos
 	allRepos, err := getAllReposForUser(client)
 	if err != nil {
@@ -1356,7 +1359,7 @@ func analyzeFineGrainedToken(client *gh.Client, token string, show_all bool) {
 	printFineGrainedPermissions(userAccessMap, show_all, false)
 
 	// Get all private gists
-	gists, err := getAllGistsForUser(client)
+	gists, _ := getAllGistsForUser(client)
 	printGists(gists, show_all)
 
 }
@@ -1404,5 +1407,5 @@ func printFineGrainedPermissions(accessMap map[string]string, show_all bool, rep
 		color.Green(fmt.Sprintf("Found %v Permission(s) for the %v above\n", permissionCount, permissionType))
 	}
 	t.Render()
-	fmt.Println("\n")
+	fmt.Print("\n\n")
 }
