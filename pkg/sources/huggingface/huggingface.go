@@ -43,11 +43,7 @@ const (
 type resourceType string
 
 type Source struct {
-	name string
-
-	// Protects the user and token.
-	// userMu           sync.Mutex
-	// huggingfaceUser  string
+	name             string
 	huggingfaceToken string
 
 	sourceID               sources.SourceID
@@ -69,7 +65,6 @@ type Source struct {
 
 	git *git.Git
 
-	// scanOptMu   sync.Mutex // protects the scanOptions
 	scanOptions *git.ScanOptions
 
 	apiClient       *HFClient
@@ -628,11 +623,6 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 	return time.Since(start), nil
 }
 
-// var (
-// 	rateLimitMu         sync.RWMutex
-// 	rateLimitResumeTime time.Time
-// )
-
 // setProgressCompleteWithRepo calls the s.SetProgressComplete after safely setting up the encoded resume info string.
 func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL string, resourceType string, repos []string) {
 	s.resumeInfoMutex.Lock()
@@ -646,8 +636,6 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
 	s.SetProgressComplete(index+offset, len(repos)+offset, fmt.Sprintf("%ss: %s", resourceType, repoURL), encodedResumeInfo)
 }
-
-//const initialPage = 1 // page to start listing from
 
 func (s *Source) scanDiscussions(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
 	discussions, err := s.apiClient.ListDiscussions(ctx, repoInfo)
