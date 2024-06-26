@@ -1,0 +1,213 @@
+package opsgenie
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+
+	"github.com/fatih/color"
+	"github.com/jedib0t/go-pretty/table"
+)
+
+type User struct {
+	FullName string `json:"fullName"`
+	Username string `json:"username"`
+	Role     struct {
+		Name string `json:"name"`
+	} `json:"role"`
+}
+
+type UsersJSON struct {
+	Users []User `json:"data"`
+}
+
+type HttpStatusTest struct {
+	Endpoint        string      `json:"endpoint"`
+	Method          string      `json:"method"`
+	Payload         interface{} `json:"payload"`
+	ValidStatuses   []int       `json:"valid_status_code"`
+	InvalidStatuses []int       `json:"invalid_status_code"`
+}
+
+func StatusContains(status int, vals []int) bool {
+	for _, v := range vals {
+		if status == v {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *HttpStatusTest) RunTest(headers map[string]string) (bool, error) {
+	// If body data, marshal to JSON
+	var data io.Reader
+	if h.Payload != nil {
+		jsonData, err := json.Marshal(h.Payload)
+		if err != nil {
+			return false, err
+		}
+		data = bytes.NewBuffer(jsonData)
+	}
+
+	// Create new HTTP request
+	client := &http.Client{}
+	req, err := http.NewRequest(h.Method, h.Endpoint, data)
+	if err != nil {
+		return false, err
+	}
+
+	// Add custom headers if provided
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	// Execute HTTP Request
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	// Check response status code
+	switch {
+	case StatusContains(resp.StatusCode, h.ValidStatuses):
+		return true, nil
+	case StatusContains(resp.StatusCode, h.InvalidStatuses):
+		return false, nil
+	default:
+		return false, errors.New("error checking response status code")
+	}
+}
+
+type Scope struct {
+	Name     string         `json:"name"`
+	HttpTest HttpStatusTest `json:"test"`
+}
+
+func readInScopes() ([]Scope, error) {
+	// Determine the current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct the path to the config file
+	configFilePath := filepath.Join(cwd, "pkg/analyzers/opsgenie/scopes.json")
+
+	data, err := os.ReadFile(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var scopes []Scope
+	err = json.Unmarshal(data, &scopes)
+	if err != nil {
+		return nil, err
+	}
+
+	return scopes, nil
+}
+
+func checkPermissions(key string) []string {
+	scopes, err := readInScopes()
+	if err != nil {
+		color.Red("[x] Error reading in scopes: %s", err.Error())
+		return nil
+	}
+
+	permissions := make([]string, 0)
+	for _, scope := range scopes {
+		status, err := scope.HttpTest.RunTest(map[string]string{"Authorization": "GenieKey " + key})
+		if err != nil {
+			color.Red("[x] Error running test: %s", err.Error())
+			return nil
+		}
+		if status {
+			permissions = append(permissions, scope.Name)
+		}
+	}
+
+	return permissions
+}
+
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func getUserList(key string) ([]User, error) {
+	// Create new HTTP request
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "https://api.opsgenie.com/v2/users", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add custom headers if provided
+	req.Header.Set("Authorization", "GenieKey "+key)
+
+	// Execute HTTP Request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decode response body
+	var userList UsersJSON
+	err = json.NewDecoder(resp.Body).Decode(&userList)
+	if err != nil {
+		return nil, err
+	}
+
+	return userList.Users, nil
+}
+
+func AnalyzePermissions(key string, showAll bool) {
+	permissions := checkPermissions(key)
+	if len(permissions) == 0 {
+		color.Red("[x] Invalid OpsGenie API key")
+		return
+	}
+	color.Green("[!] Valid OpsGenie API key\n\n")
+	printPermissions(permissions)
+
+	if contains(permissions, "Configuration Access") {
+		users, err := getUserList(key)
+		if err != nil {
+			color.Red("[x] Error getting user list: %s", err.Error())
+			return
+		}
+		printUsers(users)
+	}
+
+	color.Yellow("\n[i] Expires: Never")
+}
+
+func printPermissions(permissions []string) {
+	color.Yellow("[i] Permissions:")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Permission"})
+	for _, permission := range permissions {
+		t.AppendRow(table.Row{color.GreenString(permission)})
+	}
+	t.Render()
+}
+
+func printUsers(users []User) {
+	color.Green("\n[i] Users:")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Name", "Username", "Role"})
+	for _, user := range users {
+		t.AppendRow(table.Row{color.GreenString(user.FullName), color.GreenString(user.Username), color.GreenString(user.Role.Name)})
+	}
+	t.Render()
+}

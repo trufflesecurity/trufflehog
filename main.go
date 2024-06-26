@@ -20,6 +20,7 @@ import (
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
@@ -36,8 +37,57 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
 )
 
+// usageTemplate is a copy of kingpin.DefaultUsageTemplate with a minor change
+// to not list all flattened commands. This is required to hide all of the
+// analyze sub-commands from the main help.
+const usageTemplate = `{{define "FormatCommand" -}}
+{{if .FlagSummary}} {{.FlagSummary}}{{end -}}
+{{range .Args}}{{if not .Hidden}} {{if not .Required}}[{{end}}{{if .PlaceHolder}}{{.PlaceHolder}}{{else}}<{{.Name}}>{{end}}{{if .Value|IsCumulative}}...{{end}}{{if not .Required}}]{{end}}{{end}}{{end -}}
+{{end -}}
+
+{{define "FormatCommands" -}}
+{{range .Commands -}}
+{{if not .Hidden -}}
+  {{.FullCommand}}{{if .Default}}*{{end}}{{template "FormatCommand" .}}
+{{.Help|Wrap 4}}
+{{end -}}
+{{end -}}
+{{end -}}
+
+{{define "FormatUsage" -}}
+{{template "FormatCommand" .}}{{if .Commands}} <command> [<args> ...]{{end}}
+{{if .Help}}
+{{.Help|Wrap 0 -}}
+{{end -}}
+
+{{end -}}
+
+{{if .Context.SelectedCommand -}}
+usage: {{.App.Name}} {{.Context.SelectedCommand}}{{template "FormatUsage" .Context.SelectedCommand}}
+{{ else -}}
+usage: {{.App.Name}}{{template "FormatUsage" .App}}
+{{end}}
+{{if .Context.Flags -}}
+Flags:
+{{.Context.Flags|FlagsToTwoColumns|FormatTwoColumns}}
+{{end -}}
+{{if .Context.Args -}}
+Args:
+{{.Context.Args|ArgsToTwoColumns|FormatTwoColumns}}
+{{end -}}
+{{if .Context.SelectedCommand -}}
+{{if len .Context.SelectedCommand.Commands -}}
+Subcommands:
+{{template "FormatCommands" .Context.SelectedCommand}}
+{{end -}}
+{{else if .App.Commands -}}
+Commands:
+{{template "FormatCommands" .App}}
+{{end -}}
+`
+
 var (
-	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.").UsageTemplate(usageTemplate)
 	cmd                 string
 	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
 	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
@@ -198,6 +248,8 @@ var (
 	jenkinsUsername              = jenkinsScan.Flag("username", "Jenkins username").Envar("JENKINS_USERNAME").String()
 	jenkinsPassword              = jenkinsScan.Flag("password", "Jenkins password").Envar("JENKINS_PASSWORD").String()
 	jenkinsInsecureSkipVerifyTLS = jenkinsScan.Flag("insecure-skip-verify-tls", "Skip TLS verification").Envar("JENKINS_INSECURE_SKIP_VERIFY_TLS").Bool()
+
+	analyzeCmd = analyzer.Command(cli)
 
 	usingTUI = false
 )
@@ -615,7 +667,8 @@ func runSingleScan(ctx context.Context, cfg scanConfig, scanEntireChunk bool) (m
 	}()
 
 	var scanMetrics metrics
-	switch cfg.Command {
+	topLevelSubCommand, _, _ := strings.Cut(cfg.Command, " ")
+	switch topLevelSubCommand {
 	case gitScan.FullCommand():
 		gitCfg := sources.GitConfig{
 			URI:              *gitScanURI,
@@ -811,6 +864,8 @@ func runSingleScan(ctx context.Context, cfg scanConfig, scanEntireChunk bool) (m
 		if err := eng.ScanJenkins(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
 		}
+	case analyzeCmd.FullCommand():
+		analyzer.Run(cfg.Command)
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cfg.Command)
 	}
