@@ -89,10 +89,10 @@ func TestEndorlabs_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	key := testSecrets.MustGetField("ENDOR_ONE_KEY")
-	secret := testSecrets.MustGetField("ENDOR_ONE_SECRET")
-	inactiveKey := testSecrets.MustGetField("ENDOR_ONE_KEY_INACTIVE")
-	inactiveSecret := testSecrets.MustGetField("ENDOR_ONE_SECRET_INACTIVE")
+	key := testSecrets.MustGetField("ENDOR_KEY")
+	secret := testSecrets.MustGetField("ENDOR_SECRET")
+	inactiveKey := testSecrets.MustGetField("ENDOR_KEY_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField("ENDOR_SECRET_INACTIVE")
 
 	type args struct {
 		ctx    context.Context

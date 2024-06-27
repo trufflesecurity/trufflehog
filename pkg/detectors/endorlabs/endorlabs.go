@@ -47,12 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		secretMatches[match[1]] = struct{}{}
 	}
 
-	fmt.Printf("keyMatches: %v\n", keyMatches)
-	fmt.Printf("secretMatches: %v\n", secretMatches)
-
 	for key := range keyMatches {
 		for secret := range secretMatches {
-			if key == secret {
+			if key == secret { // Minor optimization
 				continue
 			}
 
