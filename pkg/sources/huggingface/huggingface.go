@@ -338,18 +338,10 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) source_metada
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
-	// If targets are provided, we're only scanning the data in those targets.
-	// Otherwise, we're scanning all data.
-	// This allows us to only scan the commit where a vulnerability was found.
-	// if len(targets) > 0 {
-	// 	return s.scanTargets(ctx, targets, chunksChan)
-	// }
-
 	err := s.enumerate(ctx)
 	if err != nil {
 		return err
 	}
-
 	return s.scan(ctx, chunksChan)
 }
 
@@ -686,60 +678,3 @@ func (s *Source) chunkDiscussionComments(ctx context.Context, repoInfo repoInfo,
 	}
 	return nil
 }
-
-// ToDo: Evaluate if this is needed
-// func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
-// 	for _, tgt := range targets {
-// 		if err := s.scanTarget(ctx, tgt, chunksChan); err != nil {
-// 			ctx.Logger().Error(err, "error scanning target")
-// 		}
-// 	}
-
-// 	return nil
-// }
-
-// func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
-// 	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Huggingface)
-// 	if !ok {
-// 		return fmt.Errorf("unable to cast metadata type for targeted scan")
-// 	}
-// 	meta := metaType.HuggingFace
-
-// 	u, err := url.Parse(meta.GetLink())
-// 	if err != nil {
-// 		return fmt.Errorf("unable to parse HuggingFace URL: %w", err)
-// 	}
-
-// 	// The owner is the third segment and the repo is the fourth segment of the path.
-// 	// Ex: https://hugginface.com/spaces/owner/repo/.....
-// 	segments := strings.Split(u.Path, "/")
-// 	if len(segments) < 4 {
-// 		return fmt.Errorf("invalid HuggingFace URL")
-// 	}
-
-// 	qry := commitQuery{
-// 		repo:     segments[3],
-// 		owner:    segments[2],
-// 		typ:      segments[1],
-// 		sha:      meta.GetCommit(),
-// 		filename: meta.GetFile(),
-// 	}
-// 	res, err := s.getDiffForFileInCommit(ctx, qry)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	chunk := &sources.Chunk{
-// 		SourceType: s.Type(),
-// 		SourceName: s.name,
-// 		SourceID:   s.SourceID(),
-// 		JobID:      s.JobID(),
-// 		SecretID:   target.SecretID,
-// 		Data:       []byte(res),
-// 		SourceMetadata: &source_metadatapb.MetaData{
-// 			Data: &source_metadatapb.MetaData_Github{Github: meta},
-// 		},
-// 		Verify: s.verify,
-// 	}
-
-// 	return common.CancellableWrite(ctx, chunksChan, chunk)
-// }

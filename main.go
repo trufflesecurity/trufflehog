@@ -763,6 +763,11 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if *huggingfaceEndpoint != "" {
 			*huggingfaceEndpoint = strings.TrimRight(*huggingfaceEndpoint, "/")
 		}
+
+		if len(*huggingfaceModels) == 0 && len(*huggingfaceSpaces) == 0 && len(*huggingfaceDatasets) == 0 && len(*huggingfaceOrgs) == 0 && len(*huggingfaceUsers) == 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization, user, model, space or dataset")
+		}
+
 		cfg := engine.HuggingfaceConfig{
 			Endpoint:           *huggingfaceEndpoint,
 			Models:             *huggingfaceModels,
