@@ -149,8 +149,12 @@ func (c *HFClient) get(ctx context.Context, url string, target interface{}) erro
 		return fmt.Errorf("failed to make request to HuggingFace API: %w", err)
 	}
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return errors.New("access is restricted.")
+	if resp.StatusCode == http.StatusUnauthorized {
+		return errors.New("invalid API key.")
+	}
+
+	if resp.StatusCode == http.StatusForbidden {
+		return errors.New("access to this repo is restricted and you are not in the authorized list. Visit the repository to ask for access.")
 	}
 
 	defer resp.Body.Close()
