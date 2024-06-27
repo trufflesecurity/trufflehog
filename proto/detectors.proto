@@ -1002,6 +1002,7 @@ enum DetectorType {
   Eraser = 990;
   LarkSuite = 991;
   LarkSuiteApiKey = 992;
+  EndorLabs = 993;
 }
 
 message Result {
