@@ -48,6 +48,7 @@ enum SourceType {
   SOURCE_TYPE_POSTMAN = 33;
   SOURCE_TYPE_WEBHOOK = 34;
   SOURCE_TYPE_ELASTICSEARCH = 35;
+  SOURCE_TYPE_HUGGINGFACE = 36;
 }
 
 message LocalSource {
@@ -246,6 +247,30 @@ message GoogleDrive {
   oneof credential {
     string refresh_token = 1;
   }
+}
+
+message Huggingface {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+    credentials.Unauthenticated unauthenticated = 3;
+  }
+  repeated string models = 4;
+  repeated string spaces = 5;
+  repeated string datasets = 12;
+  repeated string organizations = 6;
+  repeated string users = 15;
+  repeated string ignore_models = 7;
+  repeated string include_models = 8;
+  repeated string ignore_spaces = 9;
+  repeated string include_spaces = 10;
+  repeated string ignore_datasets = 13;
+  repeated string include_datasets = 14;
+  bool  skip_all_models = 16;
+  bool  skip_all_spaces = 17;
+  bool  skip_all_datasets = 18;
+  bool include_discussions = 11;
+  bool include_prs = 19;
 }
 
 message JIRA {

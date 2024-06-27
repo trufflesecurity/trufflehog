@@ -301,6 +301,27 @@ trufflehog elasticsearch \
   --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
 ```
 
+## 15. Scan HuggingFace
+
+### Scan a HuggingFace Model, Dataset or Space
+
+```bash
+trufflehog huggingface --model <username/modelname> --space <username/spacename> --dataset <username/datasetname>
+```
+
+### Scan all Models, Datasets and Space belonging to a HuggingFace Org/User
+
+```bash
+trufflehog huggingface --org <orgname> --user <username>
+```
+
+Optionally, skip scanning a type of resource with `--skip-models`, `--skip-datasets`, `--skip-spaces` or a particular resource with `--ignore-models/datasets/spaces <resource-name>`.
+
+### Scan Discussion and PR Comments
+```bash
+trufflehog huggingface --model <username/modelname> --include-discussions --include-prs
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?

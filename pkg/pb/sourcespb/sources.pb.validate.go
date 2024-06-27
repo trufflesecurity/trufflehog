@@ -2875,6 +2875,185 @@ var _ interface {
 	ErrorName() string
 } = GoogleDriveValidationError{}
 
+// Validate checks the field values on Huggingface with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Huggingface) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Huggingface with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in HuggingfaceMultiError, or
+// nil if none found.
+func (m *Huggingface) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Huggingface) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if _, err := url.Parse(m.GetEndpoint()); err != nil {
+		err = HuggingfaceValidationError{
+			field:  "Endpoint",
+			reason: "value must be a valid URI",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for SkipAllModels
+
+	// no validation rules for SkipAllSpaces
+
+	// no validation rules for SkipAllDatasets
+
+	// no validation rules for IncludeDiscussions
+
+	// no validation rules for IncludePrs
+
+	switch v := m.Credential.(type) {
+	case *Huggingface_Token:
+		if v == nil {
+			err := HuggingfaceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Token
+	case *Huggingface_Unauthenticated:
+		if v == nil {
+			err := HuggingfaceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetUnauthenticated()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, HuggingfaceValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, HuggingfaceValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return HuggingfaceValidationError{
+					field:  "Unauthenticated",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return HuggingfaceMultiError(errors)
+	}
+
+	return nil
+}
+
+// HuggingfaceMultiError is an error wrapping multiple validation errors
+// returned by Huggingface.ValidateAll() if the designated constraints aren't met.
+type HuggingfaceMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m HuggingfaceMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m HuggingfaceMultiError) AllErrors() []error { return m }
+
+// HuggingfaceValidationError is the validation error returned by
+// Huggingface.Validate if the designated constraints aren't met.
+type HuggingfaceValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e HuggingfaceValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e HuggingfaceValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e HuggingfaceValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e HuggingfaceValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e HuggingfaceValidationError) ErrorName() string { return "HuggingfaceValidationError" }
+
+// Error satisfies the builtin error interface
+func (e HuggingfaceValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sHuggingface.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = HuggingfaceValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = HuggingfaceValidationError{}
+
 // Validate checks the field values on JIRA with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
 // encountered is returned, or nil if there are no violations.
