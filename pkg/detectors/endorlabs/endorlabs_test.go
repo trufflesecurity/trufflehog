@@ -118,11 +118,11 @@ func TestEndorlabs_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_EndorLabs,
-					Verified:     false,
+					Verified:     true,
 				},
 				{
 					DetectorType: detectorspb.DetectorType_EndorLabs,
-					Verified:     true,
+					Verified:     false,
 				},
 			},
 			wantErr:             false,

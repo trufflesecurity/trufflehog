@@ -24,13 +24,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyAndSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"endor"}) + `\b(endr\+[a-zA-Z0-9]+)\b`)
+	keyAndSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"endor"}) + `\b(endr\+[a-zA-Z0-9-]{16})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"endor"}
+	return []string{"endr+"}
 }
 
 // FromData will find and optionally verify Endorlabs secrets in a given set of bytes.
