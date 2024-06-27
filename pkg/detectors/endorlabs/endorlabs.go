@@ -24,7 +24,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyAndSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"endor"}) + `\b(endr\+[a-zA-Z0-9]+)\b`)
+	keyAndSecretPat = regexp.MustCompile(`\b(endr\+[a-zA-Z0-9]+)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
