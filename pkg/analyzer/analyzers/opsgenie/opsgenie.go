@@ -2,16 +2,19 @@ package opsgenie
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
 )
+
+//go:embed scopes.json
+var scopesConfig []byte
 
 type User struct {
 	FullName string `json:"fullName"`
@@ -89,23 +92,8 @@ type Scope struct {
 }
 
 func readInScopes() ([]Scope, error) {
-	// Determine the current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	// Construct the path to the config file
-	configFilePath := filepath.Join(cwd, "pkg/analyzers/opsgenie/scopes.json")
-
-	data, err := os.ReadFile(configFilePath)
-	if err != nil {
-		return nil, err
-	}
-
 	var scopes []Scope
-	err = json.Unmarshal(data, &scopes)
-	if err != nil {
+	if err := json.Unmarshal(scopesConfig, &scopes); err != nil {
 		return nil, err
 	}
 
