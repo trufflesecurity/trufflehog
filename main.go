@@ -454,12 +454,12 @@ func run(state overseer.State) {
 		return
 	}
 
-	topLevelSubCommand, _, _ := strings.Cut(cmd, " ")
+	topLevelSubCommand, _, _ := strings.Cut(scanConfig.Command, " ")
 	switch topLevelSubCommand {
 	case analyzeCmd.FullCommand():
-		analyzer.Run(cmd)
+		analyzer.Run(scanConfig.Command)
 	default:
-		metrics, err := runSingleScan(ctx, cmd, engConf)
+		metrics, err := runSingleScan(ctx, scanConfig, *scanEntireChunk)
 		if err != nil {
 			logFatal(err, "error running scan")
 		}
@@ -601,8 +601,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	}()
 
 	var scanMetrics metrics
-	topLevelSubCommand, _, _ := strings.Cut(cfg.Command, " ")
-	switch topLevelSubCommand {
+	switch cfg.Command {
 	case gitScan.FullCommand():
 		gitCfg := sources.GitConfig{
 			URI:              *gitScanURI,
@@ -798,8 +797,6 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if err := eng.ScanJenkins(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
 		}
-	case analyzeCmd.FullCommand():
-		analyzer.Run(cfg.Command)
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
 	}
