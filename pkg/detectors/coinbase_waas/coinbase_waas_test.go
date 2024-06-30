@@ -75,7 +75,7 @@ func TestCoinbaseWaaS_Pattern(t *testing.T) {
 			shouldMatch: true,
 			match:       "organizations/7eead2d5-fa48-4423-8f40-c70d8ce398ae/apiKeys/7b9516b6-d82e-44e8-bed5-89b160452ed9:-----BEGIN ECDSA PRIVATE KEY-----\nMHcCAQEEINQdZMbF2r07KF0mxfLYt9Y1PNaC0C6UpZ31MxD4NEE8oAoGCCqGSM49\nAwEHoUQDQgAEeRFgMrQEHI/APWaziRH90jN7EozjdbPVxvzc1F4zqWTeCtLASwqA\nqnMugYX2epqsFhGn82xNXu2NwgORc6embQ==\n-----END ECDSA PRIVATE KEY-----\n",
 		},
-		// TODO: Is it worth supporting case-insensitve headers?
+		// TODO: Is it worth supporting case-insensitive headers?
 		// https://github.com/coinbase/waas-sdk-react-native/blob/bbaf597e73d02ecaf64161061e71b85d9eeeb9d6/example/src/.coinbase_cloud_api_key.json#L4
 		//		{
 		//			name: "valid_result_case_insensitive",

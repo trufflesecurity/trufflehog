@@ -19,10 +19,12 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -76,7 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				h := hmac.New(sha256.New, key)
 				h.Write([]byte(stringToSign))
 				signature := base64.StdEncoding.EncodeToString(h.Sum(nil))
-				req, err := http.NewRequest("GET", url, nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
 				}
@@ -95,11 +97,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			}
 
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(accountKey, detectors.DefaultFalsePositives, true) {
-				continue
-			}
-
 			results = append(results, s1)
 			if s1.Verified {
 				break
@@ -108,6 +105,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

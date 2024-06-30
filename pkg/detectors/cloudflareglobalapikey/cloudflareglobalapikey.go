@@ -2,16 +2,19 @@ package cloudflareglobalapikey
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -19,12 +22,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `([A-Za-z0-9_-]{37})`)
+	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b([A-Za-z0-9_-]{37})\b`)
 
 	// email pattern thanks https://golangcode.com/validate-an-email-address/
 	// emailPat = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	// the emailPat regex will also match emails ending in .co.uk and .engineering
 
-	emailPat = regexp.MustCompile(`\b([a-zA-Z0-9+._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)\b`)
+	emailPat = regexp.MustCompile(`\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(\.[A-Za-z]{2})?)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -51,10 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			emailRes := strings.TrimSpace(emailMatch[1])
-
-			if detectors.IsKnownFalsePositive(apiKeyRes, detectors.DefaultFalsePositives, true) { // wait- (apiKeyRes, email) might be false positive does not mean (apiKeyRes, another_email) is ?
-				continue
-			}
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_CloudflareGlobalApiKey,

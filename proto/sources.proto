@@ -45,6 +45,10 @@ enum SourceType {
   SOURCE_TYPE_GCS_UNAUTHED = 30;
   SOURCE_TYPE_AZURE_REPOS = 31;
   SOURCE_TYPE_TRAVISCI = 32;
+  SOURCE_TYPE_POSTMAN = 33;
+  SOURCE_TYPE_WEBHOOK = 34;
+  SOURCE_TYPE_ELASTICSEARCH = 35;
+  SOURCE_TYPE_HUGGINGFACE = 36;
 }
 
 message LocalSource {
@@ -245,6 +249,30 @@ message GoogleDrive {
   }
 }
 
+message Huggingface {
+  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  oneof credential {
+    string token = 2;
+    credentials.Unauthenticated unauthenticated = 3;
+  }
+  repeated string models = 4;
+  repeated string spaces = 5;
+  repeated string datasets = 12;
+  repeated string organizations = 6;
+  repeated string users = 15;
+  repeated string ignore_models = 7;
+  repeated string include_models = 8;
+  repeated string ignore_spaces = 9;
+  repeated string include_spaces = 10;
+  repeated string ignore_datasets = 13;
+  repeated string include_datasets = 14;
+  bool  skip_all_models = 16;
+  bool  skip_all_spaces = 17;
+  bool  skip_all_datasets = 18;
+  bool include_discussions = 11;
+  bool include_prs = 19;
+}
+
 message JIRA {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
@@ -280,6 +308,7 @@ message S3 {
   repeated string buckets = 3;
   int64 max_object_size = 6;
   repeated string roles = 7;
+  repeated string ignore_buckets = 8;
 }
 
 message Slack {
@@ -316,6 +345,7 @@ message Jenkins {
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
     credentials.Header header = 3;
+    credentials.Unauthenticated unauthenticated = 5;
   }
   bool insecure_skip_verify_tls = 4;
 }
@@ -340,11 +370,11 @@ message Syslog {
   string format = 5;
 }
 
-message PublicEventMonitoring {
+message Forager {
   oneof credential {
     credentials.Unauthenticated unauthenticated = 1;
   }
-  string domain = 2;
+  repeated string domains = 2;
   int64 max_depth = 3;
   google.protobuf.Timestamp since = 4;
 }
@@ -378,4 +408,42 @@ message AzureRepos {
   repeated string ignore_projects = 11;
   bool skip_binaries = 12;
   bool skip_archives = 13;
+}
+
+message Postman {
+  oneof credential {
+    credentials.Unauthenticated unauthenticated = 1;
+    string token = 2;
+  }
+  repeated string workspaces = 3; 
+  repeated string collections = 4;
+  repeated string environments = 5;
+  repeated string exclude_collections = 6;
+  repeated string exclude_environments = 7; 
+  repeated string include_collections = 8;
+  repeated string include_environments = 9; 
+  repeated string detector_keywords = 10;
+  repeated string workspace_paths = 11;
+  repeated string collection_paths = 12;
+  repeated string environment_paths = 13;
+}
+
+message Webhook {
+  string listen_address = 1 [(validate.rules).string.hostname = true];
+  oneof credential {
+    credentials.Header header = 2;
+  }
+}
+
+message Elasticsearch {
+  repeated string nodes = 1;
+  string username = 2;
+  string password = 3;
+  string cloud_id = 4;
+  string api_key = 5;
+  string service_token = 6;
+  string index_pattern = 7;
+  string query_json = 8;
+  string since_timestamp = 9;
+  bool best_effort_scan = 10;
 }

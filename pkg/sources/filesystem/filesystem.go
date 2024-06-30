@@ -9,11 +9,10 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -26,13 +25,14 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM
 
 type Source struct {
-	name     string
-	sourceId sources.SourceID
-	jobId    sources.JobID
-	verify   bool
-	paths    []string
-	log      logr.Logger
-	filter   *common.Filter
+	name        string
+	sourceId    sources.SourceID
+	jobId       sources.JobID
+	concurrency int
+	verify      bool
+	paths       []string
+	log         logr.Logger
+	filter      *common.Filter
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -57,9 +57,10 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init returns an initialized Filesystem source.
-func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, _ int) error {
+func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
 
+	s.concurrency = concurrency
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -90,9 +91,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		s.SetProgressComplete(i, len(s.paths), fmt.Sprintf("Path: %s", path), "")
 
 		cleanPath := filepath.Clean(path)
-		fileInfo, err := os.Stat(cleanPath)
+		fileInfo, err := os.Lstat(cleanPath)
 		if err != nil {
 			logger.Error(err, "unable to get file info")
+			continue
+		}
+
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
+			logger.Info("skipping, not a regular file", "path", cleanPath)
 			continue
 		}
 
@@ -102,16 +108,23 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			err = s.scanFile(ctx, cleanPath, chunksChan)
 		}
 
-		if err != nil && err != io.EOF {
-			logger.Info("error scanning filesystem", "error", err)
+		if err != nil && !errors.Is(err, io.EOF) {
+			if !errors.Is(err, skipSymlinkErr) {
+				logger.Error(err, "error scanning filesystem")
+			}
 		}
 	}
+
 	return nil
 }
-
 func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
+	workerPool := new(errgroup.Group)
+	workerPool.SetLimit(s.concurrency)
+	defer func() { _ = workerPool.Wait() }()
+
 	return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
 		if err != nil {
+			ctx.Logger().Error(err, "error walking directory")
 			return nil
 		}
 		fullPath := filepath.Join(path, relativePath)
@@ -126,21 +139,27 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			return nil
 		}
 
-		if err = s.scanFile(ctx, fullPath, chunksChan); err != nil {
-			ctx.Logger().Info("error scanning file", "path", fullPath, "error", err)
-		}
+		workerPool.Go(func() error {
+			if err = s.scanFile(ctx, fullPath, chunksChan); err != nil {
+				ctx.Logger().Error(err, "error scanning file", "path", fullPath, "error", err)
+			}
+			return nil
+		})
+
 		return nil
 	})
 }
 
+var skipSymlinkErr = errors.New("skipping symlink")
+
 func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	logger := ctx.Logger().WithValues("path", path)
-	fileStat, err := os.Stat(path)
+	fileStat, err := os.Lstat(path)
 	if err != nil {
 		return fmt.Errorf("unable to stat file: %w", err)
 	}
-	if !fileStat.Mode().IsRegular() {
-		return fmt.Errorf("not a regular file")
+	if fileStat.Mode()&os.ModeSymlink != 0 {
+		return skipSymlinkErr
 	}
 
 	inputFile, err := os.Open(path)
@@ -148,16 +167,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		return fmt.Errorf("unable to open file: %w", err)
 	}
 
-	bufferName := cleantemp.MkFilename()
-
-	defer inputFile.Close()
 	logger.V(3).Info("scanning file")
-
-	reReader, err := diskbufferreader.New(inputFile, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return fmt.Errorf("could not create re-readable reader: %w", err)
-	}
-	defer reReader.Close()
 
 	chunkSkel := &sources.Chunk{
 		SourceType: s.Type(),
@@ -173,44 +183,8 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		},
 		Verify: s.verify,
 	}
-	if handlers.HandleFile(ctx, reReader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
-		return nil
-	}
 
-	if err := reReader.Reset(); err != nil {
-		return err
-	}
-	reReader.Stop()
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, reReader)
-	for data := range chunkResChan {
-		if err := data.Error(); err != nil {
-			s.log.Error(err, "error reading chunk.")
-			continue
-		}
-
-		chunk := &sources.Chunk{
-			SourceType: s.Type(),
-			SourceName: s.name,
-			SourceID:   s.SourceID(),
-			JobID:      s.JobID(),
-			Data:       data.Bytes(),
-			SourceMetadata: &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Filesystem{
-					Filesystem: &source_metadatapb.Filesystem{
-						File: sanitizer.UTF8(path),
-					},
-				},
-			},
-			Verify: s.verify,
-		}
-		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return handlers.HandleFile(ctx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 }
 
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply
@@ -218,7 +192,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // filepath or a directory.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
-		fileInfo, err := os.Stat(filepath.Clean(path))
+		fileInfo, err := os.Lstat(filepath.Clean(path))
 		if err != nil {
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
@@ -257,11 +231,11 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 
 // ChunkUnit implements SourceUnitChunker interface.
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
-	path := unit.SourceUnitID()
+	path, _ := unit.SourceUnitID()
 	logger := ctx.Logger().WithValues("path", path)
 
 	cleanPath := filepath.Clean(path)
-	fileInfo, err := os.Stat(cleanPath)
+	fileInfo, err := os.Lstat(cleanPath)
 	if err != nil {
 		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get file info: %w", err))
 	}
@@ -289,8 +263,10 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 	}
 
-	if scanErr != nil && scanErr != io.EOF {
-		logger.Info("error scanning filesystem", "error", scanErr)
+	if scanErr != nil && !errors.Is(scanErr, io.EOF) {
+		if !errors.Is(scanErr, skipSymlinkErr) {
+			logger.Error(scanErr, "error scanning filesystem")
+		}
 		return reporter.ChunkErr(ctx, scanErr)
 	}
 	return nil

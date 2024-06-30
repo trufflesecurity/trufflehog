@@ -14,6 +14,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -81,11 +82,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else {
 					s1.SetVerificationError(err, key)
 				}
-			}
-
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s1)

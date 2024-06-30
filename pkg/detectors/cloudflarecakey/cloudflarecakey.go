@@ -2,15 +2,13 @@ package cloudflarecakey
 
 import (
 	"context"
-	// "fmt"
-	// "log"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	regexp "github.com/wasilibs/go-re2"
 )
 
 type Scanner struct{}
@@ -41,10 +39,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
-
-		if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-			continue
-		}
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CloudflareCaKey,

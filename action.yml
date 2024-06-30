@@ -18,6 +18,10 @@ inputs:
     default: ''
     description: Extra args to be passed to the trufflehog cli.
     required: false
+  version:
+    default: 'latest'
+    description: Scan with this trufflehog cli version.
+    required: false
 branding:
   icon: "shield"
   color: "green"
@@ -26,18 +30,20 @@ runs:
   using: "composite"
   steps:
   - shell: bash
+    working-directory: ${{ inputs.path }}
     env:
-      REPO_PATH: ${{ inputs.path }}
       BASE: ${{ inputs.base }}
       HEAD: ${{ inputs.head }}
       ARGS: ${{ inputs.extra_args }}
       COMMITS: ${{ toJson(github.event.commits) }}
+      VERSION: ${{ inputs.version }}
     run: |
       ##########################################
       ## ADVANCED USAGE                       ##
       ## Scan by BASE & HEAD user inputs      ##
       ## If BASE == HEAD, exit with error     ##
       ##########################################
+      git status >/dev/null  # make sure we are in a git repostiory
       if [ -n "$BASE" ] || [ -n "$HEAD" ]; then
         if [ -n "$BASE" ]; then
           base_commit=$(git rev-parse "$BASE" 2>/dev/null) || true
@@ -49,7 +55,7 @@ runs:
         else
           head_commit=""
         fi
-        if [ $base_commit == $head_commit ] ; then
+        if [ "$base_commit" == "$head_commit" ] ; then
           echo "::error::BASE and HEAD commits are the same. TruffleHog won't scan anything. Please see documentation (https://github.com/trufflesecurity/trufflehog#octocat-trufflehog-github-action)."
           exit 1
         fi
@@ -79,9 +85,9 @@ runs:
       fi
       ##########################################
       ##          Run TruffleHog              ##
-      ##########################################       
-      docker run --rm -v "$REPO_PATH":/tmp \
-      ghcr.io/trufflesecurity/trufflehog:latest \
+      ##########################################
+      docker run --rm -v .:/tmp -w /tmp \
+      ghcr.io/trufflesecurity/trufflehog:${VERSION} \
       git file:///tmp/ \
       --since-commit \
       ${BASE:-''} \

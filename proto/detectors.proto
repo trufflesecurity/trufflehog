@@ -9,6 +9,7 @@ enum DecoderType {
   PLAIN = 1;
   BASE64 = 2;
   UTF16 = 3;
+  ESCAPED_UNICODE = 4;
 }
 
 enum DetectorType {
@@ -77,7 +78,7 @@ enum DetectorType {
   DigitalOceanToken = 64;
   DiscordBotToken = 65;
   DiscordWebhook = 66;
-  EtsyApiKey = 67;
+  EtsyApiKey = 67 [deprecated = true];
   FastlyPersonalToken = 68;
   GoogleOauth2 = 69;
   ReCAPTCHA = 70; // Didn't do
@@ -250,7 +251,7 @@ enum DetectorType {
   Feedier = 238;
   Abbysale = 239;
   Magnetic = 240;
-  Nytimes = 241;
+  Nytimes = 241 [deprecated = true];
   Polygon = 242;
   Powrbot = 243;
   ProspectIO = 244 [deprecated = true];
@@ -260,7 +261,7 @@ enum DetectorType {
   Wrike = 248;
   Float = 249;
   Imagekit = 250;
-  Integromat = 251;
+  Integromat = 251 [deprecated = true];
   Salesblink = 252;
   Bored = 253;
   Campayn = 254;
@@ -313,7 +314,7 @@ enum DetectorType {
   Alconost = 301;
   Blogger = 302;
   Accuweather = 303;
-  Opengraphr = 304;
+  Opengraphr = 304 [deprecated = true];
   Rawg = 305;
   Riotgames = 306;
   RoninApp = 307;
@@ -417,7 +418,7 @@ enum DetectorType {
   FinancialModelingPrep = 406;
   Geocodio = 407;
   HereAPI = 408;
-  Macaddress = 409;
+  Macaddress = 409 [deprecated = true];
   OOPSpam = 410;
   ProtocolsIO = 411;
   ScraperAPI = 412;
@@ -455,7 +456,7 @@ enum DetectorType {
   Mixcloud = 444;
   TatumIO = 445;
   Tmetric = 446;
-  Lastfm = 447;
+  Lastfm = 447 [deprecated = true];
   Browshot = 448;
   JSONbin = 449;
   LocationIQ = 450;
@@ -496,7 +497,7 @@ enum DetectorType {
   Aylien = 485;
   Geocode = 486;
   IconFinder = 487;
-  Ipify = 488;
+  Ipify = 488 [deprecated = true];
   LanguageLayer = 489;
   Lob = 490;
   OnWaterIO = 491;
@@ -703,7 +704,7 @@ enum DetectorType {
   Chatfule = 692;
   Aeroworkflow = 693;
   Emailoctopus = 694;
-  Fusebill = 695;
+  Fusebill = 695 [deprecated = true];
   Geckoboard = 696;
   Gosquared = 697;
   Moonclerk = 698;
@@ -765,7 +766,7 @@ enum DetectorType {
   Image4 = 754;
   Pinata = 755;
   BrowserStack = 756;
-  CrossBrowserTesting = 757;
+  CrossBrowserTesting = 757 [deprecated = true];
   Loadmill = 758;
   TestingBot = 759;
   KnapsackPro = 760;
@@ -814,7 +815,7 @@ enum DetectorType {
   Parsehub = 803;
   PackageCloud = 804;
   Cloudsmith = 805;
-  Flowdash = 806;
+  Flowdash = 806 [deprecated = true];
   Flowdock = 807 [deprecated = true];
   Fibery = 808;
   Typetalk = 809;
@@ -919,7 +920,7 @@ enum DetectorType {
   BlockNative = 908;
   Moralis = 909;
   BscScan = 910;
-  CoinMarketCap = 911;
+  CoinMarketCap = 911 [deprecated = true];
   Percy = 912;
   TinesWebhook = 913;
   Pulumi = 914;
@@ -990,6 +991,18 @@ enum DetectorType {
   AzureSQL = 979;
   FlyIO = 980;
   BuiltWith = 981;
+  JupiterOne = 982;
+  GCPApplicationDefaultCredentials = 983;
+  Wiz = 984;
+  Pagarme = 985;
+  Onfleet = 986;
+  Intra42 = 987;
+  Groq = 988;
+  TwitterConsumerkey = 989;
+  Eraser = 990;
+  LarkSuite = 991;
+  LarkSuiteApiKey = 992;
+  EndorLabs = 993;
 }
 
 message Result {
@@ -1005,6 +1018,13 @@ message Result {
   // This field should only be populated if the verification process itself failed in a way that provides no information
   // about the verification status of the candidate secret, such as if the verification request timed out.
   string verification_error_message = 10;
+
+  FalsePositiveInfo false_positive_info = 11;
+}
+
+message FalsePositiveInfo {
+  bool word_match = 1;
+  bool low_entropy = 2;
 }
 
 message StructuredData {

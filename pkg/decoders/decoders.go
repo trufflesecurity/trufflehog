@@ -11,6 +11,7 @@ func DefaultDecoders() []Decoder {
 		&UTF8{},
 		&Base64{},
 		&UTF16{},
+		&EscapedUnicode{},
 	}
 }
 

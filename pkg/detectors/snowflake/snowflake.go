@@ -4,18 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"time"
 	"unicode"
 
 	_ "github.com/snowflakedb/gosnowflake"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -117,7 +119,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						ctx = context.Background()
 					}
 
-					// Disable pool + retries to prevent flooding the server with failed login attemps.
+					// Disable pool + retries to prevent flooding the server with failed login attempts.
 					db.SetConnMaxLifetime(time.Second)
 					db.SetMaxOpenConns(1)
 
@@ -151,11 +153,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.Verified = true
 						}
 					}
-				}
-
-				// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-				if !s1.Verified && detectors.IsKnownFalsePositive(resPasswordMatch, detectors.DefaultFalsePositives, true) {
-					continue
 				}
 
 				results = append(results, s1)
