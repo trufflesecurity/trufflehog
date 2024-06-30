@@ -11,6 +11,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type User struct {
@@ -42,7 +44,7 @@ func StatusContains(status int, vals []int) bool {
 	return false
 }
 
-func (h *HttpStatusTest) RunTest(headers map[string]string) (bool, error) {
+func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) (bool, error) {
 	// If body data, marshal to JSON
 	var data io.Reader
 	if h.Payload != nil {
@@ -54,7 +56,7 @@ func (h *HttpStatusTest) RunTest(headers map[string]string) (bool, error) {
 	}
 
 	// Create new HTTP request
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest(h.Method, h.Endpoint, data)
 	if err != nil {
 		return false, err
@@ -112,7 +114,7 @@ func readInScopes() ([]Scope, error) {
 	return scopes, nil
 }
 
-func checkPermissions(key string) []string {
+func checkPermissions(cfg *config.Config, key string) []string {
 	scopes, err := readInScopes()
 	if err != nil {
 		color.Red("[x] Error reading in scopes: %s", err.Error())
@@ -121,7 +123,7 @@ func checkPermissions(key string) []string {
 
 	permissions := make([]string, 0)
 	for _, scope := range scopes {
-		status, err := scope.HttpTest.RunTest(map[string]string{"Authorization": "GenieKey " + key})
+		status, err := scope.HttpTest.RunTest(cfg, map[string]string{"Authorization": "GenieKey " + key})
 		if err != nil {
 			color.Red("[x] Error running test: %s", err.Error())
 			return nil
@@ -143,9 +145,9 @@ func contains(s []string, e string) bool {
 	return false
 }
 
-func getUserList(key string) ([]User, error) {
+func getUserList(cfg *config.Config, key string) ([]User, error) {
 	// Create new HTTP request
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://api.opsgenie.com/v2/users", nil)
 	if err != nil {
 		return nil, err
@@ -171,8 +173,8 @@ func getUserList(key string) ([]User, error) {
 	return userList.Users, nil
 }
 
-func AnalyzePermissions(key string, showAll bool) {
-	permissions := checkPermissions(key)
+func AnalyzePermissions(cfg *config.Config, key string) {
+	permissions := checkPermissions(cfg, key)
 	if len(permissions) == 0 {
 		color.Red("[x] Invalid OpsGenie API key")
 		return
@@ -181,7 +183,7 @@ func AnalyzePermissions(key string, showAll bool) {
 	printPermissions(permissions)
 
 	if contains(permissions, "Configuration Access") {
-		users, err := getUserList(key)
+		users, err := getUserList(cfg, key)
 		if err != nil {
 			color.Red("[x] Error getting user list: %s", err.Error())
 			return

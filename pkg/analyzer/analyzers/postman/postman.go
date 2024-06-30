@@ -8,6 +8,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type UserInfoJSON struct {
@@ -30,10 +32,10 @@ type WorkspaceJSON struct {
 	} `json:"workspaces"`
 }
 
-func getUserInfo(key string) (UserInfoJSON, error) {
+func getUserInfo(cfg *config.Config, key string) (UserInfoJSON, error) {
 	var me UserInfoJSON
 
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://api.getpostman.com/me", nil)
 	if err != nil {
 		return me, err
@@ -57,10 +59,10 @@ func getUserInfo(key string) (UserInfoJSON, error) {
 	return me, err
 }
 
-func getWorkspaces(key string) (WorkspaceJSON, error) {
+func getWorkspaces(cfg *config.Config, key string) (WorkspaceJSON, error) {
 	var workspaces WorkspaceJSON
 
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://api.getpostman.com/workspaces", nil)
 	if err != nil {
 		return workspaces, err
@@ -84,10 +86,10 @@ func getWorkspaces(key string) (WorkspaceJSON, error) {
 	return workspaces, err
 }
 
-func AnalyzePermissions(key string, showAll bool) {
+func AnalyzePermissions(cfg *config.Config, key string) {
 	// validate key & get user info
 
-	me, err := getUserInfo(key)
+	me, err := getUserInfo(cfg, key)
 	if err != nil {
 		color.Red("[x]" + err.Error())
 	}
@@ -101,7 +103,7 @@ func AnalyzePermissions(key string, showAll bool) {
 	printUserInfo(me)
 
 	// get workspaces
-	workspaces, err := getWorkspaces(key)
+	workspaces, err := getWorkspaces(cfg, key)
 	if err != nil {
 		color.Red("[x]" + err.Error())
 	}
