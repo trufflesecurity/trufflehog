@@ -14,6 +14,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"gopkg.in/yaml.v2"
 )
 
@@ -54,7 +56,7 @@ type Config struct {
 	Categories map[string]Category `yaml:"categories"`
 }
 
-func (h *HttpStatusTest) RunTest(headers map[string]string) (bool, error) {
+func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) (bool, error) {
 	// If body data, marshal to JSON
 	var data io.Reader
 	if h.Payload != nil {
@@ -66,7 +68,7 @@ func (h *HttpStatusTest) RunTest(headers map[string]string) (bool, error) {
 	}
 
 	// Create new HTTP request
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest(h.Method, h.Endpoint, data)
 	if err != nil {
 		return false, err
@@ -130,9 +132,9 @@ func checkKeyEnv(key string) (string, error) {
 	return "", errors.New("invalid Stripe key format")
 }
 
-func checkValidity(key string) (bool, error) {
+func checkValidity(cfg *config.Config, key string) (bool, error) {
 	// Create a new request
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://api.stripe.com/v1/charges", nil)
 	if err != nil {
 		color.Red("[x] Error creating request: %s", err.Error())
@@ -157,7 +159,7 @@ func checkValidity(key string) (bool, error) {
 	return false, nil
 }
 
-func AnalyzePermissions(key string, showAll bool) {
+func AnalyzePermissions(cfg *config.Config, key string) {
 
 	// Check if secret, publishable, or restricted key
 	var keyType, keyEnv string
@@ -180,7 +182,7 @@ func AnalyzePermissions(key string, showAll bool) {
 	}
 
 	// Check if key is valid
-	valid, err := checkValidity(key)
+	valid, err := checkValidity(cfg, key)
 	if err != nil {
 		color.Red("[x] ", err.Error())
 		return
@@ -212,18 +214,18 @@ func AnalyzePermissions(key string, showAll bool) {
 		return
 	}
 
-	permissions, err := getRestrictedPermissions(key)
+	permissions, err := getRestrictedPermissions(cfg, key)
 	if err != nil {
 		color.Red("[x] Error getting permissions: %s", err.Error())
 		return
 	}
-	printRestrictedPermissions(permissions, showAll)
+	printRestrictedPermissions(permissions, cfg.ShowAll)
 	// Additional details
 	// get total customers
 	// get total charges
 }
 
-func getRestrictedPermissions(key string) ([]PermissionsCategory, error) {
+func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCategory, error) {
 
 	// Determine the current working directory
 	cwd, err := os.Getwd()
@@ -260,7 +262,7 @@ func getRestrictedPermissions(key string) ([]PermissionsCategory, error) {
 					continue
 				}
 				testCount++
-				status, err := test.RunTest(map[string]string{"Authorization": "Bearer " + key})
+				status, err := test.RunTest(cfg, map[string]string{"Authorization": "Bearer " + key})
 				if err != nil {
 					color.Red("[x] Error running test: %s", err.Error())
 					return nil, err

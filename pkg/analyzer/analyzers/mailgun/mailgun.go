@@ -8,6 +8,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type Domain struct {
@@ -23,10 +25,10 @@ type DomainsJSON struct {
 	TotalCount int      `json:"total_count"`
 }
 
-func getDomains(apiKey string) (DomainsJSON, int, error) {
+func getDomains(cfg *config.Config, apiKey string) (DomainsJSON, int, error) {
 	var domainsJSON DomainsJSON
 
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://api.mailgun.net/v4/domains", nil)
 	if err != nil {
 		return domainsJSON, -1, err
@@ -51,9 +53,9 @@ func getDomains(apiKey string) (DomainsJSON, int, error) {
 	return domainsJSON, resp.StatusCode, nil
 }
 
-func AnalyzePermissions(apiKey string, showAll bool) {
+func AnalyzePermissions(cfg *config.Config, apiKey string) {
 	// Get the domains associated with the API key
-	domains, statusCode, err := getDomains(apiKey)
+	domains, statusCode, err := getDomains(cfg, apiKey)
 	if err != nil {
 		color.Red("[x] Error getting domains: %s", err)
 		return

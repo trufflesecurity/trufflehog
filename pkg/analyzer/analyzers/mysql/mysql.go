@@ -16,6 +16,7 @@ import (
 	"github.com/fatih/color"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 const (
@@ -72,7 +73,13 @@ type Routine struct {
 // so CURRENT_USER returns `doadmin@%` and not `doadmin@localhost
 // USER() returns `doadmin@localhost`
 
-func AnalyzePermissions(connectionStr string, showAll bool) {
+func AnalyzePermissions(cfg *config.Config, connectionStr string) {
+
+	// ToDo: Add in logging
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging is not supported for this analyzer.")
+		return
+	}
 
 	db, err := createConnection(connectionStr)
 	if err != nil {
@@ -124,7 +131,7 @@ func AnalyzePermissions(connectionStr string, showAll bool) {
 	processGrants(grants, databases, &globalPrivs)
 
 	// Print the results
-	printResults(databases, globalPrivs, showAll)
+	printResults(databases, globalPrivs, cfg.ShowAll)
 
 	// Build print function, check data, and then review all of the logic.
 	// Then make sure we have an instance of lal of that logic to actually test.

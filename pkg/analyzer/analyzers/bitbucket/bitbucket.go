@@ -9,6 +9,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type Repo struct {
@@ -31,10 +33,10 @@ type RepoJSON struct {
 	Values []Repo `json:"values"`
 }
 
-func getScopesAndType(key string) (string, string, error) {
+func getScopesAndType(cfg *config.Config, key string) (string, string, error) {
 
 	// client
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 
 	// request
 	req, err := http.NewRequest("GET", "https://api.bitbucket.org/2.0/repositories", nil)
@@ -59,11 +61,11 @@ func getScopesAndType(key string) (string, string, error) {
 	return credentialType, oauthScopes, nil
 }
 
-func getRepositories(key string, role string) (RepoJSON, error) {
+func getRepositories(cfg *config.Config, key string, role string) (RepoJSON, error) {
 	var repos RepoJSON
 
 	// client
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 
 	// request
 	req, err := http.NewRequest("GET", "https://api.bitbucket.org/2.0/repositories", nil)
@@ -96,12 +98,12 @@ func getRepositories(key string, role string) (RepoJSON, error) {
 	return repos, nil
 }
 
-func getAllRepos(key string) (map[string]Repo, error) {
+func getAllRepos(cfg *config.Config, key string) (map[string]Repo, error) {
 	roles := []string{"member", "contributor", "admin", "owner"}
 
 	var allRepos = make(map[string]Repo, 0)
 	for _, role := range roles {
-		repos, err := getRepositories(key, role)
+		repos, err := getRepositories(cfg, key, role)
 		if err != nil {
 			return allRepos, err
 		}
@@ -114,9 +116,9 @@ func getAllRepos(key string) (map[string]Repo, error) {
 	return allRepos, nil
 }
 
-func AnalyzePermissions(key string, showAll bool) {
+func AnalyzePermissions(cfg *config.Config, key string) {
 
-	credentialType, oauthScopes, err := getScopesAndType(key)
+	credentialType, oauthScopes, err := getScopesAndType(cfg, key)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return
@@ -125,7 +127,7 @@ func AnalyzePermissions(key string, showAll bool) {
 
 	// get all repos available to user
 	// ToDo: pagination
-	repos, err := getAllRepos(key)
+	repos, err := getAllRepos(cfg, key)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return

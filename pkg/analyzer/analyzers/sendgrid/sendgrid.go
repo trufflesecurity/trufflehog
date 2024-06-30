@@ -12,6 +12,7 @@ import (
 	sg "github.com/sendgrid/sendgrid-go"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type ScopesJSON struct {
@@ -79,7 +80,14 @@ func processPermissions(rawScopes []string) {
 	}
 }
 
-func AnalyzePermissions(key string, show_all bool) {
+func AnalyzePermissions(cfg *config.Config, key string) {
+
+	// ToDo: Add logging when rewrite to not use SG client.
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging not supported for GitHub Token Analysis.")
+		return
+	}
+
 	req := sg.GetRequest(key, "/v3/scopes", "https://api.sendgrid.com")
 	req.Method = "GET"
 	resp, err := sg.API(req)
@@ -120,6 +128,6 @@ func AnalyzePermissions(key string, show_all bool) {
 	}
 
 	processPermissions(rawScopes)
-	printPermissions(show_all)
+	printPermissions(cfg.ShowAll)
 
 }

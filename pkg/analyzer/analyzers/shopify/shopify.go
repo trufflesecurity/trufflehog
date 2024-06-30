@@ -10,6 +10,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 func sliceContains(slice []string, value string) bool {
@@ -91,10 +93,10 @@ type ShopInfoJSON struct {
 	} `json:"shop"`
 }
 
-func getShopInfo(key string, store string) (ShopInfoJSON, error) {
+func getShopInfo(cfg *config.Config, key string, store string) (ShopInfoJSON, error) {
 	var shopInfo ShopInfoJSON
 
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/admin/api/2024-04/shop.json", store), nil)
 	if err != nil {
 		return shopInfo, err
@@ -130,10 +132,10 @@ func (a AccessScopesJSON) String() string {
 	return strings.Join(scopes, ", ")
 }
 
-func getAccessScopes(key string, store string) (AccessScopesJSON, int, error) {
+func getAccessScopes(cfg *config.Config, key string, store string) (AccessScopesJSON, int, error) {
 	var accessScopes AccessScopesJSON
 
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/admin/oauth/access_scopes.json", store), nil)
 	if err != nil {
 		return accessScopes, -1, err
@@ -155,9 +157,9 @@ func getAccessScopes(key string, store string) (AccessScopesJSON, int, error) {
 	return accessScopes, resp.StatusCode, nil
 }
 
-func AnalyzePermissions(key string, storeURL string, showAll bool) {
+func AnalyzePermissions(cfg *config.Config, key string, storeURL string) {
 
-	accessScopes, statusCode, err := getAccessScopes(key, storeURL)
+	accessScopes, statusCode, err := getAccessScopes(cfg, key, storeURL)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return
@@ -169,7 +171,7 @@ func AnalyzePermissions(key string, storeURL string, showAll bool) {
 	}
 	color.Green("[i] Valid Shopify API Key\n\n")
 
-	shopInfo, err := getShopInfo(key, storeURL)
+	shopInfo, err := getShopInfo(cfg, key, storeURL)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return

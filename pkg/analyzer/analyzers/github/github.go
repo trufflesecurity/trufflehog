@@ -10,6 +10,7 @@ import (
 	"github.com/fatih/color"
 	gh "github.com/google/go-github/v59/github"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 func getAllGistsForUser(client *gh.Client) ([]*gh.Gist, error) {
@@ -173,7 +174,14 @@ func checkFineGrained(resp *gh.Response, token string) (bool, error) {
 	return true, nil
 }
 
-func AnalyzePermissions(key string, show_all bool) {
+func AnalyzePermissions(cfg *config.Config, key string) {
+
+	// ToDo: Add logging for GitHub when rewrite to not use GH client.
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging not supported for GitHub Token Analysis.")
+		return
+	}
+
 	client := gh.NewClient(nil).WithAuthToken(key)
 
 	resp, err := getTokenMetadata(key, client)
@@ -188,9 +196,9 @@ func AnalyzePermissions(key string, show_all bool) {
 		return
 	} else if !fineGrained {
 		fmt.Print("\n\n")
-		analyzeClassicToken(client, key, show_all)
+		analyzeClassicToken(client, key, cfg.ShowAll)
 	} else {
 		fmt.Print("\n\n")
-		analyzeFineGrainedToken(client, key, show_all)
+		analyzeFineGrainedToken(client, key, cfg.ShowAll)
 	}
 }
