@@ -101,8 +101,10 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		var userResponse UserRes
 		err = json.NewDecoder(res.Body).Decode(&userResponse)
 		return true, &userResponse, nil
-	case http.StatusUnauthorized:
+	case http.StatusBadRequest:
 		// The secret is determinately not verified (nothing to do)
+		return false, nil, nil
+	case http.StatusUnauthorized:
 		return false, nil, nil
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
