@@ -14,6 +14,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -90,9 +91,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else {
 						s1.SetVerificationError(err, resMatch)
 					}
-				}
-				if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-					continue
 				}
 
 				results = append(results, s1)

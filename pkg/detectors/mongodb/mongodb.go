@@ -2,9 +2,11 @@ package mongodb
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"net/url"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -22,6 +24,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultTimeout = 2 * time.Second
@@ -70,6 +73,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
+}
+
 func isErrDeterminate(err error) bool {
 	switch e := err.(type) {
 	case topology.ConnectionError:
@@ -85,9 +92,31 @@ func isErrDeterminate(err error) bool {
 }
 
 func verifyUri(uri string, timeout time.Duration) error {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return err
+	}
+
+	params := url.Values{}
+	for k, v := range parsed.Query() {
+		if len(v) > 0 {
+			switch k {
+			case "tls":
+				if v[0] == "false" {
+					params.Set("tls", "false")
+				} else {
+					params.Set("tls", "true")
+				}
+			}
+		}
+	}
+	parsed.RawQuery = params.Encode()
+	parsed.Path = "/"
+	uri = parsed.String()
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(ctx, options.Client().SetTimeout(timeout).ApplyURI(uri))
 	if err != nil {
 		return err
 	}

@@ -11,7 +11,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -73,12 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					}
-				}
-			}
-
-			if !s1.Verified {
-				if detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
-					continue
 				}
 			}
 

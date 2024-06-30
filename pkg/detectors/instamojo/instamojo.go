@@ -3,10 +3,11 @@ package instamojo
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,6 +15,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -88,10 +90,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else {
 					s1.SetVerificationError(err, resSecret)
 				}
-			}
-
-			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s1)

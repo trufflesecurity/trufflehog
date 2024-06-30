@@ -52,7 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 10 * time.Second
 			client.Timeout = timeout
-			req, err := http.NewRequest("POST", "https://convier.me/api/event", nil)
+			req, err := http.NewRequestWithContext(ctx, "POST", "https://convier.me/api/event", nil)
 			if err != nil {
 				continue
 			}
@@ -71,11 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = true
 					} else {
 						s1.Verified = false
-					}
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
 					}
 				}
 			}

@@ -2,11 +2,12 @@ package uri
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,6 +21,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	keyPat = regexp.MustCompile(`\b(?:https?:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
@@ -95,14 +97,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s1.Verified && !s.allowKnownTestSites && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
-
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, error) {
@@ -116,7 +118,7 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 	u.User = nil
 	nonCredentialedURL := u.String()
 
-	req, err := http.NewRequest("GET", credentialedURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", credentialedURL, nil)
 	if err != nil {
 		return false, err
 	}
@@ -134,7 +136,7 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 
 	time.Sleep(time.Millisecond * 10)
 
-	req, err = http.NewRequest("GET", nonCredentialedURL, nil)
+	req, err = http.NewRequestWithContext(ctx, "GET", nonCredentialedURL, nil)
 	if err != nil {
 		return false, err
 	}

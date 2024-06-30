@@ -4,9 +4,63 @@
 package detectors
 
 import (
+	"context"
 	_ "embed"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
+
+type fakeDetector struct{}
+type customFalsePositiveChecker struct{ fakeDetector }
+
+func (d fakeDetector) FromData(ctx context.Context, verify bool, data []byte) ([]Result, error) {
+	return nil, nil
+}
+
+func (d fakeDetector) Keywords() []string {
+	return nil
+}
+
+func (d fakeDetector) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType(0)
+}
+
+func (d customFalsePositiveChecker) IsFalsePositive(result Result) (bool, string) {
+	return IsKnownFalsePositive(string(result.Raw), []FalsePositive{"a specific magic string"}, false)
+}
+
+func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
+	results := []Result{
+		{Raw: []byte("00000")},           // "default" false positive list
+		{Raw: []byte("number")},          // from wordlist
+		{Raw: []byte("hga8adshla3434g")}, // real secret
+	}
+	expected := []Result{
+		{Raw: []byte("hga8adshla3434g")},
+	}
+	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results)
+	assert.ElementsMatch(t, expected, filtered)
+}
+
+func TestFilterKnownFalsePositives_CustomLogic(t *testing.T) {
+	results := []Result{
+		{Raw: []byte("a specific magic string")}, // specific target
+		{Raw: []byte("00000")},                   // "default" false positive list
+		{Raw: []byte("number")},                  // from wordlist
+		{Raw: []byte("hga8adshla3434g")},         // real secret
+	}
+	expected := []Result{
+		{Raw: []byte("00000")},
+		{Raw: []byte("number")},
+		{Raw: []byte("hga8adshla3434g")},
+	}
+	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results)
+	assert.ElementsMatch(t, expected, filtered)
+}
 
 func TestIsFalsePositive(t *testing.T) {
 	type args struct {
@@ -67,7 +121,7 @@ func TestIsFalsePositive(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsKnownFalsePositive(tt.args.match, tt.args.falsePositives, tt.args.useWordlist); got != tt.want {
+			if got, _ := IsKnownFalsePositive(tt.args.match, tt.args.falsePositives, tt.args.useWordlist); got != tt.want {
 				t.Errorf("IsKnownFalsePositive() = %v, want %v", got, tt.want)
 			}
 		})

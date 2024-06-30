@@ -3,11 +3,12 @@ package microsoftteamswebhook
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -16,6 +17,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -63,10 +65,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyWebhook(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
-		}
-
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, false) {
-			continue
 		}
 
 		results = append(results, s1)

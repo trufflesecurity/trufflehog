@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,6 +15,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -23,7 +25,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-z]{52})\b`)
-	orgPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-z]{7,40})\b`)
+	orgPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-zA-Z][0-9a-zA-Z-]{5,48}[0-9a-zA-Z])\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -69,7 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
+					hasVerifiedRes, _ := common.ResponseContainsSubstring(res.Body, "lastUpdateTime")
+					if res.StatusCode >= 200 && res.StatusCode < 300 && hasVerifiedRes {
 						s1.Verified = true
 					} else if res.StatusCode == 401 {
 						// The secret is determinately not verified (nothing to do)
@@ -80,11 +83,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else {
 					s1.SetVerificationError(err, resMatch)
 				}
-			}
-
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s1)

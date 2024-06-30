@@ -12,7 +12,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -32,7 +34,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"thog"}
 }
 
-// FromData will find and optionally verify Trufflehog Enterprise secrets in a given set of bytes.
+// FromData will find and optionally verify TruffleHog Enterprise secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -86,11 +88,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
 							s1.Verified = true
-						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}

@@ -12,7 +12,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -61,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				payload.Add("user", resEmailMatch)
 				payload.Add("api_key", resMatch)
 
-				req, err := http.NewRequest("GET", "https://api.cloze.com/v1/profile?"+payload.Encode(), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloze.com/v1/profile?"+payload.Encode(), nil)
 				if err != nil {
 					continue
 				}
@@ -70,12 +72,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
-
 					}
 				}
 			}

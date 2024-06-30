@@ -3,9 +3,10 @@ package cloudconvert
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -16,6 +17,7 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -29,6 +31,11 @@ var (
 func (s Scanner) Keywords() []string {
 	return []string{"cloudconvert"}
 }
+
+const maxJWTSize = 1300
+
+// MaxSecretSize returns the maximum size of a secret that this detector can find.
+func (s Scanner) MaxSecretSize() int64 { return maxJWTSize }
 
 // FromData will find and optionally verify CloudConvert secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -58,11 +65,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
