@@ -89,7 +89,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.31.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
-	github.com/wasilibs/go-re2 v1.5.3
+	github.com/wasilibs/go-re2 v1.6.0
 	github.com/xanzy/go-gitlab v0.105.0
 	go.mongodb.org/mongo-driver v1.15.1
 	go.uber.org/mock v0.4.0
@@ -265,7 +265,7 @@ require (
 	github.com/skeema/knownhosts v1.2.2 // indirect
 	github.com/sorairolake/lzip-go v0.3.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/tetratelabs/wazero v1.7.1 // indirect
+	github.com/tetratelabs/wazero v1.7.2 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
