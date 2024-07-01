@@ -124,34 +124,6 @@ type AnalyzeClient struct {
 	LogFile        string
 }
 
-func (c *AnalyzeClient) Do(req *http.Request) (*http.Response, error) {
-	startTime := time.Now()
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.LoggingEnabled {
-		logEntry := fmt.Sprintf("Date: %s, Method: %s, Path: %s, Status: %d", startTime.Format(time.RFC3339), req.Method, req.URL.Path, resp.StatusCode)
-
-		// Open log file in append mode
-		file, err := os.OpenFile(c.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			color.Red("[x] Error: Failed to open log file" + err.Error())
-			return resp, err
-		}
-		defer file.Close()
-
-		// Write log entry to file
-		if _, err := file.WriteString(logEntry + "\n"); err != nil {
-			color.Red("[x] Error: Failed to write log entry to file" + err.Error())
-			return resp, err
-		}
-	}
-	return resp, nil
-}
-
 func CreateLogFileName(baseName string) string {
 	// Get the current time
 	currentTime := time.Now()
@@ -164,9 +136,46 @@ func CreateLogFileName(baseName string) string {
 	return logFileName
 }
 
-func NewAnalyzeClient(cfg *config.Config) *AnalyzeClient {
-	return &AnalyzeClient{
-		LoggingEnabled: cfg.LoggingEnabled,
-		LogFile:        cfg.LogFile,
+func NewAnalyzeClient(cfg *config.Config) *http.Client {
+	if !cfg.LoggingEnabled {
+		return &http.Client{}
 	}
+	return &http.Client{
+		Transport: LoggingRoundTripper{
+			parent:  http.DefaultTransport,
+			logFile: cfg.LogFile,
+		},
+	}
+}
+
+type LoggingRoundTripper struct {
+	parent http.RoundTripper
+	// TODO: io.Writer
+	logFile string
+}
+
+func (r LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	startTime := time.Now()
+
+	resp, err := r.parent.RoundTrip(req)
+	if err != nil {
+		return resp, err
+	}
+
+	// TODO: JSON
+	logEntry := fmt.Sprintf("Date: %s, Method: %s, Path: %s, Status: %d\n", startTime.Format(time.RFC3339), req.Method, req.URL.Path, resp.StatusCode)
+
+	// Open log file in append mode.
+	file, err := os.OpenFile(r.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return resp, fmt.Errorf("failed to open log file: %w", err)
+	}
+	defer file.Close()
+
+	// Write log entry to file.
+	if _, err := file.WriteString(logEntry); err != nil {
+		return resp, fmt.Errorf("failed to write log entry to file: %w", err)
+	}
+
+	return resp, nil
 }
