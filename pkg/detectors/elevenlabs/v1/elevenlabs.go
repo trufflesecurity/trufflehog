@@ -2,10 +2,10 @@ package elevenlabs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"encoding/json"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -39,7 +39,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"elevenlabs","xi-api-key"}
+	return []string{"elevenlabs", "xi-api-key", "xi_api_key"}
 }
 
 // FromData will find and optionally verify Elevenlabs secrets in a given set of bytes.
@@ -55,7 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ElevenLabs,
 			Raw:          []byte(match),
-			ExtraData: map[string]string{ "version": "1"},
+			ExtraData:    map[string]string{"version": "1"},
 		}
 
 		if verify {
@@ -81,7 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, *UserRes, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.elevenlabs.io/v1/user", nil)
-	req.Header.Set("xi-api-key", fmt.Sprintf("%s", token))
+	req.Header.Set("xi-api-key", token)
 	if err != nil {
 		return false, nil, nil
 	}
@@ -99,17 +99,16 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	case http.StatusOK:
 		// If the endpoint returns useful information, we can return it as a map.
 		var userResponse UserRes
-		err = json.NewDecoder(res.Body).Decode(&userResponse)
+		if err = json.NewDecoder(res.Body).Decode(&userResponse); err != nil {
+			return false, nil, err
+		}
 		return true, &userResponse, nil
-	case http.StatusBadRequest:
+	case http.StatusBadRequest, http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
-		return false, nil, nil
-	case http.StatusUnauthorized:
 		return false, nil, nil
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-	return false, nil, fmt.Errorf("unexpected HTTP response status error parsing json")
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
