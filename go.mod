@@ -62,7 +62,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/jpillora/overseer v1.1.6
 	github.com/kylelemons/godebug v1.1.0
-	github.com/launchdarkly/go-server-sdk/v7 v7.4.1
+	github.com/launchdarkly/go-server-sdk/v7 v7.5.0
 	github.com/lib/pq v1.10.9
 	github.com/lrstanley/bubblezone v0.0.0-20240125042004-b7bafc493195
 	github.com/marusama/semaphore/v2 v2.5.0
@@ -222,7 +222,7 @@ require (
 	github.com/launchdarkly/eventsource v1.6.2 // indirect
 	github.com/launchdarkly/go-jsonstream/v3 v3.0.0 // indirect
 	github.com/launchdarkly/go-sdk-common/v3 v3.1.0 // indirect
-	github.com/launchdarkly/go-sdk-events/v3 v3.2.0 // indirect
+	github.com/launchdarkly/go-sdk-events/v3 v3.3.0 // indirect
 	github.com/launchdarkly/go-semver v1.0.2 // indirect
 	github.com/launchdarkly/go-server-sdk-evaluation/v3 v3.0.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
