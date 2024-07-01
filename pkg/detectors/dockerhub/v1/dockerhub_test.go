@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package dockerhubv2
+package dockerhub
 
 import (
 	"context"
