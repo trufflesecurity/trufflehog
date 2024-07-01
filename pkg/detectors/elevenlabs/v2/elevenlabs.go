@@ -103,7 +103,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 			return false, nil, err
 		}
 		return true, &userResponse, nil
-	case http.StatusBadRequest:
+	case http.StatusBadRequest, http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
 	default:
