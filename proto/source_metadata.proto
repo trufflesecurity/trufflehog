@@ -136,6 +136,19 @@ message GCS {
   string content_type = 8;
 }
 
+message Huggingface {
+  string link = 1;
+  string username = 2;
+  string repository = 3;
+  string commit = 4;
+  string email = 5;
+  string file = 6;
+  string timestamp = 7;
+  int64 line = 8;
+  Visibility visibility = 9;
+  string resource_type = 10;
+}
+
 message Jira {
   string issue = 1;
   string author = 2;
@@ -351,5 +364,6 @@ message MetaData {
     Postman postman = 29;
     Webhook webhook = 30;
     Elasticsearch elasticsearch = 31;
+    Huggingface huggingface = 32;
   }
 }

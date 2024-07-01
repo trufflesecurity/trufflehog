@@ -198,6 +198,27 @@ var (
 	jenkinsPassword              = jenkinsScan.Flag("password", "Jenkins password").Envar("JENKINS_PASSWORD").String()
 	jenkinsInsecureSkipVerifyTLS = jenkinsScan.Flag("insecure-skip-verify-tls", "Skip TLS verification").Envar("JENKINS_INSECURE_SKIP_VERIFY_TLS").Bool()
 
+	huggingfaceScan     = cli.Command("huggingface", "Find credentials in HuggingFace datasets, models and spaces.")
+	huggingfaceEndpoint = huggingfaceScan.Flag("endpoint", "HuggingFace endpoint.").Default("https://huggingface.co").String()
+	huggingfaceModels   = huggingfaceScan.Flag("model", "HuggingFace model to scan. You can repeat this flag. Example: 'username/model'").Strings()
+	huggingfaceSpaces   = huggingfaceScan.Flag("space", "HuggingFace space to scan. You can repeat this flag. Example: 'username/space'").Strings()
+	huggingfaceDatasets = huggingfaceScan.Flag("dataset", "HuggingFace dataset to scan. You can repeat this flag. Example: 'username/dataset'").Strings()
+	huggingfaceOrgs     = huggingfaceScan.Flag("org", `HuggingFace organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	huggingfaceUsers    = huggingfaceScan.Flag("user", `HuggingFace user to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	huggingfaceToken    = huggingfaceScan.Flag("token", "HuggingFace token. Can be provided with environment variable HUGGINGFACE_TOKEN.").Envar("HUGGINGFACE_TOKEN").String()
+
+	huggingfaceIncludeModels      = huggingfaceScan.Flag("include-models", "Models to include in scan. You can repeat this flag. Must use HuggingFace model full name. Example: 'username/model' (Only used with --user or --org)").Strings()
+	huggingfaceIncludeSpaces      = huggingfaceScan.Flag("include-spaces", "Spaces to include in scan. You can repeat this flag. Must use HuggingFace space full name. Example: 'username/space' (Only used with --user or --org)").Strings()
+	huggingfaceIncludeDatasets    = huggingfaceScan.Flag("include-datasets", "Datasets to include in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)").Strings()
+	huggingfaceIgnoreModels       = huggingfaceScan.Flag("ignore-models", "Models to ignore in scan. You can repeat this flag. Must use HuggingFace model full name. Example: 'username/model' (Only used with --user or --org)").Strings()
+	huggingfaceIgnoreSpaces       = huggingfaceScan.Flag("ignore-spaces", "Spaces to ignore in scan. You can repeat this flag. Must use HuggingFace space full name. Example: 'username/space' (Only used with --user or --org)").Strings()
+	huggingfaceIgnoreDatasets     = huggingfaceScan.Flag("ignore-datasets", "Datasets to ignore in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)").Strings()
+	huggingfaceSkipAllModels      = huggingfaceScan.Flag("skip-all-models", "Skip all model scans. (Only used with --user or --org)").Bool()
+	huggingfaceSkipAllSpaces      = huggingfaceScan.Flag("skip-all-spaces", "Skip all space scans. (Only used with --user or --org)").Bool()
+	huggingfaceSkipAllDatasets    = huggingfaceScan.Flag("skip-all-datasets", "Skip all dataset scans. (Only used with --user or --org)").Bool()
+	huggingfaceIncludeDiscussions = huggingfaceScan.Flag("include-discussions", "Include discussions in scan.").Bool()
+	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
+
 	usingTUI = false
 )
 
@@ -737,6 +758,39 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 		if err := eng.ScanJenkins(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
+		}
+	case huggingfaceScan.FullCommand():
+		if *huggingfaceEndpoint != "" {
+			*huggingfaceEndpoint = strings.TrimRight(*huggingfaceEndpoint, "/")
+		}
+
+		if len(*huggingfaceModels) == 0 && len(*huggingfaceSpaces) == 0 && len(*huggingfaceDatasets) == 0 && len(*huggingfaceOrgs) == 0 && len(*huggingfaceUsers) == 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization, user, model, space or dataset")
+		}
+
+		cfg := engine.HuggingfaceConfig{
+			Endpoint:           *huggingfaceEndpoint,
+			Models:             *huggingfaceModels,
+			Spaces:             *huggingfaceSpaces,
+			Datasets:           *huggingfaceDatasets,
+			Organizations:      *huggingfaceOrgs,
+			Users:              *huggingfaceUsers,
+			Token:              *huggingfaceToken,
+			IncludeModels:      *huggingfaceIncludeModels,
+			IncludeSpaces:      *huggingfaceIncludeSpaces,
+			IncludeDatasets:    *huggingfaceIncludeDatasets,
+			IgnoreModels:       *huggingfaceIgnoreModels,
+			IgnoreSpaces:       *huggingfaceIgnoreSpaces,
+			IgnoreDatasets:     *huggingfaceIgnoreDatasets,
+			SkipAllModels:      *huggingfaceSkipAllModels,
+			SkipAllSpaces:      *huggingfaceSkipAllSpaces,
+			SkipAllDatasets:    *huggingfaceSkipAllDatasets,
+			IncludeDiscussions: *huggingfaceIncludeDiscussions,
+			IncludePrs:         *huggingfaceIncludePrs,
+			Concurrency:        *concurrency,
+		}
+		if err := eng.ScanHuggingface(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan HuggingFace: %v", err)
 		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
