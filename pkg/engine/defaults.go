@@ -61,8 +61,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_batch"
+	azure_entra_serviceprincipal_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v1"
+	azure_entra_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
@@ -1595,7 +1596,8 @@ func DefaultDetectors() []detectors.Detector {
 		portainertoken.Scanner{},
 		pagarme.Scanner{},
 		planetscaledb.Scanner{},
-		azure.Scanner{},
+		&azure_entra_serviceprincipal_v1.Scanner{},
+		&azure_entra_serviceprincipal_v2.Scanner{},
 		azurestorage.Scanner{},
 		azurecontainerregistry.Scanner{},
 		azurebatch.Scanner{},
