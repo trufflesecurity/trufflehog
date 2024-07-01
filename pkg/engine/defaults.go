@@ -331,7 +331,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/honeycomb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/host"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/html2pdf"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspotapikey"
+	hubspot_apikey_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspot_apikey/v1"
+	hubspot_apikey_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspot_apikey/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/humanity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hunter"
@@ -854,7 +855,7 @@ func DefaultDetectors() []detectors.Detector {
 		&rapidapi.Scanner{},
 		&discordbottoken.Scanner{},
 		&netlify.Scanner{},
-		&hubspotapikey.Scanner{},
+		&hubspot_apikey_v1.Scanner{},
 		&travisci.Scanner{},
 		&scalewaykey.Scanner{},
 		&fastlypersonaltoken.Scanner{},
@@ -1616,6 +1617,7 @@ func DefaultDetectors() []detectors.Detector {
 		larksuite.Scanner{},
 		larksuiteapikey.Scanner{},
 		endorlabs.Scanner{},
+		&hubspot_apikey_v2.Scanner{},
 	}
 }
 

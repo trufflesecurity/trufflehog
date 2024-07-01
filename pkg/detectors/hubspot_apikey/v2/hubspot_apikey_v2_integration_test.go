@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package hubspotapikey
+package v2
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
