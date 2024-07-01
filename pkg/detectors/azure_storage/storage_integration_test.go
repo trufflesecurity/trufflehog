@@ -1,15 +1,16 @@
 //go:build detectors
 // +build detectors
 
-package azurestorage
+package azure_storage
 
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"testing"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
