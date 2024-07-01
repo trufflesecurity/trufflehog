@@ -817,7 +817,7 @@ func TestLikelyDuplicate(t *testing.T) {
 			name:     "empty strings",
 			val:      chunkSecretKey{"", detectorA.Key},
 			dupes:    map[chunkSecretKey]struct{}{{"", detectorB.Key}: {}},
-			expected: true,
+			expected: false,
 		},
 		{
 			name: "similar within threshold same detector",
@@ -832,7 +832,7 @@ func TestLikelyDuplicate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			result := likelyDuplicate(ctx, tc.val, tc.dupes)
+			result, _ := likelyDuplicate(ctx, tc.val, tc.dupes)
 			if result != tc.expected {
 				t.Errorf("expected %v, got %v", tc.expected, result)
 			}
