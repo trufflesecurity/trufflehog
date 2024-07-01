@@ -375,6 +375,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/knapsackpro"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kontent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kraken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kubeconfig"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/languagelayer"
@@ -1616,6 +1617,7 @@ func DefaultDetectors() []detectors.Detector {
 		larksuite.Scanner{},
 		larksuiteapikey.Scanner{},
 		endorlabs.Scanner{},
+		&kubeconfig.Scanner{},
 	}
 }
 
