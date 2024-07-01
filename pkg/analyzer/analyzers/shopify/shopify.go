@@ -1,16 +1,19 @@
 package shopify
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
 )
+
+//go:embed scopes.json
+var scopesConfig []byte
 
 func sliceContains(slice []string, value string) bool {
 	for _, v := range slice {
@@ -180,24 +183,8 @@ func AnalyzePermissions(key string, storeURL string, showAll bool) {
 	color.Yellow("Email: %s", shopInfo.Shop.Email)
 	color.Yellow("Created At: %s\n\n", shopInfo.Shop.CreatedAt)
 
-	// Determine the current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		color.Red("[x] Error getting current working directory: %s", err.Error())
-		return
-	}
-
-	// Construct the path to the config file
-	configFilePath := filepath.Join(cwd, "pkg/analyzers/shopify/scopes.json")
-	jsonData, err := os.ReadFile(configFilePath)
-	if err != nil {
-		color.Red("Error: %s", err)
-		return
-	}
-
 	var data ScopeDataJSON
-	err = json.Unmarshal([]byte(jsonData), &data)
-	if err != nil {
+	if err := json.Unmarshal(scopesConfig, &data); err != nil {
 		color.Red("Error: %s", err)
 		return
 	}
