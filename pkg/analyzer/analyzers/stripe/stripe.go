@@ -2,13 +2,13 @@ package stripe
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -31,6 +31,9 @@ const (
 	LIVE               = "Live"
 	TEST               = "Test"
 )
+
+//go:embed restricted.yaml
+var restrictedConfig []byte
 
 type Permission struct {
 	Name  string
@@ -226,26 +229,8 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 }
 
 func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCategory, error) {
-
-	// Determine the current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		color.Red("[x] Error getting current working directory: %s", err.Error())
-		return nil, err
-	}
-
-	// Construct the path to the config file
-	configFilePath := filepath.Join(cwd, "pkg/analyzers/stripe/restricted.yaml")
-
-	data, err := os.ReadFile(configFilePath)
-	if err != nil {
-		fmt.Println("Error reading file:", err)
-		return nil, err
-	}
-
 	var config Config
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
+	if err := yaml.Unmarshal(restrictedConfig, &config); err != nil {
 		fmt.Println("Error unmarshalling YAML:", err)
 		return nil, err
 	}
