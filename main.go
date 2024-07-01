@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -400,27 +399,21 @@ func run(state overseer.State) {
 	}
 
 	engConf := engine.Config{
-		Concurrency:           *concurrency,
-		Detectors:             conf.Detectors,
-		Verify:                !*noVerification,
-		IncludeDetectors:      *includeDetectors,
-		ExcludeDetectors:      *excludeDetectors,
-		CustomVerifiersOnly:   *customVerifiersOnly,
-		VerifierEndpoints:     *verifiers,
-		Dispatcher:            engine.NewPrinterDispatcher(printer),
-		FilterUnverified:      *filterUnverified,
-		FilterEntropy:         *filterEntropy,
-		VerificationOverlap:   *allowVerificationOverlap,
-		Results:               parsedResults,
-		PrintAvgDetectorTime:  *printAvgDetectorTime,
-		ShouldScanEntireChunk: *scanEntireChunk,
-	}
-
-	if *compareDetectionStrategies {
-		if err := compareScans(ctx, cmd, engConf); err != nil {
-			logFatal(err, "error comparing detection strategies")
-		}
-		return
+		Concurrency:                *concurrency,
+		Detectors:                  conf.Detectors,
+		Verify:                     !*noVerification,
+		IncludeDetectors:           *includeDetectors,
+		ExcludeDetectors:           *excludeDetectors,
+		CustomVerifiersOnly:        *customVerifiersOnly,
+		VerifierEndpoints:          *verifiers,
+		Dispatcher:                 engine.NewPrinterDispatcher(printer),
+		FilterUnverified:           *filterUnverified,
+		FilterEntropy:              *filterEntropy,
+		VerificationOverlap:        *allowVerificationOverlap,
+		Results:                    parsedResults,
+		PrintAvgDetectorTime:       *printAvgDetectorTime,
+		ShouldScanEntireChunk:      *scanEntireChunk,
+		CompareDetectionStrategies: *compareDetectionStrategies,
 	}
 
 	metrics, err := runSingleScan(ctx, cmd, engConf)
@@ -442,54 +435,6 @@ func run(state overseer.State) {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
-}
-
-func compareScans(ctx context.Context, cmd string, cfg engine.Config) error {
-	var (
-		entireMetrics    metrics
-		maxLengthMetrics metrics
-		err              error
-	)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		// Run scan with entire chunk span calculator.
-		cfg.ShouldScanEntireChunk = true
-		entireMetrics, err = runSingleScan(ctx, cmd, cfg)
-		if err != nil {
-			ctx.Logger().Error(err, "error running scan with entire chunk span calculator")
-		}
-	}()
-
-	// Run scan with max-length span calculator.
-	maxLengthMetrics, err = runSingleScan(ctx, cmd, cfg)
-	if err != nil {
-		return fmt.Errorf("error running scan with custom span calculator: %v", err)
-	}
-
-	wg.Wait()
-
-	return compareMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
-}
-
-func compareMetrics(customMetrics, entireMetrics engine.Metrics) error {
-	fmt.Printf("Comparison of scan results: \n")
-	fmt.Printf("Custom span - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
-		customMetrics.ChunksScanned, customMetrics.BytesScanned, customMetrics.VerifiedSecretsFound, customMetrics.UnverifiedSecretsFound, customMetrics.ScanDuration.String())
-	fmt.Printf("Entire chunk - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
-		entireMetrics.ChunksScanned, entireMetrics.BytesScanned, entireMetrics.VerifiedSecretsFound, entireMetrics.UnverifiedSecretsFound, entireMetrics.ScanDuration.String())
-
-	// Check for differences in scan metrics.
-	if customMetrics.ChunksScanned != entireMetrics.ChunksScanned ||
-		customMetrics.BytesScanned != entireMetrics.BytesScanned ||
-		customMetrics.VerifiedSecretsFound != entireMetrics.VerifiedSecretsFound {
-		return fmt.Errorf("scan metrics do not match")
-	}
-
-	return nil
 }
 
 type metrics struct {
