@@ -56,9 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 3 {
-			continue
-		}
 		accountName := strings.TrimSpace(match[1])
 		accountKey := strings.TrimSpace(match[2])
 

@@ -44,9 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
@@ -54,9 +51,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			for _, domainMatch := range domainMatches {
-				if len(domainMatch) != 2 {
-					continue
-				}
 
 				resDomainMatch := strings.TrimSpace(domainMatch[1])
 

@@ -102,9 +102,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	sessionMatches := sessionPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, idMatch := range idMatches {
-		if len(idMatch) != 2 {
-			continue
-		}
 		resIDMatch := strings.TrimSpace(idMatch[1])
 
 		if s.skipIDs != nil {
@@ -114,15 +111,9 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		for _, secretMatch := range secretMatches {
-			if len(secretMatch) != 2 {
-				continue
-			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			for _, sessionMatch := range sessionMatches {
-				if len(sessionMatch) != 2 {
-					continue
-				}
 				resSessionMatch := strings.TrimSpace(sessionMatch[1])
 				if !checkSessionToken(resSessionMatch, resSecretMatch) {
 					continue

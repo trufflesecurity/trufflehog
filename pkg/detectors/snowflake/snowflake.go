@@ -80,9 +80,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	passwordMatches := passwordRegexState.Matches(data)
 
 	for _, accountMatch := range accountMatches {
-		if len(accountMatch) != 2 {
-			continue
-		}
 		resAccountMatch := strings.TrimSpace(accountMatch[1])
 
 		for _, resUsernameMatch := range usernameMatches {

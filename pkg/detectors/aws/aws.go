@@ -149,9 +149,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, idMatch := range idMatches {
-		if len(idMatch) != 3 {
-			continue
-		}
 		resIDMatch := strings.TrimSpace(idMatch[1])
 
 		if s.skipIDs != nil {
@@ -161,9 +158,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		for _, secretMatch := range secretMatches {
-			if len(secretMatch) != 2 {
-				continue
-			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{

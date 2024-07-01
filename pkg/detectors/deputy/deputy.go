@@ -41,15 +41,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	urlMatches := urlPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, urlMatch := range urlMatches {
-			if len(urlMatch) != 2 {
-				continue
-			}
 			resURL := strings.TrimSpace(urlMatch[1])
 
 			s1 := detectors.Result{

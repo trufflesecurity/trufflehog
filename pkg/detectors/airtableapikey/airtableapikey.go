@@ -55,16 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for _, keyMatch := range keyMatches {
-		if len(keyMatch) != 2 {
-			continue
-		}
 
 		keyRes := strings.TrimSpace(keyMatch[1])
 
 		for _, appMatch := range appMatches {
-			if len(appMatch) != 2 {
-				continue
-			}
 			appRes := strings.TrimSpace(appMatch[1])
 
 			s1 := detectors.Result{

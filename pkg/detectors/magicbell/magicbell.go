@@ -40,15 +40,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	emailMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, keyMatch := range apiKeyMatches {
-		if len(keyMatch) != 2 {
-			continue
-		}
 		apiKeyRes := strings.TrimSpace(keyMatch[1])
 
 		for _, emailMatch := range emailMatches {
-			if len(emailMatch) != 2 {
-				continue
-			}
 			emailRes := strings.TrimSpace(emailMatch[1])
 
 			s1 := detectors.Result{

@@ -42,9 +42,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 		for i, idMatch := range idMatches {
 			if i == 11 {
-				if len(idMatch) != 2 {
-					continue
-				}
 				resId := strings.TrimSpace(idMatch[1])
 
 				s1 := detectors.Result{
