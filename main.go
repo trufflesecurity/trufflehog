@@ -545,24 +545,30 @@ func run(state overseer.State) {
 		return
 	}
 
-	metrics, err := runSingleScan(ctx, scanConfig, *scanEntireChunk)
-	if err != nil {
-		logFatal(err, "error running scan")
-	}
+	topLevelSubCommand, _, _ := strings.Cut(scanConfig.Command, " ")
+	switch topLevelSubCommand {
+	case analyzeCmd.FullCommand():
+		analyzer.Run(scanConfig.Command)
+	default:
+		metrics, err := runSingleScan(ctx, scanConfig, *scanEntireChunk)
+		if err != nil {
+			logFatal(err, "error running scan")
+		}
 
-	// Print results.
-	logger.Info("finished scanning",
-		"chunks", metrics.ChunksScanned,
-		"bytes", metrics.BytesScanned,
-		"verified_secrets", metrics.VerifiedSecretsFound,
-		"unverified_secrets", metrics.UnverifiedSecretsFound,
-		"scan_duration", metrics.ScanDuration.String(),
-		"trufflehog_version", version.BuildVersion,
-	)
+		// Print results.
+		logger.Info("finished scanning",
+			"chunks", metrics.ChunksScanned,
+			"bytes", metrics.BytesScanned,
+			"verified_secrets", metrics.VerifiedSecretsFound,
+			"unverified_secrets", metrics.UnverifiedSecretsFound,
+			"scan_duration", metrics.ScanDuration.String(),
+			"trufflehog_version", version.BuildVersion,
+		)
 
-	if metrics.hasFoundResults && *fail {
-		logger.V(2).Info("exiting with code 183 because results were found")
-		os.Exit(183)
+		if metrics.hasFoundResults && *fail {
+			logger.V(2).Info("exiting with code 183 because results were found")
+			os.Exit(183)
+		}
 	}
 }
 
@@ -667,8 +673,7 @@ func runSingleScan(ctx context.Context, cfg scanConfig, scanEntireChunk bool) (m
 	}()
 
 	var scanMetrics metrics
-	topLevelSubCommand, _, _ := strings.Cut(cfg.Command, " ")
-	switch topLevelSubCommand {
+	switch cfg.Command {
 	case gitScan.FullCommand():
 		gitCfg := sources.GitConfig{
 			URI:              *gitScanURI,
@@ -864,8 +869,6 @@ func runSingleScan(ctx context.Context, cfg scanConfig, scanEntireChunk bool) (m
 		if err := eng.ScanJenkins(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
 		}
-	case analyzeCmd.FullCommand():
-		analyzer.Run(cfg.Command)
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cfg.Command)
 	}
