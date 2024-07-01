@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	mssql "github.com/microsoft/go-mssqldb"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type sqlServerJDBC struct {
@@ -66,6 +68,6 @@ func parseSqlServer(subname string) (jdbc, error) {
 		}
 	}
 	return &sqlServerJDBC{
-		connStr: fmt.Sprintf("sqlserver://sa:%s@%s:%s?database=master&connection+timeout=5", password, host, port),
+		connStr: fmt.Sprintf("sqlserver://sa:%s@%s:%s?database=master&connection+timeout=5&TrustServerCertificate=%t", password, host, port, common.VerifySsl),
 	}, nil
 }
