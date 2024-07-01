@@ -103,8 +103,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+var ftpFalsePositives = map[detectors.FalsePositive]struct{}{
+	detectors.FalsePositive("@ftp.freebsd.org"): {},
+}
+
 func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
-	return detectors.IsKnownFalsePositive(string(result.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false)
+	return detectors.IsKnownFalsePositive(string(result.Raw), ftpFalsePositives, false)
 }
 
 func isErrDeterminate(e error) bool {
