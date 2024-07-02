@@ -75,7 +75,6 @@ func (s *Source) cloneRepo(
 		if err != nil {
 			return "", nil, err
 		}
-
 	case *sourcespb.GitHub_GithubApp:
 		s.githubUser, s.githubToken, err = s.userAndToken(ctx, installationClient)
 		if err != nil {
@@ -86,7 +85,6 @@ func (s *Source) cloneRepo(
 		if err != nil {
 			return "", nil, err
 		}
-
 	case *sourcespb.GitHub_Token:
 		if err := s.getUserAndToken(ctx, repoURL, installationClient); err != nil {
 			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
