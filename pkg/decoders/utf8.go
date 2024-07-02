@@ -10,12 +10,16 @@ import (
 
 type UTF8 struct{}
 
+func (d *UTF8) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType_PLAIN
+}
+
 func (d *UTF8) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	if chunk == nil || len(chunk.Data) == 0 {
 		return nil
 	}
 
-	decodableChunk := &DecodableChunk{Chunk: chunk, DecoderType: detectorspb.DecoderType_PLAIN}
+	decodableChunk := &DecodableChunk{Chunk: chunk, DecoderType: d.Type()}
 
 	if !utf8.Valid(chunk.Data) {
 		chunk.Data = extractSubstrings(chunk.Data)
