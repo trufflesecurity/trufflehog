@@ -47,6 +47,7 @@ func BenchmarkHandleFile(b *testing.B) {
 		file, err := os.Open("testdata/test.tgz")
 		assert.Nil(b, err)
 
+		b.ReportAllocs()
 		b.StartTimer()
 		go func() {
 			defer close(sourceChan)
@@ -201,6 +202,29 @@ func TestHandleFileAR(t *testing.T) {
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
 
+func BenchmarkHandleAR(b *testing.B) {
+	file, err := os.Open("testdata/test.deb")
+	assert.Nil(b, err)
+	defer file.Close()
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		sourceChan := make(chan *sources.Chunk, 1)
+
+		b.StartTimer()
+		go func() {
+			defer close(sourceChan)
+			err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			assert.NoError(b, err)
+		}()
+
+		for range sourceChan {
+		}
+		b.StopTimer()
+		file.Seek(0, 0)
+	}
+}
+
 func TestHandleFileNonArchive(t *testing.T) {
 	wantChunkCount := 6
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
@@ -220,9 +244,11 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 	file, err := os.Open("testdata/testdir.zip")
 	assert.Nil(t, err)
 
-	chunkCh := make(chan *sources.Chunk)
+	chunkCh := make(chan *sources.Chunk, 10)
 	go func() {
-		defer close(chunkCh)
+		defer func() {
+			close(chunkCh)
+		}()
 		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
@@ -233,4 +259,47 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 		count++
 	}
 	assert.Equal(t, wantCount, count)
+}
+
+func TestHandleTar(t *testing.T) {
+	file, err := os.Open("testdata/test.tar")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer func() {
+			close(chunkCh)
+		}()
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 1
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func BenchmarkHandleTar(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		sourceChan := make(chan *sources.Chunk, 1)
+		file, err := os.Open("testdata/test.tar")
+		assert.Nil(b, err)
+
+		b.StartTimer()
+		go func() {
+			defer close(sourceChan)
+			err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			assert.NoError(b, err)
+		}()
+
+		for range sourceChan {
+		}
+		b.StopTimer()
+		file.Close()
+	}
 }

@@ -87,7 +87,7 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		return ErrMaxDepthReached
 	}
 
-	arReader := reader.BufferedFileReader
+	arReader := reader.reader
 	if reader.format == nil && depth > 0 {
 		return h.handleNonArchiveContent(ctx, arReader, archiveChan)
 	}
@@ -109,7 +109,6 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 			}
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
-		defer rdr.Close()
 
 		return h.openArchive(ctx, depth+1, rdr, archiveChan)
 	case archiver.Extractor:
@@ -193,7 +192,6 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 			}
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
-		defer rdr.Close()
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)

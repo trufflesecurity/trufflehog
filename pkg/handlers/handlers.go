@@ -9,7 +9,7 @@ import (
 	"github.com/mholt/archiver/v4"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -29,62 +29,58 @@ import (
 // promotes a more cohesive and maintainable codebase. It also embeds a BufferedFileReader to provide efficient
 // random access to the file content.
 type fileReader struct {
-	format   archiver.Format
-	mimeType mimeType
-	*readers.BufferedFileReader
+	format           archiver.Format
+	mimeType         mimeType
 	isGenericArchive bool
+
+	reader *iobuf.BufferedReaderSeeker
 }
 
 var ErrEmptyReader = errors.New("reader is empty")
 
-func newFileReader(r io.ReadCloser) (fileReader, error) {
-	defer r.Close()
+// newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
+func newFileReader(r io.Reader) (fileReader, error) {
+	var reader fileReader
 
-	var (
-		reader fileReader
-		rdr    *readers.BufferedFileReader
-		err    error
-	)
-	rdr, err = readers.NewBufferedFileReader(r)
+	bufReader, err := iobuf.NewBufferedReaderSeeker(r)
 	if err != nil {
-		return reader, fmt.Errorf("error creating random access reader: %w", err)
-	}
-	reader.BufferedFileReader = rdr
-
-	// Ensure the reader is closed if an error occurs after the reader is created.
-	// During non-error conditions, the caller is responsible for closing the reader.
-	defer func() {
-		if err != nil && rdr != nil {
-			_ = rdr.Close()
-		}
-	}()
-
-	// Check if the reader is empty.
-	if rdr.Size() == 0 {
-		return reader, ErrEmptyReader
+		return reader, fmt.Errorf("error creating buffered reader: %w", err)
 	}
 
-	format, arReader, err := archiver.Identify("", rdr)
+	mime, err := mimetype.DetectReader(bufReader)
+	if err != nil {
+		return reader, fmt.Errorf("unable to detect MIME type: %w", err)
+	}
+	reader.mimeType = mimeType(mime.String())
+
+	// Reset the reader to the beginning because Identify and DetectReader consume the reader.
+	if _, err := bufReader.Seek(0, io.SeekStart); err != nil {
+		return reader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
+	}
+
+	format, _, err := archiver.Identify("", bufReader)
 	switch {
-	case err == nil: // Archive detected
+	case err == nil:
 		reader.isGenericArchive = true
 		reader.mimeType = mimeType(format.Name())
 		reader.format = format
+
 	case errors.Is(err, archiver.ErrNoMatch):
-		// Not an archive handled by archiver, try to detect MIME type.
-		// This will occur for un-supported archive types and non-archive files. (ex: .deb, .rpm, .txt)
-		mimeT, err := mimetype.DetectReader(arReader)
-		if err != nil {
-			return reader, fmt.Errorf("error detecting MIME type: %w", err)
-		}
-		reader.mimeType = mimeType(mimeT.String())
-	default: // Error identifying archive
+		// Not an archive handled by archiver.
+		// Continue with the default reader.
+	default:
 		return reader, fmt.Errorf("error identifying archive: %w", err)
 	}
 
-	if _, err = rdr.Seek(0, io.SeekStart); err != nil {
-		return reader, fmt.Errorf("error seeking to start of file: %w", err)
+	// Reset the reader to the beginning again to allow the handler to read from the start.
+	if _, err := bufReader.Seek(0, io.SeekStart); err != nil {
+		return reader, fmt.Errorf("error resetting reader after archive identification: %w", err)
 	}
+
+	// Disable buffering after initial reads.
+	bufReader.DisableBuffering()
+
+	reader.reader = bufReader
 
 	return reader, nil
 }
@@ -185,7 +181,6 @@ func HandleFile(
 		}
 		return fmt.Errorf("error creating custom reader: %w", err)
 	}
-	defer rdr.Close()
 
 	config := newFileHandlingConfig(options...)
 	if config.skipArchives && rdr.isGenericArchive {

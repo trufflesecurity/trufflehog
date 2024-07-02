@@ -49,7 +49,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 			h.metrics.incFilesProcessed()
 		}()
 
-		if err = h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
+		if err = h.handleNonArchiveContent(ctx, input.reader, dataChan); err != nil {
 			ctx.Logger().Error(err, "error handling non-archive content.")
 		}
 	}()
