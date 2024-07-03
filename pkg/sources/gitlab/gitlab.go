@@ -21,7 +21,6 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/gobwas/glob"
-	"github.com/xanzy/go-gitlab"
 	"golang.org/x/exp/slices"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -514,6 +513,7 @@ func (s *Source) getAllProjectRepos(
 	ctx.Logger().V(2).Info("got groups", "groups", groups)
 
 	for _, group := range groups {
+		ctx := context.WithValue(ctx, "group_id", group.ID)
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
 			ListOptions:      listOpts,
 			OrderBy:          gitlab.Ptr(orderBy),
