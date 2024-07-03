@@ -3,23 +3,26 @@ package caflou
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClientTimeOut(time.Second * 10)
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"caflou"}) + `\b([a-bA-Z0-9\S]{155})\b`)
@@ -49,8 +52,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			timeout := 10 * time.Second
-			client.Timeout = timeout
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.caflou.com/api/v1/accounts", nil)
 			if err != nil {
 				continue
