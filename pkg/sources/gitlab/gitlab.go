@@ -439,6 +439,7 @@ func (s *Source) getAllProjectRepos(
 				continue
 			}
 			// Report the unit.
+			ctx.Logger().V(3).Info("accepting project")
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
