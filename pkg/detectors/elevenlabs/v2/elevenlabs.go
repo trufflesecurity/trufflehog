@@ -81,11 +81,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, *UserRes, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.elevenlabs.io/v1/user", nil)
-	req.Header.Set("xi-api-key", token)
 	if err != nil {
-		return false, nil, nil
+		return false, nil, err
 	}
 
+	req.Header.Set("xi-api-key", token)
 	res, err := client.Do(req)
 	if err != nil {
 		return false, nil, err
