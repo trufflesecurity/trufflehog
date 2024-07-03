@@ -408,7 +408,7 @@ func (s *Source) getAllProjectRepos(
 	var projectsWithNamespace []string
 
 	// Used to filter out duplicate projects.
-	processProjects := func(projList []*gitlab.Project) error {
+	processProjects := func(ctx context.Context, projList []*gitlab.Project) error {
 		for _, proj := range projList {
 			ctx := context.WithValues(ctx,
 				"project_id", proj.ID,
@@ -466,7 +466,7 @@ func (s *Source) getAllProjectRepos(
 			break
 		}
 		ctx.Logger().V(3).Info("listed user projects", "count", len(userProjects))
-		if err := processProjects(userProjects); err != nil {
+		if err := processProjects(ctx, userProjects); err != nil {
 			return err
 		}
 		projectQueryOptions.Page = res.NextPage
@@ -533,7 +533,7 @@ func (s *Source) getAllProjectRepos(
 				break
 			}
 			ctx.Logger().V(3).Info("listed group projects", "count", len(grpPrjs))
-			if err := processProjects(grpPrjs); err != nil {
+			if err := processProjects(ctx, grpPrjs); err != nil {
 				return err
 			}
 			listGroupProjectOptions.Page = res.NextPage
