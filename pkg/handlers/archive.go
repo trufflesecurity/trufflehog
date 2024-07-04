@@ -87,15 +87,14 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		return ErrMaxDepthReached
 	}
 
-	arReader := reader.reader
 	if reader.format == nil && depth > 0 {
-		return h.handleNonArchiveContent(ctx, arReader, archiveChan)
+		return h.handleNonArchiveContent(ctx, reader, archiveChan)
 	}
 
 	switch archive := reader.format.(type) {
 	case archiver.Decompressor:
 		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
-		compReader, err := archive.OpenReader(arReader)
+		compReader, err := archive.OpenReader(reader)
 		if err != nil {
 			return fmt.Errorf("error opening decompressor with format: %s %w", reader.format.Name(), err)
 		}
@@ -112,7 +111,7 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 
 		return h.openArchive(ctx, depth+1, rdr, archiveChan)
 	case archiver.Extractor:
-		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
+		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, nil, h.extractorHandler(archiveChan))
 		if err != nil {
 			return fmt.Errorf("error extracting archive with format: %s: %w", reader.format.Name(), err)
 		}

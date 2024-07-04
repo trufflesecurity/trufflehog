@@ -51,7 +51,7 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 		}()
 
 		var rpm *rpmutils.Rpm
-		rpm, err = rpmutils.ReadRpm(input.reader)
+		rpm, err = rpmutils.ReadRpm(input)
 		if err != nil {
 			ctx.Logger().Error(err, "error reading RPM")
 			return

@@ -51,7 +51,7 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan [
 		}()
 
 		var arReader *deb.Ar
-		arReader, err = deb.LoadAr(input.reader)
+		arReader, err = deb.LoadAr(input)
 		if err != nil {
 			ctx.Logger().Error(err, "error reading AR")
 			return

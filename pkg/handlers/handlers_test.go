@@ -244,11 +244,9 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 	file, err := os.Open("testdata/testdir.zip")
 	assert.Nil(t, err)
 
-	chunkCh := make(chan *sources.Chunk, 10)
+	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
-		defer func() {
-			close(chunkCh)
-		}()
+		defer close(chunkCh)
 		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
@@ -268,9 +266,7 @@ func TestHandleTar(t *testing.T) {
 
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
-		defer func() {
-			close(chunkCh)
-		}()
+		defer close(chunkCh)
 		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()

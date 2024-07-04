@@ -33,7 +33,7 @@ type fileReader struct {
 	mimeType         mimeType
 	isGenericArchive bool
 
-	reader *iobuf.BufferedReaderSeeker
+	*iobuf.BufferedReaderSeeker
 }
 
 var ErrEmptyReader = errors.New("reader is empty")
@@ -42,10 +42,7 @@ var ErrEmptyReader = errors.New("reader is empty")
 func newFileReader(r io.Reader) (fileReader, error) {
 	var reader fileReader
 
-	bufReader, err := iobuf.NewBufferedReaderSeeker(r)
-	if err != nil {
-		return reader, fmt.Errorf("error creating buffered reader: %w", err)
-	}
+	bufReader := iobuf.NewBufferedReaderSeeker(r)
 
 	mime, err := mimetype.DetectReader(bufReader)
 	if err != nil {
@@ -53,7 +50,7 @@ func newFileReader(r io.Reader) (fileReader, error) {
 	}
 	reader.mimeType = mimeType(mime.String())
 
-	// Reset the reader to the beginning because Identify and DetectReader consume the reader.
+	// Reset the reader to the beginning because DetectReader consumes the reader.
 	if _, err := bufReader.Seek(0, io.SeekStart); err != nil {
 		return reader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
@@ -73,14 +70,16 @@ func newFileReader(r io.Reader) (fileReader, error) {
 	}
 
 	// Reset the reader to the beginning again to allow the handler to read from the start.
+	// This is necessary because Identify consumes the reader.
 	if _, err := bufReader.Seek(0, io.SeekStart); err != nil {
 		return reader, fmt.Errorf("error resetting reader after archive identification: %w", err)
 	}
 
 	// Disable buffering after initial reads.
+	// This optimization ensures we don't continue writing to the buffer after the initial reads.
 	bufReader.DisableBuffering()
 
-	reader.reader = bufReader
+	reader.BufferedReaderSeeker = bufReader
 
 	return reader, nil
 }

@@ -29,7 +29,7 @@ type BufferedReaderSeeker struct {
 // NewBufferedReaderSeeker creates and initializes a BufferedReaderSeeker.
 // It takes an io.Reader and checks if it supports seeking.
 // If the reader supports seeking, it is stored in the seeker field.
-func NewBufferedReaderSeeker(r io.Reader) (*BufferedReaderSeeker, error) {
+func NewBufferedReaderSeeker(r io.Reader) *BufferedReaderSeeker {
 	var (
 		seeker          io.Seeker
 		buffer          *bytes.Buffer
@@ -40,7 +40,7 @@ func NewBufferedReaderSeeker(r io.Reader) (*BufferedReaderSeeker, error) {
 		activeBuffering = false
 	}
 
-	const mimeTypeBufferSize = 3072 // Size |mimetype.DetectReader| uses to detect MIME type
+	const mimeTypeBufferSize = 3072 // Approx buffer size for MIME type detection
 
 	if seeker == nil {
 		buffer = bytes.NewBuffer(make([]byte, 0, mimeTypeBufferSize))
@@ -53,7 +53,7 @@ func NewBufferedReaderSeeker(r io.Reader) (*BufferedReaderSeeker, error) {
 		bytesRead:       0,
 		index:           0,
 		activeBuffering: activeBuffering,
-	}, nil
+	}
 }
 
 // Read reads len(out) bytes from the reader starting at the current index.
