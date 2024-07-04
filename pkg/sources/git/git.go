@@ -1254,6 +1254,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 				cmd.String(), stderr.String(), commitHash.String(), err,
 			), "waiting for command failed")
 		}
+		stdout.Close()
 	}()
 
 	if err := cmd.Start(); err != nil {
