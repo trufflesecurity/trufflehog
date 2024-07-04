@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -42,12 +43,13 @@ func TestHandleFile(t *testing.T) {
 }
 
 func BenchmarkHandleFile(b *testing.B) {
+	file, err := os.Open("testdata/test.tgz")
+	assert.Nil(b, err)
+	defer file.Close()
+
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		sourceChan := make(chan *sources.Chunk, 1)
-		file, err := os.Open("testdata/test.tgz")
-		assert.Nil(b, err)
-
-		b.ReportAllocs()
 		b.StartTimer()
 		go func() {
 			defer close(sourceChan)
@@ -58,6 +60,8 @@ func BenchmarkHandleFile(b *testing.B) {
 		for range sourceChan {
 		}
 		b.StopTimer()
+
+		file.Seek(0, io.SeekStart)
 	}
 }
 
@@ -221,7 +225,8 @@ func BenchmarkHandleAR(b *testing.B) {
 		for range sourceChan {
 		}
 		b.StopTimer()
-		file.Seek(0, 0)
+
+		file.Seek(0, io.SeekStart)
 	}
 }
 
@@ -280,11 +285,13 @@ func TestHandleTar(t *testing.T) {
 }
 
 func BenchmarkHandleTar(b *testing.B) {
+	file, err := os.Open("testdata/test.tar")
+	assert.Nil(b, err)
+	defer file.Close()
+
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		sourceChan := make(chan *sources.Chunk, 1)
-		file, err := os.Open("testdata/test.tar")
-		assert.Nil(b, err)
 
 		b.StartTimer()
 		go func() {
@@ -296,6 +303,7 @@ func BenchmarkHandleTar(b *testing.B) {
 		for range sourceChan {
 		}
 		b.StopTimer()
-		file.Close()
+
+		file.Seek(0, io.SeekStart)
 	}
 }
