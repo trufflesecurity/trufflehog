@@ -61,7 +61,8 @@ func BenchmarkHandleFile(b *testing.B) {
 		}
 		b.StopTimer()
 
-		file.Seek(0, io.SeekStart)
+		_, err = file.Seek(0, io.SeekStart)
+		assert.NoError(b, err)
 	}
 }
 
@@ -226,7 +227,8 @@ func BenchmarkHandleAR(b *testing.B) {
 		}
 		b.StopTimer()
 
-		file.Seek(0, io.SeekStart)
+		_, err = file.Seek(0, io.SeekStart)
+		assert.NoError(b, err)
 	}
 }
 
@@ -304,6 +306,7 @@ func BenchmarkHandleTar(b *testing.B) {
 		}
 		b.StopTimer()
 
-		file.Seek(0, io.SeekStart)
+		_, err = file.Seek(0, io.SeekStart)
+		assert.NoError(b, err)
 	}
 }
