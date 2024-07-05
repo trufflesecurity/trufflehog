@@ -1,14 +1,9 @@
 package handlers
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"time"
-
-	"github.com/gabriel-vasile/mimetype"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -49,7 +44,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 			h.metrics.incFilesProcessed()
 		}()
 
-		if err = h.handleNonArchiveContent(ctx, input, dataChan); err != nil {
+		if err = h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(input), dataChan); err != nil {
 			ctx.Logger().Error(err, "error handling non-archive content.")
 		}
 	}()
@@ -76,26 +71,17 @@ func (h *defaultHandler) measureLatencyAndHandleErrors(start time.Time, err erro
 // on the type, particularly for binary files. It manages reading file chunks and writing them to the archive channel,
 // effectively collecting the final bytes for further processing. This function is a key component in ensuring that all
 // file content, regardless of being an archive or not, is handled appropriately.
-func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader io.Reader, archiveChan chan []byte) error {
-	bufReader := bufio.NewReaderSize(reader, defaultBufferSize)
-	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
-	// If fewer bytes are read, MIME type detection may still succeed.
-	buffer, err := bufReader.Peek(defaultBufferSize)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return fmt.Errorf("unable to read file for MIME type detection: %w", err)
-	}
+func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader mimeTypeReader, archiveChan chan []byte) error {
+	mimeExt := reader.mimeExt
 
-	mime := mimetype.Detect(buffer)
-	mimeT := mimeType(mime.String())
-
-	if common.SkipFile(mime.Extension()) || common.IsBinary(mime.Extension()) {
-		ctx.Logger().V(5).Info("skipping file", "ext", mimeT)
+	if common.SkipFile(mimeExt) || common.IsBinary(mimeExt) {
+		ctx.Logger().V(5).Info("skipping file", "ext", mimeExt)
 		h.metrics.incFilesSkipped()
 		return nil
 	}
 
 	chunkReader := sources.NewChunkReader()
-	for data := range chunkReader(ctx, bufReader) {
+	for data := range chunkReader(ctx, reader) {
 		if err := data.Error(); err != nil {
 			ctx.Logger().Error(err, "error reading chunk")
 			h.metrics.incErrors()
