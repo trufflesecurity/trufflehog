@@ -87,8 +87,11 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		return ErrMaxDepthReached
 	}
 
-	if reader.format == nil && depth > 0 {
-		return h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(reader), archiveChan)
+	if reader.format == nil {
+		if depth > 0 {
+			return h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(reader), archiveChan)
+		}
+		return fmt.Errorf("unknown archive format")
 	}
 
 	switch archive := reader.format.(type) {
