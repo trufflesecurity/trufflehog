@@ -31,8 +31,7 @@ import (
 // random access to the file content.
 type fileReader struct {
 	format           archiver.Format
-	mimeName         string
-	mimeExt          string
+	mime             *mimetype.MIME
 	isGenericArchive bool
 
 	*iobuf.BufferedReaderSeeker
@@ -52,8 +51,8 @@ type mimeTypeReader struct {
 // newMimeTypeReaderFromFileReader creates a new mimeTypeReader from a fileReader.
 func newMimeTypeReaderFromFileReader(r fileReader) mimeTypeReader {
 	return mimeTypeReader{
-		mimeExt:  r.mimeExt,
-		mimeName: mimeType(r.mimeName),
+		mimeExt:  r.mime.Extension(),
+		mimeName: mimeType(r.mime.String()),
 		Reader:   r.BufferedReaderSeeker,
 	}
 }
@@ -87,21 +86,25 @@ func newFileReader(r io.Reader) (fileReader, error) {
 
 	// Disable buffering after initial reads.
 	// This optimization ensures we don't continue writing to the buffer after the initial reads.
-	defer fReader.BufferedReaderSeeker.DisableBuffering()
+	defer fReader.DisableBuffering()
 
-	mime, err := mimetype.DetectReader(fReader.BufferedReaderSeeker)
+	mime, err := mimetype.DetectReader(fReader)
 	if err != nil {
 		return fReader, fmt.Errorf("unable to detect MIME type: %w", err)
 	}
-	fReader.mimeName = mime.String()
-	fReader.mimeExt = mime.Extension()
+	fReader.mime = mime
 
 	// Reset the reader to the beginning because DetectReader consumes the reader.
-	if _, err := fReader.BufferedReaderSeeker.Seek(0, io.SeekStart); err != nil {
+	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
-	format, _, err := archiver.Identify("", fReader.BufferedReaderSeeker)
+	// Check if the MIME type is not a supported archive format.
+	if _, ok := textBasedOrUnsupportedMimeTypes[mimeType(mime.String())]; ok {
+		return fReader, nil
+	}
+
+	format, _, err := archiver.Identify("", fReader)
 	switch {
 	case err == nil:
 		fReader.isGenericArchive = true
@@ -116,7 +119,7 @@ func newFileReader(r io.Reader) (fileReader, error) {
 
 	// Reset the reader to the beginning again to allow the handler to read from the start.
 	// This is necessary because Identify consumes the reader.
-	if _, err := fReader.BufferedReaderSeeker.Seek(0, io.SeekStart); err != nil {
+	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after archive identification: %w", err)
 	}
 
@@ -162,12 +165,69 @@ const (
 type mimeType string
 
 const (
-	rpmMime    mimeType = "application/x-rpm"
-	cpioMime   mimeType = "application/cpio"
-	unixArMime mimeType = "application/x-unix-archive"
-	arMime     mimeType = "application/x-archive"
-	debMime    mimeType = "application/vnd.debian.binary-package"
+	rpmMime      mimeType = "application/x-rpm"
+	cpioMime     mimeType = "application/cpio"
+	unixArMime   mimeType = "application/x-unix-archive"
+	arMime       mimeType = "application/x-archive"
+	debMime      mimeType = "application/vnd.debian.binary-package"
+	textMime     mimeType = "text/plain; charset=utf-8"
+	xmlMime      mimeType = "text/xml"
+	jsonMime     mimeType = "application/json"
+	csvMime      mimeType = "text/csv"
+	tsvMime      mimeType = "text/tab-separated-values"
+	geoJSONMine  mimeType = "application/vnd.geo+json"
+	ndjsonMime   mimeType = "application/x-ndjson"
+	htmlMime     mimeType = "text/html"
+	phpTextMime  mimeType = "text/x-php"
+	rtfTextMime  mimeType = "text/rtf"
+	jsAppMime    mimeType = "application/javascript"
+	jsTextMime   mimeType = "text/javascript"
+	jsMime       mimeType = "application/x-javascript"
+	srtMime      mimeType = "application/x-subrip"
+	srtXMime     mimeType = "application/x-srt"
+	srtTextMime  mimeType = "text/x-srt"
+	vttMime      mimeType = "text/vtt"
+	luaMime      mimeType = "text/x-lua"
+	perlMime     mimeType = "text/x-perl"
+	pythonMime   mimeType = "text/x-python"
+	pyAppMime    mimeType = "application/x-python"
+	pyScriptMime mimeType = "application/x-script.python"
+	tclTextMime  mimeType = "text/x-tcl"
+	tclMime      mimeType = "application/x-tcl"
 )
+
+// textBasedOrUnsupportedMimeTypes is a set of MIME types that are text-based or unsupported.
+var textBasedOrUnsupportedMimeTypes = map[mimeType]struct{}{
+	arMime:       {},
+	unixArMime:   {},
+	debMime:      {},
+	rpmMime:      {},
+	cpioMime:     {},
+	textMime:     {},
+	xmlMime:      {},
+	jsonMime:     {},
+	csvMime:      {},
+	tsvMime:      {},
+	geoJSONMine:  {},
+	ndjsonMime:   {},
+	htmlMime:     {},
+	phpTextMime:  {},
+	rtfTextMime:  {},
+	jsAppMime:    {},
+	jsTextMime:   {},
+	jsMime:       {},
+	srtMime:      {},
+	srtXMime:     {},
+	srtTextMime:  {},
+	vttMime:      {},
+	luaMime:      {},
+	perlMime:     {},
+	pythonMime:   {},
+	pyAppMime:    {},
+	pyScriptMime: {},
+	tclTextMime:  {},
+	tclMime:      {},
+}
 
 // selectHandler dynamically selects and configures a FileHandler based on the provided |mimetype| type and archive flag.
 // The fileReader contains information about the MIME type and whether the file is an archive.
@@ -220,7 +280,7 @@ func HandleFile(
 		return fmt.Errorf("error creating custom reader: %w", err)
 	}
 
-	mimeT := mimeType(rdr.mimeName)
+	mimeT := mimeType(rdr.mime.String())
 	config := newFileHandlingConfig(options...)
 	if config.skipArchives && rdr.isGenericArchive {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT)

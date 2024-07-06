@@ -117,7 +117,7 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		}
 		return nil
 	default:
-		return fmt.Errorf("unknown archive type: %s", reader.mimeName)
+		return fmt.Errorf("unknown archive type: %s", reader.format.Name())
 	}
 }
 

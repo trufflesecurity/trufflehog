@@ -85,7 +85,7 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 
 			rdr, err := newMimeTypeReader(arEntry.Data)
 			if err != nil {
-				return fmt.Errorf("error creating custom reader: %w", err)
+				return fmt.Errorf("error creating mime-type reader: %w", err)
 			}
 
 			if err := h.handleNonArchiveContent(fileCtx, rdr, archiveChan); err != nil {

@@ -92,7 +92,7 @@ func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 
 			rdr, err := newMimeTypeReader(reader)
 			if err != nil {
-				return fmt.Errorf("error creating custom reader: %w", err)
+				return fmt.Errorf("error creating mime-type reader: %w", err)
 			}
 
 			if err := h.handleNonArchiveContent(fileCtx, rdr, archiveChan); err != nil {
