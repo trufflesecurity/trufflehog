@@ -99,8 +99,10 @@ func newFileReader(r io.Reader) (fileReader, error) {
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
-	// Check if the MIME type is not a supported archive format.
-	if _, ok := textBasedOrUnsupportedMimeTypes[mimeType(mime.String())]; ok {
+	// Check if the MIME type should bypass the archiver library identification and continue processing.
+	// This bypass is necessary for archive formats not supported by the archiver library and for text-based formats
+	// that are best handled directly by the default reader.
+	if _, ok := skipArchiverMimeTypes[mimeType(mime.String())]; ok {
 		return fReader, nil
 	}
 
@@ -196,8 +198,9 @@ const (
 	tclMime      mimeType = "application/x-tcl"
 )
 
-// textBasedOrUnsupportedMimeTypes is a set of MIME types that are text-based or unsupported.
-var textBasedOrUnsupportedMimeTypes = map[mimeType]struct{}{
+// skipArchiverMimeTypes is a set of MIME types that should bypass archiver library processing because they are either
+// text-based or archives not supported by the library.
+var skipArchiverMimeTypes = map[mimeType]struct{}{
 	arMime:       {},
 	unixArMime:   {},
 	debMime:      {},
