@@ -149,23 +149,21 @@ func (br *BufferedReaderSeeker) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekCurrent:
 		newIndex += offset
 	case io.SeekEnd:
-		if br.bytesRead == 0 {
-			// Read the entire reader to determine its length
-			buffer := make([]byte, bufferSize)
-			for {
-				n, err := br.reader.Read(buffer)
-				if n > 0 {
-					if br.activeBuffering {
-						br.buffer.Write(buffer[:n])
-					}
-					br.bytesRead += int64(n)
+		// Read the entire reader to determine its length
+		buffer := make([]byte, bufferSize)
+		for {
+			n, err := br.reader.Read(buffer)
+			if n > 0 {
+				if br.activeBuffering {
+					br.buffer.Write(buffer[:n])
 				}
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				if err != nil {
-					return 0, err
-				}
+				br.bytesRead += int64(n)
+			}
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				return 0, err
 			}
 		}
 		newIndex = min(br.bytesRead+offset, br.bytesRead)
