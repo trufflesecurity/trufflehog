@@ -310,3 +310,28 @@ func BenchmarkHandleTar(b *testing.B) {
 		assert.NoError(b, err)
 	}
 }
+
+func BenchmarkHandleJSON(b *testing.B) {
+	file, err := os.Open("/Users/ahrav.dutta/Thog/md_random_data.json")
+	assert.Nil(b, err)
+	defer file.Close()
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		sourceChan := make(chan *sources.Chunk, 1)
+
+		b.StartTimer()
+		go func() {
+			defer close(sourceChan)
+			err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			assert.NoError(b, err)
+		}()
+
+		for range sourceChan {
+		}
+		b.StopTimer()
+
+		_, err = file.Seek(0, io.SeekStart)
+		assert.NoError(b, err)
+	}
+}

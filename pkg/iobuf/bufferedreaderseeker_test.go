@@ -360,3 +360,48 @@ func TestBufferedReaderSeekerReadAt(t *testing.T) {
 		})
 	}
 }
+
+func TestBufferedReaderSeekerSize(t *testing.T) {
+	tests := []struct {
+		name     string
+		reader   io.Reader
+		expected int64
+	}{
+		{
+			name:     "size of seekable reader",
+			reader:   strings.NewReader("test data"),
+			expected: 9,
+		},
+		{
+			name:     "size of non-seekable reader",
+			reader:   bytes.NewBufferString("test data"),
+			expected: 9,
+		},
+		{
+			name:     "error on non-seekable reader with partial data",
+			reader:   io.LimitReader(strings.NewReader("test data"), 4),
+			expected: 4,
+		},
+		{
+			name:     "empty seekable reader",
+			reader:   strings.NewReader(""),
+			expected: 0,
+		},
+		{
+			name:     "empty non-seekable reader",
+			reader:   bytes.NewBufferString(""),
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			brs := NewBufferedReaderSeeker(tt.reader)
+			size, err := brs.Size()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, size)
+		})
+	}
+}

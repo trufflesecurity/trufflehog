@@ -17,7 +17,7 @@ import (
 )
 
 func TestChunker(t *testing.T) {
-	byteBuffer := bytes.NewBuffer(make([]byte, ChunkSize*9))
+	byteBuffer := bytes.NewBuffer(make([]byte, DefaultChunkSize*9))
 	reReader, err := diskbufferreader.New(byteBuffer)
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +60,7 @@ func TestChunker(t *testing.T) {
 }
 
 func BenchmarkChunker(b *testing.B) {
-	data := bytes.Repeat([]byte("a"), ChunkSize*100)
+	data := bytes.Repeat([]byte("a"), DefaultChunkSize*100)
 	chunk := &Chunk{
 		Data: data,
 	}
@@ -83,8 +83,8 @@ func TestNewChunkedReader(t *testing.T) {
 		{
 			name:       "Smaller data than default chunkSize and peekSize",
 			input:      "example input",
-			chunkSize:  ChunkSize,
-			peekSize:   PeekSize,
+			chunkSize:  DefaultChunkSize,
+			peekSize:   DefaultPeekSize,
 			wantChunks: []string{"example input"},
 			wantErr:    false,
 		},
@@ -182,7 +182,7 @@ func BenchmarkChunkReader(b *testing.B) {
 	var bigChunk = make([]byte, 1<<24) // 16MB
 
 	reader := bytes.NewReader(bigChunk)
-	chunkReader := NewChunkReader(WithChunkSize(ChunkSize), WithPeekSize(PeekSize))
+	chunkReader := NewChunkReader(WithChunkSize(DefaultChunkSize), WithPeekSize(DefaultPeekSize))
 
 	b.ReportAllocs()
 	b.ResetTimer()

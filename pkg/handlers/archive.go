@@ -89,7 +89,11 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 
 	if reader.format == nil {
 		if depth > 0 {
-			return h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(reader), archiveChan)
+			mtr, err := newSizedMimetypeReaderFromFileReader(reader)
+			if err != nil {
+				return fmt.Errorf("error reading MIME type: %w", err)
+			}
+			return h.handleNonArchiveContent(ctx, mtr, archiveChan)
 		}
 		return fmt.Errorf("unknown archive format")
 	}

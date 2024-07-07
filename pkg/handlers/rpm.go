@@ -90,7 +90,7 @@ func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 			fileSize := fileInfo.Size()
 			fileCtx := logContext.WithValues(ctx, "filename", fileInfo.Name, "size", fileSize)
 
-			rdr, err := newMimeTypeReader(reader)
+			rdr, err := newSizedMimeTypeReader(reader, fileSize)
 			if err != nil {
 				return fmt.Errorf("error creating mime-type reader: %w", err)
 			}

@@ -83,7 +83,7 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 			fileSize := arEntry.Size
 			fileCtx := logContext.WithValues(ctx, "filename", arEntry.Name, "size", fileSize)
 
-			rdr, err := newMimeTypeReader(arEntry.Data)
+			rdr, err := newSizedMimeTypeReader(arEntry.Data, fileSize)
 			if err != nil {
 				return fmt.Errorf("error creating mime-type reader: %w", err)
 			}

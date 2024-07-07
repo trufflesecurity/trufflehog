@@ -199,3 +199,16 @@ func (br *BufferedReaderSeeker) ReadAt(out []byte, offset int64) (int, error) {
 // This is useful after initial reads (e.g., for MIME type detection and format identification)
 // to prevent further writes to the buffer, optimizing subsequent reads.
 func (br *BufferedReaderSeeker) DisableBuffering() { br.activeBuffering = false }
+
+// Size returns the size of the underlying reader.
+// Seek is used to determine the size of the reader.
+func (br *BufferedReaderSeeker) Size() (int64, error) {
+	currentIndex := br.index
+	size, err := br.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = br.Seek(currentIndex, io.SeekStart)
+	return size, err
+}
