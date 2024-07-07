@@ -153,7 +153,7 @@ func TestExtractTarContent(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	wantCount := 4
+	wantCount := 1
 	count := 0
 	for range chunkCh {
 		count++
@@ -184,7 +184,7 @@ func TestNestedDirArchive(t *testing.T) {
 }
 
 func TestHandleFileRPM(t *testing.T) {
-	wantChunkCount := 179
+	wantChunkCount := 29
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
 
 	file, err := os.Open("testdata/test.rpm")
@@ -196,7 +196,7 @@ func TestHandleFileRPM(t *testing.T) {
 }
 
 func TestHandleFileAR(t *testing.T) {
-	wantChunkCount := 102
+	wantChunkCount := 33
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
 
 	file, err := os.Open("testdata/test.deb")
@@ -233,7 +233,7 @@ func BenchmarkHandleAR(b *testing.B) {
 }
 
 func TestHandleFileNonArchive(t *testing.T) {
-	wantChunkCount := 6
+	wantChunkCount := 4
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
 
 	file, err := os.Open("testdata/nonarchive.txt")
@@ -258,7 +258,7 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	wantCount := 4
+	wantCount := 1
 	count := 0
 	for range chunkCh {
 		count++
@@ -288,31 +288,6 @@ func TestHandleTar(t *testing.T) {
 
 func BenchmarkHandleTar(b *testing.B) {
 	file, err := os.Open("testdata/test.tar")
-	assert.Nil(b, err)
-	defer file.Close()
-
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		sourceChan := make(chan *sources.Chunk, 1)
-
-		b.StartTimer()
-		go func() {
-			defer close(sourceChan)
-			err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
-			assert.NoError(b, err)
-		}()
-
-		for range sourceChan {
-		}
-		b.StopTimer()
-
-		_, err = file.Seek(0, io.SeekStart)
-		assert.NoError(b, err)
-	}
-}
-
-func BenchmarkHandleJSON(b *testing.B) {
-	file, err := os.Open("/Users/ahrav.dutta/Thog/md_random_data.json")
 	assert.Nil(b, err)
 	defer file.Close()
 

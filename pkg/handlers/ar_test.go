@@ -25,7 +25,7 @@ func TestHandleARFile(t *testing.T) {
 	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 
-	wantChunkCount := 102
+	wantChunkCount := 33
 	count := 0
 	for range archiveChan {
 		count++

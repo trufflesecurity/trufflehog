@@ -94,13 +94,14 @@ func (cr ChunkResult) Error() error {
 
 const (
 	// Size thresholds.
-	smallFileSizeThreshold  = 10 * 1024        // 10KB
-	mediumFileSizeThreshold = 100 * 1024       // 100KB
-	largeFileSizeThreshold  = 1 * 1024 * 1024  // 1MB
-	xlargeFileSizeThreshold = 10 * 1024 * 1024 // 10MB
+	xsmallFileSizeThreshold = 4 * 1024        // 4KB
+	smallFileSizeThreshold  = 10 * 1024       // 10KB
+	mediumFileSizeThreshold = 100 * 1024      // 100KB
+	largeFileSizeThreshold  = 1 * 1024 * 1024 // 1MB
 
 	// Chunk sizes.
-	smallFileChunkSize  = 1 << 12 // 4KB
+	xsmallFileChunkSize = 1 << 12 // 4KB
+	smallFileChunkSize  = 1 << 13 // 8KB
 	mediumFileChunkSize = 1 << 14 // 16KB
 	largeFileChunkSize  = 1 << 15 // 32KB
 	xlargeFileChunkSize = 1 << 16 // 64KB
@@ -141,6 +142,8 @@ func applyOptions(opts []ConfigOption) *chunkReaderConfig {
 
 func calculateOptimalChunkSize(fileSize int) int {
 	switch {
+	case fileSize < xsmallFileSizeThreshold:
+		return xsmallFileChunkSize
 	case fileSize < smallFileSizeThreshold:
 		return smallFileChunkSize
 	case fileSize < mediumFileSizeThreshold:
