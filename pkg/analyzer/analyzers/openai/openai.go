@@ -12,6 +12,7 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 const (
@@ -36,15 +37,15 @@ type MeJSON struct {
 var POST_PAYLOAD = map[string]interface{}{"speed": 1}
 
 // AnalyzePermissions will analyze the permissions of an OpenAI API key
-func AnalyzePermissions(key string, showAll bool) {
-	if meJSON, err := getUserData(key); err != nil {
+func AnalyzePermissions(cfg *config.Config, key string) {
+	if meJSON, err := getUserData(cfg, key); err != nil {
 		color.Red("[x]" + err.Error())
 		return
 	} else {
 		printUserData(meJSON)
 	}
 
-	if isAdmin, err := checkAdminKey(key); isAdmin {
+	if isAdmin, err := checkAdminKey(cfg, key); isAdmin {
 		color.Green("[!] Admin API Key. All permissions available.")
 		return
 	} else if err != nil {
@@ -56,7 +57,7 @@ func AnalyzePermissions(key string, showAll bool) {
 			color.Red("[x]" + err.Error())
 			return
 		}
-		printPermissions(showAll)
+		printPermissions(cfg.ShowAll)
 	}
 
 }
@@ -70,7 +71,7 @@ func analyzeScopes(key string) error {
 	return nil
 }
 
-func openAIRequest(method string, url string, key string, data map[string]interface{}) ([]byte, *http.Response, error) {
+func openAIRequest(cfg *config.Config, method string, url string, key string, data map[string]interface{}) ([]byte, *http.Response, error) {
 	var inBody io.Reader
 	if data != nil {
 		jsonData, err := json.Marshal(data)
@@ -80,7 +81,7 @@ func openAIRequest(method string, url string, key string, data map[string]interf
 		inBody = bytes.NewBuffer(jsonData)
 	}
 
-	client := &http.Client{}
+	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest(method, url, inBody)
 	if err != nil {
 		return nil, nil, err
@@ -102,10 +103,10 @@ func openAIRequest(method string, url string, key string, data map[string]interf
 	return outBody, resp, nil
 }
 
-func checkAdminKey(key string) (bool, error) {
+func checkAdminKey(cfg *config.Config, key string) (bool, error) {
 	// Check for all permissions
 	//nolint:bodyclose
-	_, resp, err := openAIRequest("GET", BASE_URL+ORGS_ENDPOINT, key, nil)
+	_, resp, err := openAIRequest(cfg, "GET", BASE_URL+ORGS_ENDPOINT, key, nil)
 	if err != nil {
 		return false, err
 	}
@@ -119,10 +120,10 @@ func checkAdminKey(key string) (bool, error) {
 	}
 }
 
-func getUserData(key string) (MeJSON, error) {
+func getUserData(cfg *config.Config, key string) (MeJSON, error) {
 	var meJSON MeJSON
 	//nolint:bodyclose
-	me, resp, err := openAIRequest("GET", BASE_URL+ME_ENDPOINT, key, nil)
+	me, resp, err := openAIRequest(cfg, "GET", BASE_URL+ME_ENDPOINT, key, nil)
 	if err != nil {
 		return meJSON, err
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 type DBPrivs struct {
@@ -60,7 +61,14 @@ const (
 
 var connStrPartPattern = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
 
-func AnalyzePermissions(connectionStr string, showAll bool) {
+func AnalyzePermissions(cfg *config.Config, connectionStr string) {
+
+	// ToDo: Add in logging
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging is not supported for this analyzer.")
+		return
+	}
+
 	connStr, err := pq.ParseURL(string(connectionStr))
 	if err != nil {
 		color.Red("[x] Failed to parse Postgres connection string.\n    Error: " + err.Error())
