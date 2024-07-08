@@ -195,6 +195,10 @@ func (br *BufferedReaderSeeker) ReadAt(out []byte, offset int64) (int, error) {
 	return br.Read(out)
 }
 
+// EnableBuffering starts the buffering process.
+// This is useful if the reader is non-seekable and seeks are required.
+func (br *BufferedReaderSeeker) EnableBuffering() { br.activeBuffering = true }
+
 // DisableBuffering stops the buffering process.
 // This is useful after initial reads (e.g., for MIME type detection and format identification)
 // to prevent further writes to the buffer, optimizing subsequent reads.

@@ -20,60 +20,60 @@ func TestArchiveHandler(t *testing.T) {
 		matchString    string
 		expectErr      bool
 	}{
-		// "gzip-single": {
-		// 	"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one-zip.gz",
-		// 	1,
-		// 	"AKIAYVP4CIPPH5TNP3SW",
-		// 	false,
-		// },
-		// "gzip-nested": {
-		// 	"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/double-zip.gz",
-		// 	1,
-		// 	"AKIAYVP4CIPPH5TNP3SW",
-		// 	false,
-		// },
-		// "gzip-too-deep": {
-		// 	"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six-zip.gz",
-		// 	0,
-		// 	"",
-		// 	true,
-		// },
-		// "tar-single": {
-		// 	"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one.tar",
-		// 	1,
-		// 	"AKIAYVP4CIPPH5TNP3SW",
-		// 	false,
-		// },
-		// "tar-nested": {
-		// 	"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/two.tar",
-		// 	1,
-		// 	"AKIAYVP4CIPPH5TNP3SW",
-		// 	false,
-		// },
-		// "tar-too-deep": {
-		// 	"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six.tar",
-		// 	0,
-		// 	"",
-		// 	true,
-		// },
-		// "targz-single": {
-		// 	"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/tar-archive.tar.gz",
-		// 	1,
-		// 	"AKIAYVP4CIPPH5TNP3SW",
-		// 	false,
-		// },
-		"gzip-large": {
-			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/FifteenMB.gz",
-			1543,
+		"gzip-single": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one-zip.gz",
+			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
 		},
-		// "zip-single": {
-		// 	"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip",
-		// 	1,
-		// 	"AKIAYVP4CIPPH5TNP3SW",
-		// 	false,
-		// },
+		"gzip-nested": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/double-zip.gz",
+			1,
+			"AKIAYVP4CIPPH5TNP3SW",
+			false,
+		},
+		"gzip-too-deep": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six-zip.gz",
+			0,
+			"",
+			true,
+		},
+		"tar-single": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one.tar",
+			1,
+			"AKIAYVP4CIPPH5TNP3SW",
+			false,
+		},
+		"tar-nested": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/two.tar",
+			1,
+			"AKIAYVP4CIPPH5TNP3SW",
+			false,
+		},
+		"tar-too-deep": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six.tar",
+			0,
+			"",
+			true,
+		},
+		"targz-single": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/tar-archive.tar.gz",
+			1,
+			"AKIAYVP4CIPPH5TNP3SW",
+			false,
+		},
+		"gzip-large": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/FifteenMB.gz",
+			242,
+			"AKIAYVP4CIPPH5TNP3SW",
+			false,
+		},
+		"zip-single": {
+			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip",
+			1,
+			"AKIAYVP4CIPPH5TNP3SW",
+			false,
+		},
 	}
 
 	for name, testCase := range tests {

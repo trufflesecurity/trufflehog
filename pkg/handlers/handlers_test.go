@@ -153,7 +153,7 @@ func TestExtractTarContent(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	wantCount := 1
+	wantCount := 2
 	count := 0
 	for range chunkCh {
 		count++
@@ -258,7 +258,7 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	wantCount := 1
+	wantCount := 2
 	count := 0
 	for range chunkCh {
 		count++

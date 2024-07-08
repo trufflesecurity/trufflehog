@@ -25,7 +25,7 @@ func TestHandleNonArchiveFile(t *testing.T) {
 	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 
-	wantChunkCount := 6
+	wantChunkCount := 4
 	count := 0
 	for range archiveChan {
 		count++

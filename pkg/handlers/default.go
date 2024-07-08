@@ -85,8 +85,7 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 		return nil
 	}
 
-	// chunkReader := sources.NewChunkReader(sources.WithFileSize(int(reader.size)))
-	chunkReader := sources.NewChunkReader()
+	chunkReader := sources.NewChunkReader(sources.WithFileSize(int(reader.size)))
 	for data := range chunkReader(ctx, reader) {
 		if err := data.Error(); err != nil {
 			ctx.Logger().Error(err, "error reading chunk")

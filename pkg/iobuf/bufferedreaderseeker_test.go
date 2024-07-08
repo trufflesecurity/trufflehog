@@ -405,3 +405,54 @@ func TestBufferedReaderSeekerSize(t *testing.T) {
 		})
 	}
 }
+
+func TestBufferedReaderSeekerEnableDisableBuffering(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialState  bool
+		enable        bool
+		expectedState bool
+	}{
+		{
+			name:          "enable buffering when initially disabled",
+			initialState:  false,
+			enable:        true,
+			expectedState: true,
+		},
+		{
+			name:          "disable buffering when initially enabled",
+			initialState:  true,
+			enable:        false,
+			expectedState: false,
+		},
+		{
+			name:          "enable buffering when already enabled",
+			initialState:  true,
+			enable:        true,
+			expectedState: true,
+		},
+		{
+			name:          "disable buffering when already disabled",
+			initialState:  false,
+			enable:        false,
+			expectedState: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			brs := NewBufferedReaderSeeker(strings.NewReader("test data"))
+			brs.activeBuffering = tt.initialState
+
+			if tt.enable {
+				brs.EnableBuffering()
+			} else {
+				brs.DisableBuffering()
+			}
+
+			assert.Equal(t, tt.expectedState, brs.activeBuffering)
+		})
+	}
+}
