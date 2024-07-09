@@ -450,8 +450,8 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	const (
-		orderBy         = "last_activity_at"
-		paginationLimit = 100 // Default is 20, max is 100.
+		orderBy         = "id" // TODO: Use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
+		paginationLimit = 100  // Default is 20, max is 100.
 	)
 	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
 
