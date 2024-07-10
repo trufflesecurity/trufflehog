@@ -195,6 +195,9 @@ func (br *BufferedReaderSeeker) ReadAt(out []byte, offset int64) (int, error) {
 	return br.Read(out)
 }
 
+// IsBufferingEnabled returns true if buffering is enabled.
+func (br *BufferedReaderSeeker) IsBufferingEnabled() bool { return br.activeBuffering }
+
 // EnableBuffering starts the buffering process.
 // This is useful if the reader is non-seekable and seeks are required.
 func (br *BufferedReaderSeeker) EnableBuffering() { br.activeBuffering = true }

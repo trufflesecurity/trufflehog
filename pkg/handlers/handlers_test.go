@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"os"
@@ -8,11 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/stretchr/testify/assert"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -308,5 +311,57 @@ func BenchmarkHandleTar(b *testing.B) {
 
 		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(b, err)
+	}
+}
+
+func TestNewSizedMimetypeReaderFromFileReader(t *testing.T) {
+	tests := []struct {
+		name                string
+		initialBuffering    bool
+		inputData           []byte
+		expectedSize        int64
+		expectBufferingCall bool
+	}{
+		{
+			name:                "Buffering initially enabled",
+			initialBuffering:    true,
+			inputData:           []byte("test data"),
+			expectedSize:        9,
+			expectBufferingCall: false,
+		},
+		{
+			name:                "Buffering initially disabled",
+			initialBuffering:    false,
+			inputData:           []byte("more test data"),
+			expectedSize:        14,
+			expectBufferingCall: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			data := bytes.NewReader(tt.inputData)
+			brs := iobuf.NewBufferedReaderSeeker(data)
+			if tt.initialBuffering {
+				brs.EnableBuffering()
+			}
+			fr := fileReader{
+				isGenericArchive:     false,
+				mime:                 &mimetype.MIME{},
+				BufferedReaderSeeker: brs,
+			}
+
+			result, err := newSizedMimetypeReaderFromFileReader(fr)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedSize, result.size)
+
+			if tt.expectBufferingCall {
+				assert.False(t, fr.IsBufferingEnabled(), "Buffering should be disabled after function call")
+			} else {
+				assert.True(t, fr.IsBufferingEnabled(), "Buffering should remain enabled after function call")
+			}
+		})
 	}
 }

@@ -52,8 +52,15 @@ type sizedMimeTypeReader struct {
 // newSizedMimeTypeReaderFromFileReader creates a new sizedMimeTypeReader from a fileReader.
 // This function extracts the MIME type and size from the fileReader, and returns a new sizedMimeTypeReader.
 func newSizedMimetypeReaderFromFileReader(r fileReader) (sizedMimeTypeReader, error) {
-	r.EnableBuffering()
-	defer r.DisableBuffering()
+	originalBufferingState := r.IsBufferingEnabled()
+	if !originalBufferingState {
+		r.EnableBuffering()
+	}
+	defer func() {
+		if !originalBufferingState {
+			r.DisableBuffering()
+		}
+	}()
 
 	size, err := r.Size()
 	if err != nil {
