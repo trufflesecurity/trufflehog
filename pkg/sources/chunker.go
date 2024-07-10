@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	// DefaultChunkSize is the maximum size of a chunk.
+	// DefaultChunkSize used by the chunker.
 	DefaultChunkSize = 10 * 1024
 	// DefaultPeekSize is the size of the peek into the previous chunk.
 	DefaultPeekSize = 3 * 1024
