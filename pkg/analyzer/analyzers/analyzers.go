@@ -11,6 +11,40 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+)
+
+type (
+	Analyzer interface {
+		Type() analyzerpb.SecretType
+		Analyze(ctx context.Context, key string, extraData map[string]string) (*AnalyzerResult, error)
+	}
+
+	// AnalyzerResult is the output of analysis.
+	AnalyzerResult struct {
+		ResourcePermissions []ResourcePermission
+		SecretMetadata      map[string]string
+	}
+
+	// ResourcePermission is a tuple describing a resource and the
+	// permissions associated with it.
+	ResourcePermission struct {
+		ResourceTree ResourceTree
+		Permissions  []Permission
+	}
+
+	// Resource represents an entity that a secret has permissions for. It
+	// is recursive to capture the hierarchical nature, however whether
+	// permissions apply to the children of resources is dependent on the
+	// platform.
+	ResourceTree struct {
+		Parent   *ResourceTree
+		Resource *resourcespb.Resource
+	}
+
+	Permission string
 )
 
 type PermissionType string
@@ -137,7 +171,7 @@ func CreateLogFileName(baseName string) string {
 }
 
 func NewAnalyzeClient(cfg *config.Config) *http.Client {
-	if !cfg.LoggingEnabled {
+	if cfg == nil || !cfg.LoggingEnabled {
 		return &http.Client{}
 	}
 	return &http.Client{
