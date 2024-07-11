@@ -37,3 +37,17 @@ protoc -I proto/ \
     --go_out=plugins=grpc:./pkg/pb/custom_detectorspb --go_opt=paths=source_relative \
     --validate_out="lang=go,paths=source_relative:./pkg/pb/custom_detectorspb" \
     proto/custom_detectors.proto
+protoc -I pkg/analyzer/proto/ \
+    -I ${GOPATH}/src \
+    -I /usr/local/include \
+    -I ${GOPATH}/src/github.com/envoyproxy/protoc-gen-validate \
+    --go_out=plugins=grpc:./pkg/analyzer/pb/analyzerpb --go_opt=paths=source_relative \
+    --validate_out="lang=go,paths=source_relative:./pkg/analyzer/pb/analyzerpb" \
+    pkg/analyzer/proto/analyzer.proto
+protoc -I pkg/analyzer/proto/ \
+    -I ${GOPATH}/src \
+    -I /usr/local/include \
+    -I ${GOPATH}/src/github.com/envoyproxy/protoc-gen-validate \
+    --go_out=plugins=grpc:./pkg/analyzer/pb/resourcespb --go_opt=paths=source_relative \
+    --validate_out="lang=go,paths=source_relative:./pkg/analyzer/pb/resourcespb" \
+    pkg/analyzer/proto/resources.proto
