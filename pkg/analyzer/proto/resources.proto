@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package resources;
+
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb";
+
+import "analyzer.proto";
+
+// Here to make sure the values in the database are uniform.
+// Don't ever use this on it's own as it doesn't uniquely identify a type of
+// resource.
+enum ResourceType {
+  INVALID = 0;
+  PROJECT = 1;
+  WORKSPACE = 2;
+  REPOSITORY = 3;
+  USER = 4;
+  GIST = 5;
+  ORGANIZATION = 6;
+  MODEL = 7;
+  DOMAIN = 8;
+  TABLE = 9;
+  ENDPOINT = 10;
+  DATABASE = 11;
+  SHOP = 12;
+}
+
+message Resource {
+  ResourceType resource_type = 1;
+  analyzer.SecretType secret_type = 2;
+  string name = 3;
+  map<string, string> metadata = 4;
+}
