@@ -55,6 +55,8 @@ const (
 	READ_WRITE PermissionType = "Read & Write"
 	NONE       PermissionType = "None"
 	ERROR      PermissionType = "Error"
+
+	FullAccess Permission = "full_access"
 )
 
 type PermissionStatus struct {
