@@ -18,7 +18,7 @@ type Scanner struct {
 	client *http.Client
 }
 
-func (s Scanner) Version() int { return 2 }
+func (s Scanner) Version() int { return 1 }
 
 type OrgRes struct {
 	Data []struct {
