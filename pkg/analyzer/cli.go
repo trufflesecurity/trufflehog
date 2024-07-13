@@ -188,7 +188,7 @@ func Run(cmd string) {
 		panic("todo")
 	case githubScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("github")
-		github.AnalyzePermissions(cfg, *githubKey)
+		github.AnalyzeAndPrintPermissions(cfg, *githubKey)
 	case sendgridScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("sendgrid")
 		sendgrid.AnalyzePermissions(cfg, *sendgridKey)
@@ -209,7 +209,7 @@ func Run(cmd string) {
 		twilio.AnalyzePermissions(cfg, *twilioKey)
 	case airbrakeScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("airbrake")
-		airbrake.AnalyzePermissions(cfg, *airbrakeKey)
+		airbrake.AnalyzeAndPrintPermissions(cfg, *airbrakeKey)
 	case huggingfaceScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("huggingface")
 		huggingface.AnalyzePermissions(cfg, *huggingfaceKey)
@@ -227,10 +227,10 @@ func Run(cmd string) {
 		postman.AnalyzePermissions(cfg, *postmanKey)
 	case bitbucketScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("bitbucket")
-		bitbucket.AnalyzePermissions(cfg, *bitbucketKey)
+		bitbucket.AnalyzeAndPrintPermissions(cfg, *bitbucketKey)
 	case asanaScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("asana")
-		asana.AnalyzePermissions(cfg, *asanaKey)
+		asana.AnalyzeAndPrintPermissions(cfg, *asanaKey)
 	case mailgunScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("mailgun")
 		mailgun.AnalyzePermissions(cfg, *mailgunKey)
