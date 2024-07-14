@@ -730,56 +730,63 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
-		sourceVerify := chunk.Verify
-		for _, decoder := range e.decoders {
-			decoded := decoder.FromChunk(chunk)
-			if decoded == nil {
-				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
-				continue
-			}
 
-			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
-			if len(matchingDetectors) > 1 && !e.verificationOverlap {
-				wgVerificationOverlap.Add(1)
-				e.verificationOverlapChunksChan <- verificationOverlapChunk{
-					chunk:                       *decoded.Chunk,
-					detectors:                   matchingDetectors,
-					decoder:                     decoded.DecoderType,
-					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+		// Free the chunk's data.
+		func() {
+			defer func() { chunk.Data = nil }()
+
+			sourceVerify := chunk.Verify
+			for _, decoder := range e.decoders {
+				decoded := decoder.FromChunk(chunk)
+				if decoded == nil {
+					ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+					continue
+				}
+
+				matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+				if len(matchingDetectors) > 1 && !e.verificationOverlap {
+					wgVerificationOverlap.Add(1)
+					e.verificationOverlapChunksChan <- verificationOverlapChunk{
+						chunk:                       *decoded.Chunk,
+						detectors:                   matchingDetectors,
+						decoder:                     decoded.DecoderType,
+						verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
+					}
+					continue
+				}
+
+				for _, detector := range matchingDetectors {
+					decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
+					wgDetect.Add(1)
+					e.detectableChunksChan <- detectableChunk{
+						chunk:    *decoded.Chunk,
+						detector: detector,
+						decoder:  decoded.DecoderType,
+						wgDoneFn: wgDetect.Done,
+					}
 				}
 				continue
 			}
 
-			for _, detector := range matchingDetectors {
-				decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
-				wgDetect.Add(1)
-				e.detectableChunksChan <- detectableChunk{
-					chunk:    *decoded.Chunk,
-					detector: detector,
-					decoder:  decoded.DecoderType,
-					wgDoneFn: wgDetect.Done,
-				}
-			}
-			continue
-		}
+			dataSize := float64(len(chunk.Data))
 
-		dataSize := float64(len(chunk.Data))
+			scanBytesPerChunk.Observe(dataSize)
+			jobBytesScanned.WithLabelValues(
+				strconv.Itoa(int(chunk.JobID)),
+				chunk.SourceType.String(),
+				chunk.SourceName,
+			).Add(dataSize)
+			chunksScannedLatency.Observe(float64(time.Since(startTime).Microseconds()))
+			jobChunksScanned.WithLabelValues(
+				strconv.Itoa(int(chunk.JobID)),
+				chunk.SourceType.String(),
+				chunk.SourceName,
+			).Inc()
 
-		scanBytesPerChunk.Observe(dataSize)
-		jobBytesScanned.WithLabelValues(
-			strconv.Itoa(int(chunk.JobID)),
-			chunk.SourceType.String(),
-			chunk.SourceName,
-		).Add(dataSize)
-		chunksScannedLatency.Observe(float64(time.Since(startTime).Microseconds()))
-		jobChunksScanned.WithLabelValues(
-			strconv.Itoa(int(chunk.JobID)),
-			chunk.SourceType.String(),
-			chunk.SourceName,
-		).Inc()
+			atomic.AddUint64(&e.metrics.ChunksScanned, 1)
+			atomic.AddUint64(&e.metrics.BytesScanned, uint64(dataSize))
+		}()
 
-		atomic.AddUint64(&e.metrics.ChunksScanned, 1)
-		atomic.AddUint64(&e.metrics.BytesScanned, uint64(dataSize))
 	}
 
 	wgVerificationOverlap.Wait()
@@ -928,6 +935,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 								decoder:  chunk.decoder,
 								wgDoneFn: wgDetect.Done,
 							},
+							match,
 							res,
 							isFalsePositive,
 						)
@@ -1029,7 +1037,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results = e.filterResults(ctx, data.detector, results)
 
 		for _, res := range results {
-			e.processResult(ctx, data, res, isFalsePositive)
+			e.processResult(ctx, data, matchBytes, res, isFalsePositive)
 		}
 	}
 
@@ -1058,6 +1066,7 @@ func (e *Engine) filterResults(
 func (e *Engine) processResult(
 	ctx context.Context,
 	data detectableChunk,
+	dataBytes []byte,
 	res detectors.Result,
 	isFalsePositive func(detectors.Result) (bool, string),
 ) {
@@ -1069,7 +1078,7 @@ func (e *Engine) processResult(
 			copyChunk.SourceMetadata = copyMetaData
 		}
 		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
-		ignoreLinePresent = SetResultLineNumber(&copyChunk, &res, fragStart, mdLine)
+		ignoreLinePresent = SetResultLineNumber(dataBytes, &res, fragStart, mdLine)
 		if err := UpdateLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
 			ctx.Logger().Error(err, "error setting link")
 			return
@@ -1158,8 +1167,8 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 }
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
-func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	before, after, found := bytes.Cut(chunk.Data, result.Raw)
+func FragmentLineOffset(chunk []byte, result *detectors.Result) (int64, bool) {
+	before, after, found := bytes.Cut(chunk, result.Raw)
 	if !found {
 		return 0, false
 	}
@@ -1217,7 +1226,7 @@ func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
 }
 
 // SetResultLineNumber sets the line number in the provided result.
-func SetResultLineNumber(chunk *sources.Chunk, result *detectors.Result, fragStart int64, mdLine *int64) bool {
+func SetResultLineNumber(chunk []byte, result *detectors.Result, fragStart int64, mdLine *int64) bool {
 	offset, skip := FragmentLineOffset(chunk, result)
 	*mdLine = fragStart + offset
 	return skip

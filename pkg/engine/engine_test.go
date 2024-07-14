@@ -144,7 +144,7 @@ func TestFragmentLineOffset(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lineOffset, isIgnored := FragmentLineOffset(tt.chunk, tt.result)
+			lineOffset, isIgnored := FragmentLineOffset(tt.chunk.Data, tt.result)
 			if lineOffset != tt.expectedLine {
 				t.Errorf("Expected line offset to be %d, got %d", tt.expectedLine, lineOffset)
 			}
@@ -174,21 +174,21 @@ func setupFragmentLineOffsetBench(totalLines, needleLine int) (*sources.Chunk, *
 func BenchmarkFragmentLineOffsetStart(b *testing.B) {
 	chunk, result := setupFragmentLineOffsetBench(512, 2)
 	for i := 0; i < b.N; i++ {
-		_, _ = FragmentLineOffset(chunk, result)
+		_, _ = FragmentLineOffset(chunk.Data, result)
 	}
 }
 
 func BenchmarkFragmentLineOffsetMiddle(b *testing.B) {
 	chunk, result := setupFragmentLineOffsetBench(512, 256)
 	for i := 0; i < b.N; i++ {
-		_, _ = FragmentLineOffset(chunk, result)
+		_, _ = FragmentLineOffset(chunk.Data, result)
 	}
 }
 
 func BenchmarkFragmentLineOffsetEnd(b *testing.B) {
 	chunk, result := setupFragmentLineOffsetBench(512, 510)
 	for i := 0; i < b.N; i++ {
-		_, _ = FragmentLineOffset(chunk, result)
+		_, _ = FragmentLineOffset(chunk.Data, result)
 	}
 }
 
