@@ -230,6 +230,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/edenai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eightxeight"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elasticemail"
+	elevenlabsv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elevenlabs/v1"
+	elevenlabsv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elevenlabs/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enablex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/endorlabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enigma"
@@ -1042,6 +1044,8 @@ func DefaultDetectors() []detectors.Detector {
 		&prospectcrm.Scanner{},
 		&surveyanyplace.Scanner{},
 		&ubidots.Scanner{},
+		&elevenlabsv1.Scanner{},
+		&elevenlabsv2.Scanner{},
 		sinchmessage.Scanner{},
 		ayrshare.Scanner{},
 		mailboxlayer.Scanner{},

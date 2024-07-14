@@ -408,7 +408,7 @@ func (s *Source) getAllProjectRepos(
 	var projectsWithNamespace []string
 
 	// Used to filter out duplicate projects.
-	processProjects := func(projList []*gitlab.Project) error {
+	processProjects := func(ctx context.Context, projList []*gitlab.Project) error {
 		for _, proj := range projList {
 			ctx := context.WithValues(ctx,
 				"project_id", proj.ID,
@@ -439,6 +439,7 @@ func (s *Source) getAllProjectRepos(
 				continue
 			}
 			// Report the unit.
+			ctx.Logger().V(3).Info("accepting project")
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
@@ -450,8 +451,8 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	const (
-		orderBy         = "last_activity_at"
-		paginationLimit = 100 // Default is 20, max is 100.
+		orderBy         = "id" // TODO: Use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
+		paginationLimit = 100  // Default is 20, max is 100.
 	)
 	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
 
@@ -466,7 +467,7 @@ func (s *Source) getAllProjectRepos(
 			break
 		}
 		ctx.Logger().V(3).Info("listed user projects", "count", len(userProjects))
-		if err := processProjects(userProjects); err != nil {
+		if err := processProjects(ctx, userProjects); err != nil {
 			return err
 		}
 		projectQueryOptions.Page = res.NextPage
@@ -514,6 +515,7 @@ func (s *Source) getAllProjectRepos(
 	ctx.Logger().V(2).Info("got groups", "groups", groups)
 
 	for _, group := range groups {
+		ctx := context.WithValue(ctx, "group_id", group.ID)
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
 			ListOptions:      listOpts,
 			OrderBy:          gitlab.Ptr(orderBy),
@@ -532,7 +534,7 @@ func (s *Source) getAllProjectRepos(
 				break
 			}
 			ctx.Logger().V(3).Info("listed group projects", "count", len(grpPrjs))
-			if err := processProjects(grpPrjs); err != nil {
+			if err := processProjects(ctx, grpPrjs); err != nil {
 				return err
 			}
 			listGroupProjectOptions.Page = res.NextPage

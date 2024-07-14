@@ -2,7 +2,6 @@ package sources
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"io"
 
@@ -17,37 +16,6 @@ const (
 	// TotalChunkSize is the total size of a chunk with peek data.
 	TotalChunkSize = DefaultChunkSize + DefaultPeekSize
 )
-
-// Chunker takes a chunk and splits it into chunks of DefaultChunkSize.
-func Chunker(originalChunk *Chunk) chan *Chunk {
-	chunkChan := make(chan *Chunk, 1)
-	go func() {
-		defer close(chunkChan)
-		if len(originalChunk.Data) <= TotalChunkSize {
-			chunkChan <- originalChunk
-			return
-		}
-
-		r := bytes.NewReader(originalChunk.Data)
-		reader := bufio.NewReaderSize(bufio.NewReader(r), DefaultChunkSize)
-		for {
-			chunkBytes := make([]byte, TotalChunkSize)
-			chunk := *originalChunk
-			chunkBytes = chunkBytes[:DefaultChunkSize]
-			n, err := io.ReadFull(reader, chunkBytes)
-			if n > 0 {
-				peekData, _ := reader.Peek(TotalChunkSize - n)
-				chunkBytes = append(chunkBytes[:n], peekData...)
-				chunk.Data = chunkBytes
-				chunkChan <- &chunk
-			}
-			if err != nil {
-				break
-			}
-		}
-	}()
-	return chunkChan
-}
 
 type chunkReaderConfig struct {
 	chunkSize int
