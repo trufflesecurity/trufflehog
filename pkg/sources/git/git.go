@@ -1259,8 +1259,15 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		done <- handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 	}()
 
-	return <-done
+	// Wait for the command to finish and the handler to complete.
+	// Capture any error from the file handling process.
+	processErr := <-done
 
+	if waitErr := cmd.Wait(); waitErr != nil {
+		return fmt.Errorf("error waiting for git cat-file: %w", waitErr)
+	}
+
+	return processErr
 }
 
 func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, error) {
