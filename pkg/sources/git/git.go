@@ -1251,7 +1251,6 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	}()
 
 	done := make(chan error, 1)
-
 	// Read from stdout to prevent the pipe buffer from filling up and causing the command to hang.
 	// This allows us to stream the file contents to the handler.
 	go func() {
