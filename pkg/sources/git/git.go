@@ -1243,13 +1243,6 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return err
 	}
 
-	// Close to signal that we are done writing to the pipe, which allows the reading goroutine to finish.
-	defer func() {
-		if closeErr := stdout.Close(); closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
-			ctx.Logger().Error(fmt.Errorf("error closing stdout: %w", closeErr), "closing stdout failed")
-		}
-	}()
-
 	done := make(chan error, 1)
 	// Read from stdout to prevent the pipe buffer from filling up and causing the command to hang.
 	// This allows us to stream the file contents to the handler.
@@ -1258,14 +1251,18 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		done <- handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 	}()
 
-	// Wait for the command to finish and the handler to complete.
-	// Capture any error from the file handling process.
-	processErr := <-done
+	// Close to signal that we are done writing to the pipe, which allows the reading goroutine to finish.
+	if closeErr := stdout.Close(); closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
+		ctx.Logger().Error(fmt.Errorf("error closing stdout: %w", closeErr), "closing stdout failed")
+	}
 
 	if waitErr := cmd.Wait(); waitErr != nil {
 		return fmt.Errorf("error waiting for git cat-file: %w", waitErr)
 	}
 
+	// Wait for the command to finish and the handler to complete.
+	// Capture any error from the file handling process.
+	processErr := <-done
 	return processErr
 }
 
