@@ -99,9 +99,8 @@ func newFileReader(r io.Reader) (fileReader, error) {
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
-	// Check if the MIME type should bypass the archiver library identification and continue processing.
-	// This bypass is necessary for archive formats not supported by the archiver library and for text-based formats
-	// that are best handled directly by the default reader.
+	// If a MIME type is known to not be an archive type, we might as well return here rather than
+	// paying the I/O penalty of an archiver.Identify() call that won't identify anything.
 	if _, ok := skipArchiverMimeTypes[mimeType(mime.String())]; ok {
 		return fReader, nil
 	}
