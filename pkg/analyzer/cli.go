@@ -218,7 +218,7 @@ func Run(cmd string) {
 		stripe.AnalyzePermissions(cfg, *stripeKey)
 	case gitlabScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("gitlab")
-		gitlab.AnalyzePermissions(cfg, *gitlabKey)
+		gitlab.AnalyzeAndPrintPermissions(cfg, *gitlabKey)
 	case mailchimpScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("mailchimp")
 		mailchimp.AnalyzePermissions(cfg, *mailchimpKey)
