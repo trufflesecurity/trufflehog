@@ -1262,8 +1262,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 
 	// Wait for the command to finish and the handler to complete.
 	// Capture any error from the file handling process.
-	processErr := <-done
-	return processErr
+	return <-done
 }
 
 func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, error) {
