@@ -1,0 +1,136 @@
+//go:build detectors
+// +build detectors
+
+package netsuite
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+)
+
+func TestNetsuite_FromChunk(t *testing.T) {
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+
+	consumerKey := testSecrets.MustGetField("NETSUITE_CONSUMER_KEY")
+	consumerSecret := testSecrets.MustGetField("NETSUITE_CONSUMER_SECRET")
+	tokenKey := testSecrets.MustGetField("NETSUITE_TOKEN_KEY")
+	tokenSecret := testSecrets.MustGetField("NETSUITE_TOKEN_SECRET")
+	accountID := testSecrets.MustGetField("NETSUITE_ACCOUNT_ID")
+
+	inactiveConsumerSecret := testSecrets.MustGetField("NETSUITE_CONSUMER_SECRET_INACTIVE")
+
+	type args struct {
+		ctx    context.Context
+		data   []byte
+		verify bool
+	}
+	tests := []struct {
+		name    string
+		s       Scanner
+		args    args
+		want    []detectors.Result
+		wantErr bool
+	}{
+		{
+			name: "found, verified",
+			s:    Scanner{},
+			args: args{
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf("You can find a netsuite consumer key %s with secret %s, token key %s, token secret %s, account id %s",
+					consumerKey,
+					consumerSecret,
+					tokenKey,
+					tokenSecret,
+					accountID)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Netsuite,
+					Verified:     true,
+					Raw:          []byte(consumerKey),
+					RawV2:        []byte(consumerKey + consumerSecret),
+				},
+			},
+			wantErr: false,
+		},
+		// {
+		// 	name: "found, unverified",
+		// 	s:    Scanner{},
+		// 	args: args{
+		// 		ctx: context.Background(),
+		// 		data: []byte(fmt.Sprintf("You can find a netsuite consumer key %s but not valid with secret %s, token key %s, token secret %s, account id %s",
+		// 			consumerKey,
+		// 			inactiveConsumerSecret,
+		// 			tokenKey,
+		// 			tokenSecret,
+		// 			accountID)),
+		// 		verify: true,
+		// 	},
+		// 	want: []detectors.Result{
+		// 		{
+		// 			DetectorType: detectorspb.DetectorType_Netsuite,
+		// 			Verified:     false,
+		// 			Raw:          []byte(consumerKey),
+		// 			RawV2:        []byte(consumerKey + consumerSecret),
+		// 		},
+		// 	},
+		// 	wantErr: false,
+		// },
+		// {
+		// 	name: "not found",
+		// 	s:    Scanner{},
+		// 	args: args{
+		// 		ctx:    context.Background(),
+		// 		data:   []byte("You cannot find the secret within"),
+		// 		verify: true,
+		// 	},
+		// 	want:    nil,
+		// 	wantErr: false,
+		// },
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Netsuite.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for i := range got {
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no raw secret present: \n %+v", got[i])
+				}
+				got[i].Raw = nil
+			}
+			if diff := pretty.Compare(got, tt.want); diff != "" {
+				t.Errorf("Netsuite.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
+func BenchmarkFromData(benchmark *testing.B) {
+	ctx := context.Background()
+	s := Scanner{}
+	for name, data := range detectors.MustGetBenchmarkData() {
+		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				_, err := s.FromData(ctx, false, data)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
