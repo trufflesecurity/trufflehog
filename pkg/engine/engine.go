@@ -729,12 +729,15 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	var wgVerificationOverlap sync.WaitGroup
 
 	for chunk := range e.ChunksChan() {
-		startTime := time.Now()
-
-		// Free the chunk's data.
 		func() {
+			// Set chunk.Data to nil to allow the GC to reclaim the memory earlier.
+			// This field can contain up to 64kB of data, so keeping it around
+			// for the entire duration of the scan can lead to higher memory usage.
+			// This is safe because if the chunk contains credentials,
+			// they are stored in |detectableChunk.matches| within the |matchingDetectors| slice.
 			defer func() { chunk.Data = nil }()
 
+			startTime := time.Now()
 			sourceVerify := chunk.Verify
 			for _, decoder := range e.decoders {
 				decoded := decoder.FromChunk(chunk)
@@ -1065,32 +1068,32 @@ func (e *Engine) filterResults(
 
 func (e *Engine) processResult(
 	ctx context.Context,
-	data detectableChunk,
-	dataBytes []byte,
+	chunk detectableChunk,
+	data []byte,
 	res detectors.Result,
 	isFalsePositive func(detectors.Result) (bool, string),
 ) {
 	ignoreLinePresent := false
-	if SupportsLineNumbers(data.chunk.SourceType) {
-		copyChunk := data.chunk
-		copyMetaDataClone := proto.Clone(data.chunk.SourceMetadata)
+	if SupportsLineNumbers(chunk.chunk.SourceType) {
+		copyChunk := chunk.chunk
+		copyMetaDataClone := proto.Clone(chunk.chunk.SourceMetadata)
 		if copyMetaData, ok := copyMetaDataClone.(*source_metadatapb.MetaData); ok {
 			copyChunk.SourceMetadata = copyMetaData
 		}
 		fragStart, mdLine, link := FragmentFirstLineAndLink(&copyChunk)
-		ignoreLinePresent = SetResultLineNumber(dataBytes, &res, fragStart, mdLine)
+		ignoreLinePresent = SetResultLineNumber(data, &res, fragStart, mdLine)
 		if err := UpdateLink(ctx, copyChunk.SourceMetadata, link, *mdLine); err != nil {
 			ctx.Logger().Error(err, "error setting link")
 			return
 		}
-		data.chunk = copyChunk
+		chunk.chunk = copyChunk
 	}
 	if ignoreLinePresent {
 		return
 	}
 
-	secret := detectors.CopyMetadata(&data.chunk, res)
-	secret.DecoderType = data.decoder
+	secret := detectors.CopyMetadata(&chunk.chunk, res)
+	secret.DecoderType = chunk.decoder
 
 	if !res.Verified && res.Raw != nil {
 		isFp, _ := isFalsePositive(res)
@@ -1166,9 +1169,9 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 	}
 }
 
-// FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
-func FragmentLineOffset(chunk []byte, result *detectors.Result) (int64, bool) {
-	before, after, found := bytes.Cut(chunk, result.Raw)
+// FragmentLineOffset sets the line number for a provided source chunk's data with a given detector result.
+func FragmentLineOffset(data []byte, result *detectors.Result) (int64, bool) {
+	before, after, found := bytes.Cut(data, result.Raw)
 	if !found {
 		return 0, false
 	}
@@ -1226,8 +1229,8 @@ func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
 }
 
 // SetResultLineNumber sets the line number in the provided result.
-func SetResultLineNumber(chunk []byte, result *detectors.Result, fragStart int64, mdLine *int64) bool {
-	offset, skip := FragmentLineOffset(chunk, result)
+func SetResultLineNumber(data []byte, result *detectors.Result, fragStart int64, mdLine *int64) bool {
+	offset, skip := FragmentLineOffset(data, result)
 	*mdLine = fragStart + offset
 	return skip
 }
