@@ -33,7 +33,7 @@ type fileReader struct {
 	mimeType         mimeType
 	isGenericArchive bool
 
-	*iobuf.BufferedReaderSeeker
+	*iobuf.BufferedReadSeeker
 }
 
 var ErrEmptyReader = errors.New("reader is empty")
@@ -79,7 +79,7 @@ func newFileReader(r io.Reader) (fileReader, error) {
 	// This optimization ensures we don't continue writing to the buffer after the initial reads.
 	bufReader.DisableBuffering()
 
-	reader.BufferedReaderSeeker = bufReader
+	reader.BufferedReadSeeker = bufReader
 
 	return reader, nil
 }

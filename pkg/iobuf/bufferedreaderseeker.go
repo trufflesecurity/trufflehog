@@ -7,10 +7,10 @@ import (
 	"io"
 )
 
-// BufferedReaderSeeker provides a buffered reading interface with seeking capabilities.
+// BufferedReadSeeker provides a buffered reading interface with seeking capabilities.
 // It wraps an io.Reader and optionally an io.Seeker, allowing for efficient
 // reading and seeking operations, even on non-seekable underlying readers.
-type BufferedReaderSeeker struct {
+type BufferedReadSeeker struct {
 	reader io.Reader
 	seeker io.Seeker // If the reader supports seeking, it's stored here for direct access
 
@@ -26,10 +26,10 @@ type BufferedReaderSeeker struct {
 	activeBuffering bool
 }
 
-// NewBufferedReaderSeeker creates and initializes a BufferedReaderSeeker.
+// NewBufferedReaderSeeker creates and initializes a BufferedReadSeeker.
 // It takes an io.Reader and checks if it supports seeking.
 // If the reader supports seeking, it is stored in the seeker field.
-func NewBufferedReaderSeeker(r io.Reader) *BufferedReaderSeeker {
+func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 	var (
 		seeker          io.Seeker
 		buffer          *bytes.Buffer
@@ -46,7 +46,7 @@ func NewBufferedReaderSeeker(r io.Reader) *BufferedReaderSeeker {
 		buffer = bytes.NewBuffer(make([]byte, 0, mimeTypeBufferSize))
 	}
 
-	return &BufferedReaderSeeker{
+	return &BufferedReadSeeker{
 		reader:          r,
 		seeker:          seeker,
 		buffer:          buffer,
@@ -58,7 +58,7 @@ func NewBufferedReaderSeeker(r io.Reader) *BufferedReaderSeeker {
 
 // Read reads len(out) bytes from the reader starting at the current index.
 // It handles both seekable and non-seekable underlying readers efficiently.
-func (br *BufferedReaderSeeker) Read(out []byte) (int, error) {
+func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 	// For seekable readers, read directly from the underlying reader.
 	if br.seeker != nil {
 		n, err := br.reader.Read(out)
@@ -95,15 +95,12 @@ func (br *BufferedReaderSeeker) Read(out []byte) (int, error) {
 		bytesToRead := int(outLen + br.index - int64(br.buffer.Len()))
 		readerBytes := make([]byte, bytesToRead)
 		n, err := br.reader.Read(readerBytes)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return 0, err
-		}
-		if n == 0 {
-			return 0, io.EOF
-		}
-
 		br.buffer.Write(readerBytes[:n])
 		br.bytesRead += int64(n)
+
+		if err != nil {
+			return n, err
+		}
 	}
 
 	// Ensure the read does not exceed the buffer length.
@@ -124,7 +121,7 @@ func (br *BufferedReaderSeeker) Read(out []byte) (int, error) {
 
 // Seek sets the offset for the next Read or Write to offset.
 // It supports both seekable and non-seekable underlying readers.
-func (br *BufferedReaderSeeker) Seek(offset int64, whence int) (int64, error) {
+func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	if br.seeker != nil {
 		// Use the underlying Seeker if available.
 		newIndex, err := br.seeker.Seek(offset, whence)
@@ -182,7 +179,7 @@ func (br *BufferedReaderSeeker) Seek(offset int64, whence int) (int64, error) {
 
 // ReadAt reads len(out) bytes into out starting at offset off in the underlying input source.
 // It uses Seek and Read to implement random access reading.
-func (br *BufferedReaderSeeker) ReadAt(out []byte, offset int64) (int, error) {
+func (br *BufferedReadSeeker) ReadAt(out []byte, offset int64) (int, error) {
 	startIndex, err := br.Seek(offset, io.SeekStart)
 	if err != nil {
 		return 0, err
@@ -198,4 +195,4 @@ func (br *BufferedReaderSeeker) ReadAt(out []byte, offset int64) (int, error) {
 // DisableBuffering stops the buffering process.
 // This is useful after initial reads (e.g., for MIME type detection and format identification)
 // to prevent further writes to the buffer, optimizing subsequent reads.
-func (br *BufferedReaderSeeker) DisableBuffering() { br.activeBuffering = false }
+func (br *BufferedReadSeeker) DisableBuffering() { br.activeBuffering = false }
