@@ -212,7 +212,7 @@ func Run(cmd string) {
 		airbrake.AnalyzeAndPrintPermissions(cfg, *airbrakeKey)
 	case huggingfaceScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("huggingface")
-		huggingface.AnalyzePermissions(cfg, *huggingfaceKey)
+		huggingface.AnalyzeAndPrintPermissions(cfg, *huggingfaceKey)
 	case stripeScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("stripe")
 		stripe.AnalyzePermissions(cfg, *stripeKey)
