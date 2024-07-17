@@ -128,7 +128,6 @@ func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 		if err != nil {
 			return 0, fmt.Errorf("error seeking in reader: %w", err)
 		}
-		br.index = newIndex
 		if newIndex > br.bytesRead {
 			br.bytesRead = newIndex
 		}
