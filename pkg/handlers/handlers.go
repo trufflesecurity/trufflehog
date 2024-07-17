@@ -264,7 +264,7 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 // the function will skip processing the file and return nil.
 func HandleFile(
 	ctx logContext.Context,
-	reader io.ReadCloser,
+	reader io.Reader,
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
