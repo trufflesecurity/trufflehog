@@ -148,8 +148,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func findUriMatches(data []byte) []map[string]string {

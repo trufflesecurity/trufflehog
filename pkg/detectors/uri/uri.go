@@ -103,8 +103,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, error) {

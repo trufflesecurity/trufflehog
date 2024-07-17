@@ -361,7 +361,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	// Otherwise, we're scanning all data.
 	// This allows us to only scan the commit where a vulnerability was found.
 	if len(targets) > 0 {
-		return s.scanTargets(ctx, targets, chunksChan)
+		errs := s.scanTargets(ctx, targets, chunksChan)
+		return errors.Join(errs...)
 	}
 
 	// Reset consumption and rate limit metrics on each run.
@@ -1514,14 +1515,16 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 	return nil
 }
 
-func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) []error {
+	var errs []error
 	for _, tgt := range targets {
 		if err := s.scanTarget(ctx, tgt, chunksChan); err != nil {
 			ctx.Logger().Error(err, "error scanning target")
+			errs = append(errs, &sources.TargetedScanError{Err: err, SecretID: tgt.SecretID})
 		}
 	}
 
-	return nil
+	return errs
 }
 
 func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
