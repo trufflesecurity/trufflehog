@@ -83,7 +83,12 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 			fileSize := arEntry.Size
 			fileCtx := logContext.WithValues(ctx, "filename", arEntry.Name, "size", fileSize)
 
-			if err := h.handleNonArchiveContent(fileCtx, arEntry.Data, archiveChan); err != nil {
+			rdr, err := newMimeTypeReader(arEntry.Data)
+			if err != nil {
+				return fmt.Errorf("error creating mime-type reader: %w", err)
+			}
+
+			if err := h.handleNonArchiveContent(fileCtx, rdr, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in AR")
 				h.metrics.incErrors()
 			}
