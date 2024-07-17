@@ -164,85 +164,97 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 
 func TestBufferedReaderSeekerSeek(t *testing.T) {
 	tests := []struct {
-		name         string
-		reader       io.Reader
-		offset       int64
-		whence       int
-		expectedPos  int64
-		expectedErr  bool
-		expectedRead []byte
+		name            string
+		reader          io.Reader
+		offset          int64
+		whence          int
+		expectedPos     int64
+		expectedErr     bool
+		expectedRead    []byte
+		activeBuffering bool
 	}{
 		{
-			name:         "seek on seekable reader with SeekStart",
-			reader:       strings.NewReader("test data"),
-			offset:       4,
-			whence:       io.SeekStart,
-			expectedPos:  4,
-			expectedErr:  false,
-			expectedRead: []byte(" dat"),
+			name:            "seek on seekable reader with SeekStart",
+			reader:          strings.NewReader("test data"),
+			offset:          4,
+			whence:          io.SeekStart,
+			expectedPos:     4,
+			expectedRead:    []byte(" dat"),
+			activeBuffering: true,
 		},
 		{
-			name:         "seek on seekable reader with SeekCurrent",
-			reader:       strings.NewReader("test data"),
-			offset:       4,
-			whence:       io.SeekCurrent,
-			expectedPos:  4,
-			expectedErr:  false,
-			expectedRead: []byte(" dat"),
+			name:            "seek on seekable reader with SeekCurrent",
+			reader:          strings.NewReader("test data"),
+			offset:          4,
+			whence:          io.SeekCurrent,
+			expectedPos:     4,
+			expectedRead:    []byte(" dat"),
+			activeBuffering: true,
 		},
 		{
-			name:         "seek on seekable reader with SeekEnd",
-			reader:       strings.NewReader("test data"),
-			offset:       -4,
-			whence:       io.SeekEnd,
-			expectedPos:  5,
-			expectedErr:  false,
-			expectedRead: []byte("data"),
+			name:            "seek on seekable reader with SeekEnd",
+			reader:          strings.NewReader("test data"),
+			offset:          -4,
+			whence:          io.SeekEnd,
+			expectedPos:     5,
+			expectedRead:    []byte("data"),
+			activeBuffering: true,
 		},
 		{
-			name:         "seek on non-seekable reader with SeekStart",
-			reader:       bytes.NewBufferString("test data"),
-			offset:       4,
-			whence:       io.SeekStart,
-			expectedPos:  4,
-			expectedErr:  false,
-			expectedRead: []byte{},
+			name:            "seek on non-seekable reader with SeekStart",
+			reader:          bytes.NewBufferString("test data"),
+			offset:          4,
+			whence:          io.SeekStart,
+			expectedPos:     4,
+			expectedRead:    []byte{},
+			activeBuffering: true,
 		},
 		{
-			name:         "seek on non-seekable reader with SeekCurrent",
-			reader:       bytes.NewBufferString("test data"),
-			offset:       4,
-			whence:       io.SeekCurrent,
-			expectedPos:  4,
-			expectedErr:  false,
-			expectedRead: []byte{},
+			name:            "seek on non-seekable reader with SeekCurrent",
+			reader:          bytes.NewBufferString("test data"),
+			offset:          4,
+			whence:          io.SeekCurrent,
+			expectedPos:     4,
+			expectedRead:    []byte{},
+			activeBuffering: true,
 		},
 		{
-			name:         "seek on non-seekable reader with SeekEnd",
-			reader:       bytes.NewBufferString("test data"),
-			offset:       -4,
-			whence:       io.SeekEnd,
-			expectedPos:  5,
-			expectedErr:  false,
-			expectedRead: []byte{},
+			name:            "seek on non-seekable reader with SeekEnd",
+			reader:          bytes.NewBufferString("test data"),
+			offset:          -4,
+			whence:          io.SeekEnd,
+			expectedPos:     5,
+			expectedRead:    []byte{},
+			activeBuffering: true,
 		},
 		{
-			name:         "seek to negative position",
-			reader:       strings.NewReader("test data"),
-			offset:       -1,
-			whence:       io.SeekStart,
-			expectedPos:  0,
-			expectedErr:  true,
-			expectedRead: nil,
+			name:            "seek to negative position",
+			reader:          strings.NewReader("test data"),
+			offset:          -1,
+			whence:          io.SeekStart,
+			expectedPos:     0,
+			expectedErr:     true,
+			expectedRead:    nil,
+			activeBuffering: true,
 		},
 		{
-			name:         "seek beyond EOF on non-seekable reader",
-			reader:       bytes.NewBufferString("test data"),
-			offset:       20,
-			whence:       io.SeekEnd,
-			expectedPos:  9,
-			expectedErr:  false,
-			expectedRead: []byte{},
+			name:            "seek beyond EOF on non-seekable reader",
+			reader:          bytes.NewBufferString("test data"),
+			offset:          20,
+			whence:          io.SeekEnd,
+			expectedPos:     9,
+			expectedRead:    []byte{},
+			activeBuffering: true,
+		},
+		{
+			name:            "seek on non-seekable reader with buffering disabled",
+			reader:          bytes.NewBufferString("test data"),
+			offset:          4,
+			whence:          io.SeekStart,
+			expectedPos:     0,
+			expectedErr:     true,
+			expectedRead:    nil,
+			activeBuffering: false,
 		},
 	}
 
@@ -251,6 +263,7 @@ func TestBufferedReaderSeekerSeek(t *testing.T) {
 			t.Parallel()
 
 			brs := NewBufferedReaderSeeker(tt.reader)
+			brs.activeBuffering = tt.activeBuffering
 			pos, err := brs.Seek(tt.offset, tt.whence)
 			if tt.expectedErr {
 				assert.Error(t, err)

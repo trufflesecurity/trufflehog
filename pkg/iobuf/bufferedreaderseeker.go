@@ -134,6 +134,10 @@ func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 		return newIndex, nil
 	}
 
+	if !br.activeBuffering {
+		return 0, errors.New("buffering must be enabled to seek on a non-seekable reader")
+	}
+
 	// Manual seeking for non-seekable readers.
 	newIndex := br.index
 
@@ -150,9 +154,7 @@ func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 		for {
 			n, err := br.reader.Read(buffer)
 			if n > 0 {
-				if br.activeBuffering {
-					br.buffer.Write(buffer[:n])
-				}
+				br.buffer.Write(buffer[:n])
 				br.bytesRead += int64(n)
 			}
 			if errors.Is(err, io.EOF) {
