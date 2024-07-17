@@ -21,8 +21,9 @@ type BufferedReadSeeker struct {
 
 	// Flag to control buffering. This flag is used to indicate whether buffering is active.
 	// Buffering is enabled during initial reads (e.g., for MIME type detection and format identification).
-	// Once these operations are done, buffering can be disabled to prevent further writes to the buffer
-	// and to optimize subsequent reads directly from the underlying reader.
+	// Once these operations are done, buffering should be disabled to prevent further writes to the buffer
+	// and to optimize subsequent reads directly from the underlying reader. This helps avoid excessive
+	// memory usage while still providing the necessary functionality for initial detection operations.
 	activeBuffering bool
 }
 
