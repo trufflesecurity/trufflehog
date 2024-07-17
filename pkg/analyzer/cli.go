@@ -221,7 +221,7 @@ func Run(cmd string) {
 		gitlab.AnalyzeAndPrintPermissions(cfg, *gitlabKey)
 	case mailchimpScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("mailchimp")
-		mailchimp.AnalyzePermissions(cfg, *mailchimpKey)
+		mailchimp.AnalyzeAndPrintPermissions(cfg, *mailchimpKey)
 	case postmanScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("postman")
 		postman.AnalyzePermissions(cfg, *postmanKey)
