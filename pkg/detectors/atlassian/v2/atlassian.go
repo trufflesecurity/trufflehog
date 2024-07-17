@@ -35,13 +35,13 @@ var _ detectors.Versioner = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian"}) + `\b([A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})\b`)
+	keyPat = regexp.MustCompile(`\b(ATCTT3xFfG[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"atlassian"}
+	return []string{"ATCTT3xFfG"}
 }
 
 // FromData will find and optionally verify Atlassian secrets in a given set of bytes.
