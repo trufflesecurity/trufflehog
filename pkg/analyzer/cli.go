@@ -233,7 +233,7 @@ func Run(cmd string) {
 		asana.AnalyzeAndPrintPermissions(cfg, *asanaKey)
 	case mailgunScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("mailgun")
-		mailgun.AnalyzePermissions(cfg, *mailgunKey)
+		mailgun.AnalyzeAndPrintPermissions(cfg, *mailgunKey)
 	case squareScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("square")
 		square.AnalyzePermissions(cfg, *squareKey)
