@@ -34,7 +34,7 @@ type fileReader struct {
 	mime             *mimetype.MIME
 	isGenericArchive bool
 
-	*iobuf.BufferedReaderSeeker
+	*iobuf.BufferedReadSeeker
 }
 
 var ErrEmptyReader = errors.New("reader is empty")
@@ -53,7 +53,7 @@ func newMimeTypeReaderFromFileReader(r fileReader) mimeTypeReader {
 	return mimeTypeReader{
 		mimeExt:  r.mime.Extension(),
 		mimeName: mimeType(r.mime.String()),
-		Reader:   r.BufferedReaderSeeker,
+		Reader:   r.BufferedReadSeeker,
 	}
 }
 
@@ -82,7 +82,7 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 func newFileReader(r io.Reader) (fileReader, error) {
 	var fReader fileReader
 
-	fReader.BufferedReaderSeeker = iobuf.NewBufferedReaderSeeker(r)
+	fReader.BufferedReadSeeker = iobuf.NewBufferedReaderSeeker(r)
 
 	// Disable buffering after initial reads.
 	// This optimization ensures we don't continue writing to the buffer after the initial reads.
