@@ -285,3 +285,4 @@ develop
 master
 slave
 secondary
+example

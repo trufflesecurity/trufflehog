@@ -230,9 +230,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/edenai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eightxeight"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elasticemail"
+	elevenlabsv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elevenlabs/v1"
+	elevenlabsv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elevenlabs/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enablex"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/endorlabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/enigma"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/envoyapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eraser"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/etherscan"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ethplorer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eventbrite"
@@ -376,6 +380,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/languagelayer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/larksuite"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/larksuiteapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/launchdarkly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ldap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/leadfeeder"
@@ -1038,6 +1044,8 @@ func DefaultDetectors() []detectors.Detector {
 		&prospectcrm.Scanner{},
 		&surveyanyplace.Scanner{},
 		&ubidots.Scanner{},
+		&elevenlabsv1.Scanner{},
+		&elevenlabsv2.Scanner{},
 		sinchmessage.Scanner{},
 		ayrshare.Scanner{},
 		mailboxlayer.Scanner{},
@@ -1608,6 +1616,10 @@ func DefaultDetectors() []detectors.Detector {
 		intra42.Scanner{},
 		groq.Scanner{},
 		twitterconsumerkey.Scanner{},
+		eraser.Scanner{},
+		larksuite.Scanner{},
+		larksuiteapikey.Scanner{},
+		endorlabs.Scanner{},
 	}
 }
 
