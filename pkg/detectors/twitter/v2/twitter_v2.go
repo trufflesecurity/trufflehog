@@ -10,22 +10,28 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter/v1"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
-	detectors.DefaultMultiPartCredentialProvider
+	v1.Scanner
+
+	client *http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Detector = (*v1.Scanner)(nil)
+var _ detectors.Versioner = (*v1.Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitter"}) + `\b([A-Z]{22}%[a-zA-Z-0-9]{23}%[a-zA-Z-0-9]{6}%[a-zA-Z-0-9]{3}%[a-zA-Z-0-9]{9}%[a-zA-Z-0-9]{52})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitter"}) + `\b([a-zA-Z0-9]{20,59}%([a-zA-Z0-9]{3,}%){0,2}[a-zA-Z0-9]{52})\b`)
 )
+
+func (s *Scanner) Version() int { return 2 }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -37,32 +43,30 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	keyMatches := make(map[string]struct{})
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		keyMatches[match[1]] = struct{}{}
+	}
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
+	for match := range keyMatches {
+		match = strings.TrimSpace(match)
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Twitter,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(match),
+			ExtraData: map[string]string{
+				"version": fmt.Sprintf("%d", s.Version()),
+			},
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.twitter.com/2/tweets/20", nil)
-			if err != nil {
-				continue
+			client := s.client
+			if client == nil {
+				client = defaultClient
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, err := s.VerifyTwitterToken(ctx, client, match)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err)
 		}
 
 		results = append(results, s1)
