@@ -355,6 +355,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				}
 				return nil
 			}
+			defer res.Body.Close()
 
 			email := "Unknown"
 			if obj.Owner != nil {

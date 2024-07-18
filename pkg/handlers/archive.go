@@ -87,15 +87,17 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		return ErrMaxDepthReached
 	}
 
-	arReader := reader.BufferedFileReader
-	if reader.format == nil && depth > 0 {
-		return h.handleNonArchiveContent(ctx, arReader, archiveChan)
+	if reader.format == nil {
+		if depth > 0 {
+			return h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(reader), archiveChan)
+		}
+		return fmt.Errorf("unknown archive format")
 	}
 
 	switch archive := reader.format.(type) {
 	case archiver.Decompressor:
 		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
-		compReader, err := archive.OpenReader(arReader)
+		compReader, err := archive.OpenReader(reader)
 		if err != nil {
 			return fmt.Errorf("error opening decompressor with format: %s %w", reader.format.Name(), err)
 		}
@@ -109,17 +111,16 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 			}
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
-		defer rdr.Close()
 
 		return h.openArchive(ctx, depth+1, rdr, archiveChan)
 	case archiver.Extractor:
-		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), arReader, nil, h.extractorHandler(archiveChan))
+		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, nil, h.extractorHandler(archiveChan))
 		if err != nil {
 			return fmt.Errorf("error extracting archive with format: %s: %w", reader.format.Name(), err)
 		}
 		return nil
 	default:
-		return fmt.Errorf("unknown archive type: %s", reader.mimeType)
+		return fmt.Errorf("unknown archive type: %s", reader.format.Name())
 	}
 }
 
@@ -193,7 +194,6 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 			}
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
-		defer rdr.Close()
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)

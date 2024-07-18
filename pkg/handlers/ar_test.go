@@ -20,7 +20,6 @@ func TestHandleARFile(t *testing.T) {
 
 	rdr, err := newFileReader(file)
 	assert.NoError(t, err)
-	defer rdr.Close()
 
 	handler := newARHandler()
 	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), rdr)

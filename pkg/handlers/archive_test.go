@@ -119,7 +119,6 @@ func TestOpenInvalidArchive(t *testing.T) {
 
 	rdr, err := newFileReader(io.NopCloser(reader))
 	assert.NoError(t, err)
-	defer rdr.Close()
 
 	archiveChan := make(chan []byte)
 
