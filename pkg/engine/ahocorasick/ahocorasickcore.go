@@ -167,9 +167,7 @@ type matchSpan struct {
 }
 
 // addMatchSpan adds a match span to the DetectorMatch instance.
-func (d *DetectorMatch) addMatchSpan(spans ...matchSpan) {
-	d.matchSpans = append(d.matchSpans, spans...)
-}
+func (d *DetectorMatch) addMatchSpan(span matchSpan) { d.matchSpans = append(d.matchSpans, span) }
 
 // mergeMatches merges overlapping or adjacent matchSpans into a single matchSpan.
 // It updates the matchSpans field with the merged spans.
