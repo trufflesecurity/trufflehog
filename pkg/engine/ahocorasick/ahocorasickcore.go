@@ -2,7 +2,6 @@ package ahocorasick
 
 import (
 	"bytes"
-	"strings"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
 
@@ -122,14 +121,14 @@ type Core struct {
 func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...CoreOption) *Core {
 	keywordsToDetectors := make(map[string][]DetectorKey)
 	detectorsByKey := make(map[DetectorKey]detectors.Detector, len(allDetectors))
-	var keywords []string
+	var keywords [][]byte
 	for _, d := range allDetectors {
 		key := CreateDetectorKey(d)
 		detectorsByKey[key] = d
 		for _, kw := range d.Keywords() {
-			kwLower := strings.ToLower(kw)
+			kwLower := bytes.ToLower([]byte(kw))
 			keywords = append(keywords, kwLower)
-			keywordsToDetectors[kwLower] = append(keywordsToDetectors[kwLower], key)
+			keywordsToDetectors[string(kwLower)] = append(keywordsToDetectors[string(kwLower)], key)
 		}
 	}
 
@@ -137,7 +136,7 @@ func NewAhoCorasickCore(allDetectors []detectors.Detector, opts ...CoreOption) *
 	core := &Core{
 		keywordsToDetectors: keywordsToDetectors,
 		detectorsByKey:      detectorsByKey,
-		prefilter:           *ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
+		prefilter:           *ahocorasick.NewTrieBuilder().AddPatterns(keywords).Build(),
 		spanCalculator:      newAdjustableSpanCalculator(defaultOffsetRadius), // Default span calculator
 	}
 
@@ -230,17 +229,18 @@ func (ac *Core) FindDetectorMatches(chunkData []byte) []*DetectorMatch {
 	detectorMatches := make(map[DetectorKey]*DetectorMatch)
 
 	for _, m := range matches {
-		for _, k := range ac.keywordsToDetectors[m.MatchString()] {
-			if _, exists := detectorMatches[k]; !exists {
+		for _, k := range ac.keywordsToDetectors[string(m.Match())] {
+			detectorMatch, exists := detectorMatches[k]
+			if !exists {
 				detector := ac.detectorsByKey[k]
-				detectorMatches[k] = &DetectorMatch{
+				detectorMatch = &DetectorMatch{
 					Key:        k,
 					Detector:   detector,
-					matchSpans: make([]matchSpan, 0),
+					matchSpans: make([]matchSpan, 0, matchCount),
 				}
+				detectorMatches[k] = detectorMatch
 			}
 
-			detectorMatch := detectorMatches[k]
 			startIdx := m.Pos()
 			span := ac.spanCalculator.calculateSpan(
 				spanCalculationParams{

@@ -840,7 +840,7 @@ func TestLikelyDuplicate(t *testing.T) {
 	}
 }
 
-func BenchmarkPopulateMatchingDetectors(b *testing.B) {
+func BenchmarkFindDetectorMatches(b *testing.B) {
 	allDetectors := DefaultDetectors()
 	ac := ahocorasick.NewAhoCorasickCore(allDetectors)
 
