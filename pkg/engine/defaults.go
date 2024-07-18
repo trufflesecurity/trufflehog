@@ -49,6 +49,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/assemblyai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atera"
+	atlassianv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v1"
+	atlassianv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/audd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autodesk"
@@ -1622,6 +1624,8 @@ func DefaultDetectors() []detectors.Detector {
 		larksuite.Scanner{},
 		larksuiteapikey.Scanner{},
 		endorlabs.Scanner{},
+		atlassianv1.Scanner{},
+		atlassianv2.Scanner{},
 	}
 }
 

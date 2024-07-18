@@ -1238,29 +1238,47 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	}
 
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
+	stdout, err := s.executeCatFileCmd(cmd)
+	if err != nil {
+		return err
+	}
 
+	done := make(chan error, 1)
+	// Read from stdout to prevent the pipe buffer from filling up and causing the command to hang.
+	// This allows us to stream the file contents to the handler.
+	go func() {
+		defer close(done)
+		done <- handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	}()
+
+	// Close to signal that we are done writing to the pipe, which allows the reading goroutine to finish.
+	if closeErr := stdout.Close(); closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
+		ctx.Logger().Error(fmt.Errorf("error closing stdout: %w", closeErr), "closing stdout failed")
+	}
+
+	if waitErr := cmd.Wait(); waitErr != nil {
+		return fmt.Errorf("error waiting for git cat-file: %w", waitErr)
+	}
+
+	// Wait for the command to finish and the handler to complete.
+	// Capture any error from the file handling process.
+	return <-done
+}
+
+func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, error) {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
+		return nil, fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
 	}
-
-	defer func() {
-		if err = cmd.Wait(); err != nil {
-			ctx.Logger().Error(fmt.Errorf(
-				"error waiting for command: command=%s, stderr=%s, commit=%s: %w",
-				cmd.String(), stderr.String(), commitHash.String(), err,
-			), "waiting for command failed")
-		}
-	}()
 
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
+		return nil, fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	return handlers.HandleFile(fileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	return stdout, nil
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
