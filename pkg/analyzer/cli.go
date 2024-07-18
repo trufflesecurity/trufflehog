@@ -194,7 +194,7 @@ func Run(cmd string) {
 		sendgrid.AnalyzePermissions(cfg, *sendgridKey)
 	case openAIScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("openai")
-		openai.AnalyzePermissions(cfg, *openaiKey)
+		openai.AnalyzeAndPrintPermissions(cfg, *openaiKey)
 	case postgresScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("postgres")
 		postgres.AnalyzePermissions(cfg, *postgresConnectionStr)
