@@ -127,8 +127,8 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string) {
 		color.Green("[!] Admin API Key. All permissions available.")
 	} else if data.isRestricted {
 		color.Yellow("[!] Restricted API Key. Limited permissions available.")
+		printPermissions(data.perms, cfg.ShowAll)
 	}
-	printPermissions(data.perms, cfg.ShowAll)
 }
 
 // AnalyzePermissions will analyze the permissions of an OpenAI API key
