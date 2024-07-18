@@ -134,7 +134,6 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string) {
 // AnalyzePermissions will analyze the permissions of an OpenAI API key
 func AnalyzePermissions(cfg *config.Config, key string) (*AnalyzerJSON, error) {
 	data := AnalyzerJSON{
-		perms:        getPermissions(),
 		isAdmin:      false,
 		isRestricted: false,
 	}
@@ -157,6 +156,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*AnalyzerJSON, error) {
 		if err := analyzeScopes(key); err != nil {
 			return nil, fmt.Errorf(err.Error())
 		}
+		data.perms = getPermissions()
 	}
 
 	return &data, nil
@@ -229,7 +229,7 @@ func getUserData(cfg *config.Config, key string) (MeJSON, error) {
 	}
 
 	if resp.StatusCode != 200 {
-		return meJSON, fmt.Errorf("Invalid OpenAI Token")
+		return meJSON, fmt.Errorf("invalid OpenAI token")
 	}
 	color.Green("[!] Valid OpenAI Token\n\n")
 
@@ -288,7 +288,6 @@ func getPermissions() []permissionData {
 
 	for _, scope := range SCOPES {
 		status := stringifyPermissionStatus(scope.Tests)
-
 		perms = append(perms, permissionData{
 			name:      scope.Name,
 			endpoints: scope.Endpoints,
