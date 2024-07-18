@@ -51,6 +51,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		apiKeyRes := strings.TrimSpace(apiKeyMatch[1])
 
 		for _, emailMatch := range emailMatches {
+                        if len(emailMatch) != 3 {
+                                continue
+                        }
 			emailRes := strings.TrimSpace(emailMatch[1])
 
 			s1 := detectors.Result{
