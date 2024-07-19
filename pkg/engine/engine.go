@@ -636,9 +636,8 @@ func (e *Engine) startDetectorWorkers(ctx context.Context) {
 }
 
 func (e *Engine) startVerificationOverlapWorkers(ctx context.Context) {
-	const verificationOverlapWorkerMultiplier = detectorWorkerMultiplier
 	ctx.Logger().V(2).Info("starting verificationOverlap workers", "count", e.concurrency)
-	for worker := uint64(0); worker < uint64(e.concurrency*verificationOverlapWorkerMultiplier); worker++ {
+	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.verificationOverlapWg.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "verification_overlap_worker_id", common.RandomID(5))
