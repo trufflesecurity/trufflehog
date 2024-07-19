@@ -3,10 +3,11 @@ package netsuite
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"log"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	regexp "github.com/wasilibs/go-re2"
-	"golang.org/x/exp/rand"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -43,54 +43,47 @@ var (
 	accountIDPat = regexp.MustCompile(detectors.PrefixRegex([]string{"netsuite", "account", "id"}) + `\b([a-zA-Z0-9-_]{6,15})\b`)
 )
 
+type credentialSet struct {
+	consumerKey    string
+	consumerSecret string
+	tokenKey       string
+	tokenSecret    string
+	accountID      string
+}
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"netsuite"}
 }
 
-// FromData will find and optionally verify Twitter secrets in a given set of bytes.
+// FromData will find and optionally verify Netsuite secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	// find for consumer key + secrets
-	consumerKeyMatches := make(map[string]struct{})
-	for _, match := range consumerKeyPat.FindAllStringSubmatch(dataStr, -1) {
-		consumerKeyMatches[match[1]] = struct{}{}
-	}
-	consumerSecretMatches := make(map[string]struct{})
-	for _, match := range consumerSecretPat.FindAllStringSubmatch(dataStr, -1) {
-		consumerSecretMatches[match[1]] = struct{}{}
-	}
-
-	tokenKeyMatches := make(map[string]struct{})
-	for _, match := range tokenKeyPat.FindAllStringSubmatch(dataStr, -1) {
-		tokenKeyMatches[match[1]] = struct{}{}
-	}
-
-	tokenSecretMatches := make(map[string]struct{})
-	for _, match := range tokenSecretPat.FindAllStringSubmatch(dataStr, -1) {
-		tokenSecretMatches[match[1]] = struct{}{}
-	}
-
-	accountIDMatches := make(map[string]struct{})
-	for _, match := range accountIDPat.FindAllStringSubmatch(dataStr, -1) {
-		accountIDMatches[match[1]] = struct{}{}
-	}
+	// // find for credentials
+	consumerKeyMatches := trimUniqueMatches(consumerKeyPat.FindAllStringSubmatch(dataStr, -1))
+	consumerSecretMatches := trimUniqueMatches(consumerSecretPat.FindAllStringSubmatch(dataStr, -1))
+	tokenKeyMatches := trimUniqueMatches(tokenKeyPat.FindAllStringSubmatch(dataStr, -1))
+	tokenSecretMatches := trimUniqueMatches(tokenSecretPat.FindAllStringSubmatch(dataStr, -1))
+	accountIDMatches := trimUniqueMatches(accountIDPat.FindAllStringSubmatch(dataStr, -1))
 
 	for consumerKey := range consumerKeyMatches {
 		for consumerSecret := range consumerSecretMatches {
 			for tokenKey := range tokenKeyMatches {
 				for tokenSecret := range tokenSecretMatches {
 					for accountID := range accountIDMatches {
-						// triming the credentials
-						consumerKey := strings.TrimSpace(consumerKey)
-						consumerSecret := strings.TrimSpace(consumerSecret)
+						cs := credentialSet{
+							consumerKey:    consumerKey,
+							consumerSecret: consumerSecret,
+							tokenKey:       tokenKey,
+							tokenSecret:    tokenSecret,
+							accountID:      accountID,
+						}
 
-						tokenKey := strings.TrimSpace(tokenKey)
-						tokenSecret := strings.TrimSpace(tokenSecret)
-
-						accountID := strings.TrimSpace(accountID)
+						if !isUniqueKeys(cs) {
+							continue
+						}
 
 						s1 := detectors.Result{
 							DetectorType: detectorspb.DetectorType_Netsuite,
@@ -106,11 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 							isVerified, err := verifyCredentials(ctx,
 								client,
-								consumerKey,
-								consumerSecret,
-								tokenKey,
-								tokenSecret,
-								accountID)
+								cs)
 							s1.Verified = isVerified
 							s1.SetVerificationError(err, consumerKey)
 						}
@@ -128,45 +117,56 @@ func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Netsuite
 }
 
-func verifyCredentials(ctx context.Context, client *http.Client, consumerKey, consumerSecret, tokenKey, tokenSecret, accountID string) (bool, error) {
+func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSet) (bool, error) {
+	// for url, filter or replace underscore in accountID if needed and lower case the accountID
+	urlAccountId := strings.ToLower(strings.Replace(cs.accountID, "_", "-", -1))
 
-	nonceGenerator := NetsuiteNoncer{}
+	baseUrl := "https://" + urlAccountId + ".suitetalk.api.netsuite.com"
 
-	baseUrl := "https://" + accountID + ".suitetalk.api.netsuite.com"
-	url := baseUrl + "/services/rest/record/v1/metadata-catalog/check"
+	const path = "/services/rest/record/v1/metadata-catalog/check"
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	// nonce generate
+	nonce, err := netsuiteNonce(11)
+	if err != nil {
+		return false, err
+	}
+
+	signature := makeSignature(http.MethodGet, baseUrl, path, map[string]string{
+		"consumer_key":     cs.consumerKey,
+		"consumer_secret":  cs.consumerSecret,
+		"token_id":         cs.tokenKey,
+		"token_secret":     cs.tokenSecret,
+		"signature_method": "HMAC-SHA256",
+		"timestamp":        strconv.FormatInt(time.Now().Unix(), 10),
+		"nonce":            nonce,
+		"version":          "1.0",
+		"realm":            cs.accountID,
+	})
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseUrl+path, nil)
 
 	if err != nil {
-		log.Fatalf("Error creating request: %v", err)
 		return false, err
 	}
 
 	// Set required headers
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", makeSignature("GET", url, "/services/rest/record/v1/metadata-catalog/customer", map[string]string{
-		"consumer_key":     consumerKey,
-		"consumer_secret":  consumerSecret,
-		"token_id":         tokenKey,
-		"token_secret":     tokenSecret,
-		"signature_method": "HMAC-SHA256",
-		"timestamp":        strconv.FormatInt(time.Now().Unix(), 10),
-		"nonce":            nonceGenerator.Nonce(),
-		"version":          "1.0",
-		"realm":            accountID,
-	}))
+	req.Header.Set("Authorization", signature)
 
 	// Make the request
 	res, err := client.Do(req)
 	if err != nil {
+		if strings.Contains(err.Error(), "no such host") {
+			return false, nil
+		}
 		return false, err
 	}
 	defer res.Body.Close()
 	switch res.StatusCode {
-	case http.StatusOK, http.StatusForbidden:
-		// 403 indicates lack of permission, but valid token (could be due to twitter free tier)
+	case http.StatusOK:
 		return true, nil
 	case http.StatusUnauthorized:
+		// 401 indicates unverified credentials
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
@@ -210,18 +210,44 @@ func makeSignature(method, baseUrl, path string, params map[string]string) strin
 		"oauth_signature=\"" + url.QueryEscape(signature) + "\""
 }
 
-// NetsuiteNoncer reads 11 bytes from crypto/rand and
-// returns those bytes as string
-type NetsuiteNoncer struct{}
-
-func (n NetsuiteNoncer) Nonce() string {
-
-	// Nonce provides a random nonce string.
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
-	b := make([]rune, 11)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+func trimUniqueMatches(matches [][]string) (result map[string]struct{}) {
+	result = make(map[string]struct{})
+	for _, match := range matches {
+		if len(match) > 0 {
+			trimmedString := strings.TrimSpace(match[1])
+			result[trimmedString] = struct{}{}
+		}
 	}
-	return string(b)
+	return result
+}
+
+// Check if a credential set is unique, this is used to avoid duplicates.
+func isUniqueKeys(cs credentialSet) bool {
+	seen := make(map[string]struct{})
+	credentials := []string{cs.consumerKey, cs.consumerSecret, cs.tokenKey, cs.tokenSecret, cs.accountID}
+
+	for _, cred := range credentials {
+		if _, exists := seen[cred]; exists {
+			return false
+		}
+		seen[cred] = struct{}{}
+	}
+	return true
+}
+
+// return a random nonce of 'n' character long
+func netsuiteNonce(n int) (string, error) {
+	// Nonce provides a random nonce string.
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	ret := make([]byte, n)
+	for i := 0; i < n; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return "", err
+		}
+		ret[i] = letters[num.Int64()]
+	}
+
+	return string(ret), nil
 }
