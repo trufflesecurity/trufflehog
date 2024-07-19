@@ -620,9 +620,8 @@ func (e *Engine) startScannerWorkers(ctx context.Context) {
 	}
 }
 
-const detectorWorkerMultiplier = 50
-
 func (e *Engine) startDetectorWorkers(ctx context.Context) {
+	const detectorWorkerMultiplier = 4
 	ctx.Logger().V(2).Info("starting detector workers", "count", e.concurrency*detectorWorkerMultiplier)
 	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
 		e.wgDetectorWorkers.Add(1)
