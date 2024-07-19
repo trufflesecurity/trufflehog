@@ -17,9 +17,14 @@ const (
 	TotalChunkSize = ChunkSize + PeekSize
 
 	// smallChunkThresholdRatio represents the ratio of the chunk size
-	// below which a chunk is considered "small" and will be optimized.
+	// below which a chunk is considered "small" and will be optimized
+	// by creating a smaller byte slice to only accommodate the data.
+	// This prevents a mostly empty buffer, saving memory, reducing the
+	// application's memory footprint, and allowing the garbage collector
+	// to reclaim the extra space. It could also improve cache efficiency,
+	// though most operations use the slice length rather than capacity.
 	// It's expressed as a value between 0 and 1.
-	smallChunkThresholdRatio = 0.5
+	smallChunkThresholdRatio = 0.3
 )
 
 type chunkReaderConfig struct {
@@ -27,12 +32,9 @@ type chunkReaderConfig struct {
 	totalSize int
 	peekSize  int
 
-	// smallChunkThresholdRatio represents the ratio of the chunk size
-	// below which a chunk is considered "small" and will be optimized
-	// by creating a smaller byte slice to only accommodate the data.
-	// This prevents a mostly empty buffer, saving memory and reducing
-	// computations downstream from operating on a larger-than-needed chunk.
-	// It's expressed as a value between 0 and 1.
+	// smallChunkThreshold is the size below which a chunk is considered "small"
+	// and will be optimized by creating a new, smaller slice.
+	// Chunks larger than this threshold will use the original, larger slice.
 	smallChunkThreshold int
 }
 
