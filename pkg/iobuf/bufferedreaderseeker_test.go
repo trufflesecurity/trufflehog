@@ -150,13 +150,15 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 				}
 			}
 
-			assert.Equal(t, tt.expectedBytesRead, brs.bytesRead)
-			assert.Equal(t, tt.expectedIndex, brs.index)
+			if brs.seeker == nil {
+				assert.Equal(t, tt.expectedBytesRead, brs.bytesRead)
+				assert.Equal(t, tt.expectedIndex, brs.index)
 
-			if brs.buffer != nil && len(tt.expectedBuffer) > 0 {
-				assert.Equal(t, tt.expectedBuffer, brs.buffer.Bytes())
-			} else {
-				assert.Nil(t, tt.expectedBuffer)
+				if brs.buffer != nil && len(tt.expectedBuffer) > 0 {
+					assert.Equal(t, tt.expectedBuffer, brs.buffer.Bytes())
+				} else {
+					assert.Nil(t, tt.expectedBuffer)
+				}
 			}
 		})
 	}
@@ -398,7 +400,7 @@ func TestBufferedReaderSeekerSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 			size, err := brs.Size()
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, size)

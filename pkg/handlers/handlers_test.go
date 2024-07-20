@@ -1,10 +1,7 @@
 package handlers
 
 import (
-<<<<<<< HEAD
 	"bytes"
-=======
->>>>>>> main
 	"io"
 	"net/http"
 	"os"
@@ -351,9 +348,9 @@ func TestNewSizedMimetypeReaderFromFileReader(t *testing.T) {
 				brs.EnableBuffering()
 			}
 			fr := fileReader{
-				isGenericArchive:     false,
-				mime:                 &mimetype.MIME{},
-				BufferedReaderSeeker: brs,
+				isGenericArchive:   false,
+				mime:               &mimetype.MIME{},
+				BufferedReadSeeker: brs,
 			}
 
 			result, err := newSizedMimetypeReaderFromFileReader(fr)
