@@ -68,9 +68,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				ClientSecret: secretMatch[1],
 				TokenURL:     github.Endpoint.TokenURL,
 			}
-			_, err := config.Token(ctx)
-			if err != nil && strings.Contains(err.Error(), githubBadVerificationCodeError) {
-				s1.Verified = true
+			if verify {
+				_, err := config.Token(ctx)
+				if err != nil && strings.Contains(err.Error(), githubBadVerificationCodeError) {
+					s1.Verified = true
+				}
 			}
 
 			results = append(results, s1)
