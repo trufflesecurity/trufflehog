@@ -81,11 +81,12 @@ func NewChunkReader(opts ...ConfigOption) ChunkReader {
 }
 
 func applyOptions(opts []ConfigOption) *chunkReaderConfig {
+	threshold := float64(ChunkSize+PeekSize) * smallChunkThresholdRatio
 	// Set defaults.
 	config := &chunkReaderConfig{
 		chunkSize:           ChunkSize, // default
 		peekSize:            PeekSize,  // default
-		smallChunkThreshold: int(float64(ChunkSize+PeekSize) * smallChunkThresholdRatio),
+		smallChunkThreshold: int(threshold),
 	}
 
 	for _, opt := range opts {
