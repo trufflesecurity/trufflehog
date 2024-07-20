@@ -33,7 +33,7 @@ require (
 	github.com/charmbracelet/glamour v0.7.0
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/coinbase/waas-client-library-go v1.0.8
-	github.com/couchbase/gocb/v2 v2.9.0
+	github.com/couchbase/gocb/v2 v2.9.1
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/envoyproxy/protoc-gen-validate v1.0.4
@@ -156,7 +156,7 @@ require (
 	github.com/containerd/errdefs v0.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
-	github.com/couchbase/gocbcore/v10 v10.5.0 // indirect
+	github.com/couchbase/gocbcore/v10 v10.5.1 // indirect
 	github.com/couchbase/gocbcoreps v0.1.3 // indirect
 	github.com/couchbase/goprotostellar v1.0.2 // indirect
 	github.com/couchbaselabs/gocbconnstr/v2 v2.0.0-20240607131231-fb385523de28 // indirect
