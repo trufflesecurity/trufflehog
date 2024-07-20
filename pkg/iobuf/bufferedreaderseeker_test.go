@@ -131,7 +131,7 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 			brs.activeBuffering = tt.activeBuffering
 
 			for i, readSize := range tt.reads {
@@ -250,7 +250,7 @@ func TestBufferedReaderSeekerSeek(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 			pos, err := brs.Seek(tt.offset, tt.whence)
 			if tt.expectedErr {
 				assert.Error(t, err)
@@ -345,7 +345,7 @@ func TestBufferedReaderSeekerReadAt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 
 			out := make([]byte, tt.length)
 			n, err := brs.ReadAt(out, tt.offset)
@@ -443,7 +443,7 @@ func TestBufferedReaderSeekerEnableDisableBuffering(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(strings.NewReader("test data"))
+			brs := NewBufferedReadSeeker(strings.NewReader("test data"))
 			brs.activeBuffering = tt.initialState
 
 			if tt.enable {

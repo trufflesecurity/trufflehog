@@ -49,6 +49,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/assemblyai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atera"
+	atlassianv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v1"
+	atlassianv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/audd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autodesk"
@@ -722,7 +724,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twilio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitch"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter"
+	twitterv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter/v1"
+	twitterv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitterconsumerkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tyntec"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform"
@@ -1422,7 +1425,8 @@ func DefaultDetectors() []detectors.Detector {
 		magicbell.Scanner{},
 		apitemplate.Scanner{},
 		knapsackpro.Scanner{},
-		twitter.Scanner{},
+		twitterv1.Scanner{},
+		twitterv2.Scanner{},
 		timecamp.Scanner{},
 		signable.Scanner{},
 		teletype.Scanner{},
@@ -1620,6 +1624,8 @@ func DefaultDetectors() []detectors.Detector {
 		larksuite.Scanner{},
 		larksuiteapikey.Scanner{},
 		endorlabs.Scanner{},
+		atlassianv1.Scanner{},
+		atlassianv2.Scanner{},
 	}
 }
 

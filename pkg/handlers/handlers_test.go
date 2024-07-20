@@ -1,7 +1,10 @@
 package handlers
 
 import (
+<<<<<<< HEAD
 	"bytes"
+=======
+>>>>>>> main
 	"io"
 	"net/http"
 	"os"
@@ -343,7 +346,7 @@ func TestNewSizedMimetypeReaderFromFileReader(t *testing.T) {
 			t.Parallel()
 
 			data := bytes.NewReader(tt.inputData)
-			brs := iobuf.NewBufferedReaderSeeker(data)
+			brs := iobuf.NewBufferedReadSeeker(data)
 			if tt.initialBuffering {
 				brs.EnableBuffering()
 			}

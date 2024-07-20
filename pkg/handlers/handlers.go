@@ -34,11 +34,16 @@ type fileReader struct {
 	mime             *mimetype.MIME
 	isGenericArchive bool
 
+<<<<<<< HEAD
 	*iobuf.BufferedReaderSeeker
+=======
+	*iobuf.BufferedReadSeeker
+>>>>>>> main
 }
 
 var ErrEmptyReader = errors.New("reader is empty")
 
+<<<<<<< HEAD
 // sizedMimeTypeReader wraps an io.Reader with MIME type information and the size of the content.
 // This type is used to pass content through the processing pipeline
 // while carrying its detected MIME type and size, avoiding redundant type detection and size calculation.
@@ -100,7 +105,7 @@ func newSizedMimeTypeReader(r io.Reader, size int64) (sizedMimeTypeReader, error
 func newFileReader(r io.Reader) (fileReader, error) {
 	var fReader fileReader
 
-	fReader.BufferedReaderSeeker = iobuf.NewBufferedReaderSeeker(r)
+	fReader.BufferedReaderSeeker = iobuf.NewBufferedReadSeeker(r)
 
 	// Disable buffering after initial reads.
 	// This optimization ensures we don't continue writing to the buffer after the initial reads.
@@ -120,6 +125,70 @@ func newFileReader(r io.Reader) (fileReader, error) {
 	// Check if the MIME type should bypass the archiver library identification and continue processing.
 	// This bypass is necessary for archive formats not supported by the archiver library and for text-based formats
 	// that are best handled directly by the default reader.
+=======
+// mimeTypeReader wraps an io.Reader with MIME type information.
+// This type is used to pass content through the processing pipeline
+// while carrying its detected MIME type, avoiding redundant type detection.
+type mimeTypeReader struct {
+	mimeExt  string
+	mimeName mimeType
+	io.Reader
+}
+
+// newMimeTypeReaderFromFileReader creates a new mimeTypeReader from a fileReader.
+func newMimeTypeReaderFromFileReader(r fileReader) mimeTypeReader {
+	return mimeTypeReader{
+		mimeExt:  r.mime.Extension(),
+		mimeName: mimeType(r.mime.String()),
+		Reader:   r.BufferedReadSeeker,
+	}
+}
+
+// newMimeTypeReader creates a new mimeTypeReader from an io.Reader.
+// It uses a bufio.Reader to perform MIME type detection on the input reader
+// without consuming it, by peeking into the first 512 bytes of the input.
+// This encapsulates both the original reader and the detected MIME type information.
+// This function is particularly useful for specialized archive handlers
+// that need to pass extracted content to the default handler without modifying the original reader.
+func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
+	const defaultMinBufferSize = 3072
+	bufReader := bufio.NewReaderSize(r, defaultMinBufferSize)
+	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
+	// If fewer bytes are read, MIME type detection may still succeed.
+	buffer, err := bufReader.Peek(defaultMinBufferSize)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return mimeTypeReader{}, fmt.Errorf("unable to read file for MIME type detection: %w", err)
+	}
+
+	mime := mimetype.Detect(buffer)
+
+	return mimeTypeReader{mimeExt: mime.Extension(), mimeName: mimeType(mime.String()), Reader: bufReader}, nil
+}
+
+// newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
+func newFileReader(r io.Reader) (fileReader, error) {
+	var fReader fileReader
+
+	fReader.BufferedReadSeeker = iobuf.NewBufferedReadSeeker(r)
+
+	// Disable buffering after initial reads.
+	// This optimization ensures we don't continue writing to the buffer after the initial reads.
+	defer fReader.DisableBuffering()
+
+	mime, err := mimetype.DetectReader(fReader)
+	if err != nil {
+		return fReader, fmt.Errorf("unable to detect MIME type: %w", err)
+	}
+	fReader.mime = mime
+
+	// Reset the reader to the beginning because DetectReader consumes the reader.
+	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
+	}
+
+	// If a MIME type is known to not be an archive type, we might as well return here rather than
+	// paying the I/O penalty of an archiver.Identify() call that won't identify anything.
+>>>>>>> main
 	if _, ok := skipArchiverMimeTypes[mimeType(mime.String())]; ok {
 		return fReader, nil
 	}
@@ -283,7 +352,7 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 // the function will skip processing the file and return nil.
 func HandleFile(
 	ctx logContext.Context,
-	reader io.ReadCloser,
+	reader io.Reader,
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
