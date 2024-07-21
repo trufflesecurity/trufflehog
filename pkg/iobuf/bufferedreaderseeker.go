@@ -3,7 +3,6 @@ package iobuf
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 )
 
@@ -27,10 +26,10 @@ type BufferedReadSeeker struct {
 	activeBuffering bool
 }
 
-// NewBufferedReaderSeeker creates and initializes a BufferedReadSeeker.
+// NewBufferedReadSeeker creates and initializes a BufferedReadSeeker.
 // It takes an io.Reader and checks if it supports seeking.
 // If the reader supports seeking, it is stored in the seeker field.
-func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
+func NewBufferedReadSeeker(r io.Reader) *BufferedReadSeeker {
 	var (
 		seeker          io.Seeker
 		buffer          *bytes.Buffer
@@ -62,10 +61,7 @@ func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 	// For seekable readers, read directly from the underlying reader.
 	if br.seeker != nil {
-		n, err := br.reader.Read(out)
-		br.index += int64(n)
-		br.bytesRead = max(br.bytesRead, br.index)
-		return n, err
+		return br.reader.Read(out)
 	}
 
 	// For non-seekable readers, use buffered reading.
@@ -125,14 +121,7 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	if br.seeker != nil {
 		// Use the underlying Seeker if available.
-		newIndex, err := br.seeker.Seek(offset, whence)
-		if err != nil {
-			return 0, fmt.Errorf("error seeking in reader: %w", err)
-		}
-		if newIndex > br.bytesRead {
-			br.bytesRead = newIndex
-		}
-		return newIndex, nil
+		return br.seeker.Seek(offset, whence)
 	}
 
 	// Manual seeking for non-seekable readers.
@@ -192,7 +181,45 @@ func (br *BufferedReadSeeker) ReadAt(out []byte, offset int64) (int, error) {
 	return br.Read(out)
 }
 
+// IsBufferingEnabled returns true if buffering is enabled.
+func (br *BufferedReadSeeker) IsBufferingEnabled() bool { return br.activeBuffering }
+
+// EnableBuffering starts the buffering process.
+// This is useful if the reader is non-seekable and seeks are required.
+func (br *BufferedReadSeeker) EnableBuffering() { br.activeBuffering = true }
+
 // DisableBuffering stops the buffering process.
 // This is useful after initial reads (e.g., for MIME type detection and format identification)
 // to prevent further writes to the buffer, optimizing subsequent reads.
 func (br *BufferedReadSeeker) DisableBuffering() { br.activeBuffering = false }
+
+// Size returns the size of the underlying reader.
+// Seek is used to determine the size of the reader.
+func (br *BufferedReadSeeker) Size() (int64, error) {
+	if br.seeker != nil {
+		currentPos, err := br.seeker.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return 0, err
+		}
+
+		size, err := br.seeker.Seek(0, io.SeekEnd)
+		if err != nil {
+			return 0, err
+		}
+
+		// Don't forget to reset the reader position.
+		if _, err = br.seeker.Seek(currentPos, io.SeekStart); err != nil {
+			return 0, err
+		}
+		return size, nil
+	}
+
+	currentIndex := br.index
+	size, err := br.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = br.Seek(currentIndex, io.SeekStart)
+	return size, err
+}

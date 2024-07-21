@@ -39,50 +39,68 @@ type fileReader struct {
 
 var ErrEmptyReader = errors.New("reader is empty")
 
-// mimeTypeReader wraps an io.Reader with MIME type information.
+// sizedMimeTypeReader wraps an io.Reader with MIME type information and the size of the content.
 // This type is used to pass content through the processing pipeline
-// while carrying its detected MIME type, avoiding redundant type detection.
-type mimeTypeReader struct {
-	mimeExt  string
-	mimeName mimeType
+// while carrying its detected MIME type and size, avoiding redundant type detection and size calculation.
+type sizedMimeTypeReader struct {
+	mimeExt  string   // Extension derived from the MIME type (e.g., ".zip", ".tar", etc.)
+	mimeType mimeType // MIME type (e.g., "application/zip", "application/x-tar", etc.)
+	size     int64
 	io.Reader
 }
 
-// newMimeTypeReaderFromFileReader creates a new mimeTypeReader from a fileReader.
-func newMimeTypeReaderFromFileReader(r fileReader) mimeTypeReader {
-	return mimeTypeReader{
-		mimeExt:  r.mime.Extension(),
-		mimeName: mimeType(r.mime.String()),
-		Reader:   r.BufferedReadSeeker,
+// newSizedMimeTypeReaderFromFileReader creates a new sizedMimeTypeReader from a fileReader.
+// This function extracts the MIME type and size from the fileReader, and returns a new sizedMimeTypeReader.
+func newSizedMimetypeReaderFromFileReader(r fileReader) (sizedMimeTypeReader, error) {
+	originalBufferingState := r.IsBufferingEnabled()
+	if !originalBufferingState {
+		r.EnableBuffering()
 	}
+	defer func() {
+		if !originalBufferingState {
+			r.DisableBuffering()
+		}
+	}()
+
+	size, err := r.Size()
+	if err != nil {
+		return sizedMimeTypeReader{}, fmt.Errorf("error getting file size: %w", err)
+	}
+
+	return sizedMimeTypeReader{
+		mimeExt:  r.mime.Extension(),
+		mimeType: mimeType(r.mime.String()),
+		size:     size,
+		Reader:   r.BufferedReadSeeker,
+	}, nil
 }
 
-// newMimeTypeReader creates a new mimeTypeReader from an io.Reader.
+// newSizedMimeTypeReader creates a new sizedMimeTypeReader from an io.Reader.
 // It uses a bufio.Reader to perform MIME type detection on the input reader
 // without consuming it, by peeking into the first 512 bytes of the input.
 // This encapsulates both the original reader and the detected MIME type information.
 // This function is particularly useful for specialized archive handlers
 // that need to pass extracted content to the default handler without modifying the original reader.
-func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
+func newSizedMimeTypeReader(r io.Reader, size int64) (sizedMimeTypeReader, error) {
 	const defaultMinBufferSize = 3072
 	bufReader := bufio.NewReaderSize(r, defaultMinBufferSize)
 	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
 	// If fewer bytes are read, MIME type detection may still succeed.
 	buffer, err := bufReader.Peek(defaultMinBufferSize)
 	if err != nil && !errors.Is(err, io.EOF) {
-		return mimeTypeReader{}, fmt.Errorf("unable to read file for MIME type detection: %w", err)
+		return sizedMimeTypeReader{}, fmt.Errorf("unable to read file for MIME type detection: %w", err)
 	}
 
 	mime := mimetype.Detect(buffer)
 
-	return mimeTypeReader{mimeExt: mime.Extension(), mimeName: mimeType(mime.String()), Reader: bufReader}, nil
+	return sizedMimeTypeReader{mimeExt: mime.Extension(), mimeType: mimeType(mime.String()), size: size, Reader: bufReader}, nil
 }
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
 func newFileReader(r io.Reader) (fileReader, error) {
 	var fReader fileReader
 
-	fReader.BufferedReadSeeker = iobuf.NewBufferedReaderSeeker(r)
+	fReader.BufferedReadSeeker = iobuf.NewBufferedReadSeeker(r)
 
 	// Disable buffering after initial reads.
 	// This optimization ensures we don't continue writing to the buffer after the initial reads.
@@ -99,8 +117,9 @@ func newFileReader(r io.Reader) (fileReader, error) {
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
-	// If a MIME type is known to not be an archive type, we might as well return here rather than
-	// paying the I/O penalty of an archiver.Identify() call that won't identify anything.
+	// Check if the MIME type should bypass the archiver library identification and continue processing.
+	// This bypass is necessary for archive formats not supported by the archiver library and for text-based formats
+	// that are best handled directly by the default reader.
 	if _, ok := skipArchiverMimeTypes[mimeType(mime.String())]; ok {
 		return fReader, nil
 	}
@@ -166,69 +185,71 @@ const (
 type mimeType string
 
 const (
-	rpmMime      mimeType = "application/x-rpm"
-	cpioMime     mimeType = "application/cpio"
-	unixArMime   mimeType = "application/x-unix-archive"
-	arMime       mimeType = "application/x-archive"
-	debMime      mimeType = "application/vnd.debian.binary-package"
-	textMime     mimeType = "text/plain; charset=utf-8"
-	xmlMime      mimeType = "text/xml"
-	jsonMime     mimeType = "application/json"
-	csvMime      mimeType = "text/csv"
-	tsvMime      mimeType = "text/tab-separated-values"
-	geoJSONMine  mimeType = "application/vnd.geo+json"
-	ndjsonMime   mimeType = "application/x-ndjson"
-	htmlMime     mimeType = "text/html"
-	phpTextMime  mimeType = "text/x-php"
-	rtfTextMime  mimeType = "text/rtf"
-	jsAppMime    mimeType = "application/javascript"
-	jsTextMime   mimeType = "text/javascript"
-	jsMime       mimeType = "application/x-javascript"
-	srtMime      mimeType = "application/x-subrip"
-	srtXMime     mimeType = "application/x-srt"
-	srtTextMime  mimeType = "text/x-srt"
-	vttMime      mimeType = "text/vtt"
-	luaMime      mimeType = "text/x-lua"
-	perlMime     mimeType = "text/x-perl"
-	pythonMime   mimeType = "text/x-python"
-	pyAppMime    mimeType = "application/x-python"
-	pyScriptMime mimeType = "application/x-script.python"
-	tclTextMime  mimeType = "text/x-tcl"
-	tclMime      mimeType = "application/x-tcl"
+	rpmMime       mimeType = "application/x-rpm"
+	cpioMime      mimeType = "application/cpio"
+	unixArMime    mimeType = "application/x-unix-archive"
+	arMime        mimeType = "application/x-archive"
+	debMime       mimeType = "application/vnd.debian.binary-package"
+	textPlainMime mimeType = "text/plain"
+	textMime      mimeType = "text/plain; charset=utf-8"
+	xmlMime       mimeType = "text/xml"
+	jsonMime      mimeType = "application/json"
+	csvMime       mimeType = "text/csv"
+	tsvMime       mimeType = "text/tab-separated-values"
+	geoJSONMine   mimeType = "application/vnd.geo+json"
+	ndjsonMime    mimeType = "application/x-ndjson"
+	htmlMime      mimeType = "text/html"
+	phpTextMime   mimeType = "text/x-php"
+	rtfTextMime   mimeType = "text/rtf"
+	jsAppMime     mimeType = "application/javascript"
+	jsTextMime    mimeType = "text/javascript"
+	jsMime        mimeType = "application/x-javascript"
+	srtMime       mimeType = "application/x-subrip"
+	srtXMime      mimeType = "application/x-srt"
+	srtTextMime   mimeType = "text/x-srt"
+	vttMime       mimeType = "text/vtt"
+	luaMime       mimeType = "text/x-lua"
+	perlMime      mimeType = "text/x-perl"
+	pythonMime    mimeType = "text/x-python"
+	pyAppMime     mimeType = "application/x-python"
+	pyScriptMime  mimeType = "application/x-script.python"
+	tclTextMime   mimeType = "text/x-tcl"
+	tclMime       mimeType = "application/x-tcl"
 )
 
 // skipArchiverMimeTypes is a set of MIME types that should bypass archiver library processing because they are either
 // text-based or archives not supported by the library.
 var skipArchiverMimeTypes = map[mimeType]struct{}{
-	arMime:       {},
-	unixArMime:   {},
-	debMime:      {},
-	rpmMime:      {},
-	cpioMime:     {},
-	textMime:     {},
-	xmlMime:      {},
-	jsonMime:     {},
-	csvMime:      {},
-	tsvMime:      {},
-	geoJSONMine:  {},
-	ndjsonMime:   {},
-	htmlMime:     {},
-	phpTextMime:  {},
-	rtfTextMime:  {},
-	jsAppMime:    {},
-	jsTextMime:   {},
-	jsMime:       {},
-	srtMime:      {},
-	srtXMime:     {},
-	srtTextMime:  {},
-	vttMime:      {},
-	luaMime:      {},
-	perlMime:     {},
-	pythonMime:   {},
-	pyAppMime:    {},
-	pyScriptMime: {},
-	tclTextMime:  {},
-	tclMime:      {},
+	arMime:        {},
+	unixArMime:    {},
+	debMime:       {},
+	rpmMime:       {},
+	cpioMime:      {},
+	textPlainMime: {},
+	textMime:      {},
+	xmlMime:       {},
+	jsonMime:      {},
+	csvMime:       {},
+	tsvMime:       {},
+	geoJSONMine:   {},
+	ndjsonMime:    {},
+	htmlMime:      {},
+	phpTextMime:   {},
+	rtfTextMime:   {},
+	jsAppMime:     {},
+	jsTextMime:    {},
+	jsMime:        {},
+	srtMime:       {},
+	srtXMime:      {},
+	srtTextMime:   {},
+	vttMime:       {},
+	luaMime:       {},
+	perlMime:      {},
+	pythonMime:    {},
+	pyAppMime:     {},
+	pyScriptMime:  {},
+	tclTextMime:   {},
+	tclMime:       {},
 }
 
 // selectHandler dynamically selects and configures a FileHandler based on the provided |mimetype| type and archive flag.

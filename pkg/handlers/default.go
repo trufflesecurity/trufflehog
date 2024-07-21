@@ -44,7 +44,12 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 			h.metrics.incFilesProcessed()
 		}()
 
-		if err = h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(input), dataChan); err != nil {
+		mtr, err := newSizedMimetypeReaderFromFileReader(input)
+		if err != nil {
+			ctx.Logger().Error(err, "error reading MIME type")
+			return
+		}
+		if err = h.handleNonArchiveContent(ctx, mtr, dataChan); err != nil {
 			ctx.Logger().Error(err, "error handling non-archive content.")
 		}
 	}()
@@ -71,7 +76,7 @@ func (h *defaultHandler) measureLatencyAndHandleErrors(start time.Time, err erro
 // on the type, particularly for binary files. It manages reading file chunks and writing them to the archive channel,
 // effectively collecting the final bytes for further processing. This function is a key component in ensuring that all
 // file content, regardless of being an archive or not, is handled appropriately.
-func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader mimeTypeReader, archiveChan chan []byte) error {
+func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader sizedMimeTypeReader, archiveChan chan []byte) error {
 	mimeExt := reader.mimeExt
 
 	if common.SkipFile(mimeExt) || common.IsBinary(mimeExt) {
@@ -80,7 +85,7 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 		return nil
 	}
 
-	chunkReader := sources.NewChunkReader()
+	chunkReader := sources.NewChunkReader(sources.WithFileSize(int(reader.size)))
 	for data := range chunkReader(ctx, reader) {
 		if err := data.Error(); err != nil {
 			ctx.Logger().Error(err, "error reading chunk")

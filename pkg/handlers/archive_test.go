@@ -64,7 +64,7 @@ func TestArchiveHandler(t *testing.T) {
 		},
 		"gzip-large": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/FifteenMB.gz",
-			1543,
+			242,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
 		},
@@ -89,6 +89,7 @@ func TestArchiveHandler(t *testing.T) {
 			if err != nil {
 				t.Errorf("error creating reusable reader: %s", err)
 			}
+
 			archiveChan, err := handler.HandleFile(logContext.Background(), newReader)
 			if testCase.expectErr {
 				assert.NoError(t, err)

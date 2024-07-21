@@ -131,7 +131,7 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 			brs.activeBuffering = tt.activeBuffering
 
 			for i, readSize := range tt.reads {
@@ -150,13 +150,15 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 				}
 			}
 
-			assert.Equal(t, tt.expectedBytesRead, brs.bytesRead)
-			assert.Equal(t, tt.expectedIndex, brs.index)
+			if brs.seeker == nil {
+				assert.Equal(t, tt.expectedBytesRead, brs.bytesRead)
+				assert.Equal(t, tt.expectedIndex, brs.index)
 
-			if brs.buffer != nil && len(tt.expectedBuffer) > 0 {
-				assert.Equal(t, tt.expectedBuffer, brs.buffer.Bytes())
-			} else {
-				assert.Nil(t, tt.expectedBuffer)
+				if brs.buffer != nil && len(tt.expectedBuffer) > 0 {
+					assert.Equal(t, tt.expectedBuffer, brs.buffer.Bytes())
+				} else {
+					assert.Nil(t, tt.expectedBuffer)
+				}
 			}
 		})
 	}
@@ -250,7 +252,7 @@ func TestBufferedReaderSeekerSeek(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 			pos, err := brs.Seek(tt.offset, tt.whence)
 			if tt.expectedErr {
 				assert.Error(t, err)
@@ -345,7 +347,7 @@ func TestBufferedReaderSeekerReadAt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 
 			out := make([]byte, tt.length)
 			n, err := brs.ReadAt(out, tt.offset)
@@ -357,6 +359,102 @@ func TestBufferedReaderSeekerReadAt(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedN, n)
 			assert.Equal(t, tt.expectedOut, out[:n])
+		})
+	}
+}
+
+func TestBufferedReaderSeekerSize(t *testing.T) {
+	tests := []struct {
+		name     string
+		reader   io.Reader
+		expected int64
+	}{
+		{
+			name:     "size of seekable reader",
+			reader:   strings.NewReader("test data"),
+			expected: 9,
+		},
+		{
+			name:     "size of non-seekable reader",
+			reader:   bytes.NewBufferString("test data"),
+			expected: 9,
+		},
+		{
+			name:     "error on non-seekable reader with partial data",
+			reader:   io.LimitReader(strings.NewReader("test data"), 4),
+			expected: 4,
+		},
+		{
+			name:     "empty seekable reader",
+			reader:   strings.NewReader(""),
+			expected: 0,
+		},
+		{
+			name:     "empty non-seekable reader",
+			reader:   bytes.NewBufferString(""),
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			brs := NewBufferedReadSeeker(tt.reader)
+			size, err := brs.Size()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, size)
+		})
+	}
+}
+
+func TestBufferedReaderSeekerEnableDisableBuffering(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialState  bool
+		enable        bool
+		expectedState bool
+	}{
+		{
+			name:          "enable buffering when initially disabled",
+			initialState:  false,
+			enable:        true,
+			expectedState: true,
+		},
+		{
+			name:          "disable buffering when initially enabled",
+			initialState:  true,
+			enable:        false,
+			expectedState: false,
+		},
+		{
+			name:          "enable buffering when already enabled",
+			initialState:  true,
+			enable:        true,
+			expectedState: true,
+		},
+		{
+			name:          "disable buffering when already disabled",
+			initialState:  false,
+			enable:        false,
+			expectedState: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			brs := NewBufferedReadSeeker(strings.NewReader("test data"))
+			brs.activeBuffering = tt.initialState
+
+			if tt.enable {
+				brs.EnableBuffering()
+			} else {
+				brs.DisableBuffering()
+			}
+
+			assert.Equal(t, tt.expectedState, brs.activeBuffering)
 		})
 	}
 }

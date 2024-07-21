@@ -25,7 +25,7 @@ func TestHandleRPMFile(t *testing.T) {
 	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 
-	wantChunkCount := 179
+	wantChunkCount := 29
 	count := 0
 	for range archiveChan {
 		count++
