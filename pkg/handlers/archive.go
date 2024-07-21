@@ -89,7 +89,7 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 
 	if reader.format == nil {
 		if depth > 0 {
-			mtr, err := newSizedMimetypeReaderFromFileReader(reader)
+			mtr, err := newSizedReaderFromFileReader(reader)
 			if err != nil {
 				return fmt.Errorf("error reading MIME type: %w", err)
 			}
@@ -108,12 +108,8 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		defer compReader.Close()
 
 		rdr, err := newFileReader(compReader)
-		if err != nil {
-			if errors.Is(err, ErrEmptyReader) {
-				ctx.Logger().V(5).Info("empty reader, skipping file")
-				return nil
-			}
-			return fmt.Errorf("error creating custom reader: %w", err)
+		if err := handleReaderError(ctx, err); err != nil {
+			return err
 		}
 
 		return h.openArchive(ctx, depth+1, rdr, archiveChan)
@@ -162,12 +158,6 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 			return nil
 		}
 
-		if common.SkipFile(file.Name()) || common.IsBinary(file.Name()) {
-			lCtx.Logger().V(5).Info("skipping file")
-			h.metrics.incFilesSkipped()
-			return nil
-		}
-
 		f, err := file.Open()
 		if err != nil {
 			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
@@ -191,12 +181,8 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 		}()
 
 		rdr, err := newFileReader(f)
-		if err != nil {
-			if errors.Is(err, ErrEmptyReader) {
-				lCtx.Logger().V(5).Info("empty reader, skipping file")
-				return nil
-			}
-			return fmt.Errorf("error creating custom reader: %w", err)
+		if err := handleReaderError(lCtx, err); err != nil {
+			return err
 		}
 
 		h.metrics.incFilesProcessed()
