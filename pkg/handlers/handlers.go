@@ -185,69 +185,71 @@ const (
 type mimeType string
 
 const (
-	rpmMime      mimeType = "application/x-rpm"
-	cpioMime     mimeType = "application/cpio"
-	unixArMime   mimeType = "application/x-unix-archive"
-	arMime       mimeType = "application/x-archive"
-	debMime      mimeType = "application/vnd.debian.binary-package"
-	textMime     mimeType = "text/plain; charset=utf-8"
-	xmlMime      mimeType = "text/xml"
-	jsonMime     mimeType = "application/json"
-	csvMime      mimeType = "text/csv"
-	tsvMime      mimeType = "text/tab-separated-values"
-	geoJSONMine  mimeType = "application/vnd.geo+json"
-	ndjsonMime   mimeType = "application/x-ndjson"
-	htmlMime     mimeType = "text/html"
-	phpTextMime  mimeType = "text/x-php"
-	rtfTextMime  mimeType = "text/rtf"
-	jsAppMime    mimeType = "application/javascript"
-	jsTextMime   mimeType = "text/javascript"
-	jsMime       mimeType = "application/x-javascript"
-	srtMime      mimeType = "application/x-subrip"
-	srtXMime     mimeType = "application/x-srt"
-	srtTextMime  mimeType = "text/x-srt"
-	vttMime      mimeType = "text/vtt"
-	luaMime      mimeType = "text/x-lua"
-	perlMime     mimeType = "text/x-perl"
-	pythonMime   mimeType = "text/x-python"
-	pyAppMime    mimeType = "application/x-python"
-	pyScriptMime mimeType = "application/x-script.python"
-	tclTextMime  mimeType = "text/x-tcl"
-	tclMime      mimeType = "application/x-tcl"
+	rpmMime       mimeType = "application/x-rpm"
+	cpioMime      mimeType = "application/cpio"
+	unixArMime    mimeType = "application/x-unix-archive"
+	arMime        mimeType = "application/x-archive"
+	debMime       mimeType = "application/vnd.debian.binary-package"
+	textPlainMime mimeType = "text/plain"
+	textMime      mimeType = "text/plain; charset=utf-8"
+	xmlMime       mimeType = "text/xml"
+	jsonMime      mimeType = "application/json"
+	csvMime       mimeType = "text/csv"
+	tsvMime       mimeType = "text/tab-separated-values"
+	geoJSONMine   mimeType = "application/vnd.geo+json"
+	ndjsonMime    mimeType = "application/x-ndjson"
+	htmlMime      mimeType = "text/html"
+	phpTextMime   mimeType = "text/x-php"
+	rtfTextMime   mimeType = "text/rtf"
+	jsAppMime     mimeType = "application/javascript"
+	jsTextMime    mimeType = "text/javascript"
+	jsMime        mimeType = "application/x-javascript"
+	srtMime       mimeType = "application/x-subrip"
+	srtXMime      mimeType = "application/x-srt"
+	srtTextMime   mimeType = "text/x-srt"
+	vttMime       mimeType = "text/vtt"
+	luaMime       mimeType = "text/x-lua"
+	perlMime      mimeType = "text/x-perl"
+	pythonMime    mimeType = "text/x-python"
+	pyAppMime     mimeType = "application/x-python"
+	pyScriptMime  mimeType = "application/x-script.python"
+	tclTextMime   mimeType = "text/x-tcl"
+	tclMime       mimeType = "application/x-tcl"
 )
 
 // skipArchiverMimeTypes is a set of MIME types that should bypass archiver library processing because they are either
 // text-based or archives not supported by the library.
 var skipArchiverMimeTypes = map[mimeType]struct{}{
-	arMime:       {},
-	unixArMime:   {},
-	debMime:      {},
-	rpmMime:      {},
-	cpioMime:     {},
-	textMime:     {},
-	xmlMime:      {},
-	jsonMime:     {},
-	csvMime:      {},
-	tsvMime:      {},
-	geoJSONMine:  {},
-	ndjsonMime:   {},
-	htmlMime:     {},
-	phpTextMime:  {},
-	rtfTextMime:  {},
-	jsAppMime:    {},
-	jsTextMime:   {},
-	jsMime:       {},
-	srtMime:      {},
-	srtXMime:     {},
-	srtTextMime:  {},
-	vttMime:      {},
-	luaMime:      {},
-	perlMime:     {},
-	pythonMime:   {},
-	pyAppMime:    {},
-	pyScriptMime: {},
-	tclTextMime:  {},
-	tclMime:      {},
+	arMime:        {},
+	unixArMime:    {},
+	debMime:       {},
+	rpmMime:       {},
+	cpioMime:      {},
+	textPlainMime: {},
+	textMime:      {},
+	xmlMime:       {},
+	jsonMime:      {},
+	csvMime:       {},
+	tsvMime:       {},
+	geoJSONMine:   {},
+	ndjsonMime:    {},
+	htmlMime:      {},
+	phpTextMime:   {},
+	rtfTextMime:   {},
+	jsAppMime:     {},
+	jsTextMime:    {},
+	jsMime:        {},
+	srtMime:       {},
+	srtXMime:      {},
+	srtTextMime:   {},
+	vttMime:       {},
+	luaMime:       {},
+	perlMime:      {},
+	pythonMime:    {},
+	pyAppMime:     {},
+	pyScriptMime:  {},
+	tclTextMime:   {},
+	tclMime:       {},
 }
 
 // selectHandler dynamically selects and configures a FileHandler based on the provided |mimetype| type and archive flag.
