@@ -6,13 +6,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-<<<<<<< HEAD
-	"fmt"
-	"math/big"
-=======
 	"encoding/binary"
 	"fmt"
->>>>>>> 88ff5899e13f8598581b0831ded2cf91c5dd8fbf
 	"net/http"
 	"net/url"
 	"strconv"
