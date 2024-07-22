@@ -118,17 +118,6 @@ func New(opts ...Option) *BufferedFileWriter {
 	return w
 }
 
-// NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
-func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
-	opts = append(opts, WithBufferSize(Large))
-	writer := New(opts...)
-	if _, err := io.Copy(writer, r); err != nil && !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
-	}
-
-	return writer, nil
-}
-
 // Len returns the number of bytes written to the buffer or file.
 func (w *BufferedFileWriter) Len() int { return int(w.size) }
 
