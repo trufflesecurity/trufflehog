@@ -245,6 +245,6 @@ func Run(cmd string) {
 		shopify.AnalyzePermissions(cfg, *shopifyKey, *shopifyStoreURL)
 	case opsgenieScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("opsgenie")
-		opsgenie.AnalyzePermissions(cfg, *opsgenieKey)
+		opsgenie.AnalyzeAndPrintPermissions(cfg, *opsgenieKey)
 	}
 }
