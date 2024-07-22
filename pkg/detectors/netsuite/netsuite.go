@@ -6,8 +6,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+<<<<<<< HEAD
 	"fmt"
 	"math/big"
+=======
+	"encoding/binary"
+	"fmt"
+>>>>>>> 88ff5899e13f8598581b0831ded2cf91c5dd8fbf
 	"net/http"
 	"net/url"
 	"strconv"
@@ -61,7 +66,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	// // find for credentials
+	// find for credentials
 	consumerKeyMatches := trimUniqueMatches(consumerKeyPat.FindAllStringSubmatch(dataStr, -1))
 	consumerSecretMatches := trimUniqueMatches(consumerSecretPat.FindAllStringSubmatch(dataStr, -1))
 	tokenKeyMatches := trimUniqueMatches(tokenKeyPat.FindAllStringSubmatch(dataStr, -1))
@@ -187,27 +192,51 @@ func generateHMACSHA256(message, secret string) string {
 	return base64.StdEncoding.EncodeToString(hash)
 }
 
+func addOauthParam(builder *strings.Builder, key, value string) {
+	builder.WriteString(key)
+	builder.WriteString("=\"")
+	builder.WriteString(value)
+	builder.WriteString("\",")
+}
+
 func makeSignature(method, baseUrl, path string, params map[string]string) string {
-	baseString := method + "&" + url.QueryEscape(baseUrl+path) + "&" +
-		url.QueryEscape("oauth_consumer_key="+url.QueryEscape(params["consumer_key"])+
-			"&oauth_nonce="+url.QueryEscape(params["nonce"])+
-			"&oauth_signature_method="+url.QueryEscape(params["signature_method"])+
-			"&oauth_timestamp="+url.QueryEscape(params["timestamp"])+
-			"&oauth_token="+url.QueryEscape(params["token_id"])+
-			"&oauth_version="+url.QueryEscape(params["version"]))
+	var paramsStringBuilder strings.Builder
+	paramsStringBuilder.WriteString("oauth_consumer_key=" + url.QueryEscape(params["consumer_key"]))
+	paramsStringBuilder.WriteString("&oauth_nonce=" + url.QueryEscape(params["nonce"]))
+	paramsStringBuilder.WriteString("&oauth_signature_method=" + url.QueryEscape(params["signature_method"]))
+	paramsStringBuilder.WriteString("&oauth_timestamp=" + url.QueryEscape(params["timestamp"]))
+	paramsStringBuilder.WriteString("&oauth_token=" + url.QueryEscape(params["token_id"]))
+	paramsStringBuilder.WriteString("&oauth_version=" + url.QueryEscape(params["version"]))
+
+	var signatureBaseBuilder strings.Builder
+
+	signatureBaseBuilder.WriteString(method)
+	signatureBaseBuilder.WriteString("&")
+	signatureBaseBuilder.WriteString(url.QueryEscape(baseUrl + path))
+	signatureBaseBuilder.WriteString("&")
+	signatureBaseBuilder.WriteString(url.QueryEscape(paramsStringBuilder.String()))
 
 	key := url.QueryEscape(params["consumer_secret"]) + "&" + url.QueryEscape(params["token_secret"])
 
-	signature := generateHMACSHA256(baseString, key)
+	signature := generateHMACSHA256(signatureBaseBuilder.String(), key)
 
-	return "OAuth" + " " + "realm=\"" + params["realm"] + "\"," +
-		"oauth_consumer_key=\"" + params["consumer_key"] + "\"," +
-		"oauth_token=\"" + params["token_id"] + "\"," +
-		"oauth_signature_method=\"" + params["signature_method"] + "\"," +
-		"oauth_timestamp=\"" + params["timestamp"] + "\"," +
-		"oauth_nonce=\"" + params["nonce"] + "\"," +
-		"oauth_version=\"" + params["version"] + "\"," +
-		"oauth_signature=\"" + url.QueryEscape(signature) + "\""
+	var authHeaderBuilder strings.Builder
+	authHeaderBuilder.WriteString("OAuth")
+	authHeaderBuilder.WriteString(" ")
+
+	addOauthParam(&authHeaderBuilder, "realm", params["realm"])
+	addOauthParam(&authHeaderBuilder, "oauth_consumer_key", params["consumer_key"])
+	addOauthParam(&authHeaderBuilder, "oauth_token", params["token_id"])
+	addOauthParam(&authHeaderBuilder, "oauth_signature_method", params["signature_method"])
+	addOauthParam(&authHeaderBuilder, "oauth_timestamp", params["timestamp"])
+	addOauthParam(&authHeaderBuilder, "oauth_nonce", params["nonce"])
+	addOauthParam(&authHeaderBuilder, "oauth_version", params["version"])
+	addOauthParam(&authHeaderBuilder, "oauth_signature", url.QueryEscape(signature))
+
+	// remove trailing comma
+	authHeader := authHeaderBuilder.String()
+	authHeader = authHeader[:len(authHeader)-1]
+	return authHeader
 }
 
 func trimUniqueMatches(matches [][]string) (result map[string]struct{}) {
@@ -235,19 +264,30 @@ func isUniqueKeys(cs credentialSet) bool {
 	return true
 }
 
-// return a random nonce of 'n' character long
+/*
+To generate a nonce, we need to generate a random string of characters.
+*/
+
+var (
+	charset = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+	// maxUnbiasedUint32 is the largest multiple of len(charset) that fits in a uint32.
+	// It's used to ensure unbiased sampling when selecting characters from the charset.
+	maxUnbiasedUint32 = uint32((1<<32 - 1) - ((1<<32 - 1) % uint64(len(charset))))
+)
+
 func netsuiteNonce(n int) (string, error) {
-	// Nonce provides a random nonce string.
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-	ret := make([]byte, n)
-	for i := 0; i < n; i++ {
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
-		if err != nil {
-			return "", err
+	b := make([]byte, n)
+	buf := make([]byte, 4)
+	for i := 0; i < n; {
+		if _, err := rand.Read(buf); err != nil {
+				return "", err
 		}
-		ret[i] = letters[num.Int64()]
+		num := binary.BigEndian.Uint32(buf)
+		if num < maxUnbiasedUint32 {
+				b[i] = charset[num%uint32(len(charset))]
+				i++
+		}
 	}
-
-	return string(ret), nil
+	return string(b), nil
 }
