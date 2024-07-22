@@ -276,12 +276,12 @@ func netsuiteNonce(n int) (string, error) {
 	buf := make([]byte, 4)
 	for i := 0; i < n; {
 		if _, err := rand.Read(buf); err != nil {
-				return "", err
+			return "", err
 		}
 		num := binary.BigEndian.Uint32(buf)
 		if num < maxUnbiasedUint32 {
-				b[i] = charset[num%uint32(len(charset))]
-				i++
+			b[i] = charset[num%uint32(len(charset))]
+			i++
 		}
 	}
 	return string(b), nil
