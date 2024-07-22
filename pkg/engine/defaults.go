@@ -452,6 +452,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myintervals"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nethunt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netsuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newsapi"
@@ -1626,6 +1627,7 @@ func DefaultDetectors() []detectors.Detector {
 		endorlabs.Scanner{},
 		atlassianv1.Scanner{},
 		atlassianv2.Scanner{},
+		netsuite.Scanner{},
 	}
 }
 
