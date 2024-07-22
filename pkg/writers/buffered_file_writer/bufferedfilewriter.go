@@ -291,14 +291,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 // If the content is stored in memory, it returns a custom reader that handles returning the buffer to the pool.
 // The caller should call Close() on the returned io.Reader when done to ensure resources are properly released.
 // This method can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) { return w.ReadSeekCloser() }
-
-// ReadSeekCloser returns an io.ReadSeekCloser to read the written content.
-// If the content is stored in a file, it opens the file and returns a file reader.
-// If the content is stored in memory, it returns a custom reader that allows seeking and handles returning
-// the buffer to the pool.
-// This method can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
+func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 	if w.state != readOnly {
 		return nil, fmt.Errorf("BufferedFileWriter must be in read-only mode to read")
 	}
