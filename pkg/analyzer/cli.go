@@ -200,7 +200,7 @@ func Run(cmd string) {
 		postgres.AnalyzePermissions(cfg, *postgresConnectionStr)
 	case mysqlScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("mysql")
-		mysql.AnalyzePermissions(cfg, *mysqlConnectionStr)
+		mysql.AnalyzeAndPrintPermissions(cfg, *mysqlConnectionStr)
 	case slackScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("slack")
 		slack.AnalyzePermissions(cfg, *slackKey)
