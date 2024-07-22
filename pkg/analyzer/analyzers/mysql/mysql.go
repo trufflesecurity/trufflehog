@@ -102,36 +102,36 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, 
 
 	db, err := createConnection(connectionStr)
 	if err != nil {
-		return nil, fmt.Errorf("connecting to the MySQL database: %s", err)
+		return nil, fmt.Errorf("connecting to the MySQL database: %w", err)
 	}
 	defer db.Close()
 
 	// Get the current user
 	user, err := getUser(db)
 	if err != nil {
-		return nil, fmt.Errorf("getting the current user: %s", err)
+		return nil, fmt.Errorf("getting the current user: %w", err)
 	}
 
 	// Get all accessible databases
 	var databases = make(map[string]*Database, 0)
 	err = getDatabases(db, databases)
 	if err != nil {
-		return nil, fmt.Errorf("getting databases: %s", err)
+		return nil, fmt.Errorf("getting databases: %w", err)
 	}
 	//Get all accessible tables
 	err = getTables(db, databases)
 	if err != nil {
-		return nil, fmt.Errorf("getting tables: %s", err)
+		return nil, fmt.Errorf("getting tables: %w", err)
 	}
 	// Get user grants
 	grants, err := getGrants(db)
 	if err != nil {
-		return nil, fmt.Errorf("getting user grants: %s", err)
+		return nil, fmt.Errorf("getting user grants: %w", err)
 	}
 	// Get all accessible routines
 	err = getRoutines(db, databases)
 	if err != nil {
-		return nil, fmt.Errorf("getting routines: %s", err)
+		return nil, fmt.Errorf("getting routines: %w", err)
 	}
 
 	var globalPrivs GlobalPrivs
