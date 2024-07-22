@@ -9,6 +9,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archiver/v4"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -37,21 +38,20 @@ type fileReader struct {
 	*iobuf.BufferedReadSeeker
 }
 
-var ErrEmptyReader = errors.New("reader is empty")
+var (
+	errEmptyReader     = errors.New("reader is empty")
+	errUnsupportedMIME = errors.New("unsupported MIME type")
+)
 
-// sizedMimeTypeReader wraps an io.Reader with MIME type information and the size of the content.
-// This type is used to pass content through the processing pipeline
-// while carrying its detected MIME type and size, avoiding redundant type detection and size calculation.
-type sizedMimeTypeReader struct {
-	mimeExt  string   // Extension derived from the MIME type (e.g., ".zip", ".tar", etc.)
-	mimeType mimeType // MIME type (e.g., "application/zip", "application/x-tar", etc.)
-	size     int64
+// sizedReader wraps an io.Reader with the size of the content.
+type sizedReader struct {
+	size int64
 	io.Reader
 }
 
-// newSizedMimeTypeReaderFromFileReader creates a new sizedMimeTypeReader from a fileReader.
-// This function extracts the MIME type and size from the fileReader, and returns a new sizedMimeTypeReader.
-func newSizedMimetypeReaderFromFileReader(r fileReader) (sizedMimeTypeReader, error) {
+// newSizedReaderFromFileReader creates a new sizedReader from a fileReader.
+// This function extracts the size from the fileReader, and returns a new sizedReader.
+func newSizedReaderFromFileReader(r fileReader) (sizedReader, error) {
 	originalBufferingState := r.IsBufferingEnabled()
 	if !originalBufferingState {
 		r.EnableBuffering()
@@ -64,36 +64,67 @@ func newSizedMimetypeReaderFromFileReader(r fileReader) (sizedMimeTypeReader, er
 
 	size, err := r.Size()
 	if err != nil {
-		return sizedMimeTypeReader{}, fmt.Errorf("error getting file size: %w", err)
+		return sizedReader{}, fmt.Errorf("error getting file size: %w", err)
 	}
 
-	return sizedMimeTypeReader{
-		mimeExt:  r.mime.Extension(),
-		mimeType: mimeType(r.mime.String()),
-		size:     size,
-		Reader:   r.BufferedReadSeeker,
-	}, nil
+	return sizedReader{size: size, Reader: r.BufferedReadSeeker}, nil
 }
 
-// newSizedMimeTypeReader creates a new sizedMimeTypeReader from an io.Reader.
-// It uses a bufio.Reader to perform MIME type detection on the input reader
-// without consuming it, by peeking into the first 512 bytes of the input.
-// This encapsulates both the original reader and the detected MIME type information.
+// newSizedReader creates a new sizedReader from an io.Reader.
 // This function is particularly useful for specialized archive handlers
 // that need to pass extracted content to the default handler without modifying the original reader.
-func newSizedMimeTypeReader(r io.Reader, size int64) (sizedMimeTypeReader, error) {
+func newSizedReader(r io.Reader, size int64) (sizedReader, error) {
+	if r == nil {
+		return sizedReader{}, errors.New("reader is nil")
+	}
+	if size == 0 {
+		return sizedReader{}, errEmptyReader
+	}
+
+	bufReader, _, err := determineMIMEType(r)
+	if err != nil {
+		return sizedReader{}, err
+	}
+
+	return sizedReader{size: size, Reader: bufReader}, nil
+}
+
+func determineMIMEType(r io.Reader) (io.Reader, *mimetype.MIME, error) {
 	const defaultMinBufferSize = 3072
 	bufReader := bufio.NewReaderSize(r, defaultMinBufferSize)
 	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
 	// If fewer bytes are read, MIME type detection may still succeed.
 	buffer, err := bufReader.Peek(defaultMinBufferSize)
 	if err != nil && !errors.Is(err, io.EOF) {
-		return sizedMimeTypeReader{}, fmt.Errorf("unable to read file for MIME type detection: %w", err)
+		return nil, nil, fmt.Errorf("unable to read file for MIME type detection: %w", err)
+	}
+
+	if len(buffer) == 0 {
+		return nil, nil, errEmptyReader
 	}
 
 	mime := mimetype.Detect(buffer)
+	if common.SkipFile(mime.String()) || common.IsBinary(mime.String()) {
+		return nil, mime, errUnsupportedMIME
+	}
 
-	return sizedMimeTypeReader{mimeExt: mime.Extension(), mimeType: mimeType(mime.String()), size: size, Reader: bufReader}, nil
+	return bufReader, mime, nil
+}
+
+func handleReaderError(ctx logContext.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, errEmptyReader) {
+		ctx.Logger().V(5).Info("empty reader, skipping file")
+		return nil
+	} else if errors.Is(err, errUnsupportedMIME) {
+		ctx.Logger().V(5).Info("skipping file")
+		return nil
+	}
+
+	return fmt.Errorf("error creating reader: %w", err)
 }
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
@@ -106,9 +137,9 @@ func newFileReader(r io.Reader) (fileReader, error) {
 	// This optimization ensures we don't continue writing to the buffer after the initial reads.
 	defer fReader.DisableBuffering()
 
-	mime, err := mimetype.DetectReader(fReader)
+	_, mime, err := determineMIMEType(fReader)
 	if err != nil {
-		return fReader, fmt.Errorf("unable to detect MIME type: %w", err)
+		return fReader, err
 	}
 	fReader.mime = mime
 
@@ -295,12 +326,12 @@ func HandleFile(
 	}
 
 	rdr, err := newFileReader(reader)
-	if err != nil {
-		if errors.Is(err, ErrEmptyReader) {
-			ctx.Logger().V(5).Info("empty reader, skipping file")
-			return nil
-		}
-		return fmt.Errorf("error creating custom reader: %w", err)
+	if errors.Is(err, errEmptyReader) {
+		ctx.Logger().V(5).Info("empty reader, skipping file")
+		return nil
+	} else if errors.Is(err, errUnsupportedMIME) {
+		ctx.Logger().V(5).Info("skipping file")
+		return nil
 	}
 
 	mimeT := mimeType(rdr.mime.String())

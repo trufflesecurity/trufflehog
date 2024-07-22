@@ -269,6 +269,26 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 	assert.Equal(t, wantCount, count)
 }
 
+func TestExtractEmptyFile(t *testing.T) {
+	file, err := os.Open("testdata/empty.txt")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 0
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
 func TestHandleTar(t *testing.T) {
 	file, err := os.Open("testdata/test.tar")
 	assert.Nil(t, err)
@@ -353,7 +373,7 @@ func TestNewSizedMimetypeReaderFromFileReader(t *testing.T) {
 				BufferedReadSeeker: brs,
 			}
 
-			result, err := newSizedMimetypeReaderFromFileReader(fr)
+			result, err := newSizedReaderFromFileReader(fr)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedSize, result.size)
 
