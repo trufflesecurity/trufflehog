@@ -197,7 +197,7 @@ func Run(cmd string) {
 		openai.AnalyzeAndPrintPermissions(cfg, *openaiKey)
 	case postgresScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("postgres")
-		postgres.AnalyzePermissions(cfg, *postgresConnectionStr)
+		postgres.AnalyzeAndPrintPermissions(cfg, *postgresConnectionStr)
 	case mysqlScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("mysql")
 		mysql.AnalyzeAndPrintPermissions(cfg, *mysqlConnectionStr)
