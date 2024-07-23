@@ -191,7 +191,7 @@ func Run(cmd string) {
 		github.AnalyzeAndPrintPermissions(cfg, *githubKey)
 	case sendgridScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("sendgrid")
-		sendgrid.AnalyzePermissions(cfg, *sendgridKey)
+		sendgrid.AnalyzeAndPrintPermissions(cfg, *sendgridKey)
 	case openAIScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("openai")
 		openai.AnalyzeAndPrintPermissions(cfg, *openaiKey)
