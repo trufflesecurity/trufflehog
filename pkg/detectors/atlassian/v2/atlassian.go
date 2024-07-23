@@ -2,10 +2,10 @@ package atlassian
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"encoding/json"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -71,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, orgResponse, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
-			if orgResponse != nil {
+			if orgResponse != nil && len(orgResponse.Data) > 0 {
 				s1.ExtraData["Organization"] = orgResponse.Data[0].Attributes.Name
 			}
 			s1.SetVerificationError(verificationErr, match)
@@ -88,8 +88,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	if err != nil {
 		return false, nil, nil
 	}
-        req.Header.Add("Accept", "application/json")
-        req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	res, err := client.Do(req)
 	if err != nil {
 		return false, nil, err
