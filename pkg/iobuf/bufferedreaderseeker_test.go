@@ -13,7 +13,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 	tests := []struct {
 		name              string
 		reader            io.Reader
-		activeBuffering   bool
 		reads             []int
 		expectedReads     []int
 		expectedBytes     [][]byte
@@ -25,7 +24,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "read from seekable reader",
 			reader:            strings.NewReader("test data"),
-			activeBuffering:   true,
 			reads:             []int{4},
 			expectedReads:     []int{4},
 			expectedBytes:     [][]byte{[]byte("test")},
@@ -35,7 +33,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "read from non-seekable reader with buffering",
 			reader:            bytes.NewBufferString("test data"),
-			activeBuffering:   true,
 			reads:             []int{4},
 			expectedReads:     []int{4},
 			expectedBytes:     [][]byte{[]byte("test")},
@@ -46,7 +43,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "read from non-seekable reader without buffering",
 			reader:            bytes.NewBufferString("test data"),
-			activeBuffering:   false,
 			reads:             []int{4},
 			expectedReads:     []int{4},
 			expectedBytes:     [][]byte{[]byte("test")},
@@ -56,7 +52,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "read beyond buffer",
 			reader:            strings.NewReader("test data"),
-			activeBuffering:   true,
 			reads:             []int{10},
 			expectedReads:     []int{9},
 			expectedBytes:     [][]byte{[]byte("test data")},
@@ -66,7 +61,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "read with empty reader",
 			reader:            strings.NewReader(""),
-			activeBuffering:   true,
 			reads:             []int{4},
 			expectedReads:     []int{0},
 			expectedBytes:     [][]byte{[]byte("")},
@@ -77,7 +71,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "read exact buffer size",
 			reader:            strings.NewReader("test"),
-			activeBuffering:   true,
 			reads:             []int{4},
 			expectedReads:     []int{4},
 			expectedBytes:     [][]byte{[]byte("test")},
@@ -87,7 +80,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "read less than buffer size",
 			reader:            strings.NewReader("te"),
-			activeBuffering:   true,
 			reads:             []int{4},
 			expectedReads:     []int{2},
 			expectedBytes:     [][]byte{[]byte("te")},
@@ -97,7 +89,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "read more than buffer size without buffering",
 			reader:            bytes.NewBufferString("test data"),
-			activeBuffering:   false,
 			reads:             []int{4},
 			expectedReads:     []int{4},
 			expectedBytes:     [][]byte{[]byte("test")},
@@ -107,7 +98,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "multiple reads with buffering",
 			reader:            bytes.NewBufferString("test data"),
-			activeBuffering:   true,
 			reads:             []int{4, 5},
 			expectedReads:     []int{4, 5},
 			expectedBytes:     [][]byte{[]byte("test"), []byte(" data")},
@@ -118,7 +108,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		{
 			name:              "multiple reads without buffering",
 			reader:            bytes.NewBufferString("test data"),
-			activeBuffering:   false,
 			reads:             []int{4, 5},
 			expectedReads:     []int{4, 5},
 			expectedBytes:     [][]byte{[]byte("test"), []byte(" data")},
@@ -132,7 +121,6 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 			t.Parallel()
 
 			brs := NewBufferedReaderSeeker(tt.reader)
-			brs.activeBuffering = tt.activeBuffering
 
 			for i, readSize := range tt.reads {
 				buf := make([]byte, readSize)
@@ -240,7 +228,7 @@ func TestBufferedReaderSeekerSeek(t *testing.T) {
 			reader:       bytes.NewBufferString("test data"),
 			offset:       20,
 			whence:       io.SeekEnd,
-			expectedPos:  9,
+			expectedPos:  29,
 			expectedErr:  false,
 			expectedRead: []byte{},
 		},

@@ -86,7 +86,6 @@ func newFileReader(r io.Reader) (fileReader, error) {
 
 	// Disable buffering after initial reads.
 	// This optimization ensures we don't continue writing to the buffer after the initial reads.
-	defer fReader.DisableBuffering()
 
 	mime, err := mimetype.DetectReader(fReader)
 	if err != nil {
