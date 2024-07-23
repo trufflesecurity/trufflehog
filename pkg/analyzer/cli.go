@@ -224,7 +224,7 @@ func Run(cmd string) {
 		mailchimp.AnalyzeAndPrintPermissions(cfg, *mailchimpKey)
 	case postmanScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("postman")
-		postman.AnalyzePermissions(cfg, *postmanKey)
+		postman.AnalyzeAndPrintPermissions(cfg, *postmanKey)
 	case bitbucketScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("bitbucket")
 		bitbucket.AnalyzeAndPrintPermissions(cfg, *bitbucketKey)
