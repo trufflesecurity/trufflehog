@@ -161,13 +161,13 @@ func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekCurrent:
 		newIndex += offset
 	case io.SeekEnd:
-		// If we haven't read to the end yet, we need to do so.
-		if br.bytesRead < br.diskBufferSize || br.tempFile == nil {
+		// If we already know the total size, we can use it directly.
+		if !br.sizeKnown {
 			if err := br.readToEnd(); err != nil {
 				return 0, err
 			}
 		}
-		newIndex = br.bytesRead + offset
+		newIndex = br.totalSize + offset
 	default:
 		return 0, errors.New("invalid whence value")
 	}
