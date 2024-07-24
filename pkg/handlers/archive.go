@@ -24,7 +24,7 @@ var (
 	// See: https://github.com/trufflesecurity/trufflehog/issues/2942
 	maxDepth   = 5 * 2
 	maxSize    = 2 << 30 // 2 GB
-	maxTimeout = time.Duration(30) * time.Second
+	maxTimeout = time.Duration(3000) * time.Second
 )
 
 // SetArchiveMaxSize sets the maximum size of the archive.
@@ -111,6 +111,7 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 			}
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
+		defer rdr.Close()
 
 		return h.openArchive(ctx, depth+1, rdr, archiveChan)
 	case archiver.Extractor:
@@ -194,6 +195,7 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 			}
 			return fmt.Errorf("error creating custom reader: %w", err)
 		}
+		defer rdr.Close()
 
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)

@@ -13,6 +13,19 @@ import (
 // BufferedReadSeeker provides a buffered reading interface with seeking capabilities.
 // It wraps an io.Reader and optionally an io.Seeker, allowing for efficient
 // reading and seeking operations, even on non-seekable underlying readers.
+//
+// For small amounts of data, it uses an in-memory buffer (bytes.Buffer) to store
+// read bytes. When the amount of data exceeds a specified threshold, it switches
+// to disk-based buffering using a temporary file. This approach balances memory
+// usage and performance, allowing efficient handling of both small and large data streams.
+//
+// The struct manages the transition between in-memory and disk-based buffering
+// transparently, providing a seamless reading and seeking experience regardless
+// of the underlying data size or the seekability of the original reader.
+//
+// If the underlying reader is seekable, direct seeking operations are performed
+// on it. For non-seekable readers, seeking is emulated using the buffer or
+// temporary file.
 type BufferedReadSeeker struct {
 	reader io.Reader
 	seeker io.Seeker // If the reader supports seeking, it's stored here for direct access
@@ -26,6 +39,11 @@ type BufferedReadSeeker struct {
 	tempFile       *os.File // Temporary file for disk-based buffering
 	tempFileName   string   // Name of the temporary file
 	diskBufferSize int64    // Size of data written to disk
+
+	// Fields to provide a quick way to determine the total size of the reader
+	// without having to seek.
+	totalSize int64 // Total size of the reader
+	sizeKnown bool  // Whether the total size of the reader is known
 }
 
 // NewBufferedReaderSeeker creates and initializes a BufferedReadSeeker.
@@ -39,7 +57,6 @@ func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 	seeker, _ := r.(io.Seeker)
 
 	var buffer *bytes.Buffer
-
 	if seeker == nil {
 		buffer = bytes.NewBuffer(make([]byte, 0, mimeTypeBufferSize))
 	}
@@ -50,7 +67,6 @@ func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 		buffer:    buffer,
 		bytesRead: 0,
 		index:     0,
-		// activeBuffering: activeBuffering,
 		threshold: defaultThreshold,
 	}
 }
@@ -59,7 +75,7 @@ func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 // It handles both seekable and non-seekable underlying readers efficiently.
 func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 	if br.seeker != nil {
-		// For seekable readers, read directly from the underlying reader
+		// For seekable readers, read directly from the underlying reader.
 		n, err := br.reader.Read(out)
 		br.index += int64(n)
 		br.bytesRead = max(br.bytesRead, br.index)
@@ -109,46 +125,16 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 	br.index += int64(m)
 	br.bytesRead = max(br.bytesRead, br.index)
 
-	// Always write new data to the buffer.
-	br.buffer.Write(out[:m])
-
-	// Check if we've reached or exceeded the threshold.
-	if br.buffer.Len() < int(br.threshold) {
-		return n, err
+	if writeErr := br.writeData(out[:m]); writeErr != nil {
+		return n, writeErr
 	}
 
-	if br.tempFile == nil {
-		if err = br.createTempFile(); err != nil {
-			return n, err
-		}
-	}
-
-	// Flush the buffer to disk.
-	if err = br.flushBufferToDisk(); err != nil {
-		return n, err
+	if errors.Is(err, io.EOF) {
+		br.totalSize = br.bytesRead
+		br.sizeKnown = true
 	}
 
 	return n, err
-}
-
-func (br *BufferedReadSeeker) createTempFile() error {
-	tempFile, err := os.CreateTemp(os.TempDir(), cleantemp.MkFilename())
-	if err != nil {
-		return err
-	}
-	br.tempFile = tempFile
-	br.tempFileName = tempFile.Name()
-
-	return nil
-}
-
-func (br *BufferedReadSeeker) flushBufferToDisk() error {
-	if _, err := br.buffer.WriteTo(br.tempFile); err != nil {
-		return err
-	}
-	br.diskBufferSize = int64(br.buffer.Len())
-
-	return nil
 }
 
 // Seek sets the offset for the next Read or Write to offset.
@@ -175,7 +161,7 @@ func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekCurrent:
 		newIndex += offset
 	case io.SeekEnd:
-		// If we haven't read to the end yet, we need to do so
+		// If we haven't read to the end yet, we need to do so.
 		if br.bytesRead < br.diskBufferSize || br.tempFile == nil {
 			if err := br.readToEnd(); err != nil {
 				return 0, err
@@ -190,7 +176,7 @@ func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 		return 0, errors.New("can not seek to before start of reader")
 	}
 
-	// For non-seekable readers, we need to ensure we've read up to the new index
+	// For non-seekable readers, we need to ensure we've read up to the new index.
 	if br.seeker == nil && newIndex > br.bytesRead {
 		if err := br.readUntil(newIndex); err != nil {
 			return 0, err
@@ -207,27 +193,40 @@ func (br *BufferedReadSeeker) readToEnd() error {
 	for {
 		n, err := br.reader.Read(buffer)
 		if n > 0 {
-			if br.tempFile != nil {
-				if _, err := br.tempFile.Write(buffer[:n]); err != nil {
-					return err
-				}
-				br.diskBufferSize += int64(n)
-			} else {
-				br.buffer.Write(buffer[:n])
+			if err := br.writeData(buffer[:n]); err != nil {
+				return err
 			}
-			br.bytesRead += int64(n)
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
 			return err
 		}
 	}
-	// br.totalSize = br.bytesRead
-	// br.sizeKnown = true
+	br.totalSize = br.bytesRead
+	br.sizeKnown = true
 
 	return nil
+}
+
+func (br *BufferedReadSeeker) writeData(data []byte) error {
+	br.buffer.Write(data)
+	br.bytesRead += int64(len(data))
+
+	// Check if we've reached or exceeded the threshold.
+	if br.buffer.Len() < int(br.threshold) {
+		return nil
+	}
+
+	if br.tempFile == nil {
+		if err := br.createTempFile(); err != nil {
+			return err
+		}
+	}
+
+	// Flush the buffer to disk.
+	return br.flushBufferToDisk()
 }
 
 func (br *BufferedReadSeeker) readUntil(index int64) error {
@@ -240,7 +239,7 @@ func (br *BufferedReadSeeker) readUntil(index int64) error {
 
 		buf := make([]byte, bufSize)
 		n, err := br.Read(buf)
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			return err
 		}
 
@@ -248,6 +247,26 @@ func (br *BufferedReadSeeker) readUntil(index int64) error {
 			break // We've reached the end of the reader
 		}
 	}
+
+	return nil
+}
+
+func (br *BufferedReadSeeker) createTempFile() error {
+	tempFile, err := os.CreateTemp(os.TempDir(), cleantemp.MkFilename())
+	if err != nil {
+		return err
+	}
+	br.tempFile = tempFile
+	br.tempFileName = tempFile.Name()
+
+	return nil
+}
+
+func (br *BufferedReadSeeker) flushBufferToDisk() error {
+	if _, err := br.buffer.WriteTo(br.tempFile); err != nil {
+		return err
+	}
+	br.diskBufferSize = int64(br.buffer.Len())
 
 	return nil
 }
@@ -264,11 +283,9 @@ func (br *BufferedReadSeeker) ReadAt(out []byte, offset int64) (int, error) {
 		return br.Read(out)
 	}
 
-	// For non-seekable readers, use our buffering logic
-	// Save the current index
+	// For non-seekable readers, use our buffering logic.
 	currentIndex := br.index
 
-	// Seek to the desired offset
 	if _, err := br.Seek(offset, io.SeekStart); err != nil {
 		return 0, err
 	}
@@ -289,12 +306,7 @@ func (br *BufferedReadSeeker) ReadAt(out []byte, offset int64) (int, error) {
 func (br *BufferedReadSeeker) Close() error {
 	if br.tempFile != nil {
 		br.tempFile.Close()
-		os.Remove(br.tempFileName)
+		return os.Remove(br.tempFileName)
 	}
 	return nil
 }
-
-// DisableBuffering stops the buffering process.
-// This is useful after initial reads (e.g., for MIME type detection and format identification)
-// to prevent further writes to the buffer, optimizing subsequent reads.
-// func (br *BufferedReadSeeker) DisableBuffering() { br.activeBuffering = false }
