@@ -139,10 +139,12 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectedBytesRead, brs.bytesRead)
-			assert.Equal(t, tt.expectedIndex, brs.index)
+			if brs.seeker == nil {
+				assert.Equal(t, tt.expectedIndex, brs.index)
+			}
 
-			if brs.buffer != nil && len(tt.expectedBuffer) > 0 {
-				assert.Equal(t, tt.expectedBuffer, brs.buffer.Bytes())
+			if brs.buf != nil && len(tt.expectedBuffer) > 0 {
+				assert.Equal(t, tt.expectedBuffer, brs.buf.Bytes())
 			} else {
 				assert.Nil(t, tt.expectedBuffer)
 			}
