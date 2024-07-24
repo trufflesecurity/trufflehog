@@ -31,8 +31,7 @@ func TestHandleFile(t *testing.T) {
 
 	// Only one chunk is sent on the channel.
 	// TODO: Embed a zip without making an HTTP request.
-	// resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip")
-	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm_random_data.json")
+	resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip")
 	assert.NoError(t, err)
 	if resp != nil && resp.Body != nil {
 		defer resp.Body.Close()
