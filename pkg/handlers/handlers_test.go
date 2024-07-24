@@ -89,26 +89,30 @@ func TestHandleHTTPJsonZip(t *testing.T) {
 func BenchmarkHandleHTTPJsonZip(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm.zip")
-		assert.NoError(b, err)
-
-		chunkCh := make(chan *sources.Chunk, 1)
-
-		b.StartTimer()
-		go func() {
-			defer close(chunkCh)
-			err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		func() {
+			resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm.zip")
 			assert.NoError(b, err)
+
+			defer func() {
+				if resp != nil && resp.Body != nil {
+					resp.Body.Close()
+				}
+			}()
+
+			chunkCh := make(chan *sources.Chunk, 1)
+
+			b.StartTimer()
+			go func() {
+				defer close(chunkCh)
+				err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+				assert.NoError(b, err)
+			}()
+
+			for range chunkCh {
+			}
+
+			b.StopTimer()
 		}()
-
-		for range chunkCh {
-		}
-
-		b.StopTimer()
-
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
-		}
 	}
 }
 
