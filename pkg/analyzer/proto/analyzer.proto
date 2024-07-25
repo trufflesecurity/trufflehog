@@ -4,26 +4,26 @@ package analyzer;
 
 option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb";
 
-enum SecretType {
-  INVALID = 0;
-  AIRBRAKE = 1;
-  ASANA = 2;
-  BITBUCKET = 3;
-  GITHUB = 4;
-  GITLAB = 5;
-  HUGGINGFACE = 6;
-  MAILCHIMP = 7;
-  MAILGUN = 8;
-  MYSQL = 9;
-  OPENAI = 10;
-  OPSGENIE = 11;
-  POSTGRES = 12;
-  POSTMAN = 13;
-  SENDGRID = 14;
-  SHOPIFY = 15;
-  SLACK = 16;
-  SOURCEGRAPH = 17;
-  SQUARE = 18;
-  STRIPE = 19;
-  TWILIO = 20;
+enum AnalyzerType {
+  Invalid = 0;
+  Airbrake = 1;
+  Asana = 2;
+  Bitbucket = 3;
+  GitHub = 4;
+  GitLab = 5;
+  HuggingFace = 6;
+  Mailchimp = 7;
+  Mailgun = 8;
+  MySQL = 9;
+  OpenAI = 10;
+  Opsgenie = 11;
+  Postgres = 12;
+  Postman = 13;
+  Sendgrid = 14;
+  Shopify = 15;
+  Slack = 16;
+  Sourcegraph = 17;
+  Square = 18;
+  Stripe = 19;
+  Twilio = 20;
 }
