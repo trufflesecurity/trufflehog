@@ -18,7 +18,7 @@ import (
 type (
 	Analyzer interface {
 		Type() analyzerpb.AnalyzerType
-		Analyze(ctx context.Context, key map[string]string) (*AnalyzerResult, error)
+		Analyze(ctx context.Context, credentialInfo map[string]string) (*AnalyzerResult, error)
 	}
 
 	// AnalyzerResult is the output of analysis.
