@@ -21,8 +21,8 @@ type Scanner struct {
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
-var _ detectors.Detector = (*v1.Scanner)(nil)
-var _ detectors.Versioner = (*v1.Scanner)(nil)
+var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -31,7 +31,7 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitter"}) + `\b([a-zA-Z0-9]{20,59}%([a-zA-Z0-9]{3,}%){0,2}[a-zA-Z0-9]{52})\b`)
 )
 
-func (s *Scanner) Version() int { return 2 }
+func (s Scanner) Version() int { return 2 }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
