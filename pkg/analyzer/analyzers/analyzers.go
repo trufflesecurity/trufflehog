@@ -12,39 +12,41 @@ import (
 	"github.com/fatih/color"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type (
 	Analyzer interface {
-		Type() analyzerpb.SecretType
-		Analyze(ctx context.Context, key string, extraData map[string]string) (*AnalyzerResult, error)
+		Type() analyzerpb.AnalyzerType
+		Analyze(ctx context.Context, key map[string]string) (*AnalyzerResult, error)
 	}
 
 	// AnalyzerResult is the output of analysis.
 	AnalyzerResult struct {
-		ResourcePermissions []ResourcePermission
-		SecretMetadata      map[string]string
+		AnalyzerType       analyzerpb.AnalyzerType
+		Bindings           []Binding
+		UnboundedResources []Resource
+		Metadata           map[string]any
 	}
 
-	// ResourcePermission is a tuple describing a resource and the
-	// permissions associated with it.
-	ResourcePermission struct {
-		ResourceTree ResourceTree
-		Permissions  []Permission
+	Resource struct {
+		Name               string
+		FullyQualifiedName string
+		Type               string
+		Metadata           map[string]any
+		Parent             *Resource
 	}
 
-	// Resource represents an entity that a secret has permissions for. It
-	// is recursive to capture the hierarchical nature, however whether
-	// permissions apply to the children of resources is dependent on the
-	// platform.
-	ResourceTree struct {
-		Parent   *ResourceTree
-		Resource *resourcespb.Resource
+	Permission struct {
+		Value       string
+		AccessLevel string
+		Parent      *Permission
 	}
 
-	Permission string
+	Binding struct {
+		Resource   Resource
+		Permission Permission
+	}
 )
 
 type PermissionType string
