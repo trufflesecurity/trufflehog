@@ -59,7 +59,7 @@ func newMimeTypeReaderFromFileReader(r fileReader) mimeTypeReader {
 
 // newMimeTypeReader creates a new mimeTypeReader from an io.Reader.
 // It uses a bufio.Reader to perform MIME type detection on the input reader
-// without consuming it, by peeking into the first 512 bytes of the input.
+// without consuming it, by peeking into the first 3072 bytes of the input.
 // This encapsulates both the original reader and the detected MIME type information.
 // This function is particularly useful for specialized archive handlers
 // that need to pass extracted content to the default handler without modifying the original reader.
@@ -83,10 +83,6 @@ func newFileReader(r io.Reader) (fileReader, error) {
 	var fReader fileReader
 
 	fReader.BufferedReadSeeker = iobuf.NewBufferedReaderSeeker(r)
-
-	// Disable buffering after initial reads.
-	// This optimization ensures we don't continue writing to the buffer after the initial reads.
-	defer fReader.DisableBuffering()
 
 	mime, err := mimetype.DetectReader(fReader)
 	if err != nil {
@@ -281,6 +277,7 @@ func HandleFile(
 		}
 		return fmt.Errorf("error creating custom reader: %w", err)
 	}
+	defer rdr.Close()
 
 	mimeT := mimeType(rdr.mime.String())
 	config := newFileHandlingConfig(options...)
