@@ -82,6 +82,11 @@ type Result struct {
 	// This field should only be populated if the verification process itself failed in a way that provides no
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
 	verificationError error
+
+	// AnalysisInfo should be set with information required for credential
+	// analysis to run. The keys of the map are analyzer specific and
+	// should match what is expected in the corresponding analyzer.
+	AnalysisInfo map[string]string
 }
 
 // SetVerificationError is the only way to set a verification error. Any sensitive values should be passed-in as secrets to be redacted.
