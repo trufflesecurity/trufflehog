@@ -50,7 +50,7 @@ func secretInfoToAnalyzerResult(info *AnalyzerJSON) *analyzers.AnalyzerResult {
 	for _, org := range info.me.Orgs.Data {
 		resource := analyzers.Resource{
 			Name:               org.Title,
-			FullyQualifiedName: org.Title,
+			FullyQualifiedName: org.ID,
 			Type:               "org",
 		}
 		// Copy each permission into this resource.
@@ -95,7 +95,13 @@ type MeJSON struct {
 	MfaEnabled bool   `json:"mfa_flag_enabled"`
 	Orgs       struct {
 		Data []struct {
-			Title string `json:"title"`
+			ID          string `json:"id"`
+			Title       string `json:"title"`
+			User        string `json:"name"`
+			Description string `json:"description"`
+			Personal    bool   `json:"personal"`
+			Default     bool   `json:"is_default"`
+			Role        string `json:"role"`
 		} `json:"data"`
 	} `json:"orgs"`
 }
