@@ -21,6 +21,7 @@ import (
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
@@ -35,8 +36,57 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/version"
 )
 
+// usageTemplate is a copy of kingpin.DefaultUsageTemplate with a minor change
+// to not list all flattened commands. This is required to hide all of the
+// analyze sub-commands from the main help.
+const usageTemplate = `{{define "FormatCommand" -}}
+{{if .FlagSummary}} {{.FlagSummary}}{{end -}}
+{{range .Args}}{{if not .Hidden}} {{if not .Required}}[{{end}}{{if .PlaceHolder}}{{.PlaceHolder}}{{else}}<{{.Name}}>{{end}}{{if .Value|IsCumulative}}...{{end}}{{if not .Required}}]{{end}}{{end}}{{end -}}
+{{end -}}
+
+{{define "FormatCommands" -}}
+{{range .Commands -}}
+{{if not .Hidden -}}
+  {{.FullCommand}}{{if .Default}}*{{end}}{{template "FormatCommand" .}}
+{{.Help|Wrap 4}}
+{{end -}}
+{{end -}}
+{{end -}}
+
+{{define "FormatUsage" -}}
+{{template "FormatCommand" .}}{{if .Commands}} <command> [<args> ...]{{end}}
+{{if .Help}}
+{{.Help|Wrap 0 -}}
+{{end -}}
+
+{{end -}}
+
+{{if .Context.SelectedCommand -}}
+usage: {{.App.Name}} {{.Context.SelectedCommand}}{{template "FormatUsage" .Context.SelectedCommand}}
+{{ else -}}
+usage: {{.App.Name}}{{template "FormatUsage" .App}}
+{{end}}
+{{if .Context.Flags -}}
+Flags:
+{{.Context.Flags|FlagsToTwoColumns|FormatTwoColumns}}
+{{end -}}
+{{if .Context.Args -}}
+Args:
+{{.Context.Args|ArgsToTwoColumns|FormatTwoColumns}}
+{{end -}}
+{{if .Context.SelectedCommand -}}
+{{if len .Context.SelectedCommand.Commands -}}
+Subcommands:
+{{template "FormatCommands" .Context.SelectedCommand}}
+{{end -}}
+{{else if .App.Commands -}}
+Commands:
+{{template "FormatCommands" .App}}
+{{end -}}
+`
+
 var (
-	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.").UsageTemplate(usageTemplate)
 	cmd                 string
 	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
 	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
@@ -219,7 +269,8 @@ var (
 	huggingfaceIncludeDiscussions = huggingfaceScan.Flag("include-discussions", "Include discussions in scan.").Bool()
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
-	usingTUI = false
+	analyzeCmd = analyzer.Command(cli)
+	usingTUI   = false
 )
 
 func init() {
@@ -423,24 +474,30 @@ func run(state overseer.State) {
 		return
 	}
 
-	metrics, err := runSingleScan(ctx, cmd, engConf)
-	if err != nil {
-		logFatal(err, "error running scan")
-	}
+	topLevelSubCommand, _, _ := strings.Cut(cmd, " ")
+	switch topLevelSubCommand {
+	case analyzeCmd.FullCommand():
+		analyzer.Run(cmd)
+	default:
+		metrics, err := runSingleScan(ctx, cmd, engConf)
+		if err != nil {
+			logFatal(err, "error running scan")
+		}
 
-	// Print results.
-	logger.Info("finished scanning",
-		"chunks", metrics.ChunksScanned,
-		"bytes", metrics.BytesScanned,
-		"verified_secrets", metrics.VerifiedSecretsFound,
-		"unverified_secrets", metrics.UnverifiedSecretsFound,
-		"scan_duration", metrics.ScanDuration.String(),
-		"trufflehog_version", version.BuildVersion,
-	)
+		// Print results.
+		logger.Info("finished scanning",
+			"chunks", metrics.ChunksScanned,
+			"bytes", metrics.BytesScanned,
+			"verified_secrets", metrics.VerifiedSecretsFound,
+			"unverified_secrets", metrics.UnverifiedSecretsFound,
+			"scan_duration", metrics.ScanDuration.String(),
+			"trufflehog_version", version.BuildVersion,
+		)
 
-	if metrics.hasFoundResults && *fail {
-		logger.V(2).Info("exiting with code 183 because results were found")
-		os.Exit(183)
+		if metrics.hasFoundResults && *fail {
+			logger.V(2).Info("exiting with code 183 because results were found")
+			os.Exit(183)
+		}
 	}
 }
 
