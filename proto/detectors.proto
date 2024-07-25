@@ -500,7 +500,7 @@ enum DetectorType {
   Ipify = 488 [deprecated = true];
   LanguageLayer = 489;
   Lob = 490;
-  OnWaterIO = 491;
+  OnWaterIO = 491 [deprecated = true];
   Pastebin = 492;
   PdfLayer = 493;
   Pixabay = 494;
@@ -1004,6 +1004,7 @@ enum DetectorType {
   LarkSuiteApiKey = 992;
   EndorLabs = 993;
   ElevenLabs = 994;
+  Netsuite = 995;
 }
 
 message Result {

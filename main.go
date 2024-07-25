@@ -270,8 +270,7 @@ var (
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
 	analyzeCmd = analyzer.Command(cli)
-
-	usingTUI = false
+	usingTUI   = false
 )
 
 func init() {
