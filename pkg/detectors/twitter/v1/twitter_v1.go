@@ -30,7 +30,7 @@ var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitter"}) + `\b([A-Z]{22}%[a-zA-Z-0-9]{23}%[a-zA-Z-0-9]{6}%[a-zA-Z-0-9]{3}%[a-zA-Z-0-9]{9}%[a-zA-Z-0-9]{52})\b`)
 )
 
-func (s *Scanner) Version() int { return 1 }
+func (s Scanner) Version() int { return 1 }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
