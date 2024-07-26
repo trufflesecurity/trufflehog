@@ -127,6 +127,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string) {
 		color.Red("[x] %s", err.Error())
 		return
 	}
+	color.Green("[!] Valid OpenAI Token\n\n")
 
 	printUserData(data.me)
 	if data.isAdmin {
@@ -237,7 +238,6 @@ func getUserData(cfg *config.Config, key string) (MeJSON, error) {
 	if resp.StatusCode != 200 {
 		return meJSON, fmt.Errorf("invalid OpenAI token")
 	}
-	color.Green("[!] Valid OpenAI Token\n\n")
 
 	// Marshall me into meJSON struct
 	if err := json.Unmarshal(me, &meJSON); err != nil {
