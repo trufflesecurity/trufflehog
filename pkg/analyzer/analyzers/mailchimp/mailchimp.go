@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
@@ -13,7 +12,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -25,94 +23,27 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.SecretType { return analyzerpb.SecretType_MAILCHIMP }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Mailchimp }
 
-func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, key)
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
-	return secretInfoToAnalyzerResult(info), nil
+	return nil, fmt.Errorf("not implemented")
 }
 
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	if info == nil {
-		return nil
-	}
-
-	// Metadata
-	//	AccountID
-	//	AccountName
-	//	Email
-	//	FirstName
-	//	LastName
-	//	Role
-	//	MemberSince
-	//	PricingPlan
-	//	AccountTimezone
-	//	Contact
-	//		Company
-	//		Address1
-	//		Address2
-	//		City
-	//		State
-	//		Zip
-	//		Country
-	//	LastLogin
-	//	TotalSubscribers
-	// Domains
-	//	Domains
-	//		Domain        string
-	//		Authenticated bool
-	//		Verified      bool
-	//	}
-
-	result := analyzers.AnalyzerResult{
-		SecretMetadata: map[string]string{
-			// Metadata info.
-			"account_name": info.Metadata.AccountName,
-			"company_name": info.Metadata.Contact.Company,
-			"address": fmt.Sprintf("%s %s\n%s, %s %s\n%s",
-				info.Metadata.Contact.Address1, info.Metadata.Contact.Address2,
-				info.Metadata.Contact.City, info.Metadata.Contact.State, info.Metadata.Contact.Zip,
-				info.Metadata.Contact.Country,
-			),
-			"total_subscribers": strconv.Itoa(info.Metadata.TotalSubscribers),
-			// User info.
-			"user_name":    fmt.Sprintf("%s %s", info.Metadata.FirstName, info.Metadata.LastName),
-			"user_email":   info.Metadata.Email,
-			"user_role":    info.Metadata.Role,
-			"last_login":   info.Metadata.LastLogin,
-			"member_since": info.Metadata.MemberSince,
-		},
-	}
-
-	for _, domain := range info.Domains.Domains {
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_MAILCHIMP,
-					ResourceType: resourcespb.ResourceType_DOMAIN,
-					Name:         domain.Domain,
-					Metadata:     map[string]string{},
-				},
-			},
-			Permissions: convertDomainPermissions(domain),
-		}
-
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
-	}
-
-	return &result
+	return nil
 }
 
 func convertDomainPermissions(domain Domain) []analyzers.Permission {
 	var permissions []analyzers.Permission
 	if domain.Authenticated {
-		permissions = append(permissions, analyzers.Permission("authenticated"))
+		permissions = append(permissions, analyzers.Permission{Value: "authenticated"})
 	}
 	if domain.Verified {
-		permissions = append(permissions, analyzers.Permission("verified"))
+		permissions = append(permissions, analyzers.Permission{Value: "verified"})
 	}
 	return permissions
 }
