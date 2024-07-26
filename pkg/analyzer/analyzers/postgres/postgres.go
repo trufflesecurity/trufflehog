@@ -79,7 +79,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, connectionStr string) {
 
 	info, err := AnalyzePermissions(cfg, connectionStr)
 	if err != nil {
-		color.Red("[x] Error: " + err.Error())
+		color.Red("[x] Error: %s", err.Error())
 		return
 	}
 
