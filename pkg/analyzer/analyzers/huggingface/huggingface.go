@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
@@ -13,7 +12,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -29,77 +27,18 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.SecretType { return analyzerpb.SecretType_HUGGINGFACE }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_HuggingFace }
 
-func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, key)
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
-	return secretInfoToAnalyzerResult(info), nil
+	return nil, fmt.Errorf("not implemented")
 }
 
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	if info == nil {
-		return nil
-	}
-
-	// Token  HFTokenJSON
-	//	Username string
-	//	Name     string
-	//	Orgs
-	//		Name         string
-	//		Role         string
-	//		IsEnterprise bool
-	//	Auth
-	//		AccessToken
-	//			Name        string
-	//			Type        string
-	//			CreatedAt   string
-	//			FineGrained
-	//				Global []string
-	//				Scoped []struct
-	//					Entity
-	//						Type string
-	//						Name string
-	//						ID   string
-	//					Permissions []string
-	// Models []Model
-	//	   Name        string
-	//	   ID          string
-	//	   Private     bool
-	//	   Permissions Permissions
-	//		   Read  bool
-	//		   Write bool
-
-	result := analyzers.AnalyzerResult{
-		SecretMetadata: map[string]string{
-			"name":       info.Token.Auth.AccessToken.Name,
-			"type":       info.Token.Auth.AccessToken.Type,
-			"created_at": info.Token.Auth.AccessToken.CreatedAt,
-		},
-	}
-
-	for _, model := range info.Models {
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_HUGGINGFACE,
-					ResourceType: resourcespb.ResourceType_MODEL,
-					Name:         model.Name,
-					Metadata: map[string]string{
-						"id":      model.ID,
-						"private": strconv.FormatBool(model.Private),
-					},
-				},
-			},
-			Permissions: convertModelPermissions(model.Permissions),
-		}
-
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
-	}
-
-	return &result
+	return nil
 }
 
 // convertModelPermissions converts a model Permissions struct into a slice of
@@ -108,11 +47,11 @@ func convertModelPermissions(perms Permissions) []analyzers.Permission {
 	var permissions []analyzers.Permission
 	if perms.Read {
 		// TODO: Is this the right string?
-		permissions = append(permissions, analyzers.Permission("read"))
+		permissions = append(permissions, analyzers.Permission{Value: "read"})
 	}
 	if perms.Write {
 		// TODO: Is this the right string?
-		permissions = append(permissions, analyzers.Permission("write"))
+		permissions = append(permissions, analyzers.Permission{Value: "write"})
 	}
 	return permissions
 }
