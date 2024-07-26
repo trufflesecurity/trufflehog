@@ -870,8 +870,8 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 				queryCriteria: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
-							Repository: "test_keys",
-							Link:       "https://github.com/trufflesecurity/test_keys/blob/fbc14303ffbf8fb1c2c1914e8dda7d0121633aca/keys#L4",
+							Repository: "test_keys_nonpublic",
+							Link:       "https://github.com/trufflesecurity/test_keys_nonpublic/blob/fbc14303ffbf8fb1c2c1914e8dda7d0121633aca/keys#L4",
 							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
 							File:       "keys",
 						},
