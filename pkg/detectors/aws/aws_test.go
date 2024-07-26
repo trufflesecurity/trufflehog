@@ -43,12 +43,10 @@ func TestAWS_FromChunk_InvalidValidReuseIDSequence(t *testing.T) {
 			{
 				DetectorType: detectorspb.DetectorType_AWS,
 				Verified:     false,
-				Redacted:     "AKIASP2TPHJSQH3FJRUX",
+				Redacted:     "AKIAZAVB57H55F3T4BKH",
 				ExtraData: map[string]string{
 					"resource_type": "Access key",
-					"account":       "171436882533",
-					"is_canary":     "true",
-					"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+					"account":       "619888638459",
 				},
 			},
 		}
@@ -63,12 +61,13 @@ func TestAWS_FromChunk_InvalidValidReuseIDSequence(t *testing.T) {
 			{
 				DetectorType: detectorspb.DetectorType_AWS,
 				Verified:     true,
-				Redacted:     "AKIASP2TPHJSQH3FJRUX",
+				Redacted:     "AKIAZAVB57H55F3T4BKH",
 				ExtraData: map[string]string{
-					"resource_type": "Access key",
-					"account":       "171436882533",
-					"is_canary":     "true",
-					"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+					"resource_type":  "Access key",
+					"account":        "619888638459",
+					"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
+					"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
 				},
 			},
 		}
