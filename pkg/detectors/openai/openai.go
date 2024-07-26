@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -72,9 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyToken(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	// Undocumented API
-	// https://api.openai.com/v1/organizations
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.openai.com/v1/organizations", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.openai.com/v1/me", nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -92,21 +91,22 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case 200:
-		var orgs orgResponse
-		if err = json.NewDecoder(res.Body).Decode(&orgs); err != nil {
+		var resData response
+		if err = json.NewDecoder(res.Body).Decode(&resData); err != nil {
 			return false, nil, err
 		}
 
-		org := orgs.Data[0]
 		extraData := map[string]string{
-			"id":          org.ID,
-			"title":       org.Title,
-			"user":        org.User,
-			"description": org.Description,
-			"role":        org.Role,
-			"is_personal": strconv.FormatBool(org.Personal),
-			"is_default":  strconv.FormatBool(org.Default),
-			"total_orgs":  fmt.Sprintf("%d", len(orgs.Data)),
+			"id":          resData.ID,
+			"total_orgs":  fmt.Sprintf("%d", len(resData.Orgs.Data)),
+			"mfa_enabled": strconv.FormatBool(resData.MfaFlagEnabled),
+			"created_at":  time.Unix(int64(resData.Created), 0).Format(time.RFC3339),
+		}
+
+		if len(resData.Orgs.Data) > 0 {
+			extraData["description"] = resData.Orgs.Data[0].Description
+			extraData["is_personal"] = strconv.FormatBool(resData.Orgs.Data[0].Personal)
+			extraData["is_default"] = strconv.FormatBool(resData.Orgs.Data[0].IsDefault)
 		}
 		return true, extraData, nil
 	case 401:
@@ -117,21 +117,47 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 	}
 }
 
-// TODO: Add secret context?? Information about access, ownership etc
-type orgResponse struct {
-	Data []organization `json:"data"`
-}
-
-type organization struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	User        string `json:"name"`
-	Description string `json:"description"`
-	Personal    bool   `json:"personal"`
-	Default     bool   `json:"is_default"`
-	Role        string `json:"role"`
-}
-
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_OpenAI
+}
+
+type response struct {
+	Object                   string `json:"object"`
+	ID                       string `json:"id"`
+	Email                    any    `json:"email"`
+	Name                     any    `json:"name"`
+	Picture                  any    `json:"picture"`
+	Created                  int    `json:"created"`
+	PhoneNumber              any    `json:"phone_number"`
+	MfaFlagEnabled           bool   `json:"mfa_flag_enabled"`
+	Orgs                     orgs   `json:"orgs"`
+	HasProjectsArchive       bool   `json:"has_projects_archive"`
+	HasPaygProjectSpendLimit bool   `json:"has_payg_project_spend_limit"`
+	Amr                      []any  `json:"amr"`
+}
+type settings struct {
+	ThreadsUIVisibility      string `json:"threads_ui_visibility"`
+	UsageDashboardVisibility string `json:"usage_dashboard_visibility"`
+}
+type projects struct {
+	Object string `json:"object"`
+	Data   []any  `json:"data"`
+}
+type data struct {
+	Object      string   `json:"object"`
+	ID          string   `json:"id"`
+	Created     int      `json:"created"`
+	Title       string   `json:"title"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Personal    bool     `json:"personal"`
+	Settings    settings `json:"settings"`
+	ParentOrgID any      `json:"parent_org_id"`
+	IsDefault   bool     `json:"is_default"`
+	Role        string   `json:"role"`
+	Projects    projects `json:"projects"`
+}
+type orgs struct {
+	Object string `json:"object"`
+	Data   []data `json:"data"`
 }
