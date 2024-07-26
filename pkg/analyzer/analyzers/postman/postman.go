@@ -87,8 +87,9 @@ func getWorkspaces(cfg *config.Config, key string) (WorkspaceJSON, error) {
 }
 
 type SecretInfo struct {
-	User      UserInfoJSON
-	Workspace WorkspaceJSON
+	User           UserInfoJSON
+	Workspace      WorkspaceJSON
+	WorkspaceError error
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
@@ -107,11 +108,13 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	color.Green("[!] Valid Postman API Key")
 	printUserInfo(info.User)
 
-	if len(info.Workspace.Workspaces) == 0 {
+	if info.WorkspaceError != nil {
+		color.Red("[x] Error Fetching Workspaces: %s", info.WorkspaceError.Error())
+	} else if len(info.Workspace.Workspaces) == 0 {
 		color.Red("[x] No Workspaces Found")
-		return
+	} else {
+		printWorkspaces(info.Workspace)
 	}
-	printWorkspaces(info.Workspace)
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
@@ -119,22 +122,20 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	me, err := getUserInfo(cfg, key)
 	if err != nil {
-		return nil, fmt.Errorf("%w" + err.Error())
+		return nil, err
 	}
 
 	if me.User.Username == "" {
 		return nil, fmt.Errorf("Invalid Postman API Key")
 	}
 
-	// get workspaces
+	// get workspaces, if there is error user with empty workspaces will be returned
 	workspaces, err := getWorkspaces(cfg, key)
-	if err != nil {
-		color.Red("[x]" + err.Error())
-	}
 
 	return &SecretInfo{
-		User:      me,
-		Workspace: workspaces,
+		User:           me,
+		Workspace:      workspaces,
+		WorkspaceError: err,
 	}, nil
 }
 
