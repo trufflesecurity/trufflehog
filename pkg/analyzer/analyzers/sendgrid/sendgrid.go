@@ -126,13 +126,13 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 		return nil, fmt.Errorf("%v", resp.StatusCode)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w", err)
+		return nil, err
 	}
 
 	// Unmarshal the JSON response into a struct
 	var jsonScopes ScopesJSON
 	if err := json.Unmarshal([]byte(resp.Body), &jsonScopes); err != nil {
-		return nil, fmt.Errorf("%w", err)
+		return nil, err
 	}
 
 	// Now you can access the scopes
