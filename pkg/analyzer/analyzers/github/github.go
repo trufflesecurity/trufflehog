@@ -210,23 +210,6 @@ func printGists(gists []*gh.Gist, showAll bool) {
 	fmt.Print("\n\n")
 }
 
-func getRemainingTime(t string) string {
-	targetTime, err := time.Parse("2006-01-02 15:04:05 MST", t)
-	if err != nil {
-		return ""
-	}
-
-	// Get the current time
-	currentTime := time.Now()
-
-	// Calculate the duration until the target time
-	durationUntilTarget := targetTime.Sub(currentTime)
-	durationUntilTarget = durationUntilTarget.Truncate(time.Minute)
-
-	// Print the duration
-	return fmt.Sprintf("%v", durationUntilTarget)
-}
-
 type TokenMetadata struct {
 	Type        string
 	FineGrained bool
@@ -301,6 +284,9 @@ type SecretInfo struct {
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+	if cfg == nil {
+		cfg = &config.Config{}
+	}
 	client := gh.NewClient(analyzers.NewAnalyzeClient(cfg)).WithAuthToken(key)
 
 	md, err := getTokenMetadata(key, client)
@@ -309,7 +295,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}
 
 	if md.FineGrained {
-		return analyzeFineGrainedToken(client, md)
+		return analyzeFineGrainedToken(client, md, cfg.Shallow)
 	}
 	return analyzeClassicToken(client, md)
 }
