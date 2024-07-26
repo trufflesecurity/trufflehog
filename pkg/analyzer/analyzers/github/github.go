@@ -73,14 +73,16 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 }
 
 func secretInfoToUserBindings(info *SecretInfo) []analyzers.Binding {
-	username := info.Metadata.User.GetLogin()
-	resource := analyzers.Resource{
-		Name:               username,
-		FullyQualifiedName: fmt.Sprintf("github.com/%s", username),
-		Type:               "user",
-	}
+	return analyzers.BindAllPermissions(*userToResource(info.Metadata.User), info.Metadata.OauthScopes...)
+}
 
-	return analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)
+func userToResource(user *gh.User) *analyzers.Resource {
+	name := *user.Login
+	return &analyzers.Resource{
+		Name:               name,
+		FullyQualifiedName: fmt.Sprintf("github.com/%s", name),
+		Type:               strings.ToLower(*user.Type), // "user" or "organization"
+	}
 }
 
 func secretInfoToRepoBindings(info *SecretInfo) []analyzers.Binding {
@@ -94,6 +96,7 @@ func secretInfoToRepoBindings(info *SecretInfo) []analyzers.Binding {
 			Name:               *repo.Name,
 			FullyQualifiedName: fmt.Sprintf("github.com/%s", *repo.FullName),
 			Type:               "repository",
+			Parent:             userToResource(repo.Owner),
 		}
 		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
 	}
@@ -107,6 +110,7 @@ func secretInfoToGistBindings(info *SecretInfo) []analyzers.Binding {
 			Name:               *gist.Description,
 			FullyQualifiedName: fmt.Sprintf("gist.github.com/%s/%s", *gist.Owner.Login, *gist.ID),
 			Type:               "gist",
+			Parent:             userToResource(gist.Owner),
 		}
 		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
 	}
