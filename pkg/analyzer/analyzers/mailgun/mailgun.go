@@ -12,7 +12,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -22,46 +21,18 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.SecretType { return analyzerpb.SecretType_MAILGUN }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Mailgun }
 
-func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, key)
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
-	return secretInfoToAnalyzerResult(info), nil
+	return nil, fmt.Errorf("not implemented")
 }
 
 func secretInfoToAnalyzerResult(info *DomainsJSON) *analyzers.AnalyzerResult {
-
-	result := analyzers.AnalyzerResult{
-		SecretMetadata: map[string]string{
-			"total": strconv.Itoa(info.TotalCount),
-		},
-	}
-
-	for _, domain := range info.Items {
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_MAILGUN,
-					ResourceType: resourcespb.ResourceType_DOMAIN,
-					Name:         domain.URL,
-					Metadata: map[string]string{
-						"url":        domain.URL,
-						"disabled":   strconv.FormatBool(domain.IsDisabled),
-						"type":       domain.Type,
-						"state":      domain.State,
-						"created_at": domain.CreatedAt,
-					},
-				},
-			},
-			Permissions: convertDomainPermissions(domain),
-		}
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
-	}
-
-	return &result
+	return nil
 }
 
 func convertDomainPermissions(domain Domain) []analyzers.Permission {
@@ -69,13 +40,13 @@ func convertDomainPermissions(domain Domain) []analyzers.Permission {
 
 	switch {
 	case domain.IsDisabled:
-		permissions = append(permissions, analyzers.Permission("disabled"))
+		permissions = append(permissions, analyzers.Permission{Value: "disabled"})
 	case domain.Type == "sandbox":
-		permissions = append(permissions, analyzers.Permission("sandbox"))
+		permissions = append(permissions, analyzers.Permission{Value: "sandbox"})
 	case domain.State == "unverified":
-		permissions = append(permissions, analyzers.Permission("unverified"))
+		permissions = append(permissions, analyzers.Permission{Value: "unverified"})
 	default:
-		permissions = append(permissions, analyzers.FullAccess)
+		permissions = append(permissions, analyzers.Permission{Value: analyzers.FullAccess})
 	}
 
 	return permissions
