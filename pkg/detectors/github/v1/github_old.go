@@ -85,6 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 				"version":        fmt.Sprintf("%d", s.Version()),
 			},
+			AnalysisInfo: map[string]string{"key": token},
 		}
 
 		if verify {

@@ -217,3 +217,16 @@ func (r LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 
 	return resp, nil
 }
+
+// BindAllPermissions creates a Binding for each permission to the given
+// resource.
+func BindAllPermissions(r Resource, perms ...Permission) []Binding {
+	bindings := make([]Binding, len(perms))
+	for i, perm := range perms {
+		bindings[i] = Binding{
+			Resource:   r,
+			Permission: perm,
+		}
+	}
+	return bindings
+}
