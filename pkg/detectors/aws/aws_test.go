@@ -22,6 +22,13 @@ const canaryAccessKeyID = "AKIASP2TPHJSQH3FJRUX"
 
 var unverifiedSecretClient = common.ConstantResponseHttpClient(403, `{"Error": {"Code": "InvalidClientTokenId"} }`)
 
+// Our AWS detector interacts with AWS in an (expectedly) uncommon way that triggers some odd AWS behavior. (This odd
+// behavior doesn't affect "normal" AWS use, so it's not really "broken" - it's just something that we have to work
+// around.) The AWS detector code has a long comment explaining this in more detail, but the basic issue is that AWS STS
+// is stateful, so the behavior of these tests can vary depending on which of them you run, and in which order. This
+// particular test (TestAWS_FromChunk_InvalidValidReuseIDSequence) duplicates some logic in the "big" test table in the
+// other test in this file, but extracting it in this way as well makes it fail more consistently when it's supposed to
+// fail, which is why it's extracted.
 func TestAWS_FromChunk_InvalidValidReuseIDSequence(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
