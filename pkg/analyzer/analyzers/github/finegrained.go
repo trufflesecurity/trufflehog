@@ -12,6 +12,7 @@ import (
 	"github.com/fatih/color"
 	gh "github.com/google/go-github/v59/github"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
 const (
@@ -119,7 +120,7 @@ var acctPermFuncMap = map[string]func(client *gh.Client, user *gh.User) (string,
 }
 
 // Define your custom formatter function
-func permissionFormatter(key interface{}, val interface{}) (string, string) {
+func permissionFormatter(key, val any) (string, string) {
 	if strVal, ok := val.(string); ok {
 		switch strVal {
 		case NO_ACCESS:
@@ -970,12 +971,8 @@ func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess
 // Ex: "Code scanning alerts" must be enabled to tell if we have that permission.
 func analyzeRepositoryPermissions(client *gh.Client, repos []*gh.Repository, permissionType string) string {
 	access := ""
-	var err error
 	for _, repo := range repos {
-		access, err = repoPermFuncMap[permissionType](client, repo, access)
-		if err != nil {
-			log.Fatal(err)
-		}
+		access, _ = repoPermFuncMap[permissionType](client, repo, access)
 		if access != UNKNOWN && access != ERROR {
 			return access
 		}
@@ -1310,61 +1307,63 @@ func analyzeUserPermissions(client *gh.Client, user *gh.User, permissionType str
 	return access
 }
 
-func analyzeFineGrainedToken(client *gh.Client, _ string, show_all bool) {
-	// Get all private repos
+func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata) (*SecretInfo, error) {
 	allRepos, err := getAllReposForUser(client)
 	if err != nil {
-		color.Red("Error getting repos.")
-		return
+		return nil, err
 	}
 
-	filteredRepos := make([]*gh.Repository, 0)
+	allGists, err := getAllGistsForUser(client)
+	if err != nil {
+		return nil, err
+	}
+	accessibleRepos := make([]*gh.Repository, 0)
 	for _, repo := range allRepos {
 		if analyzeRepositoryPermissions(client, []*gh.Repository{repo}, METADATA) != NO_ACCESS {
-			filteredRepos = append(filteredRepos, repo)
+			accessibleRepos = append(accessibleRepos, repo)
 		}
 	}
 
-	if len(filteredRepos) == 0 {
-		// If no repos are accessible, then we only have read access to public repos
-		color.Red("[!] Repository Access: Public Repositories (read-only)\n")
-	} else {
-		// Print out the repos the token can access
-		color.Green(fmt.Sprintf("Found %v", len(filteredRepos)) + " Accessible Repositor(ies) \n")
-		printGitHubRepos(filteredRepos)
-
-		// Check our access
-		repoAccessMap := make(map[string]string)
-		for key := range repoPermFuncMap {
-			repoAccessMap[key] = analyzeRepositoryPermissions(client, filteredRepos, key)
-		}
-
-		// Print out the access map
-		printFineGrainedPermissions(repoAccessMap, show_all, true)
-	}
-
-	// Get this token's user
-	user, _, err := client.Users.Get(context.Background(), "")
-	if err != nil {
-		color.Red("Error getting user.")
-		return
+	// Check our access
+	repoAccessMap := make(map[string]string)
+	for key := range repoPermFuncMap {
+		repoAccessMap[key] = analyzeRepositoryPermissions(client, accessibleRepos, key)
 	}
 
 	// Analyze Account's Permissions
 	userAccessMap := make(map[string]string)
 	for key := range acctPermFuncMap {
-		userAccessMap[key] = analyzeUserPermissions(client, user, key)
+		userAccessMap[key] = analyzeUserPermissions(client, meta.User, key)
 	}
 
-	printFineGrainedPermissions(userAccessMap, show_all, false)
-
-	// Get all private gists
-	gists, _ := getAllGistsForUser(client)
-	printGists(gists, show_all)
-
+	return &SecretInfo{
+		Metadata:        meta,
+		Repos:           allRepos,
+		Gists:           allGists,
+		AccessibleRepos: accessibleRepos,
+		RepoAccessMap:   repoAccessMap,
+		UserAccessMap:   userAccessMap,
+	}, nil
 }
 
-func printFineGrainedPermissions(accessMap map[string]string, show_all bool, repo_permissions bool) {
+func printFineGrainedToken(cfg *config.Config, info *SecretInfo) {
+	if len(info.AccessibleRepos) == 0 {
+		// If no repos are accessible, then we only have read access to public repos
+		color.Red("[!] Repository Access: Public Repositories (read-only)\n")
+	} else {
+		// Print out the repos the token can access
+		color.Green(fmt.Sprintf("Found %v", len(info.AccessibleRepos)) + " Accessible Repositor(ies) \n")
+		printGitHubRepos(info.AccessibleRepos)
+
+		// Print out the access map
+		printFineGrainedPermissions(info.RepoAccessMap, cfg.ShowAll, true)
+	}
+
+	printFineGrainedPermissions(info.UserAccessMap, cfg.ShowAll, false)
+	printGists(info.Gists, cfg.ShowAll)
+}
+
+func printFineGrainedPermissions(accessMap map[string]string, showAll bool, repoPermissions bool) {
 	permissionCount := 0
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -1385,20 +1384,20 @@ func printFineGrainedPermissions(accessMap map[string]string, show_all bool, rep
 		} else {
 			permissionCount++
 		}
-		if !show_all && (value == NO_ACCESS || value == UNKNOWN || value == NOT_IMPLEMENTED) {
+		if !showAll && (value == NO_ACCESS || value == UNKNOWN || value == NOT_IMPLEMENTED) {
 			continue
 		} else {
 			k, v := permissionFormatter(key, value)
-			t.AppendRow([]interface{}{k, v})
+			t.AppendRow([]any{k, v})
 		}
 	}
 	var permissionType string
-	if repo_permissions {
+	if repoPermissions {
 		permissionType = "Repositor(ies)"
 	} else {
 		permissionType = "User Account"
 	}
-	if permissionCount == 0 && !show_all {
+	if permissionCount == 0 && !showAll {
 		color.Red("No Permissions Found for the %v above\n\n", permissionType)
 		return
 	} else if permissionCount == 0 {
@@ -1408,4 +1407,17 @@ func printFineGrainedPermissions(accessMap map[string]string, show_all bool, rep
 	}
 	t.Render()
 	fmt.Print("\n\n")
+}
+
+// significantPermissions returns whether there are any non-error or
+// non-unknown permissions from the enumerated values at the top of this file.
+func significantPermissions(perm string) bool {
+	switch perm {
+	case READ_ONLY, READ_WRITE:
+		return true
+	case NO_ACCESS, ERROR, UNKNOWN, NOT_IMPLEMENTED:
+		return false
+	default:
+		panic("invalid use of significantPermissions, expected one of the enumerated permissions")
+	}
 }
