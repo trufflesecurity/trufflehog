@@ -12,7 +12,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -22,10 +21,10 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.SecretType { return analyzerpb.SecretType_AIRBRAKE }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Airbrake }
 
-func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, key)
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
@@ -37,32 +36,32 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		SecretMetadata: map[string]string{
+		Metadata: map[string]any{
 			"key_type":  info.KeyType,
 			"reference": info.Reference,
 		},
 	}
 	// Copy the rest of the metadata over.
 	for k, v := range info.Misc {
-		result.SecretMetadata[k] = v
+		result.Metadata[k] = v
 	}
 
-	// Build a list of ResourcePermissions by referencing the same
-	// permissions list for each resource.
+	// Build a list of Bindings by referencing the same permissions list
+	// for each resource.
+	permissions := allPermissions()
 	for _, proj := range info.Projects {
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_AIRBRAKE,
-					ResourceType: resourcespb.ResourceType_PROJECT,
-					Name:         proj.Name,
-					Metadata:     map[string]string{"id": strconv.Itoa(proj.ID)},
-				},
-			},
-			Permissions: allPermissions(),
+		resource := analyzers.Resource{
+			Name:               proj.Name,
+			FullyQualifiedName: strconv.Itoa(proj.ID),
+			Type:               "project",
 		}
-
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
+		for _, perm := range permissions {
+			binding := analyzers.Binding{
+				Resource:   resource,
+				Permission: perm,
+			}
+			result.Bindings = append(result.Bindings, binding)
+		}
 	}
 
 	return &result
@@ -172,7 +171,11 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 }
 
 func allPermissions() []analyzers.Permission {
-	return scope_order
+	permissions := make([]analyzers.Permission, len(scope_order))
+	for i, perm := range scope_order {
+		permissions[i] = analyzers.Permission{Value: perm}
+	}
+	return permissions
 }
 
 func printProjects(projects ...Project) {

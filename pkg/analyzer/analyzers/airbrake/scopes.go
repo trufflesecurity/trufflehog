@@ -2,7 +2,7 @@ package airbrake
 
 import "github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 
-var scope_order = []analyzers.Permission{
+var scope_order = []string{
 	"Authentication",
 	"Performance Monitoring",
 	"Error Notification",
