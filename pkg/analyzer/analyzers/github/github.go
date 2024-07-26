@@ -24,15 +24,93 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_GitHub }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("not implemented")
+	return secretInfoToAnalyzerResult(info), nil
 }
 
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	return nil
+	if info == nil {
+		return nil
+	}
+	// Metadata        *TokenMetadata
+	//	Type        string
+	//	FineGrained bool
+	//	User        *gh.User
+	//	Expiration  time.Time
+	//	OauthScopes []analyzers.Permission
+	// Repos           []*gh.Repository
+	// Gists           []*gh.Gist
+	// AccessibleRepos []*gh.Repository
+	// RepoAccessMap   map[string]string
+	// UserAccessMap   map[string]string
+	result := &analyzers.AnalyzerResult{
+		Metadata: map[string]any{
+			"type":       info.Metadata.Type,
+			"expiration": info.Metadata.Expiration,
+		},
+	}
+	result.Bindings = append(result.Bindings, secretInfoToUserBindings(info)...)
+	result.Bindings = append(result.Bindings, secretInfoToRepoBindings(info)...)
+	result.Bindings = append(result.Bindings, secretInfoToGistBindings(info)...)
+	for _, repo := range append(info.Repos, info.AccessibleRepos...) {
+		if *repo.Owner.Type != "Organization" {
+			continue
+		}
+		name := *repo.Owner.Name
+		result.UnboundedResources = append(result.UnboundedResources, analyzers.Resource{
+			Name:               name,
+			FullyQualifiedName: fmt.Sprintf("github.com/%s", name),
+			Type:               "organization",
+		})
+	}
+	// TODO: Unbound resources
+	// - Repo owners
+	// - Gist owners
+	return result
+}
+
+func secretInfoToUserBindings(info *SecretInfo) []analyzers.Binding {
+	username := info.Metadata.User.GetLogin()
+	resource := analyzers.Resource{
+		Name:               username,
+		FullyQualifiedName: fmt.Sprintf("github.com/%s", username),
+		Type:               "user",
+	}
+
+	return analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)
+}
+
+func secretInfoToRepoBindings(info *SecretInfo) []analyzers.Binding {
+	repos := info.Repos
+	if len(info.AccessibleRepos) > 0 {
+		repos = info.AccessibleRepos
+	}
+	var bindings []analyzers.Binding
+	for _, repo := range repos {
+		resource := analyzers.Resource{
+			Name:               *repo.Name,
+			FullyQualifiedName: fmt.Sprintf("github.com/%s", *repo.FullName),
+			Type:               "repository",
+		}
+		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
+	}
+	return bindings
+}
+
+func secretInfoToGistBindings(info *SecretInfo) []analyzers.Binding {
+	var bindings []analyzers.Binding
+	for _, gist := range info.Gists {
+		resource := analyzers.Resource{
+			Name:               *gist.Description,
+			FullyQualifiedName: fmt.Sprintf("gist.github.com/%s/%s", *gist.Owner.Login, *gist.ID),
+			Type:               "gist",
+		}
+		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
+	}
+	return bindings
 }
 
 func getAllGistsForUser(client *gh.Client) ([]*gh.Gist, error) {
@@ -207,9 +285,11 @@ func checkFineGrained(token string, oauthScopes []analyzers.Permission) (string,
 }
 
 type SecretInfo struct {
-	Metadata        *TokenMetadata
-	Repos           []*gh.Repository
-	Gists           []*gh.Gist
+	Metadata *TokenMetadata
+	Repos    []*gh.Repository
+	Gists    []*gh.Gist
+	// AccessibleRepos, RepoAccessMap, and UserAccessMap are only set if
+	// the token has fine-grained access.
 	AccessibleRepos []*gh.Repository
 	RepoAccessMap   map[string]string
 	UserAccessMap   map[string]string
