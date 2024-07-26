@@ -193,7 +193,7 @@ func printPermissions(scopes []analyzers.Permission) {
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Scope", "Permissions"})
 	for _, scope := range scopes {
-		scope := string(scope)
+		scope := scope.Value
 		for i, permission := range scope_mapping[scope] {
 			if i == 0 {
 				t.AppendRow([]any{color.GreenString("%s", scope), color.GreenString("%s", permission)})
