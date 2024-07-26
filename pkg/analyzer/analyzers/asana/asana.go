@@ -13,7 +13,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -23,45 +22,18 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.SecretType { return analyzerpb.SecretType_ASANA }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Asana }
 
-func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, key)
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
-	return secretInfoToAnalyzerResult(info), nil
+	return nil, fmt.Errorf("not implemented")
 }
 
 func secretInfoToAnalyzerResult(info *MeJSON) *analyzers.AnalyzerResult {
-	if info == nil {
-		return nil
-	}
-	result := analyzers.AnalyzerResult{
-		SecretMetadata: map[string]string{
-			"email": info.Data.Email,
-			"name":  info.Data.Name,
-			"type":  info.Data.Type,
-		},
-	}
-	// Build a list of ResourcePermissions by referencing the same
-	// permissions list for each resource.
-	permissions := []analyzers.Permission{analyzers.FullAccess}
-	for _, ws := range info.Data.Workspaces {
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_ASANA,
-					ResourceType: resourcespb.ResourceType_WORKSPACE,
-					Name:         ws.Name,
-				},
-			},
-			Permissions: permissions,
-		}
-
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
-	}
-	return &result
+	return nil
 }
 
 type MeJSON struct {
