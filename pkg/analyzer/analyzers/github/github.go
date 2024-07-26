@@ -13,7 +13,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -23,122 +22,18 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.SecretType { return analyzerpb.SecretType_GITHUB }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_GitHub }
 
-func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, key)
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
-	return secretInfoToAnalyzerResult(info), nil
+	return nil, fmt.Errorf("not implemented")
 }
 
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	// TODO: Tree-ify repos
-	if info == nil {
-		return nil
-	}
-
-	// Copy metadata into SecretMetadata (Type, Expiration)
-	result := analyzers.AnalyzerResult{
-		SecretMetadata: map[string]string{
-			"type":       info.Metadata.Type,
-			"expiration": info.Metadata.Expiration.String(),
-		},
-	}
-
-	// Metadata        *TokenMetadata
-	//	Type        string
-	// 	FineGrained bool
-	// 	User        *gh.User
-	// 	Expiration  time.Time
-	// 	OauthScopes []analyzers.Permission
-	// Repos           []*gh.Repository
-	// Gists           []*gh.Gist
-	// AccessibleRepos []*gh.Repository
-	// RepoAccessMap   map[string]string
-	// UserAccessMap   map[string]string
-
-	// Create the list of permissions from Metadata.OauthScopes,
-	// RepoAccessMap, and UserAccessMap. For now, assume that all
-	// permissions apply to all resources of all types.
-	// TODO: Re-assess whether this makes sense.
-	permissions := make([]analyzers.Permission, 0, len(info.Metadata.OauthScopes)+len(info.RepoAccessMap)+len(info.UserAccessMap))
-
-	// Copy existing oauth scopes.
-	copy(permissions, info.Metadata.OauthScopes)
-
-	// Copy permissions enumerated from RepoAccessMap.
-	for scope, access := range info.RepoAccessMap {
-		if !significantPermissions(access) {
-			continue
-		}
-		permissions = append(permissions, analyzers.Permission(scope))
-	}
-
-	// Copy permissions enumerated from UserAccessMap.
-	for scope, access := range info.UserAccessMap {
-		if !significantPermissions(access) {
-			continue
-		}
-		permissions = append(permissions, analyzers.Permission(scope))
-	}
-
-	// Add repos to the list of resources (if AccessibleRepos is available,
-	// use that instead).
-	repos := info.Repos
-	if len(info.AccessibleRepos) > 0 {
-		repos = info.AccessibleRepos
-	}
-	for _, repo := range repos {
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_GITHUB,
-					ResourceType: resourcespb.ResourceType_REPOSITORY,
-					Name:         *repo.Name,
-					Metadata: map[string]string{
-						"full_name": repo.GetFullName(),
-						"private":   strconv.FormatBool(repo.GetPrivate()),
-					},
-				},
-			},
-			Permissions: permissions,
-		}
-
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
-	}
-
-	// Add gists to the list of resources.
-	for _, gist := range info.Gists {
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_GITHUB,
-					ResourceType: resourcespb.ResourceType_GIST,
-					Name:         gist.GetID(),
-					Metadata:     map[string]string{},
-				},
-			},
-			Permissions: permissions,
-		}
-
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
-	}
-
-	// Add user to the list of resources.
-	result.ResourcePermissions = append(result.ResourcePermissions, analyzers.ResourcePermission{
-		ResourceTree: analyzers.ResourceTree{
-			Resource: &resourcespb.Resource{
-				SecretType:   analyzerpb.SecretType_GITHUB,
-				ResourceType: resourcespb.ResourceType_USER,
-				Name:         *info.Metadata.User.Login,
-				Metadata:     map[string]string{},
-			},
-		},
-	})
-
-	return &result
+	return nil
 }
 
 func getAllGistsForUser(client *gh.Client) ([]*gh.Gist, error) {
@@ -272,7 +167,7 @@ func getTokenMetadata(token string, client *gh.Client) (*TokenMetadata, error) {
 	var oauthScopes []analyzers.Permission
 	for _, scope := range resp.Header.Values("X-OAuth-Scopes") {
 		for _, scope := range strings.Split(scope, ", ") {
-			oauthScopes = append(oauthScopes, analyzers.Permission(scope))
+			oauthScopes = append(oauthScopes, analyzers.Permission{Value: scope})
 		}
 	}
 	tokenType, fineGrained := checkFineGrained(token, oauthScopes)
