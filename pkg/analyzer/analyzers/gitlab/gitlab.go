@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/fatih/color"
@@ -15,7 +14,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -25,59 +23,18 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.SecretType { return analyzerpb.SecretType_GITLAB }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_GitLab }
 
-func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, key)
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
-	return secretInfoToAnalyzerResult(info), nil
+	return nil, fmt.Errorf("not implemented")
 }
 
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	if info == nil {
-		return nil
-	}
-
-	result := analyzers.AnalyzerResult{
-		SecretMetadata: map[string]string{
-			"version":      info.Metadata.Version,
-			"enterprise":   strconv.FormatBool(info.Metadata.Enterprise),
-			"revoked":      strconv.FormatBool(info.AccessToken.Revoked),
-			"created_at":   info.AccessToken.CreatedAt,
-			"expires_at":   info.AccessToken.ExpiresAt,
-			"last_used_at": info.AccessToken.LastUsedAt,
-			"name":         info.AccessToken.Name,
-		},
-	}
-
-	var permissions []analyzers.Permission
-	for _, scope := range info.AccessToken.Scopes {
-		permissions = append(permissions, analyzers.Permission(scope))
-	}
-
-	for _, project := range info.Projects {
-		accessLevel := access_level_map[project.Permissions.ProjectAccess.AccessLevel]
-
-		// Only append this one permission for this specific resource.
-		permissions := append(permissions, analyzers.Permission(accessLevel))
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_GITLAB,
-					ResourceType: resourcespb.ResourceType_PROJECT,
-					Name:         project.NameWithNamespace,
-					Metadata:     map[string]string{},
-				},
-			},
-			Permissions: permissions,
-		}
-
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
-	}
-
-	return &result
+	return nil
 }
 
 // consider calling /api/v4/metadata to learn about gitlab instance version and whether neterrprises is enabled
