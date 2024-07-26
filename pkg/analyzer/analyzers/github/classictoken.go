@@ -68,7 +68,7 @@ func hasPrivateRepoAccess(scopes map[string]bool) bool {
 func processScopes(headerScopesSlice []analyzers.Permission) map[string]bool {
 	allScopes := make(map[string]bool)
 	for _, scope := range headerScopesSlice {
-		allScopes[string(scope)] = true
+		allScopes[scope.Value] = true
 	}
 	for scope := range allScopes {
 		if subScopes, ok := SCOPE_TO_SUB_SCOPE[scope]; ok {

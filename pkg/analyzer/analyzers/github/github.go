@@ -3,7 +3,6 @@ package github
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
