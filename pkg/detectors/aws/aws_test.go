@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -20,6 +21,62 @@ import (
 const canaryAccessKeyID = "AKIASP2TPHJSQH3FJRUX"
 
 var unverifiedSecretClient = common.ConstantResponseHttpClient(403, `{"Error": {"Code": "InvalidClientTokenId"} }`)
+
+func TestAWS_FromChunk_InvalidValidReuseIDSequence(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	secret := testSecrets.MustGetField("AWS")
+	id := testSecrets.MustGetField("AWS_ID")
+	inactiveSecret := testSecrets.MustGetField("AWS_INACTIVE")
+
+	d := scanner{}
+
+	ignoreOpts := []cmp.Option{cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError")}
+
+	got, err := d.FromData(ctx, true, []byte(fmt.Sprintf("aws %s %s", id, inactiveSecret)))
+	if assert.NoError(t, err) {
+		want := []detectors.Result{
+			{
+				DetectorType: detectorspb.DetectorType_AWS,
+				Verified:     false,
+				Redacted:     "AKIASP2TPHJSQH3FJRUX",
+				ExtraData: map[string]string{
+					"resource_type": "Access key",
+					"account":       "171436882533",
+					"is_canary":     "true",
+					"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+				},
+			},
+		}
+		if diff := cmp.Diff(got, want, ignoreOpts...); diff != "" {
+			t.Errorf("AWS.FromData() (valid ID, invalid secret) diff: (-got +want)\n%s", diff)
+		}
+	}
+
+	got, err = d.FromData(ctx, true, []byte(fmt.Sprintf("aws %s %s", id, secret)))
+	if assert.NoError(t, err) {
+		want := []detectors.Result{
+			{
+				DetectorType: detectorspb.DetectorType_AWS,
+				Verified:     true,
+				Redacted:     "AKIASP2TPHJSQH3FJRUX",
+				ExtraData: map[string]string{
+					"resource_type": "Access key",
+					"account":       "171436882533",
+					"is_canary":     "true",
+					"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+				},
+			},
+		}
+		if diff := cmp.Diff(got, want, ignoreOpts...); diff != "" {
+			t.Errorf("AWS.FromData() (valid secret after invalid secret using same ID) diff: (-got +want)\n%s", diff)
+		}
+	}
+}
 
 func TestAWS_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
