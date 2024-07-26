@@ -15,7 +15,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -25,10 +24,10 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.SecretType { return analyzerpb.SecretType_OPENAI }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_OpenAI }
 
-func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, key)
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +36,7 @@ func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*
 
 func secretInfoToAnalyzerResult(info *AnalyzerJSON) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
-		SecretMetadata: map[string]string{
+		Metadata: map[string]any{
 			"user":          info.me.Name,
 			"email":         info.me.Email,
 			"phone":         info.me.Phone,
@@ -49,18 +48,19 @@ func secretInfoToAnalyzerResult(info *AnalyzerJSON) *analyzers.AnalyzerResult {
 
 	perms := convertPermissions(info.isAdmin, info.perms)
 	for _, org := range info.me.Orgs.Data {
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_OPENAI,
-					ResourceType: resourcespb.ResourceType_ORGANIZATION,
-					Name:         org.Title,
-					Metadata:     map[string]string{},
-				},
-			},
-			Permissions: perms,
+		resource := analyzers.Resource{
+			Name:               org.Title,
+			FullyQualifiedName: org.ID,
+			Type:               "org",
 		}
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
+		// Copy each permission into this resource.
+		for _, perm := range perms {
+			binding := analyzers.Binding{
+				Resource:   resource,
+				Permission: perm,
+			}
+			result.Bindings = append(result.Bindings, binding)
+		}
 	}
 
 	return &result
@@ -70,11 +70,11 @@ func convertPermissions(isAdmin bool, perms []permissionData) []analyzers.Permis
 	var permissions []analyzers.Permission
 
 	if isAdmin {
-		permissions = append(permissions, analyzers.FullAccess)
+		permissions = append(permissions, analyzers.Permission{Value: analyzers.FullAccess})
 	} else {
 		for _, perm := range perms {
 			permName := perm.name + ":" + string(perm.status)
-			permissions = append(permissions, analyzers.Permission(permName))
+			permissions = append(permissions, analyzers.Permission{Value: permName})
 		}
 	}
 
@@ -95,7 +95,13 @@ type MeJSON struct {
 	MfaEnabled bool   `json:"mfa_flag_enabled"`
 	Orgs       struct {
 		Data []struct {
-			Title string `json:"title"`
+			ID          string `json:"id"`
+			Title       string `json:"title"`
+			User        string `json:"name"`
+			Description string `json:"description"`
+			Personal    bool   `json:"personal"`
+			Default     bool   `json:"is_default"`
+			Role        string `json:"role"`
 		} `json:"data"`
 	} `json:"orgs"`
 }
