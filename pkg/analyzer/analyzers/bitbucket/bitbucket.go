@@ -2,10 +2,10 @@ package bitbucket
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
@@ -13,7 +13,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/resourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -23,14 +22,14 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.SecretType { return analyzerpb.SecretType_BITBUCKET }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Bitbucket }
 
-func (a Analyzer) Analyze(_ context.Context, key string, _ map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, key)
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
-	return secretInfoToAnalyzerResult(info), nil
+	return nil, fmt.Errorf("not implemented")
 }
 
 type SecretInfo struct {
@@ -60,40 +59,7 @@ type RepoJSON struct {
 }
 
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	if info == nil {
-		return nil
-	}
-	result := analyzers.AnalyzerResult{
-		SecretMetadata: map[string]string{
-			"key_type": info.Type,
-		},
-	}
-
-	for _, repo := range info.Repos {
-		// TODO: Tree-ify repos
-		rp := analyzers.ResourcePermission{
-			ResourceTree: analyzers.ResourceTree{
-				Resource: &resourcespb.Resource{
-					SecretType:   analyzerpb.SecretType_BITBUCKET,
-					ResourceType: resourcespb.ResourceType_REPOSITORY,
-					Name:         repo.RepoName,
-					Metadata: map[string]string{
-						"full_name": repo.FullName,
-						"project":   repo.Project.Name,
-						"workspace": repo.Workspace.Name,
-						"private":   strconv.FormatBool(repo.IsPrivate),
-						"owner":     repo.Owner.Username,
-						"role":      repo.Role,
-					},
-				},
-			},
-			Permissions: info.OauthScopes,
-		}
-
-		result.ResourcePermissions = append(result.ResourcePermissions, rp)
-	}
-
-	return &result
+	return nil
 }
 
 func getScopesAndType(cfg *config.Config, key string) (string, []analyzers.Permission, error) {
@@ -122,7 +88,7 @@ func getScopesAndType(cfg *config.Config, key string) (string, []analyzers.Permi
 
 	var scopes []analyzers.Permission
 	for _, scope := range strings.Split(oauthScopes, ", ") {
-		scopes = append(scopes, analyzers.Permission(scope))
+		scopes = append(scopes, analyzers.Permission{Value: scope})
 	}
 	return credentialType, scopes, nil
 }
@@ -130,7 +96,7 @@ func getScopesAndType(cfg *config.Config, key string) (string, []analyzers.Permi
 func scopesToBitbucketScopes(scopes ...analyzers.Permission) []BitbucketScope {
 	scopesSlice := []BitbucketScope{}
 	for _, scope := range scopes {
-		scope := string(scope)
+		scope := scope.Value
 		mapping := oauth_scope_map[scope]
 		for _, impliedScope := range mapping.ImpliedScopes {
 			scopesSlice = append(scopesSlice, oauth_scope_map[impliedScope])
