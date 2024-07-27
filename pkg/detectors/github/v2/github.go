@@ -18,9 +18,9 @@ type Scanner struct {
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*v1.Scanner)(nil)
-var _ detectors.Versioner = (*v1.Scanner)(nil)
-var _ detectors.EndpointCustomizer = (*v1.Scanner)(nil)
+var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 func (s Scanner) Version() int {
 	return 2
@@ -66,6 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 				"version":        fmt.Sprintf("%d", s.Version()),
 			},
+			AnalysisInfo: map[string]string{"key": token},
 		}
 
 		if verify {

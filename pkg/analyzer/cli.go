@@ -188,7 +188,7 @@ func Run(cmd string) {
 		panic("todo")
 	case githubScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("github")
-		github.AnalyzePermissions(cfg, *githubKey)
+		github.AnalyzeAndPrintPermissions(cfg, *githubKey)
 	case sendgridScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("sendgrid")
 		sendgrid.AnalyzePermissions(cfg, *sendgridKey)
