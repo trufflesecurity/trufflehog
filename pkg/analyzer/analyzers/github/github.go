@@ -50,7 +50,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Metadata: map[string]any{
 			"type":         info.Metadata.Type,
 			"fine_grained": info.Metadata.FineGrained,
-			"expiration":   info.Metadata.Expiration,
+			"expiration":   info.Metadata.Expiration.String(),
 		},
 	}
 	result.Bindings = append(result.Bindings, secretInfoToUserBindings(info)...)
