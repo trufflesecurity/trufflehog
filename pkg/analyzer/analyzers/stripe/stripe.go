@@ -14,9 +14,10 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
+	"gopkg.in/yaml.v3"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -124,7 +125,7 @@ func checkKeyType(key string) (string, error) {
 }
 
 func checkKeyEnv(key string) (string, error) {
-	//remove first 3 characters
+	// remove first 3 characters
 	key = key[3:]
 	if strings.HasPrefix(key, LIVE_PREFIX) {
 		return LIVE, nil

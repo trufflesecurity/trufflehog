@@ -17,9 +17,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-github/v62/github"
+	"github.com/google/go-github/v63/github"
 	"github.com/stretchr/testify/assert"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
@@ -28,6 +27,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {

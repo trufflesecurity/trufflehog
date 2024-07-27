@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	gh "github.com/google/go-github/v59/github"
+	gh "github.com/google/go-github/v63/github"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
@@ -112,7 +112,7 @@ var acctPermFuncMap = map[string]func(client *gh.Client, user *gh.User) (string,
 	GIT_KEYS:               getGitKeysPermission,
 	LIMITS:                 getLimitsPermission,
 	PLAN:                   getPlanPermission,
-	//PRIVATE_INVITES:        getPrivateInvitesPermission, // Skipped until API better documented
+	// PRIVATE_INVITES:        getPrivateInvitesPermission, // Skipped until API better documented
 	PROFILE:      getProfilePermission,
 	SIGNING_KEYS: getSigningKeysPermission,
 	STARRING:     getStarringPermission,
@@ -591,7 +591,7 @@ func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAc
 
 	// Risk: Extremely Low
 	// GET /repositories/{repository_id}/environments/{environment_name}/variables
-	_, resp, err := client.Actions.ListEnvVariables(context.Background(), int(*repo.ID), *envResp.Environments[0].Name, &gh.ListOptions{})
+	_, resp, err := client.Actions.ListEnvVariables(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
 		return NO_ACCESS, nil
@@ -604,7 +604,7 @@ func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAc
 	// Risk: Very Low
 	// -> We're updating an environment variable with an invalid payload. Even if we did, the name would be (see RANDOM_STRING above) and the value would be nil.
 	// PATCH /repositories/{repository_id}/environments/{environment_name}/variables/{variable_name}
-	resp, err = client.Actions.UpdateEnvVariable(context.Background(), int(*repo.ID), *envResp.Environments[0].Name, &gh.ActionsVariable{Name: RANDOM_STRING})
+	resp, err = client.Actions.UpdateEnvVariable(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ActionsVariable{Name: RANDOM_STRING})
 	switch resp.StatusCode {
 	case 403:
 		return READ_ONLY, nil

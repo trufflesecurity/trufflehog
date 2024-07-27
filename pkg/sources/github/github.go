@@ -14,13 +14,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/exp/rand"
-	"golang.org/x/oauth2"
-
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
-	"github.com/google/go-github/v62/github"
+	"github.com/google/go-github/v63/github"
+	"golang.org/x/exp/rand"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"

@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	gh "github.com/google/go-github/v59/github"
+	gh "github.com/google/go-github/v63/github"
 	"github.com/jedib0t/go-pretty/v6/table"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
