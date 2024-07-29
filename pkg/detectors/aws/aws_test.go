@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -20,6 +21,68 @@ import (
 const canaryAccessKeyID = "AKIASP2TPHJSQH3FJRUX"
 
 var unverifiedSecretClient = common.ConstantResponseHttpClient(403, `{"Error": {"Code": "InvalidClientTokenId"} }`)
+
+// Our AWS detector interacts with AWS in an (expectedly) uncommon way that triggers some odd AWS behavior. (This odd
+// behavior doesn't affect "normal" AWS use, so it's not really "broken" - it's just something that we have to work
+// around.) The AWS detector code has a long comment explaining this in more detail, but the basic issue is that AWS STS
+// is stateful, so the behavior of these tests can vary depending on which of them you run, and in which order. This
+// particular test (TestAWS_FromChunk_InvalidValidReuseIDSequence) duplicates some logic in the "big" test table in the
+// other test in this file, but extracting it in this way as well makes it fail more consistently when it's supposed to
+// fail, which is why it's extracted.
+func TestAWS_FromChunk_InvalidValidReuseIDSequence(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	secret := testSecrets.MustGetField("AWS")
+	id := testSecrets.MustGetField("AWS_ID")
+	inactiveSecret := testSecrets.MustGetField("AWS_INACTIVE")
+
+	d := scanner{}
+
+	ignoreOpts := []cmp.Option{cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError")}
+
+	got, err := d.FromData(ctx, true, []byte(fmt.Sprintf("aws %s %s", id, inactiveSecret)))
+	if assert.NoError(t, err) {
+		want := []detectors.Result{
+			{
+				DetectorType: detectorspb.DetectorType_AWS,
+				Verified:     false,
+				Redacted:     "AKIAZAVB57H55F3T4BKH",
+				ExtraData: map[string]string{
+					"resource_type": "Access key",
+					"account":       "619888638459",
+				},
+			},
+		}
+		if diff := cmp.Diff(got, want, ignoreOpts...); diff != "" {
+			t.Errorf("AWS.FromData() (valid ID, invalid secret) diff: (-got +want)\n%s", diff)
+		}
+	}
+
+	got, err = d.FromData(ctx, true, []byte(fmt.Sprintf("aws %s %s", id, secret)))
+	if assert.NoError(t, err) {
+		want := []detectors.Result{
+			{
+				DetectorType: detectorspb.DetectorType_AWS,
+				Verified:     true,
+				Redacted:     "AKIAZAVB57H55F3T4BKH",
+				ExtraData: map[string]string{
+					"resource_type":  "Access key",
+					"account":        "619888638459",
+					"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
+					"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
+				},
+			},
+		}
+		if diff := cmp.Diff(got, want, ignoreOpts...); diff != "" {
+			t.Errorf("AWS.FromData() (valid secret after invalid secret using same ID) diff: (-got +want)\n%s", diff)
+		}
+	}
+}
 
 func TestAWS_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -61,13 +124,13 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
-						"resource_type": "Access key",
-						"account":       "171436882533",
-						"arn":           "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+						"resource_type":  "Access key",
+						"account":        "619888638459",
+						"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
+						"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
 					},
 				},
 			},
@@ -85,12 +148,10 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+						"account":       "619888638459",
 					},
 				},
 			},
@@ -119,24 +180,22 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJXYZ",
+					Redacted:     "AKIAZAVB57H55F3T4XYZ",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+						"account":       "619888638459",
 					},
 				},
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
-						"resource_type": "Access key",
-						"account":       "171436882533",
-						"arn":           "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+						"resource_type":  "Access key",
+						"account":        "619888638459",
+						"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
+						"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
 					},
 				},
 			},
@@ -165,13 +224,13 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
-						"resource_type": "Access key",
-						"account":       "171436882533",
-						"arn":           "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+						"resource_type":  "Access key",
+						"account":        "619888638459",
+						"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
+						"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
 					},
 				},
 				{
@@ -179,10 +238,8 @@ func TestAWS_FromChunk(t *testing.T) {
 					Verified:     false,
 					Redacted:     inactiveID,
 					ExtraData: map[string]string{
-						"account":       "171436882533",
+						"account":       "619888638459",
 						"resource_type": "Access key",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
@@ -202,12 +259,10 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+						"account":       "619888638459",
 					},
 				},
 			},
@@ -217,7 +272,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			name: "skipped",
 			s: scanner{
 				skipIDs: map[string]struct{}{
-					"AKIASP2TPHJSQH3FJRUX": {},
+					"AKIAZAVB57H55F3T4BKH": {},
 				},
 			},
 			args: args{
@@ -241,12 +296,10 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+						"account":       "619888638459",
 					},
 				},
 			},
@@ -267,12 +320,10 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+						"account":       "619888638459",
 					},
 				},
 			},
@@ -339,13 +390,13 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
-						"resource_type": "Access key",
-						"account":       "171436882533",
-						"arn":           "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"is_canary":     "true",
-						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+						"resource_type":  "Access key",
+						"account":        "619888638459",
+						"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
+						"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
 					},
 				},
 			},
