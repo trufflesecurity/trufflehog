@@ -466,7 +466,11 @@ RepoLoop:
 }
 
 func (s *Source) enumerateBasicAuth(ctx context.Context, apiEndpoint string, basicAuth *credentialspb.BasicAuth) error {
-	ghClient, err := newBasicAuthClient(basicAuth, apiEndpoint)
+	s.httpClient.Transport = &github.BasicAuthTransport{
+		Username: basicAuth.Username,
+		Password: basicAuth.Password,
+	}
+	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
 	if err != nil {
 		s.log.Error(err, "error creating GitHub client")
 	}
@@ -491,7 +495,7 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, apiEndpoint string, bas
 }
 
 func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint string) {
-	ghClient, err := newUnauthenticatedClient(apiEndpoint)
+	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
 	if err != nil {
 		s.log.Error(err, "error creating GitHub client")
 	}
@@ -518,7 +522,18 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	// Needed for clones.
 	s.githubToken = token
 
-	ghClient, err := newTokenClient(token, apiEndpoint)
+	// Needed to list repos.
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+	s.httpClient.Transport = &oauth2.Transport{
+		Base:   s.httpClient.Transport,
+		Source: oauth2.ReuseTokenSource(nil, ts),
+	}
+
+	// If we're using public GitHub, make a regular client.
+	// Otherwise, make an enterprise client.
+	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
 	if err != nil {
 		s.log.Error(err, "error creating GitHub client")
 	}
@@ -658,6 +673,16 @@ func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *
 	}
 
 	return installationClient, nil
+}
+
+func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Client, error) {
+	// If we're using public GitHub, make a regular client.
+	// Otherwise, make an enterprise client.
+	if strings.EqualFold(apiEndpoint, cloudEndpoint) {
+		return github.NewClient(httpClient), nil
+	}
+
+	return github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 }
 
 func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
