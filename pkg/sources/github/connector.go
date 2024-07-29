@@ -18,7 +18,7 @@ type connector interface {
 	ListAppInstallations(ctx context.Context) ([]*github.Installation, error)
 }
 
-func newConnector(connection *sourcespb.GitHub) (connector, error) {
+func newConnector(connection *sourcespb.GitHub, handleRateLimit func(error) bool) (connector, error) {
 	apiEndpoint := connection.Endpoint
 	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
 		apiEndpoint = cloudEndpoint
@@ -27,6 +27,8 @@ func newConnector(connection *sourcespb.GitHub) (connector, error) {
 	switch cred := connection.GetCredential().(type) {
 	case *sourcespb.GitHub_GithubApp:
 		return newAppConnector(apiEndpoint, cred.GithubApp)
+	case *sourcespb.GitHub_Token:
+		return newTokenConnector(apiEndpoint, cred.Token, handleRateLimit)
 	case *sourcespb.GitHub_Unauthenticated:
 		return newUnauthenticatedConnector(apiEndpoint)
 	default:
