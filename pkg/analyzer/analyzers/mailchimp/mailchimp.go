@@ -33,21 +33,6 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	return nil, fmt.Errorf("not implemented")
 }
 
-func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	return nil
-}
-
-func convertDomainPermissions(domain Domain) []analyzers.Permission {
-	var permissions []analyzers.Permission
-	if domain.Authenticated {
-		permissions = append(permissions, analyzers.Permission{Value: "authenticated"})
-	}
-	if domain.Verified {
-		permissions = append(permissions, analyzers.Permission{Value: "verified"})
-	}
-	return permissions
-}
-
 type MetadataJSON struct {
 	AccountID       string `json:"account_id"`
 	AccountName     string `json:"account_name"`

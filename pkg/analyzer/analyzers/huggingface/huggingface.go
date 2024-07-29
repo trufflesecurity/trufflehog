@@ -37,25 +37,6 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	return nil, fmt.Errorf("not implemented")
 }
 
-func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	return nil
-}
-
-// convertModelPermissions converts a model Permissions struct into a slice of
-// analyzers.Permission.
-func convertModelPermissions(perms Permissions) []analyzers.Permission {
-	var permissions []analyzers.Permission
-	if perms.Read {
-		// TODO: Is this the right string?
-		permissions = append(permissions, analyzers.Permission{Value: "read"})
-	}
-	if perms.Write {
-		// TODO: Is this the right string?
-		permissions = append(permissions, analyzers.Permission{Value: "write"})
-	}
-	return permissions
-}
-
 // HFTokenJSON is the struct for the HF /whoami-v2 API JSON response
 type HFTokenJSON struct {
 	Username string `json:"name"`

@@ -32,10 +32,6 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	return nil, fmt.Errorf("not implemented")
 }
 
-func secretInfoToAnalyzerResult(info *MeJSON) *analyzers.AnalyzerResult {
-	return nil
-}
-
 type MeJSON struct {
 	Data struct {
 		Email      string `json:"email"`

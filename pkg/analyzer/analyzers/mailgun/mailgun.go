@@ -31,27 +31,6 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	return nil, fmt.Errorf("not implemented")
 }
 
-func secretInfoToAnalyzerResult(info *DomainsJSON) *analyzers.AnalyzerResult {
-	return nil
-}
-
-func convertDomainPermissions(domain Domain) []analyzers.Permission {
-	var permissions []analyzers.Permission
-
-	switch {
-	case domain.IsDisabled:
-		permissions = append(permissions, analyzers.Permission{Value: "disabled"})
-	case domain.Type == "sandbox":
-		permissions = append(permissions, analyzers.Permission{Value: "sandbox"})
-	case domain.State == "unverified":
-		permissions = append(permissions, analyzers.Permission{Value: "unverified"})
-	default:
-		permissions = append(permissions, analyzers.Permission{Value: analyzers.FullAccess})
-	}
-
-	return permissions
-}
-
 type Domain struct {
 	URL        string `json:"name"`
 	IsDisabled bool   `json:"is_disabled"`

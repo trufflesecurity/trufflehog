@@ -58,10 +58,6 @@ type RepoJSON struct {
 	Values []Repo `json:"values"`
 }
 
-func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	return nil
-}
-
 func getScopesAndType(cfg *config.Config, key string) (string, []analyzers.Permission, error) {
 	// client
 	client := analyzers.NewAnalyzeClient(cfg)

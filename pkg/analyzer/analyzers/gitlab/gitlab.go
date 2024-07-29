@@ -33,10 +33,6 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	return nil, fmt.Errorf("not implemented")
 }
 
-func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
-	return nil
-}
-
 // consider calling /api/v4/metadata to learn about gitlab instance version and whether neterrprises is enabled
 
 // we'll call /api/v4/personal_access_tokens and /api/v4/user and then filter down to scopes.
