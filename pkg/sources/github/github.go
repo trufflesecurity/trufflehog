@@ -491,7 +491,7 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, apiEndpoint string, bas
 }
 
 func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint string) {
-	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
+	ghClient, err := newUnauthenticatedClient(apiEndpoint)
 	if err != nil {
 		s.log.Error(err, "error creating GitHub client")
 	}

@@ -31,3 +31,7 @@ func newBasicAuthClient(basicAuth *credentialspb.BasicAuth, apiEndpoint string) 
 	}
 	return createGitHubClient(httpClient, apiEndpoint)
 }
+
+func newUnauthenticatedClient(apiEndpoint string) (*github.Client, error) {
+	return createGitHubClient(common.RetryableHTTPClientTimeout(60), apiEndpoint)
+}
