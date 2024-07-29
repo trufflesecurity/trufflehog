@@ -228,7 +228,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 	// get total charges
 }
 
-func getRestrictedPermissions(key string) ([]PermissionsCategory, error) {
+func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCategory, error) {
 	var config Config
 	if err := yaml.Unmarshal(restrictedConfig, &config); err != nil {
 		fmt.Println("Error unmarshalling YAML:", err)

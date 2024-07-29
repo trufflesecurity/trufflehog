@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	gh "github.com/google/go-github/v59/github"
+	gh "github.com/google/go-github/v63/github"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
@@ -112,7 +112,7 @@ var acctPermFuncMap = map[string]func(client *gh.Client, user *gh.User) (string,
 	GIT_KEYS:               getGitKeysPermission,
 	LIMITS:                 getLimitsPermission,
 	PLAN:                   getPlanPermission,
-	//PRIVATE_INVITES:        getPrivateInvitesPermission, // Skipped until API better documented
+	// PRIVATE_INVITES:        getPrivateInvitesPermission, // Skipped until API better documented
 	PROFILE:      getProfilePermission,
 	SIGNING_KEYS: getSigningKeysPermission,
 	STARRING:     getStarringPermission,
@@ -591,7 +591,7 @@ func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAc
 
 	// Risk: Extremely Low
 	// GET /repositories/{repository_id}/environments/{environment_name}/variables
-	_, resp, err := client.Actions.ListEnvVariables(context.Background(), int(*repo.ID), *envResp.Environments[0].Name, &gh.ListOptions{})
+	_, resp, err := client.Actions.ListEnvVariables(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
 		return NO_ACCESS, nil
@@ -604,7 +604,7 @@ func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAc
 	// Risk: Very Low
 	// -> We're updating an environment variable with an invalid payload. Even if we did, the name would be (see RANDOM_STRING above) and the value would be nil.
 	// PATCH /repositories/{repository_id}/environments/{environment_name}/variables/{variable_name}
-	resp, err = client.Actions.UpdateEnvVariable(context.Background(), int(*repo.ID), *envResp.Environments[0].Name, &gh.ActionsVariable{Name: RANDOM_STRING})
+	resp, err = client.Actions.UpdateEnvVariable(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ActionsVariable{Name: RANDOM_STRING})
 	switch resp.StatusCode {
 	case 403:
 		return READ_ONLY, nil
@@ -1307,7 +1307,7 @@ func analyzeUserPermissions(client *gh.Client, user *gh.User, permissionType str
 	return access
 }
 
-func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata) (*SecretInfo, error) {
+func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata, shallowCheck bool) (*SecretInfo, error) {
 	allRepos, err := getAllReposForUser(client)
 	if err != nil {
 		return nil, err
@@ -1324,16 +1324,19 @@ func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata) (*SecretInf
 		}
 	}
 
-	// Check our access
 	repoAccessMap := make(map[string]string)
-	for key := range repoPermFuncMap {
-		repoAccessMap[key] = analyzeRepositoryPermissions(client, accessibleRepos, key)
-	}
-
-	// Analyze Account's Permissions
 	userAccessMap := make(map[string]string)
-	for key := range acctPermFuncMap {
-		userAccessMap[key] = analyzeUserPermissions(client, meta.User, key)
+
+	if !shallowCheck {
+		// Check our access
+		for key := range repoPermFuncMap {
+			repoAccessMap[key] = analyzeRepositoryPermissions(client, accessibleRepos, key)
+		}
+
+		// Analyze Account's Permissions
+		for key := range acctPermFuncMap {
+			userAccessMap[key] = analyzeUserPermissions(client, meta.User, key)
+		}
 	}
 
 	return &SecretInfo{
@@ -1407,17 +1410,4 @@ func printFineGrainedPermissions(accessMap map[string]string, showAll bool, repo
 	}
 	t.Render()
 	fmt.Print("\n\n")
-}
-
-// significantPermissions returns whether there are any non-error or
-// non-unknown permissions from the enumerated values at the top of this file.
-func significantPermissions(perm string) bool {
-	switch perm {
-	case READ_ONLY, READ_WRITE:
-		return true
-	case NO_ACCESS, ERROR, UNKNOWN, NOT_IMPLEMENTED:
-		return false
-	default:
-		panic("invalid use of significantPermissions, expected one of the enumerated permissions")
-	}
 }

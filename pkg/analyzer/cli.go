@@ -102,7 +102,7 @@ var (
 
 func Command(app *kingpin.Application) *kingpin.CmdClause {
 	// TODO: Add list of supported key types.
-	cli := app.Command("analyze", "Analyze API keys for fine-grained permissions information")
+	cli := app.Command("analyze", "Analyze API keys for fine-grained permissions information").Hidden()
 	list = cli.Command("list", "List supported API providers")
 	showAll = cli.Flag("show-all", "Show all data, including permissions not available to this account + publicly-available data related to this account.").Default("false").Bool()
 	log = cli.Flag("log", "Log all HTTP requests sent during analysis to a file").Default("false").Bool()

@@ -51,16 +51,14 @@ func secretInfoToAnalyzerResult(info *AnalyzerJSON) *analyzers.AnalyzerResult {
 		resource := analyzers.Resource{
 			Name:               org.Title,
 			FullyQualifiedName: org.ID,
-			Type:               "org",
+			Type:               "organization",
+			Metadata: map[string]any{
+				"description": org.Description,
+				"user":        org.User,
+			},
 		}
 		// Copy each permission into this resource.
-		for _, perm := range perms {
-			binding := analyzers.Binding{
-				Resource:   resource,
-				Permission: perm,
-			}
-			result.Bindings = append(result.Bindings, binding)
-		}
+		result.Bindings = append(result.Bindings, analyzers.BindAllPermissions(resource, perms...)...)
 	}
 
 	return &result
@@ -127,6 +125,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string) {
 		color.Red("[x] %s", err.Error())
 		return
 	}
+	color.Green("[!] Valid OpenAI Token\n\n")
 
 	printUserData(data.me)
 	if data.isAdmin {
@@ -237,7 +236,6 @@ func getUserData(cfg *config.Config, key string) (MeJSON, error) {
 	if resp.StatusCode != 200 {
 		return meJSON, fmt.Errorf("invalid OpenAI token")
 	}
-	color.Green("[!] Valid OpenAI Token\n\n")
 
 	// Marshall me into meJSON struct
 	if err := json.Unmarshal(me, &meJSON); err != nil {
