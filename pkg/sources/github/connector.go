@@ -27,6 +27,8 @@ func newConnector(connection *sourcespb.GitHub, handleRateLimit func(error) bool
 	switch cred := connection.GetCredential().(type) {
 	case *sourcespb.GitHub_GithubApp:
 		return newAppConnector(apiEndpoint, cred.GithubApp)
+	case *sourcespb.GitHub_BasicAuth:
+		return newBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		return newTokenConnector(apiEndpoint, cred.Token, handleRateLimit)
 	case *sourcespb.GitHub_Unauthenticated:
