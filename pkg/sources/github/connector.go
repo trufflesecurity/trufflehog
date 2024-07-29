@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	gogit "github.com/go-git/go-git/v5"
@@ -44,7 +43,6 @@ type appConnector struct {
 	httpClient         *http.Client
 	apiClient          *github.Client
 	installationClient *github.Client
-	apiEndpoint        string
 	installationID     int64
 }
 
@@ -99,7 +97,6 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 		httpClient:         httpClient,
 		apiClient:          apiClient,
 		installationClient: installationClient,
-		apiEndpoint:        apiEndpoint,
 		installationID:     installationID,
 	}, nil
 }
@@ -122,7 +119,7 @@ func (c appConnector) Clone(ctx context.Context, repoURL string) (string, *gogit
 }
 
 func (c appConnector) IsGithubEnterprise() bool {
-	return !strings.EqualFold(c.apiEndpoint, cloudEndpoint)
+	return false
 }
 
 func (c appConnector) HttpClient() *http.Client {
