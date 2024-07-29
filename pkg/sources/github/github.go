@@ -205,7 +205,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	s.connector = newConnector(s.conn)
+	connector, err := newConnector(s.conn)
+	if err != nil {
+		return fmt.Errorf("could not create connector: %w", err)
+	}
+	s.connector = connector
 
 	s.orgsCache = memory.New[string]()
 	for _, org := range s.conn.Organizations {
@@ -873,7 +877,7 @@ func (s *Source) addMembersByApp(ctx context.Context) error {
 
 	// TODO: Check rate limit for this call.
 	//installs, _, err := installationClient.Apps.ListInstallations(ctx, opts)
-	installs, err := s.connector.ListAppInstallations()
+	installs, err := s.connector.ListAppInstallations(ctx)
 	if err != nil {
 		return fmt.Errorf("could not enumerate installed orgs: %w", err)
 	}
