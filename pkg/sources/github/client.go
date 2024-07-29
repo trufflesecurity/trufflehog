@@ -2,8 +2,10 @@ package github
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v62/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -22,6 +24,51 @@ func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Cl
 	}
 
 	return github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
+}
+
+func newAppClient(app *credentialspb.GitHubApp, apiEndpoint string) (*github.Client, *github.Client, error) {
+	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	appID, err := strconv.ParseInt(app.AppId, 10, 64)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	httpClient := common.RetryableHTTPClientTimeout(60)
+	installationTransport, err := ghinstallation.NewAppsTransport(
+		httpClient.Transport,
+		appID,
+		[]byte(app.PrivateKey))
+	if err != nil {
+		return nil, nil, err
+	}
+	installationTransport.BaseURL = apiEndpoint
+	installationHttpClient := common.RetryableHTTPClientTimeout(60)
+	installationHttpClient.Transport = installationTransport
+	installationClient, err := github.NewClient(installationHttpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	apiTransport, err := ghinstallation.New(
+		httpClient.Transport,
+		appID,
+		installationID,
+		[]byte(app.PrivateKey))
+	if err != nil {
+		return nil, nil, err
+	}
+	apiTransport.BaseURL = apiEndpoint
+	httpClient.Transport = apiTransport
+	apiClient, err := github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return apiClient, installationClient, nil
 }
 
 func newBasicAuthClient(basicAuth *credentialspb.BasicAuth, apiEndpoint string) (*github.Client, error) {
