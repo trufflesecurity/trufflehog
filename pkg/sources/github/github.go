@@ -518,18 +518,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 	// Needed for clones.
 	s.githubToken = token
 
-	// Needed to list repos.
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	s.httpClient.Transport = &oauth2.Transport{
-		Base:   s.httpClient.Transport,
-		Source: oauth2.ReuseTokenSource(nil, ts),
-	}
-
-	// If we're using public GitHub, make a regular client.
-	// Otherwise, make an enterprise client.
-	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
+	ghClient, err := newTokenClient(token, apiEndpoint)
 	if err != nil {
 		s.log.Error(err, "error creating GitHub client")
 	}

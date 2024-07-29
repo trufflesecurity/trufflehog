@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-github/v62/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
+	"golang.org/x/oauth2"
 )
 
 type client struct {
@@ -28,6 +29,15 @@ func newBasicAuthClient(basicAuth *credentialspb.BasicAuth, apiEndpoint string) 
 	httpClient.Transport = &github.BasicAuthTransport{
 		Username: basicAuth.Username,
 		Password: basicAuth.Password,
+	}
+	return createGitHubClient(httpClient, apiEndpoint)
+}
+
+func newTokenClient(token, apiEndpoint string) (*github.Client, error) {
+	httpClient := common.RetryableHTTPClientTimeout(60)
+	httpClient.Transport = &oauth2.Transport{
+		Base:   httpClient.Transport,
+		Source: oauth2.ReuseTokenSource(nil, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})),
 	}
 	return createGitHubClient(httpClient, apiEndpoint)
 }
