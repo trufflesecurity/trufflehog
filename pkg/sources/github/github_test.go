@@ -193,6 +193,24 @@ func TestAddMembersByOrg(t *testing.T) {
 func TestAddMembersByApp(t *testing.T) {
 	defer gock.Off()
 
+	// generate a private key (it just needs to be in the right format)
+	privateKey := func() string {
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			panic(err)
+		}
+
+		data := x509.MarshalPKCS1PrivateKey(key)
+		var pemKey bytes.Buffer
+		if err := pem.Encode(&pemKey, &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: data,
+		}); err != nil {
+			panic(err)
+		}
+		return pemKey.String()
+	}()
+
 	gock.New("https://api.github.com").
 		Get("/app/installations").
 		Reply(200).
@@ -208,7 +226,15 @@ func TestAddMembersByApp(t *testing.T) {
 			{"login": "ssm3"},
 		})
 
-	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		}})
 	err := s.addMembersByApp(context.Background())
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(s.memberCache))
