@@ -677,7 +677,7 @@ func TestEnumerateWithApp(t *testing.T) {
 	s := initTestSource(&sourcespb.GitHub{
 		Endpoint: "https://api.github.com",
 		Credential: &sourcespb.GitHub_GithubApp{
-			&credentialspb.GitHubApp{
+			GithubApp: &credentialspb.GitHubApp{
 				PrivateKey:     privateKey,
 				InstallationId: "1337",
 				AppId:          "4141",
