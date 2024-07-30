@@ -4,6 +4,7 @@ package asana
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 
@@ -11,7 +12,25 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Asana }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	if err != nil {
+		return nil, err
+	}
+	return nil, fmt.Errorf("not implemented")
+}
 
 type MeJSON struct {
 	Data struct {
@@ -24,48 +43,48 @@ type MeJSON struct {
 	} `json:"data"`
 }
 
-func getMetadata(cfg *config.Config, key string) (MeJSON, error) {
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	me, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[x] %s", err.Error())
+		return
+	}
+	printMetadata(me)
+}
+
+func AnalyzePermissions(cfg *config.Config, key string) (*MeJSON, error) {
 	var me MeJSON
 
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://app.asana.com/api/1.0/users/me", nil)
 	if err != nil {
-		return me, err
+		return nil, err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+key)
 	resp, err := client.Do(req)
 	if err != nil {
-		return me, err
+		return nil, err
 	}
 
 	if resp.StatusCode != 200 {
-		return me, nil
+		return nil, fmt.Errorf("Invalid Asana API Key")
 	}
 
 	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&me)
 	if err != nil {
-		return me, err
+		return nil, err
 	}
-	return me, nil
-}
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-	me, err := getMetadata(cfg, key)
-	if err != nil {
-		color.Red("[x] ", err.Error())
-		return
-	}
-	printMetadata(me)
-}
-
-func printMetadata(me MeJSON) {
 	if me.Data.Email == "" {
-		color.Red("[x] Invalid Asana API Key\n")
-		return
+		return nil, fmt.Errorf("Invalid Asana API Key")
 	}
+	return &me, nil
+}
+
+func printMetadata(me *MeJSON) {
 	color.Green("[!] Valid Asana API Key\n\n")
 	color.Yellow("[i] User Information")
 	color.Yellow("    Name: %s", me.Data.Name)

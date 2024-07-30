@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"sort"
@@ -11,7 +12,31 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Bitbucket }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	if err != nil {
+		return nil, err
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+
+type SecretInfo struct {
+	Type        string
+	OauthScopes []analyzers.Permission
+	Repos       []Repo
+}
 
 type Repo struct {
 	FullName string `json:"full_name"`
@@ -33,15 +58,14 @@ type RepoJSON struct {
 	Values []Repo `json:"values"`
 }
 
-func getScopesAndType(cfg *config.Config, key string) (string, string, error) {
-
+func getScopesAndType(cfg *config.Config, key string) (string, []analyzers.Permission, error) {
 	// client
 	client := analyzers.NewAnalyzeClient(cfg)
 
 	// request
 	req, err := http.NewRequest("GET", "https://api.bitbucket.org/2.0/repositories", nil)
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 
 	// headers
@@ -50,7 +74,7 @@ func getScopesAndType(cfg *config.Config, key string) (string, string, error) {
 	// response
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 	defer resp.Body.Close()
 
@@ -58,7 +82,27 @@ func getScopesAndType(cfg *config.Config, key string) (string, string, error) {
 	credentialType := resp.Header.Get("x-credential-type")
 	oauthScopes := resp.Header.Get("x-oauth-scopes")
 
-	return credentialType, oauthScopes, nil
+	var scopes []analyzers.Permission
+	for _, scope := range strings.Split(oauthScopes, ", ") {
+		scopes = append(scopes, analyzers.Permission{Value: scope})
+	}
+	return credentialType, scopes, nil
+}
+
+func scopesToBitbucketScopes(scopes ...analyzers.Permission) []BitbucketScope {
+	scopesSlice := []BitbucketScope{}
+	for _, scope := range scopes {
+		scope := scope.Value
+		mapping := oauth_scope_map[scope]
+		for _, impliedScope := range mapping.ImpliedScopes {
+			scopesSlice = append(scopesSlice, oauth_scope_map[impliedScope])
+		}
+		scopesSlice = append(scopesSlice, oauth_scope_map[scope])
+	}
+
+	// sort scopes by category
+	sort.Sort(ByCategoryAndName(scopesSlice))
+	return scopesSlice
 }
 
 func getRepositories(cfg *config.Config, key string, role string) (RepoJSON, error) {
@@ -98,14 +142,14 @@ func getRepositories(cfg *config.Config, key string, role string) (RepoJSON, err
 	return repos, nil
 }
 
-func getAllRepos(cfg *config.Config, key string) (map[string]Repo, error) {
+func getAllRepos(cfg *config.Config, key string) ([]Repo, error) {
 	roles := []string{"member", "contributor", "admin", "owner"}
 
 	var allRepos = make(map[string]Repo, 0)
 	for _, role := range roles {
 		repos, err := getRepositories(cfg, key, role)
 		if err != nil {
-			return allRepos, err
+			return nil, err
 		}
 		// purposefully overwriting, so that get the most permissive role
 		for _, repo := range repos.Values {
@@ -113,31 +157,43 @@ func getAllRepos(cfg *config.Config, key string) (map[string]Repo, error) {
 			allRepos[repo.FullName] = repo
 		}
 	}
-	return allRepos, nil
+	repoSlice := make([]Repo, 0, len(allRepos))
+	for _, repo := range allRepos {
+		repoSlice = append(repoSlice, repo)
+	}
+	return repoSlice, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	credentialType, oauthScopes, err := getScopesAndType(cfg, key)
 	if err != nil {
-		color.Red("Error: %s", err)
-		return
+		return nil, err
 	}
-	printScopes(credentialType, oauthScopes)
 
 	// get all repos available to user
 	// ToDo: pagination
 	repos, err := getAllRepos(cfg, key)
 	if err != nil {
-		color.Red("Error: %s", err)
-		return
+		return nil, err
 	}
-
-	printAccessibleRepositories(repos)
-
+	return &SecretInfo{
+		Type:        credentialType,
+		OauthScopes: oauthScopes,
+		Repos:       repos,
+	}, nil
 }
 
-func printScopes(credentialType string, oauthScopes string) {
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[x] Error: %s", err.Error())
+		return
+	}
+	printScopes(info.Type, info.OauthScopes)
+	printAccessibleRepositories(info.Repos)
+}
+
+func printScopes(credentialType string, scopes []analyzers.Permission) {
 	if credentialType == "" {
 		color.Red("[x] Invalid Bitbucket access token.")
 		return
@@ -145,38 +201,25 @@ func printScopes(credentialType string, oauthScopes string) {
 	color.Green("[!] Valid Bitbucket access token.\n\n")
 	color.Green("[i] Credential Type: %s\n\n", credential_type_map[credentialType])
 
-	scopes := strings.Split(oauthScopes, ", ")
-	scopesSlice := []BitbucketScope{}
-	for _, scope := range scopes {
-		mapping := oauth_scope_map[scope]
-		for _, impliedScope := range mapping.ImpliedScopes {
-			scopesSlice = append(scopesSlice, oauth_scope_map[impliedScope])
-		}
-		scopesSlice = append(scopesSlice, oauth_scope_map[scope])
-	}
-
-	// sort scopes by category
-	sort.Sort(ByCategoryAndName(scopesSlice))
-
 	color.Yellow("[i] Access Token Scopes:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Category", "Permission"})
 
 	currentCategory := ""
-	for _, scope := range scopesSlice {
+	for _, scope := range scopesToBitbucketScopes(scopes...) {
 		if currentCategory != scope.Category {
 			currentCategory = scope.Category
-			t.AppendRow([]interface{}{scope.Category, ""})
+			t.AppendRow([]any{scope.Category, ""})
 		}
-		t.AppendRow([]interface{}{"", color.GreenString(scope.Name)})
+		t.AppendRow([]any{"", color.GreenString(scope.Name)})
 	}
 
 	t.Render()
 
 }
 
-func printAccessibleRepositories(repos map[string]Repo) {
+func printAccessibleRepositories(repos []Repo) {
 	color.Yellow("\n[i] Accessible Repositories:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -189,7 +232,14 @@ func printAccessibleRepositories(repos map[string]Repo) {
 		} else {
 			private = color.RedString("No")
 		}
-		t.AppendRow([]interface{}{color.GreenString(repo.RepoName), color.GreenString(repo.Project.Name), color.GreenString(repo.Workspace.Name), color.GreenString(repo.Owner.Username), private, color.GreenString(repo.Role)})
+		t.AppendRow([]any{
+			color.GreenString(repo.RepoName),
+			color.GreenString(repo.Project.Name),
+			color.GreenString(repo.Workspace.Name),
+			color.GreenString(repo.Owner.Username),
+			private,
+			color.GreenString(repo.Role),
+		})
 	}
 
 	t.Render()

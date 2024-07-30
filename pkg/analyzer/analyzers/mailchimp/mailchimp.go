@@ -11,9 +11,27 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-var BASE_URL = "https://%s.api.mailchimp.com/3.0"
+const BASE_URL = "https://%s.api.mailchimp.com/3.0"
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Mailchimp }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	if err != nil {
+		return nil, err
+	}
+	return nil, fmt.Errorf("not implemented")
+}
 
 type MetadataJSON struct {
 	AccountID       string `json:"account_id"`
@@ -39,11 +57,13 @@ type MetadataJSON struct {
 }
 
 type DomainsJSON struct {
-	Domains []struct {
-		Domain        string `json:"domain"`
-		Authenticated bool   `json:"authenticated"`
-		Verified      bool   `json:"verified"`
-	} `json:"domains"`
+	Domains []Domain `json:"domains"`
+}
+
+type Domain struct {
+	Domain        string `json:"domain"`
+	Authenticated bool   `json:"authenticated"`
+	Verified      bool   `json:"verified"`
 }
 
 func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
@@ -59,21 +79,18 @@ func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", fmt.Sprintf(BASE_URL, datacenter), nil)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return metadata, err
 	}
 
 	req.SetBasicAuth("anystring", key)
 	resp, err := client.Do(req)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return metadata, err
 	}
 
 	defer resp.Body.Close()
 
 	if err := json.NewDecoder(resp.Body).Decode(&metadata); err != nil {
-		color.Red("[x] Error: %s", err)
 		return metadata, err
 	}
 
@@ -93,59 +110,69 @@ func getDomains(cfg *config.Config, key string) (DomainsJSON, error) {
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", fmt.Sprintf(BASE_URL, datacenter)+"/verified-domains", nil)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return domains, err
 	}
 
 	req.SetBasicAuth("anystring", key)
 	resp, err := client.Do(req)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return domains, err
 	}
 
 	defer resp.Body.Close()
 
 	if err := json.NewDecoder(resp.Body).Decode(&domains); err != nil {
-		color.Red("[x] Error: %s", err)
 		return domains, err
 	}
 
 	return domains, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+type SecretInfo struct {
+	Metadata MetadataJSON
+	Domains  DomainsJSON
+}
+
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// get metadata
 	metadata, err := getMetadata(cfg, key)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
-		return
+		return nil, err
 	}
-
-	// print mailchimp instance metadata
 	if metadata.AccountID == "" {
-		color.Red("[x] Invalid Mailchimp API key")
-		return
+		return nil, fmt.Errorf("Invalid Mailchimp API key")
 	}
-	printMetadata(metadata)
-
-	// print full api key permissions
-	color.Green("\n[i] Permissions: Full Access\n\n")
 
 	// get sending domains
 	domains, err := getDomains(cfg, key)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
+		return nil, err
+	}
+
+	return &SecretInfo{
+		Metadata: metadata,
+		Domains:  domains,
+	}, nil
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[x] Error: %s", err.Error())
 		return
 	}
 
+	printMetadata(info.Metadata)
+
+	// print full api key permissions
+	color.Green("\n[i] Permissions: Full Access\n\n")
+
 	// print sending domains
-	if len(domains.Domains) > 0 {
-		printDomains(domains)
+	if len(info.Domains.Domains) > 0 {
+		printDomains(info.Domains)
 	} else {
 		color.Yellow("[i] No sending domains found\n")
 	}
-
 }
 
 func printMetadata(metadata MetadataJSON) {
@@ -155,21 +182,21 @@ func printMetadata(metadata MetadataJSON) {
 	color.Yellow("[i] Mailchimp Account Info:\n")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendRow([]interface{}{("Account Name"), color.GreenString("%s", metadata.AccountName)})
-	t.AppendRow([]interface{}{("Company Name"), color.GreenString("%s", metadata.Contact.Company)})
-	t.AppendRow([]interface{}{("Address"), color.GreenString("%s %s\n%s, %s %s\n%s", metadata.Contact.Address1, metadata.Contact.Address2, metadata.Contact.City, metadata.Contact.State, metadata.Contact.Zip, metadata.Contact.Country)})
-	t.AppendRow([]interface{}{("Total Subscribers"), color.GreenString("%d", metadata.TotalSubscribers)})
+	t.AppendRow([]any{("Account Name"), color.GreenString("%s", metadata.AccountName)})
+	t.AppendRow([]any{("Company Name"), color.GreenString("%s", metadata.Contact.Company)})
+	t.AppendRow([]any{("Address"), color.GreenString("%s %s\n%s, %s %s\n%s", metadata.Contact.Address1, metadata.Contact.Address2, metadata.Contact.City, metadata.Contact.State, metadata.Contact.Zip, metadata.Contact.Country)})
+	t.AppendRow([]any{("Total Subscribers"), color.GreenString("%d", metadata.TotalSubscribers)})
 	t.Render()
 
 	// print user info
 	color.Yellow("\n[i] Mailchimp User Info:\n")
 	t = table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendRow([]interface{}{("User Name"), color.GreenString("%s %s", metadata.FirstName, metadata.LastName)})
-	t.AppendRow([]interface{}{("User Email"), color.GreenString("%s", metadata.Email)})
-	t.AppendRow([]interface{}{("User Role"), color.GreenString("%s", metadata.Role)})
-	t.AppendRow([]interface{}{("Last Login"), color.GreenString("%s", metadata.LastLogin)})
-	t.AppendRow([]interface{}{("Member Since"), color.GreenString("%s", metadata.MemberSince)})
+	t.AppendRow([]any{("User Name"), color.GreenString("%s %s", metadata.FirstName, metadata.LastName)})
+	t.AppendRow([]any{("User Email"), color.GreenString("%s", metadata.Email)})
+	t.AppendRow([]any{("User Role"), color.GreenString("%s", metadata.Role)})
+	t.AppendRow([]any{("Last Login"), color.GreenString("%s", metadata.LastLogin)})
+	t.AppendRow([]any{("Member Since"), color.GreenString("%s", metadata.MemberSince)})
 	t.Render()
 }
 
@@ -185,7 +212,7 @@ func printDomains(domains DomainsJSON) {
 		} else {
 			authenticated = color.RedString("No")
 		}
-		t.AppendRow([]interface{}{color.GreenString(domain.Domain), authenticated})
+		t.AppendRow([]any{color.GreenString(domain.Domain), authenticated})
 	}
 	t.Render()
 }

@@ -1,16 +1,16 @@
 package airbrake
 
-var scope_order = [][]string{
-	{"Authentication"},
-	{"Performance Monitoring"},
-	{"Error Notification"},
-	{"Projects"},
-	{"Deploys"},
-	{"Groups"},
-	{"Notices"},
-	{"Project Activities"},
-	{"Source Maps"},
-	{"iOS Crash Reports"},
+var scope_order = []string{
+	"Authentication",
+	"Performance Monitoring",
+	"Error Notification",
+	"Projects",
+	"Deploys",
+	"Groups",
+	"Notices",
+	"Project Activities",
+	"Source Maps",
+	"iOS Crash Reports",
 }
 
 var scope_mapping = map[string][]string{
