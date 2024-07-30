@@ -1,4 +1,6 @@
-package github
+//go:generate generate_permissions finegrained.yaml finegrained_permissions.go finegrained
+
+package finegrained
 
 import (
 	"context"
@@ -13,6 +15,8 @@ import (
 	"github.com/fatih/color"
 	gh "github.com/google/go-github/v63/github"
 	"github.com/jedib0t/go-pretty/v6/table"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
@@ -1260,13 +1264,13 @@ func analyzeUserPermissions(client *gh.Client, user *gh.User, permissionType str
 	return access, nil
 }
 
-func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata, shallowCheck bool) (*SecretInfo, error) {
-	allRepos, err := getAllReposForUser(client)
+func AnalyzeFineGrainedToken(client *gh.Client, meta *common.TokenMetadata, shallowCheck bool) (*common.SecretInfo, error) {
+	allRepos, err := common.GetAllReposForUser(client)
 	if err != nil {
 		return nil, err
 	}
 
-	allGists, err := getAllGistsForUser(client)
+	allGists, err := common.GetAllGistsForUser(client)
 	if err != nil {
 		return nil, err
 	}
@@ -1292,7 +1296,7 @@ func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata, shallowChec
 		}
 	}
 
-	return &SecretInfo{
+	return &common.SecretInfo{
 		Metadata:        meta,
 		Repos:           allRepos,
 		Gists:           allGists,
@@ -1302,21 +1306,30 @@ func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata, shallowChec
 	}, nil
 }
 
-func printFineGrainedToken(cfg *config.Config, info *SecretInfo) {
+func PrintFineGrainedToken(cfg *config.Config, info *common.SecretInfo) {
 	if len(info.AccessibleRepos) == 0 {
 		// If no repos are accessible, then we only have read access to public repos
 		color.Red("[!] Repository Access: Public Repositories (read-only)\n")
 	} else {
 		// Print out the repos the token can access
 		color.Green(fmt.Sprintf("Found %v", len(info.AccessibleRepos)) + " Accessible Repositor(ies) \n")
-		printGitHubRepos(info.AccessibleRepos)
+		common.PrintGitHubRepos(info.AccessibleRepos)
 
 		// Print out the access map
-		printFineGrainedPermissions(info.RepoAccessMap, cfg.ShowAll, true)
+		perms, ok := info.RepoAccessMap.(map[string]Permission)
+		if !ok {
+			panic("Repo Access Map is not of type Permission")
+		}
+		printFineGrainedPermissions(perms, cfg.ShowAll, true)
 	}
 
-	printFineGrainedPermissions(info.UserAccessMap, cfg.ShowAll, false)
-	printGists(info.Gists, cfg.ShowAll)
+	perms, ok := info.UserAccessMap.(map[string]Permission)
+	if !ok {
+		panic("Repo Access Map is not of type Permission")
+	}
+
+	printFineGrainedPermissions(perms, cfg.ShowAll, false)
+	common.PrintGists(info.Gists, cfg.ShowAll)
 }
 
 func printFineGrainedPermissions(accessMap map[string]Permission, showAll bool, repoPermissions bool) {
