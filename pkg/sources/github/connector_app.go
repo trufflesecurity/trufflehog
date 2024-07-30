@@ -110,10 +110,14 @@ func (c appConnector) HttpClient() *http.Client {
 	return c.httpClient
 }
 
-func (c appConnector) ListAppInstallations(ctx context.Context) ([]*github.Installation, error) {
-	opts := &github.ListOptions{
-		PerPage: membersAppPagination,
-	}
-	installs, _, err := c.installationClient.Apps.ListInstallations(ctx, opts)
-	return installs, err
+func (c appConnector) InstallationClient() *github.Client {
+	return c.installationClient
 }
+
+//func (c appConnector) ListAppInstallations(ctx context.Context) ([]*github.Installation, error) {
+//	opts := &github.ListOptions{
+//		PerPage: membersAppPagination,
+//	}
+//	installs, _, err := c.installationClient.Apps.ListInstallations(ctx, opts)
+//	return installs, err
+//}

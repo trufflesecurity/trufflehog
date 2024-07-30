@@ -612,7 +612,7 @@ func (s *Source) enumerateWithApp(ctx context.Context) error {
 
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
-			err := s.addMembersByApp(ctx)
+			err := s.addMembersByApp(ctx, s.connector.InstallationClient())
 			if err != nil {
 				return err
 			}
@@ -873,14 +873,13 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 	return nil
 }
 
-func (s *Source) addMembersByApp(ctx context.Context) error {
-	//opts := &github.ListOptions{
-	//	PerPage: membersAppPagination,
-	//}
+func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client) error {
+	opts := &github.ListOptions{
+		PerPage: membersAppPagination,
+	}
 
 	// TODO: Check rate limit for this call.
-	//installs, _, err := installationClient.Apps.ListInstallations(ctx, opts)
-	installs, err := s.connector.ListAppInstallations(ctx)
+	installs, _, err := installationClient.Apps.ListInstallations(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("could not enumerate installed orgs: %w", err)
 	}

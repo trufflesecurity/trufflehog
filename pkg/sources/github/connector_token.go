@@ -77,8 +77,8 @@ func (c *tokenConnector) HttpClient() *http.Client {
 	return c.httpClient
 }
 
-func (c *tokenConnector) ListAppInstallations(ctx context.Context) ([]*github.Installation, error) {
-	return nil, nil
+func (c *tokenConnector) InstallationClient() *github.Client {
+	return nil
 }
 
 func (c *tokenConnector) getUser(ctx context.Context) (string, error) {

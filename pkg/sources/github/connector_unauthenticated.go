@@ -55,6 +55,6 @@ func (c unauthenticatedConnector) HttpClient() *http.Client {
 	return c.httpClient
 }
 
-func (c unauthenticatedConnector) ListAppInstallations(context.Context) ([]*github.Installation, error) {
-	return nil, nil
+func (c unauthenticatedConnector) InstallationClient() *github.Client {
+	return nil
 }

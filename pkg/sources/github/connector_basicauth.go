@@ -66,6 +66,6 @@ func (c basicAuthConnector) HttpClient() *http.Client {
 	return c.httpClient
 }
 
-func (c basicAuthConnector) ListAppInstallations(ctx context.Context) ([]*github.Installation, error) {
-	return nil, nil
+func (c basicAuthConnector) InstallationClient() *github.Client {
+	return nil
 }

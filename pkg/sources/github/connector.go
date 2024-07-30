@@ -16,7 +16,7 @@ type connector interface {
 	Enumerate(ctx context.Context) error
 	HttpClient() *http.Client
 	IsGithubEnterprise() bool
-	ListAppInstallations(ctx context.Context) ([]*github.Installation, error)
+	InstallationClient() *github.Client
 }
 
 func newConnector(source *Source) (connector, error) {
