@@ -38,8 +38,8 @@ type (
 	}
 
 	Permission struct {
-		Value       string
-		AccessLevel string
+		Type        int
+		AccessLevel AccessLevel
 		Parent      *Permission
 	}
 
@@ -49,17 +49,37 @@ type (
 	}
 )
 
-type PermissionType string
+type AccessLevel int
 
 const (
-	READ       PermissionType = "Read"
-	WRITE      PermissionType = "Write"
-	READ_WRITE PermissionType = "Read & Write"
-	NONE       PermissionType = "None"
-	ERROR      PermissionType = "Error"
-
-	FullAccess string = "full_access"
+	UNDEFINED AccessLevel = iota
+	READ
+	WRITE
+	READ_WRITE
+	NONE
+	ERROR
+	FULL_ACCESS
 )
+
+var AccessLevelToInt = map[AccessLevel]int{
+	UNDEFINED:   0,
+	READ:        1,
+	WRITE:       2,
+	READ_WRITE:  3,
+	NONE:        4,
+	ERROR:       5,
+	FULL_ACCESS: 6,
+}
+
+var IntToAccessLevel = map[int]AccessLevel{
+	0: UNDEFINED,
+	1: READ,
+	2: WRITE,
+	3: READ_WRITE,
+	4: NONE,
+	5: ERROR,
+	6: FULL_ACCESS,
+}
 
 type PermissionStatus struct {
 	Value   bool
@@ -73,7 +93,7 @@ type HttpStatusTest struct {
 	Params  map[string]string
 	Valid   []int
 	Invalid []int
-	Type    PermissionType
+	Type    AccessLevel
 	Status  PermissionStatus
 	Risk    string
 }
@@ -134,7 +154,7 @@ func StatusContains(status int, vals []int) bool {
 	return false
 }
 
-func GetWriterFromStatus(status PermissionType) func(a ...interface{}) string {
+func GetWriterFromStatus(status AccessLevel) func(a ...interface{}) string {
 	switch status {
 	case READ:
 		return color.New(color.FgYellow).SprintFunc()

@@ -74,8 +74,18 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	return result
 }
 
+func scopesToPermissions(scopes []string) []analyzers.Permission {
+	var permissions []analyzers.Permission
+	for _, scope := range scopes {
+		permissions = append(permissions, analyzers.Permission{
+			Type: ClassicPermissionNameToID[scope],
+		})
+	}
+	return permissions
+}
+
 func secretInfoToUserBindings(info *SecretInfo) []analyzers.Binding {
-	return analyzers.BindAllPermissions(*userToResource(info.Metadata.User), info.Metadata.OauthScopes...)
+	return analyzers.BindAllPermissions(*userToResource(info.Metadata.User), scopesToPermissions(info.Metadata.OauthScopes)...)
 }
 
 func userToResource(user *gh.User) *analyzers.Resource {
@@ -100,7 +110,7 @@ func secretInfoToRepoBindings(info *SecretInfo) []analyzers.Binding {
 			Type:               "repository",
 			Parent:             userToResource(repo.Owner),
 		}
-		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
+		bindings = append(bindings, analyzers.BindAllPermissions(resource, scopesToPermissions(info.Metadata.OauthScopes)...)...)
 	}
 	return bindings
 }
@@ -114,7 +124,7 @@ func secretInfoToGistBindings(info *SecretInfo) []analyzers.Binding {
 			Type:               "gist",
 			Parent:             userToResource(gist.Owner),
 		}
-		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
+		bindings = append(bindings, analyzers.BindAllPermissions(resource, scopesToPermissions(info.Metadata.OauthScopes)...)...)
 	}
 	return bindings
 }
@@ -216,7 +226,7 @@ type TokenMetadata struct {
 	FineGrained bool
 	User        *gh.User
 	Expiration  time.Time
-	OauthScopes []analyzers.Permission
+	OauthScopes []string
 }
 
 // getTokenMetadata gets the username, expiration date, and x-oauth-scopes headers for a given token
@@ -230,10 +240,10 @@ func getTokenMetadata(token string, client *gh.Client) (*TokenMetadata, error) {
 
 	expiration, _ := time.Parse("2006-01-02 15:04:05 MST", resp.Header.Get("github-authentication-token-expiration"))
 
-	var oauthScopes []analyzers.Permission
+	var oauthScopes []string
 	for _, scope := range resp.Header.Values("X-OAuth-Scopes") {
 		for _, scope := range strings.Split(scope, ", ") {
-			oauthScopes = append(oauthScopes, analyzers.Permission{Value: scope})
+			oauthScopes = append(oauthScopes, scope)
 		}
 	}
 	tokenType, fineGrained := checkFineGrained(token, oauthScopes)
@@ -246,7 +256,7 @@ func getTokenMetadata(token string, client *gh.Client) (*TokenMetadata, error) {
 	}, nil
 }
 
-func checkFineGrained(token string, oauthScopes []analyzers.Permission) (string, bool) {
+func checkFineGrained(token string, oauthScopes []string) (string, bool) {
 	// For details on token prefixes, see:
 	// https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
 

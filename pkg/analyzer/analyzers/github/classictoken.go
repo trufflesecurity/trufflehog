@@ -8,7 +8,6 @@ import (
 	"github.com/fatih/color"
 	gh "github.com/google/go-github/v63/github"
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
@@ -330,10 +329,10 @@ func hasPrivateRepoAccess(scopes map[string]bool) bool {
 	return scopes["repo"]
 }
 
-func processScopes(headerScopesSlice []analyzers.Permission) map[string]bool {
+func processScopes(headerScopesSlice []string) map[string]bool {
 	allScopes := make(map[string]bool)
 	for _, scope := range headerScopesSlice {
-		allScopes[scope.Value] = true
+		allScopes[scope] = true
 	}
 
 	for _, perm := range GitHubClassicPerms {

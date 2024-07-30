@@ -39,7 +39,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
                     "Parent": null
                   },
                   "Permission": {
-                    "Value": "notifications",
+                    "Type": 23,
                     "AccessLevel": "",
                     "Parent": null
                   }
@@ -59,7 +59,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
                     }
                   },
                   "Permission": {
-                    "Value": "notifications",
+                    "Type": 23,
                     "AccessLevel": "",
                     "Parent": null
                   }
