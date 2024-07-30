@@ -1,3 +1,5 @@
+//go:generate generate_permissions finegrained.yaml finegrained_permissions.go github
+
 package github
 
 import (
@@ -280,8 +282,8 @@ type SecretInfo struct {
 	// AccessibleRepos, RepoAccessMap, and UserAccessMap are only set if
 	// the token has fine-grained access.
 	AccessibleRepos []*gh.Repository
-	RepoAccessMap   map[string]string
-	UserAccessMap   map[string]string
+	RepoAccessMap   map[string]Permission
+	UserAccessMap   map[string]Permission
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
