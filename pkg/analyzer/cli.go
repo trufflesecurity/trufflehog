@@ -203,7 +203,7 @@ func Run(cmd string) {
 		mysql.AnalyzeAndPrintPermissions(cfg, *mysqlConnectionStr)
 	case slackScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("slack")
-		slack.AnalyzePermissions(cfg, *slackKey)
+		slack.AnalyzeAndPrintPermissions(cfg, *slackKey)
 	case twilioScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("twilio")
 		twilio.AnalyzePermissions(cfg, *twilioKey)
