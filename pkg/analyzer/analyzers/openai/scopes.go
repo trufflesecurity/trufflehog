@@ -2,6 +2,28 @@ package openai
 
 import "github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 
+var ScopeNameToID = map[string]int{
+	"Models":             1,
+	"Model capabilities": 2,
+	"Assistants":         3,
+	"Threads":            4,
+	"Fine-tuning":        5,
+	"Files":              6,
+}
+
+var ScopeIDToPermission = make(map[int]OpenAIScope, len(ScopeNameToID))
+
+func init() {
+	for name, id := range ScopeNameToID {
+		for _, scope := range SCOPES {
+			if scope.Name == name {
+				ScopeIDToPermission[id] = scope
+				break
+			}
+		}
+	}
+}
+
 type OpenAIScope struct {
 	Name      string
 	Tests     []analyzers.HttpStatusTest
