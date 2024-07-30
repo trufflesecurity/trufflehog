@@ -92,8 +92,8 @@ func TestSource_ScanComments(t *testing.T) {
 	// For the personal access token test
 	githubToken := secret.MustGetField("GITHUB_TOKEN")
 
-	const totalPRChunks = 2
-	const totalIssueChunks = 1
+	const totalPRChunks = 3
+	const totalIssueChunks = 2
 
 	type init struct {
 		name       string
