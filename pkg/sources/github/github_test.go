@@ -47,6 +47,7 @@ func initTestSource(src *sourcespb.GitHub) *Source {
 	//s.apiClient = github.NewClient(s.httpClient)
 	//gock.InterceptClient(s.httpClient)
 	gock.InterceptClient(s.connector.HttpClient())
+	gock.Intercept()
 	gock.InterceptClient(s.connector.ApiClient().Client())
 	if installationClient := s.connector.InstallationClient(); installationClient != nil {
 		gock.InterceptClient(installationClient.Client())
@@ -221,6 +222,10 @@ func TestAddMembersByApp(t *testing.T) {
 		JSON([]map[string]any{
 			{"account": map[string]string{"login": "super-secret-org", "type": "Organization"}},
 		})
+	gock.New("https://api.github.com").
+		Post("/app/installations/1337/access_tokens").
+		Reply(200).
+		JSON(map[string]string{"token": "dontlook"})
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/members").
 		Reply(200).
