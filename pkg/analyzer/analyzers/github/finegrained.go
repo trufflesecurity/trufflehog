@@ -117,65 +117,12 @@ var FineGrainedPermissionNameToID = map[string]FineGrainedPermissionID{
 	"Watching":                       WatchingID,
 }
 
-var IDToPermission = make(map[FineGrainedPermissionID]GithubPermission, len(FineGrainedPermissionNameToID))
+var IDToPermission = make(map[FineGrainedPermissionID]string, len(FineGrainedPermissionNameToID))
 
 func init() {
 	for name, id := range FineGrainedPermissionNameToID {
-		for _, perm := range GitHubPermissions {
-			if perm.Name == name {
-				IDToPermission[id] = perm
-				break
-			}
-		}
+		IDToPermission[id] = name
 	}
-}
-
-type GithubPermission struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Implies     []string `json:"implies"`
-}
-
-var GitHubPermissions = []GithubPermission{
-	{Name: "Actions", Description: "Access to actions", Implies: []string{}},
-	{Name: "Administration", Description: "Administer the repository", Implies: []string{}},
-	{Name: "Code scanning alerts", Description: "Manage code scanning alerts", Implies: []string{}},
-	{Name: "Codespaces", Description: "Manage codespaces", Implies: []string{}},
-	{Name: "Codespaces lifecycle admin", Description: "Administer codespaces lifecycle", Implies: []string{}},
-	{Name: "Codespaces metadata", Description: "Access codespaces metadata", Implies: []string{}},
-	{Name: "Codespaces secrets", Description: "Manage codespaces secrets", Implies: []string{}},
-	{Name: "Commit statuses", Description: "Access commit statuses", Implies: []string{}},
-	{Name: "Contents", Description: "Access repository contents", Implies: []string{}},
-	{Name: "Custom properties", Description: "Manage custom properties", Implies: []string{}},
-	{Name: "Dependabot alerts", Description: "Manage dependabot alerts", Implies: []string{}},
-	{Name: "Dependabot secrets", Description: "Manage dependabot secrets", Implies: []string{}},
-	{Name: "Deployments", Description: "Manage deployments", Implies: []string{}},
-	{Name: "Environments", Description: "Manage environments", Implies: []string{}},
-	{Name: "Issues", Description: "Manage issues", Implies: []string{}},
-	{Name: "Merge queues", Description: "Manage merge queues", Implies: []string{}},
-	{Name: "Metadata", Description: "Access repository metadata", Implies: []string{}},
-	{Name: "Pages", Description: "Manage GitHub pages", Implies: []string{}},
-	{Name: "Pull requests", Description: "Manage pull requests", Implies: []string{}},
-	{Name: "Repository security advisories", Description: "Manage repository security advisories", Implies: []string{}},
-	{Name: "Secret scanning alerts", Description: "Manage secret scanning alerts", Implies: []string{}},
-	{Name: "Secrets", Description: "Manage repository secrets", Implies: []string{}},
-	{Name: "Variables", Description: "Manage repository variables", Implies: []string{}},
-	{Name: "Webhooks", Description: "Manage webhooks", Implies: []string{}},
-	{Name: "Workflows", Description: "Manage workflows", Implies: []string{}},
-	{Name: "Block another user", Description: "Block another user", Implies: []string{}},
-	{Name: "Codespace user secrets", Description: "Manage codespace user secrets", Implies: []string{}},
-	{Name: "Email Addresses", Description: "Access email addresses", Implies: []string{}},
-	{Name: "Followers", Description: "Access followers", Implies: []string{}},
-	{Name: "GPG Keys", Description: "Manage GPG keys", Implies: []string{}},
-	{Name: "Gists", Description: "Manage gists", Implies: []string{}},
-	{Name: "Git SSH keys", Description: "Manage Git SSH keys", Implies: []string{}},
-	{Name: "Interaction limits", Description: "Manage interaction limits", Implies: []string{}},
-	{Name: "Plan", Description: "Access plan details", Implies: []string{}},
-	{Name: "Private invitations", Description: "Manage private invitations", Implies: []string{}},
-	{Name: "Profile", Description: "Manage profile", Implies: []string{}},
-	{Name: "SSH signing keys", Description: "Manage SSH signing keys", Implies: []string{}},
-	{Name: "Starring", Description: "Manage starring", Implies: []string{}},
-	{Name: "Watching", Description: "Manage watching", Implies: []string{}},
 }
 
 var repoPermFuncMap = map[string]func(client *gh.Client, repo *gh.Repository, access string) (string, error){
