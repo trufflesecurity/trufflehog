@@ -860,6 +860,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 		name       string
 		init       init
 		wantChunks int
+		wantErr    bool
 	}{
 		{
 			name: "targeted scan, one file in small commit",
@@ -914,6 +915,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 				},
 			},
 			wantChunks: 0,
+			wantErr:    true,
 		},
 		{
 			name: "invalid query criteria, malformed link",
@@ -932,6 +934,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 				},
 			},
 			wantChunks: 0,
+			wantErr:    true,
 		},
 	}
 
@@ -949,7 +952,11 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			go func() {
 				defer close(chunksCh)
 				err = s.Chunks(ctx, chunksCh, sources.ChunkingTarget{QueryCriteria: tt.init.queryCriteria})
-				assert.Nil(t, err)
+				if tt.wantErr {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
 			}()
 
 			i := 0
