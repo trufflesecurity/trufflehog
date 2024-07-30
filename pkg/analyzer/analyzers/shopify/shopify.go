@@ -96,6 +96,12 @@ type ShopInfoJSON struct {
 	} `json:"shop"`
 }
 
+type SecretInfo struct {
+	StatusCode int
+	ShopInfo   ShopInfoJSON
+	Scopes     map[string]OutputScopes
+}
+
 func getShopInfo(cfg *config.Config, key string, store string) (ShopInfoJSON, error) {
 	var shopInfo ShopInfoJSON
 
@@ -160,38 +166,56 @@ func getAccessScopes(cfg *config.Config, key string, store string) (AccessScopes
 	return accessScopes, resp.StatusCode, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string, storeURL string) {
-
-	accessScopes, statusCode, err := getAccessScopes(cfg, key, storeURL)
-	if err != nil {
-		color.Red("Error: %s", err)
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string, storeURL string) {
+	// ToDo: Add in logging
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging is not supported for this analyzer.")
 		return
 	}
 
-	if statusCode != 200 {
+	info, err := AnalyzePermissions(cfg, key, storeURL)
+	if err != nil {
+		color.Red("[x] Error: %s", err.Error())
+		return
+	}
+
+	if info.StatusCode != 200 {
 		color.Red("[x] Invalid Shopfiy API Key and Store URL combination")
 		return
 	}
 	color.Green("[i] Valid Shopify API Key\n\n")
 
-	shopInfo, err := getShopInfo(cfg, key, storeURL)
+	color.Yellow("[i] Shop Information\n")
+	color.Yellow("Name: %s", info.ShopInfo.Shop.Name)
+	color.Yellow("Email: %s", info.ShopInfo.Shop.Email)
+	color.Yellow("Created At: %s\n\n", info.ShopInfo.Shop.CreatedAt)
+
+	printAccessScopes(info.Scopes)
+}
+
+func AnalyzePermissions(cfg *config.Config, key string, storeURL string) (*SecretInfo, error) {
+
+	accessScopes, statusCode, err := getAccessScopes(cfg, key, storeURL)
 	if err != nil {
-		color.Red("Error: %s", err)
-		return
+		return nil, err
 	}
 
-	color.Yellow("[i] Shop Information\n")
-	color.Yellow("Name: %s", shopInfo.Shop.Name)
-	color.Yellow("Email: %s", shopInfo.Shop.Email)
-	color.Yellow("Created At: %s\n\n", shopInfo.Shop.CreatedAt)
+	shopInfo, err := getShopInfo(cfg, key, storeURL)
+	if err != nil {
+		return nil, err
+	}
 
 	var data ScopeDataJSON
 	if err := json.Unmarshal(scopesConfig, &data); err != nil {
-		color.Red("Error: %s", err)
-		return
+		return nil, err
 	}
 	scopes := determineScopes(data, accessScopes.String())
-	printAccessScopes(scopes)
+
+	return &SecretInfo{
+		StatusCode: statusCode,
+		ShopInfo:   shopInfo,
+		Scopes:     scopes,
+	}, nil
 }
 
 func printAccessScopes(accessScopes map[string]OutputScopes) {
