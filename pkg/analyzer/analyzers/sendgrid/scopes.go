@@ -11,7 +11,7 @@ type SendgridScope struct {
 	SubCategory    string
 	Prefixes       []string // Prefixes for the scope
 	Permissions    []string
-	PermissionType analyzers.PermissionType
+	PermissionType analyzers.AccessLevel
 }
 
 func (s *SendgridScope) AddPermission(permission string) {

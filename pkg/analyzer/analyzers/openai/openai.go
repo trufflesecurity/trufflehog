@@ -68,11 +68,16 @@ func convertPermissions(isAdmin bool, perms []permissionData) []analyzers.Permis
 	var permissions []analyzers.Permission
 
 	if isAdmin {
-		permissions = append(permissions, analyzers.Permission{Value: analyzers.FullAccess})
+		permissions = append(permissions, analyzers.Permission{
+			Type:        FullAccess.ID(),
+			AccessLevel: analyzers.FULL_ACCESS,
+		})
 	} else {
 		for _, perm := range perms {
-			permName := perm.name + ":" + string(perm.status)
-			permissions = append(permissions, analyzers.Permission{Value: permName})
+			permissions = append(permissions, analyzers.Permission{
+				Type:        perm.permission.ID(),
+				AccessLevel: perm.status,
+			})
 		}
 	}
 
@@ -105,9 +110,9 @@ type MeJSON struct {
 }
 
 type permissionData struct {
-	name      string
-	endpoints []string
-	status    analyzers.PermissionType
+	permission PermissionType
+	endpoints  []string
+	status     analyzers.AccessLevel
 }
 
 type AnalyzerJSON struct {
@@ -259,7 +264,7 @@ func printUserData(meJSON MeJSON) {
 	fmt.Print("\n\n")
 }
 
-func stringifyPermissionStatus(tests []analyzers.HttpStatusTest) analyzers.PermissionType {
+func stringifyPermissionStatus(tests []analyzers.HttpStatusTest) analyzers.AccessLevel {
 	readStatus := false
 	writeStatus := false
 	errors := false
@@ -293,9 +298,9 @@ func getPermissions() []permissionData {
 	for _, scope := range SCOPES {
 		status := stringifyPermissionStatus(scope.Tests)
 		perms = append(perms, permissionData{
-			name:      scope.Name,
-			endpoints: scope.Endpoints,
-			status:    status,
+			permission: scope.Permission,
+			endpoints:  scope.Endpoints,
+			status:     status,
 		})
 	}
 
@@ -310,7 +315,7 @@ func printPermissions(perms []permissionData, show_all bool) {
 
 	for _, perm := range perms {
 		if show_all || perm.status != analyzers.NONE {
-			t.AppendRow([]interface{}{perm.name, perm.endpoints[0], perm.status})
+			t.AppendRow([]interface{}{perm.permission.String(), perm.endpoints[0], perm.status})
 
 			for i := 1; i < len(perm.endpoints); i++ {
 				t.AppendRow([]interface{}{"", perm.endpoints[i], perm.status})
