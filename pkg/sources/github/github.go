@@ -355,6 +355,9 @@ func (s *Source) enumerate(ctx context.Context) error {
 	//	// TODO: move this error to Init
 	//	return nil, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	//}
+	if err := s.connector.Enumerate(ctx); err != nil {
+		return err
+	}
 
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
 
