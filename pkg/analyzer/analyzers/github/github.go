@@ -233,7 +233,7 @@ func getTokenMetadata(token string, client *gh.Client) (*TokenMetadata, error) {
 	var oauthScopes []analyzers.Permission
 	for _, scope := range resp.Header.Values("X-OAuth-Scopes") {
 		for _, scope := range strings.Split(scope, ", ") {
-			oauthScopes = append(oauthScopes, analyzers.Permission{Value: scope})
+			oauthScopes = append(oauthScopes, oauthScopeToPermissions(scope)...)
 		}
 	}
 	tokenType, fineGrained := checkFineGrained(token, oauthScopes)
@@ -244,6 +244,28 @@ func getTokenMetadata(token string, client *gh.Client) (*TokenMetadata, error) {
 		Expiration:  expiration,
 		OauthScopes: oauthScopes,
 	}, nil
+}
+
+// oauthScopeToPermissions takes a given scope and returns a slice of
+// permissions for it. If the scope has implied permissions, they are included
+// as children of the parent scope, and both the parent and children are
+// returned in the slice.
+func oauthScopeToPermissions(scope string) []analyzers.Permission {
+	parent := analyzers.Permission{Value: scope}
+	perms := []analyzers.Permission{parent}
+	subScopes, ok := SCOPE_TO_SUB_SCOPE[scope]
+	if !ok {
+		// No sub-scopes, so the only permission is itself.
+		return perms
+	}
+	// Add all the children to the list of permissions.
+	for _, subScope := range subScopes {
+		perms = append(perms, analyzers.Permission{
+			Value:  subScope,
+			Parent: &parent,
+		})
+	}
+	return perms
 }
 
 func checkFineGrained(token string, oauthScopes []analyzers.Permission) (string, bool) {
