@@ -12,6 +12,118 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
+type ClassicPermissionID int
+
+const (
+	RepoID ClassicPermissionID = iota + 1
+	RepoStatusID
+	RepoDeploymentID
+	PublicRepoID
+	RepoInviteID
+	SecurityEventsID
+	WorkflowID
+	WritePackagesID
+	ReadPackagesID
+	DeletePackagesID
+	AdminOrgID
+	WriteOrgID
+	ReadOrgID
+	ManageRunnersOrgID
+	AdminPublicKeyID
+	WritePublicKeyID
+	ReadPublicKeyID
+	AdminRepoHookID
+	WriteRepoHookID
+	ReadRepoHookID
+	AdminOrgHookID
+	GistID
+	NotificationsID
+	UserID
+	ReadUserID
+	UserEmailID
+	UserFollowID
+	DeleteRepoID
+	WriteDiscussionID
+	ReadDiscussionID
+	AdminEnterpriseID
+	ManageRunnersEnterpriseID
+	ManageBillingEnterpriseID
+	ReadEnterpriseID
+	AuditLogID
+	ReadAuditLogID
+	CodespaceID
+	CodespaceSecretsID
+	CopilotID
+	ManageBillingCopilotID
+	ProjectID
+	ReadProjectID
+	AdminGpgKeyID
+	WriteGpgKeyID
+	ReadGpgKeyID
+	AdminSshSigningKeyID
+	WriteSshSigningKeyID
+	ReadSshSigningKeyID
+)
+
+var ClassicPermissionNameToID = map[string]ClassicPermissionID{
+	"repo":                      RepoID,
+	"repo:status":               RepoStatusID,
+	"repo_deployment":           RepoDeploymentID,
+	"public_repo":               PublicRepoID,
+	"repo:invite":               RepoInviteID,
+	"security_events":           SecurityEventsID,
+	"workflow":                  WorkflowID,
+	"write:packages":            WritePackagesID,
+	"read:packages":             ReadPackagesID,
+	"delete:packages":           DeletePackagesID,
+	"admin:org":                 AdminOrgID,
+	"write:org":                 WriteOrgID,
+	"read:org":                  ReadOrgID,
+	"manage_runners:org":        ManageRunnersOrgID,
+	"admin:public_key":          AdminPublicKeyID,
+	"write:public_key":          WritePublicKeyID,
+	"read:public_key":           ReadPublicKeyID,
+	"admin:repo_hook":           AdminRepoHookID,
+	"write:repo_hook":           WriteRepoHookID,
+	"read:repo_hook":            ReadRepoHookID,
+	"admin:org_hook":            AdminOrgHookID,
+	"gist":                      GistID,
+	"notifications":             NotificationsID,
+	"user":                      UserID,
+	"read:user":                 ReadUserID,
+	"user:email":                UserEmailID,
+	"user:follow":               UserFollowID,
+	"delete_repo":               DeleteRepoID,
+	"write:discussion":          WriteDiscussionID,
+	"read:discussion":           ReadDiscussionID,
+	"admin:enterprise":          AdminEnterpriseID,
+	"manage_runners:enterprise": ManageRunnersEnterpriseID,
+	"manage_billing:enterprise": ManageBillingEnterpriseID,
+	"read:enterprise":           ReadEnterpriseID,
+	"audit_log":                 AuditLogID,
+	"read:audit_log":            ReadAuditLogID,
+	"codespace":                 CodespaceID,
+	"codespace:secrets":         CodespaceSecretsID,
+	"copilot":                   CopilotID,
+	"manage_billing:copilot":    ManageBillingCopilotID,
+	"project":                   ProjectID,
+	"read:project":              ReadProjectID,
+	"admin:gpg_key":             AdminGpgKeyID,
+	"write:gpg_key":             WriteGpgKeyID,
+	"read:gpg_key":              ReadGpgKeyID,
+	"admin:ssh_signing_key":     AdminSshSigningKeyID,
+	"write:ssh_signing_key":     WriteSshSigningKeyID,
+	"read:ssh_signing_key":      ReadSshSigningKeyID,
+}
+
+var ClassicIDToPermissionName = make(map[ClassicPermissionID]string, len(ClassicPermissionNameToID))
+
+func init() {
+	for name, id := range ClassicPermissionNameToID {
+		ClassicIDToPermissionName[id] = name
+	}
+}
+
 var SCOPE_ORDER = [][]string{
 	{"repo", "repo:status", "repo_deployment", "public_repo", "repo:invite", "security_events"},
 	{"workflow"},

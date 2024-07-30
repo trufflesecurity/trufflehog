@@ -29,94 +29,198 @@ const (
 	ERROR           = "Error"
 	UNKNOWN         = "Unknown"
 	NOT_IMPLEMENTED = "Not implemented"
-
-	// Repo Permission Types
-	ACTIONS              = "Actions"
-	ADMINISTRATION       = "Administration"
-	CODE_SCANNING_ALERTS = "Code scanning alerts"
-	CODESPACES           = "Codespaces"
-	CODESPACES_LIFECYCLE = "Codespaces lifecycle admin"
-	CODESPACES_METADATA  = "Codespaces metadata"
-	CODESPACES_SECRETS   = "Codespaces secrets"
-	COMMIT_STATUSES      = "Commit statuses"
-	CONTENTS             = "Contents"
-	CUSTOM_PROPERTIES    = "Custom properties"
-	DEPENDABOT_ALERTS    = "Dependabot alerts"
-	DEPENDABOT_SECRETS   = "Dependabot secrets"
-	DEPLOYMENTS          = "Deployments"
-	ENVIRONMENTS         = "Environments" // Note: Addt'l permissions are not required (despite documentation).
-	ISSUES               = "Issues"
-	MERGE_QUEUES         = "Merge queues"
-	METADATA             = "Metadata"
-	PAGES                = "Pages"
-	PULL_REQUESTS        = "Pull requests"
-	REPO_SECURITY        = "Repository security advisories"
-	SECRET_SCANNING      = "Secret scanning alerts"
-	SECRETS              = "Secrets"
-	VARIABLES            = "Variables"
-	WEBHOOKS             = "Webhooks"
-	WORKFLOWS            = "Workflows"
-
-	// Account Permission Types
-	BLOCK_USER             = "Block another user"
-	CODESPACE_USER_SECRETS = "Codespace user secrets"
-	EMAIL                  = "Email Addresses"
-	FOLLOWERS              = "Followers"
-	GPG_KEYS               = "GPG Keys"
-	GISTS                  = "Gists"
-	GIT_KEYS               = "Git SSH keys"
-	LIMITS                 = "Interaction limits"
-	PLAN                   = "Plan"
-	PRIVATE_INVITES        = "Private invitations"
-	PROFILE                = "Profile"
-	SIGNING_KEYS           = "SSH signing keys"
-	STARRING               = "Starring"
-	WATCHING               = "Watching"
 )
 
-var repoPermFuncMap = map[string]func(client *gh.Client, repo *gh.Repository, acess string) (string, error){
-	ACTIONS:              getActionsPermission,
-	ADMINISTRATION:       getAdministrationPermission,
-	CODE_SCANNING_ALERTS: getCodeScanningAlertsPermission,
-	CODESPACES:           getCodespacesPermission,
-	CODESPACES_LIFECYCLE: notImplemented, // ToDo: Implement. Docs make this look org-wide...not repo-based?
-	CODESPACES_METADATA:  getCodespacesMetadataPermission,
-	CODESPACES_SECRETS:   getCodespacesSecretsPermission,
-	COMMIT_STATUSES:      getCommitStatusesPermission,
-	CONTENTS:             getContentsPermission,
-	CUSTOM_PROPERTIES:    notImplemented, // ToDo: Only supports orgs. Implement once have an org token.
-	DEPENDABOT_ALERTS:    getDependabotAlertsPermission,
-	DEPENDABOT_SECRETS:   getDependabotSecretsPermission,
-	DEPLOYMENTS:          getDeploymentsPermission,
-	ENVIRONMENTS:         getEnvironmentsPermission,
-	ISSUES:               getIssuesPermission,
-	MERGE_QUEUES:         notImplemented, // Skipped until API better documented
-	METADATA:             getMetadataPermission,
-	PAGES:                getPagesPermission,
-	PULL_REQUESTS:        getPullRequestsPermission,
-	REPO_SECURITY:        getRepoSecurityPermission,
-	SECRET_SCANNING:      getSecretScanningPermission,
-	SECRETS:              getSecretsPermission,
-	VARIABLES:            getVariablesPermission,
-	WEBHOOKS:             getWebhooksPermission,
-	WORKFLOWS:            notImplemented, // ToDo: Skipped b/c would require us to create a release (High Risk function)
+type FineGrainedPermissionID int
+
+const (
+	ActionsID FineGrainedPermissionID = iota + 1
+	AdministrationID
+	CodeScanningAlertsID
+	CodespacesID
+	CodespacesLifecycleAdminID
+	CodespacesMetadataID
+	CodespacesSecretsID
+	CommitStatusesID
+	ContentsID
+	CustomPropertiesID
+	DependabotAlertsID
+	DependabotSecretsID
+	DeploymentsID
+	EnvironmentsID
+	IssuesID
+	MergeQueuesID
+	MetadataID
+	PagesID
+	PullRequestsID
+	RepositorySecurityAdvisoriesID
+	SecretScanningAlertsID
+	SecretsID
+	VariablesID
+	WebhooksID
+	WorkflowsID
+	BlockAnotherUserID
+	CodespaceUserSecretsID
+	EmailAddressesID
+	FollowersID
+	GPGKeysID
+	GistsID
+	GitSSHKeysID
+	InteractionLimitsID
+	PlanID
+	PrivateInvitationsID
+	ProfileID
+	SSHSigningKeysID
+	StarringID
+	WatchingID
+)
+
+var FineGrainedPermissionNameToID = map[string]FineGrainedPermissionID{
+	"Actions":                        ActionsID,
+	"Administration":                 AdministrationID,
+	"Code scanning alerts":           CodeScanningAlertsID,
+	"Codespaces":                     CodespacesID,
+	"Codespaces lifecycle admin":     CodespacesLifecycleAdminID,
+	"Codespaces metadata":            CodespacesMetadataID,
+	"Codespaces secrets":             CodespacesSecretsID,
+	"Commit statuses":                CommitStatusesID,
+	"Contents":                       ContentsID,
+	"Custom properties":              CustomPropertiesID,
+	"Dependabot alerts":              DependabotAlertsID,
+	"Dependabot secrets":             DependabotSecretsID,
+	"Deployments":                    DeploymentsID,
+	"Environments":                   EnvironmentsID,
+	"Issues":                         IssuesID,
+	"Merge queues":                   MergeQueuesID,
+	"Metadata":                       MetadataID,
+	"Pages":                          PagesID,
+	"Pull requests":                  PullRequestsID,
+	"Repository security advisories": RepositorySecurityAdvisoriesID,
+	"Secret scanning alerts":         SecretScanningAlertsID,
+	"Secrets":                        SecretsID,
+	"Variables":                      VariablesID,
+	"Webhooks":                       WebhooksID,
+	"Workflows":                      WorkflowsID,
+	"Block another user":             BlockAnotherUserID,
+	"Codespace user secrets":         CodespaceUserSecretsID,
+	"Email Addresses":                EmailAddressesID,
+	"Followers":                      FollowersID,
+	"GPG Keys":                       GPGKeysID,
+	"Gists":                          GistsID,
+	"Git SSH keys":                   GitSSHKeysID,
+	"Interaction limits":             InteractionLimitsID,
+	"Plan":                           PlanID,
+	"Private invitations":            PrivateInvitationsID,
+	"Profile":                        ProfileID,
+	"SSH signing keys":               SSHSigningKeysID,
+	"Starring":                       StarringID,
+	"Watching":                       WatchingID,
+}
+
+var IDToPermission = make(map[FineGrainedPermissionID]GithubPermission, len(FineGrainedPermissionNameToID))
+
+func init() {
+	for name, id := range FineGrainedPermissionNameToID {
+		for _, perm := range GitHubPermissions {
+			if perm.Name == name {
+				IDToPermission[id] = perm
+				break
+			}
+		}
+	}
+}
+
+type GithubPermission struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Implies     []string `json:"implies"`
+}
+
+var GitHubPermissions = []GithubPermission{
+	{Name: "Actions", Description: "Access to actions", Implies: []string{}},
+	{Name: "Administration", Description: "Administer the repository", Implies: []string{}},
+	{Name: "Code scanning alerts", Description: "Manage code scanning alerts", Implies: []string{}},
+	{Name: "Codespaces", Description: "Manage codespaces", Implies: []string{}},
+	{Name: "Codespaces lifecycle admin", Description: "Administer codespaces lifecycle", Implies: []string{}},
+	{Name: "Codespaces metadata", Description: "Access codespaces metadata", Implies: []string{}},
+	{Name: "Codespaces secrets", Description: "Manage codespaces secrets", Implies: []string{}},
+	{Name: "Commit statuses", Description: "Access commit statuses", Implies: []string{}},
+	{Name: "Contents", Description: "Access repository contents", Implies: []string{}},
+	{Name: "Custom properties", Description: "Manage custom properties", Implies: []string{}},
+	{Name: "Dependabot alerts", Description: "Manage dependabot alerts", Implies: []string{}},
+	{Name: "Dependabot secrets", Description: "Manage dependabot secrets", Implies: []string{}},
+	{Name: "Deployments", Description: "Manage deployments", Implies: []string{}},
+	{Name: "Environments", Description: "Manage environments", Implies: []string{}},
+	{Name: "Issues", Description: "Manage issues", Implies: []string{}},
+	{Name: "Merge queues", Description: "Manage merge queues", Implies: []string{}},
+	{Name: "Metadata", Description: "Access repository metadata", Implies: []string{}},
+	{Name: "Pages", Description: "Manage GitHub pages", Implies: []string{}},
+	{Name: "Pull requests", Description: "Manage pull requests", Implies: []string{}},
+	{Name: "Repository security advisories", Description: "Manage repository security advisories", Implies: []string{}},
+	{Name: "Secret scanning alerts", Description: "Manage secret scanning alerts", Implies: []string{}},
+	{Name: "Secrets", Description: "Manage repository secrets", Implies: []string{}},
+	{Name: "Variables", Description: "Manage repository variables", Implies: []string{}},
+	{Name: "Webhooks", Description: "Manage webhooks", Implies: []string{}},
+	{Name: "Workflows", Description: "Manage workflows", Implies: []string{}},
+	{Name: "Block another user", Description: "Block another user", Implies: []string{}},
+	{Name: "Codespace user secrets", Description: "Manage codespace user secrets", Implies: []string{}},
+	{Name: "Email Addresses", Description: "Access email addresses", Implies: []string{}},
+	{Name: "Followers", Description: "Access followers", Implies: []string{}},
+	{Name: "GPG Keys", Description: "Manage GPG keys", Implies: []string{}},
+	{Name: "Gists", Description: "Manage gists", Implies: []string{}},
+	{Name: "Git SSH keys", Description: "Manage Git SSH keys", Implies: []string{}},
+	{Name: "Interaction limits", Description: "Manage interaction limits", Implies: []string{}},
+	{Name: "Plan", Description: "Access plan details", Implies: []string{}},
+	{Name: "Private invitations", Description: "Manage private invitations", Implies: []string{}},
+	{Name: "Profile", Description: "Manage profile", Implies: []string{}},
+	{Name: "SSH signing keys", Description: "Manage SSH signing keys", Implies: []string{}},
+	{Name: "Starring", Description: "Manage starring", Implies: []string{}},
+	{Name: "Watching", Description: "Manage watching", Implies: []string{}},
+}
+
+var repoPermFuncMap = map[string]func(client *gh.Client, repo *gh.Repository, access string) (string, error){
+	"Actions":                        getActionsPermission,
+	"Administration":                 getAdministrationPermission,
+	"Code scanning alerts":           getCodeScanningAlertsPermission,
+	"Codespaces":                     getCodespacesPermission,
+	"Codespaces lifecycle admin":     notImplementedRepoPerm, // ToDo: Implement. Docs make this look org-wide...not repo-based?
+	"Codespaces metadata":            getCodespacesMetadataPermission,
+	"Codespaces secrets":             getCodespacesSecretsPermission,
+	"Commit statuses":                getCommitStatusesPermission,
+	"Contents":                       getContentsPermission,
+	"Custom properties":              notImplementedRepoPerm, // ToDo: Only supports orgs. Implement once have an org token.
+	"Dependabot alerts":              getDependabotAlertsPermission,
+	"Dependabot secrets":             getDependabotSecretsPermission,
+	"Deployments":                    getDeploymentsPermission,
+	"Environments":                   getEnvironmentsPermission,
+	"Issues":                         getIssuesPermission,
+	"Merge queues":                   notImplementedRepoPerm, // Skipped until API better documented
+	"Metadata":                       getMetadataPermission,
+	"Pages":                          getPagesPermission,
+	"Pull requests":                  getPullRequestsPermission,
+	"Repository security advisories": getRepoSecurityPermission,
+	"Secret scanning alerts":         getSecretScanningPermission,
+	"Secrets":                        getSecretsPermission,
+	"Variables":                      getVariablesPermission,
+	"Webhooks":                       getWebhooksPermission,
+	"Workflows":                      notImplementedRepoPerm, // ToDo: Skipped b/c would require us to create a release (High Risk function)
 }
 
 var acctPermFuncMap = map[string]func(client *gh.Client, user *gh.User) (string, error){
-	BLOCK_USER:             getBlockUserPermission,
-	CODESPACE_USER_SECRETS: getCodespacesUserPermission,
-	EMAIL:                  getEmailPermission,
-	FOLLOWERS:              getFollowersPermission,
-	GPG_KEYS:               getGPGKeysPermission,
-	GISTS:                  getGistsPermission,
-	GIT_KEYS:               getGitKeysPermission,
-	LIMITS:                 getLimitsPermission,
-	PLAN:                   getPlanPermission,
-	// PRIVATE_INVITES:        getPrivateInvitesPermission, // Skipped until API better documented
-	PROFILE:      getProfilePermission,
-	SIGNING_KEYS: getSigningKeysPermission,
-	STARRING:     getStarringPermission,
-	WATCHING:     getWatchingPermission,
+	"Block another user":     getBlockUserPermission,
+	"Codespace user secrets": getCodespacesUserPermission,
+	"Email Addresses":        getEmailPermission,
+	"Followers":              getFollowersPermission,
+	"GPG Keys":               getGPGKeysPermission,
+	"Gists":                  getGistsPermission,
+	"Git SSH keys":           getGitKeysPermission,
+	"Interaction limits":     getLimitsPermission,
+	"Plan":                   getPlanPermission,
+	"Private invitations":    notImplementedAcctPerm, // Skipped until API better documented
+	"Profile":                getProfilePermission,
+	"SSH signing keys":       getSigningKeysPermission,
+	"Starring":               getStarringPermission,
+	"Watching":               getWatchingPermission,
 }
 
 // Define your custom formatter function
@@ -146,7 +250,11 @@ func permissionFormatter(key, val any) (string, string) {
 	return fmt.Sprintf("%v", key), fmt.Sprintf("%v", val)
 }
 
-func notImplemented(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func notImplementedRepoPerm(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+	return NOT_IMPLEMENTED, nil
+}
+
+func notImplementedAcctPerm(client *gh.Client, user *gh.User) (string, error) {
 	return NOT_IMPLEMENTED, nil
 }
 
@@ -1319,7 +1427,7 @@ func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata, shallowChec
 	}
 	accessibleRepos := make([]*gh.Repository, 0)
 	for _, repo := range allRepos {
-		if analyzeRepositoryPermissions(client, []*gh.Repository{repo}, METADATA) != NO_ACCESS {
+		if analyzeRepositoryPermissions(client, []*gh.Repository{repo}, "Metadata") != NO_ACCESS {
 			accessibleRepos = append(accessibleRepos, repo)
 		}
 	}
