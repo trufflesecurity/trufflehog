@@ -12,13 +12,77 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
-type githubClassicPermission struct {
+var ClassicIDToPermission = make(map[int]GithubClassicPermission, len(ClassicPermissionNameToID))
+
+func init() {
+	for name, id := range ClassicPermissionNameToID {
+		for _, perm := range GitHubClassicPerms {
+			if perm.Name == name {
+				ClassicIDToPermission[id] = perm
+				break
+			}
+		}
+	}
+}
+
+var ClassicPermissionNameToID = map[string]int{
+	"repo":                      1,
+	"repo:status":               2,
+	"repo_deployment":           3,
+	"public_repo":               4,
+	"repo:invite":               5,
+	"security_events":           6,
+	"workflow":                  7,
+	"write:packages":            8,
+	"read:packages":             9,
+	"delete:packages":           10,
+	"admin:org":                 11,
+	"write:org":                 12,
+	"read:org":                  13,
+	"manage_runners:org":        14,
+	"admin:public_key":          15,
+	"write:public_key":          16,
+	"read:public_key":           17,
+	"admin:repo_hook":           18,
+	"write:repo_hook":           19,
+	"read:repo_hook":            20,
+	"admin:org_hook":            21,
+	"gist":                      22,
+	"notifications":             23,
+	"user":                      24,
+	"read:user":                 25,
+	"user:email":                26,
+	"user:follow":               27,
+	"delete_repo":               28,
+	"write:discussion":          29,
+	"read:discussion":           30,
+	"admin:enterprise":          31,
+	"manage_runners:enterprise": 32,
+	"manage_billing:enterprise": 33,
+	"read:enterprise":           34,
+	"audit_log":                 35,
+	"read:audit_log":            36,
+	"codespace":                 37,
+	"codespace:secrets":         38,
+	"copilot":                   39,
+	"manage_billing:copilot":    40,
+	"project":                   41,
+	"read:project":              42,
+	"admin:gpg_key":             43,
+	"write:gpg_key":             44,
+	"read:gpg_key":              45,
+	"admin:ssh_signing_key":     46,
+	"write:ssh_signing_key":     47,
+	"read:ssh_signing_key":      48,
+}
+
+type GithubClassicPermission struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Implies     []string `json:"implies"`
 }
 
-var GitHubClassicPerms = []githubClassicPermission{
+var GitHubClassicPerms = []GithubClassicPermission{
 	{
 		Name:        "repo",
 		Description: "Full control of private repositories",
@@ -358,10 +422,10 @@ func printClassicGHPermissions(scopes map[string]bool, showAll bool) {
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Scope", "In-Scope" /* Add more column headers if needed */})
 
-	filteredScopes := make([][]githubClassicPermission, 0)
+	filteredScopes := make([][]GithubClassicPermission, 0)
 	for _, perm := range GitHubClassicPerms {
 		if scopes[perm.Name] {
-			filteredScopes = append(filteredScopes, []githubClassicPermission{perm})
+			filteredScopes = append(filteredScopes, []GithubClassicPermission{perm})
 		}
 	}
 
