@@ -231,6 +231,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/edamam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/edenai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/eightxeight"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elasticcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elasticemail"
 	elevenlabsv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elevenlabs/v1"
 	elevenlabsv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/elevenlabs/v2"
@@ -1626,6 +1627,7 @@ func DefaultDetectors() []detectors.Detector {
 		atlassianv1.Scanner{},
 		atlassianv2.Scanner{},
 		netsuite.Scanner{},
+		elasticcloud.Scanner{},
 	}
 }
 
