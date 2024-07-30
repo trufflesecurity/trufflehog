@@ -39,7 +39,6 @@ func secretInfoToAnalyzerResult(info *AnalyzerJSON) *analyzers.AnalyzerResult {
 		Metadata: map[string]any{
 			"user":          info.me.Name,
 			"email":         info.me.Email,
-			"phone":         info.me.Phone,
 			"mfa":           strconv.FormatBool(info.me.MfaEnabled),
 			"is_admin":      strconv.FormatBool(info.isAdmin),
 			"is_restricted": strconv.FormatBool(info.isRestricted),
