@@ -18,11 +18,16 @@ type appConnector struct {
 	apiClient          *github.Client
 	installationClient *github.Client
 	installationID     int64
+	enumerate          func(ctx context.Context) error
 }
 
 var _ connector = (*appConnector)(nil)
 
-func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConnector, error) {
+func newAppConnector(
+	apiEndpoint string,
+	app *credentialspb.GitHubApp,
+	enumerate func(ctx context.Context) error) (*appConnector, error) {
+
 	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
 	if err != nil {
 		return nil, err
@@ -72,6 +77,7 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 		apiClient:          apiClient,
 		installationClient: installationClient,
 		installationID:     installationID,
+		enumerate:          enumerate,
 	}, nil
 }
 
@@ -90,6 +96,10 @@ func (c appConnector) Clone(ctx context.Context, repoURL string) (string, *gogit
 	}
 
 	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token")
+}
+
+func (c appConnector) Enumerate(ctx context.Context) error {
+	return c.enumerate(ctx)
 }
 
 func (c appConnector) IsGithubEnterprise() bool {

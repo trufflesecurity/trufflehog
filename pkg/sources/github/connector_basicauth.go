@@ -16,11 +16,16 @@ type basicAuthConnector struct {
 	apiClient  *github.Client
 	username   string
 	password   string
+	enumerate  func(ctx context.Context) error
 }
 
 var _ connector = (*basicAuthConnector)(nil)
 
-func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*basicAuthConnector, error) {
+func newBasicAuthConnector(
+	apiEndpoint string,
+	cred *credentialspb.BasicAuth,
+	enumerate func(ctx context.Context) error) (*basicAuthConnector, error) {
+
 	httpClient := common.RetryableHTTPClientTimeout(60)
 	httpClient.Transport = &github.BasicAuthTransport{
 		Username: cred.Username,
@@ -37,6 +42,7 @@ func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*
 		apiClient:  apiClient,
 		username:   cred.Username,
 		password:   cred.Password,
+		enumerate:  enumerate,
 	}, nil
 }
 
@@ -46,6 +52,10 @@ func (c basicAuthConnector) ApiClient() *github.Client {
 
 func (c basicAuthConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
 	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.username)
+}
+
+func (c basicAuthConnector) Enumerate(ctx context.Context) error {
+	return c.enumerate(ctx)
 }
 
 func (c basicAuthConnector) IsGithubEnterprise() bool {
