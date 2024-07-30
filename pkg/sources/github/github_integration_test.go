@@ -129,7 +129,7 @@ func TestSource_ScanComments(t *testing.T) {
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
-							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/issues/1#issuecomment-1603436833",
+							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/issues/1",
 							Username:  "truffle-sandbox",
 							Timestamp: "2023-06-22 23:33:46 +0000 UTC",
 						},
