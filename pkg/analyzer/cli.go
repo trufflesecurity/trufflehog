@@ -215,7 +215,7 @@ func Run(cmd string) {
 		huggingface.AnalyzeAndPrintPermissions(cfg, *huggingfaceKey)
 	case stripeScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("stripe")
-		stripe.AnalyzePermissions(cfg, *stripeKey)
+		stripe.AnalyzeAndPrintPermissions(cfg, *stripeKey)
 	case gitlabScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("gitlab")
 		gitlab.AnalyzeAndPrintPermissions(cfg, *gitlabKey)

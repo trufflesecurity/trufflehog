@@ -59,6 +59,13 @@ type Config struct {
 	Categories map[string]Category `yaml:"categories"`
 }
 
+type SecretInfo struct {
+	KeyType     string
+	KeyEnv      string
+	Valid       bool
+	Permissions []PermissionsCategory
+}
+
 func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) (bool, error) {
 	// If body data, marshal to JSON
 	var data io.Reader
@@ -140,7 +147,6 @@ func checkValidity(cfg *config.Config, key string) (bool, error) {
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://api.stripe.com/v1/charges", nil)
 	if err != nil {
-		color.Red("[x] Error creating request: %s", err.Error())
 		return false, err
 	}
 
@@ -150,7 +156,6 @@ func checkValidity(cfg *config.Config, key string) (bool, error) {
 	// Send the request
 	resp, err := client.Do(req)
 	if err != nil {
-		color.Red("[x] Error sending request: %s", err.Error())
 		return false, err
 	}
 	defer resp.Body.Close()
@@ -162,70 +167,81 @@ func checkValidity(cfg *config.Config, key string) (bool, error) {
 	return false, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// Check if secret, publishable, or restricted key
 	var keyType, keyEnv string
 	keyType, err := checkKeyType(key)
 	if err != nil {
-		color.Red("[x] ", err.Error())
-		return
-	}
-
-	if keyType == PUBLISHABLE {
-		color.Red("[x] This is a publishable Stripe key. It is not considered secret.")
-		return
+		return nil, err
 	}
 
 	// Check if live or test key
 	keyEnv, err = checkKeyEnv(key)
 	if err != nil {
-		color.Red("[x] ", err.Error())
-		return
+		return nil, err
 	}
 
 	// Check if key is valid
 	valid, err := checkValidity(cfg, key)
 	if err != nil {
-		color.Red("[x] ", err.Error())
+		return nil, err
+	}
+
+	permissions, err := getRestrictedPermissions(cfg, key)
+	if err != nil {
+		return nil, err
+	}
+	// Additional details
+	// get total customers
+	// get total charges
+
+	return &SecretInfo{
+		KeyType:     keyType,
+		KeyEnv:      keyEnv,
+		Valid:       valid,
+		Permissions: permissions,
+	}, nil
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[x] Error: %s", err.Error())
 		return
 	}
 
-	if !valid {
+	if info.KeyType == PUBLISHABLE {
+		color.Red("[x] This is a publishable Stripe key. It is not considered secret.")
+		return
+	}
+
+	if !info.Valid {
 		color.Red("[x] Invalid Stripe API Key\n")
 		return
 	}
 
 	color.Green("[!] Valid Stripe API Key\n\n")
 
-	if keyType == SECRET {
-		color.Green("[i] Key Type: %s", keyType)
-	} else if keyType == RESTRICTED {
-		color.Yellow("[i] Key Type: %s", keyType)
+	if info.KeyType == SECRET {
+		color.Green("[i] Key Type: %s", info.KeyType)
+	} else if info.KeyType == RESTRICTED {
+		color.Yellow("[i] Key Type: %s", info.KeyType)
 	}
 
-	if keyEnv == LIVE {
-		color.Green("[i] Key Environment: %s", keyEnv)
-	} else if keyEnv == TEST {
-		color.Red("[i] Key Environment: %s", keyEnv)
+	if info.KeyEnv == LIVE {
+		color.Green("[i] Key Environment: %s", info.KeyEnv)
+	} else if info.KeyEnv == TEST {
+		color.Red("[i] Key Environment: %s", info.KeyEnv)
 	}
 
 	fmt.Println("")
 
-	if keyType == SECRET {
+	if info.KeyType == SECRET {
 		color.Green("[i] Permissions: Full Access")
 		return
 	}
 
-	permissions, err := getRestrictedPermissions(cfg, key)
-	if err != nil {
-		color.Red("[x] Error getting permissions: %s", err.Error())
-		return
-	}
-	printRestrictedPermissions(permissions, cfg.ShowAll)
-	// Additional details
-	// get total customers
-	// get total charges
+	printRestrictedPermissions(info.Permissions, cfg.ShowAll)
 }
 
 func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCategory, error) {
