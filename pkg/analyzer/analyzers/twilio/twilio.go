@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go twilio
+
 package twilio
 
 import (
@@ -10,7 +12,85 @@ import (
 	"github.com/fatih/color"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+type Analyzer struct{}
+
+func (a *Analyzer) Type() analyzerpb.AnalyzerType {
+	return analyzerpb.AnalyzerType_Twilio
+}
+
+func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	key, ok := credentialInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+
+	cfg := &config.Config{} // You might need to adjust this based on how you want to handle config
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	var permissions []Permission
+	if info.AccountStatusCode == 200 {
+		permissions = []Permission{
+			AccountManagementRead,
+			AccountManagementWrite,
+			SubaccountConfigurationRead,
+			SubaccountConfigurationWrite,
+			KeyManagementRead,
+			KeyManagementWrite,
+			ServiceVerificationRead,
+			ServiceVerificationWrite,
+			SmsRead,
+			SmsWrite,
+			VoiceRead,
+			VoiceWrite,
+			MessagingRead,
+			MessagingWrite,
+			CallManagementRead,
+			CallManagementWrite,
+		}
+	} else if info.AccountStatusCode == 401 {
+		permissions = []Permission{
+			ServiceVerificationRead,
+			ServiceVerificationWrite,
+			SmsRead,
+			SmsWrite,
+			VoiceRead,
+			VoiceWrite,
+			MessagingRead,
+			MessagingWrite,
+			CallManagementRead,
+			CallManagementWrite,
+		}
+	}
+
+	// Can we get org information?
+	resource := analyzers.Resource{
+		Name: "Twilio API",
+		Type: "API",
+	}
+
+	var bindings []analyzers.Binding
+	for _, perm := range permissions {
+		permStr, _ := perm.ToString()
+		bindings = append(bindings, analyzers.Binding{
+			Resource: resource,
+			Permission: analyzers.Permission{
+				Value: permStr,
+			},
+		})
+	}
+
+	return &analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Twilio,
+		Bindings:     bindings,
+	}, nil
+}
 
 type VerifyJSON struct {
 	Code int `json:"code"`
