@@ -206,7 +206,7 @@ func Run(cmd string) {
 		slack.AnalyzePermissions(cfg, *slackKey)
 	case twilioScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("twilio")
-		twilio.AnalyzePermissions(cfg, *twilioKey)
+		twilio.AnalyzeAndPrintPermissions(cfg, *twilioKey)
 	case airbrakeScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("airbrake")
 		airbrake.AnalyzeAndPrintPermissions(cfg, *airbrakeKey)

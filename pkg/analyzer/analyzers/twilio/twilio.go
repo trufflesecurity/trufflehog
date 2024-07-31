@@ -16,6 +16,11 @@ type VerifyJSON struct {
 	Code int `json:"code"`
 }
 
+type SecretInfo struct {
+	VerifyJson        VerifyJSON
+	AccountStatusCode int
+}
+
 const (
 	AUTHENTICATED_NO_PERMISSION = 70051
 	INVALID_CREDENTIALS         = 20003
@@ -96,35 +101,52 @@ func getVerifyServicesStatusCode(cfg *config.Config, sid string, secret string) 
 	return verifyJSON, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	sid, secret, err := splitKey(key)
 	if err != nil {
-		color.Red("[x]" + err.Error())
-		return
+		return nil, err
 	}
 
 	verifyJSON, err := getVerifyServicesStatusCode(cfg, sid, secret)
 	if err != nil {
-		color.Red("[x]" + err.Error())
-		return
-	}
-
-	if verifyJSON.Code == INVALID_CREDENTIALS {
-		color.Red("[x] Invalid Twilio API Key")
-		return
-	}
-
-	if verifyJSON.Code == AUTHENTICATED_NO_PERMISSION {
-		printRestrictedKeyMsg()
-		return
+		return nil, err
 	}
 
 	statusCode, err := getAccountsStatusCode(cfg, sid, secret)
 	if err != nil {
-		color.Red("[x]" + err.Error())
+		return nil, err
+	}
+
+	return &SecretInfo{
+		VerifyJson:        verifyJSON,
+		AccountStatusCode: statusCode,
+	}, nil
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	// ToDo: Add in logging
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging is not supported for this analyzer.")
 		return
 	}
-	printPermissions(statusCode)
+
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[x] Error: %s", err.Error())
+		return
+	}
+
+	if info.VerifyJson.Code == INVALID_CREDENTIALS {
+		color.Red("[x] Invalid Twilio API Key")
+		return
+	}
+
+	if info.VerifyJson.Code == AUTHENTICATED_NO_PERMISSION {
+		printRestrictedKeyMsg()
+		return
+	}
+
+	printPermissions(info.AccountStatusCode)
 }
 
 // printPermissions prints the permissions based on the status code
