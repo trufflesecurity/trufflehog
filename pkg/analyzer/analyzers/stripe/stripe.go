@@ -61,20 +61,18 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			Metadata:           nil,
 			Parent:             nil,
 		}
-		result.UnboundedResources = append(result.UnboundedResources, *parentResource)
-
-		for _, permission := range permissionCategory.Permissions {
-			result.Bindings = append(result.Bindings, analyzers.Binding{
-				Resource: analyzers.Resource{
-					Name:               permission.Name,
-					FullyQualifiedName: permission.Name,
-					Type:               "resource",
-					Parent:             parentResource,
-				},
-				Permission: analyzers.Permission{
-					Value: *permission.Value,
-				},
-			})
+		if len(permissionCategory.Permissions) == 0 {
+			result.UnboundedResources = append(result.UnboundedResources, *parentResource)
+		} else {
+			for _, permission := range permissionCategory.Permissions {
+				result.Bindings = append(result.Bindings, analyzers.Binding{
+					Resource: *parentResource,
+					Permission: analyzers.Permission{
+						Value:       permission.Name,
+						AccessLevel: *permission.Value,
+					},
+				})
+			}
 		}
 	}
 
