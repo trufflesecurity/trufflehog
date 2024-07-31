@@ -149,6 +149,9 @@ var (
 	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 
+	githubIncludeHiddenData  = githubScan.Flag("include-hidden-data", "Include hidden data in scan.").Bool()
+	githubCollisionThreshold = githubScan.Flag("collision-threshold", "Threshold for short-sha collisions in hidden data enumeration. Default is 1.").Default("1").Int()
+
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
 	gitlabScanEndpoint     = gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
@@ -659,6 +662,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludePullRequestComments: *githubScanPRComments,
 			IncludeGistComments:        *githubScanGistComments,
 			Filter:                     filter,
+			IncludeHiddenData:          *githubIncludeHiddenData,
+			CollisionThreshold:         *githubCollisionThreshold,
 		}
 		if err := eng.ScanGitHub(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)

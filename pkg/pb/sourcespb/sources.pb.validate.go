@@ -2542,6 +2542,10 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for IncludeWikis
 
+	// no validation rules for IncludeHiddenData
+
+	// no validation rules for CollisionThreshold
+
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
 		if v == nil {

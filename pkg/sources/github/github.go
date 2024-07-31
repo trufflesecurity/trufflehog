@@ -81,6 +81,9 @@ type Source struct {
 	includeIssueComments bool
 	includeGistComments  bool
 
+	includeHiddenData  bool
+	collisionThreshold int64
+
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -233,6 +236,15 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includePRComments = s.conn.IncludePullRequestComments
 	s.includeGistComments = s.conn.IncludeGistComments
 
+	s.includeHiddenData = s.conn.IncludeHiddenData
+	s.collisionThreshold = s.conn.CollisionThreshold
+	if s.includeHiddenData && len(s.filteredRepoCache.Keys()) > 1 {
+		return fmt.Errorf("cannot scan hidden data with multiple repositories (would be too slow)")
+	}
+	if s.includeHiddenData && len(s.orgsCache.Keys()) > 0 {
+		return fmt.Errorf("cannot scan hidden data with organizations")
+	}
+
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
 		return fmt.Errorf("cannot specify head or base with multiple repositories")
@@ -310,7 +322,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
 		}
 	default:
-		errs = append(errs, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
+		errs = append(errs, fmt.Errorf("invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
 	}
 
 	// Run a simple query to check if the client is actually valid
@@ -364,6 +376,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 		return errors.Join(errs...)
 	}
 
+	// If scanning hidden data, jump into the hidden_data.go file.
+	if s.includeHiddenData {
+		err := scanHiddenData(ctx, s, chunksChan)
+		return err
+	}
+
 	// Reset consumption and rate limit metrics on each run.
 	githubNumRateLimitEncountered.WithLabelValues(s.name).Set(0)
 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
@@ -400,7 +418,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 		}
 	default:
 		// TODO: move this error to Init
-		return nil, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
+		return nil, fmt.Errorf("invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())

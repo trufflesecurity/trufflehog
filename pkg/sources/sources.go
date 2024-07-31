@@ -236,6 +236,10 @@ type GithubConfig struct {
 	SkipBinaries bool
 	// IncludeWikis indicates whether to include repository wikis in the scan.
 	IncludeWikis bool
+	// IncludeHiddenData indicates whether to scan all hidden commits in a repository (via guessing short-sha hashes)
+	IncludeHiddenData bool
+	// CollisionThreshold is the number of short-sha collisions tolerated during hidden data enumeration. Default is 1.
+	CollisionThreshold int
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.
