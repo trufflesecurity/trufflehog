@@ -25,14 +25,54 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Asana }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("not implemented")
+
+	return secretInfoToAnalyzerResult(info), nil
 }
 
-type MeJSON struct {
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	result := analyzers.AnalyzerResult{}
+
+	// resoures/permission setup
+	permissions := allPermissions()
+	userResource := analyzers.Resource{
+		Name: info.Data.Name,
+		Type: "user",
+		Metadata: map[string]any{
+			"email": info.Data.Email,
+			"type":  info.Data.Type,
+		},
+	}
+
+	for _, perm := range permissions {
+		binding := analyzers.Binding{
+			Resource:   userResource,
+			Permission: perm,
+		}
+		result.Bindings = append(result.Bindings, binding)
+	}
+
+	// unbounded resources
+	result.UnboundedResources = make([]analyzers.Resource, len(info.Data.Workspaces))
+	for _, workspace := range info.Data.Workspaces {
+		resource := analyzers.Resource{
+			Name: workspace.Name,
+			Type: "workspace",
+		}
+		result.UnboundedResources = append(result.UnboundedResources, resource)
+	}
+
+	return &result
+}
+
+type SecretInfo struct {
 	Data struct {
 		Email      string `json:"email"`
 		Name       string `json:"name"`
@@ -52,8 +92,8 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	printMetadata(me)
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) (*MeJSON, error) {
-	var me MeJSON
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+	var me SecretInfo
 
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://app.asana.com/api/1.0/users/me", nil)
@@ -84,7 +124,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*MeJSON, error) {
 	return &me, nil
 }
 
-func printMetadata(me *MeJSON) {
+func printMetadata(me *SecretInfo) {
 	color.Green("[!] Valid Asana API Key\n\n")
 	color.Yellow("[i] User Information")
 	color.Yellow("    Name: %s", me.Data.Name)
@@ -101,4 +141,12 @@ func printMetadata(me *MeJSON) {
 		t.AppendRow(table.Row{color.GreenString(workspace.Name)})
 	}
 	t.Render()
+}
+
+func allPermissions() []analyzers.Permission {
+	permissions := make([]analyzers.Permission, 1)
+	permissions = append(permissions, analyzers.Permission{
+		Value: "Full Access",
+	})
+	return permissions
 }
