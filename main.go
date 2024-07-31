@@ -20,6 +20,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
+	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
@@ -310,6 +311,7 @@ func init() {
 }
 
 func main() {
+
 	// setup logger
 	logFormat := log.WithConsoleSink
 	if *jsonOut {
@@ -349,6 +351,8 @@ func main() {
 }
 
 func run(state overseer.State) {
+	_, _ = maxprocs.Set()
+
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
 
