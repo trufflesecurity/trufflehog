@@ -2,7 +2,6 @@ package bitbucket
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"sort"
@@ -18,18 +17,10 @@ import (
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
 
-type Analyzer struct {
-	Cfg *config.Config
-}
-
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Bitbucket }
-
-func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
-	if err != nil {
-		return nil, err
-	}
-	return nil, fmt.Errorf("not implemented")
+var resource_name_map = map[string]string{
+	"repo_access_token":      "Repository",
+	"project_access_token":   "Project",
+	"workspace_access_token": "Workspace",
 }
 
 type SecretInfo struct {
@@ -56,6 +47,69 @@ type Repo struct {
 
 type RepoJSON struct {
 	Values []Repo `json:"values"`
+}
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Bitbucket }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Bitbucket,
+	}
+
+	// add unbounded resources
+	result.UnboundedResources = make([]analyzers.Resource, len(info.Repos))
+	for i, repo := range info.Repos {
+		result.UnboundedResources[i] = analyzers.Resource{
+			Type: "repository",
+			Name: repo.FullName,
+			Parent: &analyzers.Resource{
+				Type: "project",
+				Name: repo.Project.Name,
+				Parent: &analyzers.Resource{
+					Type: "workspace",
+					Name: repo.Workspace.Name,
+				},
+			},
+			Metadata: map[string]any{
+				"owner":     repo.Owner.Username,
+				"isPrivate": repo.IsPrivate,
+				"role":      repo.Role,
+			},
+		}
+	}
+
+	credentialResource := analyzers.Resource{
+		Type: info.Type,
+		Name: resource_name_map[info.Type],
+		Metadata: map[string]any{
+			"type": credential_type_map[info.Type],
+		},
+	}
+
+	for _, permission := range info.OauthScopes {
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource:   credentialResource,
+			Permission: permission,
+		})
+	}
+
+	return &result
 }
 
 func getScopesAndType(cfg *config.Config, key string) (string, []analyzers.Permission, error) {
