@@ -320,16 +320,6 @@ func TestSource_Scan(t *testing.T) {
 	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
 	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
 
-	// OLD app for breaking app change tests
-	// githubPrivateKeyB64 := secret.MustGetField("GITHUB_PRIVATE_KEY")
-	// githubPrivateKeyBytes, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// githubPrivateKey := string(githubPrivateKeyBytes)
-	// githubInstallationID := secret.MustGetField("GITHUB_INSTALLATION_ID")
-	// githubAppID := secret.MustGetField("GITHUB_APP_ID")
-
 	type init struct {
 		name       string
 		verify     bool

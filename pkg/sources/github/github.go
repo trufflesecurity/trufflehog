@@ -44,11 +44,6 @@ const (
 type Source struct {
 	name string
 
-	// Protects the user and token.
-	//userMu sync.Mutex
-	//githubUser  string
-	//githubToken string
-
 	sourceID          sources.SourceID
 	jobID             sources.JobID
 	verify            bool
@@ -65,14 +60,12 @@ type Source struct {
 	scanOptMu   sync.Mutex // protects the scanOptions
 	scanOptions *git.ScanOptions
 
-	//httpClient      *http.Client
 	log             logr.Logger
 	conn            *sourcespb.GitHub
 	jobPool         *errgroup.Group
 	resumeInfoMutex sync.Mutex
 	resumeInfoSlice []string
-	//apiClient       *github.Client
-	connector connector
+	connector       connector
 
 	includePRComments    bool
 	includeIssueComments bool
@@ -195,9 +188,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
-	//s.httpClient = common.RetryableHTTPClientTimeout(60)
-	//s.apiClient = github.NewClient(s.httpClient)
-
 	var conn sourcespb.GitHub
 	err = anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
@@ -304,11 +294,6 @@ const cloudEndpoint = "https://api.github.com"
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
-	//apiEndpoint := s.conn.Endpoint
-	//if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
-	//	apiEndpoint = cloudEndpoint
-	//}
-
 	// If targets are provided, we're only scanning the data in those targets.
 	// Otherwise, we're scanning all data.
 	// This allows us to only scan the commit where a vulnerability was found.
@@ -331,33 +316,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 }
 
 func (s *Source) enumerate(ctx context.Context) error {
-	//var (
-	//	installationClient *github.Client
-	//	err                error
-	//)
-	//
-	//switch cred := s.conn.GetCredential().(type) {
-	//case *sourcespb.GitHub_BasicAuth:
-	//	if err = s.enumerateBasicAuth(ctx, apiEndpoint, cred.BasicAuth); err != nil {
-	//		return nil, err
-	//	}
-	//case *sourcespb.GitHub_Unauthenticated:
-	//	s.enumerateUnauthenticated(ctx, apiEndpoint)
-	//case *sourcespb.GitHub_Token:
-	//	if err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
-	//		return nil, err
-	//	}
-	//case *sourcespb.GitHub_GithubApp:
-	//	if installationClient, err = s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
-	//		return nil, err
-	//	}
-	//default:
-	//	// TODO: move this error to Init
-	//	return nil, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
-	//}
-	//if err := s.connector.Enumerate(ctx); err != nil {
-	//	return err
-	//}
 	switch s.connector.(type) {
 	case *appConnector:
 		if err := s.enumerateWithApp(ctx); err != nil {
@@ -438,16 +396,6 @@ RepoLoop:
 }
 
 func (s *Source) enumerateBasicAuth(ctx context.Context) error {
-	//s.httpClient.Transport = &github.BasicAuthTransport{
-	//	Username: basicAuth.Username,
-	//	Password: basicAuth.Password,
-	//}
-	//ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
-	//if err != nil {
-	//	s.log.Error(err, "error creating GitHub client")
-	//}
-	//s.apiClient = ghClient
-
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
 		userType, err := s.getReposByOrgOrUser(ctx, org)
@@ -467,11 +415,6 @@ func (s *Source) enumerateBasicAuth(ctx context.Context) error {
 }
 
 func (s *Source) enumerateUnauthenticated(ctx context.Context) {
-	//ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
-	//if err != nil {
-	//	s.log.Error(err, "error creating GitHub client")
-	//}
-	//s.apiClient = ghClient
 	if s.orgsCache.Count() > unauthGithubOrgRateLimt {
 		s.log.Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
@@ -491,26 +434,6 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context) {
 }
 
 func (s *Source) enumerateWithToken(ctx context.Context) error {
-	//// Needed for clones.
-	//s.githubToken = token
-	//
-	//// Needed to list repos.
-	//ts := oauth2.StaticTokenSource(
-	//	&oauth2.Token{AccessToken: token},
-	//)
-	//s.httpClient.Transport = &oauth2.Transport{
-	//	Base:   s.httpClient.Transport,
-	//	Source: oauth2.ReuseTokenSource(nil, ts),
-	//}
-	//
-	//// If we're using public GitHub, make a regular client.
-	//// Otherwise, make an enterprise client.
-	//ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
-	//if err != nil {
-	//	s.log.Error(err, "error creating GitHub client")
-	//}
-	//s.apiClient = ghClient
-
 	ctx.Logger().V(1).Info("Enumerating with token")
 	var ghUser *github.User
 	var err error
@@ -535,7 +458,6 @@ func (s *Source) enumerateWithToken(ctx context.Context) error {
 			s.log.Error(err, "Unable to fetch gists for the current user", "user", ghUser.GetLogin())
 		}
 
-		//isGHE := !strings.EqualFold(apiEndpoint, cloudEndpoint)
 		if s.connector.IsGithubEnterprise() {
 			s.addAllVisibleOrgs(ctx)
 		} else {
@@ -571,55 +493,6 @@ func (s *Source) enumerateWithToken(ctx context.Context) error {
 }
 
 func (s *Source) enumerateWithApp(ctx context.Context) error {
-	//installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//appID, err := strconv.ParseInt(app.AppId, 10, 64)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//// This client is required to create installation tokens for cloning.
-	//// Otherwise, the required JWT is not in the request for the token :/
-	//// This client uses the source's original HTTP transport, so make sure
-	//// to build it before modifying that transport (such as is done during
-	//// the creation of the other API client below).
-	//appItr, err := ghinstallation.NewAppsTransport(
-	//	s.httpClient.Transport,
-	//	appID,
-	//	[]byte(app.PrivateKey))
-	//if err != nil {
-	//	return nil, err
-	//}
-	//appItr.BaseURL = apiEndpoint
-	//
-	//// Does this need to be separate from |s.httpClient|?
-	//instHTTPClient := common.RetryableHTTPClientTimeout(60)
-	//instHTTPClient.Transport = appItr
-	//installationClient, err = github.NewClient(instHTTPClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//// This client is used for most APIs.
-	//itr, err := ghinstallation.New(
-	//	s.httpClient.Transport,
-	//	appID,
-	//	installationID,
-	//	[]byte(app.PrivateKey))
-	//if err != nil {
-	//	return nil, err
-	//}
-	//itr.BaseURL = apiEndpoint
-	//
-	//s.httpClient.Transport = itr
-	//s.apiClient, err = github.NewClient(s.httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
 		if err := s.getReposByApp(ctx); err != nil {
