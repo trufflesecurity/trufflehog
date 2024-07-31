@@ -137,12 +137,6 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 		return nil, err
 	}
 
-	// second call
-	userInfo, err = getUserInfo(cfg, key)
-	if err != nil {
-		return nil, err
-	}
-
 	if userInfo.Data.CurrentUser.Username == "" {
 		return nil, fmt.Errorf("invalid Sourcegraph Access Token")
 	}
