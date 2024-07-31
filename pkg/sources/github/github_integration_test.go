@@ -824,7 +824,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			name: "targeted scan, one file in med commit",
 			init: init{
 				name:       "test source",
-				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}},
 				queryCriteria: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
@@ -842,7 +842,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			name: "no file in commit",
 			init: init{
 				name:       "test source",
-				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}},
 				queryCriteria: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
@@ -861,7 +861,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			name: "invalid query criteria, malformed link",
 			init: init{
 				name:       "test source",
-				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}},
 				queryCriteria: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
