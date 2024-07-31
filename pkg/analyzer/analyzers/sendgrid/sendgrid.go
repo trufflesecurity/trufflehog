@@ -19,6 +19,10 @@ type ScopesJSON struct {
 	Scopes []string `json:"scopes"`
 }
 
+type SecretInfo struct {
+	RawScopes []string
+}
+
 func printPermissions(show_all bool) {
 	fmt.Print("\n\n")
 	t := table.NewWriter()
@@ -80,7 +84,7 @@ func processPermissions(rawScopes []string) {
 	}
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 
 	// ToDo: Add logging when rewrite to not use SG client.
 	if cfg.LoggingEnabled {
@@ -88,16 +92,7 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 		return
 	}
 
-	req := sg.GetRequest(key, "/v3/scopes", "https://api.sendgrid.com")
-	req.Method = "GET"
-	resp, err := sg.API(req)
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		color.Red("[!] Invalid API Key")
-		return
-	} else if resp.StatusCode != 200 {
-		color.Red("[!] Error: %v", resp.StatusCode)
-		return
-	}
+	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
 		color.Red("[!] Error: %v", err)
 		return
@@ -105,29 +100,45 @@ func AnalyzePermissions(cfg *config.Config, key string) {
 
 	color.Green("[!] Valid Sendgrid API Key\n\n")
 
-	// Unmarshal the JSON response into a struct
-	var jsonScopes ScopesJSON
-	if err := json.Unmarshal([]byte(resp.Body), &jsonScopes); err != nil {
-		color.Red("Error:", err)
-		return
-	}
-
-	// Now you can access the scopes
-	rawScopes := jsonScopes.Scopes
-
-	if slices.Contains(rawScopes, "user.email.read") {
+	if slices.Contains(info.RawScopes, "user.email.read") {
 		color.Green("[*] Sendgrid Key Type: Full Access Key")
-	} else if slices.Contains(rawScopes, "billing.read") {
+	} else if slices.Contains(info.RawScopes, "billing.read") {
 		color.Yellow("[*] Sendgrid Key Type: Billing Access Key")
 	} else {
 		color.Yellow("[*] Sendgrid Key Type: Restricted Access Key")
 	}
 
-	if slices.Contains(rawScopes, "2fa_required") {
+	if slices.Contains(info.RawScopes, "2fa_required") {
 		color.Yellow("[i] 2FA Required for this account")
 	}
 
-	processPermissions(rawScopes)
 	printPermissions(cfg.ShowAll)
+}
 
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+
+	req := sg.GetRequest(key, "/v3/scopes", "https://api.sendgrid.com")
+	req.Method = "GET"
+	resp, err := sg.API(req)
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return nil, fmt.Errorf("Invalid API Key")
+	} else if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("%v", resp.StatusCode)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the JSON response into a struct
+	var jsonScopes ScopesJSON
+	if err := json.Unmarshal([]byte(resp.Body), &jsonScopes); err != nil {
+		return nil, err
+	}
+
+	// Now you can access the scopes
+	rawScopes := jsonScopes.Scopes
+
+	processPermissions(rawScopes)
+
+	return &SecretInfo{RawScopes: rawScopes}, nil
 }

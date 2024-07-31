@@ -73,69 +73,76 @@ type Routine struct {
 // so CURRENT_USER returns `doadmin@%` and not `doadmin@localhost
 // USER() returns `doadmin@localhost`
 
-func AnalyzePermissions(cfg *config.Config, connectionStr string) {
+type SecretInfo struct {
+	User        string
+	Databases   map[string]*Database
+	GlobalPrivs GlobalPrivs
+}
 
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	// ToDo: Add in logging
 	if cfg.LoggingEnabled {
 		color.Red("[x] Logging is not supported for this analyzer.")
 		return
 	}
 
-	db, err := createConnection(connectionStr)
+	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
-		color.Red("[!] Error connecting to the MySQL database: %s", err)
+		color.Red("[x] Error: %s", err.Error())
 		return
 	}
 
+	color.Green("[+] Successfully connected as user: %s", info.User)
+
+	// Print the results
+	printResults(info.Databases, info.GlobalPrivs, cfg.ShowAll)
+}
+
+func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, error) {
+
+	db, err := createConnection(connectionStr)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to the MySQL database: %w", err)
+	}
 	defer db.Close()
 
 	// Get the current user
 	user, err := getUser(db)
 	if err != nil {
-		color.Red("[!] Error getting the current user: %s", err)
-		return
+		return nil, fmt.Errorf("getting the current user: %w", err)
 	}
-	color.Green("[+] Successfully connected as user: %s", user)
 
 	// Get all accessible databases
 	var databases = make(map[string]*Database, 0)
 	err = getDatabases(db, databases)
 	if err != nil {
-		color.Red("[!] Error getting databases: %s", err)
-		return
+		return nil, fmt.Errorf("getting databases: %w", err)
 	}
-
 	//Get all accessible tables
 	err = getTables(db, databases)
 	if err != nil {
-		color.Red("[!] Error getting tables: %s", err)
-		return
+		return nil, fmt.Errorf("getting tables: %w", err)
 	}
-
-	// Get all accessible routines
-	err = getRoutines(db, databases)
-	if err != nil {
-		color.Red("[!] Error getting routines: %s", err)
-		return
-	}
-
 	// Get user grants
 	grants, err := getGrants(db)
 	if err != nil {
-		color.Red("[!] Error getting user grants: %s", err)
-		return
+		return nil, fmt.Errorf("getting user grants: %w", err)
+	}
+	// Get all accessible routines
+	err = getRoutines(db, databases)
+	if err != nil {
+		return nil, fmt.Errorf("getting routines: %w", err)
 	}
 
 	var globalPrivs GlobalPrivs
 	// Process user grants
 	processGrants(grants, databases, &globalPrivs)
 
-	// Print the results
-	printResults(databases, globalPrivs, cfg.ShowAll)
-
-	// Build print function, check data, and then review all of the logic.
-	// Then make sure we have an instance of lal of that logic to actually test.
-
+	return &SecretInfo{
+		User:        user,
+		Databases:   databases,
+		GlobalPrivs: globalPrivs,
+	}, nil
 }
 
 func createConnection(connection string) (*sql.DB, error) {
@@ -353,11 +360,12 @@ func processGrants(grants []string, databases map[string]*Database, globalPrivs 
 		}
 	}
 	for _, grant := range grants {
-		processGrant(grant, databases, globalPrivs)
+		// TODO: How to deal with error here?
+		_ = processGrant(grant, databases, globalPrivs)
 	}
 }
 
-func processGrant(grant string, databases map[string]*Database, globalPrivs *GlobalPrivs) {
+func processGrant(grant string, databases map[string]*Database, globalPrivs *GlobalPrivs) error {
 	isGrant := strings.HasPrefix(grant, "GRANT")
 	//hasGrantOption := strings.HasSuffix(grant, "WITH GRANT OPTION")
 
@@ -368,8 +376,7 @@ func processGrant(grant string, databases map[string]*Database, globalPrivs *Glo
 	// Split on " ON "
 	parts := strings.Split(grant, " ON ")
 	if len(parts) < 2 {
-		color.Red("[!] Error processing grant: %s", grant)
-		return
+		return fmt.Errorf("Error processing grant: %s", grant)
 	}
 
 	// Put privs in a slice
@@ -436,6 +443,7 @@ func processGrant(grant string, databases map[string]*Database, globalPrivs *Glo
 			(*d.Tables)[idx].Privs = addRemovePrivs((*d.Tables)[idx].Privs, privs, isGrant)
 		}
 	}
+	return nil
 }
 
 func parseDBFromGrant(grant string) string {

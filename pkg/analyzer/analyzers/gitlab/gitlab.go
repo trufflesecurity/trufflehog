@@ -13,13 +13,31 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_GitLab }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	if err != nil {
+		return nil, err
+	}
+	return nil, fmt.Errorf("not implemented")
+}
 
 // consider calling /api/v4/metadata to learn about gitlab instance version and whether neterrprises is enabled
 
 // we'll call /api/v4/personal_access_tokens and /api/v4/user and then filter down to scopes.
 
-type AcessTokenJSON struct {
+type AccessTokenJSON struct {
 	Name       string   `json:"name"`
 	Revoked    bool     `json:"revoked"`
 	CreatedAt  string   `json:"created_at"`
@@ -47,26 +65,23 @@ type MetadataJSON struct {
 	Enterprise bool   `json:"enterprise"`
 }
 
-func getPersonalAccessToken(cfg *config.Config, key string) (AcessTokenJSON, int, error) {
-	var tokens AcessTokenJSON
+func getPersonalAccessToken(cfg *config.Config, key string) (AccessTokenJSON, int, error) {
+	var tokens AccessTokenJSON
 
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/personal_access_tokens/self", nil)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return tokens, -1, err
 	}
 
-	req.Header.Set("PRIVATE-TOKEN", key)
+	req.Header.Set("Private-Token", key)
 	resp, err := client.Do(req)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return tokens, resp.StatusCode, err
 	}
 
 	defer resp.Body.Close()
 	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
-		color.Red("[x] Error: %s", err)
 		return tokens, resp.StatusCode, err
 	}
 	return tokens, resp.StatusCode, nil
@@ -78,11 +93,10 @@ func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, erro
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/projects", nil)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return projects, err
 	}
 
-	req.Header.Set("PRIVATE-TOKEN", key)
+	req.Header.Set("Private-Token", key)
 
 	// Add query parameters
 	q := req.URL.Query()
@@ -91,7 +105,6 @@ func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, erro
 
 	resp, err := client.Do(req)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return projects, err
 	}
 
@@ -99,7 +112,6 @@ func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, erro
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading the response body:", err)
 		return projects, err
 	}
 
@@ -110,10 +122,8 @@ func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, erro
 	if err := json.NewDecoder(newBody()).Decode(&projects); err != nil {
 		var e ErrorJSON
 		if err := json.NewDecoder(newBody()).Decode(&e); err == nil {
-			color.Red("[x] Insufficient Scope to query for projects. We need api or read_api permissions.\n")
-			return projects, nil
+			return projects, fmt.Errorf("Insufficient Scope to query for projects. We need api or read_api permissions.")
 		}
-		color.Red("[x] Error: %s", err)
 		return projects, err
 	}
 	return projects, nil
@@ -125,14 +135,12 @@ func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/metadata", nil)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return metadata, err
 	}
 
-	req.Header.Set("PRIVATE-TOKEN", key)
+	req.Header.Set("Private-Token", key)
 	resp, err := client.Do(req)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
 		return metadata, err
 	}
 
@@ -140,7 +148,6 @@ func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading the response body:", err)
 		return metadata, err
 	}
 
@@ -154,59 +161,69 @@ func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
 
 	if metadata.Version == "" {
 		var e ErrorJSON
-		if err := json.NewDecoder(newBody()).Decode(&e); err == nil {
-			color.Red("[x] Insufficient Scope to query for metadata. We need read_user, ai_features, api or read_api permissions.\n")
-			return metadata, nil
-		} else {
+		if err := json.NewDecoder(newBody()).Decode(&e); err != nil {
 			return metadata, err
 		}
+		return metadata, fmt.Errorf("Insufficient Scope to query for metadata. We need read_user, ai_features, api or read_api permissions.")
 	}
 
 	return metadata, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+type SecretInfo struct {
+	AccessToken AccessTokenJSON
+	Metadata    MetadataJSON
+	Projects    []ProjectsJSON
+}
 
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// get personal_access_tokens accessible
 	token, statusCode, err := getPersonalAccessToken(cfg, key)
 	if err != nil {
-		color.Red("[x] Error: %s", err)
-		return
+		return nil, err
+	}
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("Invalid GitLab Access Token")
 	}
 
-	if statusCode != 200 {
-		color.Red("[x] Invalid GitLab Access Token")
+	meta, err := getMetadata(cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	projects, err := getAccessibleProjects(cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SecretInfo{
+		AccessToken: token,
+		Metadata:    meta,
+		Projects:    projects,
+	}, nil
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[x] Error: %s", err)
 		return
 	}
 
 	// print token info
-	printTokenInfo(token)
-
-	// get metadata
-	metadata, err := getMetadata(cfg, key)
-	if err != nil {
-		color.Red("[x] Error: %s", err)
-		return
-	}
+	printTokenInfo(info.AccessToken)
 
 	// print gitlab instance metadata
-	if metadata.Version != "" {
-		printMetadata(metadata)
+	if info.Metadata.Version != "" {
+		printMetadata(info.Metadata)
 	}
 
 	// print token permissions
-	printTokenPermissions(token)
-
-	// get accessible projects
-	projects, err := getAccessibleProjects(cfg, key)
-	if err != nil {
-		color.Red("[x] Error: %s", err)
-		return
-	}
+	printTokenPermissions(info.AccessToken)
 
 	// print repos accessible
-	if len(projects) > 0 {
-		printProjects(projects)
+	if len(info.Projects) > 0 {
+		printProjects(info.Projects)
 	}
 }
 
@@ -227,7 +244,7 @@ func getRemainingTime(t string) string {
 	return fmt.Sprintf("%v", durationUntilTarget)
 }
 
-func printTokenInfo(token AcessTokenJSON) {
+func printTokenInfo(token AccessTokenJSON) {
 	color.Green("[!] Valid GitLab Access Token\n\n")
 	color.Green("Token Name: %s\n", token.Name)
 	color.Green("Created At: %s\n", token.CreatedAt)
@@ -244,13 +261,13 @@ func printMetadata(metadata MetadataJSON) {
 	color.Green("Enterprise: %v\n\n", metadata.Enterprise)
 }
 
-func printTokenPermissions(token AcessTokenJSON) {
+func printTokenPermissions(token AccessTokenJSON) {
 	color.Green("[i] Token Permissions\n")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Scope", "Access" /* Add more column headers if needed */})
 	for _, scope := range token.Scopes {
-		t.AppendRow([]interface{}{color.GreenString(scope), color.GreenString(gitlab_scopes[scope])})
+		t.AppendRow([]any{color.GreenString(scope), color.GreenString(gitlab_scopes[scope])})
 	}
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 2, WidthMax: 100}, // Limit the width of the third column (Description) to 20 characters
@@ -272,7 +289,7 @@ func printProjects(projects []ProjectsJSON) {
 		} else {
 			access = color.RedString(access)
 		}
-		t.AppendRow([]interface{}{color.GreenString(project.NameWithNamespace), access})
+		t.AppendRow([]any{color.GreenString(project.NameWithNamespace), access})
 	}
 	t.Render()
 }

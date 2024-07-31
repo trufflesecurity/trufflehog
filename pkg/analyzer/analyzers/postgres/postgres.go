@@ -61,7 +61,15 @@ const (
 
 var connStrPartPattern = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
 
-func AnalyzePermissions(cfg *config.Config, connectionStr string) {
+type SecretInfo struct {
+	User       string
+	Role       string
+	RolePrivs  map[string]bool
+	DBs        []DB
+	TablePrivs map[string]map[string]*TableData
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, connectionStr string) {
 
 	// ToDo: Add in logging
 	if cfg.LoggingEnabled {
@@ -69,10 +77,37 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) {
 		return
 	}
 
+	info, err := AnalyzePermissions(cfg, connectionStr)
+	if err != nil {
+		color.Red("[x] Error: %s", err.Error())
+		return
+	}
+
+	color.Yellow("[!] Successfully connected to Postgres database.")
+	printUserRoleAndPriv(info.Role, info.RolePrivs)
+
+	printDBPrivs(info.DBs, info.User)
+
+	// Print db privs
+	if len(info.DBs) > 0 {
+		fmt.Print("\n\n")
+		color.Green("[i] User has the following database privileges:")
+		printDBPrivs(info.DBs, info.User)
+	}
+
+	// Print table privs
+	if len(info.TablePrivs) > 0 {
+		fmt.Print("\n\n")
+		color.Green("[i] User has the following table privileges:")
+		printTablePrivs(info.TablePrivs)
+	}
+}
+
+func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, error) {
+
 	connStr, err := pq.ParseURL(string(connectionStr))
 	if err != nil {
-		color.Red("[x] Failed to parse Postgres connection string.\n    Error: " + err.Error())
-		return
+		return nil, fmt.Errorf("failed to parse Postgres connection string: %w", err)
 	}
 	parts := connStrPartPattern.FindAllStringSubmatch(connStr, -1)
 	params := make(map[string]string, len(parts))
@@ -81,26 +116,30 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) {
 	}
 	db, err := createConnection(params, "")
 	if err != nil {
-		color.Red("[x] Failed to connect to Postgres database.\n    Error: " + err.Error())
-		return
+		return nil, fmt.Errorf("failed to connect to Postgres database: %w", err)
 	}
 	defer db.Close()
-	color.Yellow("[!] Successfully connected to Postgres database.")
-	err = getUserPrivs(db)
+
+	role, privs, err := getUserPrivs(db)
 	if err != nil {
-		color.Red("[x] Failed to retrieve user privileges.\n    Error: " + err.Error())
-		return
+		return nil, fmt.Errorf("failed to retrieve user privileges: %w", err)
 	}
-	dbs, err := getDBPrivs(db)
+	currentUser, dbs, err := getDBPrivs(db)
 	if err != nil {
-		color.Red("[x] Failed to retrieve database privileges.\n    Error: " + err.Error())
-		return
+		return nil, fmt.Errorf("failed to retrieve database privileges: %w", err)
 	}
-	err = getTablePrivs(params, dbs)
+	tablePrivs, err := getTablePrivs(params, buildSliceDBNames(dbs))
 	if err != nil {
-		color.Red("[x] Failed to retrieve table privileges.\n    Error: " + err.Error())
-		return
+		return nil, fmt.Errorf("failed to retrieve table privileges: %w", err)
 	}
+
+	return &SecretInfo{
+		User:       currentUser,
+		Role:       role,
+		RolePrivs:  privs,
+		DBs:        dbs,
+		TablePrivs: tablePrivs,
+	}, nil
 }
 
 func isErrorDatabaseNotFound(err error, dbName string, user string) bool {
@@ -155,7 +194,7 @@ func createConnection(params map[string]string, database string) (*sql.DB, error
 	}
 }
 
-func getUserPrivs(db *sql.DB) error {
+func getUserPrivs(db *sql.DB) (string, map[string]bool, error) {
 	// Prepare the SQL statement
 	query := `SELECT rolname AS role_name,
 				rolsuper AS is_superuser,
@@ -170,7 +209,7 @@ func getUserPrivs(db *sql.DB) error {
 	// Execute the SQL query
 	rows, err := db.Query(query)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	defer rows.Close()
 
@@ -179,13 +218,13 @@ func getUserPrivs(db *sql.DB) error {
 	// Iterate over the rows
 	for rows.Next() {
 		if err := rows.Scan(&roleName, &isSuperuser, &canInherit, &canCreateRole, &canCreateDB, &canLogin, &isReplicationRole, &bypassesRLS); err != nil {
-			return err
+			return "", nil, err
 		}
 	}
 
 	// Check for errors during iteration
 	if err := rows.Err(); err != nil {
-		return err
+		return "", nil, err
 	}
 
 	// Map roles to privileges
@@ -199,20 +238,10 @@ func getUserPrivs(db *sql.DB) error {
 		"Bypass RLS":           bypassesRLS,
 	}
 
-	// Print User roles + privs
-	color.Yellow("[i] User: %s", roleName)
-	color.Yellow("[i] Privileges: ")
-	for role, priv := range mapRoles {
-		if role == "Superuser" && priv {
-			color.Green("  - %s", role)
-		} else if priv {
-			color.Yellow("  - %s", role)
-		}
-	}
-	return nil
+	return roleName, mapRoles, nil
 }
 
-func getDBPrivs(db *sql.DB) ([]string, error) {
+func getDBPrivs(db *sql.DB) (string, []DB, error) {
 	query := `
         SELECT 
             d.datname AS database_name,
@@ -235,7 +264,7 @@ func getDBPrivs(db *sql.DB) ([]string, error) {
 	// Execute the query
 	rows, err := db.Query(query)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	defer rows.Close()
 
@@ -248,7 +277,7 @@ func getDBPrivs(db *sql.DB) ([]string, error) {
 		var canConnect, canCreate, canCreateTemp bool
 		err := rows.Scan(&dbName, &owner, &currentUser, &canConnect, &canCreate, &canCreateTemp)
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 
 		db := DB{
@@ -263,17 +292,10 @@ func getDBPrivs(db *sql.DB) ([]string, error) {
 		dbs = append(dbs, db)
 	}
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
-	// Print db privs
-	if len(dbs) > 0 {
-		fmt.Print("\n\n")
-		color.Green("[i] User has the following database privileges:")
-		printDBPrivs(dbs, currentUser)
-		return buildSliceDBNames(dbs), nil
-	}
-	return nil, nil
+	return currentUser, dbs, nil
 }
 
 func printDBPrivs(dbs []DB, current_user string) {
@@ -325,16 +347,15 @@ func buildSliceDBNames(dbs []DB) []string {
 	return dbNames
 }
 
-func getTablePrivs(params map[string]string, databases []string) error {
+func getTablePrivs(params map[string]string, databases []string) (map[string]map[string]*TableData, error) {
 
 	tablePrivileges := make(map[string]map[string]*TableData, 0)
 
 	for _, dbase := range databases {
-
 		// Connect to db
 		db, err := createConnection(params, dbase)
 		if err != nil {
-			color.Red("[x] Failed to connect to Postgres database: %s", dbase)
+			// color.Red("[x] Failed to connect to Postgres database: %s", dbase)
 			continue
 		}
 		defer db.Close()
@@ -359,7 +380,7 @@ func getTablePrivs(params map[string]string, databases []string) error {
 		// Execute the query
 		rows, err := db.Query(query)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer rows.Close()
 
@@ -368,13 +389,17 @@ func getTablePrivs(params map[string]string, databases []string) error {
 			var database, table, priv, size, row_count string
 			err := rows.Scan(&database, &table, &priv, &size, &row_count)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			if _, ok := tablePrivileges[database]; !ok {
 				tablePrivileges[database] = map[string]*TableData{
 					table: {},
 				}
+			}
+
+			if _, ok := tablePrivileges[database][table]; !ok {
+				tablePrivileges[database][table] = &TableData{}
 			}
 
 			switch priv {
@@ -401,18 +426,12 @@ func getTablePrivs(params map[string]string, databases []string) error {
 			}
 		}
 		if err = rows.Err(); err != nil {
-			return err
+			return nil, err
 		}
 		db.Close()
 	}
 
-	// Print table privs
-	if len(tablePrivileges) > 0 {
-		fmt.Print("\n\n")
-		color.Green("[i] User has the following table privileges:")
-		printTablePrivs(tablePrivileges)
-	}
-	return nil
+	return tablePrivileges, nil
 }
 
 func printTablePrivs(tables map[string]map[string]*TableData) {
@@ -433,6 +452,18 @@ func printTablePrivs(tables map[string]map[string]*TableData) {
 		}
 	}
 	t.Render()
+}
+
+func printUserRoleAndPriv(role string, privs map[string]bool) {
+	color.Yellow("[i] User: %s", role)
+	color.Yellow("[i] Privileges: ")
+	for role, priv := range privs {
+		if role == "Superuser" && priv {
+			color.Green("  - %s", role)
+		} else if priv {
+			color.Yellow("  - %s", role)
+		}
+	}
 }
 
 func buildTablePrivsStr(privs TablePrivs) string {

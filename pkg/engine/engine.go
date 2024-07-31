@@ -308,9 +308,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 		e.decoders = decoders.DefaultDecoders()
 	}
 
-	if len(e.detectors) == 0 {
-		e.detectors = DefaultDetectors()
-	}
+	e.detectors = append(e.detectors, DefaultDetectors()...)
 
 	if e.dispatcher == nil {
 		e.dispatcher = NewPrinterDispatcher(new(output.PlainPrinter))

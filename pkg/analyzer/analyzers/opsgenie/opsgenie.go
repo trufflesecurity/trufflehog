@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -102,26 +103,24 @@ func readInScopes() ([]Scope, error) {
 	return scopes, nil
 }
 
-func checkPermissions(cfg *config.Config, key string) []string {
+func checkPermissions(cfg *config.Config, key string) ([]string, error) {
 	scopes, err := readInScopes()
 	if err != nil {
-		color.Red("[x] Error reading in scopes: %s", err.Error())
-		return nil
+		return nil, fmt.Errorf("reading in scopes: %w", err)
 	}
 
 	permissions := make([]string, 0)
 	for _, scope := range scopes {
 		status, err := scope.HttpTest.RunTest(cfg, map[string]string{"Authorization": "GenieKey " + key})
 		if err != nil {
-			color.Red("[x] Error running test: %s", err.Error())
-			return nil
+			return nil, fmt.Errorf("running test: %w", err)
 		}
 		if status {
 			permissions = append(permissions, scope.Name)
 		}
 	}
 
-	return permissions
+	return permissions, nil
 }
 
 func contains(s []string, e string) bool {
@@ -161,25 +160,50 @@ func getUserList(cfg *config.Config, key string) ([]User, error) {
 	return userList.Users, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-	permissions := checkPermissions(cfg, key)
-	if len(permissions) == 0 {
-		color.Red("[x] Invalid OpsGenie API key")
+type SecretInfo struct {
+	Users       []User
+	Permissions []string
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[x] Error : %s", err.Error())
 		return
 	}
+
 	color.Green("[!] Valid OpsGenie API key\n\n")
-	printPermissions(permissions)
+	printPermissions(info.Permissions)
+	if len(info.Users) > 0 {
+		printUsers(info.Users)
+	}
+	color.Yellow("\n[i] Expires: Never")
+
+}
+
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+	var info = &SecretInfo{}
+
+	permissions, err := checkPermissions(cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(permissions) == 0 {
+		return nil, fmt.Errorf("invalid OpsGenie API key")
+	}
+
+	info.Permissions = permissions
 
 	if contains(permissions, "Configuration Access") {
 		users, err := getUserList(cfg, key)
 		if err != nil {
-			color.Red("[x] Error getting user list: %s", err.Error())
-			return
+			return nil, fmt.Errorf("getting user list: %w", err)
 		}
-		printUsers(users)
+		info.Users = users
 	}
 
-	color.Yellow("\n[i] Expires: Never")
+	return info, nil
 }
 
 func printPermissions(permissions []string) {

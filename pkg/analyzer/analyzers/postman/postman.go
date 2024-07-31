@@ -86,39 +86,60 @@ func getWorkspaces(cfg *config.Config, key string) (WorkspaceJSON, error) {
 	return workspaces, err
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+type SecretInfo struct {
+	User           UserInfoJSON
+	Workspace      WorkspaceJSON
+	WorkspaceError error
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	// ToDo: Add in logging
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging is not supported for this analyzer.")
+		return
+	}
+
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[x] Error: %s", err.Error())
+		return
+	}
+
+	color.Green("[!] Valid Postman API Key")
+	printUserInfo(info.User)
+
+	if info.WorkspaceError != nil {
+		color.Red("[x] Error Fetching Workspaces: %s", info.WorkspaceError.Error())
+	} else if len(info.Workspace.Workspaces) == 0 {
+		color.Red("[x] No Workspaces Found")
+	} else {
+		printWorkspaces(info.Workspace)
+	}
+}
+
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// validate key & get user info
 
 	me, err := getUserInfo(cfg, key)
 	if err != nil {
-		color.Red("[x]" + err.Error())
+		return nil, err
 	}
 
 	if me.User.Username == "" {
-		color.Red("[x] Invalid Postman API Key")
-		return
+		return nil, fmt.Errorf("Invalid Postman API Key")
 	}
 
-	// print user info
-	printUserInfo(me)
-
-	// get workspaces
+	// get workspaces, if there is error user with empty workspaces will be returned
 	workspaces, err := getWorkspaces(cfg, key)
-	if err != nil {
-		color.Red("[x]" + err.Error())
-	}
 
-	if len(workspaces.Workspaces) == 0 {
-		color.Red("[x] No Workspaces Found")
-		return
-	}
-
-	// print workspaces
-	printWorkspaces(workspaces)
+	return &SecretInfo{
+		User:           me,
+		Workspace:      workspaces,
+		WorkspaceError: err,
+	}, nil
 }
 
 func printUserInfo(me UserInfoJSON) {
-	color.Green("[!] Valid Postman API Key")
 
 	color.Yellow("\n[i] User Information")
 	color.Green("Username: " + me.User.Username)
