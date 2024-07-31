@@ -242,7 +242,7 @@ func Run(cmd string) {
 		sourcegraph.AnalyzePermissions(cfg, *sourcegraphKey)
 	case shopifyScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("shopify")
-		shopify.AnalyzePermissions(cfg, *shopifyKey, *shopifyStoreURL)
+		shopify.AnalyzeAndPrintPermissions(cfg, *shopifyKey, *shopifyStoreURL)
 	case opsgenieScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("opsgenie")
 		opsgenie.AnalyzeAndPrintPermissions(cfg, *opsgenieKey)
