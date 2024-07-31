@@ -16,8 +16,71 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"gopkg.in/yaml.v2"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Stripe }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := &analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Stripe,
+		Metadata: map[string]any{
+			"key_type": info.KeyType,
+			"key_env":  info.KeyEnv,
+			"valid":    info.Valid,
+		},
+	}
+
+	// create list of bindings using permissions, with category being the parent and unbounded resource
+	result.Bindings = []analyzers.Binding{}
+	result.UnboundedResources = []analyzers.Resource{}
+	for _, permissionCategory := range info.Permissions {
+		parentResource := &analyzers.Resource{
+			Name:               permissionCategory.Name,
+			FullyQualifiedName: permissionCategory.Name,
+			Type:               "category",
+			Metadata:           nil,
+			Parent:             nil,
+		}
+		result.UnboundedResources = append(result.UnboundedResources, *parentResource)
+
+		for _, permission := range permissionCategory.Permissions {
+			result.Bindings = append(result.Bindings, analyzers.Binding{
+				Resource: analyzers.Resource{
+					Name:               permission.Name,
+					FullyQualifiedName: permission.Name,
+					Type:               "resource",
+					Parent:             parentResource,
+				},
+				Permission: analyzers.Permission{
+					Value: *permission.Value,
+				},
+			})
+		}
+	}
+
+	return result
+
+}
 
 const (
 	SECRET_PREFIX      = "sk_"
