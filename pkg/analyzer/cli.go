@@ -236,7 +236,7 @@ func Run(cmd string) {
 		mailgun.AnalyzeAndPrintPermissions(cfg, *mailgunKey)
 	case squareScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("square")
-		square.AnalyzePermissions(cfg, *squareKey)
+		square.AnalyzeAndPrintPermissions(cfg, *squareKey)
 	case sourcegraphScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("sourcegraph")
 		sourcegraph.AnalyzePermissions(cfg, *sourcegraphKey)

@@ -30,6 +30,11 @@ type PermissionsJSON struct {
 	MerchantID string   `json:"merchant_id"`
 }
 
+type SecretInfo struct {
+	Permissions PermissionsJSON
+	Team        TeamJSON
+}
+
 func getPermissions(cfg *config.Config, key string) (PermissionsJSON, error) {
 	var permissions PermissionsJSON
 
@@ -96,33 +101,51 @@ func getUsers(cfg *config.Config, key string) (TeamJSON, error) {
 	return team, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	permissions, err := getPermissions(cfg, key)
 	if err != nil {
-		color.Red("Error: %s", err)
+		return nil, err
+	}
+
+	team, err := getUsers(cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SecretInfo{
+		Permissions: permissions,
+		Team:        team,
+	}, nil
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	// ToDo: Add in logging
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging is not supported for this analyzer.")
 		return
 	}
 
-	if permissions.MerchantID == "" {
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[x] Error: %s", err.Error())
+		return
+	}
+
+	if info.Permissions.MerchantID == "" {
 		color.Red("[x] Invalid Square API Key")
 		return
 	}
 	color.Green("[!] Valid Square API Key\n\n")
-	color.Yellow("Merchant ID: %s", permissions.MerchantID)
-	color.Yellow("Client ID: %s", permissions.ClientID)
-	if permissions.ExpiresAt == "" {
+	color.Yellow("Merchant ID: %s", info.Permissions.MerchantID)
+	color.Yellow("Client ID: %s", info.Permissions.ClientID)
+	if info.Permissions.ExpiresAt == "" {
 		color.Green("Expires: Never\n\n")
 	} else {
-		color.Yellow("Expires: %s\n\n", permissions.ExpiresAt)
+		color.Yellow("Expires: %s\n\n", info.Permissions.ExpiresAt)
 	}
-	printPermissions(permissions.Scopes, cfg.ShowAll)
+	printPermissions(info.Permissions.Scopes, cfg.ShowAll)
 
-	team, err := getUsers(cfg, key)
-	if err != nil {
-		color.Red("Error: %s", err)
-		return
-	}
-	printTeamMembers(team)
+	printTeamMembers(info.Team)
 }
 
 func contains(s []string, e string) bool {
