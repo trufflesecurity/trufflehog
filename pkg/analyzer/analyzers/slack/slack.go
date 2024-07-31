@@ -12,7 +12,68 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Slack }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Slack,
+		Metadata:     nil,
+	}
+
+	resourceType := "user"
+	fullyQualifiedName := info.User.UserId
+	if info.User.BotId != "" {
+		resourceType = "bot"
+		fullyQualifiedName = info.User.BotId
+	}
+	resource := &analyzers.Resource{
+		Name:               info.User.User,
+		FullyQualifiedName: fullyQualifiedName,
+		Type:               resourceType,
+		Metadata: map[string]any{
+			"url":     info.User.Url,
+			"team":    info.User.Team,
+			"team_id": info.User.TeamId,
+		},
+	}
+	result.Bindings = []analyzers.Binding{}
+	for _, scope := range strings.Split(info.Scopes, ",") {
+		perms := scope_mapping[scope]
+		if perms != nil {
+			result.Bindings = append(result.Bindings, analyzers.Binding{
+				Resource: *resource,
+				Permission: analyzers.Permission{
+					Value:       scope,
+					AccessLevel: strings.Join(perms, ","),
+				},
+			})
+		}
+
+	}
+
+	return &result
+}
 
 // Add in showAll to printScopes + deal with testing enterprise + add scope details
 
