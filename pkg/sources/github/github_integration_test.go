@@ -617,19 +617,6 @@ func TestSource_paginateGists(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	secret, err := common.GetTestSecret(ctx)
-	if err != nil {
-		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
-	}
-	// For the  NEW github app test (+Member enum)
-	githubPrivateKeyB64New := secret.MustGetField("GITHUB_PRIVATE_KEY_NEW")
-	githubPrivateKeyBytesNew, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64New)
-	if err != nil {
-		t.Fatal(err)
-	}
-	githubPrivateKeyNew := string(githubPrivateKeyBytesNew)
-	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
-	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
 	type init struct {
 		name       string
 		verify     bool
@@ -648,13 +635,7 @@ func TestSource_paginateGists(t *testing.T) {
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
-					Credential: &sourcespb.GitHub_GithubApp{
-						GithubApp: &credentialspb.GitHubApp{
-							PrivateKey:     githubPrivateKeyNew,
-							InstallationId: githubInstallationIDNew,
-							AppId:          githubAppIDNew,
-						},
-					},
+					Credential: &sourcespb.GitHub_Unauthenticated{},
 				},
 			},
 			wantChunk: &sources.Chunk{
@@ -672,54 +653,19 @@ func TestSource_paginateGists(t *testing.T) {
 			user:     "truffle-sandbox",
 			minRepos: 1,
 		},
-		// {
-		// 	name: "get multiple pages of gists",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Credential: &sourcespb.GitHub_GithubApp{
-		// 				GithubApp: &credentialspb.GitHubApp{
-		// 					PrivateKey:     githubPrivateKeyNew,
-		// 					InstallationId: githubInstallationIDNew,
-		// 					AppId:          githubAppIDNew,
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	wantChunk: nil,
-		// 	wantErr:   false,
-		// 	user:      "andrew",
-		// 	minRepos:  101,
-		// },
-		/*		{
-					name: "get multiple pages of gists",
-					init: init{
-						name: "test source",
-						connection: &sourcespb.GitHub{
-							Credential: &sourcespb.GitHub_GithubApp{
-								GithubApp: &credentialspb.GitHubApp{
-									PrivateKey:     githubPrivateKeyNew,
-									InstallationId: githubInstallationIDNew,
-									AppId:          githubAppIDNew,
-								},
-							},
-						},
-					},
-					wantChunk: &sources.Chunk{
-						SourceName: "test source",
-						SourceMetadata: &source_metadatapb.MetaData{
-							Data: &source_metadatapb.MetaData_Github{
-								Github: &source_metadatapb.Github{
-									Repository: "https://gist.github.com/872df3b78b9ec3e7dbe597fb5a202121.git",
-								},
-							},
-						},
-						Verify: false,
-					},
-					wantErr: false,
-					user:    "andrew",
+		{
+			name: "get multiple pages of gists",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Credential: &sourcespb.GitHub_Unauthenticated{},
 				},
-		*/
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			user:      "andrew",
+			minRepos:  101,
+		},
 	}
 
 	for _, tt := range tests {
