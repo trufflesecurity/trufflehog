@@ -290,8 +290,6 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) source_metada
 	return repoInfo.visibility
 }
 
-const cloudEndpoint = "https://api.github.com"
-
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	// If targets are provided, we're only scanning the data in those targets.

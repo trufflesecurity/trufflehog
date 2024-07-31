@@ -10,6 +10,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
+const cloudEndpoint = "https://api.github.com"
+
 type connector interface {
 	ApiClient() *github.Client
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
