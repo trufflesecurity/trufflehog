@@ -2,6 +2,7 @@ package github
 
 import (
 	"net/http"
+	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v63/github"
@@ -12,10 +13,11 @@ import (
 )
 
 type basicAuthConnector struct {
-	httpClient *http.Client
-	apiClient  *github.Client
-	username   string
-	password   string
+	httpClient         *http.Client
+	apiClient          *github.Client
+	username           string
+	password           string
+	isGitHubEnterprise bool
 }
 
 var _ connector = (*basicAuthConnector)(nil)
@@ -33,10 +35,11 @@ func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*
 	}
 
 	return &basicAuthConnector{
-		httpClient: httpClient,
-		apiClient:  apiClient,
-		username:   cred.Username,
-		password:   cred.Password,
+		httpClient:         httpClient,
+		apiClient:          apiClient,
+		username:           cred.Username,
+		password:           cred.Password,
+		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudEndpoint),
 	}, nil
 }
 
@@ -49,7 +52,7 @@ func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string) (string,
 }
 
 func (c *basicAuthConnector) IsGithubEnterprise() bool {
-	return false
+	return c.isGitHubEnterprise
 }
 
 func (c *basicAuthConnector) HttpClient() *http.Client {
