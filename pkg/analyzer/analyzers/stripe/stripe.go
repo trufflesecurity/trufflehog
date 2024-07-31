@@ -204,12 +204,6 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-	// ToDo: Add in logging
-	if cfg.LoggingEnabled {
-		color.Red("[x] Logging is not supported for this analyzer.")
-		return
-	}
-
 	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
 		color.Red("[x] Error: %s", err.Error())
