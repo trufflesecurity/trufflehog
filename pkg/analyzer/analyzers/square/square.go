@@ -11,7 +11,91 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Square }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Square,
+		Metadata: map[string]any{
+			"team_members": info.Team.TeamMembers,
+			"expires_at":   info.Permissions.ExpiresAt,
+			"client_id":    info.Permissions.ClientID,
+			"merchant_id":  info.Permissions.MerchantID,
+		},
+	}
+
+	bindings, unboundedResources := getBindingsAndUnboundedResources(info.Permissions.Scopes)
+
+	result.Bindings = bindings
+	result.UnboundedResources = unboundedResources
+
+	return &result
+}
+
+// Build a list of Bindings and UnboundedResources by referencing the category permissions list and
+// checking with the given scopes
+func getBindingsAndUnboundedResources(scopes []string) ([]analyzers.Binding, []analyzers.Resource) {
+	bindings := []analyzers.Binding{}
+	unboundedResources := []analyzers.Resource{}
+	for _, permissions_category := range permissions_slice {
+		for category, permissions := range permissions_category {
+			parentResource := analyzers.Resource{
+				Name:               category,
+				FullyQualifiedName: category,
+				Type:               "category",
+				Metadata:           nil,
+				Parent:             nil,
+			}
+			hasScope := false
+			for endpoint, requiredPermissions := range permissions {
+				resource := analyzers.Resource{
+					Name:               endpoint,
+					FullyQualifiedName: endpoint,
+					Type:               "endpoint",
+					Metadata:           nil,
+					Parent:             &parentResource,
+				}
+				for _, permission := range requiredPermissions {
+					if contains(scopes, permission) {
+						hasScope = true
+						bindings = append(bindings, analyzers.Binding{
+							Resource: resource,
+							Permission: analyzers.Permission{
+								Value: permission,
+							},
+						})
+					}
+				}
+			}
+			if hasScope {
+				unboundedResources = append(unboundedResources, parentResource)
+			}
+		}
+	}
+
+	return bindings, unboundedResources
+}
 
 type TeamJSON struct {
 	TeamMembers []struct {
