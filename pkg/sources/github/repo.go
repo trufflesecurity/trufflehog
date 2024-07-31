@@ -50,15 +50,8 @@ type repoInfo struct {
 	visibility source_metadatapb.Visibility
 }
 
-func (s *Source) cloneRepo(
-	ctx context.Context,
-	repoURL string,
-) (string, *gogit.Repository, error) {
-	path, repo, err := s.connector.Clone(ctx, repoURL)
-	if err != nil {
-		return "", nil, err
-	}
-	return path, repo, nil
+func (s *Source) cloneRepo(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
+	return s.connector.Clone(ctx, repoURL)
 }
 
 type repoListOptions interface {

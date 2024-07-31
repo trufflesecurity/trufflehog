@@ -1,6 +1,7 @@
 package github
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -89,7 +90,7 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogi
 		c.installationID,
 		&github.InstallationTokenOptions{})
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("could not create installation token: %w", err)
 	}
 
 	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token")

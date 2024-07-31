@@ -1,6 +1,7 @@
 package github
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -81,7 +82,7 @@ func (c *tokenConnector) getUser(ctx context.Context) (string, error) {
 			continue
 		}
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("could not get GitHub user: %w", err)
 		}
 		break
 	}
