@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -17,12 +18,15 @@ type TUI struct {
 	secretInfo SecretInfo
 	common     common.Common
 	model      tea.Model
+	abort      bool
 }
 
 type SecretInfo struct {
 	Parts map[string]string
 	Cfg   *config.Config
 }
+
+var AbortError error = errors.New("command aborted")
 
 func Run(keyType string) (string, *SecretInfo, error) {
 	// If a keyType is provided, make sure it's in the list of AvailableAnalyzers.
@@ -41,10 +45,18 @@ func Run(keyType string) (string, *SecretInfo, error) {
 	if _, err := tea.NewProgram(t).Run(); err != nil {
 		return "", nil, err
 	}
+	if t.abort {
+		return "", nil, AbortError
+	}
 	return t.keyType, &t.secretInfo, nil
 }
 
 func (ui *TUI) Init() tea.Cmd {
+	if ui.keyType == "" {
+		ui.model = KeyTypePage{Common: ui.common}
+	} else {
+		ui.model = FormPage{Common: ui.common, KeyType: ui.keyType}
+	}
 	return nil
 }
 
@@ -55,7 +67,13 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	// Always be able to force quit.
 	if msg, ok := msg.(tea.KeyMsg); ok && msg.Type.String() == "ctrl+c" {
+		ui.abort = true
 		return ui, tea.Quit
+	}
+
+	switch m := msg.(type) {
+	case SetKeyTypeMsg:
+		ui.keyType = string(m)
 	}
 
 	if ui.model == nil {
@@ -78,5 +96,13 @@ func (ui *TUI) SetSize(msg tea.WindowSizeMsg) {
 	ui.common.SetSize(msg.Width, msg.Height)
 	if ui.model != nil {
 		ui.model, _ = ui.model.Update(msg)
+	}
+}
+
+type SetKeyTypeMsg string
+
+func SetKeyTypeCmd(keyType string) tea.Cmd {
+	return func() tea.Msg {
+		return SetKeyTypeMsg(keyType)
 	}
 }
