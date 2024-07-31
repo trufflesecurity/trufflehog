@@ -30,49 +30,49 @@ const (
 
 var ErrNoAccess = errors.New("no access")
 
-var repoPermFuncMap = map[string]func(client *gh.Client, repo *gh.Repository, access string) (Permission, error){
-	"actions":                        getActionsPermission,
-	"administration":                 getAdministrationPermission,
-	"code_scanning_alerts":           getCodeScanningAlertsPermission,
-	"codespaces":                     getCodespacesPermission,
-	"codespaces_lifecycle_admin":     notImplementedRepoPerm, // ToDo: Implement. Docs make this look org-wide...not repo-based?
-	"codespaces_metadata":            getCodespacesMetadataPermission,
-	"codespaces_secrets":             getCodespacesSecretsPermission,
-	"commit_statuses":                getCommitStatusesPermission,
-	"contents":                       getContentsPermission,
-	"custom_properties":              notImplementedRepoPerm, // ToDo: Only supports orgs. Implement once have an org token.
-	"dependabot_alerts":              getDependabotAlertsPermission,
-	"dependabot_secrets":             getDependabotSecretsPermission,
-	"deployments":                    getDeploymentsPermission,
-	"environments":                   getEnvironmentsPermission,
-	"issues":                         getIssuesPermission,
-	"merge_queues":                   notImplementedRepoPerm, // Skipped until API better documented
-	"metadata":                       getMetadataPermission,
-	"pages":                          getPagesPermission,
-	"pull_requests":                  getPullRequestsPermission,
-	"repository_security_advisories": getRepoSecurityPermission,
-	"secret_scanning_alerts":         getSecretScanningPermission,
-	"secrets":                        getSecretsPermission,
-	"variables":                      getVariablesPermission,
-	"webhooks":                       getWebhooksPermission,
-	"workflows":                      notImplementedRepoPerm, // ToDo: Skipped b/c would require us to create a release (High Risk function)
+var repoPermFuncMap = []func(client *gh.Client, repo *gh.Repository, access string) (Permission, error){
+	getActionsPermission,
+	getAdministrationPermission,
+	getCodeScanningAlertsPermission,
+	getCodespacesPermission,
+	notImplementedRepoPerm, // ToDo: Implement. Docs make this look org-wide...not repo-based?
+	getCodespacesMetadataPermission,
+	getCodespacesSecretsPermission,
+	getCommitStatusesPermission,
+	getContentsPermission,
+	notImplementedRepoPerm, // ToDo: Only supports orgs. Implement once have an org token.
+	getDependabotAlertsPermission,
+	getDependabotSecretsPermission,
+	getDeploymentsPermission,
+	getEnvironmentsPermission,
+	getIssuesPermission,
+	notImplementedRepoPerm, // Skipped until API better documented
+	getMetadataPermission,
+	getPagesPermission,
+	getPullRequestsPermission,
+	getRepoSecurityPermission,
+	getSecretScanningPermission,
+	getSecretsPermission,
+	getVariablesPermission,
+	getWebhooksPermission,
+	notImplementedRepoPerm, // ToDo: Skipped b/c would require us to create a release (High Risk function)
 }
 
-var acctPermFuncMap = map[string]func(client *gh.Client, user *gh.User) (Permission, error){
-	"block_another_user":     getBlockUserPermission,
-	"codespace_user_secrets": getCodespacesUserPermission,
-	"email_addresses":        getEmailPermission,
-	"followers":              getFollowersPermission,
-	"gpg_keys":               getGPGKeysPermission,
-	"gists":                  getGistsPermission,
-	"git_ssh_keys":           getGitKeysPermission,
-	"interaction_limits":     getLimitsPermission,
-	"plan":                   getPlanPermission,
-	"private_invitations":    notImplementedAcctPerm, // Skipped until API better documented
-	"profile":                getProfilePermission,
-	"ssh_signing_keys":       getSigningKeysPermission,
-	"starring":               getStarringPermission,
-	"watching":               getWatchingPermission,
+var acctPermFuncMap = []func(client *gh.Client, user *gh.User) (Permission, error){
+	getBlockUserPermission,
+	getCodespacesUserPermission,
+	getEmailPermission,
+	getFollowersPermission,
+	getGPGKeysPermission,
+	getGistsPermission,
+	getGitKeysPermission,
+	getLimitsPermission,
+	getPlanPermission,
+	notImplementedAcctPerm, // Skipped until API better documented
+	getProfilePermission,
+	getSigningKeysPermission,
+	getStarringPermission,
+	getWatchingPermission,
 }
 
 // Define your custom formatter function
@@ -930,15 +930,20 @@ func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess
 // This function is needed b/c in some cases a token could have permissions that are only enabled on specific repos.
 // If we only checked one repo, we wouldn't be able to tell if the token has access to a specific permission type.
 // Ex: "Code scanning alerts" must be enabled to tell if we have that permission.
-func analyzeRepositoryPermissions(client *gh.Client, repos []*gh.Repository, permissionType string) Permission {
-	var access Permission
+func analyzeRepositoryPermissions(client *gh.Client, repos []*gh.Repository) ([]Permission, error) {
+	perms := []Permission{}
 	for _, repo := range repos {
-		access, _ = repoPermFuncMap[permissionType](client, repo, "")
-		if access != NoAccess {
-			return access
+		for _, permFunc := range repoPermFuncMap {
+			access, err := permFunc(client, repo, "")
+			if err != nil {
+				return nil, err
+			}
+			if access != NoAccess {
+				perms = append(perms, access)
+			}
 		}
 	}
-	return access
+	return perms, nil
 }
 
 func getBlockUserPermission(client *gh.Client, user *gh.User) (Permission, error) {
@@ -1254,14 +1259,17 @@ func getWatchingPermission(client *gh.Client, user *gh.User) (Permission, error)
 	return WatchingRead, nil
 }
 
-func analyzeUserPermissions(client *gh.Client, user *gh.User, permissionType string) (Permission, error) {
-	var access Permission
-	var err error
-	access, err = acctPermFuncMap[permissionType](client, user)
-	if err != nil {
-		return NoAccess, err
+func analyzeUserPermissions(client *gh.Client, user *gh.User) ([]Permission, error) {
+	perms := []Permission{}
+	for _, permFunc := range acctPermFuncMap {
+		access, err := permFunc(client, user)
+		if err != nil {
+			return nil, err
+		}
+		perms = append(perms, access)
 	}
-	return access, nil
+
+	return perms, nil
 }
 
 func AnalyzeFineGrainedToken(client *gh.Client, meta *common.TokenMetadata, shallowCheck bool) (*common.SecretInfo, error) {
@@ -1276,24 +1284,31 @@ func AnalyzeFineGrainedToken(client *gh.Client, meta *common.TokenMetadata, shal
 	}
 	accessibleRepos := make([]*gh.Repository, 0)
 	for _, repo := range allRepos {
-		if analyzeRepositoryPermissions(client, []*gh.Repository{repo}, "Metadata") != NoAccess {
+		perm, err := getMetadataPermission(client, repo, "")
+		if err != nil {
+			return nil, err
+		}
+		if perm != NoAccess {
 			accessibleRepos = append(accessibleRepos, repo)
 		}
 	}
 
-	repoAccessMap := make(map[string]Permission)
-	userAccessMap := make(map[string]Permission)
+	repoAccessMap := []Permission{}
+	userAccessMap := []Permission{}
 
 	if !shallowCheck {
 		// Check our access
-		for key := range repoPermFuncMap {
-			repoAccessMap[key] = analyzeRepositoryPermissions(client, accessibleRepos, key)
+		perms, err := analyzeRepositoryPermissions(client, accessibleRepos)
+		if err != nil {
+			return nil, err
 		}
+		repoAccessMap = append(repoAccessMap, perms...)
 
-		// Analyze Account's Permissions
-		for key := range acctPermFuncMap {
-			userAccessMap[key], _ = analyzeUserPermissions(client, meta.User, key)
+		perms, err = analyzeUserPermissions(client, meta.User)
+		if err != nil {
+			return nil, err
 		}
+		userAccessMap = append(userAccessMap, perms...)
 	}
 
 	return &common.SecretInfo{
