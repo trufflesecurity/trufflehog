@@ -32,25 +32,25 @@ const (
 )
 
 var (
-    permissionStrings = map[Permission]string{
+    PermissionStrings = map[Permission]string{
 {{- range $index, $permission := .Permissions }}
         {{ ToCamelCase $permission }}: "{{ $permission }}",
 {{- end }}
     }
 
-    stringToPermission = map[string]Permission{
+    StringToPermission = map[string]Permission{
 {{- range $index, $permission := .Permissions }}
         "{{ $permission }}": {{ ToCamelCase $permission }},
 {{- end }}
     }
 
-    permissionIDs = map[Permission]int{
+    PermissionIDs = map[Permission]int{
 {{- range $index, $permission := .Permissions }}
         {{ ToCamelCase $permission }}: {{ $index }},
 {{- end }}
     }
 
-    idToPermission = map[int]Permission{
+    IdToPermission = map[int]Permission{
 {{- range $index, $permission := .Permissions }}
         {{ $index }}: {{ ToCamelCase $permission }},
 {{- end }}
@@ -59,7 +59,7 @@ var (
 
 // ToString converts a Permission enum to its string representation
 func (p Permission) ToString() (string, error) {
-    if str, ok := permissionStrings[p]; ok {
+    if str, ok := PermissionStrings[p]; ok {
         return str, nil
     }
     return "", errors.New("invalid permission")
@@ -67,7 +67,7 @@ func (p Permission) ToString() (string, error) {
 
 // ToID converts a Permission enum to its ID
 func (p Permission) ToID() (int, error) {
-    if id, ok := permissionIDs[p]; ok {
+    if id, ok := PermissionIDs[p]; ok {
         return id, nil
     }
     return 0, errors.New("invalid permission")
@@ -75,7 +75,7 @@ func (p Permission) ToID() (int, error) {
 
 // PermissionFromString converts a string representation to its Permission enum
 func PermissionFromString(s string) (Permission, error) {
-    if p, ok := stringToPermission[s]; ok {
+    if p, ok := StringToPermission[s]; ok {
         return p, nil
     }
     return 0, errors.New("invalid permission string")
@@ -83,7 +83,7 @@ func PermissionFromString(s string) (Permission, error) {
 
 // PermissionFromID converts an ID to its Permission enum
 func PermissionFromID(id int) (Permission, error) {
-    if p, ok := idToPermission[id]; ok {
+    if p, ok := IdToPermission[id]; ok {
         return p, nil
     }
     return 0, errors.New("invalid permission ID")

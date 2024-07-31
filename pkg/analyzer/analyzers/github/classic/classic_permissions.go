@@ -58,7 +58,7 @@ const (
 )
 
 var (
-    permissionStrings = map[Permission]string{
+    PermissionStrings = map[Permission]string{
         Repo: "repo",
         RepoStatus: "repo:status",
         RepoDeployment: "repo_deployment",
@@ -109,7 +109,7 @@ var (
         ReadSshSigningKey: "read:ssh_signing_key",
     }
 
-    stringToPermission = map[string]Permission{
+    StringToPermission = map[string]Permission{
         "repo": Repo,
         "repo:status": RepoStatus,
         "repo_deployment": RepoDeployment,
@@ -160,7 +160,7 @@ var (
         "read:ssh_signing_key": ReadSshSigningKey,
     }
 
-    permissionIDs = map[Permission]int{
+    PermissionIDs = map[Permission]int{
         Repo: 0,
         RepoStatus: 1,
         RepoDeployment: 2,
@@ -211,7 +211,7 @@ var (
         ReadSshSigningKey: 47,
     }
 
-    idToPermission = map[int]Permission{
+    IdToPermission = map[int]Permission{
         0: Repo,
         1: RepoStatus,
         2: RepoDeployment,
@@ -265,7 +265,7 @@ var (
 
 // ToString converts a Permission enum to its string representation
 func (p Permission) ToString() (string, error) {
-    if str, ok := permissionStrings[p]; ok {
+    if str, ok := PermissionStrings[p]; ok {
         return str, nil
     }
     return "", errors.New("invalid permission")
@@ -273,7 +273,7 @@ func (p Permission) ToString() (string, error) {
 
 // ToID converts a Permission enum to its ID
 func (p Permission) ToID() (int, error) {
-    if id, ok := permissionIDs[p]; ok {
+    if id, ok := PermissionIDs[p]; ok {
         return id, nil
     }
     return 0, errors.New("invalid permission")
@@ -281,7 +281,7 @@ func (p Permission) ToID() (int, error) {
 
 // PermissionFromString converts a string representation to its Permission enum
 func PermissionFromString(s string) (Permission, error) {
-    if p, ok := stringToPermission[s]; ok {
+    if p, ok := StringToPermission[s]; ok {
         return p, nil
     }
     return 0, errors.New("invalid permission string")
@@ -289,7 +289,7 @@ func PermissionFromString(s string) (Permission, error) {
 
 // PermissionFromID converts an ID to its Permission enum
 func PermissionFromID(id int) (Permission, error) {
-    if p, ok := idToPermission[id]; ok {
+    if p, ok := IdToPermission[id]; ok {
         return p, nil
     }
     return 0, errors.New("invalid permission ID")
