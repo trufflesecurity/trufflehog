@@ -311,7 +311,6 @@ func init() {
 }
 
 func main() {
-
 	// setup logger
 	logFormat := log.WithConsoleSink
 	if *jsonOut {
