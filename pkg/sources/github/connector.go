@@ -13,7 +13,6 @@ import (
 type connector interface {
 	ApiClient() *github.Client
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
-	Enumerate(ctx context.Context) error
 	HttpClient() *http.Client
 	IsGithubEnterprise() bool
 	InstallationClient() *github.Client
@@ -27,13 +26,13 @@ func newConnector(source *Source) (connector, error) {
 
 	switch cred := source.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_GithubApp:
-		return newAppConnector(apiEndpoint, cred.GithubApp, source.enumerateWithApp)
+		return newAppConnector(apiEndpoint, cred.GithubApp)
 	case *sourcespb.GitHub_BasicAuth:
-		return newBasicAuthConnector(apiEndpoint, cred.BasicAuth, source.enumerateBasicAuth)
+		return newBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
-		return newTokenConnector(apiEndpoint, cred.Token, source.handleRateLimit, source.enumerateWithToken)
+		return newTokenConnector(apiEndpoint, cred.Token, source.handleRateLimit)
 	case *sourcespb.GitHub_Unauthenticated:
-		return newUnauthenticatedConnector(apiEndpoint, source.enumerateUnauthenticated)
+		return newUnauthenticatedConnector(apiEndpoint)
 	default:
 		return nil, fmt.Errorf("unknown connection type")
 	}

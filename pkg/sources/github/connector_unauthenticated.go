@@ -13,14 +13,11 @@ import (
 type unauthenticatedConnector struct {
 	httpClient *http.Client
 	apiClient  *github.Client
-	enumerate  func(ctx context.Context)
 }
 
 var _ connector = (*unauthenticatedConnector)(nil)
 
-func newUnauthenticatedConnector(
-	apiEndpoint string,
-	enumerate func(ctx context.Context)) (*unauthenticatedConnector, error) {
+func newUnauthenticatedConnector(apiEndpoint string) (*unauthenticatedConnector, error) {
 
 	httpClient := common.RetryableHTTPClientTimeout(60)
 	apiClient, err := createGitHubClient(httpClient, apiEndpoint)
@@ -30,31 +27,25 @@ func newUnauthenticatedConnector(
 	return &unauthenticatedConnector{
 		httpClient: httpClient,
 		apiClient:  apiClient,
-		enumerate:  enumerate,
 	}, nil
 }
 
-func (c unauthenticatedConnector) ApiClient() *github.Client {
+func (c *unauthenticatedConnector) ApiClient() *github.Client {
 	return c.apiClient
 }
 
-func (c unauthenticatedConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
+func (c *unauthenticatedConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
 	return git.CloneRepoUsingUnauthenticated(ctx, repoURL)
 }
 
-func (c unauthenticatedConnector) Enumerate(ctx context.Context) error {
-	c.enumerate(ctx)
-	return nil
-}
-
-func (c unauthenticatedConnector) IsGithubEnterprise() bool {
+func (c *unauthenticatedConnector) IsGithubEnterprise() bool {
 	return false
 }
 
-func (c unauthenticatedConnector) HttpClient() *http.Client {
+func (c *unauthenticatedConnector) HttpClient() *http.Client {
 	return c.httpClient
 }
 
-func (c unauthenticatedConnector) InstallationClient() *github.Client {
+func (c *unauthenticatedConnector) InstallationClient() *github.Client {
 	return nil
 }

@@ -355,8 +355,24 @@ func (s *Source) enumerate(ctx context.Context) error {
 	//	// TODO: move this error to Init
 	//	return nil, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	//}
-	if err := s.connector.Enumerate(ctx); err != nil {
-		return err
+	//if err := s.connector.Enumerate(ctx); err != nil {
+	//	return err
+	//}
+	switch s.connector.(type) {
+	case *appConnector:
+		if err := s.enumerateWithApp(ctx); err != nil {
+			return err
+		}
+	case *basicAuthConnector:
+		if err := s.enumerateBasicAuth(ctx); err != nil {
+			return err
+		}
+	case *tokenConnector:
+		if err := s.enumerateWithToken(ctx); err != nil {
+			return err
+		}
+	case *unauthenticatedConnector:
+		s.enumerateUnauthenticated(ctx)
 	}
 
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
