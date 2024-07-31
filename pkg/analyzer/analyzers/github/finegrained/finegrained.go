@@ -1,7 +1,10 @@
-package github
+//go:generate generate_permissions finegrained.yaml finegrained_permissions.go finegrained
+
+package finegrained
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -12,6 +15,8 @@ import (
 	"github.com/fatih/color"
 	gh "github.com/google/go-github/v63/github"
 	"github.com/jedib0t/go-pretty/v6/table"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
@@ -21,161 +26,123 @@ const (
 	RANDOM_USERNAME = "d" + "ummy" + "acco" + "untgh" + "2024"
 	RANDOM_REPO     = "te" + "st"
 	RANDOM_INTEGER  = 4294967289
-
-	// Permissions
-	NO_ACCESS       = "No access"
-	READ_ONLY       = "Read-only"
-	READ_WRITE      = "Read and write"
-	ERROR           = "Error"
-	UNKNOWN         = "Unknown"
-	NOT_IMPLEMENTED = "Not implemented"
-
-	// Repo Permission Types
-	ACTIONS              = "Actions"
-	ADMINISTRATION       = "Administration"
-	CODE_SCANNING_ALERTS = "Code scanning alerts"
-	CODESPACES           = "Codespaces"
-	CODESPACES_LIFECYCLE = "Codespaces lifecycle admin"
-	CODESPACES_METADATA  = "Codespaces metadata"
-	CODESPACES_SECRETS   = "Codespaces secrets"
-	COMMIT_STATUSES      = "Commit statuses"
-	CONTENTS             = "Contents"
-	CUSTOM_PROPERTIES    = "Custom properties"
-	DEPENDABOT_ALERTS    = "Dependabot alerts"
-	DEPENDABOT_SECRETS   = "Dependabot secrets"
-	DEPLOYMENTS          = "Deployments"
-	ENVIRONMENTS         = "Environments" // Note: Addt'l permissions are not required (despite documentation).
-	ISSUES               = "Issues"
-	MERGE_QUEUES         = "Merge queues"
-	METADATA             = "Metadata"
-	PAGES                = "Pages"
-	PULL_REQUESTS        = "Pull requests"
-	REPO_SECURITY        = "Repository security advisories"
-	SECRET_SCANNING      = "Secret scanning alerts"
-	SECRETS              = "Secrets"
-	VARIABLES            = "Variables"
-	WEBHOOKS             = "Webhooks"
-	WORKFLOWS            = "Workflows"
-
-	// Account Permission Types
-	BLOCK_USER             = "Block another user"
-	CODESPACE_USER_SECRETS = "Codespace user secrets"
-	EMAIL                  = "Email Addresses"
-	FOLLOWERS              = "Followers"
-	GPG_KEYS               = "GPG Keys"
-	GISTS                  = "Gists"
-	GIT_KEYS               = "Git SSH keys"
-	LIMITS                 = "Interaction limits"
-	PLAN                   = "Plan"
-	PRIVATE_INVITES        = "Private invitations"
-	PROFILE                = "Profile"
-	SIGNING_KEYS           = "SSH signing keys"
-	STARRING               = "Starring"
-	WATCHING               = "Watching"
 )
 
-var repoPermFuncMap = map[string]func(client *gh.Client, repo *gh.Repository, acess string) (string, error){
-	ACTIONS:              getActionsPermission,
-	ADMINISTRATION:       getAdministrationPermission,
-	CODE_SCANNING_ALERTS: getCodeScanningAlertsPermission,
-	CODESPACES:           getCodespacesPermission,
-	CODESPACES_LIFECYCLE: notImplemented, // ToDo: Implement. Docs make this look org-wide...not repo-based?
-	CODESPACES_METADATA:  getCodespacesMetadataPermission,
-	CODESPACES_SECRETS:   getCodespacesSecretsPermission,
-	COMMIT_STATUSES:      getCommitStatusesPermission,
-	CONTENTS:             getContentsPermission,
-	CUSTOM_PROPERTIES:    notImplemented, // ToDo: Only supports orgs. Implement once have an org token.
-	DEPENDABOT_ALERTS:    getDependabotAlertsPermission,
-	DEPENDABOT_SECRETS:   getDependabotSecretsPermission,
-	DEPLOYMENTS:          getDeploymentsPermission,
-	ENVIRONMENTS:         getEnvironmentsPermission,
-	ISSUES:               getIssuesPermission,
-	MERGE_QUEUES:         notImplemented, // Skipped until API better documented
-	METADATA:             getMetadataPermission,
-	PAGES:                getPagesPermission,
-	PULL_REQUESTS:        getPullRequestsPermission,
-	REPO_SECURITY:        getRepoSecurityPermission,
-	SECRET_SCANNING:      getSecretScanningPermission,
-	SECRETS:              getSecretsPermission,
-	VARIABLES:            getVariablesPermission,
-	WEBHOOKS:             getWebhooksPermission,
-	WORKFLOWS:            notImplemented, // ToDo: Skipped b/c would require us to create a release (High Risk function)
+var ErrNoAccess = errors.New("no access")
+
+var repoPermFuncMap = []func(client *gh.Client, repo *gh.Repository, access string) (Permission, error){
+	getActionsPermission,
+	getAdministrationPermission,
+	getCodeScanningAlertsPermission,
+	getCodespacesPermission,
+	notImplementedRepoPerm, // ToDo: Implement. Docs make this look org-wide...not repo-based?
+	getCodespacesMetadataPermission,
+	getCodespacesSecretsPermission,
+	getCommitStatusesPermission,
+	getContentsPermission,
+	notImplementedRepoPerm, // ToDo: Only supports orgs. Implement once have an org token.
+	getDependabotAlertsPermission,
+	getDependabotSecretsPermission,
+	getDeploymentsPermission,
+	getEnvironmentsPermission,
+	getIssuesPermission,
+	notImplementedRepoPerm, // Skipped until API better documented
+	getMetadataPermission,
+	getPagesPermission,
+	getPullRequestsPermission,
+	getRepoSecurityPermission,
+	getSecretScanningPermission,
+	getSecretsPermission,
+	getVariablesPermission,
+	getWebhooksPermission,
+	notImplementedRepoPerm, // ToDo: Skipped b/c would require us to create a release (High Risk function)
 }
 
-var acctPermFuncMap = map[string]func(client *gh.Client, user *gh.User) (string, error){
-	BLOCK_USER:             getBlockUserPermission,
-	CODESPACE_USER_SECRETS: getCodespacesUserPermission,
-	EMAIL:                  getEmailPermission,
-	FOLLOWERS:              getFollowersPermission,
-	GPG_KEYS:               getGPGKeysPermission,
-	GISTS:                  getGistsPermission,
-	GIT_KEYS:               getGitKeysPermission,
-	LIMITS:                 getLimitsPermission,
-	PLAN:                   getPlanPermission,
-	// PRIVATE_INVITES:        getPrivateInvitesPermission, // Skipped until API better documented
-	PROFILE:      getProfilePermission,
-	SIGNING_KEYS: getSigningKeysPermission,
-	STARRING:     getStarringPermission,
-	WATCHING:     getWatchingPermission,
+var acctPermFuncMap = []func(client *gh.Client, user *gh.User) (Permission, error){
+	getBlockUserPermission,
+	getCodespacesUserPermission,
+	getEmailPermission,
+	getFollowersPermission,
+	getGPGKeysPermission,
+	getGistsPermission,
+	getGitKeysPermission,
+	getLimitsPermission,
+	getPlanPermission,
+	notImplementedAcctPerm, // Skipped until API better documented
+	getProfilePermission,
+	getSigningKeysPermission,
+	getStarringPermission,
+	getWatchingPermission,
 }
 
 // Define your custom formatter function
 func permissionFormatter(key, val any) (string, string) {
-	if strVal, ok := val.(string); ok {
-		switch strVal {
-		case NO_ACCESS:
-			red := color.New(color.FgRed).SprintFunc()
-			return red(key), red(NO_ACCESS)
-		case READ_ONLY:
-			yellow := color.New(color.FgYellow).SprintFunc()
-			return yellow(key), yellow(READ_ONLY)
-		case READ_WRITE:
-			green := color.New(color.FgGreen).SprintFunc()
-			return green(key), green(READ_WRITE)
-		case UNKNOWN:
-			blue := color.New(color.FgBlue).SprintFunc()
-			return blue(key), blue(UNKNOWN)
-		case NOT_IMPLEMENTED:
-			blue := color.New(color.FgBlue).SprintFunc()
-			return blue(key), blue(NOT_IMPLEMENTED)
+	if perm, ok := val.(Permission); ok {
+		permStr, err := perm.ToString()
+		if err != nil {
+			log.Fatal(fmt.Errorf("Error converting permission to string: %v", err))
+		}
+		var permissionStr string
+		switch {
+		case strings.Contains(permStr, "read"):
+			permissionStr = "READ_ONLY"
+		case strings.Contains(permStr, "write"):
+			permissionStr = "READ_WRITE"
 		default:
-			red := color.New(color.FgRed).SprintFunc()
-			return red(key), red(ERROR)
+			permissionStr = "UNKNOWN"
+		}
+
+		switch permissionStr {
+		case "READ_ONLY":
+			yellow := color.New(color.FgYellow).SprintFunc()
+			return yellow(key), yellow(permissionStr)
+		case "READ_WRITE":
+			red := color.New(color.FgGreen).SprintFunc()
+			return red(key), red(permissionStr)
+		case "UNKNOWN":
+			blue := color.New(color.FgBlue).SprintFunc()
+			return blue(key), blue(permissionStr)
 		}
 	}
 	return fmt.Sprintf("%v", key), fmt.Sprintf("%v", val)
 }
 
-func notImplemented(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
-	return NOT_IMPLEMENTED, nil
+func notImplementedRepoPerm(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+	return NoAccess, ErrNoAccess
 }
 
-func getMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+// notImplementedAcctPerm is a placeholder function that returns a "NOT_IMPLEMENTED" status when a GitHub account permission is not yet implemented.
+func notImplementedAcctPerm(client *gh.Client, user *gh.User) (Permission, error) {
+	return NoAccess, ErrNoAccess
+}
+
+func getMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/collaborators
 	_, resp, err := client.Repositories.ListCollaborators(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 	if err != nil {
 		if resp.StatusCode == 403 {
-			return NO_ACCESS, nil
+			return NoAccess, ErrNoAccess
 		}
-		return ERROR, err
+		return NoAccess, err
 	}
 	// If no error, then we have read access
-	return READ_ONLY, nil
+
+	return MetadataRead, nil
 }
 
-func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// -> GET request to /repos/{owner}/{repo}/actions/artifacts
 		_, resp, err := client.Actions.ListArtifacts(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 		switch resp.StatusCode {
 		case 403:
-			return NO_ACCESS, nil
+			return NoAccess, ErrNoAccess
 		case 200:
 			break
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 
 		// Risk: Very, very low.
@@ -184,19 +151,19 @@ func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 		resp, err = client.Actions.CreateWorkflowDispatchEventByFileName(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, gh.CreateWorkflowDispatchEventRequest{})
 		switch resp.StatusCode {
 		case 403:
-			return READ_ONLY, nil
+			return ActionsRead, nil
 		case 404:
-			return READ_WRITE, nil
+			return ActionsWrite, nil
 		case 200:
 			log.Fatal("This shouldn't print. We are enabling a workflow based on a random string " + RANDOM_STRING + ", which most likely doesn't exist.")
-			return READ_WRITE, nil
+			return ActionsWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == UNKNOWN {
-			return UNKNOWN, nil
+		if currentAccess == "UNKNOWN" {
+			return NoAccess, ErrNoAccess
 		}
 		// Risk: Very, very low.
 		// -> Unless the user has a workflow file named (see RANDOM_STRING above), this will always return 404 for users with READ_WRITE permissions.
@@ -204,54 +171,56 @@ func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 		resp, err := client.Actions.CreateWorkflowDispatchEventByFileName(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, gh.CreateWorkflowDispatchEventRequest{})
 		switch resp.StatusCode {
 		case 403:
-			return UNKNOWN, nil
+			return NoAccess, ErrNoAccess
 		case 404:
-			return READ_WRITE, nil
+			return ActionsWrite, nil
 		case 200:
 			log.Fatal("This shouldn't print. We are enabling a workflow based on a random string " + RANDOM_STRING + ", which most likely doesn't exist.")
-			return READ_WRITE, nil
+			return ActionsWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	}
 }
 
-func getAdministrationPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+// Continue with the other functions using the same pattern...
+
+func getAdministrationPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/actions/permissions
 	_, resp, err := client.Repositories.GetActionsPermissions(context.Background(), *repo.Owner.Login, *repo.Name)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/rulesets/rule-suites
 	req, err := client.NewRequest("GET", "https://api.github.com/repos/"+*repo.Owner.Login+"/"+*repo.Name+"/rulesets/rule-suites", nil)
 	if err != nil {
-		return ERROR, err
+		return NoAccess, err
 	}
 	resp, err = client.Do(context.Background(), req, nil)
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return AdministrationRead, nil
 	case 200:
-		return READ_WRITE, nil
+		return AdministrationWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/code-scanning/alerts
 	_, resp, err := client.CodeScanning.ListAlertsForRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 	if err != nil {
-		return "", err
+		return NoAccess, err
 	}
 	defer resp.Body.Close()
 
@@ -262,18 +231,18 @@ func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, cur
 	body := string(bodyBytes)
 
 	if strings.Contains(body, "Code scanning is not enabled for this repository") {
-		return UNKNOWN, nil
+		return NoAccess, errors.New("code scanning is not enabled")
 	}
 
 	switch {
 	case resp.StatusCode == 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case resp.StatusCode == 404:
 		break
 	case resp.StatusCode >= 200 && resp.StatusCode <= 299:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Very Low
@@ -282,80 +251,80 @@ func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, cur
 	_, resp, err = client.CodeScanning.UpdateAlert(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_INTEGER, nil)
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return CodeScanningAlertsRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return CodeScanningAlertsWrite, nil
 	case 200:
 		log.Fatal("This should never happen. We are updating an alert with nil which should be an invalid request.")
-		return READ_WRITE, nil
+		return CodeScanningAlertsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getCodespacesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getCodespacesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /repos/{owner}/{repo}/codespaces
 	_, resp, err := client.Codespaces.ListInRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Extremely Low
 	// GET request to /repos/{owner}/{repo}/codespaces/permissions_check
 	req, err := client.NewRequest("GET", "https://api.github.com/repos/"+*repo.Owner.Login+"/"+*repo.Name+"/codespaces/permissions_check", nil)
 	if err != nil {
-		return ERROR, err
+		return NoAccess, err
 	}
 	resp, err = client.Do(context.Background(), req, nil)
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return CodespacesRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return CodespacesWrite, nil
 	case 200:
-		return READ_WRITE, nil
+		return CodespacesWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getCodespacesMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getCodespacesMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /repos/{owner}/{repo}/codespaces/machines
 	req, err := client.NewRequest("GET", "https://api.github.com/repos/"+*repo.Owner.Login+"/"+*repo.Name+"/codespaces/machines", nil)
 	if err != nil {
-		return ERROR, err
+		return NoAccess, err
 	}
 	resp, err := client.Do(context.Background(), req, nil)
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
-		return READ_ONLY, nil
+		return CodespacesMetadataRead, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getCodespacesSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getCodespacesSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /repos/{owner}/{repo}/codespaces/secrets for non-existent secret
 	_, resp, err := client.Codespaces.GetRepoSecret(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING)
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 404:
-		return READ_WRITE, nil
+		return CodespacesSecretsWrite, nil
 	case 200:
-		return READ_WRITE, nil
+		return CodespacesSecretsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
@@ -363,18 +332,18 @@ func getCodespacesSecretsPermission(client *gh.Client, repo *gh.Repository, curr
 // By default, we have read-only access to commit statuses for all public repos. If only public repos exist under
 // this key's permissions, then they best we can hope for us a READ_WRITE status or an UNKNOWN status.
 // If a private repo exists, then we can check for READ_ONLY, READ_WRITE and NO_ACCESS.
-func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// GET request to /repos/{owner}/{repo}/commits/{commit_sha}/statuses
 		_, resp, err := client.Repositories.ListStatuses(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, nil)
 		switch resp.StatusCode {
 		case 403:
-			return NO_ACCESS, nil
+			return NoAccess, ErrNoAccess
 		case 404:
 			break
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 		// At this point we have read access
 
@@ -384,16 +353,16 @@ func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, current
 		_, resp, err = client.Repositories.CreateStatus(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, &gh.RepoStatus{})
 		switch resp.StatusCode {
 		case 403:
-			return READ_ONLY, nil
+			return CommitStatusesRead, nil
 		case 422:
-			return READ_WRITE, nil
+			return CommitStatusesWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == UNKNOWN {
-			return UNKNOWN, nil
+		if currentAccess == "UNKNOWN" {
+			return NoAccess, ErrNoAccess
 		}
 		// Risk: Extremely Low
 		// -> We're POSTing a commit status to a commit that cannot exist. This should always return 422 if valid access.
@@ -402,11 +371,11 @@ func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, current
 		switch resp.StatusCode {
 		case 403:
 			// All we know is we don't have READ_WRITE
-			return UNKNOWN, nil
+			return NoAccess, ErrNoAccess
 		case 422:
-			return READ_WRITE, nil
+			return CommitStatusesWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	}
 }
@@ -415,20 +384,20 @@ func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, current
 // By default, we have read-only access to the contents of all public repos. If only public repos exist under
 // this key's permissions, then they best we can hope for us a READ_WRITE status or an UNKNOWN status.
 // If a private repo exists, then we can check for READ_ONLY, READ_WRITE and NO_ACCESS.
-func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// GET request to /repos/{owner}/{repo}/commits
 		_, resp, err := client.Repositories.ListCommits(context.Background(), *repo.Owner.Login, *repo.Name, &gh.CommitsListOptions{})
 		switch resp.StatusCode {
 		case 403:
-			return NO_ACCESS, nil
+			return NoAccess, ErrNoAccess
 		case 200:
 			break
 		case 409:
 			break
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 		// At this point we have read access
 
@@ -438,19 +407,19 @@ func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess
 		_, resp, err = client.Repositories.CreateFile(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, &gh.RepositoryContentFileOptions{})
 		switch resp.StatusCode {
 		case 403:
-			return READ_ONLY, nil
+			return ContentsRead, nil
 		case 200:
 			log.Fatal("This should never happen. We are creating a file with an invalid payload.")
-			return READ_WRITE, nil
+			return ContentsWrite, nil
 		case 400, 422:
-			return READ_WRITE, nil
+			return ContentsWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == UNKNOWN {
-			return UNKNOWN, nil
+		if currentAccess == "UNKNOWN" {
+			return NoAccess, ErrNoAccess
 		}
 		// Risk: Low-Medium
 		// -> We're creating a file with an invalid payload. Worst case is a file with a random string and no content is created. But this should never happen.
@@ -458,27 +427,19 @@ func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess
 		_, resp, err := client.Repositories.CreateFile(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, &gh.RepositoryContentFileOptions{})
 		switch resp.StatusCode {
 		case 403:
-			return UNKNOWN, nil
+			return NoAccess, ErrNoAccess
 		case 200:
 			log.Fatal("This should never happen. We are creating a file with an invalid payload.")
-			return READ_WRITE, nil
+			return ContentsWrite, nil
 		case 400, 422:
-			return READ_WRITE, nil
+			return ContentsWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	}
 }
 
-// func getCustomPropertiesPermission(client *gh.Client, owner, repo string, private bool) (string, error) {
-// 	// Look for the phrase "Custom properties only supported for organizations" in the response body
-// 	// If find, then we want to skip this repo.
-// 	// If all repos have that phrase, then we have to put "Unknown".
-//  // If we find a repo without that (an organization-owned repo), then we just check for NO_ACCESS and READ_WRITE?
-//  // I'd add in READ_ONLY, but the docs only show one `write` endpoint for this block.
-// }
-
-func getDependabotAlertsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getDependabotAlertsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/dependabot/alerts
 	_, resp, err := client.Dependabot.ListRepoAlerts(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListAlertsOptions{})
@@ -493,41 +454,41 @@ func getDependabotAlertsPermission(client *gh.Client, repo *gh.Repository, curre
 		body := string(bodyBytes)
 
 		if strings.Contains(body, "Dependabot alerts are disabled for this repository.") {
-			return UNKNOWN, nil
+			return NoAccess, errors.New("dependabot alerts are disabled")
 		}
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// PATCH /repos/{owner}/{repo}/dependabot/alerts/{alert_number}
 	_, resp, err = client.Dependabot.UpdateAlert(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_INTEGER, nil)
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return DependabotAlertsRead, nil
 	case 422, 404:
-		return READ_WRITE, nil
+		return DependabotAlertsWrite, nil
 	case 200:
 		log.Fatal("This should never happen. We are updating an alert with nil which should be an invalid request.")
-		return READ_WRITE, nil
+		return DependabotAlertsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getDependabotSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getDependabotSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/dependabot/secrets
 	_, resp, err := client.Dependabot.ListRepoSecrets(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Very Low
@@ -536,28 +497,28 @@ func getDependabotSecretsPermission(client *gh.Client, repo *gh.Repository, curr
 	resp, err = client.Dependabot.CreateOrUpdateRepoSecret(context.Background(), *repo.Owner.Login, *repo.Name, &gh.DependabotEncryptedSecret{Name: RANDOM_STRING})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return DependabotSecretsRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return DependabotSecretsWrite, nil
 	case 201, 204:
 		log.Fatal("This should never happen. We are creating a secret with an invalid payload.")
-		return READ_WRITE, nil
+		return DependabotSecretsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getDeploymentsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getDeploymentsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/deployments
 	_, resp, err := client.Repositories.ListDeployments(context.Background(), *repo.Owner.Login, *repo.Name, &gh.DeploymentsListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Very Low
@@ -566,27 +527,27 @@ func getDeploymentsPermission(client *gh.Client, repo *gh.Repository, currentAcc
 	_, resp, err = client.Repositories.CreateDeployment(context.Background(), *repo.Owner.Login, *repo.Name, &gh.DeploymentRequest{})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return DeploymentsRead, nil
 	case 409, 422:
-		return READ_WRITE, nil
+		return DeploymentsWrite, nil
 	case 201, 202:
 		log.Fatal("This should never happen. We are creating a deployment with an invalid payload.")
-		return READ_WRITE, nil
+		return DeploymentsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/environments
 	envResp, resp, _ := client.Repositories.ListEnvironments(context.Background(), *repo.Owner.Login, *repo.Name, &gh.EnvironmentListOptions{})
 	if resp.StatusCode != 200 {
-		return UNKNOWN, nil
+		return NoAccess, errors.New("unknown status code")
 	}
 	// If no environments exist, then we return UNKNOWN
 	if len(envResp.Environments) == 0 {
-		return UNKNOWN, nil
+		return NoAccess, errors.New("no environments found")
 	}
 
 	// Risk: Extremely Low
@@ -594,11 +555,11 @@ func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAc
 	_, resp, err := client.Actions.ListEnvVariables(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Very Low
@@ -607,18 +568,18 @@ func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAc
 	resp, err = client.Actions.UpdateEnvVariable(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ActionsVariable{Name: RANDOM_STRING})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return EnvironmentsRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return EnvironmentsWrite, nil
 	case 200:
 		log.Fatal("This should never happen. We are updating an environment variable with an invalid payload.")
-		return READ_WRITE, nil
+		return EnvironmentsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 
 	if *repo.Private {
 
@@ -627,11 +588,11 @@ func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess s
 		_, resp, err := client.Issues.ListByRepo(context.Background(), *repo.Owner.Login, *repo.Name, &gh.IssueListByRepoOptions{})
 		switch resp.StatusCode {
 		case 403:
-			return NO_ACCESS, nil
+			return NoAccess, ErrNoAccess
 		case 200, 301:
 			break
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 
 		// Risk: Very Low
@@ -640,19 +601,19 @@ func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess s
 		_, resp, err = client.Issues.EditLabel(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, &gh.Label{})
 		switch resp.StatusCode {
 		case 403:
-			return READ_ONLY, nil
+			return IssuesRead, nil
 		case 404:
-			return READ_WRITE, nil
+			return IssuesWrite, nil
 		case 200:
 			log.Fatal("This should never happen. We are editing a label with an invalid payload.")
-			return READ_WRITE, nil
+			return IssuesWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == UNKNOWN {
-			return UNKNOWN, nil
+		if currentAccess == "UNKNOWN" {
+			return NoAccess, ErrNoAccess
 		}
 		// Risk: Very Low
 		// -> We're editing an issue label that does not exist. Even if we did, the name would be (see RANDOM_STRING above).
@@ -660,30 +621,30 @@ func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess s
 		_, resp, err := client.Issues.EditLabel(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, &gh.Label{})
 		switch resp.StatusCode {
 		case 403:
-			return UNKNOWN, nil
+			return NoAccess, ErrNoAccess
 		case 404:
-			return READ_WRITE, nil
+			return IssuesWrite, nil
 		case 200:
 			log.Fatal("This should never happen. We are editing a label with an invalid payload.")
-			return READ_WRITE, nil
+			return IssuesWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	}
 }
 
-func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// GET /repos/{owner}/{repo}/pages
 		_, resp, err := client.Repositories.GetPagesInfo(context.Background(), *repo.Owner.Login, *repo.Name)
 		switch resp.StatusCode {
 		case 403:
-			return NO_ACCESS, nil
+			return NoAccess, ErrNoAccess
 		case 200, 404:
 			break
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 
 		// Risk: Very Low
@@ -691,59 +652,59 @@ func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess st
 		// POST /repos/{owner}/{repo}/pages/deployments/{deployment_id}/cancel
 		req, err := client.NewRequest("POST", "https://api.github.com/repos/"+*repo.Owner.Login+"/"+*repo.Name+"/pages/deployments/"+RANDOM_STRING+"/cancel", nil)
 		if err != nil {
-			return ERROR, err
+			return NoAccess, err
 		}
 		resp, err = client.Do(context.Background(), req, nil)
 		switch resp.StatusCode {
 		case 403:
-			return READ_ONLY, nil
+			return PagesRead, nil
 		case 404:
-			return READ_WRITE, nil
+			return PagesWrite, nil
 		case 200:
 			log.Fatal("This should never happen. We are cancelling a deployment with an invalid ID.")
-			return READ_WRITE, nil
+			return PagesWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == UNKNOWN {
-			return UNKNOWN, nil
+		if currentAccess == "UNKNOWN" {
+			return NoAccess, ErrNoAccess
 		}
 		// Risk: Very Low
 		// -> We're cancelling a GitHub Pages deployment that does not exist (see RANDOM_STRING above).
 		// POST /repos/{owner}/{repo}/pages/deployments/{deployment_id}/cancel
 		req, err := client.NewRequest("POST", "https://api.github.com/repos/"+*repo.Owner.Login+"/"+*repo.Name+"/pages/deployments/"+RANDOM_STRING+"/cancel", nil)
 		if err != nil {
-			return ERROR, err
+			return NoAccess, err
 		}
 		resp, err := client.Do(context.Background(), req, nil)
 		switch resp.StatusCode {
 		case 403:
-			return UNKNOWN, nil
+			return NoAccess, ErrNoAccess
 		case 404:
-			return READ_WRITE, nil
+			return PagesWrite, nil
 		case 200:
 			log.Fatal("This should never happen. We are cancelling a deployment with an invalid ID.")
-			return READ_WRITE, nil
+			return PagesWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	}
 }
 
-func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// GET /repos/{owner}/{repo}/pulls
 		_, resp, err := client.PullRequests.List(context.Background(), *repo.Owner.Login, *repo.Name, &gh.PullRequestListOptions{})
 		switch resp.StatusCode {
 		case 403:
-			return NO_ACCESS, nil
+			return NoAccess, ErrNoAccess
 		case 200:
 			break
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 
 		// Risk: Very Low
@@ -752,19 +713,19 @@ func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAc
 		_, resp, err = client.PullRequests.Create(context.Background(), *repo.Owner.Login, *repo.Name, &gh.NewPullRequest{})
 		switch resp.StatusCode {
 		case 403:
-			return READ_ONLY, nil
+			return PullRequestsRead, nil
 		case 422:
-			return READ_WRITE, nil
+			return PullRequestsWrite, nil
 		case 200:
 			log.Fatal("This should never happen. We are creating a pull request with an invalid payload.")
-			return READ_WRITE, nil
+			return PullRequestsWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == UNKNOWN {
-			return UNKNOWN, nil
+		if currentAccess == "UNKNOWN" {
+			return NoAccess, ErrNoAccess
 		}
 		// Risk: Very Low
 		// -> We're creating a pull request with an invalid payload.
@@ -772,19 +733,19 @@ func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAc
 		_, resp, err := client.PullRequests.Create(context.Background(), *repo.Owner.Login, *repo.Name, &gh.NewPullRequest{})
 		switch resp.StatusCode {
 		case 403:
-			return UNKNOWN, nil
+			return NoAccess, ErrNoAccess
 		case 422:
-			return READ_WRITE, nil
+			return PullRequestsWrite, nil
 		case 200:
 			log.Fatal("This should never happen. We are creating a pull request with an invalid payload.")
-			return READ_WRITE, nil
+			return PullRequestsWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	}
 }
 
-func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 
 	if *repo.Private {
 		// Risk: Extremely Low
@@ -792,11 +753,11 @@ func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAc
 		_, resp, err := client.SecurityAdvisories.ListRepositorySecurityAdvisories(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 		switch resp.StatusCode {
 		case 403, 404:
-			return NO_ACCESS, nil
+			return NoAccess, ErrNoAccess
 		case 200:
 			break
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 
 		// Risk: Very Low
@@ -804,58 +765,58 @@ func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAc
 		// POST /repos/{owner}/{repo}/security-advisories
 		req, err := client.NewRequest("POST", "https://api.github.com/repos/"+*repo.Owner.Login+"/"+*repo.Name+"/security-advisories", nil)
 		if err != nil {
-			return ERROR, err
+			return NoAccess, err
 		}
 		resp, err = client.Do(context.Background(), req, nil)
 		switch resp.StatusCode {
 		case 403:
-			return READ_ONLY, nil
+			return RepoSecurityRead, nil
 		case 422:
-			return READ_WRITE, nil
+			return RepoSecurityWrite, nil
 		case 200:
 			log.Fatal("This should never happen. We are creating a security advisory with an invalid payload.")
-			return READ_WRITE, nil
+			return RepoSecurityWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == UNKNOWN {
-			return UNKNOWN, nil
+		if currentAccess == "UNKNOWN" {
+			return NoAccess, ErrNoAccess
 		}
 		// Risk: Very Low
 		// -> We're creating a security advisory with an invalid payload.
 		// POST /repos/{owner}/{repo}/security-advisories
 		req, err := client.NewRequest("POST", "https://api.github.com/repos/"+*repo.Owner.Login+"/"+*repo.Name+"/security-advisories", nil)
 		if err != nil {
-			return ERROR, err
+			return NoAccess, err
 		}
 		resp, err := client.Do(context.Background(), req, nil)
 		switch resp.StatusCode {
 		case 403:
-			return UNKNOWN, nil
+			return NoAccess, ErrNoAccess
 		case 422:
-			return READ_WRITE, nil
+			return RepoSecurityWrite, nil
 		case 200:
 			log.Fatal("This should never happen. We are creating a security advisory with an invalid payload.")
-			return READ_WRITE, nil
+			return RepoSecurityWrite, nil
 		default:
-			return ERROR, err
+			return NoAccess, err
 		}
 	}
 }
 
-func getSecretScanningPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getSecretScanningPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/secret-scanning/alerts
 	_, resp, err := client.SecretScanning.ListAlertsForRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200, 404:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Very Low
@@ -864,28 +825,28 @@ func getSecretScanningPermission(client *gh.Client, repo *gh.Repository, current
 	_, resp, err = client.SecretScanning.UpdateAlert(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_INTEGER, &gh.SecretScanningAlertUpdateOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return SecretScanningRead, nil
 	case 404, 422:
-		return READ_WRITE, nil
+		return SecretScanningWrite, nil
 	case 200:
 		log.Fatal("This should never happen. We are updating a secret scanning alert that doesn't exist.")
-		return READ_WRITE, nil
+		return SecretScanningWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/actions/secrets
 	_, resp, err := client.Actions.ListRepoSecrets(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Very Low
@@ -894,28 +855,28 @@ func getSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 	resp, err = client.Actions.CreateOrUpdateRepoSecret(context.Background(), *repo.Owner.Login, *repo.Name, &gh.EncryptedSecret{Name: RANDOM_STRING})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return SecretsRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return SecretsWrite, nil
 	case 201, 204:
 		log.Fatal("This should never happen. We are creating a secret with an invalid payload.")
-		return READ_WRITE, nil
+		return SecretsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getVariablesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getVariablesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/actions/variables
 	_, resp, err := client.Actions.ListRepoVariables(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Very Low
@@ -924,28 +885,28 @@ func getVariablesPermission(client *gh.Client, repo *gh.Repository, currentAcces
 	resp, err = client.Actions.UpdateRepoVariable(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ActionsVariable{Name: RANDOM_STRING})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return VariablesRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return VariablesWrite, nil
 	case 201, 204:
 		log.Fatal("This should never happen. We are patching a variable with an invalid payload and no name.")
-		return READ_WRITE, nil
+		return VariablesWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (string, error) {
+func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/hooks
 	_, resp, err := client.Repositories.ListHooks(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Very Low
@@ -954,14 +915,14 @@ func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess
 	_, resp, err = client.Repositories.EditHook(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_INTEGER, &gh.Hook{})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return WebhooksRead, nil
 	case 404:
-		return READ_WRITE, nil
+		return WebhooksWrite, nil
 	case 200:
 		log.Fatal("This should never happen. We are updating a webhook with an invalid payload.")
-		return READ_WRITE, nil
+		return WebhooksWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
@@ -969,28 +930,33 @@ func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess
 // This function is needed b/c in some cases a token could have permissions that are only enabled on specific repos.
 // If we only checked one repo, we wouldn't be able to tell if the token has access to a specific permission type.
 // Ex: "Code scanning alerts" must be enabled to tell if we have that permission.
-func analyzeRepositoryPermissions(client *gh.Client, repos []*gh.Repository, permissionType string) string {
-	access := ""
+func analyzeRepositoryPermissions(client *gh.Client, repos []*gh.Repository) ([]Permission, error) {
+	perms := []Permission{}
 	for _, repo := range repos {
-		access, _ = repoPermFuncMap[permissionType](client, repo, access)
-		if access != UNKNOWN && access != ERROR {
-			return access
+		for _, permFunc := range repoPermFuncMap {
+			access, err := permFunc(client, repo, "")
+			if err != nil {
+				return nil, err
+			}
+			if access != NoAccess {
+				perms = append(perms, access)
+			}
 		}
 	}
-	return access
+	return perms, nil
 }
 
-func getBlockUserPermission(client *gh.Client, user *gh.User) (string, error) {
+func getBlockUserPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Extremely Low
 	// -> GET request to /user/blocks
 	_, resp, err := client.Users.ListBlockedUsers(context.Background(), nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Extremely Low
@@ -999,28 +965,28 @@ func getBlockUserPermission(client *gh.Client, user *gh.User) (string, error) {
 	resp, err = client.Users.BlockUser(context.Background(), RANDOM_STRING)
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return BlockUserRead, nil
 	case 404:
-		return READ_WRITE, nil
+		return BlockUserWrite, nil
 	case 204:
 		log.Fatal("This should never happen. We are blocking a user that doesn't exist.")
-		return READ_WRITE, nil
+		return BlockUserWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getCodespacesUserPermission(client *gh.Client, user *gh.User) (string, error) {
+func getCodespacesUserPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /user/codespaces/secrets
 	_, resp, err := client.Codespaces.ListUserSecrets(context.Background(), nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Low
@@ -1029,28 +995,28 @@ func getCodespacesUserPermission(client *gh.Client, user *gh.User) (string, erro
 	resp, err = client.Codespaces.CreateOrUpdateUserSecret(context.Background(), &gh.EncryptedSecret{Name: RANDOM_STRING})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return CodespaceUserSecretsRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return CodespaceUserSecretsWrite, nil
 	case 201, 204:
 		log.Fatal("This should never happen. We are creating a user secret with an invalid payload.")
-		return READ_WRITE, nil
+		return CodespaceUserSecretsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getEmailPermission(client *gh.Client, user *gh.User) (string, error) {
+func getEmailPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /user/emails
 	_, resp, err := client.Users.ListEmails(context.Background(), nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Low
@@ -1058,28 +1024,28 @@ func getEmailPermission(client *gh.Client, user *gh.User) (string, error) {
 	_, resp, err = client.Users.SetEmailVisibility(context.Background(), RANDOM_STRING)
 	switch resp.StatusCode {
 	case 403, 404:
-		return READ_ONLY, nil
+		return EmailRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return EmailWrite, nil
 	case 201:
 		log.Fatal("This should never happen. We are setting email visibility with an invalid payload.")
-		return READ_WRITE, nil
+		return EmailWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getFollowersPermission(client *gh.Client, user *gh.User) (string, error) {
+func getFollowersPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /user/followers
 	_, resp, err := client.Users.ListFollowers(context.Background(), "", nil)
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Low - Medium
@@ -1090,25 +1056,25 @@ func getFollowersPermission(client *gh.Client, user *gh.User) (string, error) {
 	resp, err = client.Users.Unfollow(context.Background(), RANDOM_USERNAME)
 	switch resp.StatusCode {
 	case 403, 404:
-		return READ_ONLY, nil
+		return FollowersRead, nil
 	case 204:
-		return READ_WRITE, nil
+		return FollowersWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getGPGKeysPermission(client *gh.Client, user *gh.User) (string, error) {
+func getGPGKeysPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /user/gpg_keys
 	_, resp, err := client.Users.ListGPGKeys(context.Background(), "", nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Low - Medium
@@ -1117,46 +1083,46 @@ func getGPGKeysPermission(client *gh.Client, user *gh.User) (string, error) {
 	_, resp, err = client.Users.CreateGPGKey(context.Background(), RANDOM_STRING)
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return GpgKeysRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return GpgKeysWrite, nil
 	case 200, 201, 204:
 		log.Fatal("This should never happen. We are creating a GPG key with an invalid payload.")
-		return READ_WRITE, nil
+		return GpgKeysWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getGistsPermission(client *gh.Client, user *gh.User) (string, error) {
+func getGistsPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Low - Medium
 	// POST request to /gists
 	// Payload is invalid, so it shouldn't actually post.
 	_, resp, err := client.Gists.Create(context.Background(), &gh.Gist{})
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 422:
-		return READ_WRITE, nil
+		return GistsWrite, nil
 	case 200, 201, 204:
 		log.Fatal("This should never happen. We are creating a Gist with an invalid payload.")
-		return READ_WRITE, nil
+		return GistsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getGitKeysPermission(client *gh.Client, user *gh.User) (string, error) {
+func getGitKeysPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /user/keys
 	_, resp, err := client.Users.ListKeys(context.Background(), "", nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Low - Medium
@@ -1165,32 +1131,32 @@ func getGitKeysPermission(client *gh.Client, user *gh.User) (string, error) {
 	_, resp, err = client.Users.CreateKey(context.Background(), &gh.Key{})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return GitKeysRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return GitKeysWrite, nil
 	case 200, 201, 204:
 		log.Fatal("This should never happen. We are creating a key with an invalid payload.")
-		return READ_WRITE, nil
+		return GitKeysWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getLimitsPermission(client *gh.Client, user *gh.User) (string, error) {
+func getLimitsPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /user/interaction-limits
 	req, err := client.NewRequest("GET", "https://api.github.com/user/interaction-limits", nil)
 	if err != nil {
-		return ERROR, err
+		return NoAccess, err
 	}
 	resp, err := client.Do(context.Background(), req, nil)
 	switch resp.StatusCode {
 	case 403:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200, 204:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Low
@@ -1198,69 +1164,69 @@ func getLimitsPermission(client *gh.Client, user *gh.User) (string, error) {
 	// Payload is invalid, so it shouldn't actually post.
 	req, err = client.NewRequest("PUT", "https://api.github.com/user/interaction-limits", nil)
 	if err != nil {
-		return ERROR, err
+		return NoAccess, err
 	}
 	resp, err = client.Do(context.Background(), req, nil)
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return LimitsRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return LimitsWrite, nil
 	case 200, 204:
 		log.Fatal("This should never happen. We are setting interaction limits with an invalid payload.")
-		return READ_WRITE, nil
+		return LimitsWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getPlanPermission(client *gh.Client, user *gh.User) (string, error) {
+func getPlanPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /user/{username}/settings/billing/actions
 	_, resp, err := client.Billing.GetActionsBillingUser(context.Background(), *user.Login)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
-		return READ_ONLY, nil
+		return PlanRead, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getProfilePermission(client *gh.Client, user *gh.User) (string, error) {
+func getProfilePermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Low
 	// POST request to /user/social_accounts
 	// Payload is invalid, so it shouldn't actually patch.
 	req, err := client.NewRequest("POST", "https://api.github.com/user/social_accounts", nil)
 	if err != nil {
-		return ERROR, err
+		return NoAccess, err
 	}
 	resp, err := client.Do(context.Background(), req, nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 422:
-		return READ_WRITE, nil
+		return ProfileWrite, nil
 	case 200, 201, 204:
 		log.Fatal("This should never happen. We are creating a social account with an invalid payload.")
-		return READ_WRITE, nil
+		return ProfileWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getSigningKeysPermission(client *gh.Client, user *gh.User) (string, error) {
+func getSigningKeysPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /user/ssh_signing_keys
 	_, resp, err := client.Users.ListSSHSigningKeys(context.Background(), "", nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return NO_ACCESS, nil
+		return NoAccess, ErrNoAccess
 	case 200:
 		break
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 
 	// Risk: Low - Medium
@@ -1269,77 +1235,83 @@ func getSigningKeysPermission(client *gh.Client, user *gh.User) (string, error) 
 	_, resp, err = client.Users.CreateSSHSigningKey(context.Background(), &gh.Key{})
 	switch resp.StatusCode {
 	case 403:
-		return READ_ONLY, nil
+		return SigningKeysRead, nil
 	case 422:
-		return READ_WRITE, nil
+		return SigningKeysWrite, nil
 	case 200, 201, 204:
 		log.Fatal("This should never happen. We are creating a SSH key with an invalid payload.")
-		return READ_WRITE, nil
+		return SigningKeysWrite, nil
 	default:
-		return ERROR, err
+		return NoAccess, err
 	}
 }
 
-func getStarringPermission(client *gh.Client, user *gh.User) (string, error) {
+func getStarringPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Note: We can't test READ_WRITE b/c Unstar() isn't working even with READ_WRITE permissions.
 	// Note: GET /user/starred returns the same results regardless of permissions
 	//       but since all have the same access, we'll call it READ_ONLY for now.
-	return READ_ONLY, nil
-
+	return StarringRead, nil
 }
 
-func getWatchingPermission(client *gh.Client, user *gh.User) (string, error) {
+func getWatchingPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	// Note: GET /user/subscriptions returns the same results regardless of permissions
 	//       but since all have the same access, we'll call it READ_ONLY for now.
-	return READ_ONLY, nil
+	return WatchingRead, nil
 }
 
-func analyzeUserPermissions(client *gh.Client, user *gh.User, permissionType string) string {
-	access := ""
-	var err error
-	access, err = acctPermFuncMap[permissionType](client, user)
-	if err != nil {
-		log.Fatal(err)
+func analyzeUserPermissions(client *gh.Client, user *gh.User) ([]Permission, error) {
+	perms := []Permission{}
+	for _, permFunc := range acctPermFuncMap {
+		access, err := permFunc(client, user)
+		if err != nil {
+			return nil, err
+		}
+		perms = append(perms, access)
 	}
-	if access != UNKNOWN && access != ERROR {
-		return access
-	}
-	return access
+
+	return perms, nil
 }
 
-func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata, shallowCheck bool) (*SecretInfo, error) {
-	allRepos, err := getAllReposForUser(client)
+func AnalyzeFineGrainedToken(client *gh.Client, meta *common.TokenMetadata, shallowCheck bool) (*common.SecretInfo, error) {
+	allRepos, err := common.GetAllReposForUser(client)
 	if err != nil {
 		return nil, err
 	}
 
-	allGists, err := getAllGistsForUser(client)
+	allGists, err := common.GetAllGistsForUser(client)
 	if err != nil {
 		return nil, err
 	}
 	accessibleRepos := make([]*gh.Repository, 0)
 	for _, repo := range allRepos {
-		if analyzeRepositoryPermissions(client, []*gh.Repository{repo}, METADATA) != NO_ACCESS {
+		perm, err := getMetadataPermission(client, repo, "")
+		if err != nil {
+			return nil, err
+		}
+		if perm != NoAccess {
 			accessibleRepos = append(accessibleRepos, repo)
 		}
 	}
 
-	repoAccessMap := make(map[string]string)
-	userAccessMap := make(map[string]string)
+	repoAccessMap := []Permission{}
+	userAccessMap := []Permission{}
 
 	if !shallowCheck {
 		// Check our access
-		for key := range repoPermFuncMap {
-			repoAccessMap[key] = analyzeRepositoryPermissions(client, accessibleRepos, key)
+		perms, err := analyzeRepositoryPermissions(client, accessibleRepos)
+		if err != nil {
+			return nil, err
 		}
+		repoAccessMap = append(repoAccessMap, perms...)
 
-		// Analyze Account's Permissions
-		for key := range acctPermFuncMap {
-			userAccessMap[key] = analyzeUserPermissions(client, meta.User, key)
+		perms, err = analyzeUserPermissions(client, meta.User)
+		if err != nil {
+			return nil, err
 		}
+		userAccessMap = append(userAccessMap, perms...)
 	}
 
-	return &SecretInfo{
+	return &common.SecretInfo{
 		Metadata:        meta,
 		Repos:           allRepos,
 		Gists:           allGists,
@@ -1349,24 +1321,33 @@ func analyzeFineGrainedToken(client *gh.Client, meta *TokenMetadata, shallowChec
 	}, nil
 }
 
-func printFineGrainedToken(cfg *config.Config, info *SecretInfo) {
+func PrintFineGrainedToken(cfg *config.Config, info *common.SecretInfo) {
 	if len(info.AccessibleRepos) == 0 {
 		// If no repos are accessible, then we only have read access to public repos
 		color.Red("[!] Repository Access: Public Repositories (read-only)\n")
 	} else {
 		// Print out the repos the token can access
 		color.Green(fmt.Sprintf("Found %v", len(info.AccessibleRepos)) + " Accessible Repositor(ies) \n")
-		printGitHubRepos(info.AccessibleRepos)
+		common.PrintGitHubRepos(info.AccessibleRepos)
 
 		// Print out the access map
-		printFineGrainedPermissions(info.RepoAccessMap, cfg.ShowAll, true)
+		perms, ok := info.RepoAccessMap.(map[string]Permission)
+		if !ok {
+			panic("Repo Access Map is not of type Permission")
+		}
+		printFineGrainedPermissions(perms, cfg.ShowAll, true)
 	}
 
-	printFineGrainedPermissions(info.UserAccessMap, cfg.ShowAll, false)
-	printGists(info.Gists, cfg.ShowAll)
+	perms, ok := info.UserAccessMap.(map[string]Permission)
+	if !ok {
+		panic("Repo Access Map is not of type Permission")
+	}
+
+	printFineGrainedPermissions(perms, cfg.ShowAll, false)
+	common.PrintGists(info.Gists, cfg.ShowAll)
 }
 
-func printFineGrainedPermissions(accessMap map[string]string, showAll bool, repoPermissions bool) {
+func printFineGrainedPermissions(accessMap map[string]Permission, showAll bool, repoPermissions bool) {
 	permissionCount := 0
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -1382,12 +1363,12 @@ func printFineGrainedPermissions(accessMap map[string]string, showAll bool, repo
 
 	for _, key := range keys {
 		value := accessMap[key]
-		if value == NO_ACCESS || value == UNKNOWN || value == ERROR || value == NOT_IMPLEMENTED {
+		if value == NoAccess {
 			// don't change permissionCount
 		} else {
 			permissionCount++
 		}
-		if !showAll && (value == NO_ACCESS || value == UNKNOWN || value == NOT_IMPLEMENTED) {
+		if !showAll && value == NoAccess {
 			continue
 		} else {
 			k, v := permissionFormatter(key, value)

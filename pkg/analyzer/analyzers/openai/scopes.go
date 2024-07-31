@@ -1,11 +1,15 @@
 package openai
 
-import "github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+import (
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+)
 
 type OpenAIScope struct {
-	Name      string
-	Tests     []analyzers.HttpStatusTest
-	Endpoints []string
+	ReadTests       []analyzers.HttpStatusTest
+	WriteTests      []analyzers.HttpStatusTest
+	Endpoints       []string
+	ReadPermission  Permission
+	WritePermission Permission
 }
 
 func (s *OpenAIScope) RunTests(key string) error {
@@ -13,8 +17,14 @@ func (s *OpenAIScope) RunTests(key string) error {
 		"Authorization": "Bearer " + key,
 		"Content-Type":  "application/json",
 	}
-	for i := range s.Tests {
-		test := &s.Tests[i]
+	for i := range s.ReadTests {
+		test := &s.ReadTests[i]
+		if err := test.RunTest(headers); err != nil {
+			return err
+		}
+	}
+	for i := range s.WriteTests {
+		test := &s.WriteTests[i]
 		if err := test.RunTest(headers); err != nil {
 			return err
 		}
@@ -24,49 +34,61 @@ func (s *OpenAIScope) RunTests(key string) error {
 
 var SCOPES = []OpenAIScope{
 	{
-		Name: "Models",
-		Tests: []analyzers.HttpStatusTest{
+		ReadTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/models", Method: "GET", Valid: []int{200}, Invalid: []int{403}, Type: analyzers.READ, Status: analyzers.PermissionStatus{}},
 		},
-		Endpoints: []string{"/v1/models"},
+		Endpoints:      []string{"/v1/models"},
+		ReadPermission: ModelsRead,
 	},
 	{
-		Name: "Model capabilities",
-		Tests: []analyzers.HttpStatusTest{
+		WriteTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/images/generations", Method: "POST", Payload: POST_PAYLOAD, Valid: []int{400}, Invalid: []int{401}, Type: analyzers.WRITE, Status: analyzers.PermissionStatus{}},
 		},
-		Endpoints: []string{"/v1/audio", "/v1/chat/completions", "/v1/embeddings", "/v1/images", "/v1/moderations"},
+		Endpoints:       []string{"/v1/audio", "/v1/chat/completions", "/v1/embeddings", "/v1/images", "/v1/moderations"},
+		WritePermission: ModelCapabilitiesWrite,
 	},
 	{
-		Name: "Assistants",
-		Tests: []analyzers.HttpStatusTest{
+		ReadTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/assistants", Method: "GET", Valid: []int{400}, Invalid: []int{401}, Type: analyzers.READ, Status: analyzers.PermissionStatus{}},
+		},
+		WriteTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/assistants", Method: "POST", Payload: POST_PAYLOAD, Valid: []int{400}, Invalid: []int{401}, Type: analyzers.WRITE, Status: analyzers.PermissionStatus{}},
 		},
-		Endpoints: []string{"/v1/assistants"},
+		Endpoints:       []string{"/v1/assistants"},
+		ReadPermission:  AssistantsRead,
+		WritePermission: AssistantsWrite,
 	},
 	{
-		Name: "Threads",
-		Tests: []analyzers.HttpStatusTest{
+		ReadTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/threads/1", Method: "GET", Valid: []int{400}, Invalid: []int{401}, Type: analyzers.READ, Status: analyzers.PermissionStatus{}},
+		},
+		WriteTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/threads", Method: "POST", Payload: POST_PAYLOAD, Valid: []int{400}, Invalid: []int{401}, Type: analyzers.WRITE, Status: analyzers.PermissionStatus{}},
 		},
-		Endpoints: []string{"/v1/threads"},
+		Endpoints:       []string{"/v1/threads"},
+		ReadPermission:  ThreadsRead,
+		WritePermission: ThreadsWrite,
 	},
 	{
-		Name: "Fine-tuning",
-		Tests: []analyzers.HttpStatusTest{
+		ReadTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/fine_tuning/jobs", Method: "GET", Valid: []int{200}, Invalid: []int{401}, Type: analyzers.READ, Status: analyzers.PermissionStatus{}},
+		},
+		WriteTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/fine_tuning/jobs", Method: "POST", Payload: POST_PAYLOAD, Valid: []int{400}, Invalid: []int{401}, Type: analyzers.WRITE, Status: analyzers.PermissionStatus{}},
 		},
-		Endpoints: []string{"/v1/fine_tuning"},
+		Endpoints:       []string{"/v1/fine_tuning"},
+		ReadPermission:  FineTuningRead,
+		WritePermission: FineTuningWrite,
 	},
 	{
-		Name: "Files",
-		Tests: []analyzers.HttpStatusTest{
+		ReadTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/files", Method: "GET", Valid: []int{200}, Invalid: []int{401}, Type: analyzers.READ, Status: analyzers.PermissionStatus{}},
+		},
+		WriteTests: []analyzers.HttpStatusTest{
 			{URL: BASE_URL + "/v1/files", Method: "POST", Payload: POST_PAYLOAD, Valid: []int{415}, Invalid: []int{401}, Type: analyzers.WRITE, Status: analyzers.PermissionStatus{}},
 		},
-		Endpoints: []string{"/v1/files"},
+		Endpoints:       []string{"/v1/files"},
+		ReadPermission:  FilesRead,
+		WritePermission: FilesWrite,
 	},
 }
