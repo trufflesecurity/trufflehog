@@ -738,7 +738,7 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				s.addUserGistsToCache(ctx, tt.user)
+				assert.NoError(t, s.addUserGistsToCache(ctx, tt.user))
 				chunksCh <- &sources.Chunk{}
 			}()
 			var wantedRepo string
