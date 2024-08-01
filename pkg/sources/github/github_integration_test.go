@@ -468,29 +468,29 @@ func TestSource_Scan(t *testing.T) {
 			minRepo:   40,
 			minOrg:    1,
 		},
-		// {
-		// 	name: "unauthenticated, single repo",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
-		// 			Credential:   &sourcespb.GitHub_Unauthenticated{},
-		// 		},
-		// 	},
-		// 	wantChunk: &sources.Chunk{
-		// 		SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
-		// 		SourceName: "test source",
-		// 		SourceMetadata: &source_metadatapb.MetaData{
-		// 			Data: &source_metadatapb.MetaData_Github{
-		// 				Github: &source_metadatapb.Github{
-		// 					Repository: "https://github.com/trufflesecurity/driftwood.git",
-		// 				},
-		// 			},
-		// 		},
-		// 		Verify: false,
-		// 	},
-		// 	wantErr: false,
-		// },
+		{
+			name: "unauthenticated, single repo",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
+					Credential:   &sourcespb.GitHub_Unauthenticated{},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+				SourceName: "test source",
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/trufflesecurity/driftwood.git",
+						},
+					},
+				},
+				Verify: false,
+			},
+			wantErr: false,
+		},
 		{
 			name: "app authenticated, no repo or org",
 			init: init{
