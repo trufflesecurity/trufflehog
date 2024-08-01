@@ -711,35 +711,6 @@ func githubCommentCheckFunc(gotChunk, wantChunk *sources.Chunk, i int, t *testin
 	}
 }
 
-// func TestSource_paginateRepos(t *testing.T) {
-// 	type args struct {
-// 		ctx       context.Context
-// 		apiClient *github.Client
-// 	}
-// 	tests := []struct {
-// 		name string
-// 		org  string
-// 		args args
-// 	}{
-// 		{
-// 			org: "fakeNetflix",
-// 			args: args{
-// 				ctx:       context.Background(),
-// 				apiClient: github.NewClient(common.SaneHttpClient()),
-// 			},
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			s := &Source{httpClient: common.SaneHttpClient()}
-// 			s.paginateRepos(tt.args.ctx, tt.args.apiClient, tt.org)
-// 			if len(s.repos) < 101 {
-// 				t.Errorf("expected > 100 repos, got %d", len(s.repos))
-// 			}
-// 		})
-// 	}
-// }
-
 func TestSource_Chunks_TargetedScan(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3000)
 	defer cancel()
