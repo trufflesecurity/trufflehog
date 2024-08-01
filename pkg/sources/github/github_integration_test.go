@@ -431,26 +431,6 @@ func TestSource_Scan(t *testing.T) {
 			minRepo:   2,
 			minOrg:    0,
 		},
-		//{
-		//	name: "app authenticated (old), no repo or org (enum)",
-		//	init: init{
-		//		name: "test source",
-		//		connection: &sourcespb.GitHub{
-		//			ScanUsers: false,
-		//			Credential: &sourcespb.GitHub_GithubApp{
-		//				GithubApp: &credentialspb.GitHubApp{
-		//					PrivateKey:     githubPrivateKey,
-		//					InstallationId: githubInstallationID,
-		//					AppId:          githubAppID,
-		//				},
-		//			},
-		//		},
-		//	},
-		//	wantChunk: nil,
-		//	wantErr:   false,
-		//	minRepo:   3,
-		//	minOrg:    0,
-		//},
 		{
 			name: "unauthenticated, single org",
 			init: init{
@@ -506,7 +486,7 @@ func TestSource_Scan(t *testing.T) {
 			},
 			wantChunk: nil,
 			wantErr:   false,
-			minRepo:   1,
+			minRepo:   32,
 			minOrg:    0,
 		},
 		{
