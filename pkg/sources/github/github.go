@@ -244,6 +244,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	if s.includeHiddenData && len(s.orgsCache.Keys()) > 0 {
 		return fmt.Errorf("cannot scan hidden data with organizations")
 	}
+	if s.includeHiddenData && s.conn.GetToken() == "" {
+		return fmt.Errorf("cannot scan hidden data without a token")
+	}
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
