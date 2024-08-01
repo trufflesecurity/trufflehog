@@ -3,7 +3,6 @@ package github
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	gogit "github.com/go-git/go-git/v5"
@@ -18,7 +17,6 @@ type appConnector struct {
 	apiClient          *github.Client
 	installationClient *github.Client
 	installationID     int64
-	isGitHubEnterprise bool
 }
 
 var _ connector = (*appConnector)(nil)
@@ -72,7 +70,6 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 		apiClient:          apiClient,
 		installationClient: installationClient,
 		installationID:     installationID,
-		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudEndpoint),
 	}, nil
 }
 
@@ -91,13 +88,6 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogi
 	}
 
 	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token")
-}
-
-func (c *appConnector) IsGithubEnterprise() bool {
-	// At the time of this writing, this method is not called anywhere, so if you start calling it and something looks
-	// wrong don't assume that this implementation is correct. (It is implemented here because the interface requires
-	// it, but the only code path that checks for GHE uses a different implementation of this interface.)
-	return c.isGitHubEnterprise
 }
 
 func (c *appConnector) InstallationClient() *github.Client {

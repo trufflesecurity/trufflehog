@@ -435,6 +435,12 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context) {
 
 func (s *Source) enumerateWithToken(ctx context.Context) error {
 	ctx.Logger().V(1).Info("Enumerating with token")
+
+	connector, ok := s.connector.(*tokenConnector)
+	if !ok {
+		return fmt.Errorf("cannot enumerate repositories using a token because no token is configured")
+	}
+
 	var ghUser *github.User
 	var err error
 	for {
@@ -458,7 +464,7 @@ func (s *Source) enumerateWithToken(ctx context.Context) error {
 			s.log.Error(err, "Unable to fetch gists for the current user", "user", ghUser.GetLogin())
 		}
 
-		if s.connector.IsGithubEnterprise() {
+		if connector.IsGithubEnterprise() {
 			s.addAllVisibleOrgs(ctx)
 		} else {
 			// Scan for orgs is default with a token.
@@ -493,6 +499,11 @@ func (s *Source) enumerateWithToken(ctx context.Context) error {
 }
 
 func (s *Source) enumerateWithApp(ctx context.Context) error {
+	connector, ok := s.connector.(*appConnector)
+	if !ok {
+		return fmt.Errorf("cannot enumerate app repositories because no app is configured")
+	}
+
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
 		if err := s.getReposByApp(ctx); err != nil {
@@ -501,7 +512,7 @@ func (s *Source) enumerateWithApp(ctx context.Context) error {
 
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
-			err := s.addMembersByApp(ctx, s.connector.InstallationClient())
+			err := s.addMembersByApp(ctx, connector.InstallationClient())
 			if err != nil {
 				return err
 			}

@@ -62,8 +62,8 @@ func initTestSource(src *sourcespb.GitHub) *Source {
 		panic(err)
 	}
 	gock.InterceptClient(s.connector.ApiClient().Client())
-	if installationClient := s.connector.InstallationClient(); installationClient != nil {
-		gock.InterceptClient(installationClient.Client())
+	if appConnector, ok := s.connector.(*appConnector); ok {
+		gock.InterceptClient(appConnector.InstallationClient().Client())
 	}
 	return s
 }
@@ -241,7 +241,7 @@ func TestAddMembersByApp(t *testing.T) {
 				AppId:          "4141",
 			},
 		}})
-	err := s.addMembersByApp(context.Background(), s.connector.InstallationClient())
+	err := s.addMembersByApp(context.Background(), s.connector.(*appConnector).InstallationClient())
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(s.memberCache))
 	_, ok := s.memberCache["ssm1"]

@@ -2,7 +2,6 @@ package github
 
 import (
 	"fmt"
-	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v63/github"
@@ -13,10 +12,9 @@ import (
 )
 
 type basicAuthConnector struct {
-	apiClient          *github.Client
-	username           string
-	password           string
-	isGitHubEnterprise bool
+	apiClient *github.Client
+	username  string
+	password  string
 }
 
 var _ connector = (*basicAuthConnector)(nil)
@@ -34,10 +32,9 @@ func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*
 	}
 
 	return &basicAuthConnector{
-		apiClient:          apiClient,
-		username:           cred.Username,
-		password:           cred.Password,
-		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudEndpoint),
+		apiClient: apiClient,
+		username:  cred.Username,
+		password:  cred.Password,
 	}, nil
 }
 
@@ -47,15 +44,4 @@ func (c *basicAuthConnector) ApiClient() *github.Client {
 
 func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
 	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.username)
-}
-
-func (c *basicAuthConnector) IsGithubEnterprise() bool {
-	// At the time of this writing, this method is not called anywhere, so if you start calling it and something looks
-	// wrong don't assume that this implementation is correct. (It is implemented here because the interface requires
-	// it, but the only code path that checks for GHE uses a different implementation of this interface.)
-	return c.isGitHubEnterprise
-}
-
-func (c *basicAuthConnector) InstallationClient() *github.Client {
-	return nil
 }

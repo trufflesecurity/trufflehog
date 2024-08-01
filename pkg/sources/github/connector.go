@@ -16,11 +16,6 @@ type connector interface {
 	ApiClient() *github.Client
 	// Clone clones a repository using the configured authentication information.
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
-	// IsGithubEnterprise returns whether the connector is for a GitHub Enterprise endpoint.
-	IsGithubEnterprise() bool
-	// InstallationClient returns a GitHub client that can be used to get information about all the configured GitHub
-	// app's installations. If no GitHub app is configured, nil is returned.
-	InstallationClient() *github.Client
 }
 
 func newConnector(source *Source) (connector, error) {

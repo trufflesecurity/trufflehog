@@ -60,10 +60,6 @@ func (c *tokenConnector) IsGithubEnterprise() bool {
 	return c.isGitHubEnterprise
 }
 
-func (c *tokenConnector) InstallationClient() *github.Client {
-	return nil
-}
-
 func (c *tokenConnector) getUser(ctx context.Context) (string, error) {
 	var (
 		user *github.User

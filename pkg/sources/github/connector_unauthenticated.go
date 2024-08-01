@@ -2,7 +2,6 @@ package github
 
 import (
 	"fmt"
-	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v63/github"
@@ -12,8 +11,7 @@ import (
 )
 
 type unauthenticatedConnector struct {
-	apiClient          *github.Client
-	isGitHubEnterprise bool
+	apiClient *github.Client
 }
 
 var _ connector = (*unauthenticatedConnector)(nil)
@@ -25,8 +23,7 @@ func newUnauthenticatedConnector(apiEndpoint string) (*unauthenticatedConnector,
 		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
 	return &unauthenticatedConnector{
-		apiClient:          apiClient,
-		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudEndpoint),
+		apiClient: apiClient,
 	}, nil
 }
 
@@ -36,15 +33,4 @@ func (c *unauthenticatedConnector) ApiClient() *github.Client {
 
 func (c *unauthenticatedConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
 	return git.CloneRepoUsingUnauthenticated(ctx, repoURL)
-}
-
-func (c *unauthenticatedConnector) IsGithubEnterprise() bool {
-	// At the time of this writing, this method is not called anywhere, so if you start calling it and something looks
-	// wrong don't assume that this implementation is correct. (It is implemented here because the interface requires
-	// it, but the only code path that checks for GHE uses a different implementation of this interface.)
-	return c.isGitHubEnterprise
-}
-
-func (c *unauthenticatedConnector) InstallationClient() *github.Client {
-	return nil
 }
