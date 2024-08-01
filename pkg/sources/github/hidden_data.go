@@ -350,8 +350,14 @@ func processCommits(ctx context.Context, needsProcessing []string, owner, repo, 
 		repoCtx.Logger().V(2).Info("Progress", "percent_completed", percentCompleted, "needs_processing", len(needsProcessing))
 
 		queryChunkSize.successOccurred()
-		writeCommitsToDisk(commitData[validHiddenCommit], validHiddenCommit, path)
-		writeCommitsToDisk(commitData[invalidCommit], invalidCommit, path)
+		err = writeCommitsToDisk(commitData[validHiddenCommit], validHiddenCommit, path)
+		if err != nil {
+			repoCtx.Logger().V(2).Info("Failed to write valid hidden commits to disk", "error", err)
+		}
+		err = writeCommitsToDisk(commitData[invalidCommit], invalidCommit, path)
+		if err != nil {
+			repoCtx.Logger().V(2).Info("Failed to write invalid commits to disk", "error", err)
+		}
 	}
 }
 
