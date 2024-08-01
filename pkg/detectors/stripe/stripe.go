@@ -3,8 +3,9 @@ package stripe
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -65,6 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s.Verified = true
 				}
 			}
+			s.AnalysisInfo = map[string]string{"key": match}
 		}
 
 		results = append(results, s)
