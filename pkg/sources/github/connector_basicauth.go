@@ -2,7 +2,6 @@ package github
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
@@ -14,7 +13,6 @@ import (
 )
 
 type basicAuthConnector struct {
-	httpClient         *http.Client
 	apiClient          *github.Client
 	username           string
 	password           string
@@ -36,7 +34,6 @@ func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*
 	}
 
 	return &basicAuthConnector{
-		httpClient:         httpClient,
 		apiClient:          apiClient,
 		username:           cred.Username,
 		password:           cred.Password,
@@ -54,10 +51,6 @@ func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string) (string,
 
 func (c *basicAuthConnector) IsGithubEnterprise() bool {
 	return c.isGitHubEnterprise
-}
-
-func (c *basicAuthConnector) HttpClient() *http.Client {
-	return c.httpClient
 }
 
 func (c *basicAuthConnector) InstallationClient() *github.Client {

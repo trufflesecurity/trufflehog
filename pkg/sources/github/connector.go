@@ -2,7 +2,6 @@ package github
 
 import (
 	"fmt"
-	"net/http"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v63/github"
@@ -15,7 +14,6 @@ const cloudEndpoint = "https://api.github.com"
 type connector interface {
 	ApiClient() *github.Client
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
-	HttpClient() *http.Client
 	IsGithubEnterprise() bool
 	InstallationClient() *github.Client
 }

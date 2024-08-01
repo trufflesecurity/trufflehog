@@ -270,7 +270,7 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 		return false
 	}
 
-	res, err := s.connector.HttpClient().Do(req)
+	res, err := s.connector.ApiClient().Client().Do(req)
 	if err != nil {
 		return false
 	}

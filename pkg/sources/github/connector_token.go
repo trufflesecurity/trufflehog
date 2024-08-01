@@ -2,7 +2,6 @@ package github
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 	"sync"
 
@@ -15,7 +14,6 @@ import (
 )
 
 type tokenConnector struct {
-	httpClient         *http.Client
 	apiClient          *github.Client
 	token              string
 	isGitHubEnterprise bool
@@ -40,7 +38,6 @@ func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(er
 	}
 
 	return &tokenConnector{
-		httpClient:         httpClient,
 		apiClient:          apiClient,
 		token:              token,
 		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudEndpoint),
@@ -61,10 +58,6 @@ func (c *tokenConnector) Clone(ctx context.Context, repoURL string) (string, *go
 
 func (c *tokenConnector) IsGithubEnterprise() bool {
 	return c.isGitHubEnterprise
-}
-
-func (c *tokenConnector) HttpClient() *http.Client {
-	return c.httpClient
 }
 
 func (c *tokenConnector) InstallationClient() *github.Client {

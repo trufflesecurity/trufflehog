@@ -2,7 +2,6 @@ package github
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
@@ -13,7 +12,6 @@ import (
 )
 
 type unauthenticatedConnector struct {
-	httpClient         *http.Client
 	apiClient          *github.Client
 	isGitHubEnterprise bool
 }
@@ -27,7 +25,6 @@ func newUnauthenticatedConnector(apiEndpoint string) (*unauthenticatedConnector,
 		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
 	return &unauthenticatedConnector{
-		httpClient:         httpClient,
 		apiClient:          apiClient,
 		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudEndpoint),
 	}, nil
@@ -43,10 +40,6 @@ func (c *unauthenticatedConnector) Clone(ctx context.Context, repoURL string) (s
 
 func (c *unauthenticatedConnector) IsGithubEnterprise() bool {
 	return c.isGitHubEnterprise
-}
-
-func (c *unauthenticatedConnector) HttpClient() *http.Client {
-	return c.httpClient
 }
 
 func (c *unauthenticatedConnector) InstallationClient() *github.Client {

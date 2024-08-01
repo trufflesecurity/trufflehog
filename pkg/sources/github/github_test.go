@@ -61,8 +61,6 @@ func initTestSource(src *sourcespb.GitHub) *Source {
 	if err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1); err != nil {
 		panic(err)
 	}
-	gock.InterceptClient(s.connector.HttpClient())
-	gock.Intercept()
 	gock.InterceptClient(s.connector.ApiClient().Client())
 	if installationClient := s.connector.InstallationClient(); installationClient != nil {
 		gock.InterceptClient(installationClient.Client())

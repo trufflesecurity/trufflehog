@@ -2,7 +2,6 @@ package github
 
 import (
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -16,7 +15,6 @@ import (
 )
 
 type appConnector struct {
-	httpClient         *http.Client
 	apiClient          *github.Client
 	installationClient *github.Client
 	installationID     int64
@@ -71,7 +69,6 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 	}
 
 	return &appConnector{
-		httpClient:         httpClient,
 		apiClient:          apiClient,
 		installationClient: installationClient,
 		installationID:     installationID,
@@ -98,10 +95,6 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogi
 
 func (c *appConnector) IsGithubEnterprise() bool {
 	return c.isGitHubEnterprise
-}
-
-func (c *appConnector) HttpClient() *http.Client {
-	return c.httpClient
 }
 
 func (c *appConnector) InstallationClient() *github.Client {
