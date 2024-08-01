@@ -51,7 +51,6 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Metadata: map[string]any{
 			"key_type": info.KeyType,
 			"key_env":  info.KeyEnv,
-			"valid":    info.Valid,
 		},
 	}
 
