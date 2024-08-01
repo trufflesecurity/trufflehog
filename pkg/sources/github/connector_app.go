@@ -94,6 +94,9 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogi
 }
 
 func (c *appConnector) IsGithubEnterprise() bool {
+	// At the time of this writing, this method is not called anywhere, so if you start calling it and something looks
+	// wrong don't assume that this implementation is correct. (It is implemented here because the interface requires
+	// it, but the only code path that checks for GHE uses a different implementation of this interface.)
 	return c.isGitHubEnterprise
 }
 
