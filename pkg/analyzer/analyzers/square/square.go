@@ -2,6 +2,7 @@ package square
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"strconv"
@@ -24,7 +25,11 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Square }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +72,7 @@ func getBindingsAndUnboundedResources(scopes []string) ([]analyzers.Binding, []a
 				Metadata:           nil,
 				Parent:             nil,
 			}
-			hasScope := false
+			categoryBinding := make([]analyzers.Binding, 0)
 			for endpoint, requiredPermissions := range permissions {
 				resource := analyzers.Resource{
 					Name:               endpoint,
@@ -78,8 +83,7 @@ func getBindingsAndUnboundedResources(scopes []string) ([]analyzers.Binding, []a
 				}
 				for _, permission := range requiredPermissions {
 					if contains(scopes, permission) {
-						hasScope = true
-						bindings = append(bindings, analyzers.Binding{
+						categoryBinding = append(categoryBinding, analyzers.Binding{
 							Resource: resource,
 							Permission: analyzers.Permission{
 								Value: permission,
@@ -88,8 +92,10 @@ func getBindingsAndUnboundedResources(scopes []string) ([]analyzers.Binding, []a
 					}
 				}
 			}
-			if hasScope {
+			if len(categoryBinding) == 0 {
 				unboundedResources = append(unboundedResources, parentResource)
+			} else {
+				bindings = append(bindings, categoryBinding...)
 			}
 		}
 	}
