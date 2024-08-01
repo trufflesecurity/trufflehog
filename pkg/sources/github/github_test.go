@@ -100,7 +100,6 @@ func TestAddReposByOrg(t *testing.T) {
 		Repositories: nil,
 		IgnoreRepos:  []string{"secret/super-*-repo2"},
 	})
-	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.getReposByOrg(context.Background(), "super-secret-org")
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
@@ -129,7 +128,6 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 		IncludeRepos:  []string{"super-secret-org/super*"},
 		Organizations: []string{"super-secret-org"},
 	})
-	// gock works here because github.NewClient is using the default HTTP Transport
 	err := s.getReposByOrg(context.Background(), "super-secret-org")
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
@@ -645,7 +643,6 @@ func BenchmarkEnumerate(b *testing.B) {
 		setupMocks(b)
 
 		b.StartTimer()
-		//_, _ = s.enumerate(context.Background(), "https://api.github.com")
 		_ = s.enumerate(context.Background())
 	}
 }
@@ -666,7 +663,6 @@ func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 	})
 	s.repos = []string{"some-special-repo"}
 
-	//err := s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
 	err := s.enumerateWithToken(context.Background())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
