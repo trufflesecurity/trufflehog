@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/confirm"
 )
 
 type KeyTypePage struct {
@@ -14,14 +16,22 @@ func (KeyTypePage) Init() tea.Cmd {
 }
 
 func (ui KeyTypePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if key, ok := msg.(tea.KeyMsg); ok && key.String() == "g" {
-		return ui.NextPage("github")
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return ui, nil
+	}
+	if key.Matches(keyMsg, ui.Common.KeyMap.Back) {
+		return confirm.New(ui.Common, "Quit?",
+			confirm.WithDefault(true),
+			confirm.WithNegativeTransition(ui, nil),
+			confirm.WithAffirmativeTransition(nil, tea.Quit),
+		), nil
 	}
 	return ui, nil
 }
 
 func (KeyTypePage) View() string {
-	return ""
+	return "keytype"
 }
 
 func (ui KeyTypePage) NextPage(keyType string) (tea.Model, tea.Cmd) {
