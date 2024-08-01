@@ -30,6 +30,23 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+func createPrivateKey() string {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+
+	data := x509.MarshalPKCS1PrivateKey(key)
+	var pemKey bytes.Buffer
+	if err := pem.Encode(&pemKey, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: data,
+	}); err != nil {
+		panic(err)
+	}
+	return pemKey.String()
+}
+
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
 	s := &Source{}
 	conn, err := anypb.New(src)
@@ -196,23 +213,7 @@ func TestAddMembersByOrg(t *testing.T) {
 func TestAddMembersByApp(t *testing.T) {
 	defer gock.Off()
 
-	// generate a private key (it just needs to be in the right format)
-	privateKey := func() string {
-		key, err := rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			panic(err)
-		}
-
-		data := x509.MarshalPKCS1PrivateKey(key)
-		var pemKey bytes.Buffer
-		if err := pem.Encode(&pemKey, &pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: data,
-		}); err != nil {
-			panic(err)
-		}
-		return pemKey.String()
-	}()
+	privateKey := createPrivateKey()
 
 	gock.New("https://api.github.com").
 		Get("/app/installations").
@@ -679,23 +680,7 @@ func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 func TestEnumerateWithApp(t *testing.T) {
 	defer gock.Off()
 
-	// generate a private key (it just needs to be in the right format)
-	privateKey := func() string {
-		key, err := rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			panic(err)
-		}
-
-		data := x509.MarshalPKCS1PrivateKey(key)
-		var pemKey bytes.Buffer
-		if err := pem.Encode(&pemKey, &pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: data,
-		}); err != nil {
-			panic(err)
-		}
-		return pemKey.String()
-	}()
+	privateKey := createPrivateKey()
 
 	gock.New("https://api.github.com").
 		Post("/app/installations/1337/access_tokens").
@@ -717,15 +702,6 @@ func TestEnumerateWithApp(t *testing.T) {
 			},
 		},
 	})
-	//_, err := s.enumerateWithApp(
-	//	context.Background(),
-	//	"https://api.github.com",
-	//	&credentialspb.GitHubApp{
-	//		InstallationId: "1337",
-	//		AppId:          "4141",
-	//		PrivateKey:     privateKey,
-	//	},
-	//)
 	err := s.enumerateWithApp(context.Background())
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(s.repos))
