@@ -68,18 +68,6 @@ func TestSource_Token(t *testing.T) {
 	err = s.enumerateWithApp(ctx)
 	assert.NoError(t, err)
 
-	//user, token, err := s.userAndToken(ctx, installationClient)
-	//assert.NotEmpty(t, token)
-	//assert.NoError(t, err)
-	//
-	//// user provided
-	//_, _, err = git.CloneRepoUsingToken(ctx, token, "https://github.com/truffle-test-integration-org/another-test-repo.git", user)
-	//assert.NoError(t, err)
-	//
-	//// no user provided
-	//_, _, err = git.CloneRepoUsingToken(ctx, token, "https://github.com/truffle-test-integration-org/another-test-repo.git", "")
-	//assert.Error(t, err)
-
 	_, _, err = s.cloneRepo(ctx, "https://github.com/truffle-test-integration-org/another-test-repo.git")
 	assert.NoError(t, err)
 }
