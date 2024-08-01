@@ -397,42 +397,24 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: nil,
 			wantErr:   false,
 			minRepo:   1,
-			minOrg:    0,
+			minOrg:    1,
 		},
-		// {
-		// 	name: "token authenticated, username in org",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Organizations: []string{"truffle-sandbox"},
-		// 			Credential: &sourcespb.GitHub_Token{
-		// 				Token: githubToken,
-		// 			},
-		// 		},
-		// 	},
-		// 	wantChunk: nil,
-		// 	wantErr:   false,
-		// 	minRepo:   0, // I think enumerating users with the org API does not work for newer users! Or maybe just newer users with a `-` in their name?
-		// 	// See also: https://github.com/trufflesecurity/trufflehog/issues/874
-		// 	minOrg: 0,
-		// },
-		// {
-		// 	name: "token authenticated, org in repo",
-		// 	// I do not think that this is a supported case, but adding the test to specify there is no requirement.
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Repositories: []string{"truffle-test-integration-org"},
-		// 			Credential: &sourcespb.GitHub_Token{
-		// 				Token: githubToken,
-		// 			},
-		// 		},
-		// 	},
-		// 	wantChunk: nil,
-		// 	wantErr:   false,
-		// 	minRepo:   0,
-		// 	minOrg:    0,
-		// },
+		{
+			name: "token authenticated, username in org",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Organizations: []string{"truffle-sandbox"},
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   2,
+			minOrg:    1,
+		},
 		/*
 			{
 				name: "token authenticated, no org or user (enum)",
