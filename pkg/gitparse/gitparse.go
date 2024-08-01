@@ -247,7 +247,7 @@ func (c *Parser) RepoPath(
 		args = append(args, "--all")
 	}
 	for _, glob := range excludedGlobs {
-		args = append(args, "--", ".", ":(exclude)%"+glob)
+		args = append(args, "--", ".", ":(exclude)"+glob)
 	}
 
 	cmd := exec.Command("git", args...)
@@ -282,7 +282,7 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 
 	absPath, err := filepath.Abs(source)
 	if err == nil {
-		cmd.Env = append(cmd.Env, "GIT_DIR=%"+filepath.Join(absPath, ".git"))
+		cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
 	}
 
 	return c.executeCommand(ctx, cmd, true)
