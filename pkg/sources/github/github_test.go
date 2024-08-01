@@ -458,7 +458,6 @@ func TestEnumerateWithToken(t *testing.T) {
 			Token: "token",
 		},
 	})
-	//err := s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
 	err := s.enumerateWithToken(context.Background())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
