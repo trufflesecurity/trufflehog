@@ -30,7 +30,12 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_HuggingFace }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok || key == "" {
+		return nil, fmt.Errorf("key not found in credentialInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
@@ -38,16 +43,16 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 }
 
 func bakeUnboundedResources(tokenJSON HFTokenJSON) []analyzers.Resource {
-	var unboundedResources []analyzers.Resource
-	for _, org := range tokenJSON.Orgs {
-		unboundedResources = append(unboundedResources, analyzers.Resource{
+	unboundedResources := make([]analyzers.Resource, len(tokenJSON.Orgs))
+	for idx, org := range tokenJSON.Orgs {
+		unboundedResources[idx] = analyzers.Resource{
 			Name: org.Name,
 			Type: "organization",
 			Metadata: map[string]interface{}{
 				"role":          org.Role,
 				"is_enterprise": org.IsEnterprise,
 			},
-		})
+		}
 	}
 	return unboundedResources
 }
@@ -66,20 +71,15 @@ func bakeUnfineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analy
 		}
 
 		// means both read & write permission for the model
+		accessLevel := string(analyzers.READ)
 		if tokenJSON.Auth.AccessToken.Type == WRITE {
-			bindings[idx] = analyzers.Binding{
-				Resource: modelResource,
-				Permission: analyzers.Permission{
-					Value: string(analyzers.READ_WRITE),
-				},
-			}
-		} else {
-			bindings[idx] = analyzers.Binding{
-				Resource: modelResource,
-				Permission: analyzers.Permission{
-					Value: string(analyzers.READ),
-				},
-			}
+			accessLevel = string(analyzers.WRITE)
+		}
+		bindings[idx] = analyzers.Binding{
+			Resource: modelResource,
+			Permission: analyzers.Permission{
+				Value: string(accessLevel),
+			},
 		}
 	}
 	return bindings
@@ -139,19 +139,15 @@ func bakefineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analyze
 }
 
 func bakeOrganizationBindings(tokenJSON HFTokenJSON) []analyzers.Binding {
-	bindings := make([]analyzers.Binding, 0)
-
 	// check if there are any org permissions
 	// if so, save them as a map. Only need to do this once
 	// even if multiple orgs b/c as of 6/6/24, users can only define one set of scopes
 	// for all orgs referenced on an access token
-	orgScoped := false
 	orgPermissions := map[string]struct{}{}
-	var orgResource analyzers.Resource
+	var orgResource *analyzers.Resource = nil
 	for _, permission := range tokenJSON.Auth.AccessToken.FineGrained.Scoped {
 		if permission.Entity.Type == "org" {
-			orgScoped = true
-			orgResource = analyzers.Resource{
+			orgResource = &analyzers.Resource{
 				Name: permission.Entity.Name,
 				Type: "organization",
 			}
@@ -162,8 +158,9 @@ func bakeOrganizationBindings(tokenJSON HFTokenJSON) []analyzers.Binding {
 		}
 	}
 
+	bindings := make([]analyzers.Binding, 0)
 	// check if there are any org permissions
-	if !orgScoped {
+	if orgResource == nil {
 		return bindings
 	}
 
@@ -171,7 +168,7 @@ func bakeOrganizationBindings(tokenJSON HFTokenJSON) []analyzers.Binding {
 		for key, value := range org_scopes[permission] {
 			if _, ok := orgPermissions[key]; ok {
 				bindings = append(bindings, analyzers.Binding{
-					Resource: orgResource,
+					Resource: *orgResource,
 					Permission: analyzers.Permission{
 						Value: value,
 					},
@@ -261,21 +258,6 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	return &result
-}
-
-// convertModelPermissions converts a model Permissions struct into a slice of
-// analyzers.Permission.
-func convertModelPermissions(perms Permissions) []analyzers.Permission {
-	var permissions []analyzers.Permission
-	if perms.Read {
-		// TODO: Is this the right string?
-		permissions = append(permissions, analyzers.Permission{Value: "read"})
-	}
-	if perms.Write {
-		// TODO: Is this the right string?
-		permissions = append(permissions, analyzers.Permission{Value: "write"})
-	}
-	return permissions
 }
 
 // HFTokenJSON is the struct for the HF /whoami-v2 API JSON response
