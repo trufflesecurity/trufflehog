@@ -415,44 +415,42 @@ func TestSource_Scan(t *testing.T) {
 			minRepo:   2,
 			minOrg:    1,
 		},
-		/*
-			{
-				name: "token authenticated, no org or user (enum)",
-				// This configuration currently will only find gists from the user. No repos or orgs will be scanned.
-				init: init{
-					name: "test source",
-					connection: &sourcespb.GitHub{
-						Credential: &sourcespb.GitHub_Token{
-							Token: githubToken,
-						},
+		{
+			name: "token authenticated, no org or user (enum)",
+			// This configuration currently will only find gists from the user. No repos or orgs will be scanned.
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
 					},
 				},
-				wantChunk: nil,
-				wantErr:   false,
-				minRepo:   0,
-				minOrg:    0,
 			},
-			{
-				name: "app authenticated (old), no repo or org (enum)",
-				init: init{
-					name: "test source",
-					connection: &sourcespb.GitHub{
-						ScanUsers: false,
-						Credential: &sourcespb.GitHub_GithubApp{
-							GithubApp: &credentialspb.GitHubApp{
-								PrivateKey:     githubPrivateKey,
-								InstallationId: githubInstallationID,
-								AppId:          githubAppID,
-							},
-						},
-					},
-				},
-				wantChunk: nil,
-				wantErr:   false,
-				minRepo:   3,
-				minOrg:    0,
-			},
-		*/
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   2,
+			minOrg:    0,
+		},
+		//{
+		//	name: "app authenticated (old), no repo or org (enum)",
+		//	init: init{
+		//		name: "test source",
+		//		connection: &sourcespb.GitHub{
+		//			ScanUsers: false,
+		//			Credential: &sourcespb.GitHub_GithubApp{
+		//				GithubApp: &credentialspb.GitHubApp{
+		//					PrivateKey:     githubPrivateKey,
+		//					InstallationId: githubInstallationID,
+		//					AppId:          githubAppID,
+		//				},
+		//			},
+		//		},
+		//	},
+		//	wantChunk: nil,
+		//	wantErr:   false,
+		//	minRepo:   3,
+		//	minOrg:    0,
+		//},
 		{
 			name: "unauthenticated, single org",
 			init: init{
