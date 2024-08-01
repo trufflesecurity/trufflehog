@@ -275,6 +275,8 @@ var (
 )
 
 func init() {
+	_, _ = maxprocs.Set()
+
 	for i, arg := range os.Args {
 		if strings.HasPrefix(arg, "--") {
 			split := strings.SplitN(arg, "=", 2)
@@ -350,7 +352,6 @@ func main() {
 }
 
 func run(state overseer.State) {
-	_, _ = maxprocs.Set()
 
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
