@@ -114,10 +114,6 @@ func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string
 	}, nil
 }
 
-type verifyJSON struct {
-	Code int `json:"code"`
-}
-
 type secretInfo struct {
 	ServicesRes       serviceResponse
 	AccountStatusCode int
