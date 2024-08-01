@@ -453,20 +453,21 @@ func TestSource_Scan(t *testing.T) {
 				minOrg:    0,
 			},
 		*/
-		// {
-		// 	name: "unauthenticated, single org",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Organizations: []string{"trufflesecurity"},
-		// 			Credential:    &sourcespb.GitHub_Unauthenticated{},
-		// 		},
-		// 	},
-		// 	wantChunk: nil,
-		// 	wantErr:   false,
-		// 	minRepo:   3,
-		// 	minOrg:    1,
-		// },
+		{
+			name: "unauthenticated, single org",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Organizations: []string{"trufflesecurity"},
+					Credential:    &sourcespb.GitHub_Unauthenticated{},
+					IncludeForks:  true,
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   40,
+			minOrg:    1,
+		},
 		// {
 		// 	name: "unauthenticated, single repo",
 		// 	init: init{

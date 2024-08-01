@@ -115,6 +115,7 @@ func (o *orgListOptions) getListOptions() *github.ListOptions {
 }
 
 func (s *Source) orgListReposWrapper(ctx context.Context, org string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
+	// TODO: It's possible to exclude forks when making the API request rather than doing post-request filtering
 	return s.connector.ApiClient().Repositories.ListByOrg(ctx, org, &opts.(*orgListOptions).RepositoryListByOrgOptions)
 }
 
