@@ -20,41 +20,34 @@ import (
 
 // Assumption: sleeping for 60 seconds is enough to reset the secondary rate limit
 // see https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api#secondary-rate-limits
-const SECONDARY_RATE_LIMIT_SLEEP = 60
+const secondaryRateLimitSleep = 60
 
 // Assumption: on average, a fork contributes 0.1% additional commits
-const FORK_COMMIT_MULTIPLIER = 0.001
-
-// Assumption: on average, for every commit, there are n other commit objects
-// that use a commit sha hash (which could cause a collision).
-// These objects are: tags, blobs, and trees.
-// const COMMIT_OBJECT_MULTIPLIER = 3
-// Not using this b/c instead we're going to grab all commit object hashes in the
-// locally cloned repo and then use this as the basis for the known key set.
+const forkCommitMultiplier = 0.001
 
 // Threshold for estimated Short SHA-1 hash collisions (default to 1...so basically none)
 // as calculated using the Birthday Paradox
 // Adjust this to a higher value if you're willing to accept more collisions (and shorter runtime).
-const COLLISION_THRESHOLD = 50
+const collisionThreshold = 50
 
 // Starting character length (4 is the minimum required by git)
-const STARTING_CHAR_LEN = 4
+const startingCharLen = 4
 
 // Max character length (6 is the default maximum)
 // 6 chars == 16M possibilities --> which will take 18k-55k queries.
 // that's really the max that's tolerable since it will take a long time to run.
 // If you increase this to accomdate a MASSIVE repository, it will take a long time to run.
-const MAX_CHAR_LEN = 6
+const maxCharLen = 6
 
 // Starting GraphQL query chunk size.
 // Max that worked was 900.
 // 350 is a safe starting point.
-const MAX_CHUNK_SIZE = 900
-const INITIAL_CHUNK_SIZE = 350
+const maxChunkSize = 900
+const initialChunkSize = 350
 
 // Max number of commits to fetch from the repository in one command
 // ex: git fetch origin <commit1> <commit2> ... <commit1000>
-const GIT_FETCH_MAX = 1000
+const gitFetchMax = 1000
 
 // Constants for commit types
 const (
@@ -62,7 +55,7 @@ const (
 	validHiddenCommit = "valid_hidden"
 )
 
-type Backoff struct {
+type backoff struct {
 	value              float64
 	decreasePercentage float64
 	increasePercentage float64
@@ -70,8 +63,8 @@ type Backoff struct {
 	successCount       int
 }
 
-func NewBackoff(initialValue, decreasePercentage, increasePercentage float64, successThreshold int) *Backoff {
-	return &Backoff{
+func newBackoff(initialValue, decreasePercentage, increasePercentage float64, successThreshold int) *backoff {
+	return &backoff{
 		value:              initialValue,
 		decreasePercentage: decreasePercentage,
 		increasePercentage: increasePercentage,
@@ -79,7 +72,7 @@ func NewBackoff(initialValue, decreasePercentage, increasePercentage float64, su
 	}
 }
 
-func (b *Backoff) ErrorOccurred() float64 {
+func (b *backoff) errorOccurred() float64 {
 	b.value -= b.value * (b.decreasePercentage / 100)
 	b.successCount = 0 // Reset success count on error
 	if b.value < 100 {
@@ -88,24 +81,24 @@ func (b *Backoff) ErrorOccurred() float64 {
 	return b.value
 }
 
-func (b *Backoff) SuccessOccurred() float64 {
+func (b *backoff) successOccurred() float64 {
 	b.successCount++
 	if b.successCount >= b.successThreshold {
 		b.value += b.value * (b.increasePercentage / 100)
 		b.successCount = 0 // Reset success count after increasing the value
 	}
-	if b.value > MAX_CHUNK_SIZE {
-		b.value = MAX_CHUNK_SIZE
+	if b.value > maxChunkSize {
+		b.value = maxChunkSize
 	}
 	return b.value
 }
 
-func (b *Backoff) GetValue() int {
+func (b *backoff) getValue() int {
 	return int(b.value)
 }
 
 // Github token
-var ghToken = os.Getenv("GH_TOKEN")
+var ghToken = ""
 
 func getForksCount(owner, repoName string) (int, error) {
 	ctx := context.Background()
@@ -140,15 +133,25 @@ func getGitHubUser() (string, error) {
 	return ghUser.GetLogin(), nil
 }
 
-func getExistingHashes() ([]string, error) {
+// runGitCommand runs a git command
+func runGitCommand(args []string) ([]byte, error) {
+	cmd := exec.Command("git", args...)
+	out, err := cmd.CombinedOutput()
+	return out, err
+}
+
+func getExistingHashes(path string) ([]string, error) {
 	var hashes []string
 	gitArgs := []string{
+		"-C",
+		path,
+		"--work-tree",
+		path,
 		"cat-file",
 		"--batch-check",
 		"--batch-all-objects",
 	}
-	countCmd := exec.Command("git", gitArgs...)
-	outputBytes, err := countCmd.CombinedOutput()
+	outputBytes, err := runGitCommand(gitArgs)
 	if err != nil {
 		return hashes, err
 	}
@@ -172,7 +175,7 @@ func calculateUsedKeySet(commitCount, forksCount int) int {
 	// Calculate total known key set
 	commits := float64(commitCount)
 	forks := float64(forksCount)
-	knownKeySet := (commits + (commits * FORK_COMMIT_MULTIPLIER * forks))
+	knownKeySet := (commits + (commits * forkCommitMultiplier * forks))
 
 	return int(knownKeySet)
 }
@@ -188,12 +191,12 @@ func getShortShaLen(knownKeySet int) int {
 	// Calculate the length of the short SHA-1 hash
 	// This is the minimum length required to avoid collisions
 	// in the estimated known key set
-	shortShaLen := STARTING_CHAR_LEN
+	shortShaLen := startingCharLen
 	keySpace := 1 << (shortShaLen * 4)
 	collisions := estimateCollisions(keySpace, knownKeySet)
 
-	for collisions > COLLISION_THRESHOLD {
-		if shortShaLen >= MAX_CHAR_LEN {
+	for collisions > collisionThreshold {
+		if shortShaLen >= maxCharLen {
 			break
 		}
 		shortShaLen++
@@ -321,12 +324,12 @@ func processCommits(ctx context.Context, needsProcessing []string, owner, repo, 
 	repoCtx := context.WithValue(ctx, "repo", repo)
 
 	startingSize := float64(len(needsProcessing))
-	queryChunkSize := NewBackoff(INITIAL_CHUNK_SIZE, 10, 10, 1)
+	queryChunkSize := newBackoff(initialChunkSize, 10, 10, 1)
 	for len(needsProcessing) > 0 {
-		if len(needsProcessing) < queryChunkSize.GetValue() {
+		if len(needsProcessing) < queryChunkSize.getValue() {
 			queryChunkSize.value = float64(len(needsProcessing))
 		}
-		chunkSize := queryChunkSize.GetValue()
+		chunkSize := queryChunkSize.getValue()
 		chunk := needsProcessing[:chunkSize]
 		needsProcessing = needsProcessing[chunkSize:]
 
@@ -334,10 +337,10 @@ func processCommits(ctx context.Context, needsProcessing []string, owner, repo, 
 		if err != nil {
 			repoCtx.Logger().V(2).Info("Temporary error occurred in guessing commits", "error", err)
 			needsProcessing = append(needsProcessing, chunk...)
-			queryChunkSize.ErrorOccurred()
+			queryChunkSize.errorOccurred()
 			if strings.Contains(err.Error(), "You have exceeded a secondary rate limit") {
 				repoCtx.Logger().V(2).Info("Reached secondary GitHub Rate Limit. Sleeping for 60 seconds.")
-				time.Sleep(SECONDARY_RATE_LIMIT_SLEEP * time.Second)
+				time.Sleep(secondaryRateLimitSleep * time.Second)
 			}
 			continue
 		}
@@ -346,19 +349,19 @@ func processCommits(ctx context.Context, needsProcessing []string, owner, repo, 
 
 		repoCtx.Logger().V(2).Info("Progress", "percent_completed", percentCompleted, "needs_processing", len(needsProcessing))
 
-		queryChunkSize.SuccessOccurred()
+		queryChunkSize.successOccurred()
 		writeCommitsToDisk(commitData[validHiddenCommit], validHiddenCommit, path)
 		writeCommitsToDisk(commitData[invalidCommit], invalidCommit, path)
 	}
 }
 
-type CommitData struct {
+type commitData struct {
 	OID string `json:"oid"`
 }
 
-type ResponseData struct {
+type responseData struct {
 	Data struct {
-		Repository map[string]CommitData `json:"repository"`
+		Repository map[string]commitData `json:"repository"`
 	} `json:"data"`
 	Errors []struct {
 		Message string `json:"message"`
@@ -419,11 +422,10 @@ func checkHashes(owner, repo string, hashes []string) (map[string][]string, erro
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(string(body))
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var data ResponseData
+	var data responseData
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
@@ -462,13 +464,14 @@ func createBatches(items []string, batchSize int) <-chan []string {
 	out := make(chan []string)
 	go func() {
 		defer close(out)
-		for len(items) > 0 {
+		itemsCopy := append([]string(nil), items...)
+		for len(itemsCopy) > 0 {
 			end := batchSize
-			if len(items) < batchSize {
-				end = len(items)
+			if len(itemsCopy) < batchSize {
+				end = len(itemsCopy)
 			}
-			batch := items[:end]
-			items = items[end:]
+			batch := itemsCopy[:end]
+			itemsCopy = itemsCopy[end:]
 			out <- batch
 		}
 	}()
@@ -476,45 +479,56 @@ func createBatches(items []string, batchSize int) <-chan []string {
 }
 
 // downloadPatches fetches and checks out cfor commits
-func downloadPatches(valid_cfor []string) error {
+func downloadPatches(valid_cfor []string, path string) error {
 	// Download all patches
-	for batch := range createBatches(valid_cfor, GIT_FETCH_MAX) {
+	for batch := range createBatches(valid_cfor, gitFetchMax) {
 		gitArgs := []string{
+			"-C",
+			path,
+			"--work-tree",
+			path,
 			"fetch",
 			"--quiet",
 			"origin",
 		}
 		gitArgs = append(gitArgs, batch...)
-		cmd := exec.Command("git", gitArgs...)
-		_, err := cmd.CombinedOutput()
+		_, err := runGitCommand(gitArgs)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Checkout each commit (otherwise it won't be scanned, since it lives
-	// isolated in an object file)
+	// Checkout each commit
+	// Note: path and worktree are needed or else git will do something funny with the actual cwd
 	for _, commit := range valid_cfor {
 		branchName := fmt.Sprintf("_%s", commit)
 		gitArgs := []string{
+			"-C",
+			path,
+			"--work-tree",
+			path,
 			"checkout",
 			"--quiet",
 			"-b",
 			branchName,
 			commit,
 		}
-		cmd := exec.Command("git", gitArgs...)
-		_, err := cmd.CombinedOutput()
+		_, err := runGitCommand(gitArgs)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to checkout commit %s: %v", commit, err)
 		}
 	}
+
 	return nil
 }
 
 // scanHiddenData scans hidden data (and non-hidden data) for secrets in a GitHub repository
 func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chunk) error {
 
+	// assign github token to global variable
+	ghToken = s.conn.GetToken()
+
+	// parse the repo URL
 	repoURL, urlParts, err := getRepoURLParts(s.filteredRepoCache.Values()[0])
 	if err != nil {
 		return fmt.Errorf("failed to get repo URL parts: %w", err)
@@ -524,6 +538,7 @@ func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chu
 	owner := urlParts[1]
 	repoName := urlParts[2]
 
+	// get repo metadata and store in cacheRepoInfo
 	repoCtx := context.WithValue(ctx, "repo", owner+"/"+repoName)
 	ghRepo, _, err := s.apiClient.Repositories.Get(repoCtx, owner, repoName)
 	if s.handleRateLimit(err) {
@@ -540,7 +555,7 @@ func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chu
 		return fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
-	folderPath := userHomeDir + "/.trufflehog/hidden_commits/" + owner + "/" + repoName
+	folderPath := userHomeDir + "/.trufflehog/" + owner + "/" + repoName
 	err = os.MkdirAll(folderPath, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create .trufflehog folder in user's home directory: %w", err)
@@ -566,14 +581,8 @@ func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chu
 
 	defer os.RemoveAll(path)
 
-	// Set the GIT_DIR environment variable so our git operations run smoothly
-	err = os.Setenv("GIT_DIR", path+"/.git")
-	if err != nil {
-		return fmt.Errorf("failed to set GIT_DIR environment variable: %w", err)
-	}
-
 	// count total valid hashes
-	validHashes, err := getExistingHashes()
+	validHashes, err := getExistingHashes(path)
 	if err != nil {
 		return fmt.Errorf("failed to enumerate existing commit object hashes: %w", err)
 	}
@@ -584,11 +593,12 @@ func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chu
 	// Calculate Short SHA-1 Length for Unambiguous Commit Identifiers
 	shortShaLen := getShortShaLen(estimatedUsedKeySet)
 
-	// Print repo stats
+	// Log stats
 	repoCtx.Logger().V(2).Info("Estimated used keys", "count", estimatedUsedKeySet)
 	repoCtx.Logger().V(2).Info("Target Short SHA-1 length", "length", shortShaLen)
 	repoCtx.Logger().V(2).Info("Estimated collisions", "count", estimateCollisions(1<<(shortShaLen*4), estimatedUsedKeySet))
 
+	// Read in existing commits (if any)
 	validHiddenCommits, err := readCommitsFromDisk(validHiddenCommit, folderPath)
 	if err != nil {
 		return fmt.Errorf("failed to read valid hidden commits from disk: %w", err)
@@ -611,16 +621,14 @@ func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chu
 	processCommits(ctx, possibleCommits, owner, repoName, folderPath)
 
 	// Download commit hashes and checkout into branches (only way scanner will pick them up)
-	downloadPatches(validHiddenCommits)
+	err = downloadPatches(validHiddenCommits, path)
+	if err != nil {
+		return fmt.Errorf("failed to download patches: %w", err)
+	}
 
 	// Scan git for secrets
-	// init a TH OSS git source
-	// then call ScanRepo() on it
 	s.setScanOptions(s.conn.Base, s.conn.Head)
-
-	// Repo size is not collected for wikis.
 	repoCtx.Logger().V(2).Info("scanning for secrets in repo", "repo_url", repoURL)
-
 	start := time.Now()
 	err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan})
 	if err != nil {
