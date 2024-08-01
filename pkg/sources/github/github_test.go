@@ -502,7 +502,6 @@ func BenchmarkEnumerateWithToken(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		//_ = s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
 		_ = s.enumerateWithToken(context.Background())
 	}
 }
@@ -568,7 +567,6 @@ func TestEnumerate(t *testing.T) {
 	s.filteredRepoCache.Set(repo.GetFullName(), repo.GetCloneURL())
 
 	// Act
-	//_, err := s.enumerate(context.Background(), "https://api.github.com")
 	err := s.enumerate(context.Background())
 
 	// Assert
