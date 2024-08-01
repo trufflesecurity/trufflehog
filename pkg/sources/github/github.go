@@ -307,13 +307,15 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 
 	err := s.enumerate(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("error enumerating: %w", err)
 	}
 
 	return s.scan(ctx, chunksChan)
 }
 
 func (s *Source) enumerate(ctx context.Context) error {
+	// I'm not wild about switching on the connector type here (as opposed to dispatching to the connector itself) but
+	// this felt like a compromise that allowed me to isolate connection logic without rewriting the entire source.
 	switch s.connector.(type) {
 	case *appConnector:
 		if err := s.enumerateWithApp(ctx); err != nil {

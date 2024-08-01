@@ -36,7 +36,7 @@ func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(er
 
 	apiClient, err := createGitHubClient(httpClient, apiEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
 
 	return &tokenConnector{

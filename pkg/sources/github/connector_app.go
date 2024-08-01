@@ -28,12 +28,12 @@ var _ connector = (*appConnector)(nil)
 func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConnector, error) {
 	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse app installation ID %q: %w", app.InstallationId, err)
 	}
 
 	appID, err := strconv.ParseInt(app.AppId, 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse app ID %q: %w", appID, err)
 	}
 
 	httpClient := common.RetryableHTTPClientTimeout(60)
@@ -43,7 +43,7 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 		appID,
 		[]byte(app.PrivateKey))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create installation client transport: %w", err)
 	}
 	installationTransport.BaseURL = apiEndpoint
 
@@ -51,7 +51,7 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 	installationHttpClient.Transport = installationTransport
 	installationClient, err := github.NewClient(installationHttpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create installation client: %w", err)
 	}
 
 	apiTransport, err := ghinstallation.New(
@@ -60,14 +60,14 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 		installationID,
 		[]byte(app.PrivateKey))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create API client transport: %w", err)
 	}
 	apiTransport.BaseURL = apiEndpoint
 
 	httpClient.Transport = apiTransport
 	apiClient, err := github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
 
 	return &appConnector{

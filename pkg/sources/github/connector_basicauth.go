@@ -1,6 +1,7 @@
 package github
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -31,7 +32,7 @@ func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*
 
 	apiClient, err := createGitHubClient(httpClient, apiEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
 
 	return &basicAuthConnector{

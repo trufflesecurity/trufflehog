@@ -1,6 +1,7 @@
 package github
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -20,11 +21,10 @@ type unauthenticatedConnector struct {
 var _ connector = (*unauthenticatedConnector)(nil)
 
 func newUnauthenticatedConnector(apiEndpoint string) (*unauthenticatedConnector, error) {
-
 	httpClient := common.RetryableHTTPClientTimeout(60)
 	apiClient, err := createGitHubClient(httpClient, apiEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create API client: %w", err)
 	}
 	return &unauthenticatedConnector{
 		httpClient:         httpClient,
