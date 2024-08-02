@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-github/v63/github"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -37,7 +36,6 @@ type Source struct {
 	httpClient             *http.Client
 	log                    logr.Logger
 	conn                   *sourcespb.GitHubExperimental
-	jobPool                *errgroup.Group
 	apiClient              *github.Client
 
 	sources.Progress
@@ -82,8 +80,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.sourceID = sourceID
 	s.jobID = jobID
 	s.verify = verify
-	s.jobPool = &errgroup.Group{}
-	s.jobPool.SetLimit(concurrency)
 
 	s.httpClient = common.RetryableHTTPClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
