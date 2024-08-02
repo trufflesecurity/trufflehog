@@ -196,8 +196,6 @@ func getShortShaLen(knownKeySet int) int {
 	shortShaLen := startingCharLen
 	keySpace := 1 << (shortShaLen * 4)
 	collisions := estimateCollisions(keySpace, knownKeySet)
-	fmt.Println("Collisions: ", collisions)
-	fmt.Println("Collision Threshold: ", collisionThreshold)
 	for collisions > collisionThreshold {
 		if shortShaLen >= maxCharLen {
 			break
