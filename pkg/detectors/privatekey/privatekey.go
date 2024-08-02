@@ -104,6 +104,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				} else {
 					verificationErrors.Add(err)
+					errChan <- err
 				}
 			}()
 
@@ -114,6 +115,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				user, err := verifyGitHubUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
+					errChan <- err
 				}
 				if user != nil {
 					extraData.Add("github_user", *user)
@@ -127,6 +129,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				user, err := verifyGitLabUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
+					errChan <- err
 				}
 				if user != nil {
 					extraData.Add("gitlab_user", *user)
