@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/google/go-github/v63/github"
+	"github.com/k0kubun/go-ansi"
+	"github.com/schollz/progressbar/v3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
@@ -194,8 +196,6 @@ func getShortShaLen(knownKeySet int) int {
 	shortShaLen := startingCharLen
 	keySpace := 1 << (shortShaLen * 4)
 	collisions := estimateCollisions(keySpace, knownKeySet)
-	fmt.Println("Collisions: ", collisions)
-	fmt.Println("Collision Threshold: ", collisionThreshold)
 	for collisions > collisionThreshold {
 		if shortShaLen >= maxCharLen {
 			break
@@ -326,6 +326,14 @@ func processCommits(ctx context.Context, needsProcessing []string, owner, repo, 
 
 	startingSize := float64(len(needsProcessing))
 	queryChunkSize := newBackoff(initialChunkSize, 10, 10, 1)
+
+	// Initialize the progress bar for commit processing
+	bar := progressbar.NewOptions(int(startingSize),
+		progressbar.OptionSetDescription("[green]Processing commits[reset]"),
+		progressbar.OptionSetWriter(ansi.NewAnsiStderr()),
+		progressbar.OptionEnableColorCodes(true),
+	)
+
 	for len(needsProcessing) > 0 {
 		if len(needsProcessing) < queryChunkSize.getValue() {
 			queryChunkSize.value = float64(len(needsProcessing))
@@ -359,7 +367,13 @@ func processCommits(ctx context.Context, needsProcessing []string, owner, repo, 
 		if err != nil {
 			repoCtx.Logger().V(2).Info("Failed to write invalid commits to disk", "error", err)
 		}
+
+		// Update the progress bar
+		_ = bar.Add(chunkSize)
 	}
+
+	// Finish the progress bar
+	_ = bar.Finish()
 }
 
 type commitData struct {

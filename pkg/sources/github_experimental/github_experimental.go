@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-github/v63/github"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -23,40 +22,21 @@ import (
 
 const (
 	SourceType = sourcespb.SourceType_SOURCE_TYPE_GITHUB_EXPERIMENTAL
-
-	// unauthGithubOrgRateLimt = 30
-	// defaultPagination       = 100
-	// membersAppPagination    = 500
 )
 
 type Source struct {
-	name string
-
-	// Protects the user and token.
-	//userMu      sync.Mutex
-	//githubUser  string
-	//githubToken string
-
-	sourceID sources.SourceID
-	jobID    sources.JobID
-	verify   bool
-	//orgsCache         cache.Cache[string]
-	//memberCache       map[string]struct{}
-	//repos             []string
-	//filteredRepoCache *filteredRepoCache
-	repoInfoCache repoInfoCache
-	//totalRepoSize int // total size of all repos in kb
-
+	name                   string
+	sourceID               sources.SourceID
+	jobID                  sources.JobID
+	verify                 bool
+	repoInfoCache          repoInfoCache
 	useCustomContentWriter bool
 	git                    *git.Git
-
-	scanOptions *git.ScanOptions
-
-	httpClient *http.Client
-	log        logr.Logger
-	conn       *sourcespb.GitHubExperimental
-	jobPool    *errgroup.Group
-	apiClient  *github.Client
+	scanOptions            *git.ScanOptions
+	httpClient             *http.Client
+	log                    logr.Logger
+	conn                   *sourcespb.GitHubExperimental
+	apiClient              *github.Client
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
@@ -100,8 +80,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.sourceID = sourceID
 	s.jobID = jobID
 	s.verify = verify
-	s.jobPool = &errgroup.Group{}
-	s.jobPool.SetLimit(concurrency)
 
 	s.httpClient = common.RetryableHTTPClientTimeout(60)
 	s.apiClient = github.NewClient(s.httpClient)
