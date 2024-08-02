@@ -71,13 +71,23 @@ func convertPermissions(isAdmin bool, perms []permissionData) []analyzers.Permis
 	if isAdmin {
 		permissions = append(permissions, analyzers.Permission{Value: analyzers.FullAccess})
 	} else {
-		for _, perm := range perms {
-			permName := perm.name + ":" + string(perm.status)
+		for _, perm := range flattenPerms(perms...) {
+			permName := PermissionStrings[perm]
 			permissions = append(permissions, analyzers.Permission{Value: permName})
 		}
 	}
 
 	return permissions
+}
+
+// flattenPerms takes a slice of permissionData and returns all of the
+// individual Permission values in a single slice.
+func flattenPerms(perms ...permissionData) []Permission {
+	var output []Permission
+	for _, perm := range perms {
+		output = append(output, perm.permissions...)
+	}
+	return output
 }
 
 const (
@@ -106,9 +116,10 @@ type MeJSON struct {
 }
 
 type permissionData struct {
-	name      string
-	endpoints []string
-	status    analyzers.PermissionType
+	name        string
+	endpoints   []string
+	status      analyzers.PermissionType
+	permissions []Permission
 }
 
 type AnalyzerJSON struct {
@@ -260,11 +271,11 @@ func printUserData(meJSON MeJSON) {
 	fmt.Print("\n\n")
 }
 
-func stringifyPermissionStatus(readTests []analyzers.HttpStatusTest, writeTests []analyzers.HttpStatusTest) analyzers.PermissionType {
+func stringifyPermissionStatus(scope OpenAIScope) ([]Permission, analyzers.PermissionType) {
 	readStatus := false
 	writeStatus := false
 	errors := false
-	for _, test := range readTests {
+	for _, test := range scope.ReadTests {
 		if test.Type == analyzers.READ {
 			readStatus = test.Status.Value
 		}
@@ -272,7 +283,7 @@ func stringifyPermissionStatus(readTests []analyzers.HttpStatusTest, writeTests 
 			errors = true
 		}
 	}
-	for _, test := range writeTests {
+	for _, test := range scope.WriteTests {
 		if test.Type == analyzers.WRITE {
 			writeStatus = test.Status.Value
 		}
@@ -281,16 +292,16 @@ func stringifyPermissionStatus(readTests []analyzers.HttpStatusTest, writeTests 
 		}
 	}
 	if errors {
-		return analyzers.ERROR
+		return nil, analyzers.ERROR
 	}
 	if readStatus && writeStatus {
-		return analyzers.READ_WRITE
+		return []Permission{scope.ReadPermission, scope.WritePermission}, analyzers.READ_WRITE
 	} else if readStatus {
-		return analyzers.READ
+		return []Permission{scope.ReadPermission}, analyzers.READ
 	} else if writeStatus {
-		return analyzers.WRITE
+		return []Permission{scope.WritePermission}, analyzers.WRITE
 	} else {
-		return analyzers.NONE
+		return nil, analyzers.NONE
 	}
 }
 
@@ -298,29 +309,30 @@ func getPermissions() []permissionData {
 	var perms []permissionData
 
 	for _, scope := range SCOPES {
-		status := stringifyPermissionStatus(scope.ReadTests, scope.WriteTests)
+		permissions, status := stringifyPermissionStatus(scope)
 		perms = append(perms, permissionData{
-			name:      scope.Endpoints[0], // Using the first endpoint as the name for simplicity
-			endpoints: scope.Endpoints,
-			status:    status,
+			name:        scope.Endpoints[0], // Using the first endpoint as the name for simplicity
+			endpoints:   scope.Endpoints,
+			status:      status,
+			permissions: permissions,
 		})
 	}
 
 	return perms
 }
 
-func printPermissions(perms []permissionData, show_all bool) {
+func printPermissions(perms []permissionData, showAll bool) {
 	fmt.Print("\n\n")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Scope", "Endpoints", "Permission"})
 
 	for _, perm := range perms {
-		if show_all || perm.status != analyzers.NONE {
-			t.AppendRow([]interface{}{perm.name, perm.endpoints[0], perm.status})
+		if showAll || perm.status != analyzers.NONE {
+			t.AppendRow([]any{perm.name, perm.endpoints[0], perm.status})
 
 			for i := 1; i < len(perm.endpoints); i++ {
-				t.AppendRow([]interface{}{"", perm.endpoints[i], perm.status})
+				t.AppendRow([]any{"", perm.endpoints[i], perm.status})
 			}
 		}
 	}
