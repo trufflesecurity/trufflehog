@@ -661,7 +661,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			continue
 		}
 
-		if diff.Len() > sources.DefaultChunkSize+sources.DefaultPeekSize {
+		if diff.Len() > sources.ChunkSize+sources.PeekSize {
 			s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
 			continue
 		}
@@ -724,7 +724,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		line := make([]byte, len(originalChunk.Bytes())+1)
 		copy(line, originalChunk.Bytes())
 		line[len(line)-1] = byte('\n')
-		if len(line) > sources.DefaultChunkSize || len(line)+newChunkBuffer.Len() > sources.DefaultChunkSize {
+		if len(line) > sources.ChunkSize || len(line)+newChunkBuffer.Len() > sources.ChunkSize {
 			// Add oversize chunk info
 			if newChunkBuffer.Len() > 0 {
 				// Send the existing fragment.
@@ -746,7 +746,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 				newChunkBuffer.Reset()
 				lastOffset = offset
 			}
-			if len(line) > sources.DefaultChunkSize {
+			if len(line) > sources.ChunkSize {
 				// Send the oversize line.
 				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+offset))
 				chunk := sources.Chunk{
