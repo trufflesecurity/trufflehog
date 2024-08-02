@@ -2,7 +2,6 @@ package docker
 
 import (
 	"archive/tar"
-	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
+	gzip "github.com/klauspost/pgzip"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -116,7 +116,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		ctx.Logger().V(2).Info("scanning image history")
 
-		historyEntries, err := getHistoryEntries(ctx, imgInfo)
+		layers, err := imgInfo.image.Layers()
+		if err != nil {
+			ctx.Logger().Error(err, "error getting image layers")
+			return nil
+		}
+
+		historyEntries, err := getHistoryEntries(ctx, imgInfo, layers)
 		if err != nil {
 			ctx.Logger().Error(err, "error getting image history entries")
 			return nil
@@ -131,12 +137,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 
 		ctx.Logger().V(2).Info("scanning image layers")
-
-		layers, err := imgInfo.image.Layers()
-		if err != nil {
-			ctx.Logger().Error(err, "error getting image layers")
-			return nil
-		}
 
 		for _, layer := range layers {
 			workers.Go(func() error {
@@ -207,13 +207,8 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 
 // getHistoryEntries collates an image's configuration history together with the
 // corresponding layer digests for any non-empty layers.
-func getHistoryEntries(ctx context.Context, imgInfo imageInfo) ([]historyEntryInfo, error) {
+func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer) ([]historyEntryInfo, error) {
 	config, err := imgInfo.image.ConfigFile()
-	if err != nil {
-		return nil, err
-	}
-
-	layers, err := imgInfo.image.Layers()
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +301,12 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	}
 	defer rc.Close()
 
-	gzipReader, err := gzip.NewReader(rc)
+	const (
+		defaultBlockSize = 1 << 24 // 16MB
+		defaultBlocks    = 8
+	)
+
+	gzipReader, err := gzip.NewReaderN(rc, defaultBlockSize, defaultBlocks)
 	if err != nil {
 		return err
 	}
