@@ -465,8 +465,12 @@ func run(state overseer.State) {
 	}
 
 	engConf := engine.Config{
-		Concurrency:           *concurrency,
-		Detectors:             conf.Detectors,
+		Concurrency: *concurrency,
+		// The engine must always be configured with the list of
+		// default detectors, which can be further filtered by the
+		// user. The filters are applied by the engine and are only
+		// subtractive.
+		Detectors:             append(engine.DefaultDetectors(), conf.Detectors...),
 		Verify:                !*noVerification,
 		IncludeDetectors:      *includeDetectors,
 		ExcludeDetectors:      *excludeDetectors,
