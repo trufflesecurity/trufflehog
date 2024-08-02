@@ -49,6 +49,7 @@ enum SourceType {
   SOURCE_TYPE_WEBHOOK = 34;
   SOURCE_TYPE_ELASTICSEARCH = 35;
   SOURCE_TYPE_HUGGINGFACE = 36;
+  SOURCE_TYPE_GITHUB_EXPERIMENTAL = 37;
 }
 
 message LocalSource {
@@ -241,6 +242,16 @@ message GitHub {
   bool skip_binaries = 17;
   bool skip_archives = 18;
   bool include_wikis = 19;
+}
+
+message GitHubExperimental {
+  string repository = 1;
+  oneof credential {
+    string token = 2;
+  }
+  bool object_discovery = 3;
+  int64 collision_threshold = 4;
+  bool delete_cached_data = 5;
 }
 
 message GoogleDrive {

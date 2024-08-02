@@ -310,7 +310,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
 		}
 	default:
-		errs = append(errs, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
+		errs = append(errs, fmt.Errorf("invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
 	}
 
 	// Run a simple query to check if the client is actually valid
@@ -400,7 +400,7 @@ func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Cli
 		}
 	default:
 		// TODO: move this error to Init
-		return nil, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
+		return nil, fmt.Errorf("invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
 	}
 
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
