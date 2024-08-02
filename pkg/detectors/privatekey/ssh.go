@@ -87,7 +87,7 @@ func firstResponseFromSSH(ctx context.Context, parsedKey any, username, hostport
 }
 
 func sshDialWithContext(ctx context.Context, network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	d := net.Dialer{Timeout: config.Timeout}
+	d := net.Dialer{}
 	conn, err := d.DialContext(ctx, network, addr)
 	if err != nil {
 		return nil, fmt.Errorf("error dialing %s: %w", addr, err)
