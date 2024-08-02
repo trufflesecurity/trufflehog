@@ -884,7 +884,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			for _, match := range matchedBytes {
 				results, err := detector.FromData(ctx, false, match)
 				ctx.Logger().Error(
-					err, "error finding results in chunk",
+					err, "error finding results in chunk during verification overlap",
 					"detector", detector.Key.Type().String(),
 				)
 
