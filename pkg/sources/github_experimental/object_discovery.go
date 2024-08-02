@@ -371,11 +371,11 @@ func processCommits(ctx context.Context, needsProcessing []string, owner, repo, 
 		}
 
 		// Update the progress bar
-		bar.Add(chunkSize)
+		_ = bar.Add(chunkSize)
 	}
 
 	// Finish the progress bar
-	bar.Finish()
+	_ = bar.Finish()
 }
 
 type commitData struct {
