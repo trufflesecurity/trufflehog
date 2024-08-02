@@ -2759,6 +2759,133 @@ var _ interface {
 	ErrorName() string
 } = GitHubValidationError{}
 
+// Validate checks the field values on GitHubExperimental with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GitHubExperimental) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GitHubExperimental with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GitHubExperimentalMultiError, or nil if none found.
+func (m *GitHubExperimental) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GitHubExperimental) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Repository
+
+	// no validation rules for ObjectDiscovery
+
+	// no validation rules for CollisionThreshold
+
+	// no validation rules for DeleteCachedData
+
+	switch v := m.Credential.(type) {
+	case *GitHubExperimental_Token:
+		if v == nil {
+			err := GitHubExperimentalValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Token
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return GitHubExperimentalMultiError(errors)
+	}
+
+	return nil
+}
+
+// GitHubExperimentalMultiError is an error wrapping multiple validation errors
+// returned by GitHubExperimental.ValidateAll() if the designated constraints
+// aren't met.
+type GitHubExperimentalMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GitHubExperimentalMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GitHubExperimentalMultiError) AllErrors() []error { return m }
+
+// GitHubExperimentalValidationError is the validation error returned by
+// GitHubExperimental.Validate if the designated constraints aren't met.
+type GitHubExperimentalValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GitHubExperimentalValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GitHubExperimentalValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GitHubExperimentalValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GitHubExperimentalValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GitHubExperimentalValidationError) ErrorName() string {
+	return "GitHubExperimentalValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GitHubExperimentalValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGitHubExperimental.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GitHubExperimentalValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GitHubExperimentalValidationError{}
+
 // Validate checks the field values on GoogleDrive with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.

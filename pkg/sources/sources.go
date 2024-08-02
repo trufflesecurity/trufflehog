@@ -238,6 +238,20 @@ type GithubConfig struct {
 	IncludeWikis bool
 }
 
+// GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.
+type GitHubExperimentalConfig struct {
+	// Repository is the repository to scan.
+	Repository string
+	// Token is the token to use to authenticate with the source.
+	Token string
+	// ObjectDiscovery indicates whether to discover all commit objects (CFOR) in the repository.
+	ObjectDiscovery bool
+	// CollisionThreshold is the number of short-sha collisions tolerated during hidden data enumeration. Default is 1.
+	CollisionThreshold int
+	// DeleteCachedData indicates whether to delete cached data.
+	DeleteCachedData bool
+}
+
 // GitlabConfig defines the optional configuration for a gitlab source.
 type GitlabConfig struct {
 	// Endpoint is the endpoint of the source.
