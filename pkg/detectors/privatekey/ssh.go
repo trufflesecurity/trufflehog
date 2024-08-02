@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -35,8 +34,7 @@ func firstResponseFromSSH(ctx context.Context, parsedKey any, username, hostport
 
 	// Verify the server fingerprint to ensure that there is no MITM replay attack
 	config := &ssh.ClientConfig{
-		Timeout: 5 * time.Second,
-		User:    username,
+		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
