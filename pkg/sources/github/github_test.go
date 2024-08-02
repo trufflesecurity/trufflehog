@@ -458,7 +458,7 @@ func TestEnumerateWithToken(t *testing.T) {
 			Token: "token",
 		},
 	})
-	err := s.enumerateWithToken(context.Background())
+	err := s.enumerateWithToken(context.Background(), false)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
@@ -502,7 +502,7 @@ func BenchmarkEnumerateWithToken(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = s.enumerateWithToken(context.Background())
+		_ = s.enumerateWithToken(context.Background(), false)
 	}
 }
 
@@ -660,7 +660,7 @@ func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 	})
 	s.repos = []string{"some-special-repo"}
 
-	err := s.enumerateWithToken(context.Background())
+	err := s.enumerateWithToken(context.Background(), false)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"some-special-repo"}, s.repos)
@@ -693,7 +693,7 @@ func TestEnumerateWithApp(t *testing.T) {
 			},
 		},
 	})
-	err := s.enumerateWithApp(context.Background())
+	err := s.enumerateWithApp(context.Background(), s.connector.(*appConnector).InstallationClient())
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(s.repos))
 	assert.False(t, gock.HasUnmatchedRequest())

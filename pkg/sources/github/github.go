@@ -316,9 +316,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 func (s *Source) enumerate(ctx context.Context) error {
 	// I'm not wild about switching on the connector type here (as opposed to dispatching to the connector itself) but
 	// this felt like a compromise that allowed me to isolate connection logic without rewriting the entire source.
-	switch s.connector.(type) {
+	switch c := s.connector.(type) {
 	case *appConnector:
-		if err := s.enumerateWithApp(ctx); err != nil {
+		if err := s.enumerateWithApp(ctx, c.InstallationClient()); err != nil {
 			return err
 		}
 	case *basicAuthConnector:
@@ -326,7 +326,7 @@ func (s *Source) enumerate(ctx context.Context) error {
 			return err
 		}
 	case *tokenConnector:
-		if err := s.enumerateWithToken(ctx); err != nil {
+		if err := s.enumerateWithToken(ctx, c.IsGithubEnterprise()); err != nil {
 			return err
 		}
 	case *unauthenticatedConnector:
@@ -433,13 +433,8 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context) {
 	}
 }
 
-func (s *Source) enumerateWithToken(ctx context.Context) error {
+func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool) error {
 	ctx.Logger().V(1).Info("Enumerating with token")
-
-	connector, ok := s.connector.(*tokenConnector)
-	if !ok {
-		return fmt.Errorf("cannot enumerate repositories using a token because no token is configured")
-	}
 
 	var ghUser *github.User
 	var err error
@@ -464,7 +459,7 @@ func (s *Source) enumerateWithToken(ctx context.Context) error {
 			s.log.Error(err, "Unable to fetch gists for the current user", "user", ghUser.GetLogin())
 		}
 
-		if connector.IsGithubEnterprise() {
+		if isGithubEnterprise {
 			s.addAllVisibleOrgs(ctx)
 		} else {
 			// Scan for orgs is default with a token.
@@ -498,12 +493,7 @@ func (s *Source) enumerateWithToken(ctx context.Context) error {
 	return nil
 }
 
-func (s *Source) enumerateWithApp(ctx context.Context) error {
-	connector, ok := s.connector.(*appConnector)
-	if !ok {
-		return fmt.Errorf("cannot enumerate app repositories because no app is configured")
-	}
-
+func (s *Source) enumerateWithApp(ctx context.Context, installationClient *github.Client) error {
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
 		if err := s.getReposByApp(ctx); err != nil {
@@ -512,7 +502,7 @@ func (s *Source) enumerateWithApp(ctx context.Context) error {
 
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
-			err := s.addMembersByApp(ctx, connector.InstallationClient())
+			err := s.addMembersByApp(ctx, installationClient)
 			if err != nil {
 				return err
 			}
