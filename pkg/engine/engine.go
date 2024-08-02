@@ -883,9 +883,10 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			matchedBytes := detector.Matches()
 			for _, match := range matchedBytes {
 				results, err := detector.FromData(ctx, false, match)
-				if err != nil {
-					ctx.Logger().Error(err, "error verifying chunk")
-				}
+				ctx.Logger().Error(
+					err, "error finding results in chunk",
+					"detector", detector.Key.Type().String(),
+				)
 
 				if len(results) == 0 {
 					continue
