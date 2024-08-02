@@ -2,6 +2,7 @@ package privatekey
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -26,7 +27,7 @@ var gitlabFingerprints = map[string]string{
 	"SHA256:ROQFvPThGrW4RuWLoL9tq9I9zJ42fK4XywyRtbOz/EQ": "RSA",
 }
 
-func firstResponseFromSSH(parsedKey any, username, hostport string) (string, error) {
+func firstResponseFromSSH(ctx context.Context, parsedKey any, username, hostport string) (string, error) {
 	signer, err := ssh.NewSignerFromKey(parsedKey)
 	if err != nil {
 		return "", err
@@ -58,7 +59,7 @@ func firstResponseFromSSH(parsedKey any, username, hostport string) (string, err
 		},
 	}
 
-	client, err := ssh.Dial("tcp", hostport, config)
+	client, err := sshDialWithContext(ctx, "tcp", hostport, config)
 	if err != nil {
 		if strings.Contains(err.Error(), "unable to authenticate") {
 			return "", errPermissionDenied
@@ -85,10 +86,27 @@ func firstResponseFromSSH(parsedKey any, username, hostport string) (string, err
 	return output.String(), err
 }
 
+func sshDialWithContext(ctx context.Context, network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
+	d := net.Dialer{Timeout: config.Timeout}
+	conn, err := d.DialContext(ctx, network, addr)
+	if err != nil {
+		return nil, fmt.Errorf("error dialing %s: %w", addr, err)
+	}
+
+	ncc, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("error creating SSH connection to %s: %w", addr, err)
+	}
+
+	client := ssh.NewClient(ncc, chans, reqs)
+	return client, nil
+}
+
 var errPermissionDenied = errors.New("permission denied")
 
-func verifyGitHubUser(parsedKey any) (*string, error) {
-	output, err := firstResponseFromSSH(parsedKey, "git", "github.com:22")
+func verifyGitHubUser(ctx context.Context, parsedKey any) (*string, error) {
+	output, err := firstResponseFromSSH(ctx, parsedKey, "git", "github.com:22")
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +123,8 @@ func verifyGitHubUser(parsedKey any) (*string, error) {
 	return nil, nil
 }
 
-func verifyGitLabUser(parsedKey any) (*string, error) {
-	output, err := firstResponseFromSSH(parsedKey, "git", "gitlab.com:22")
+func verifyGitLabUser(ctx context.Context, parsedKey any) (*string, error) {
+	output, err := firstResponseFromSSH(ctx, parsedKey, "git", "gitlab.com:22")
 	if err != nil {
 		return nil, err
 	}
