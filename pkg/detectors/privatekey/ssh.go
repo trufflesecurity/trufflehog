@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -35,8 +34,7 @@ func firstResponseFromSSH(ctx context.Context, parsedKey any, username, hostport
 
 	// Verify the server fingerprint to ensure that there is no MITM replay attack
 	config := &ssh.ClientConfig{
-		Timeout: 5 * time.Second,
-		User:    username,
+		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
@@ -87,7 +85,7 @@ func firstResponseFromSSH(ctx context.Context, parsedKey any, username, hostport
 }
 
 func sshDialWithContext(ctx context.Context, network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	d := net.Dialer{Timeout: config.Timeout}
+	d := net.Dialer{}
 	conn, err := d.DialContext(ctx, network, addr)
 	if err != nil {
 		return nil, fmt.Errorf("error dialing %s: %w", addr, err)

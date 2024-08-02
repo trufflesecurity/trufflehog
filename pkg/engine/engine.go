@@ -882,11 +882,15 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			// DO NOT VERIFY at this stage of the pipeline.
 			matchedBytes := detector.Matches()
 			for _, match := range matchedBytes {
+				ctx, cancel := context.WithTimeout(ctx, time.Second*2)
 				results, err := detector.FromData(ctx, false, match)
-				ctx.Logger().Error(
-					err, "error finding results in chunk during verification overlap",
-					"detector", detector.Key.Type().String(),
-				)
+				cancel()
+				if err != nil {
+					ctx.Logger().Error(
+						err, "error finding results in chunk during verification overlap",
+						"detector", detector.Key.Type().String(),
+					)
+				}
 
 				if len(results) == 0 {
 					continue
@@ -980,9 +984,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	if e.printAvgDetectorTime {
 		start = time.Now()
 	}
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer common.Recover(ctx)
-	defer cancel()
 
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
 
@@ -996,7 +998,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	for _, matchBytes := range matches {
 		matchCount++
 		detectBytesPerMatch.Observe(float64(len(matchBytes)))
+
+		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
+		cancel()
 		if err != nil {
 			ctx.Logger().Error(
 				err, "error finding results in chunk",
