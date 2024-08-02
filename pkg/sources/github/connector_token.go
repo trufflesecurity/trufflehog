@@ -25,8 +25,9 @@ type tokenConnector struct {
 var _ connector = (*tokenConnector)(nil)
 
 func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(error) bool) (*tokenConnector, error) {
+	const httpTimeoutSeconds = 60
+	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
-	httpClient := common.RetryableHTTPClientTimeout(60)
 	httpClient.Transport = &oauth2.Transport{
 		Base:   httpClient.Transport,
 		Source: oauth2.ReuseTokenSource(nil, tokenSource),

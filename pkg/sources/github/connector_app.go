@@ -32,7 +32,8 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 		return nil, fmt.Errorf("could not parse app ID %q: %w", appID, err)
 	}
 
-	httpClient := common.RetryableHTTPClientTimeout(60)
+	const httpTimeoutSeconds = 60
+	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 
 	installationTransport, err := ghinstallation.NewAppsTransport(
 		httpClient.Transport,
