@@ -116,7 +116,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		ctx.Logger().V(2).Info("scanning image history")
 
-		historyEntries, err := getHistoryEntries(ctx, imgInfo)
+		layers, err := imgInfo.image.Layers()
+		if err != nil {
+			ctx.Logger().Error(err, "error getting image layers")
+			return nil
+		}
+
+		historyEntries, err := getHistoryEntries(ctx, imgInfo, layers)
 		if err != nil {
 			ctx.Logger().Error(err, "error getting image history entries")
 			return nil
@@ -131,12 +137,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 
 		ctx.Logger().V(2).Info("scanning image layers")
-
-		layers, err := imgInfo.image.Layers()
-		if err != nil {
-			ctx.Logger().Error(err, "error getting image layers")
-			return nil
-		}
 
 		for _, layer := range layers {
 			workers.Go(func() error {
@@ -207,13 +207,8 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 
 // getHistoryEntries collates an image's configuration history together with the
 // corresponding layer digests for any non-empty layers.
-func getHistoryEntries(ctx context.Context, imgInfo imageInfo) ([]historyEntryInfo, error) {
+func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer) ([]historyEntryInfo, error) {
 	config, err := imgInfo.image.ConfigFile()
-	if err != nil {
-		return nil, err
-	}
-
-	layers, err := imgInfo.image.Layers()
 	if err != nil {
 		return nil, err
 	}
