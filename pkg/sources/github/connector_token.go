@@ -45,7 +45,7 @@ func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(er
 	}, nil
 }
 
-func (c *tokenConnector) ApiClient() *github.Client {
+func (c *tokenConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 
@@ -82,13 +82,15 @@ func (c *tokenConnector) setUserIfUnset(ctx context.Context) error {
 	c.userMu.Lock()
 	defer c.userMu.Unlock()
 
-	if c.user == "" {
-		if user, err := c.getUser(ctx); err != nil {
-			return err
-		} else {
-			c.user = user
-		}
+	if c.user != "" {
+		return nil
 	}
 
+	user, err := c.getUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.user = user
 	return nil
 }

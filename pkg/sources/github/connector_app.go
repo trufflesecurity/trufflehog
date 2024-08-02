@@ -73,7 +73,7 @@ func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConn
 	}, nil
 }
 
-func (c *appConnector) ApiClient() *github.Client {
+func (c *appConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 

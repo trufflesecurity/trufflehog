@@ -38,7 +38,7 @@ func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*
 	}, nil
 }
 
-func (c *basicAuthConnector) ApiClient() *github.Client {
+func (c *basicAuthConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 

@@ -27,7 +27,7 @@ func newUnauthenticatedConnector(apiEndpoint string) (*unauthenticatedConnector,
 	}, nil
 }
 
-func (c *unauthenticatedConnector) ApiClient() *github.Client {
+func (c *unauthenticatedConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 

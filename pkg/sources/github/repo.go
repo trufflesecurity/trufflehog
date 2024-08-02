@@ -69,7 +69,7 @@ func (a *appListOptions) getListOptions() *github.ListOptions {
 }
 
 func (s *Source) appListReposWrapper(ctx context.Context, _ string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	someRepos, res, err := s.connector.ApiClient().Apps.ListRepos(ctx, opts.getListOptions())
+	someRepos, res, err := s.connector.APIClient().Apps.ListRepos(ctx, opts.getListOptions())
 	if someRepos != nil {
 		return someRepos.Repositories, res, err
 	}
@@ -93,7 +93,7 @@ func (u *userListOptions) getListOptions() *github.ListOptions {
 }
 
 func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	return s.connector.ApiClient().Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
+	return s.connector.APIClient().Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
 }
 
 func (s *Source) getReposByUser(ctx context.Context, user string) error {
@@ -116,7 +116,7 @@ func (o *orgListOptions) getListOptions() *github.ListOptions {
 
 func (s *Source) orgListReposWrapper(ctx context.Context, org string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
 	// TODO: It's possible to exclude forks when making the API request rather than doing post-request filtering
-	return s.connector.ApiClient().Repositories.ListByOrg(ctx, org, &opts.(*orgListOptions).RepositoryListByOrgOptions)
+	return s.connector.APIClient().Repositories.ListByOrg(ctx, org, &opts.(*orgListOptions).RepositoryListByOrgOptions)
 }
 
 func (s *Source) getReposByOrg(ctx context.Context, org string) error {
@@ -270,7 +270,7 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 		return false
 	}
 
-	res, err := s.connector.ApiClient().Client().Do(req)
+	res, err := s.connector.APIClient().Client().Do(req)
 	if err != nil {
 		return false
 	}
@@ -297,7 +297,7 @@ func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) 
 		err    error
 	)
 	for {
-		commit, _, err = s.connector.ApiClient().Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
+		commit, _, err = s.connector.APIClient().Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
 		if s.handleRateLimit(err) {
 			continue
 		}

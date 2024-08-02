@@ -12,15 +12,15 @@ import (
 const cloudEndpoint = "https://api.github.com"
 
 type connector interface {
-	// ApiClient returns a configured GitHub client that can be used for GitHub API operations.
-	ApiClient() *github.Client
+	// APIClient returns a configured GitHub client that can be used for GitHub API operations.
+	APIClient() *github.Client
 	// Clone clones a repository using the configured authentication information.
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
 }
 
 func newConnector(source *Source) (connector, error) {
 	apiEndpoint := source.conn.Endpoint
-	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
+	if apiEndpoint == "" || endsWithGithub.MatchString(apiEndpoint) {
 		apiEndpoint = cloudEndpoint
 	}
 

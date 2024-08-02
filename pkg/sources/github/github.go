@@ -265,7 +265,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 // Validate is used by enterprise CLI to validate the GitHub config file.
 func (s *Source) Validate(ctx context.Context) []error {
-	if _, _, err := s.connector.ApiClient().Users.Get(ctx, ""); err != nil {
+	if _, _, err := s.connector.APIClient().Users.Get(ctx, ""); err != nil {
 		return []error{err}
 	}
 
@@ -355,7 +355,7 @@ RepoLoop:
 				// Cache gist info.
 				for {
 					gistID := extractGistID(urlParts)
-					gist, _, err := s.connector.ApiClient().Gists.Get(repoCtx, gistID)
+					gist, _, err := s.connector.APIClient().Gists.Get(repoCtx, gistID)
 					// Normalize the URL to the Gist's pull URL.
 					// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
 					repo = gist.GetGitPullURL()
@@ -372,7 +372,7 @@ RepoLoop:
 			} else {
 				// Cache repository info.
 				for {
-					ghRepo, _, err := s.connector.ApiClient().Repositories.Get(repoCtx, urlParts[1], urlParts[2])
+					ghRepo, _, err := s.connector.APIClient().Repositories.Get(repoCtx, urlParts[1], urlParts[2])
 					if s.handleRateLimit(err) {
 						continue
 					}
@@ -444,7 +444,7 @@ func (s *Source) enumerateWithToken(ctx context.Context) error {
 	var ghUser *github.User
 	var err error
 	for {
-		ghUser, _, err = s.connector.ApiClient().Users.Get(ctx, "")
+		ghUser, _, err = s.connector.APIClient().Users.Get(ctx, "")
 		if s.handleRateLimit(err) {
 			continue
 		}
@@ -751,7 +751,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 	gistOpts := &github.GistListOptions{}
 	logger := s.log.WithValues("user", user)
 	for {
-		gists, res, err := s.connector.ApiClient().Gists.List(ctx, user, gistOpts)
+		gists, res, err := s.connector.APIClient().Gists.List(ctx, user, gistOpts)
 		if s.handleRateLimit(err) {
 			continue
 		}
@@ -808,7 +808,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 		},
 	}
 	for {
-		orgs, _, err := s.connector.ApiClient().Organizations.ListAll(ctx, orgOpts)
+		orgs, _, err := s.connector.APIClient().Organizations.ListAll(ctx, orgOpts)
 		if s.handleRateLimit(err) {
 			continue
 		}
@@ -847,7 +847,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	}
 	logger := s.log.WithValues("user", user)
 	for {
-		orgs, resp, err := s.connector.ApiClient().Organizations.List(ctx, "", orgOpts)
+		orgs, resp, err := s.connector.APIClient().Organizations.List(ctx, "", orgOpts)
 		if s.handleRateLimit(err) {
 			continue
 		}
@@ -880,7 +880,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 
 	logger := s.log.WithValues("org", org)
 	for {
-		members, res, err := s.connector.ApiClient().Organizations.ListMembers(ctx, org, opts)
+		members, res, err := s.connector.APIClient().Organizations.ListMembers(ctx, org, opts)
 		if s.handleRateLimit(err) {
 			continue
 		}
@@ -1002,7 +1002,7 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 		Page:    initialPage,
 	}
 	for {
-		comments, _, err := s.connector.ApiClient().Gists.ListComments(ctx, gistID, options)
+		comments, _, err := s.connector.APIClient().Gists.ListComments(ctx, gistID, options)
 		if s.handleRateLimit(err) {
 			continue
 		}
@@ -1115,7 +1115,7 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, chunksCha
 	}
 
 	for {
-		issues, _, err := s.connector.ApiClient().Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
+		issues, _, err := s.connector.APIClient().Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
 		if s.handleRateLimit(err) {
 			continue
 		}
@@ -1187,7 +1187,7 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, ch
 	}
 
 	for {
-		issueComments, _, err := s.connector.ApiClient().Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
+		issueComments, _, err := s.connector.APIClient().Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
 		if s.handleRateLimit(err) {
 			continue
 		}
@@ -1252,7 +1252,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, chunksChan c
 	}
 
 	for {
-		prs, _, err := s.connector.ApiClient().PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
+		prs, _, err := s.connector.APIClient().PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
 		if s.handleRateLimit(err) {
 			continue
 		}
@@ -1284,7 +1284,7 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, chunk
 	}
 
 	for {
-		prComments, _, err := s.connector.ApiClient().PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
+		prComments, _, err := s.connector.APIClient().PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
 		if s.handleRateLimit(err) {
 			continue
 		}
