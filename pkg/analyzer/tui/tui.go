@@ -16,7 +16,7 @@ import (
 type TUI struct {
 	keyType    string
 	secretInfo SecretInfo
-	common     common.Common
+	common     *common.Common
 	model      tea.Model
 	abort      bool
 }
@@ -38,7 +38,7 @@ func Run(keyType string) (string, *SecretInfo, error) {
 
 	t := &TUI{
 		keyType: keyType,
-		common: common.Common{
+		common: &common.Common{
 			KeyMap: keymap.DefaultKeyMap(),
 		},
 	}
@@ -52,18 +52,12 @@ func Run(keyType string) (string, *SecretInfo, error) {
 }
 
 func (ui *TUI) Init() tea.Cmd {
-	if ui.keyType == "" {
-		ui.model = KeyTypePage{Common: ui.common}
-	} else {
-		ui.model = FormPage{Common: ui.common, KeyType: ui.keyType}
-	}
 	return nil
 }
 
 func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		ui.SetSize(msg)
-		return ui, nil
 	}
 	// Always be able to force quit.
 	if msg, ok := msg.(tea.KeyMsg); ok && msg.Type.String() == "ctrl+c" {
@@ -95,7 +89,15 @@ func (ui *TUI) View() string {
 func (ui *TUI) SetSize(msg tea.WindowSizeMsg) {
 	ui.common.SetSize(msg.Width, msg.Height)
 	if ui.model != nil {
-		ui.model, _ = ui.model.Update(msg)
+		return
+	}
+
+	// Set the model only after we have size information.
+	// TODO: Responsive pages.
+	if ui.keyType == "" {
+		ui.model = NewKeyTypePage(ui.common)
+	} else {
+		ui.model = FormPage{Common: ui.common, KeyType: ui.keyType}
 	}
 }
 
