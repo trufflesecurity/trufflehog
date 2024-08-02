@@ -306,7 +306,12 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	}
 	defer rc.Close()
 
-	gzipReader, err := gzip.NewReader(rc)
+	const (
+		defaultBlockSize = 1 << 24 // 16MB
+		defaultBlocks    = 8
+	)
+
+	gzipReader, err := gzip.NewReaderN(rc, defaultBlockSize, defaultBlocks)
 	if err != nil {
 		return err
 	}
