@@ -6,7 +6,7 @@ import "errors"
 type Permission int
 
 const (
-    NoAccess Permission = iota
+    Invalid Permission = iota
     AccountManagementRead Permission = iota
     AccountManagementWrite Permission = iota
     SubaccountConfigurationRead Permission = iota
@@ -65,41 +65,41 @@ var (
     }
 
     PermissionIDs = map[Permission]int{
-        AccountManagementRead: 0,
-        AccountManagementWrite: 1,
-        SubaccountConfigurationRead: 2,
-        SubaccountConfigurationWrite: 3,
-        KeyManagementRead: 4,
-        KeyManagementWrite: 5,
-        ServiceVerificationRead: 6,
-        ServiceVerificationWrite: 7,
-        SmsRead: 8,
-        SmsWrite: 9,
-        VoiceRead: 10,
-        VoiceWrite: 11,
-        MessagingRead: 12,
-        MessagingWrite: 13,
-        CallManagementRead: 14,
-        CallManagementWrite: 15,
+        AccountManagementRead: 1,
+        AccountManagementWrite: 2,
+        SubaccountConfigurationRead: 3,
+        SubaccountConfigurationWrite: 4,
+        KeyManagementRead: 5,
+        KeyManagementWrite: 6,
+        ServiceVerificationRead: 7,
+        ServiceVerificationWrite: 8,
+        SmsRead: 9,
+        SmsWrite: 10,
+        VoiceRead: 11,
+        VoiceWrite: 12,
+        MessagingRead: 13,
+        MessagingWrite: 14,
+        CallManagementRead: 15,
+        CallManagementWrite: 16,
     }
 
     IdToPermission = map[int]Permission{
-        0: AccountManagementRead,
-        1: AccountManagementWrite,
-        2: SubaccountConfigurationRead,
-        3: SubaccountConfigurationWrite,
-        4: KeyManagementRead,
-        5: KeyManagementWrite,
-        6: ServiceVerificationRead,
-        7: ServiceVerificationWrite,
-        8: SmsRead,
-        9: SmsWrite,
-        10: VoiceRead,
-        11: VoiceWrite,
-        12: MessagingRead,
-        13: MessagingWrite,
-        14: CallManagementRead,
-        15: CallManagementWrite,
+        1: AccountManagementRead,
+        2: AccountManagementWrite,
+        3: SubaccountConfigurationRead,
+        4: SubaccountConfigurationWrite,
+        5: KeyManagementRead,
+        6: KeyManagementWrite,
+        7: ServiceVerificationRead,
+        8: ServiceVerificationWrite,
+        9: SmsRead,
+        10: SmsWrite,
+        11: VoiceRead,
+        12: VoiceWrite,
+        13: MessagingRead,
+        14: MessagingWrite,
+        15: CallManagementRead,
+        16: CallManagementWrite,
     }
 )
 
