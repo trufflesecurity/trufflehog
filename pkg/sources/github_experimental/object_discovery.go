@@ -28,7 +28,7 @@ const forkCommitMultiplier = 0.001
 // Threshold for estimated Short SHA-1 hash collisions (default to 1...so basically none)
 // as calculated using the Birthday Paradox
 // Adjust this to a higher value if you're willing to accept more collisions (and shorter runtime).
-const collisionThreshold = 50
+var collisionThreshold float64
 
 // Starting character length (4 is the minimum required by git)
 const startingCharLen = 4
@@ -194,7 +194,8 @@ func getShortShaLen(knownKeySet int) int {
 	shortShaLen := startingCharLen
 	keySpace := 1 << (shortShaLen * 4)
 	collisions := estimateCollisions(keySpace, knownKeySet)
-
+	fmt.Println("Collisions: ", collisions)
+	fmt.Println("Collision Threshold: ", collisionThreshold)
 	for collisions > collisionThreshold {
 		if shortShaLen >= maxCharLen {
 			break
@@ -532,6 +533,9 @@ func downloadPatches(valid_cfor []string, path string) error {
 func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// assign github token to global variable
 	ghToken = s.conn.GetToken()
+
+	// set collision threshold to user input
+	collisionThreshold = float64(s.conn.CollisionThreshold)
 
 	// parse the repo URL
 	repoURL, urlParts, err := getRepoURLParts(s.conn.Repository)
