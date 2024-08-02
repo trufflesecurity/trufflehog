@@ -308,7 +308,10 @@ func (e *Engine) setDefaults(ctx context.Context) {
 		e.decoders = decoders.DefaultDecoders()
 	}
 
-	e.detectors = append(e.detectors, DefaultDetectors()...)
+	// Only use the default detectors if none are provided.
+	if len(e.detectors) == 0 {
+		e.detectors = DefaultDetectors()
+	}
 
 	if e.dispatcher == nil {
 		e.dispatcher = NewPrinterDispatcher(new(output.PlainPrinter))
@@ -880,9 +883,10 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			matchedBytes := detector.Matches()
 			for _, match := range matchedBytes {
 				results, err := detector.FromData(ctx, false, match)
-				if err != nil {
-					ctx.Logger().Error(err, "error verifying chunk")
-				}
+				ctx.Logger().Error(
+					err, "error finding results in chunk during verification overlap",
+					"detector", detector.Key.Type().String(),
+				)
 
 				if len(results) == 0 {
 					continue
@@ -994,7 +998,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		detectBytesPerMatch.Observe(float64(len(matchBytes)))
 		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
 		if err != nil {
-			ctx.Logger().Error(err, "error scanning chunk")
+			ctx.Logger().Error(
+				err, "error finding results in chunk",
+				"detector", data.detector.Key.Type().String(),
+			)
 			continue
 		}
 

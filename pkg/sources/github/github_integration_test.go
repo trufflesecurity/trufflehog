@@ -92,8 +92,8 @@ func TestSource_ScanComments(t *testing.T) {
 	// For the personal access token test
 	githubToken := secret.MustGetField("GITHUB_TOKEN")
 
-	const totalPRChunks = 2
-	const totalIssueChunks = 1
+	const totalPRChunks = 3
+	const totalIssueChunks = 2
 
 	type init struct {
 		name       string
@@ -129,7 +129,7 @@ func TestSource_ScanComments(t *testing.T) {
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
-							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/issues/1#issuecomment-1603436833",
+							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/issues/1",
 							Username:  "truffle-sandbox",
 							Timestamp: "2023-06-22 23:33:46 +0000 UTC",
 						},
@@ -860,6 +860,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 		name       string
 		init       init
 		wantChunks int
+		wantErr    bool
 	}{
 		{
 			name: "targeted scan, one file in small commit",
@@ -914,6 +915,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 				},
 			},
 			wantChunks: 0,
+			wantErr:    true,
 		},
 		{
 			name: "invalid query criteria, malformed link",
@@ -932,6 +934,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 				},
 			},
 			wantChunks: 0,
+			wantErr:    true,
 		},
 	}
 
@@ -949,7 +952,11 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			go func() {
 				defer close(chunksCh)
 				err = s.Chunks(ctx, chunksCh, sources.ChunkingTarget{QueryCriteria: tt.init.queryCriteria})
-				assert.Nil(t, err)
+				if tt.wantErr {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
 			}()
 
 			i := 0

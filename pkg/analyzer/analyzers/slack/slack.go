@@ -27,6 +27,11 @@ type SlackUserData struct {
 	IsEnterprise bool   `json:"is_enterprise"`
 }
 
+type SecretInfo struct {
+	Scopes string
+	User   SlackUserData
+}
+
 func getSlackOAuthScopes(cfg *config.Config, key string) (scopes string, userData SlackUserData, err error) {
 	userData = SlackUserData{}
 	scopes = ""
@@ -69,21 +74,32 @@ func getSlackOAuthScopes(cfg *config.Config, key string) (scopes string, userDat
 	return scopes, userData, err
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
-	scopes, userData, err := getSlackOAuthScopes(cfg, key)
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
-		color.Red("[!] Error getting Slack OAuth scopes:", err)
-		return
-	}
-
-	if !userData.Ok {
-		color.Red("[!] Invalid Slack Token")
+		color.Red("[x] Error: %v", err)
 		return
 	}
 
 	color.Green("[!] Valid Slack API Key\n\n")
-	printIdentityInfo(userData)
-	printScopes(strings.Split(scopes, ","))
+	printIdentityInfo(info.User)
+	printScopes(strings.Split(info.Scopes, ","))
+}
+
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+	scopes, userData, err := getSlackOAuthScopes(cfg, key)
+	if err != nil {
+		return nil, fmt.Errorf("error getting Slack OAuth scopes: %w", err)
+	}
+
+	if !userData.Ok {
+		return nil, fmt.Errorf("invalid Slack token")
+	}
+
+	return &SecretInfo{
+		Scopes: scopes,
+		User:   userData,
+	}, nil
 }
 
 func printIdentityInfo(userData SlackUserData) {

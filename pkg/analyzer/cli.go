@@ -203,10 +203,10 @@ func Run(cmd string) {
 		mysql.AnalyzeAndPrintPermissions(cfg, *mysqlConnectionStr)
 	case slackScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("slack")
-		slack.AnalyzePermissions(cfg, *slackKey)
+		slack.AnalyzeAndPrintPermissions(cfg, *slackKey)
 	case twilioScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("twilio")
-		twilio.AnalyzePermissions(cfg, *twilioKey)
+		twilio.AnalyzeAndPrintPermissions(cfg, *twilioKey)
 	case airbrakeScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("airbrake")
 		airbrake.AnalyzeAndPrintPermissions(cfg, *airbrakeKey)
@@ -215,7 +215,7 @@ func Run(cmd string) {
 		huggingface.AnalyzeAndPrintPermissions(cfg, *huggingfaceKey)
 	case stripeScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("stripe")
-		stripe.AnalyzePermissions(cfg, *stripeKey)
+		stripe.AnalyzeAndPrintPermissions(cfg, *stripeKey)
 	case gitlabScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("gitlab")
 		gitlab.AnalyzeAndPrintPermissions(cfg, *gitlabKey)
@@ -236,13 +236,13 @@ func Run(cmd string) {
 		mailgun.AnalyzeAndPrintPermissions(cfg, *mailgunKey)
 	case squareScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("square")
-		square.AnalyzePermissions(cfg, *squareKey)
+		square.AnalyzeAndPrintPermissions(cfg, *squareKey)
 	case sourcegraphScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("sourcegraph")
-		sourcegraph.AnalyzePermissions(cfg, *sourcegraphKey)
+		sourcegraph.AnalyzeAndPrintPermissions(cfg, *sourcegraphKey)
 	case shopifyScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("shopify")
-		shopify.AnalyzePermissions(cfg, *shopifyKey, *shopifyStoreURL)
+		shopify.AnalyzeAndPrintPermissions(cfg, *shopifyKey, *shopifyStoreURL)
 	case opsgenieScan.FullCommand():
 		cfg.LogFile = analyzers.CreateLogFileName("opsgenie")
 		opsgenie.AnalyzeAndPrintPermissions(cfg, *opsgenieKey)

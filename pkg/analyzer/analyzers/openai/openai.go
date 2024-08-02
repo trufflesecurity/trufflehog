@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go openai
+
 package openai
 
 import (
@@ -39,7 +41,6 @@ func secretInfoToAnalyzerResult(info *AnalyzerJSON) *analyzers.AnalyzerResult {
 		Metadata: map[string]any{
 			"user":          info.me.Name,
 			"email":         info.me.Email,
-			"phone":         info.me.Phone,
 			"mfa":           strconv.FormatBool(info.me.MfaEnabled),
 			"is_admin":      strconv.FormatBool(info.isAdmin),
 			"is_restricted": strconv.FormatBool(info.isRestricted),
@@ -259,14 +260,20 @@ func printUserData(meJSON MeJSON) {
 	fmt.Print("\n\n")
 }
 
-func stringifyPermissionStatus(tests []analyzers.HttpStatusTest) analyzers.PermissionType {
+func stringifyPermissionStatus(readTests []analyzers.HttpStatusTest, writeTests []analyzers.HttpStatusTest) analyzers.PermissionType {
 	readStatus := false
 	writeStatus := false
 	errors := false
-	for _, test := range tests {
+	for _, test := range readTests {
 		if test.Type == analyzers.READ {
 			readStatus = test.Status.Value
-		} else if test.Type == analyzers.WRITE {
+		}
+		if test.Status.IsError {
+			errors = true
+		}
+	}
+	for _, test := range writeTests {
+		if test.Type == analyzers.WRITE {
 			writeStatus = test.Status.Value
 		}
 		if test.Status.IsError {
@@ -291,9 +298,9 @@ func getPermissions() []permissionData {
 	var perms []permissionData
 
 	for _, scope := range SCOPES {
-		status := stringifyPermissionStatus(scope.Tests)
+		status := stringifyPermissionStatus(scope.ReadTests, scope.WriteTests)
 		perms = append(perms, permissionData{
-			name:      scope.Name,
+			name:      scope.Endpoints[0], // Using the first endpoint as the name for simplicity
 			endpoints: scope.Endpoints,
 			status:    status,
 		})
