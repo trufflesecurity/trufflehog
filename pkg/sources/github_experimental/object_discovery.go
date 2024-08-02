@@ -330,7 +330,7 @@ func processCommits(ctx context.Context, needsProcessing []string, owner, repo, 
 	// Initialize the progress bar for commit processing
 	bar := progressbar.NewOptions(int(startingSize),
 		progressbar.OptionSetDescription("[green]Processing commits[reset]"),
-		progressbar.OptionSetWriter(ansi.NewAnsiStdout()),
+		progressbar.OptionSetWriter(ansi.NewAnsiStderr()),
 		progressbar.OptionEnableColorCodes(true),
 	)
 
