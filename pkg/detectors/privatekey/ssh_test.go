@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 func TestFirstResponseFromSSH(t *testing.T) {
@@ -23,7 +24,7 @@ func TestFirstResponseFromSSH(t *testing.T) {
 		t.Fatalf("could not parse test secret: %s", err)
 	}
 
-	output, err := firstResponseFromSSH(parsedKey, "git", "github.com:22")
+	output, err := firstResponseFromSSH(ctx, parsedKey, "git", "github.com:22")
 	if err != nil {
 		t.Fail()
 	}
