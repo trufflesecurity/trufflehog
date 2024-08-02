@@ -90,6 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
+						s1.AnalysisInfo = map[string]string{"key": sid + ":" + key}
 						var serviceResponse serviceResponse
 						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have at least one service
 							service := serviceResponse.Services[0]
