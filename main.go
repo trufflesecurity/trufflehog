@@ -407,6 +407,8 @@ func run(state overseer.State) {
 	}
 
 	if *profile {
+		runtime.SetBlockProfileRate(1)
+		runtime.SetMutexProfileFraction(-1)
 		go func() {
 			router := http.NewServeMux()
 			router.Handle("/debug/pprof/", http.DefaultServeMux)
