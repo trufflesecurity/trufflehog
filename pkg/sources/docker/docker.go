@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -382,29 +385,42 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 }
 
 func (s *Source) remoteOpts() ([]remote.Option, error) {
+	defaultTransport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          s.concurrency * 4,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConnsPerHost:   s.concurrency * 2,
+	}
+
+	var opts []remote.Option
+	opts = append(opts, remote.WithTransport(defaultTransport))
+
 	switch s.conn.GetCredential().(type) {
 	case *sourcespb.Docker_Unauthenticated:
 		return nil, nil
 	case *sourcespb.Docker_BasicAuth:
-		return []remote.Option{
-			remote.WithAuth(&authn.Basic{
-				Username: s.conn.GetBasicAuth().GetUsername(),
-				Password: s.conn.GetBasicAuth().GetPassword(),
-			}),
-		}, nil
+		opts = append(opts, remote.WithAuth(&authn.Basic{
+			Username: s.conn.GetBasicAuth().GetUsername(),
+			Password: s.conn.GetBasicAuth().GetPassword(),
+		}))
 	case *sourcespb.Docker_BearerToken:
-		return []remote.Option{
-			remote.WithAuth(&authn.Bearer{
-				Token: s.conn.GetBearerToken(),
-			}),
-		}, nil
+		opts = append(opts, remote.WithAuth(&authn.Bearer{
+			Token: s.conn.GetBearerToken(),
+		}))
 	case *sourcespb.Docker_DockerKeychain:
-		return []remote.Option{
-			remote.WithAuthFromKeychain(authn.DefaultKeychain),
-		}, nil
+		opts = append(opts, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	default:
 		return nil, fmt.Errorf("unknown credential type: %T", s.conn.Credential)
 	}
+
+	return opts, nil
 }
 
 func baseAndTagFromImage(image string) (base, tag string, hasDigest bool) {
