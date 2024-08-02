@@ -72,8 +72,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 				result.Bindings = append(result.Bindings, analyzers.Binding{
 					Resource: *parentResource,
 					Permission: analyzers.Permission{
-						Value:       permission.Name,
-						AccessLevel: *permission.Value,
+						Value: fmt.Sprintf("%s:%s", permission.Name, *permission.Value),
 					},
 				})
 			}
