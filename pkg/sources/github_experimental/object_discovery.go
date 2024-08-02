@@ -640,6 +640,12 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 	// Guess all possible commit hashes
 	processCommits(ctx, possibleCommits, owner, repoName, folderPath)
 
+	// Read in the new commits
+	validHiddenCommits, err = readCommitsFromDisk(validHiddenCommit, folderPath)
+	if err != nil {
+		return fmt.Errorf("failed to read valid hidden commits from disk: %w", err)
+	}
+
 	// Download commit hashes and checkout into branches (only way scanner will pick them up)
 	err = downloadPatches(validHiddenCommits, path)
 	if err != nil {
