@@ -38,9 +38,8 @@ type (
 	}
 
 	Permission struct {
-		Value       string
-		AccessLevel string
-		Parent      *Permission
+		Value  string
+		Parent *Permission
 	}
 
 	Binding struct {

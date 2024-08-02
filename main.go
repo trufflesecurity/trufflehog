@@ -20,6 +20,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
+	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
@@ -284,6 +285,8 @@ var (
 )
 
 func init() {
+	_, _ = maxprocs.Set()
+
 	for i, arg := range os.Args {
 		if strings.HasPrefix(arg, "--") {
 			split := strings.SplitN(arg, "=", 2)
@@ -359,6 +362,7 @@ func main() {
 }
 
 func run(state overseer.State) {
+
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
 
