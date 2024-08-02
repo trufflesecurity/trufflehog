@@ -25,7 +25,7 @@ import "errors"
 type Permission int
 
 const (
-    NoAccess Permission = iota
+    Invalid Permission = iota
 {{- range $index, $permission := .Permissions }}
     {{ ToCamelCase $permission }} Permission = iota
 {{- end }}
@@ -46,13 +46,13 @@ var (
 
     PermissionIDs = map[Permission]int{
 {{- range $index, $permission := .Permissions }}
-        {{ ToCamelCase $permission }}: {{ $index }},
+        {{ ToCamelCase $permission }}: {{ inc $index }},
 {{- end }}
     }
 
     IdToPermission = map[int]Permission{
 {{- range $index, $permission := .Permissions }}
-        {{ $index }}: {{ ToCamelCase $permission }},
+        {{ inc $index }}: {{ ToCamelCase $permission }},
 {{- end }}
     }
 )
@@ -123,6 +123,7 @@ func main() {
 	// Parse the template
 	tmpl, err := template.New("permissions").Funcs(template.FuncMap{
 		"ToCamelCase": ToCamelCase,
+		"inc":         func(i int) int { return i + 1 },
 	}).Parse(templateText)
 	if err != nil {
 		log.Fatalf("Failed to parse template: %v", err)
