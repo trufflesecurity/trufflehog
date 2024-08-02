@@ -64,6 +64,7 @@ require (
 	github.com/jlaffaye/ftp v0.2.0
 	github.com/joho/godotenv v1.5.1
 	github.com/jpillora/overseer v1.1.6
+	github.com/k0kubun/go-ansi v0.0.0-20180517002512-3bf9e2903213
 	github.com/kylelemons/godebug v1.1.0
 	github.com/lib/pq v1.10.9
 	github.com/lrstanley/bubblezone v0.0.0-20240125042004-b7bafc493195
@@ -79,6 +80,7 @@ require (
 	github.com/prometheus/client_golang v1.19.1
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/sassoftware/go-rpmutils v0.4.0
+	github.com/schollz/progressbar/v3 v3.14.5
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 	github.com/shuheiktgw/go-travis v0.3.1
@@ -235,6 +237,7 @@ require (
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.25 // indirect
+	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
