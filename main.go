@@ -149,8 +149,15 @@ var (
 	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 
-	githubIncludeHiddenData  = githubScan.Flag("include-hidden-data", "Include hidden data in scan.").Bool()
-	githubCollisionThreshold = githubScan.Flag("collision-threshold", "Threshold for short-sha collisions in hidden data enumeration. Default is 1.").Default("1").Int()
+	// GitHub Cross Fork Object Reference Experimental Feature
+	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
+	// GitHub Experimental SubModules
+	githubExperimentalObjectDiscovery = githubExperimentalScan.Flag("object-discovery", "Discover hidden data objects in GitHub repositories.").Bool()
+	// GitHub Experimental Options
+	githubExperimentalToken              = githubExperimentalScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
+	githubExperimentalRepo               = githubExperimentalScan.Flag("repo", "GitHub repository to scan. Example: https://github.com/<user>/<repo>.git").Required().String()
+	githubExperimentalCollisionThreshold = githubExperimentalScan.Flag("collision-threshold", "Threshold for short-sha collisions in object-discovery submodule. Default is 1.").Default("1").Int()
+	githubExperimentalDeleteCache        = githubExperimentalScan.Flag("delete-cached-data", "Delete cached data after object-discovery secret scanning.").Bool()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -662,11 +669,20 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludePullRequestComments: *githubScanPRComments,
 			IncludeGistComments:        *githubScanGistComments,
 			Filter:                     filter,
-			IncludeHiddenData:          *githubIncludeHiddenData,
-			CollisionThreshold:         *githubCollisionThreshold,
 		}
 		if err := eng.ScanGitHub(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)
+		}
+	case githubExperimentalScan.FullCommand():
+		cfg := sources.GitHubExperimentalConfig{
+			Token:              *githubExperimentalToken,
+			Repository:         *githubExperimentalRepo,
+			ObjectDiscovery:    *githubExperimentalObjectDiscovery,
+			CollisionThreshold: *githubExperimentalCollisionThreshold,
+			DeleteCachedData:   *githubExperimentalDeleteCache,
+		}
+		if err := eng.ScanGitHubExperimental(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan using Github Experimental: %v", err)
 		}
 	case gitlabScan.FullCommand():
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)

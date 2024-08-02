@@ -81,9 +81,6 @@ type Source struct {
 	includeIssueComments bool
 	includeGistComments  bool
 
-	includeHiddenData  bool
-	collisionThreshold int64
-
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -236,18 +233,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includePRComments = s.conn.IncludePullRequestComments
 	s.includeGistComments = s.conn.IncludeGistComments
 
-	s.includeHiddenData = s.conn.IncludeHiddenData
-	s.collisionThreshold = s.conn.CollisionThreshold
-	if s.includeHiddenData && len(s.filteredRepoCache.Keys()) > 1 {
-		return fmt.Errorf("cannot scan hidden data with multiple repositories (would be too slow)")
-	}
-	if s.includeHiddenData && len(s.orgsCache.Keys()) > 0 {
-		return fmt.Errorf("cannot scan hidden data with organizations")
-	}
-	if s.includeHiddenData && s.conn.GetToken() == "" {
-		return fmt.Errorf("cannot scan hidden data without a token")
-	}
-
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
 		return fmt.Errorf("cannot specify head or base with multiple repositories")
@@ -377,12 +362,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	if len(targets) > 0 {
 		errs := s.scanTargets(ctx, targets, chunksChan)
 		return errors.Join(errs...)
-	}
-
-	// If scanning hidden data, jump into the hidden_data.go file.
-	if s.includeHiddenData {
-		err := scanHiddenData(ctx, s, chunksChan)
-		return err
 	}
 
 	// Reset consumption and rate limit metrics on each run.

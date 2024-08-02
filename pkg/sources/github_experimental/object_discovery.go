@@ -1,4 +1,4 @@
-package github
+package github_experimental
 
 import (
 	"bytes"
@@ -529,13 +529,12 @@ func downloadPatches(valid_cfor []string, path string) error {
 }
 
 // scanHiddenData scans hidden data (and non-hidden data) for secrets in a GitHub repository
-func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chunk) error {
-
+func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// assign github token to global variable
 	ghToken = s.conn.GetToken()
 
 	// parse the repo URL
-	repoURL, urlParts, err := getRepoURLParts(s.filteredRepoCache.Values()[0])
+	repoURL, urlParts, err := getRepoURLParts(s.conn.Repository)
 	if err != nil {
 		return fmt.Errorf("failed to get repo URL parts: %w", err)
 	}
@@ -547,9 +546,6 @@ func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chu
 	// get repo metadata and store in cacheRepoInfo
 	repoCtx := context.WithValue(ctx, "repo", owner+"/"+repoName)
 	ghRepo, _, err := s.apiClient.Repositories.Get(repoCtx, owner, repoName)
-	if s.handleRateLimit(err) {
-		return fmt.Errorf("failed to fetch repository: %w", err)
-	}
 	if err != nil {
 		return fmt.Errorf("failed to fetch repository: %w", err)
 	}
@@ -633,7 +629,6 @@ func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chu
 	}
 
 	// Scan git for secrets
-	s.setScanOptions(s.conn.Base, s.conn.Head)
 	repoCtx.Logger().V(2).Info("scanning for secrets in repo", "repo_url", repoURL)
 	start := time.Now()
 	err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan})
@@ -642,5 +637,14 @@ func scanHiddenData(ctx context.Context, s *Source, chunksChan chan *sources.Chu
 	}
 	duration := time.Since(start)
 	repoCtx.Logger().V(2).Info("scanned 1 repo for hidden data", "duration_seconds", duration)
+
+	// Remove the folder if user requests
+	if s.conn.DeleteCachedData {
+		err = os.RemoveAll(folderPath)
+		if err != nil {
+			return fmt.Errorf("failed to delete cached data: %w", err)
+		}
+	}
+
 	return nil
 }
