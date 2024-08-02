@@ -998,7 +998,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
 		if err != nil {
 			ctx.Logger().Error(
-				err, "error scanning chunk",
+				err, "error finding results in chunk",
 				"detector", data.detector.Key.Type().String(),
 			)
 			continue
