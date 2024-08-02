@@ -406,22 +406,16 @@ func (s *Source) remoteOpts() ([]remote.Option, error) {
 	case *sourcespb.Docker_Unauthenticated:
 		return nil, nil
 	case *sourcespb.Docker_BasicAuth:
-		opts = []remote.Option{
-			remote.WithAuth(&authn.Basic{
-				Username: s.conn.GetBasicAuth().GetUsername(),
-				Password: s.conn.GetBasicAuth().GetPassword(),
-			}),
-		}
+		opts = append(opts, remote.WithAuth(&authn.Basic{
+			Username: s.conn.GetBasicAuth().GetUsername(),
+			Password: s.conn.GetBasicAuth().GetPassword(),
+		}))
 	case *sourcespb.Docker_BearerToken:
-		opts = []remote.Option{
-			remote.WithAuth(&authn.Bearer{
-				Token: s.conn.GetBearerToken(),
-			}),
-		}
+		opts = append(opts, remote.WithAuth(&authn.Bearer{
+			Token: s.conn.GetBearerToken(),
+		}))
 	case *sourcespb.Docker_DockerKeychain:
-		opts = []remote.Option{
-			remote.WithAuthFromKeychain(authn.DefaultKeychain),
-		}
+		opts = append(opts, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	default:
 		return nil, fmt.Errorf("unknown credential type: %T", s.conn.Credential)
 	}
