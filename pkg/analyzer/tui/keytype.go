@@ -22,7 +22,7 @@ func (ui KeyTypePage) Init() tea.Cmd {
 func NewKeyTypePage(c *common.Common) KeyTypePage {
 	items := make([]list.Item, len(analyzers.AvailableAnalyzers))
 	for i, analyzerType := range analyzers.AvailableAnalyzers {
-		items[i] = KeyTypeItem{KeyType: analyzerType}
+		items[i] = KeyTypeItem(analyzerType)
 	}
 	delegate := list.NewDefaultDelegate()
 	delegate.ShowDescription = false
@@ -47,11 +47,8 @@ func (ui KeyTypePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				confirm.WithAffirmativeTransition(nil, tea.Quit),
 			), nil
 		case key.Matches(msg, ui.Common.KeyMap.Select):
-			chosen := ui.list.SelectedItem().(KeyTypeItem)
-			return FormPage{
-				Common:  ui.Common,
-				KeyType: chosen.KeyType,
-			}, nil
+			chosen := string(ui.list.SelectedItem().(KeyTypeItem))
+			return NewFormPage(ui.Common, chosen), SetKeyTypeCmd(chosen)
 		}
 	}
 
@@ -65,17 +62,12 @@ func (ui KeyTypePage) View() string {
 }
 
 func (ui KeyTypePage) NextPage(keyType string) (tea.Model, tea.Cmd) {
-	return FormPage{
-		Common:  ui.Common,
-		KeyType: keyType,
-	}, SetKeyTypeCmd(keyType)
+	return NewFormPage(ui.Common, keyType), SetKeyTypeCmd(keyType)
 }
 
-type KeyTypeItem struct {
-	KeyType string
-}
+type KeyTypeItem string
 
-func (i KeyTypeItem) ID() string          { return i.KeyType }
-func (i KeyTypeItem) Title() string       { return i.KeyType }
+func (i KeyTypeItem) ID() string          { return string(i) }
+func (i KeyTypeItem) Title() string       { return string(i) }
 func (i KeyTypeItem) Description() string { return "" }
-func (i KeyTypeItem) FilterValue() string { return i.KeyType }
+func (i KeyTypeItem) FilterValue() string { return string(i) }

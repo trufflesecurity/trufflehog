@@ -26,6 +26,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/square"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/stripe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/twilio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/tui"
 )
 
@@ -51,6 +52,9 @@ func Run(cmd string) {
 	if err != nil {
 		// TODO: Log error.
 		return
+	}
+	if secretInfo.Cfg == nil {
+		secretInfo.Cfg = &config.Config{}
 	}
 	switch keyType {
 	case "github":

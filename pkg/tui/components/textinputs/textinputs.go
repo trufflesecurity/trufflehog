@@ -37,6 +37,9 @@ type Model struct {
 	configs    []InputConfig
 	// cursorMode cursor.Mode
 	skipButton bool
+	submitMsg  string
+	header     string
+	footer     string
 }
 
 type InputConfig struct {
@@ -80,7 +83,8 @@ func (m Model) GetLabels() map[string]string {
 
 func New(config []InputConfig) Model {
 	m := Model{
-		inputs: make([]textinput.Model, len(config)),
+		inputs:    make([]textinput.Model, len(config)),
+		submitMsg: "Next",
 	}
 
 	for i, conf := range config {
@@ -171,6 +175,10 @@ func (m *Model) updateInputs(msg tea.Msg) tea.Cmd {
 func (m Model) View() string {
 	var b strings.Builder
 
+	if m.header != "" {
+		fmt.Fprintf(&b, "%s\n\n", m.header)
+	}
+
 	if m.skipButton {
 		button := &blurredSkipButton
 		if m.focusIndex == -1 {
@@ -191,11 +199,15 @@ func (m Model) View() string {
 		}
 	}
 
-	button := &blurredButton
-	if m.focusIndex == len(m.inputs) {
-		button = &focusedButton
+	if m.footer != "" {
+		fmt.Fprintf(&b, "\n\n%s", m.footer)
 	}
-	fmt.Fprintf(&b, "\n\n%s\n\n", *button)
+
+	button := blurredStyle.Render(m.submitMsg)
+	if m.focusIndex == len(m.inputs) {
+		button = focusedStyle.Render(fmt.Sprintf("[ %s ]", m.submitMsg))
+	}
+	fmt.Fprintf(&b, "\n\n%s\n\n", button)
 
 	return b.String()
 }
@@ -224,6 +236,21 @@ func (m Model) SetSkip(skip bool) Model {
 		}
 		m.focusIndex = -1
 	}
+	return m
+}
+
+func (m Model) SetSubmitMsg(msg string) Model {
+	m.submitMsg = msg
+	return m
+}
+
+func (m Model) SetFooter(foot string) Model {
+	m.footer = foot
+	return m
+}
+
+func (m Model) SetHeader(head string) Model {
+	m.header = head
 	return m
 }
 

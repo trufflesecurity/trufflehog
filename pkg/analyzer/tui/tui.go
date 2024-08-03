@@ -68,6 +68,8 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m := msg.(type) {
 	case SetKeyTypeMsg:
 		ui.keyType = string(m)
+	case SecretInfo:
+		ui.secretInfo = m
 	}
 
 	if ui.model == nil {
@@ -97,7 +99,7 @@ func (ui *TUI) SetSize(msg tea.WindowSizeMsg) {
 	if ui.keyType == "" {
 		ui.model = NewKeyTypePage(ui.common)
 	} else {
-		ui.model = FormPage{Common: ui.common, KeyType: ui.keyType}
+		ui.model = NewFormPage(ui.common, ui.keyType)
 	}
 }
 
