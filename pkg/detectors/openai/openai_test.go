@@ -41,6 +41,16 @@ func TestOpenAI_Pattern(t *testing.T) {
 			input: `OPENAI_API_KEY = "sk-service-account-name-Ofbtr05CFsJqs4TAeKlCT3BlbkFJsh1KtN0SUjTPeJiaglyC"`,
 			want:  []string{"sk-service-account-name-Ofbtr05CFsJqs4TAeKlCT3BlbkFJsh1KtN0SUjTPeJiaglyC"},
 		},
+		{
+			name:  "newer user API key",
+			input: `"OPENAI_API_KEY = "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"`,
+			want:  []string{"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"},
+		},
+		{
+			name:  "newer service account API key",
+			input: `OPENAI_API_KEY = "sk-svcacct-IUXtc5gIZK-2cBfB-nTgEWbD8mi-fi-gc20oGtq8ve51sET3BlbkFJCg8iQkCVz_nmE_q1dCWlMpemoaoMqHzQ6D-FnWGqlz4C8A"`,
+			want:  []string{"sk-svcacct-IUXtc5gIZK-2cBfB-nTgEWbD8mi-fi-gc20oGtq8ve51sET3BlbkFJCg8iQkCVz_nmE_q1dCWlMpemoaoMqHzQ6D-FnWGqlz4C8A"},
+		},
 	}
 
 	for _, test := range tests {
