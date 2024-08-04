@@ -55,6 +55,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_ZulipChat,
 					Verified:     true,
+					ExtraData:    map[string]string{"Domain": "secretscanner.zulipchat.com", "Id": "knightmoverchan@gmail.com"},
 				},
 			},
 			wantErr:             false,
@@ -72,6 +73,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_ZulipChat,
 					Verified:     false,
+					ExtraData:    map[string]string{"Domain": "secretscanner.zulipchat.com", "Id": "knightmoverchan@gmail.com"},
 				},
 			},
 			wantErr:             false,
@@ -101,6 +103,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_ZulipChat,
 					Verified:     false,
+					ExtraData:    map[string]string{"Domain": "secretscanner.zulipchat.com", "Id": "knightmoverchan@gmail.com"},
 				},
 			},
 			wantErr:             false,
@@ -118,6 +121,7 @@ func TestZulipChat_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_ZulipChat,
 					Verified:     false,
+					ExtraData:    map[string]string{"Domain": "secretscanner.zulipchat.com", "Id": "knightmoverchan@gmail.com"},
 				},
 			},
 			wantErr:             false,
