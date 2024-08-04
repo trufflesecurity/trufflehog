@@ -28,7 +28,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// The magic string T3BlbkFJ is the base64-encoded string: OpenAI
-	keyPat = regexp.MustCompile(`\b(sk-(?:(?:proj|[a-z0-9](?:[a-z0-9-]{0,40}[a-z0-9])?)-)?[[:alnum:]]{20}T3BlbkFJ[[:alnum:]]{20})\b`)
+	keyPat = regexp.MustCompile(`\b(sk-[[:alnum:]_-]+T3BlbkFJ[[:alnum:]_-]+)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
