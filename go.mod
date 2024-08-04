@@ -87,7 +87,7 @@ require (
 	github.com/shuheiktgw/go-travis v0.3.1
 	github.com/snowflakedb/gosnowflake v1.10.1
 	github.com/stretchr/testify v1.9.0
-	github.com/tailscale/depaware v0.0.0-20210622194025-720c4b409502
+	github.com/tailscale/depaware v0.0.0-20240804103531-585336c3e1b3
 	github.com/testcontainers/testcontainers-go v0.32.0
 	github.com/testcontainers/testcontainers-go/modules/elasticsearch v0.32.0
 	github.com/testcontainers/testcontainers-go/modules/mongodb v0.32.0
@@ -106,7 +106,7 @@ require (
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/net v0.27.0
 	golang.org/x/oauth2 v0.22.0
-	golang.org/x/sync v0.7.0
+	golang.org/x/sync v0.8.0
 	golang.org/x/text v0.16.0
 	google.golang.org/api v0.190.0
 	google.golang.org/protobuf v1.34.2
