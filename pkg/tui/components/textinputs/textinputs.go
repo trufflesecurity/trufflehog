@@ -19,8 +19,6 @@ var (
 	// cursorStyle         = focusedStyle.Copy()
 	// cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
-	focusedButton     = focusedStyle.Copy().Render("[ Next ]")
-	blurredButton     = fmt.Sprintf("[ %s ]", blurredStyle.Render("Next"))
 	focusedSkipButton = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render("[ Run with defaults ]")
 	blurredSkipButton = fmt.Sprintf("[ %s ]", lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("Run with defaults"))
 )
