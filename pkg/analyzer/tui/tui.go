@@ -10,6 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/keymap"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
 // TUI is the main TUI model.
@@ -89,7 +90,9 @@ func (ui *TUI) View() string {
 }
 
 func (ui *TUI) SetSize(msg tea.WindowSizeMsg) {
-	ui.common.SetSize(msg.Width, msg.Height)
+	h, v := styles.AppStyle.GetFrameSize()
+	h, v = msg.Width-h, msg.Height-v
+	ui.common.SetSize(h, v)
 	if ui.model != nil {
 		return
 	}

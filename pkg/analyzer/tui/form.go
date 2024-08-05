@@ -9,6 +9,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
 type FormPage struct {
@@ -32,7 +33,7 @@ func NewFormPage(c *common.Common, keyType string) FormPage {
 	}
 
 	form := textinputs.New(inputs).
-		SetHeader(fmt.Sprintf("Configuring %s analyzer", keyType)).
+		SetHeader(titleStyle.Render(fmt.Sprintf("Configuring %s analyzer", keyType))).
 		SetFooter("⚠️  Running TruffleHog Analyze will send a lot of requests ⚠️").
 		SetSubmitMsg("Run TruffleHog Analyze")
 	return FormPage{
@@ -71,7 +72,7 @@ func (ui FormPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (ui FormPage) View() string {
-	return ui.form.View()
+	return styles.AppStyle.Render(ui.form.View())
 }
 
 func (ui FormPage) PrevPage() (tea.Model, tea.Cmd) {

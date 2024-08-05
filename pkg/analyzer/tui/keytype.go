@@ -4,8 +4,23 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
+)
+
+var (
+	selectedItemStyle = lipgloss.NewStyle().
+				Border(lipgloss.NormalBorder(), false, false, false, true).
+				BorderForeground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["bronze"]}).
+				Foreground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["fern"]}).
+				Padding(0, 0, 0, 1)
+
+	titleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFDF5")).
+			Background(lipgloss.Color(styles.Colors["bronze"])).
+			Padding(0, 1)
 )
 
 type KeyTypePage struct {
@@ -26,9 +41,12 @@ func NewKeyTypePage(c *common.Common) KeyTypePage {
 	delegate := list.NewDefaultDelegate()
 	delegate.ShowDescription = false
 	delegate.SetSpacing(0)
+	delegate.Styles.SelectedTitle = selectedItemStyle
 
 	list := list.New(items, delegate, c.Width, c.Height)
 	list.Title = "Select an analyzer type"
+	list.SetShowStatusBar(false)
+	list.Styles.Title = titleStyle
 	return KeyTypePage{
 		Common: c,
 		list:   list,
@@ -53,7 +71,7 @@ func (ui KeyTypePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (ui KeyTypePage) View() string {
-	return ui.list.View()
+	return styles.AppStyle.Render(ui.list.View())
 }
 
 func (ui KeyTypePage) NextPage(keyType string) (tea.Model, tea.Cmd) {
