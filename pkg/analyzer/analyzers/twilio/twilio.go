@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
@@ -16,7 +15,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-type Analyzer struct{}
+type Analyzer struct {
+	Cfg *config.Config
+}
 
 func (a *Analyzer) Type() analyzerpb.AnalyzerType {
 	return analyzerpb.AnalyzerType_Twilio
@@ -28,14 +29,22 @@ func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string
 		return nil, errors.New("key not found in credentialInfo")
 	}
 
-	cfg := &config.Config{} // You might need to adjust this based on how you want to handle config
-	info, err := AnalyzePermissions(cfg, key)
+	sid, ok := credentialInfo["sid"]
+	if !ok {
+		return nil, errors.New("sid not found in credentialInfo")
+	}
+
+	if a.Cfg == nil {
+		a.Cfg = &config.Config{} // You might need to adjust this based on how you want to handle config
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, sid, key)
 	if err != nil {
 		return nil, err
 	}
 
 	// List parent and subaccounts
-	accounts, err := listTwilioAccounts(cfg, key)
+	accounts, err := listTwilioAccounts(a.Cfg, sid, key)
 	if err != nil {
 		return nil, err
 	}
@@ -124,15 +133,6 @@ const (
 	INVALID_CREDENTIALS         = 20003
 )
 
-// splitKey splits the key into SID and Secret
-func splitKey(key string) (string, string, error) {
-	split := strings.Split(key, ":")
-	if len(split) != 2 {
-		return "", "", errors.New("key must be in the format SID:Secret")
-	}
-	return split[0], split[1], nil
-}
-
 // getAccountsStatusCode returns the status code from the Accounts endpoint
 // this is used to determine whether the key is scoped as main or standard, since standard has no access here.
 func getAccountsStatusCode(cfg *config.Config, sid string, secret string) (int, error) {
@@ -200,12 +200,7 @@ func getVerifyServicesStatusCode(cfg *config.Config, sid string, secret string) 
 	return serviceRes, nil
 }
 
-func listTwilioAccounts(cfg *config.Config, key string) ([]service, error) {
-	sid, secret, err := splitKey(key)
-	if err != nil {
-		return nil, err
-	}
-
+func listTwilioAccounts(cfg *config.Config, sid, secret string) ([]service, error) {
 	// create http client
 	client := analyzers.NewAnalyzeClient(cfg)
 
@@ -237,12 +232,7 @@ func listTwilioAccounts(cfg *config.Config, key string) ([]service, error) {
 	return result.Accounts, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) (*secretInfo, error) {
-	sid, secret, err := splitKey(key)
-	if err != nil {
-		return nil, err
-	}
-
+func AnalyzePermissions(cfg *config.Config, sid, secret string) (*secretInfo, error) {
 	servicesRes, err := getVerifyServicesStatusCode(cfg, sid, secret)
 	if err != nil {
 		return nil, err
@@ -259,14 +249,8 @@ func AnalyzePermissions(cfg *config.Config, key string) (*secretInfo, error) {
 	}, nil
 }
 
-func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-	// ToDo: Add in logging
-	if cfg.LoggingEnabled {
-		color.Red("[x] Logging is not supported for this analyzer.")
-		return
-	}
-
-	info, err := AnalyzePermissions(cfg, key)
+func AnalyzeAndPrintPermissions(cfg *config.Config, sid, secret string) {
+	info, err := AnalyzePermissions(cfg, sid, secret)
 	if err != nil {
 		color.Red("[x] Error: %s", err.Error())
 		return

@@ -70,7 +70,7 @@ func Run(cmd string) {
 	case "slack":
 		slack.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "twilio":
-		twilio.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+		twilio.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["sid"], secretInfo.Parts["key"])
 	case "airbrake":
 		airbrake.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "huggingface":

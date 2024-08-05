@@ -20,19 +20,40 @@ type FormPage struct {
 }
 
 func NewFormPage(c *common.Common, keyType string) FormPage {
-	inputs := []textinputs.InputConfig{{
-		Label:       "Secret",
-		Key:         "key",
-		Required:    true,
-		RedactInput: true,
-	}}
-	if keyType == "shopify" {
-		inputs = append(inputs, textinputs.InputConfig{
+	var inputs []textinputs.InputConfig
+	switch keyType {
+	case "twilio":
+		inputs = []textinputs.InputConfig{{
+			Label:    "SID",
+			Key:      "sid",
+			Required: true,
+		}, {
+			Label:       "Token",
+			Key:         "key",
+			Required:    true,
+			RedactInput: true,
+		}}
+	case "shopify":
+		inputs = []textinputs.InputConfig{{
+			Label:       "Secret",
+			Key:         "key",
+			Required:    true,
+			RedactInput: true,
+		}, {
 			Label:    "Shopify URL",
 			Key:      "url",
 			Required: true,
-		})
+		}}
+	default:
+		inputs = []textinputs.InputConfig{{
+			Label:       "Secret",
+			Key:         "key",
+			Required:    true,
+			RedactInput: true,
+		}}
 	}
+
+	// Always append a log file option.
 	inputs = append(inputs, textinputs.InputConfig{
 		Label: "Log file",
 		Help:  "Log HTTP requests that analysis performs to this file",
