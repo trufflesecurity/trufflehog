@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = verified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr)
+			s1.AnalysisInfo = map[string]string{"key": token}
 		}
 
 		results = append(results, s1)

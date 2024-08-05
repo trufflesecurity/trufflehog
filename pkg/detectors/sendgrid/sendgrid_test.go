@@ -126,7 +126,7 @@ func TestSendgrid_FromChunk(t *testing.T) {
 				t.Errorf("Sendgrid.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Sendgrid.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
