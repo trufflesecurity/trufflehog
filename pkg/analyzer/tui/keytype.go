@@ -54,14 +54,16 @@ func NewKeyTypePage(c *common.Common) KeyTypePage {
 }
 
 func (ui KeyTypePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, ui.Common.KeyMap.Back):
-			return nil, tea.Quit
-		case key.Matches(msg, ui.Common.KeyMap.Select):
-			chosen := string(ui.list.SelectedItem().(KeyTypeItem))
-			return NewFormPage(ui.Common, chosen), SetKeyTypeCmd(chosen)
+	if !ui.list.SettingFilter() {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch {
+			case key.Matches(msg, ui.Common.KeyMap.Back):
+				return nil, tea.Quit
+			case key.Matches(msg, ui.Common.KeyMap.Select):
+				chosen := string(ui.list.SelectedItem().(KeyTypeItem))
+				return NewFormPage(ui.Common, chosen), SetKeyTypeCmd(chosen)
+			}
 		}
 	}
 
