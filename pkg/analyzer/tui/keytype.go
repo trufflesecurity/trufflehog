@@ -6,7 +6,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/confirm"
 )
 
 type KeyTypePage struct {
@@ -41,11 +40,7 @@ func (ui KeyTypePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, ui.Common.KeyMap.Back):
-			return confirm.New(*ui.Common, "Quit?",
-				confirm.WithDefault(true),
-				confirm.WithNegativeTransition(ui, nil),
-				confirm.WithAffirmativeTransition(nil, tea.Quit),
-			), nil
+			return nil, tea.Quit
 		case key.Matches(msg, ui.Common.KeyMap.Select):
 			chosen := string(ui.list.SelectedItem().(KeyTypeItem))
 			return NewFormPage(ui.Common, chosen), SetKeyTypeCmd(chosen)
