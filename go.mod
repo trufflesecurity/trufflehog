@@ -30,8 +30,8 @@ require (
 	github.com/brianvoe/gofakeit/v7 v7.0.4
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.26.6
-	github.com/charmbracelet/glamour v0.7.0
-	github.com/charmbracelet/lipgloss v0.10.0
+	github.com/charmbracelet/glamour v0.8.0
+	github.com/charmbracelet/lipgloss v0.12.1
 	github.com/coinbase/waas-client-library-go v1.0.8
 	github.com/couchbase/gocb/v2 v2.9.1
 	github.com/crewjam/rfc5424 v0.1.0
@@ -144,7 +144,7 @@ require (
 	github.com/Microsoft/hcsshim v0.11.5 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
 	github.com/STARRY-S/zip v0.1.0 // indirect
-	github.com/alecthomas/chroma/v2 v2.8.0 // indirect
+	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/apache/arrow/go/v14 v14.0.2 // indirect
@@ -159,7 +159,7 @@ require (
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/charmbracelet/x/ansi v0.1.2 // indirect
+	github.com/charmbracelet/x/ansi v0.1.4 // indirect
 	github.com/charmbracelet/x/input v0.1.0 // indirect
 	github.com/charmbracelet/x/term v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.1.0 // indirect
@@ -178,7 +178,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/dlclark/regexp2 v1.4.0 // indirect
+	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/docker/cli v24.0.0+incompatible // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/docker v27.0.3+incompatible // indirect
@@ -214,7 +214,7 @@ require (
 	github.com/google/pprof v0.0.0-20240227163752-401108e1b7e7 // indirect
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
-	github.com/gorilla/css v1.0.0 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
@@ -235,7 +235,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
-	github.com/microcosm-cc/bluemonday v1.0.25 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -249,7 +249,7 @@ require (
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/muesli/termenv v0.15.2 // indirect
+	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.2 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
@@ -287,8 +287,8 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	github.com/yuin/goldmark v1.5.4 // indirect
-	github.com/yuin/goldmark-emoji v1.0.2 // indirect
+	github.com/yuin/goldmark v1.7.4 // indirect
+	github.com/yuin/goldmark-emoji v1.0.3 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.einride.tech/aip v0.60.0 // indirect
