@@ -69,14 +69,14 @@ func (ui FormPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		secretInfoCmd := func() tea.Msg {
 			// TODO: Set Config
-			logFile, logEnabled := values["log_file"]
+			logFile := values["log_file"]
 			cfg := config.Config{
 				LogFile:        logFile,
-				LoggingEnabled: logEnabled,
+				LoggingEnabled: logFile != "",
 			}
 			return SecretInfo{Cfg: &cfg, Parts: values}
 		}
-		return nil, tea.Batch(tea.Quit, secretInfoCmd)
+		return nil, secretInfoCmd
 	}
 	form, cmd := ui.form.Update(msg)
 	ui.form = form.(textinputs.Model)

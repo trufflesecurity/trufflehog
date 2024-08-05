@@ -16,10 +16,9 @@ import (
 // TUI is the main TUI model.
 type TUI struct {
 	keyType    string
-	secretInfo SecretInfo
+	secretInfo *SecretInfo
 	common     *common.Common
 	model      tea.Model
-	abort      bool
 }
 
 type SecretInfo struct {
@@ -46,10 +45,10 @@ func Run(keyType string) (string, *SecretInfo, error) {
 	if _, err := tea.NewProgram(t).Run(); err != nil {
 		return "", nil, err
 	}
-	if t.abort {
+	if t.secretInfo == nil {
 		return "", nil, AbortError
 	}
-	return t.keyType, &t.secretInfo, nil
+	return t.keyType, t.secretInfo, nil
 }
 
 func (ui *TUI) Init() tea.Cmd {
@@ -62,7 +61,6 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	// Always be able to force quit.
 	if msg, ok := msg.(tea.KeyMsg); ok && msg.Type.String() == "ctrl+c" {
-		ui.abort = true
 		return ui, tea.Quit
 	}
 
@@ -70,7 +68,8 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SetKeyTypeMsg:
 		ui.keyType = string(m)
 	case SecretInfo:
-		ui.secretInfo = m
+		ui.secretInfo = &m
+		return ui, tea.Quit
 	}
 
 	if ui.model == nil {
