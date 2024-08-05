@@ -196,23 +196,33 @@ func RetryableHTTPClientTimeout(timeOutSeconds int64, opts ...ClientOption) *htt
 
 const DefaultResponseTimeout = 5 * time.Second
 
-var saneTransport = &http.Transport{
-	Proxy: http.ProxyFromEnvironment,
-	DialContext: (&net.Dialer{
-		Timeout:   2 * time.Second,
-		KeepAlive: 5 * time.Second,
-	}).DialContext,
-	MaxIdleConns:          5,
-	IdleConnTimeout:       5 * time.Second,
-	TLSHandshakeTimeout:   3 * time.Second,
-	ExpectContinueTimeout: 1 * time.Second,
+var VerifySsl = true
+
+func saneTransport() *http.Transport {
+	t := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   2 * time.Second,
+			KeepAlive: 5 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          5,
+		IdleConnTimeout:       5 * time.Second,
+		TLSHandshakeTimeout:   3 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	// Disable TLS certificate validation.
+	if !VerifySsl {
+		t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	return t
 }
 
 func SaneHttpClient() *http.Client {
-	httpClient := &http.Client{}
-	httpClient.Timeout = DefaultResponseTimeout
-	httpClient.Transport = NewCustomTransport(saneTransport)
-	return httpClient
+	client := &http.Client{}
+	client.Timeout = DefaultResponseTimeout
+	client.Transport = NewCustomTransport(saneTransport())
+	return client
 }
 
 // SaneHttpClientTimeOut adds a custom timeout for some scanners
