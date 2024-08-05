@@ -1,3 +1,4 @@
+//go:generate generate_permissions permissions.yaml permissions.go sourcegraph
 package sourcegraph
 
 // ToDo: Add suport for custom domain
@@ -36,9 +37,9 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 
-	permission := "user:full (default)"
+	permission := PermissionStrings[UserRead]
 	if info.IsSiteAdmin {
-		permission = "Site Admin"
+		permission = PermissionStrings[SiteAdminFull]
 	}
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzerpb.AnalyzerType_Sourcegraph,
@@ -47,9 +48,10 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			{
 				Resource: analyzers.Resource{
 					Name:               info.User.Data.CurrentUser.Username,
-					FullyQualifiedName: info.User.Data.CurrentUser.Email,
+					FullyQualifiedName: info.User.Data.CurrentUser.Username,
 					Type:               "user",
 					Metadata: map[string]any{
+						"email":      info.User.Data.CurrentUser.Email,
 						"created_at": info.User.Data.CurrentUser.CreatedAt,
 					},
 					Parent: nil,
