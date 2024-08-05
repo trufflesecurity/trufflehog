@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
@@ -32,6 +33,11 @@ func NewFormPage(c *common.Common, keyType string) FormPage {
 			Required: true,
 		})
 	}
+	inputs = append(inputs, textinputs.InputConfig{
+		Label: "Log file",
+		Help:  "Log HTTP requests that analysis performs to this file",
+		Key:   "log_file",
+	})
 
 	form := textinputs.New(inputs).
 		SetHeader(titleStyle.Render(fmt.Sprintf("Configuring %s analyzer", keyType))).
@@ -63,7 +69,12 @@ func (ui FormPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		secretInfoCmd := func() tea.Msg {
 			// TODO: Set Config
-			return SecretInfo{Parts: values}
+			logFile, logEnabled := values["log_file"]
+			cfg := config.Config{
+				LogFile:        logFile,
+				LoggingEnabled: logEnabled,
+			}
+			return SecretInfo{Cfg: &cfg, Parts: values}
 		}
 		return nil, tea.Batch(tea.Quit, secretInfoCmd)
 	}
