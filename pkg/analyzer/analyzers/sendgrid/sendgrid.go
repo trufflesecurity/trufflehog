@@ -41,11 +41,6 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	if info == nil {
 		return nil
 	}
-	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_Sendgrid,
-		Metadata:     nil,
-		Bindings:     []analyzers.Binding{},
-	}
 
 	var keyType string
 	if slices.Contains(info.RawScopes, "user.email.read") {
@@ -56,28 +51,55 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		keyType = "restricted access"
 	}
 
-	resource := analyzers.Resource{
-		Name:               "Sendgrid Key",
-		FullyQualifiedName: "Sendgrid Key",
-		Type:               "key",
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Sendgrid,
 		Metadata: map[string]any{
 			"key_type":     keyType,
 			"2fa_required": slices.Contains(info.RawScopes, "2fa_required"),
 		},
+		Bindings:           []analyzers.Binding{},
+		UnboundedResources: []analyzers.Resource{},
 	}
 
 	for _, scope := range SCOPES {
-		for _, permission := range scope.Permissions {
-			result.Bindings = append(result.Bindings, analyzers.Binding{
-				Resource: resource,
-				Permission: analyzers.Permission{
-					Value: permission,
-				},
-			})
+		resource := getCategoryResource(scope)
+
+		if len(scope.Permissions) == 0 {
+			result.UnboundedResources = append(result.UnboundedResources, *resource)
+		} else {
+			for _, permission := range scope.Permissions {
+				result.Bindings = append(result.Bindings, analyzers.Binding{
+					Resource: *resource,
+					Permission: analyzers.Permission{
+						Value: permission,
+					},
+				})
+			}
 		}
 	}
 
 	return &result
+}
+
+func getCategoryResource(scope SendgridScope) *analyzers.Resource {
+	categoryResource := &analyzers.Resource{
+		Name:               scope.Category,
+		FullyQualifiedName: scope.Category,
+		Type:               "category",
+		Metadata:           nil,
+	}
+
+	if scope.SubCategory != "" {
+		return &analyzers.Resource{
+			Name:               scope.SubCategory,
+			FullyQualifiedName: scope.SubCategory,
+			Type:               "category",
+			Metadata:           nil,
+			Parent:             categoryResource,
+		}
+	}
+
+	return categoryResource
 }
 
 type ScopesJSON struct {
@@ -170,7 +192,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		color.Yellow("[i] 2FA Required for this account")
 	}
 
-	printPermissions(cfg.ShowAll)
+	printPermissions(true)
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
