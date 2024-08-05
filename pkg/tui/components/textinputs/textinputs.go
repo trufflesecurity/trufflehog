@@ -48,6 +48,7 @@ type InputConfig struct {
 	Help        string
 	Required    bool
 	Placeholder string
+	RedactInput bool
 }
 
 type Input struct {
@@ -192,7 +193,17 @@ func (m Model) View() string {
 			b.WriteString(m.GetLabel(m.configs[i]))
 		}
 
-		b.WriteString(m.inputs[i].View())
+		input := m.inputs[i]
+		if val := input.Value(); len(val) > 4 && m.configs[i].RedactInput {
+			if len(val) > 10 {
+				// start***end
+				input.SetValue(val[:4] + strings.Repeat("*", len(val)-8) + val[len(val)-4:])
+			} else {
+				// start***
+				input.SetValue(val[:4] + strings.Repeat("*", len(val)-4))
+			}
+		}
+		b.WriteString(input.View())
 		b.WriteRune('\n')
 		if i < len(m.inputs)-1 {
 			b.WriteRune('\n')

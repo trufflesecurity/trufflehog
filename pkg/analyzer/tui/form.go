@@ -20,9 +20,10 @@ type FormPage struct {
 
 func NewFormPage(c *common.Common, keyType string) FormPage {
 	inputs := []textinputs.InputConfig{{
-		Label:    "Secret",
-		Key:      "key",
-		Required: true,
+		Label:       "Secret",
+		Key:         "key",
+		Required:    true,
+		RedactInput: true,
 	}}
 	if keyType == "shopify" {
 		inputs = append(inputs, textinputs.InputConfig{
