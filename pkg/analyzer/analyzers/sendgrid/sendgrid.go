@@ -13,7 +13,68 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Sendgrid }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Sendgrid,
+		Metadata:     nil,
+		Bindings:     []analyzers.Binding{},
+	}
+
+	var keyType string
+	if slices.Contains(info.RawScopes, "user.email.read") {
+		keyType = "full access"
+	} else if slices.Contains(info.RawScopes, "billing.read") {
+		keyType = "billing access"
+	} else {
+		keyType = "restricted access"
+	}
+
+	resource := analyzers.Resource{
+		Name:               "Sendgrid Key",
+		FullyQualifiedName: "Sendgrid Key",
+		Type:               "key",
+		Metadata: map[string]any{
+			"key_type":     keyType,
+			"2fa_required": slices.Contains(info.RawScopes, "2fa_required"),
+		},
+	}
+
+	for _, scope := range SCOPES {
+		for _, permission := range scope.Permissions {
+			result.Bindings = append(result.Bindings, analyzers.Binding{
+				Resource: resource,
+				Permission: analyzers.Permission{
+					Value: permission,
+				},
+			})
+		}
+	}
+
+	return &result
+}
 
 type ScopesJSON struct {
 	Scopes []string `json:"scopes"`
