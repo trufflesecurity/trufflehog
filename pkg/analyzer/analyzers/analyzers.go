@@ -60,6 +60,32 @@ const (
 	FullAccess string = "full_access"
 )
 
+// Sorted list of all available analyzers. Used for valid sub-commands and TUI
+// selection. TODO: Change slice type to Analyzer interface when all available
+// analyzers implement it.
+var AvailableAnalyzers = []string{
+	"airbrake",
+	"asana",
+	"bitbucket",
+	"github",
+	"gitlab",
+	"huggingface",
+	"mailchimp",
+	"mailgun",
+	"mysql",
+	"openai",
+	"opsgenie",
+	"postgres",
+	"postman",
+	"sendgrid",
+	"shopify",
+	"slack",
+	"sourcegraph",
+	"square",
+	"stripe",
+	"twilio",
+}
+
 type PermissionStatus struct {
 	Value   bool
 	IsError bool
