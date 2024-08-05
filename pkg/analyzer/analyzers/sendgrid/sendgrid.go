@@ -192,7 +192,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		color.Yellow("[i] 2FA Required for this account")
 	}
 
-	printPermissions(true)
+	printPermissions(cfg.ShowAll)
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
