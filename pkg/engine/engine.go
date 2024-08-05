@@ -886,7 +886,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				results, err := detector.FromData(ctx, false, match)
 				cancel()
 				if err != nil {
-					ctx.Logger().Error(
+					ctx.Logger().V(2).Error(
 						err, "error finding results in chunk during verification overlap",
 						"detector", detector.Key.Type().String(),
 					)
