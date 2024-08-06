@@ -271,7 +271,10 @@ func (br *BufferedReadSeeker) readToEnd() error {
 		}
 	}
 
-	// If we have a temp file, flush the buffer to disk.
+	// If a temporary file exists and the buffer contains data,
+	// flush the buffer to the file. This allows future operations
+	// to utilize the temporary file exclusively, simplifying
+	// management by avoiding separate handling of the buffer and file.
 	if br.tempFile != nil && br.buf.Len() > 0 {
 		if err := br.flushBufferToDisk(); err != nil {
 			return err
