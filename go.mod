@@ -107,7 +107,7 @@ require (
 	golang.org/x/net v0.27.0
 	golang.org/x/oauth2 v0.22.0
 	golang.org/x/sync v0.8.0
-	golang.org/x/text v0.16.0
+	golang.org/x/text v0.17.0
 	google.golang.org/api v0.190.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/h2non/gock.v1 v1.1.2
