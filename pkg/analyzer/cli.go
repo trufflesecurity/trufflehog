@@ -61,7 +61,7 @@ func Run(cmd string) {
 	if secretInfo.Cfg == nil {
 		secretInfo.Cfg = &config.Config{}
 	}
-	switch keyType {
+	switch strings.ToLower(keyType) {
 	case "github":
 		github.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "sendgrid":
