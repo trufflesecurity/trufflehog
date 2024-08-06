@@ -36,7 +36,7 @@ var (
 )
 
 func Command(app *kingpin.Application) *kingpin.CmdClause {
-	cli := app.Command("analyze", "Analyze API keys for fine-grained permissions information.").Hidden()
+	cli := app.Command("analyze", "Analyze API keys for fine-grained permissions information.")
 
 	keyTypeHelp := fmt.Sprintf(
 		"Type of key to analyze. Omit to interactively choose. Available key types: %s",
