@@ -650,9 +650,9 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 			commitHash := plumbing.NewHash(fullHash)
 			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.V(1).Info(
+				logger.Error(
+					err,
 					"error handling binary file",
-					"error", err,
 					"filename", fileName,
 					"commit", commitHash,
 					"file", diff.PathB,
@@ -873,7 +873,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				Verify:         s.verify,
 			}
 			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
+				logger.Error(err, "error handling binary file", "filename", fileName)
 			}
 			continue
 		}

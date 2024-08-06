@@ -168,7 +168,6 @@ func TestSkipArchive(t *testing.T) {
 
 func TestHandleNestedArchives(t *testing.T) {
 	file, err := os.Open("testdata/nested-dirs.zip")
-	// file, err := os.Open("/Users/ahrav.dutta/Thog/json-files/md_random_data.json.zip")
 	assert.Nil(t, err)
 
 	chunkCh := make(chan *sources.Chunk)
@@ -421,7 +420,7 @@ func TestHandlePipe(t *testing.T) {
 }
 
 func TestHandleZipCommandStdoutPipe(t *testing.T) {
-	cmd := exec.Command("zip", "-r", "-", ".")
+	cmd := exec.Command("zip", "-j", "-", "testdata/nested-dirs.zip")
 	stdout, err := cmd.StdoutPipe()
 	assert.NoError(t, err)
 
@@ -441,7 +440,7 @@ func TestHandleZipCommandStdoutPipe(t *testing.T) {
 	err = cmd.Wait()
 	assert.NoError(t, err)
 
-	wantCount := 254
+	wantCount := 8
 	count := 0
 	for range chunkCh {
 		count++
