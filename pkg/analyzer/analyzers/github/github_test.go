@@ -18,12 +18,374 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
+	analyzerSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "analyzers1")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+
 	tests := []struct {
 		name    string
 		key     string
 		want    string // JSON string
 		wantErr bool
 	}{
+		{
+			name:    "finegrained - github-allrepos-actionsRW-contentsRW-issuesRW",
+			key:     analyzerSecrets.MustGetField("GITHUB_FINEGRAINED_ALLREPOS_ACTIONS_RW_CONTENTS_RW_ISSUES_RW"),
+			wantErr: false,
+			want: `{
+              "AnalyzerType": 0,
+              "Bindings": [
+                {
+                  "Resource": {
+                    "Name": "private",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "actions:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "private",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "contents:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "private",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "issues:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "private",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "metadata:read",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "private",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "actions:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "private",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "contents:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "private",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "deployments:read",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "private",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "issues:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "private",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "metadata:read",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "public",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "actions:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "public",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "contents:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "public",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "issues:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "public",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "metadata:read",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "public",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "actions:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "public",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "contents:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "public",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "deployments:read",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "public",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "issues:write",
+                    "Parent": null
+                  }
+                },
+                {
+                  "Resource": {
+                    "Name": "public",
+                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
+                    "Type": "repository",
+                    "Metadata": null,
+                    "Parent": {
+                      "Name": "sirdetectsalot",
+                      "FullyQualifiedName": "github.com/sirdetectsalot",
+                      "Type": "user",
+                      "Metadata": null,
+                      "Parent": null
+                    }
+                  },
+                  "Permission": {
+                    "Value": "metadata:read",
+                    "Parent": null
+                  }
+                }
+              ],
+              "UnboundedResources": null,
+              "Metadata": {
+                "expiration": "0001-01-01T00:00:00Z",
+                "type": "Fine-Grained GitHub Personal Access Token"
+              }
+            }`,
+		},
 		{
 			name: "v2 ghp",
 			key:  testSecrets.MustGetField("GITHUB_VERIFIED_GHP"),
@@ -60,7 +422,6 @@ func TestAnalyzer_Analyze(t *testing.T) {
                   },
                   "Permission": {
                     "Value": "notifications",
-                    "AccessLevel": "",
                     "Parent": null
                   }
                 }
@@ -68,7 +429,6 @@ func TestAnalyzer_Analyze(t *testing.T) {
               "UnboundedResources": null,
               "Metadata": {
                 "expiration": "0001-01-01T00:00:00Z",
-                "fine_grained": false,
                 "type": "Classic GitHub Personal Access Token"
               }
             }`,
