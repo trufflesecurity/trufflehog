@@ -27,7 +27,11 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Opsgenie }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("missing key in credInfo")
+	}
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +45,8 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
 		AnalyzerType:       analyzerpb.AnalyzerType_Opsgenie,
 		Metadata:           nil,
-		Bindings:           []analyzers.Binding{},
-		UnboundedResources: []analyzers.Resource{},
+		Bindings:           make([]analyzers.Binding, len(info.Permissions)),
+		UnboundedResources: make([]analyzers.Resource, len(info.Users)),
 	}
 
 	// Opsgenie has API integrations, so the key does not belong
@@ -56,13 +60,13 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		},
 	}
 
-	for _, permission := range info.Permissions {
-		result.Bindings = append(result.Bindings, analyzers.Binding{
+	for idx, permission := range info.Permissions {
+		result.Bindings[idx] = analyzers.Binding{
 			Resource: resource,
 			Permission: analyzers.Permission{
 				Value: permission,
 			},
-		})
+		}
 	}
 
 	// We can find list of users in the current account
@@ -71,10 +75,11 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	for _, user := range info.Users {
 		result.UnboundedResources = append(result.UnboundedResources, analyzers.Resource{
 			Name:               user.FullName,
-			FullyQualifiedName: user.Username,
+			FullyQualifiedName: user.FullName,
 			Type:               "user",
 			Metadata: map[string]any{
-				"role": user.Role.Name,
+				"username": user.Username,
+				"role":     user.Role.Name,
 			},
 		})
 	}

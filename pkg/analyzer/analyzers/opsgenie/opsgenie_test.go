@@ -19,6 +19,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
+	key := testSecrets.MustGetField("OPSGENIE")
+
 	tests := []struct {
 		name    string
 		key     string
@@ -27,84 +29,92 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name: "valid Opsgenie API key",
-			key:  testSecrets.MustGetField("OPSGENIE"),
+			key:  key,
 			want: `{
-				"AnalyzerType":11,
-				"Bindings":[
-				   {
-					  "Resource":{
-						 "Name":"Opsgenie API Integration Key",
-						 "FullyQualifiedName":"Opsgenie API Integration Key",
-						 "Type":"API Key",
-						 "Metadata":{
-							"expires":"never"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Configuration Access",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"Opsgenie API Integration Key",
-						 "FullyQualifiedName":"Opsgenie API Integration Key",
-						 "Type":"API Key",
-						 "Metadata":{
-							"expires":"never"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"Opsgenie API Integration Key",
-						 "FullyQualifiedName":"Opsgenie API Integration Key",
-						 "Type":"API Key",
-						 "Metadata":{
-							"expires":"never"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Delete",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"Opsgenie API Integration Key",
-						 "FullyQualifiedName":"Opsgenie API Integration Key",
-						 "Type":"API Key",
-						 "Metadata":{
-							"expires":"never"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Create and Update",
-						 "Parent":null
-					  }
-				   }
+				"AnalyzerType": 11,
+				"Bindings": [
+					{
+					"Resource": {
+						"Name": "Opsgenie API Integration Key",
+						"FullyQualifiedName": "Opsgenie API Integration Key",
+						"Type": "API Key",
+						"Metadata": {
+						"expires": "never"
+						},
+						"Parent": null
+					},
+					"Permission": {
+						"Value": "Configuration Access",
+						"Parent": null
+					}
+					},
+					{
+					"Resource": {
+						"Name": "Opsgenie API Integration Key",
+						"FullyQualifiedName": "Opsgenie API Integration Key",
+						"Type": "API Key",
+						"Metadata": {
+						"expires": "never"
+						},
+						"Parent": null
+					},
+					"Permission": {
+						"Value": "Read",
+						"Parent": null
+					}
+					},
+					{
+					"Resource": {
+						"Name": "Opsgenie API Integration Key",
+						"FullyQualifiedName": "Opsgenie API Integration Key",
+						"Type": "API Key",
+						"Metadata": {
+						"expires": "never"
+						},
+						"Parent": null
+					},
+					"Permission": {
+						"Value": "Delete",
+						"Parent": null
+					}
+					},
+					{
+					"Resource": {
+						"Name": "Opsgenie API Integration Key",
+						"FullyQualifiedName": "Opsgenie API Integration Key",
+						"Type": "API Key",
+						"Metadata": {
+						"expires": "never"
+						},
+						"Parent": null
+					},
+					"Permission": {
+						"Value": "Create and Update",
+						"Parent": null
+					}
+					}
 				],
-				"UnboundedResources":[
-				   {
-					  "Name":"John Scanner",
-					  "FullyQualifiedName":"secretscanner02@zohomail.com",
-					  "Type":"user",
-					  "Metadata":{
-						 "role":"Owner"
-					  },
-					  "Parent":null
-				   }
+				"UnboundedResources": [
+					{
+					"Name": "",
+					"FullyQualifiedName": "",
+					"Type": "",
+					"Metadata": null,
+					"Parent": null
+					},
+					{
+					"Name": "John Scanner",
+					"FullyQualifiedName": "John Scanner",
+					"Type": "user",
+					"Metadata": {
+						"role": "Owner",
+						"username": "secretscanner02@zohomail.com"
+					},
+					"Parent": null
+					}
 				],
-				"Metadata":null
-			 }`,
+				"Metadata": null
+				}`,
 			wantErr: false,
 		},
 	}
