@@ -37,22 +37,10 @@ func secretInfoToAnalyzerResult(info *common.SecretInfo) *analyzers.AnalyzerResu
 	if info == nil {
 		return nil
 	}
-	// Metadata        *TokenMetadata
-	//	Type        string
-	//	FineGrained bool
-	//	User        *gh.User
-	//	Expiration  time.Time
-	//	OauthScopes []analyzers.Permission
-	// Repos           []*gh.Repository
-	// Gists           []*gh.Gist
-	// AccessibleRepos []*gh.Repository
-	// RepoAccessMap   map[string]string
-	// UserAccessMap   map[string]string
 	result := &analyzers.AnalyzerResult{
 		Metadata: map[string]any{
-			"type":         info.Metadata.Type,
-			"fine_grained": info.Metadata.FineGrained,
-			"expiration":   info.Metadata.Expiration,
+			"type":       info.Metadata.Type,
+			"expiration": info.Metadata.Expiration,
 		},
 	}
 	result.Bindings = append(result.Bindings, secretInfoToUserBindings(info)...)
@@ -89,6 +77,22 @@ func userToResource(user *gh.User) *analyzers.Resource {
 }
 
 func secretInfoToRepoBindings(info *common.SecretInfo) []analyzers.Binding {
+	var perms []analyzers.Permission
+	switch info.Metadata.Type {
+	case common.TokenTypeClassicPAT:
+		perms = info.Metadata.OauthScopes
+	case common.TokenTypeFineGrainedPAT:
+		fineGrainedPermissions := info.RepoAccessMap.([]finegrained.Permission)
+		for _, perm := range fineGrainedPermissions {
+			permName, _ := perm.ToString()
+			perms = append(perms, analyzers.Permission{Value: permName})
+		}
+	default:
+		if len(info.Metadata.OauthScopes) > 0 {
+			perms = info.Metadata.OauthScopes
+		}
+	}
+
 	repos := info.Repos
 	if len(info.AccessibleRepos) > 0 {
 		repos = info.AccessibleRepos
@@ -101,7 +105,7 @@ func secretInfoToRepoBindings(info *common.SecretInfo) []analyzers.Binding {
 			Type:               "repository",
 			Parent:             userToResource(repo.Owner),
 		}
-		bindings = append(bindings, analyzers.BindAllPermissions(resource, info.Metadata.OauthScopes...)...)
+		bindings = append(bindings, analyzers.BindAllPermissions(resource, perms...)...)
 	}
 	return bindings
 }
@@ -133,8 +137,9 @@ func AnalyzePermissions(cfg *config.Config, key string) (*common.SecretInfo, err
 
 	if md.FineGrained {
 		return finegrained.AnalyzeFineGrainedToken(client, md, cfg.Shallow)
+	} else {
+		return classic.AnalyzeClassicToken(client, md)
 	}
-	return classic.AnalyzeClassicToken(client, md)
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {

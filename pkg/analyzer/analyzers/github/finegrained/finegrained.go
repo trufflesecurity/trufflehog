@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"sort"
@@ -108,12 +107,12 @@ func permissionFormatter(key, val any) (string, string) {
 }
 
 func notImplementedRepoPerm(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
-	return Invalid, ErrInvalid
+	return NoAccess, nil
 }
 
 // notImplementedAcctPerm is a placeholder function that returns a "NOT_IMPLEMENTED" status when a GitHub account permission is not yet implemented.
 func notImplementedAcctPerm(client *gh.Client, user *gh.User) (Permission, error) {
-	return Invalid, ErrInvalid
+	return NoAccess, nil
 }
 
 func getMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
@@ -122,7 +121,7 @@ func getMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess
 	_, resp, err := client.Repositories.ListCollaborators(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 	if err != nil {
 		if resp.StatusCode == 403 {
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		}
 		return Invalid, err
 	}
@@ -138,7 +137,7 @@ func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 		_, resp, err := client.Actions.ListArtifacts(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 200:
 			break
 		default:
@@ -163,7 +162,7 @@ func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
 		if currentAccess == "UNKNOWN" {
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		}
 		// Risk: Very, very low.
 		// -> Unless the user has a workflow file named (see RANDOM_STRING above), this will always return 404 for users with READ_WRITE permissions.
@@ -171,7 +170,7 @@ func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 		resp, err := client.Actions.CreateWorkflowDispatchEventByFileName(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, gh.CreateWorkflowDispatchEventRequest{})
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 404:
 			return ActionsWrite, nil
 		case 200:
@@ -191,7 +190,7 @@ func getAdministrationPermission(client *gh.Client, repo *gh.Repository, current
 	_, resp, err := client.Repositories.GetActionsPermissions(context.Background(), *repo.Owner.Login, *repo.Name)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -219,24 +218,11 @@ func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, cur
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/code-scanning/alerts
 	_, resp, err := client.CodeScanning.ListAlertsForRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
-	if err != nil {
-		return Invalid, err
-	}
 	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	body := string(bodyBytes)
-
-	if strings.Contains(body, "Code scanning is not enabled for this repository") {
-		return Invalid, errors.New("code scanning is not enabled")
-	}
 
 	switch {
 	case resp.StatusCode == 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case resp.StatusCode == 404:
 		break
 	case resp.StatusCode >= 200 && resp.StatusCode <= 299:
@@ -268,7 +254,7 @@ func getCodespacesPermission(client *gh.Client, repo *gh.Repository, currentAcce
 	_, resp, err := client.Codespaces.ListInRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -304,7 +290,7 @@ func getCodespacesMetadataPermission(client *gh.Client, repo *gh.Repository, cur
 	resp, err := client.Do(context.Background(), req, nil)
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		return CodespacesMetadataRead, nil
 	default:
@@ -318,7 +304,7 @@ func getCodespacesSecretsPermission(client *gh.Client, repo *gh.Repository, curr
 	_, resp, err := client.Codespaces.GetRepoSecret(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING)
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 404:
 		return CodespacesSecretsWrite, nil
 	case 200:
@@ -339,7 +325,7 @@ func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, current
 		_, resp, err := client.Repositories.ListStatuses(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, nil)
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 404:
 			break
 		default:
@@ -362,7 +348,7 @@ func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, current
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
 		if currentAccess == "UNKNOWN" {
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		}
 		// Risk: Extremely Low
 		// -> We're POSTing a commit status to a commit that cannot exist. This should always return 422 if valid access.
@@ -371,7 +357,7 @@ func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, current
 		switch resp.StatusCode {
 		case 403:
 			// All we know is we don't have READ_WRITE
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 422:
 			return CommitStatusesWrite, nil
 		default:
@@ -391,7 +377,7 @@ func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess
 		_, resp, err := client.Repositories.ListCommits(context.Background(), *repo.Owner.Login, *repo.Name, &gh.CommitsListOptions{})
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 200:
 			break
 		case 409:
@@ -419,7 +405,7 @@ func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
 		if currentAccess == "UNKNOWN" {
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		}
 		// Risk: Low-Medium
 		// -> We're creating a file with an invalid payload. Worst case is a file with a random string and no content is created. But this should never happen.
@@ -427,10 +413,9 @@ func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess
 		_, resp, err := client.Repositories.CreateFile(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, &gh.RepositoryContentFileOptions{})
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 200:
-			log.Fatal("This should never happen. We are creating a file with an invalid payload.")
-			return ContentsWrite, nil
+			panic("This should never happen. We are creating a file with an invalid payload.")
 		case 400, 422:
 			return ContentsWrite, nil
 		default:
@@ -443,20 +428,16 @@ func getDependabotAlertsPermission(client *gh.Client, repo *gh.Repository, curre
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/dependabot/alerts
 	_, resp, err := client.Dependabot.ListRepoAlerts(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListAlertsOptions{})
+	if err != nil {
+		if !strings.Contains(err.Error(), "disabled") {
+			return NoAccess, err
+		}
+	}
+	defer resp.Body.Close()
+
 	switch resp.StatusCode {
 	case 403:
-		defer resp.Body.Close()
-
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		body := string(bodyBytes)
-
-		if strings.Contains(body, "Dependabot alerts are disabled for this repository.") {
-			return Invalid, errors.New("dependabot alerts are disabled")
-		}
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -484,7 +465,7 @@ func getDependabotSecretsPermission(client *gh.Client, repo *gh.Repository, curr
 	_, resp, err := client.Dependabot.ListRepoSecrets(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -514,7 +495,7 @@ func getDeploymentsPermission(client *gh.Client, repo *gh.Repository, currentAcc
 	_, resp, err := client.Repositories.ListDeployments(context.Background(), *repo.Owner.Login, *repo.Name, &gh.DeploymentsListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -543,29 +524,29 @@ func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAc
 	// GET /repos/{owner}/{repo}/environments
 	envResp, resp, _ := client.Repositories.ListEnvironments(context.Background(), *repo.Owner.Login, *repo.Name, &gh.EnvironmentListOptions{})
 	if resp.StatusCode != 200 {
-		return Invalid, errors.New("unknown status code")
+		return NoAccess, nil
 	}
 	// If no environments exist, then we return UNKNOWN
 	if len(envResp.Environments) == 0 {
-		return Invalid, errors.New("no environments found")
+		return NoAccess, nil
 	}
 
 	// Risk: Extremely Low
 	// GET /repositories/{repository_id}/environments/{environment_name}/variables
-	_, resp, err := client.Actions.ListEnvVariables(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ListOptions{})
+	_, resp, _ = client.Actions.ListEnvVariables(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
-		return Invalid, err
+		return Invalid, nil
 	}
 
 	// Risk: Very Low
 	// -> We're updating an environment variable with an invalid payload. Even if we did, the name would be (see RANDOM_STRING above) and the value would be nil.
 	// PATCH /repositories/{repository_id}/environments/{environment_name}/variables/{variable_name}
-	resp, err = client.Actions.UpdateEnvVariable(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ActionsVariable{Name: RANDOM_STRING})
+	resp, err := client.Actions.UpdateEnvVariable(context.Background(), *repo.Owner.Login, *repo.Name, *envResp.Environments[0].Name, &gh.ActionsVariable{Name: RANDOM_STRING})
 	switch resp.StatusCode {
 	case 403:
 		return EnvironmentsRead, nil
@@ -588,7 +569,7 @@ func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess s
 		_, resp, err := client.Issues.ListByRepo(context.Background(), *repo.Owner.Login, *repo.Name, &gh.IssueListByRepoOptions{})
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 200, 301:
 			break
 		default:
@@ -613,7 +594,7 @@ func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess s
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
 		if currentAccess == "UNKNOWN" {
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		}
 		// Risk: Very Low
 		// -> We're editing an issue label that does not exist. Even if we did, the name would be (see RANDOM_STRING above).
@@ -621,7 +602,7 @@ func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess s
 		_, resp, err := client.Issues.EditLabel(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING, &gh.Label{})
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 404:
 			return IssuesWrite, nil
 		case 200:
@@ -640,7 +621,7 @@ func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess st
 		_, resp, err := client.Repositories.GetPagesInfo(context.Background(), *repo.Owner.Login, *repo.Name)
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 200, 404:
 			break
 		default:
@@ -669,7 +650,7 @@ func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess st
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
 		if currentAccess == "UNKNOWN" {
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		}
 		// Risk: Very Low
 		// -> We're cancelling a GitHub Pages deployment that does not exist (see RANDOM_STRING above).
@@ -681,7 +662,7 @@ func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess st
 		resp, err := client.Do(context.Background(), req, nil)
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 404:
 			return PagesWrite, nil
 		case 200:
@@ -700,7 +681,7 @@ func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAc
 		_, resp, err := client.PullRequests.List(context.Background(), *repo.Owner.Login, *repo.Name, &gh.PullRequestListOptions{})
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 200:
 			break
 		default:
@@ -725,7 +706,7 @@ func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAc
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
 		if currentAccess == "UNKNOWN" {
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		}
 		// Risk: Very Low
 		// -> We're creating a pull request with an invalid payload.
@@ -733,7 +714,7 @@ func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAc
 		_, resp, err := client.PullRequests.Create(context.Background(), *repo.Owner.Login, *repo.Name, &gh.NewPullRequest{})
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 422:
 			return PullRequestsWrite, nil
 		case 200:
@@ -753,7 +734,7 @@ func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAc
 		_, resp, err := client.SecurityAdvisories.ListRepositorySecurityAdvisories(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 		switch resp.StatusCode {
 		case 403, 404:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 200:
 			break
 		default:
@@ -782,7 +763,7 @@ func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAc
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
 		if currentAccess == "UNKNOWN" {
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		}
 		// Risk: Very Low
 		// -> We're creating a security advisory with an invalid payload.
@@ -794,7 +775,7 @@ func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAc
 		resp, err := client.Do(context.Background(), req, nil)
 		switch resp.StatusCode {
 		case 403:
-			return Invalid, ErrInvalid
+			return NoAccess, nil
 		case 422:
 			return RepoSecurityWrite, nil
 		case 200:
@@ -812,7 +793,7 @@ func getSecretScanningPermission(client *gh.Client, repo *gh.Repository, current
 	_, resp, err := client.SecretScanning.ListAlertsForRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200, 404:
 		break
 	default:
@@ -842,7 +823,7 @@ func getSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 	_, resp, err := client.Actions.ListRepoSecrets(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -872,7 +853,7 @@ func getVariablesPermission(client *gh.Client, repo *gh.Repository, currentAcces
 	_, resp, err := client.Actions.ListRepoVariables(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -902,7 +883,7 @@ func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess
 	_, resp, err := client.Repositories.ListHooks(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -952,7 +933,7 @@ func getBlockUserPermission(client *gh.Client, user *gh.User) (Permission, error
 	_, resp, err := client.Users.ListBlockedUsers(context.Background(), nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -982,7 +963,7 @@ func getCodespacesUserPermission(client *gh.Client, user *gh.User) (Permission, 
 	_, resp, err := client.Codespaces.ListUserSecrets(context.Background(), nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -1012,7 +993,7 @@ func getEmailPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	_, resp, err := client.Users.ListEmails(context.Background(), nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -1041,7 +1022,7 @@ func getFollowersPermission(client *gh.Client, user *gh.User) (Permission, error
 	_, resp, err := client.Users.ListFollowers(context.Background(), "", nil)
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -1070,7 +1051,7 @@ func getGPGKeysPermission(client *gh.Client, user *gh.User) (Permission, error) 
 	_, resp, err := client.Users.ListGPGKeys(context.Background(), "", nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -1101,7 +1082,7 @@ func getGistsPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	_, resp, err := client.Gists.Create(context.Background(), &gh.Gist{})
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 422:
 		return GistsWrite, nil
 	case 200, 201, 204:
@@ -1118,7 +1099,7 @@ func getGitKeysPermission(client *gh.Client, user *gh.User) (Permission, error) 
 	_, resp, err := client.Users.ListKeys(context.Background(), "", nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -1152,7 +1133,7 @@ func getLimitsPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	resp, err := client.Do(context.Background(), req, nil)
 	switch resp.StatusCode {
 	case 403:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200, 204:
 		break
 	default:
@@ -1186,7 +1167,7 @@ func getPlanPermission(client *gh.Client, user *gh.User) (Permission, error) {
 	_, resp, err := client.Billing.GetActionsBillingUser(context.Background(), *user.Login)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		return PlanRead, nil
 	default:
@@ -1205,7 +1186,7 @@ func getProfilePermission(client *gh.Client, user *gh.User) (Permission, error) 
 	resp, err := client.Do(context.Background(), req, nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 422:
 		return ProfileWrite, nil
 	case 200, 201, 204:
@@ -1222,7 +1203,7 @@ func getSigningKeysPermission(client *gh.Client, user *gh.User) (Permission, err
 	_, resp, err := client.Users.ListSSHSigningKeys(context.Background(), "", nil)
 	switch resp.StatusCode {
 	case 403, 404:
-		return Invalid, ErrInvalid
+		return NoAccess, nil
 	case 200:
 		break
 	default:
@@ -1302,13 +1283,21 @@ func AnalyzeFineGrainedToken(client *gh.Client, meta *common.TokenMetadata, shal
 		if err != nil {
 			return nil, err
 		}
-		repoAccessMap = append(repoAccessMap, perms...)
+		for _, perm := range perms {
+			if perm != Invalid && perm != NoAccess {
+				repoAccessMap = append(repoAccessMap, perm)
+			}
+		}
 
 		perms, err = analyzeUserPermissions(client, meta.User)
 		if err != nil {
 			return nil, err
 		}
-		userAccessMap = append(userAccessMap, perms...)
+		for _, perm := range perms {
+			if perm != Invalid && perm != NoAccess {
+				userAccessMap = append(userAccessMap, perm)
+			}
+		}
 	}
 
 	return &common.SecretInfo{
