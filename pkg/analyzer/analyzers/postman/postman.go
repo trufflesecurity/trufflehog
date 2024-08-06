@@ -96,7 +96,7 @@ func bakePermissions(roles []string) []analyzers.Permission {
 
 	permissions := make([]analyzers.Permission, len(permissionMap))
 	count := 0
-	for perm, _ := range permissionMap {
+	for perm := range permissionMap {
 		permStr, err := perm.ToString()
 		if err != nil {
 			continue
