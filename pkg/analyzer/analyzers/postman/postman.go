@@ -1,3 +1,4 @@
+//go:generate generate_permissions permissions.yaml permissions.go postman
 package postman
 
 import (
@@ -5,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
@@ -23,7 +25,11 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Postman }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, fmt.Errorf("missing key in credInfo")
+	}
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
@@ -34,39 +40,38 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	if info == nil {
 		return nil
 	}
+
 	result := analyzers.AnalyzerResult{
 		AnalyzerType:       analyzerpb.AnalyzerType_Postman,
 		Metadata:           nil,
-		Bindings:           []analyzers.Binding{},
 		UnboundedResources: []analyzers.Resource{},
 	}
 
 	resource := analyzers.Resource{
-		Name:               info.User.User.Username,
-		FullyQualifiedName: info.User.User.Email,
+		Name:               info.User.User.FullName,
+		FullyQualifiedName: info.User.User.FullName,
 		Type:               "user",
 		Metadata: map[string]any{
-			"full_name":   info.User.User.FullName,
+			"role":        strings.Join(info.User.User.Roles, ","),
+			"username":    info.User.User.Username,
+			"email":       info.User.User.Email,
 			"team_name":   info.User.User.TeamName,
 			"team_domain": info.User.User.TeamDomain,
 		},
 	}
 
-	for _, role := range info.User.User.Roles {
-		result.Bindings = append(result.Bindings, analyzers.Binding{
-			Resource: resource,
-			Permission: analyzers.Permission{
-				Value: role,
-			},
-		})
-	}
+	permissions := bakePermissions(info.User.User.Roles)
+
+	// bind all permissions with resources
+	result.Bindings = analyzers.BindAllPermissions(resource, permissions...)
 
 	for _, workspace := range info.Workspace.Workspaces {
 		result.UnboundedResources = append(result.UnboundedResources, analyzers.Resource{
 			Name:               workspace.Name,
-			FullyQualifiedName: workspace.ID,
+			FullyQualifiedName: workspace.Name,
 			Type:               "workspace",
 			Metadata: map[string]any{
+				"id":         workspace.ID,
 				"type":       workspace.Type,
 				"visibility": workspace.Visibility,
 			},
@@ -74,6 +79,36 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	return &result
+}
+
+func bakePermissions(roles []string) []analyzers.Permission {
+	permissionMap := map[Permission]struct{}{}
+
+	for _, role := range roles {
+		permissions, ok := rolePermission[role]
+		if !ok {
+			continue
+		}
+		for _, permission := range permissions {
+			permissionMap[permission] = struct{}{}
+		}
+	}
+
+	permissions := make([]analyzers.Permission, len(permissionMap))
+	count := 0
+	for perm, _ := range permissionMap {
+		permStr, err := perm.ToString()
+		if err != nil {
+			continue
+		}
+		permissions[count] = analyzers.Permission{
+			Value:  permStr,
+			Parent: nil,
+		}
+		count++
+	}
+
+	return permissions
 }
 
 type UserInfoJSON struct {
