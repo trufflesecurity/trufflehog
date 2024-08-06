@@ -85,13 +85,6 @@ func processPermissions(rawScopes []string) {
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-
-	// ToDo: Add logging when rewrite to not use SG client.
-	if cfg.LoggingEnabled {
-		color.Red("[x] Logging not supported for GitHub Token Analysis.")
-		return
-	}
-
 	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
 		color.Red("[!] Error: %v", err)
@@ -116,6 +109,8 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+	// Setup custom HTTP client so we can log requests.
+	sg.DefaultClient.HTTPClient = analyzers.NewAnalyzeClient(cfg)
 
 	req := sg.GetRequest(key, "/v3/scopes", "https://api.sendgrid.com")
 	req.Method = "GET"
