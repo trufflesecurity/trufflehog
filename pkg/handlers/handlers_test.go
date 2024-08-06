@@ -394,20 +394,17 @@ func BenchmarkHandleTar(b *testing.B) {
 }
 
 func TestHandlePipe(t *testing.T) {
-	// Create a pipe
 	r, w := io.Pipe()
 
-	// Start a goroutine to write test data to the pipe
 	go func() {
 		defer w.Close()
 		file, err := os.Open("testdata/test.tar")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		defer file.Close()
 		_, err = io.Copy(w, file)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	}()
 
-	// Use the pipe reader in HandleFile
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
@@ -434,7 +431,6 @@ func TestHandleZipCommandStdoutPipe(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Use the stdout pipe in HandleFile
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
