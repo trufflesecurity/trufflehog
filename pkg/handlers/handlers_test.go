@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -167,6 +168,7 @@ func TestSkipArchive(t *testing.T) {
 
 func TestHandleNestedArchives(t *testing.T) {
 	file, err := os.Open("testdata/nested-dirs.zip")
+	// file, err := os.Open("/Users/ahrav.dutta/Thog/json-files/md_random_data.json.zip")
 	assert.Nil(t, err)
 
 	chunkCh := make(chan *sources.Chunk)
@@ -389,4 +391,65 @@ func BenchmarkHandleTar(b *testing.B) {
 		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(b, err)
 	}
+}
+
+func TestHandlePipe(t *testing.T) {
+	// Create a pipe
+	r, w := io.Pipe()
+
+	// Start a goroutine to write test data to the pipe
+	go func() {
+		defer w.Close()
+		file, err := os.Open("testdata/test.tar")
+		assert.Nil(t, err)
+		defer file.Close()
+		_, err = io.Copy(w, file)
+		assert.Nil(t, err)
+	}()
+
+	// Use the pipe reader in HandleFile
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), r, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 1
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func TestHandleZipCommandStdoutPipe(t *testing.T) {
+	cmd := exec.Command("zip", "-r", "-", ".")
+	stdout, err := cmd.StdoutPipe()
+	assert.NoError(t, err)
+
+	err = cmd.Start()
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Use the stdout pipe in HandleFile
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(ctx, stdout, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	err = cmd.Wait()
+	assert.NoError(t, err)
+
+	wantCount := 254
+	count := 0
+	for range chunkCh {
+		count++
+	}
+
+	assert.Equal(t, wantCount, count)
 }

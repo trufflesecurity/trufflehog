@@ -1223,6 +1223,15 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
+type countingWriter struct {
+	total *int64
+}
+
+func (w countingWriter) Write(p []byte) (int, error) {
+	*w.total += int64(len(p))
+	return len(p), nil
+}
+
 func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
 	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
 	fileCtx.Logger().V(5).Info("handling binary file")
@@ -1243,26 +1252,11 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return err
 	}
 
-	done := make(chan error, 1)
-	// Read from stdout to prevent the pipe buffer from filling up and causing the command to hang.
-	// This allows us to stream the file contents to the handler.
-	go func() {
-		defer close(done)
-		done <- handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
-	}()
-
-	// Close to signal that we are done writing to the pipe, which allows the reading goroutine to finish.
-	if closeErr := stdout.Close(); closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
-		ctx.Logger().Error(fmt.Errorf("error closing stdout: %w", closeErr), "closing stdout failed")
+	if err = handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives)); err != nil {
+		return err
 	}
 
-	if waitErr := cmd.Wait(); waitErr != nil {
-		return fmt.Errorf("error waiting for git cat-file: %w", waitErr)
-	}
-
-	// Wait for the command to finish and the handler to complete.
-	// Capture any error from the file handling process.
-	return <-done
+	return cmd.Wait()
 }
 
 func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, error) {
