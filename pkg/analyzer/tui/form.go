@@ -63,7 +63,7 @@ func NewFormPage(c *common.Common, keyType string) FormPage {
 
 	form := textinputs.New(inputs).
 		SetHeader(titleStyle.Render(fmt.Sprintf("Configuring %s analyzer", keyType))).
-		SetFooter("⚠️  Running TruffleHog Analyze will send a lot of requests ⚠️").
+		SetFooter("⚠️  Running TruffleHog Analyze will send a lot of requests ⚠️\n\n🚧 Please confirm you have permission to run TruffleHog Analyze against this secret 🚧").
 		SetSubmitMsg("Run TruffleHog Analyze")
 	return FormPage{
 		Common:  c,
