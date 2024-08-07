@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/felixge/fgprof"
@@ -338,9 +337,6 @@ func run(state overseer.State) {
 		} else {
 			logger.Info("cleaned temporary artifacts")
 		}
-
-		time.Sleep(time.Second * 10)
-		logger.Info("10 seconds elapsed. Forcing shutdown.")
 		os.Exit(0)
 	}()
 
