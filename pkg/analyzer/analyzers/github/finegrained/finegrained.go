@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/fatih/color"
@@ -1337,17 +1336,8 @@ func printFineGrainedPermissions(accessMap []Permission, showAll bool, repoPermi
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Permission Type", "Permission" /* Add more column headers if needed */})
 
-	// Extract keys from accessMap into slice
-	keys := make([]string, 0, len(accessMap))
-	for _, k := range accessMap {
-		val, _ := k.ToString()
-		keys = append(keys, val)
-	}
-	// Sort the slice
-	sort.Strings(keys)
-
-	for idx, permStr := range keys {
-		perm := accessMap[idx]
+	for _, perm := range accessMap {
+		permStr, _ := perm.ToString()
 		if perm == Invalid {
 			// don't change permissionCount
 		} else {
