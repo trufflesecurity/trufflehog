@@ -54,36 +54,15 @@ type BufferedReadSeeker struct {
 	sizeKnown bool  // Whether the total size of the reader is known
 }
 
-// isSeekable determines if a reader supports reliable seeking operations.
-// This function is necessary because some types (like os.File when used as a pipe)
-// may implement io.Seeker but don't actually support seeking operations.
-//
-// It performs the following checks:
-//  1. Verifies if the reader implements io.Seeker.
-//  2. For os.File types, it checks if the file is a pipe or character device,
-//     which typically don't support seeking.
-//  3. Attempts a no-op seek operation to confirm seeking functionality.
-//
-// This function is crucial for correctly handling various types of readers,
-// especially in scenarios involving command pipelines or network streams,
-// where seeking might not be supported despite the type implementing the Seeker interface.
+// isSeekable checks if a reader reliably supports seeking operations.
+// Some types, like os.File when used as a pipe, may implement io.Seeker
+// but do not actually support seeking.
 func isSeekable(r io.Reader) bool {
 	seeker, ok := r.(io.Seeker)
 	if !ok {
 		return false
 	}
 
-	// Check if it's an *os.File.
-	file, isFile := r.(*os.File)
-	if isFile {
-		// Check if it's a pipe or character device.
-		fi, err := file.Stat()
-		if err == nil && (fi.Mode()&os.ModeNamedPipe != 0 || fi.Mode()&os.ModeCharDevice != 0) {
-			return false
-		}
-	}
-
-	// Try to perform a no-op seek.
 	_, err := seeker.Seek(0, io.SeekCurrent)
 	return err == nil
 }
