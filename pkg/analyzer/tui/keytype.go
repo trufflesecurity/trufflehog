@@ -86,3 +86,10 @@ func (i KeyTypeItem) ID() string          { return string(i) }
 func (i KeyTypeItem) Title() string       { return string(i) }
 func (i KeyTypeItem) Description() string { return "" }
 func (i KeyTypeItem) FilterValue() string { return string(i) }
+
+func init() {
+	// Preload HasDarkBackground call. For some reason, if we don't do
+	// this, the TUI can take a noticeably long time to start. We should
+	// investigate further, but this is a good-enough bandaid for now.
+	_ = lipgloss.HasDarkBackground()
+}
