@@ -696,6 +696,14 @@ with HTTPServer(('', 8000), Verifier) as server:
         pass
 ```
 
+## :mag: Analyze
+
+TruffleHog supports running a deeper analysis of a credential to view its permissions and the resources it has access to.
+
+```bash
+trufflehog analyze
+```
+
 # :heart: Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
