@@ -1240,7 +1240,8 @@ func analyzeUserPermissions(client *gh.Client, user *gh.User) ([]Permission, err
 	for _, permFunc := range acctPermFuncMap {
 		access, err := permFunc(client, user)
 		if err != nil {
-			return nil, err
+			// TODO: Log error.
+			continue
 		}
 		perms = append(perms, access)
 	}
