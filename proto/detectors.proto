@@ -377,7 +377,7 @@ enum DetectorType {
   Nutritionix = 364;
   Swell = 365;
   ClickupPersonalToken = 366;
-  Nitro = 367;
+  Nitro = 367 [deprecated = true];
   Rev = 368;
   RunRunIt = 369;
   Typeform = 370;

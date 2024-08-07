@@ -4,6 +4,7 @@ package sourcegraph
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -31,6 +32,11 @@ type UserInfoJSON struct {
 			CreatedAt string `json:"createdAt"`
 		} `json:"currentUser"`
 	} `json:"data"`
+}
+
+type SecretInfo struct {
+	User        UserInfoJSON
+	IsSiteAdmin bool
 }
 
 func getUserInfo(cfg *config.Config, key string) (UserInfoJSON, error) {
@@ -98,42 +104,50 @@ func checkSiteAdmin(cfg *config.Config, key string) (bool, error) {
 	return true, nil
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) {
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	// ToDo: Add in logging
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging is not supported for this analyzer.")
+		return
+	}
 
-	userInfo, err := getUserInfo(cfg, key)
+	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
-		color.Red("Error: %s", err)
+		color.Red("[x] Error: %s", err.Error())
 		return
 	}
 
-	// second call
-	userInfo, err = getUserInfo(cfg, key)
-	if err != nil {
-		color.Red("Error: %s", err)
-		return
-	}
-
-	if userInfo.Data.CurrentUser.Username == "" {
-		color.Red("[x] Invalid Sourcegraph Access Token")
-		return
-	}
 	color.Green("[!] Valid Sourcegraph Access Token\n\n")
 	color.Yellow("[i] Sourcegraph User Information\n")
-	color.Green("Username: %s\n", userInfo.Data.CurrentUser.Username)
-	color.Green("Email: %s\n", userInfo.Data.CurrentUser.Email)
-	color.Green("Created At: %s\n\n", userInfo.Data.CurrentUser.CreatedAt)
+	color.Green("Username: %s\n", info.User.Data.CurrentUser.Username)
+	color.Green("Email: %s\n", info.User.Data.CurrentUser.Email)
+	color.Green("Created At: %s\n\n", info.User.Data.CurrentUser.CreatedAt)
 
-	isSiteAdmin, err := checkSiteAdmin(cfg, key)
-	if err != nil {
-		color.Red("Error: %s", err)
-		return
-	}
-
-	if isSiteAdmin {
+	if info.IsSiteAdmin {
 		color.Green("[!] Token Permissions: Site Admin")
 	} else {
 		// This is the default for all access tokens as of 6/11/24
 		color.Yellow("[i] Token Permissions: user:full (default)")
 	}
+}
 
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+	userInfo, err := getUserInfo(cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	if userInfo.Data.CurrentUser.Username == "" {
+		return nil, fmt.Errorf("invalid Sourcegraph Access Token")
+	}
+
+	isSiteAdmin, err := checkSiteAdmin(cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SecretInfo{
+		User:        userInfo,
+		IsSiteAdmin: isSiteAdmin,
+	}, nil
 }
