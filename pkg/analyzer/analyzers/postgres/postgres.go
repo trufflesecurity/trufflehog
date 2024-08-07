@@ -86,8 +86,6 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, connectionStr string) {
 	color.Yellow("[!] Successfully connected to Postgres database.")
 	printUserRoleAndPriv(info.Role, info.RolePrivs)
 
-	printDBPrivs(info.DBs, info.User)
-
 	// Print db privs
 	if len(info.DBs) > 0 {
 		fmt.Print("\n\n")
