@@ -51,6 +51,21 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Bindings:     []analyzers.Binding{},
 	}
 
+	// add user priviliges to bindings
+	userBindings, userResource := bakeUserBindings(info)
+	result.Bindings = append(result.Bindings, userBindings...)
+
+	// add user's database priviliges to bindings
+	databaseBindings := bakeDatabaseBindings(userResource, info)
+	result.Bindings = append(result.Bindings, databaseBindings...)
+
+	return &result
+}
+
+func bakeUserBindings(info *SecretInfo) ([]analyzers.Binding, *analyzers.Resource) {
+
+	var userBindings []analyzers.Binding
+
 	// add user and their priviliges to bindings
 	userResource := analyzers.Resource{
 		Name:               info.User,
@@ -59,7 +74,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	for _, priv := range info.GlobalPrivs.Privs {
-		result.Bindings = append(result.Bindings, analyzers.Binding{
+		userBindings = append(userBindings, analyzers.Binding{
 			Resource: userResource,
 			Permission: analyzers.Permission{
 				Value: priv,
@@ -67,7 +82,12 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		})
 	}
 
-	// add user's database priviliges to bindings
+	return userBindings, &userResource
+}
+
+func bakeDatabaseBindings(userResource *analyzers.Resource, info *SecretInfo) []analyzers.Binding {
+	var databaseBindings []analyzers.Binding
+
 	for _, database := range info.Databases {
 		dbResource := analyzers.Resource{
 			Name:               database.Name,
@@ -77,11 +97,11 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 				"default":      database.Default,
 				"non_existent": database.Nonexistent,
 			},
-			Parent: &userResource,
+			Parent: userResource,
 		}
 
 		for _, priv := range database.Privs {
-			result.Bindings = append(result.Bindings, analyzers.Binding{
+			databaseBindings = append(databaseBindings, analyzers.Binding{
 				Resource: dbResource,
 				Permission: analyzers.Permission{
 					Value: priv,
@@ -90,65 +110,54 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		}
 
 		// add this database's table privileges to bindings
-		if database.Tables != nil {
-			for _, table := range *database.Tables {
-				tableResource := analyzers.Resource{
-					Name:               table.Name,
-					FullyQualifiedName: table.Name,
-					Type:               "table",
-					Metadata: map[string]any{
-						"bytes":        table.Bytes,
-						"non_existent": table.Nonexistent,
-					},
-					Parent: &dbResource,
-				}
-
-				for _, priv := range table.Privs {
-					result.Bindings = append(result.Bindings, analyzers.Binding{
-						Resource: tableResource,
-						Permission: analyzers.Permission{
-							Value: priv,
-						},
-					})
-				}
-
-				// Add this table's column privileges to bindings
-				for _, column := range table.Columns {
-					columnResource := analyzers.Resource{
-						Name:               column.Name,
-						FullyQualifiedName: column.Name,
-						Type:               "column",
-						Parent:             &tableResource,
-					}
-
-					for _, priv := range column.Privs {
-						result.Bindings = append(result.Bindings, analyzers.Binding{
-							Resource: columnResource,
-							Permission: analyzers.Permission{
-								Value: priv,
-							},
-						})
-					}
-				}
-			}
-		}
+		tableBindings := bakeTableBindings(&dbResource, database)
+		databaseBindings = append(databaseBindings, tableBindings...)
 
 		// add this database's routines privileges to bindings
-		if database.Routines != nil {
-			for _, routine := range *database.Routines {
-				routineResource := analyzers.Resource{
-					Name:               routine.Name,
-					FullyQualifiedName: routine.Name,
-					Type:               "routine",
-					Metadata: map[string]any{
-						"non_existent": routine.Nonexistent,
+		routineBindings := bakeRoutineBindings(&dbResource, database)
+		databaseBindings = append(databaseBindings, routineBindings...)
+	}
+
+	return databaseBindings
+}
+
+func bakeTableBindings(dbResource *analyzers.Resource, database *Database) []analyzers.Binding {
+	var tableBindings []analyzers.Binding
+
+	if database.Tables != nil {
+		for _, table := range *database.Tables {
+			tableResource := analyzers.Resource{
+				Name:               table.Name,
+				FullyQualifiedName: table.Name,
+				Type:               "table",
+				Metadata: map[string]any{
+					"bytes":        table.Bytes,
+					"non_existent": table.Nonexistent,
+				},
+				Parent: dbResource,
+			}
+
+			for _, priv := range table.Privs {
+				tableBindings = append(tableBindings, analyzers.Binding{
+					Resource: tableResource,
+					Permission: analyzers.Permission{
+						Value: priv,
 					},
-					Parent: &dbResource,
+				})
+			}
+
+			// Add this table's column privileges to bindings
+			for _, column := range table.Columns {
+				columnResource := analyzers.Resource{
+					Name:               column.Name,
+					FullyQualifiedName: column.Name,
+					Type:               "column",
+					Parent:             &tableResource,
 				}
 
-				for _, priv := range routine.Privs {
-					result.Bindings = append(result.Bindings, analyzers.Binding{
-						Resource: routineResource,
+				for _, priv := range column.Privs {
+					tableBindings = append(tableBindings, analyzers.Binding{
+						Resource: columnResource,
 						Permission: analyzers.Permission{
 							Value: priv,
 						},
@@ -158,7 +167,36 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		}
 	}
 
-	return &result
+	return tableBindings
+}
+
+func bakeRoutineBindings(dbResource *analyzers.Resource, database *Database) []analyzers.Binding {
+	var routineBindings []analyzers.Binding
+
+	if database.Routines != nil {
+		for _, routine := range *database.Routines {
+			routineResource := analyzers.Resource{
+				Name:               routine.Name,
+				FullyQualifiedName: routine.Name,
+				Type:               "routine",
+				Metadata: map[string]any{
+					"non_existent": routine.Nonexistent,
+				},
+				Parent: dbResource,
+			}
+
+			for _, priv := range routine.Privs {
+				routineBindings = append(routineBindings, analyzers.Binding{
+					Resource: routineResource,
+					Permission: analyzers.Permission{
+						Value: priv,
+					},
+				})
+			}
+		}
+	}
+
+	return routineBindings
 }
 
 const (
