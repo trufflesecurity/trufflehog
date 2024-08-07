@@ -22,11 +22,7 @@ const (
 	postgresPass = "23201da=b56ca236f3dc6736c0f9afad"
 	postgresHost = "localhost"
 	postgresPort = "5434" // Do not use 5433, as local dev environments can use it for other things
-
-	inactivePass = "inactive"
-	inactiveHost = "192.0.2.0"
-
-	defaultPort = "5432"
+	defaultPort  = "5432"
 )
 
 //go:embed expected_output.json
@@ -161,5 +157,8 @@ func startPostgres() error {
 }
 
 func stopPostgres() {
-	exec.Command("docker", "kill", postgresDockerHash).Run()
+	err := exec.Command("docker", "kill", postgresDockerHash).Run()
+	if err != nil {
+		fmt.Println("could not stop postgres container:", err)
+	}
 }

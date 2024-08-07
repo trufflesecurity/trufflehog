@@ -27,7 +27,12 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Postgres }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["connection_string"])
+	uri, ok := credInfo["connection_string"]
+	if !ok {
+		return nil, errors.New("connection string not found in credInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +49,22 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Bindings:     []analyzers.Binding{},
 	}
 
-	// add user and their priviliges to bindings
+	// set user related bindings in result
+	userResource, userBindings := bakeUserBindings(info)
+	result.Bindings = append(result.Bindings, userBindings...)
+
+	// add user's database priviliges to bindings
+	dbNameToResourceMap, dbBindings := bakeDatabaseBindings(userResource, info)
+	result.Bindings = append(result.Bindings, dbBindings...)
+
+	// add user's table priviliges to bindings
+	tableBindings := bakeTableBindings(dbNameToResourceMap, info)
+	result.Bindings = append(result.Bindings, tableBindings...)
+
+	return &result
+}
+
+func bakeUserBindings(info *SecretInfo) (analyzers.Resource, []analyzers.Binding) {
 	userResource := analyzers.Resource{
 		Name:               info.User,
 		FullyQualifiedName: info.User,
@@ -54,9 +74,11 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		},
 	}
 
+	var bindings []analyzers.Binding
+
 	for role_priv, exists := range info.RolePrivs {
 		if exists {
-			result.Bindings = append(result.Bindings, analyzers.Binding{
+			bindings = append(bindings, analyzers.Binding{
 				Resource: userResource,
 				Permission: analyzers.Permission{
 					Value: role_priv,
@@ -65,8 +87,12 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		}
 	}
 
-	// add user's database priviliges to bindings
+	return userResource, bindings
+}
+
+func bakeDatabaseBindings(userResource analyzers.Resource, info *SecretInfo) (map[string]*analyzers.Resource, []analyzers.Binding) {
 	dbNameToResourceMap := map[string]*analyzers.Resource{}
+	dbBindings := []analyzers.Binding{}
 
 	for _, db := range info.DBs {
 		dbResource := analyzers.Resource{
@@ -90,7 +116,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 		for priv, exists := range DB_PRIVILIGES {
 			if exists {
-				result.Bindings = append(result.Bindings, analyzers.Binding{
+				dbBindings = append(dbBindings, analyzers.Binding{
 					Resource: dbResource,
 					Permission: analyzers.Permission{
 						Value: priv,
@@ -100,7 +126,12 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		}
 	}
 
-	// add user's table priviliges to bindings
+	return dbNameToResourceMap, dbBindings
+}
+
+func bakeTableBindings(dbNameToResourceMap map[string]*analyzers.Resource, info *SecretInfo) []analyzers.Binding {
+	var tableBindings []analyzers.Binding
+
 	for dbName, tableMap := range info.TablePrivs {
 		dbResource, ok := dbNameToResourceMap[dbName]
 		if !ok {
@@ -131,7 +162,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 			for priv, exists := range tablePrivsMap {
 				if exists {
-					result.Bindings = append(result.Bindings, analyzers.Binding{
+					tableBindings = append(tableBindings, analyzers.Binding{
 						Resource: tableResource,
 						Permission: analyzers.Permission{
 							Value: priv,
@@ -142,7 +173,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		}
 	}
 
-	return &result
+	return tableBindings
 }
 
 type DBPrivs struct {
