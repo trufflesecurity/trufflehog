@@ -91,5 +91,6 @@ func init() {
 	// Preload HasDarkBackground call. For some reason, if we don't do
 	// this, the TUI can take a noticeably long time to start. We should
 	// investigate further, but this is a good-enough bandaid for now.
+	// See: https://github.com/charmbracelet/lipgloss/issues/73
 	_ = lipgloss.HasDarkBackground()
 }
