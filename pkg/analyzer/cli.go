@@ -42,7 +42,12 @@ func Command(app *kingpin.Application) *kingpin.CmdClause {
 		"Type of key to analyze. Omit to interactively choose. Available key types: %s",
 		strings.Join(analyzers.AvailableAnalyzers, ", "),
 	)
-	analyzeKeyType = cli.Arg("key-type", keyTypeHelp).Enum(analyzers.AvailableAnalyzers...)
+	// Lowercase the available analyzers.
+	availableAnalyzers := make([]string, len(analyzers.AvailableAnalyzers))
+	for i, a := range analyzers.AvailableAnalyzers {
+		availableAnalyzers[i] = strings.ToLower(a)
+	}
+	analyzeKeyType = cli.Arg("key-type", keyTypeHelp).Enum(availableAnalyzers...)
 
 	return cli
 }
@@ -56,7 +61,7 @@ func Run(cmd string) {
 	if secretInfo.Cfg == nil {
 		secretInfo.Cfg = &config.Config{}
 	}
-	switch keyType {
+	switch strings.ToLower(keyType) {
 	case "github":
 		github.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "sendgrid":

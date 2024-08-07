@@ -3,7 +3,7 @@ package tui
 import (
 	"errors"
 	"fmt"
-	"slices"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
@@ -31,7 +31,15 @@ var AbortError error = errors.New("command aborted")
 func Run(keyType string) (string, *SecretInfo, error) {
 	// If a keyType is provided, make sure it's in the list of AvailableAnalyzers.
 	if keyType != "" {
-		if _, ok := slices.BinarySearch(analyzers.AvailableAnalyzers, keyType); !ok {
+		var found bool
+		for _, a := range analyzers.AvailableAnalyzers {
+			if strings.EqualFold(a, keyType) {
+				keyType = a
+				found = true
+				break
+			}
+		}
+		if !found {
 			return "", nil, fmt.Errorf("Unrecognized command %q", keyType)
 		}
 	}
