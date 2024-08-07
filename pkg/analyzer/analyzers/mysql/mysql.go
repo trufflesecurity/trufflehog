@@ -30,7 +30,11 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_MySQL }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["connection_string"])
+	uri, ok := credInfo["connection_string"]
+	if !ok {
+		return nil, fmt.Errorf("missing connection string")
+	}
+	info, err := AnalyzePermissions(a.Cfg, uri)
 	if err != nil {
 		return nil, err
 	}
