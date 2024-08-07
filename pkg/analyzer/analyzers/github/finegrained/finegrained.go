@@ -428,11 +428,6 @@ func getDependabotAlertsPermission(client *gh.Client, repo *gh.Repository, curre
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/dependabot/alerts
 	_, resp, err := client.Dependabot.ListRepoAlerts(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListAlertsOptions{})
-	if err != nil {
-		if !strings.Contains(err.Error(), "disabled") {
-			return NoAccess, err
-		}
-	}
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
@@ -1320,14 +1315,14 @@ func PrintFineGrainedToken(cfg *config.Config, info *common.SecretInfo) {
 		common.PrintGitHubRepos(info.AccessibleRepos)
 
 		// Print out the access map
-		perms, ok := info.RepoAccessMap.(map[string]Permission)
+		perms, ok := info.RepoAccessMap.([]Permission)
 		if !ok {
 			panic("Repo Access Map is not of type Permission")
 		}
 		printFineGrainedPermissions(perms, cfg.ShowAll, true)
 	}
 
-	perms, ok := info.UserAccessMap.(map[string]Permission)
+	perms, ok := info.UserAccessMap.([]Permission)
 	if !ok {
 		panic("Repo Access Map is not of type Permission")
 	}
@@ -1336,7 +1331,7 @@ func PrintFineGrainedToken(cfg *config.Config, info *common.SecretInfo) {
 	common.PrintGists(info.Gists, cfg.ShowAll)
 }
 
-func printFineGrainedPermissions(accessMap map[string]Permission, showAll bool, repoPermissions bool) {
+func printFineGrainedPermissions(accessMap []Permission, showAll bool, repoPermissions bool) {
 	permissionCount := 0
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -1344,23 +1339,24 @@ func printFineGrainedPermissions(accessMap map[string]Permission, showAll bool, 
 
 	// Extract keys from accessMap into slice
 	keys := make([]string, 0, len(accessMap))
-	for k := range accessMap {
-		keys = append(keys, k)
+	for _, k := range accessMap {
+		val, _ := k.ToString()
+		keys = append(keys, val)
 	}
 	// Sort the slice
 	sort.Strings(keys)
 
-	for _, key := range keys {
-		value := accessMap[key]
-		if value == Invalid {
+	for idx, permStr := range keys {
+		perm := accessMap[idx]
+		if perm == Invalid {
 			// don't change permissionCount
 		} else {
 			permissionCount++
 		}
-		if !showAll && value == Invalid {
+		if !showAll && perm == Invalid {
 			continue
 		} else {
-			k, v := permissionFormatter(key, value)
+			k, v := permissionFormatter(permStr, perm)
 			t.AppendRow([]any{k, v})
 		}
 	}
