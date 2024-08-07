@@ -25,14 +25,18 @@ func NewFormPage(c *common.Common, keyType string) FormPage {
 	switch strings.ToLower(keyType) {
 	case "twilio":
 		inputs = []textinputs.InputConfig{{
-			Label:    "SID",
-			Key:      "sid",
-			Required: true,
+			Label:       "SID",
+			Key:         "sid",
+			Required:    true,
+			AllowEnv:    true,
+			Placeholder: "$TWILIO_SID",
 		}, {
 			Label:       "Token",
 			Key:         "key",
 			Required:    true,
 			RedactInput: true,
+			AllowEnv:    true,
+			Placeholder: "$TWILIO_TOKEN",
 		}}
 	case "shopify":
 		inputs = []textinputs.InputConfig{{
@@ -40,25 +44,33 @@ func NewFormPage(c *common.Common, keyType string) FormPage {
 			Key:         "key",
 			Required:    true,
 			RedactInput: true,
+			AllowEnv:    true,
+			Placeholder: "$SHOPIFY_TOKEN",
 		}, {
-			Label:    "Shopify URL",
-			Key:      "url",
-			Required: true,
+			Label:       "Shopify URL",
+			Key:         "url",
+			Required:    true,
+			AllowEnv:    true,
+			Placeholder: "$SHOPIFY_URL",
 		}}
 	default:
+		kt := strings.ToUpper(keyType)
 		inputs = []textinputs.InputConfig{{
 			Label:       "Secret",
 			Key:         "key",
 			Required:    true,
 			RedactInput: true,
+			AllowEnv:    true,
+			Placeholder: fmt.Sprintf("$%s_TOKEN", kt),
 		}}
 	}
 
 	// Always append a log file option.
 	inputs = append(inputs, textinputs.InputConfig{
-		Label: "Log file",
-		Help:  "Log HTTP requests that analysis performs to this file",
-		Key:   "log_file",
+		Label:    "Log file",
+		Help:     "Log HTTP requests that analysis performs to this file",
+		Key:      "log_file",
+		AllowEnv: true,
 	})
 
 	form := textinputs.New(inputs).
