@@ -4,6 +4,7 @@ package asana
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -25,7 +26,12 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Asana }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
