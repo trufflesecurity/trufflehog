@@ -986,6 +986,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 	defer common.Recover(ctx)
 
+	ctx = context.WithValue(ctx, "detector", data.detector.Key.Loggable())
+
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
 
 	var matchCount int
@@ -1000,13 +1002,13 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		detectBytesPerMatch.Observe(float64(len(matchBytes)))
 
 		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+		t := time.AfterFunc(time.Second*11, func() {
+			ctx.Logger().Error(nil, "a detector ignored the context timeout")
+		})
 		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
 		cancel()
 		if err != nil {
-			ctx.Logger().Error(
-				err, "error finding results in chunk",
-				"detector", data.detector.Key.Type().String(),
-			)
+			ctx.Logger().Error(err, "error finding results in chunk")
 			continue
 		}
 
