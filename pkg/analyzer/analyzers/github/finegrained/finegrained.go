@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/fatih/color"
@@ -29,7 +28,7 @@ const (
 
 var ErrInvalid = errors.New("invalid")
 
-var repoPermFuncMap = []func(client *gh.Client, repo *gh.Repository, access string) (Permission, error){
+var repoPermFuncMap = []func(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error){
 	getActionsPermission,
 	getAdministrationPermission,
 	getCodeScanningAlertsPermission,
@@ -106,7 +105,7 @@ func permissionFormatter(key, val any) (string, string) {
 	return fmt.Sprintf("%v", key), fmt.Sprintf("%v", val)
 }
 
-func notImplementedRepoPerm(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func notImplementedRepoPerm(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	return NoAccess, nil
 }
 
@@ -115,7 +114,7 @@ func notImplementedAcctPerm(client *gh.Client, user *gh.User) (Permission, error
 	return NoAccess, nil
 }
 
-func getMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/collaborators
 	_, resp, err := client.Repositories.ListCollaborators(context.Background(), *repo.Owner.Login, *repo.Name, nil)
@@ -130,7 +129,7 @@ func getMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess
 	return MetadataRead, nil
 }
 
-func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// -> GET request to /repos/{owner}/{repo}/actions/artifacts
@@ -161,7 +160,7 @@ func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == "UNKNOWN" {
+		if currentAccess == NoAccess {
 			return NoAccess, nil
 		}
 		// Risk: Very, very low.
@@ -184,7 +183,7 @@ func getActionsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 
 // Continue with the other functions using the same pattern...
 
-func getAdministrationPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getAdministrationPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/actions/permissions
 	_, resp, err := client.Repositories.GetActionsPermissions(context.Background(), *repo.Owner.Login, *repo.Name)
@@ -214,7 +213,7 @@ func getAdministrationPermission(client *gh.Client, repo *gh.Repository, current
 	}
 }
 
-func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// -> GET request to /repos/{owner}/{repo}/code-scanning/alerts
 	_, resp, err := client.CodeScanning.ListAlertsForRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
@@ -248,7 +247,7 @@ func getCodeScanningAlertsPermission(client *gh.Client, repo *gh.Repository, cur
 	}
 }
 
-func getCodespacesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getCodespacesPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /repos/{owner}/{repo}/codespaces
 	_, resp, err := client.Codespaces.ListInRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
@@ -280,7 +279,7 @@ func getCodespacesPermission(client *gh.Client, repo *gh.Repository, currentAcce
 	}
 }
 
-func getCodespacesMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getCodespacesMetadataPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /repos/{owner}/{repo}/codespaces/machines
 	req, err := client.NewRequest("GET", "https://api.github.com/repos/"+*repo.Owner.Login+"/"+*repo.Name+"/codespaces/machines", nil)
@@ -298,7 +297,7 @@ func getCodespacesMetadataPermission(client *gh.Client, repo *gh.Repository, cur
 	}
 }
 
-func getCodespacesSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getCodespacesSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET request to /repos/{owner}/{repo}/codespaces/secrets for non-existent secret
 	_, resp, err := client.Codespaces.GetRepoSecret(context.Background(), *repo.Owner.Login, *repo.Name, RANDOM_STRING)
@@ -318,7 +317,7 @@ func getCodespacesSecretsPermission(client *gh.Client, repo *gh.Repository, curr
 // By default, we have read-only access to commit statuses for all public repos. If only public repos exist under
 // this key's permissions, then they best we can hope for us a READ_WRITE status or an UNKNOWN status.
 // If a private repo exists, then we can check for READ_ONLY, READ_WRITE and NO_ACCESS.
-func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// GET request to /repos/{owner}/{repo}/commits/{commit_sha}/statuses
@@ -347,7 +346,7 @@ func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, current
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == "UNKNOWN" {
+		if currentAccess == NoAccess {
 			return NoAccess, nil
 		}
 		// Risk: Extremely Low
@@ -370,7 +369,7 @@ func getCommitStatusesPermission(client *gh.Client, repo *gh.Repository, current
 // By default, we have read-only access to the contents of all public repos. If only public repos exist under
 // this key's permissions, then they best we can hope for us a READ_WRITE status or an UNKNOWN status.
 // If a private repo exists, then we can check for READ_ONLY, READ_WRITE and NO_ACCESS.
-func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// GET request to /repos/{owner}/{repo}/commits
@@ -404,7 +403,7 @@ func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == "UNKNOWN" {
+		if currentAccess == NoAccess {
 			return NoAccess, nil
 		}
 		// Risk: Low-Medium
@@ -424,15 +423,10 @@ func getContentsPermission(client *gh.Client, repo *gh.Repository, currentAccess
 	}
 }
 
-func getDependabotAlertsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getDependabotAlertsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/dependabot/alerts
 	_, resp, err := client.Dependabot.ListRepoAlerts(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListAlertsOptions{})
-	if err != nil {
-		if !strings.Contains(err.Error(), "disabled") {
-			return NoAccess, err
-		}
-	}
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
@@ -459,7 +453,7 @@ func getDependabotAlertsPermission(client *gh.Client, repo *gh.Repository, curre
 	}
 }
 
-func getDependabotSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getDependabotSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/dependabot/secrets
 	_, resp, err := client.Dependabot.ListRepoSecrets(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
@@ -489,7 +483,7 @@ func getDependabotSecretsPermission(client *gh.Client, repo *gh.Repository, curr
 	}
 }
 
-func getDeploymentsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getDeploymentsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/deployments
 	_, resp, err := client.Repositories.ListDeployments(context.Background(), *repo.Owner.Login, *repo.Name, &gh.DeploymentsListOptions{})
@@ -519,7 +513,7 @@ func getDeploymentsPermission(client *gh.Client, repo *gh.Repository, currentAcc
 	}
 }
 
-func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/environments
 	envResp, resp, _ := client.Repositories.ListEnvironments(context.Background(), *repo.Owner.Login, *repo.Name, &gh.EnvironmentListOptions{})
@@ -560,7 +554,7 @@ func getEnvironmentsPermission(client *gh.Client, repo *gh.Repository, currentAc
 	}
 }
 
-func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 
 	if *repo.Private {
 
@@ -593,7 +587,7 @@ func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess s
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == "UNKNOWN" {
+		if currentAccess == NoAccess {
 			return NoAccess, nil
 		}
 		// Risk: Very Low
@@ -614,7 +608,7 @@ func getIssuesPermission(client *gh.Client, repo *gh.Repository, currentAccess s
 	}
 }
 
-func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// GET /repos/{owner}/{repo}/pages
@@ -649,7 +643,7 @@ func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess st
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == "UNKNOWN" {
+		if currentAccess == NoAccess {
 			return NoAccess, nil
 		}
 		// Risk: Very Low
@@ -674,7 +668,7 @@ func getPagesPermission(client *gh.Client, repo *gh.Repository, currentAccess st
 	}
 }
 
-func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	if *repo.Private {
 		// Risk: Extremely Low
 		// GET /repos/{owner}/{repo}/pulls
@@ -705,7 +699,7 @@ func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAc
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == "UNKNOWN" {
+		if currentAccess == NoAccess {
 			return NoAccess, nil
 		}
 		// Risk: Very Low
@@ -726,7 +720,7 @@ func getPullRequestsPermission(client *gh.Client, repo *gh.Repository, currentAc
 	}
 }
 
-func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 
 	if *repo.Private {
 		// Risk: Extremely Low
@@ -762,7 +756,7 @@ func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAc
 		}
 	} else {
 		// Will only land here if already tested one public repo and got a 403.
-		if currentAccess == "UNKNOWN" {
+		if currentAccess == NoAccess {
 			return NoAccess, nil
 		}
 		// Risk: Very Low
@@ -787,7 +781,7 @@ func getRepoSecurityPermission(client *gh.Client, repo *gh.Repository, currentAc
 	}
 }
 
-func getSecretScanningPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getSecretScanningPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/secret-scanning/alerts
 	_, resp, err := client.SecretScanning.ListAlertsForRepo(context.Background(), *repo.Owner.Login, *repo.Name, nil)
@@ -817,7 +811,7 @@ func getSecretScanningPermission(client *gh.Client, repo *gh.Repository, current
 	}
 }
 
-func getSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/actions/secrets
 	_, resp, err := client.Actions.ListRepoSecrets(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
@@ -847,7 +841,7 @@ func getSecretsPermission(client *gh.Client, repo *gh.Repository, currentAccess 
 	}
 }
 
-func getVariablesPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getVariablesPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/actions/variables
 	_, resp, err := client.Actions.ListRepoVariables(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
@@ -877,7 +871,7 @@ func getVariablesPermission(client *gh.Client, repo *gh.Repository, currentAcces
 	}
 }
 
-func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess string) (Permission, error) {
+func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess Permission) (Permission, error) {
 	// Risk: Extremely Low
 	// GET /repos/{owner}/{repo}/hooks
 	_, resp, err := client.Repositories.ListHooks(context.Background(), *repo.Owner.Login, *repo.Name, &gh.ListOptions{})
@@ -912,15 +906,16 @@ func getWebhooksPermission(client *gh.Client, repo *gh.Repository, currentAccess
 // If we only checked one repo, we wouldn't be able to tell if the token has access to a specific permission type.
 // Ex: "Code scanning alerts" must be enabled to tell if we have that permission.
 func analyzeRepositoryPermissions(client *gh.Client, repos []*gh.Repository) ([]Permission, error) {
-	perms := []Permission{}
+	perms := make([]Permission, len(repoPermFuncMap))
 	for _, repo := range repos {
-		for _, permFunc := range repoPermFuncMap {
-			access, err := permFunc(client, repo, "")
-			if err != nil {
-				return nil, err
+		for i, permFunc := range repoPermFuncMap {
+			access, err := permFunc(client, repo, perms[i])
+			if err != nil || access == Invalid {
+				// TODO: Log error.
+				continue
 			}
-			if access != Invalid {
-				perms = append(perms, access)
+			if perms[i] == Invalid || perms[i] == NoAccess {
+				perms[i] = access
 			}
 		}
 	}
@@ -1245,7 +1240,8 @@ func analyzeUserPermissions(client *gh.Client, user *gh.User) ([]Permission, err
 	for _, permFunc := range acctPermFuncMap {
 		access, err := permFunc(client, user)
 		if err != nil {
-			return nil, err
+			// TODO: Log error.
+			continue
 		}
 		perms = append(perms, access)
 	}
@@ -1265,9 +1261,10 @@ func AnalyzeFineGrainedToken(client *gh.Client, meta *common.TokenMetadata, shal
 	}
 	accessibleRepos := make([]*gh.Repository, 0)
 	for _, repo := range allRepos {
-		perm, err := getMetadataPermission(client, repo, "")
+		perm, err := getMetadataPermission(client, repo, Invalid)
 		if err != nil {
-			return nil, err
+			// TODO: Log error.
+			continue
 		}
 		if perm != Invalid {
 			accessibleRepos = append(accessibleRepos, repo)
@@ -1320,14 +1317,14 @@ func PrintFineGrainedToken(cfg *config.Config, info *common.SecretInfo) {
 		common.PrintGitHubRepos(info.AccessibleRepos)
 
 		// Print out the access map
-		perms, ok := info.RepoAccessMap.(map[string]Permission)
+		perms, ok := info.RepoAccessMap.([]Permission)
 		if !ok {
 			panic("Repo Access Map is not of type Permission")
 		}
 		printFineGrainedPermissions(perms, cfg.ShowAll, true)
 	}
 
-	perms, ok := info.UserAccessMap.(map[string]Permission)
+	perms, ok := info.UserAccessMap.([]Permission)
 	if !ok {
 		panic("Repo Access Map is not of type Permission")
 	}
@@ -1336,31 +1333,23 @@ func PrintFineGrainedToken(cfg *config.Config, info *common.SecretInfo) {
 	common.PrintGists(info.Gists, cfg.ShowAll)
 }
 
-func printFineGrainedPermissions(accessMap map[string]Permission, showAll bool, repoPermissions bool) {
+func printFineGrainedPermissions(accessMap []Permission, showAll bool, repoPermissions bool) {
 	permissionCount := 0
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Permission Type", "Permission" /* Add more column headers if needed */})
 
-	// Extract keys from accessMap into slice
-	keys := make([]string, 0, len(accessMap))
-	for k := range accessMap {
-		keys = append(keys, k)
-	}
-	// Sort the slice
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		value := accessMap[key]
-		if value == Invalid {
+	for _, perm := range accessMap {
+		permStr, _ := perm.ToString()
+		if perm == Invalid {
 			// don't change permissionCount
 		} else {
 			permissionCount++
 		}
-		if !showAll && value == Invalid {
+		if !showAll && perm == Invalid {
 			continue
 		} else {
-			k, v := permissionFormatter(key, value)
+			k, v := permissionFormatter(permStr, perm)
 			t.AppendRow([]any{k, v})
 		}
 	}
