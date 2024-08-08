@@ -393,7 +393,10 @@ func BenchmarkHandleTar(b *testing.B) {
 
 func TestHandleLargeHTTPJson(t *testing.T) {
 	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/md_random_data.json.zip")
-	assert.NoError(t, err)
+	if !assert.NoError(t, err) {
+		return
+	}
+
 	defer func() {
 		if resp != nil && resp.Body != nil {
 			resp.Body.Close()
