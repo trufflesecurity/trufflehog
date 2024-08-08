@@ -87,6 +87,19 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 		return n, err
 	}
 
+	// If we have a temp file and the total size is known, we can read directly from it.
+	if br.sizeKnown && br.tempFile != nil {
+		if br.index >= br.totalSize {
+			return 0, io.EOF
+		}
+		if _, err := br.tempFile.Seek(br.index, io.SeekStart); err != nil {
+			return 0, err
+		}
+		n, err := br.tempFile.Read(out)
+		br.index += int64(n)
+		return n, err
+	}
+
 	var (
 		totalBytesRead int
 		err            error
@@ -211,6 +224,17 @@ func (br *BufferedReadSeeker) readToEnd() error {
 			return err
 		}
 	}
+
+	// If a temporary file exists and the buffer contains data,
+	// flush the buffer to the file. This allows future operations
+	// to utilize the temporary file exclusively, simplifying
+	// management by avoiding separate handling of the buffer and file.
+	if br.tempFile != nil && br.buf.Len() > 0 {
+		if err := br.flushBufferToDisk(); err != nil {
+			return err
+		}
+	}
+
 	br.totalSize = br.bytesRead
 	br.sizeKnown = true
 
