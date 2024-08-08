@@ -1006,6 +1006,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			ctx.Logger().Error(nil, "a detector ignored the context timeout")
 		})
 		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
+		t.Stop()
 		cancel()
 		if err != nil {
 			ctx.Logger().Error(err, "error finding results in chunk")
