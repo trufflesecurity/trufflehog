@@ -65,4 +65,4 @@ snifftest:
 	./hack/snifftest/snifftest.sh
 
 test-release:
-	goreleaser release --rm-dist --skip-publish --snapshot
+	goreleaser release --clean --skip-publish --snapshot

@@ -19,12 +19,12 @@ import (
 func TestTwitter_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("TWITTER")
-	inactiveSecret := testSecrets.MustGetField("TWITTER_INACTIVE")
+	secret := testSecrets.MustGetField("TWITTER_V2_ACTIVE")
+	inactiveSecret := testSecrets.MustGetField("TWITTER_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -50,6 +50,9 @@ func TestTwitter_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Twitter,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"version": "2",
+					},
 				},
 			},
 			wantErr: false,
@@ -66,6 +69,9 @@ func TestTwitter_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Twitter,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"version": "2",
+					},
 				},
 			},
 			wantErr: false,

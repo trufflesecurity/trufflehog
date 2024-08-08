@@ -301,6 +301,20 @@ trufflehog elasticsearch \
   --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
 ```
 
+## 15. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
+
+The following command will enumerate deleted and hidden commits on a GitHub repository and then scan them for secrets. This is an alpha release feature.
+
+```bash
+trufflehog github-experimental --repo https://github.com/<USER>/<REPO>.git --object-discovery
+```
+
+In addition to the normal TruffleHog output, the `--object-discovery` flag creates two files in a new `$HOME/.trufflehog` directory:  `valid_hidden.txt` and `invalid.txt`. These are used to track state during commit enumeration, as well as to provide users with a complete list of all hidden and deleted commits (`valid_hidden.txt`). If you'd like to automatically remove these files after scanning, please add the flag `--delete-cached-data`. 
+
+**Note**: Enumerating all valid commits on a repository using this method takes between 20 minutes and a few hours, depending on the size of your repository. We added a progress bar to keep you updated on how long the enumeration will take. The actual secret scanning runs extremely fast.
+
+For more information on Cross Fork Object References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github). 
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
@@ -680,6 +694,14 @@ with HTTPServer(('', 8000), Verifier) as server:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+```
+
+## :mag: Analyze
+
+TruffleHog supports running a deeper analysis of a credential to view its permissions and the resources it has access to.
+
+```bash
+trufflehog analyze
 ```
 
 # :heart: Contributors

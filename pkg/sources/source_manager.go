@@ -245,7 +245,7 @@ func (s *SourceManager) preflightChecks(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// run is a helper method to sychronously run the source. It does not check for
+// run is a helper method to synchronously run the source. It does not check for
 // acquired resources. An error is returned if there was a fatal error during
 // the run. This information is also recorded in the JobProgress.
 func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
