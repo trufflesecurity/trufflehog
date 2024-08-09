@@ -41,7 +41,7 @@ func (d *EscapedUnicode) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 
 	if matched {
 		decodableChunk := &DecodableChunk{
-			DecoderType: detectorspb.DecoderType_ESCAPED_UNICODE,
+			DecoderType: d.Type(),
 			Chunk:       chunk,
 		}
 		return decodableChunk
@@ -92,6 +92,10 @@ func decodeCodePoint(input []byte) []byte {
 	}
 
 	return input
+}
+
+func (d *EscapedUnicode) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType_ESCAPED_UNICODE
 }
 
 func decodeEscaped(input []byte) []byte {
