@@ -18,6 +18,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+	"golang.org/x/oauth2"
 )
 
 const (
@@ -82,7 +83,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.verify = verify
 
 	s.httpClient = common.RetryableHTTPClientTimeout(60)
-	s.apiClient = github.NewClient(s.httpClient)
 
 	var conn sourcespb.GitHubExperimental
 	err = anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -94,6 +94,18 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	if err != nil {
 		return fmt.Errorf("error normalizing repo: %w", err)
 	}
+	if conn.GetToken() != "" {
+		// Needed to list repos.
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: conn.GetToken()},
+		)
+		s.httpClient.Transport = &oauth2.Transport{
+			Base:   s.httpClient.Transport,
+			Source: oauth2.ReuseTokenSource(nil, ts),
+		}
+
+	}
+	s.apiClient = github.NewClient(s.httpClient)
 
 	s.repoInfoCache = newRepoInfoCache()
 
