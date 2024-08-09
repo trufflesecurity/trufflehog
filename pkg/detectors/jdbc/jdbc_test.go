@@ -134,6 +134,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].AnalysisInfo = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Jdbc.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

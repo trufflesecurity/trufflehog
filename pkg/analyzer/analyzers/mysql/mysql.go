@@ -17,7 +17,187 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_MySQL }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	uri, ok := credInfo["connection_string"]
+	if !ok {
+		return nil, fmt.Errorf("missing connection string")
+	}
+	info, err := AnalyzePermissions(a.Cfg, uri)
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_MySQL,
+		Metadata:     nil,
+		Bindings:     []analyzers.Binding{},
+	}
+
+	// add user priviliges to bindings
+	userBindings, userResource := bakeUserBindings(info)
+	result.Bindings = append(result.Bindings, userBindings...)
+
+	// add user's database priviliges to bindings
+	databaseBindings := bakeDatabaseBindings(userResource, info)
+	result.Bindings = append(result.Bindings, databaseBindings...)
+
+	return &result
+}
+
+func bakeUserBindings(info *SecretInfo) ([]analyzers.Binding, *analyzers.Resource) {
+
+	var userBindings []analyzers.Binding
+
+	// add user and their priviliges to bindings
+	userResource := analyzers.Resource{
+		Name:               info.User,
+		FullyQualifiedName: info.User,
+		Type:               "user",
+	}
+
+	for _, priv := range info.GlobalPrivs.Privs {
+		userBindings = append(userBindings, analyzers.Binding{
+			Resource: userResource,
+			Permission: analyzers.Permission{
+				Value: priv,
+			},
+		})
+	}
+
+	return userBindings, &userResource
+}
+
+func bakeDatabaseBindings(userResource *analyzers.Resource, info *SecretInfo) []analyzers.Binding {
+	var databaseBindings []analyzers.Binding
+
+	for _, database := range info.Databases {
+		dbResource := analyzers.Resource{
+			Name:               database.Name,
+			FullyQualifiedName: database.Name,
+			Type:               "database",
+			Metadata: map[string]any{
+				"default":      database.Default,
+				"non_existent": database.Nonexistent,
+			},
+			Parent: userResource,
+		}
+
+		for _, priv := range database.Privs {
+			databaseBindings = append(databaseBindings, analyzers.Binding{
+				Resource: dbResource,
+				Permission: analyzers.Permission{
+					Value: priv,
+				},
+			})
+		}
+
+		// add this database's table privileges to bindings
+		tableBindings := bakeTableBindings(&dbResource, database)
+		databaseBindings = append(databaseBindings, tableBindings...)
+
+		// add this database's routines privileges to bindings
+		routineBindings := bakeRoutineBindings(&dbResource, database)
+		databaseBindings = append(databaseBindings, routineBindings...)
+	}
+
+	return databaseBindings
+}
+
+func bakeTableBindings(dbResource *analyzers.Resource, database *Database) []analyzers.Binding {
+	var tableBindings []analyzers.Binding
+
+	if database.Tables != nil {
+		for _, table := range *database.Tables {
+			tableResource := analyzers.Resource{
+				Name:               table.Name,
+				FullyQualifiedName: table.Name,
+				Type:               "table",
+				Metadata: map[string]any{
+					"bytes":        table.Bytes,
+					"non_existent": table.Nonexistent,
+				},
+				Parent: dbResource,
+			}
+
+			for _, priv := range table.Privs {
+				tableBindings = append(tableBindings, analyzers.Binding{
+					Resource: tableResource,
+					Permission: analyzers.Permission{
+						Value: priv,
+					},
+				})
+			}
+
+			// Add this table's column privileges to bindings
+			for _, column := range table.Columns {
+				columnResource := analyzers.Resource{
+					Name:               column.Name,
+					FullyQualifiedName: column.Name,
+					Type:               "column",
+					Parent:             &tableResource,
+				}
+
+				for _, priv := range column.Privs {
+					tableBindings = append(tableBindings, analyzers.Binding{
+						Resource: columnResource,
+						Permission: analyzers.Permission{
+							Value: priv,
+						},
+					})
+				}
+			}
+		}
+	}
+
+	return tableBindings
+}
+
+func bakeRoutineBindings(dbResource *analyzers.Resource, database *Database) []analyzers.Binding {
+	var routineBindings []analyzers.Binding
+
+	if database.Routines != nil {
+		for _, routine := range *database.Routines {
+			routineResource := analyzers.Resource{
+				Name:               routine.Name,
+				FullyQualifiedName: routine.Name,
+				Type:               "routine",
+				Metadata: map[string]any{
+					"non_existent": routine.Nonexistent,
+				},
+				Parent: dbResource,
+			}
+
+			for _, priv := range routine.Privs {
+				routineBindings = append(routineBindings, analyzers.Binding{
+					Resource: routineResource,
+					Permission: analyzers.Permission{
+						Value: priv,
+					},
+				})
+			}
+		}
+	}
+
+	return routineBindings
+}
 
 const (
 	// MySQL SSL Modes
