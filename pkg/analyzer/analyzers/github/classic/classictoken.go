@@ -82,6 +82,8 @@ func processScopes(headerScopesSlice []analyzers.Permission) map[Permission]bool
 }
 
 func AnalyzeClassicToken(client *gh.Client, meta *common.TokenMetadata) (*common.SecretInfo, error) {
+	// Convert OauthScopes to have hierarchical permissions.
+	meta.OauthScopes = oauthScopesToPermissions(meta.OauthScopes...)
 	scopes := processScopes(meta.OauthScopes)
 
 	var repos []*gh.Repository
@@ -243,4 +245,46 @@ func printClassicGHPermissions(scopes map[Permission]bool, showAll bool) {
 	}
 	t.Render()
 	fmt.Print("\n\n")
+}
+
+// oauthScopesToPermissions takes a list of scopes and returns a slice of
+// permissions for it. If the scope has implied permissions, they are included
+// as children of the parent scope, and both the parent and children are
+// returned in the slice.
+func oauthScopesToPermissions(scopes ...analyzers.Permission) []analyzers.Permission {
+	allPermissions := make([]analyzers.Permission, 0, len(scopes))
+	for _, scope := range scopes {
+		allPermissions = append(allPermissions, oauthScopeToPermissions(scope.Value)...)
+	}
+	return allPermissions
+}
+
+// oauthScopeToPermissions takes a given scope and returns a slice of
+// permissions for it. If the scope has implied permissions, they are included
+// as children of the parent scope, and both the parent and children are
+// returned in the slice.
+func oauthScopeToPermissions(scope string) []analyzers.Permission {
+	parent := analyzers.Permission{Value: scope}
+	perms := []analyzers.Permission{parent}
+	subScopes, ok := func() ([]Permission, bool) {
+		id, err := PermissionFromString(scope)
+		if err != nil {
+			return nil, false
+		}
+		subScopes, ok := SCOPE_TO_SUB_SCOPE[id]
+		return subScopes, ok
+	}()
+	if !ok {
+		// No sub-scopes, so the only permission is itself.
+		return perms
+	}
+	// Add all the children to the list of permissions.
+	for _, subScope := range subScopes {
+		subScope, _ := subScope.ToString()
+		perms = append(perms, analyzers.Permission{
+			Value:  subScope,
+			Parent: &parent,
+		})
+	}
+	return perms
 }

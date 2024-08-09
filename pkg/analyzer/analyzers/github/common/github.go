@@ -68,6 +68,7 @@ type TokenMetadata struct {
 	FineGrained bool
 	User        *gh.User
 	Expiration  time.Time
+	// OauthScopes is only set for classic tokens.
 	OauthScopes []analyzers.Permission
 }
 
