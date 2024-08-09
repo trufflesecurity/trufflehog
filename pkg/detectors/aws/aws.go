@@ -53,6 +53,7 @@ var thinkstCanaryList = map[string]struct{}{
 	"717712589309": {},
 	"819147034852": {},
 	"992382622183": {},
+	"730335385048": {},
 }
 
 const thinkstMessage = "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries"

@@ -43,7 +43,7 @@ runs:
       ## Scan by BASE & HEAD user inputs      ##
       ## If BASE == HEAD, exit with error     ##
       ##########################################
-      git status >/dev/null  # make sure we are in a git repostiory
+      git status >/dev/null  # make sure we are in a git repository
       if [ -n "$BASE" ] || [ -n "$HEAD" ]; then
         if [ -n "$BASE" ]; then
           base_commit=$(git rev-parse "$BASE" 2>/dev/null) || true

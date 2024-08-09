@@ -417,12 +417,13 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	sourceManager := sources.NewManager(opts...)
 
 	c := Config{
-		Concurrency:   1,
-		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     conf.Detectors,
-		Verify:        false,
-		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+		Concurrency:      1,
+		Decoders:         decoders.DefaultDecoders(),
+		Detectors:        conf.Detectors,
+		IncludeDetectors: "904", // isolate this test to only the custom detectors provided
+		Verify:           false,
+		SourceManager:    sourceManager,
+		Dispatcher:       NewPrinterDispatcher(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &c)

@@ -452,6 +452,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myintervals"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nethunt"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netsuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newsapi"
@@ -480,7 +481,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepagecrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onesignal"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onfleet"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onwaterio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/opencagedata"
@@ -724,7 +724,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twilio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitch"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter"
+	twitterv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter/v1"
+	twitterv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitterconsumerkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tyntec"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform"
@@ -1182,7 +1183,6 @@ func DefaultDetectors() []detectors.Detector {
 		pastebin.Scanner{},
 		vatlayer.Scanner{},
 		verifier.Scanner{},
-		onwaterio.Scanner{},
 		graphhopper.Scanner{},
 		scraperapi.Scanner{},
 		ritekit.Scanner{},
@@ -1424,7 +1424,8 @@ func DefaultDetectors() []detectors.Detector {
 		magicbell.Scanner{},
 		apitemplate.Scanner{},
 		knapsackpro.Scanner{},
-		twitter.Scanner{},
+		twitterv1.Scanner{},
+		twitterv2.Scanner{},
 		timecamp.Scanner{},
 		signable.Scanner{},
 		teletype.Scanner{},
@@ -1624,6 +1625,7 @@ func DefaultDetectors() []detectors.Detector {
 		endorlabs.Scanner{},
 		atlassianv1.Scanner{},
 		atlassianv2.Scanner{},
+		netsuite.Scanner{},
 	}
 }
 

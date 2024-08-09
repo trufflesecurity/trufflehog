@@ -2,17 +2,20 @@ package docker
 
 import (
 	"archive/tar"
-	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
+	gzip "github.com/klauspost/pgzip"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -101,62 +104,61 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	workers := new(errgroup.Group)
 	workers.SetLimit(s.concurrency)
 
-	scanErrs := sources.NewScanErrors()
 	for _, image := range s.conn.GetImages() {
-		image := image
-		workers.Go(func() error {
-			if common.IsDone(ctx) {
+		if common.IsDone(ctx) {
+			return nil
+		}
+
+		imgInfo, err := s.processImage(ctx, image)
+		if err != nil {
+			ctx.Logger().Error(err, "error processing image", "image", image)
+			return nil
+		}
+
+		ctx = context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
+
+		ctx.Logger().V(2).Info("scanning image history")
+
+		layers, err := imgInfo.image.Layers()
+		if err != nil {
+			ctx.Logger().Error(err, "error getting image layers")
+			return nil
+		}
+
+		historyEntries, err := getHistoryEntries(ctx, imgInfo, layers)
+		if err != nil {
+			ctx.Logger().Error(err, "error getting image history entries")
+			return nil
+		}
+
+		for _, historyEntry := range historyEntries {
+			if err := s.processHistoryEntry(ctx, historyEntry, chunksChan); err != nil {
+				ctx.Logger().Error(err, "error processing history entry")
 				return nil
 			}
+			dockerHistoryEntriesScanned.WithLabelValues(s.name).Inc()
+		}
 
-			imgInfo, err := s.processImage(ctx, image)
-			if err != nil {
-				scanErrs.Add(err)
-				return nil
-			}
+		ctx.Logger().V(2).Info("scanning image layers")
 
-			ctx = context.WithValues(ctx, "image", imgInfo.base, "tag", imgInfo.tag)
-
-			ctx.Logger().V(2).Info("scanning image history")
-
-			historyEntries, err := getHistoryEntries(ctx, imgInfo)
-			if err != nil {
-				scanErrs.Add(err)
-				return nil
-			}
-
-			for _, historyEntry := range historyEntries {
-				if err := s.processHistoryEntry(ctx, historyEntry, chunksChan); err != nil {
-					scanErrs.Add(err)
-					return nil
-				}
-				dockerHistoryEntriesScanned.WithLabelValues(s.name).Inc()
-			}
-
-			ctx.Logger().V(2).Info("scanning image layers")
-
-			layers, err := imgInfo.image.Layers()
-			if err != nil {
-				scanErrs.Add(err)
-				return nil
-			}
-
-			for _, layer := range layers {
+		for _, layer := range layers {
+			workers.Go(func() error {
 				if err := s.processLayer(ctx, layer, imgInfo, chunksChan); err != nil {
-					scanErrs.Add(err)
+					ctx.Logger().Error(err, "error processing layer")
 					return nil
 				}
 				dockerLayersScanned.WithLabelValues(s.name).Inc()
-			}
 
-			dockerImagesScanned.WithLabelValues(s.name).Inc()
+				return nil
+			})
+		}
 
+		if err := workers.Wait(); err != nil {
+			ctx.Logger().Error(err, "error processing layers")
 			return nil
-		})
-	}
-	_ = workers.Wait()
-	if scanErrs.Count() > 0 {
-		ctx.Logger().V(2).Info("scan errors", "errors", scanErrs.String())
+		}
+
+		dockerImagesScanned.WithLabelValues(s.name).Inc()
 	}
 
 	return nil
@@ -208,13 +210,8 @@ func (s *Source) processImage(ctx context.Context, image string) (imageInfo, err
 
 // getHistoryEntries collates an image's configuration history together with the
 // corresponding layer digests for any non-empty layers.
-func getHistoryEntries(ctx context.Context, imgInfo imageInfo) ([]historyEntryInfo, error) {
+func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer) ([]historyEntryInfo, error) {
 	config, err := imgInfo.image.ConfigFile()
-	if err != nil {
-		return nil, err
-	}
-
-	layers, err := imgInfo.image.Layers()
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +304,12 @@ func (s *Source) processLayer(ctx context.Context, layer v1.Layer, imgInfo image
 	}
 	defer rc.Close()
 
-	gzipReader, err := gzip.NewReader(rc)
+	const (
+		defaultBlockSize = 1 << 24 // 16MB
+		defaultBlocks    = 8
+	)
+
+	gzipReader, err := gzip.NewReaderN(rc, defaultBlockSize, defaultBlocks)
 	if err != nil {
 		return err
 	}
@@ -383,29 +385,42 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 }
 
 func (s *Source) remoteOpts() ([]remote.Option, error) {
+	defaultTransport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          s.concurrency * 4,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConnsPerHost:   s.concurrency * 2,
+	}
+
+	var opts []remote.Option
+	opts = append(opts, remote.WithTransport(defaultTransport))
+
 	switch s.conn.GetCredential().(type) {
 	case *sourcespb.Docker_Unauthenticated:
 		return nil, nil
 	case *sourcespb.Docker_BasicAuth:
-		return []remote.Option{
-			remote.WithAuth(&authn.Basic{
-				Username: s.conn.GetBasicAuth().GetUsername(),
-				Password: s.conn.GetBasicAuth().GetPassword(),
-			}),
-		}, nil
+		opts = append(opts, remote.WithAuth(&authn.Basic{
+			Username: s.conn.GetBasicAuth().GetUsername(),
+			Password: s.conn.GetBasicAuth().GetPassword(),
+		}))
 	case *sourcespb.Docker_BearerToken:
-		return []remote.Option{
-			remote.WithAuth(&authn.Bearer{
-				Token: s.conn.GetBearerToken(),
-			}),
-		}, nil
+		opts = append(opts, remote.WithAuth(&authn.Bearer{
+			Token: s.conn.GetBearerToken(),
+		}))
 	case *sourcespb.Docker_DockerKeychain:
-		return []remote.Option{
-			remote.WithAuthFromKeychain(authn.DefaultKeychain),
-		}, nil
+		opts = append(opts, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	default:
 		return nil, fmt.Errorf("unknown credential type: %T", s.conn.Credential)
 	}
+
+	return opts, nil
 }
 
 func baseAndTagFromImage(image string) (base, tag string, hasDigest bool) {

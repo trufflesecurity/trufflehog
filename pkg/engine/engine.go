@@ -29,6 +29,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const detectionTimeout = 10 * time.Second
+
 var errOverlap = errors.New(
 	"More than one detector has found this result. For your safety, verification has been disabled." +
 		"You can override this behavior by using the --allow-verification-overlap flag.",
@@ -308,6 +310,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 		e.decoders = decoders.DefaultDecoders()
 	}
 
+	// Only use the default detectors if none are provided.
 	if len(e.detectors) == 0 {
 		e.detectors = DefaultDetectors()
 	}
@@ -620,9 +623,8 @@ func (e *Engine) startScannerWorkers(ctx context.Context) {
 	}
 }
 
-const detectorWorkerMultiplier = 50
-
 func (e *Engine) startDetectorWorkers(ctx context.Context) {
+	const detectorWorkerMultiplier = 4
 	ctx.Logger().V(2).Info("starting detector workers", "count", e.concurrency*detectorWorkerMultiplier)
 	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
 		e.wgDetectorWorkers.Add(1)
@@ -636,9 +638,8 @@ func (e *Engine) startDetectorWorkers(ctx context.Context) {
 }
 
 func (e *Engine) startVerificationOverlapWorkers(ctx context.Context) {
-	const verificationOverlapWorkerMultiplier = detectorWorkerMultiplier
 	ctx.Logger().V(2).Info("starting verificationOverlap workers", "count", e.concurrency)
-	for worker := uint64(0); worker < uint64(e.concurrency*verificationOverlapWorkerMultiplier); worker++ {
+	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.verificationOverlapWg.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "verification_overlap_worker_id", common.RandomID(5))
@@ -883,9 +884,14 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			// DO NOT VERIFY at this stage of the pipeline.
 			matchedBytes := detector.Matches()
 			for _, match := range matchedBytes {
+				ctx, cancel := context.WithTimeout(ctx, time.Second*2)
 				results, err := detector.FromData(ctx, false, match)
+				cancel()
 				if err != nil {
-					ctx.Logger().Error(err, "error verifying chunk")
+					ctx.Logger().V(2).Error(
+						err, "error finding results in chunk during verification overlap",
+						"detector", detector.Key.Type().String(),
+					)
 				}
 
 				if len(results) == 0 {
@@ -980,9 +986,9 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	if e.printAvgDetectorTime {
 		start = time.Now()
 	}
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer common.Recover(ctx)
-	defer cancel()
+
+	ctx = context.WithValue(ctx, "detector", data.detector.Key.Loggable())
 
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
 
@@ -996,9 +1002,16 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	for _, matchBytes := range matches {
 		matchCount++
 		detectBytesPerMatch.Observe(float64(len(matchBytes)))
+
+		ctx, cancel := context.WithTimeout(ctx, detectionTimeout)
+		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
+			ctx.Logger().Error(nil, "a detector ignored the context timeout")
+		})
 		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
+		t.Stop()
+		cancel()
 		if err != nil {
-			ctx.Logger().Error(err, "error scanning chunk")
+			ctx.Logger().Error(err, "error finding results in chunk")
 			continue
 		}
 
