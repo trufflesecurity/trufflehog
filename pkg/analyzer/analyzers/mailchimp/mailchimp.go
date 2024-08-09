@@ -25,7 +25,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Mailgun }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Mailchimp }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
@@ -45,7 +45,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType:       analyzerpb.AnalyzerType_Mailgun,
+		AnalyzerType:       analyzerpb.AnalyzerType_Mailchimp,
 		Bindings:           make([]analyzers.Binding, len(StringToPermission)),
 		UnboundedResources: make([]analyzers.Resource, len(info.Domains.Domains)),
 	}
