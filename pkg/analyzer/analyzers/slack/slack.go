@@ -47,7 +47,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		resourceType = "bot"
 		fullyQualifiedName = info.User.BotId
 	}
-	resource := &analyzers.Resource{
+	resource := analyzers.Resource{
 		Name:               info.User.User,
 		FullyQualifiedName: fullyQualifiedName,
 		Type:               resourceType,
@@ -57,22 +57,39 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			"team_id": info.User.TeamId,
 		},
 	}
-	result.Bindings = []analyzers.Binding{}
+
+	// extract all permissions
+	permissions := extractPermissions(info)
+
+	result.Bindings = analyzers.BindAllPermissions(resource, permissions...)
+
+	return &result
+}
+
+func extractPermissions(info *SecretInfo) []analyzers.Permission {
+	var permissions []analyzers.Permission
+
 	for _, scope := range strings.Split(info.Scopes, ",") {
-		perms := scope_mapping[scope]
-		if perms != nil {
-			result.Bindings = append(result.Bindings, analyzers.Binding{
-				Resource: *resource,
-				Permission: analyzers.Permission{
-					Value:       scope,
-					AccessLevel: strings.Join(perms, ","),
-				},
+		parentPermission := analyzers.Permission{
+			Value: scope,
+		}
+		permissions = append(permissions, parentPermission)
+
+		perms, ok := scope_mapping[scope]
+		if !ok {
+			continue
+		}
+
+		for _, perm := range perms {
+			permissions = append(permissions, analyzers.Permission{
+				Value:  perm,
+				Parent: &parentPermission,
 			})
 		}
 
 	}
 
-	return &result
+	return permissions
 }
 
 // Add in showAll to printScopes + deal with testing enterprise + add scope details
