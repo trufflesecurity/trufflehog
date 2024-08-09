@@ -13,7 +13,94 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Sendgrid }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, fmt.Errorf("missing key in credInfo")
+	}
+	info, err := AnalyzePermissions(a.Cfg, key)
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	var keyType string
+	if slices.Contains(info.RawScopes, "user.email.read") {
+		keyType = "full access"
+	} else if slices.Contains(info.RawScopes, "billing.read") {
+		keyType = "billing access"
+	} else {
+		keyType = "restricted access"
+	}
+
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Sendgrid,
+		Metadata: map[string]any{
+			"key_type":     keyType,
+			"2fa_required": slices.Contains(info.RawScopes, "2fa_required"),
+		},
+		Bindings:           []analyzers.Binding{},
+		UnboundedResources: []analyzers.Resource{},
+	}
+
+	for _, scope := range SCOPES {
+		resource := getCategoryResource(scope)
+
+		if len(scope.Permissions) == 0 {
+			result.UnboundedResources = append(result.UnboundedResources, *resource)
+		} else {
+			for _, permission := range scope.Permissions {
+				result.Bindings = append(result.Bindings, analyzers.Binding{
+					Resource: *resource,
+					Permission: analyzers.Permission{
+						Value: permission,
+					},
+				})
+			}
+		}
+	}
+
+	return &result
+}
+
+func getCategoryResource(scope SendgridScope) *analyzers.Resource {
+	categoryResource := &analyzers.Resource{
+		Name:               scope.Category,
+		FullyQualifiedName: scope.Category,
+		Type:               "category",
+		Metadata:           nil,
+	}
+
+	if scope.SubCategory != "" {
+		return &analyzers.Resource{
+			Name:               scope.SubCategory,
+			FullyQualifiedName: scope.SubCategory,
+			Type:               "category",
+			Metadata:           nil,
+			Parent:             categoryResource,
+		}
+	}
+
+	return categoryResource
+}
 
 type ScopesJSON struct {
 	Scopes []string `json:"scopes"`
