@@ -1,7 +1,9 @@
+//go:generate generate_permissions permissions.yaml permissions.go mailchimp
 package mailchimp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -23,14 +25,80 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Mailchimp }
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Mailgun }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("not implemented")
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType:       analyzerpb.AnalyzerType_Mailgun,
+		Bindings:           make([]analyzers.Binding, len(StringToPermission)),
+		UnboundedResources: make([]analyzers.Resource, len(info.Domains.Domains)),
+	}
+
+	accountResource := analyzers.Resource{
+		Name:               info.Metadata.AccountName,
+		FullyQualifiedName: info.Metadata.AccountID,
+		Type:               "account",
+		Metadata: map[string]any{
+			"email":             info.Metadata.Email,
+			"first_name":        info.Metadata.FirstName,
+			"last_name":         info.Metadata.LastName,
+			"role":              info.Metadata.Role,
+			"member_since":      info.Metadata.MemberSince,
+			"pricing_plan":      info.Metadata.PricingPlan,
+			"account_timezone":  info.Metadata.AccountTimezone,
+			"last_login":        info.Metadata.LastLogin,
+			"total_subscribers": info.Metadata.TotalSubscribers,
+			"company":           info.Metadata.Contact.Company,
+			"address1":          info.Metadata.Contact.Address1,
+			"address2":          info.Metadata.Contact.Address2,
+			"city":              info.Metadata.Contact.City,
+			"state":             info.Metadata.Contact.State,
+			"zip":               info.Metadata.Contact.Zip,
+			"country":           info.Metadata.Contact.Country,
+		},
+	}
+
+	count := 0
+	for perm := range StringToPermission {
+		result.Bindings[count] = analyzers.Binding{
+			Resource: accountResource,
+			Permission: analyzers.Permission{
+				Value: perm,
+			},
+		}
+		count++
+	}
+
+	for idx, domain := range info.Domains.Domains {
+		result.UnboundedResources[idx] = analyzers.Resource{
+			Name:               domain.Domain,
+			FullyQualifiedName: domain.Domain,
+			Type:               "domain",
+			Metadata: map[string]any{
+				"verified":      domain.Verified,
+				"authenticated": domain.Authenticated,
+			},
+			Parent: &accountResource,
+		}
+	}
+
+	return &result
 }
 
 type MetadataJSON struct {
