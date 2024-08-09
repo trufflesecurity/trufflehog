@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -415,5 +416,62 @@ func TestHandleLargeHTTPJson(t *testing.T) {
 	for range chunkCh {
 		count++
 	}
+	assert.Equal(t, wantCount, count)
+}
+
+func TestHandlePipe(t *testing.T) {
+	r, w := io.Pipe()
+
+	go func() {
+		defer w.Close()
+		file, err := os.Open("testdata/test.tar")
+		assert.NoError(t, err)
+		defer file.Close()
+		_, err = io.Copy(w, file)
+		assert.NoError(t, err)
+	}()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), r, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 1
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func TestHandleZipCommandStdoutPipe(t *testing.T) {
+	cmd := exec.Command("zip", "-j", "-", "testdata/nested-dirs.zip")
+	stdout, err := cmd.StdoutPipe()
+	assert.NoError(t, err)
+
+	err = cmd.Start()
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(ctx, stdout, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	err = cmd.Wait()
+	assert.NoError(t, err)
+
+	wantCount := 8
+	count := 0
+	for range chunkCh {
+		count++
+	}
+
 	assert.Equal(t, wantCount, count)
 }

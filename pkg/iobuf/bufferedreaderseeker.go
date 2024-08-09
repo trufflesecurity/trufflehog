@@ -33,8 +33,9 @@ func init() { defaultBufferPool = pool.NewBufferPool(defaultBufferSize) }
 // on it. For non-seekable readers, seeking is emulated using the buffer or
 // temporary file.
 type BufferedReadSeeker struct {
-	reader io.Reader
-	seeker io.Seeker // If the reader supports seeking, it's stored here for direct access
+	reader     io.Reader
+	seeker     io.Seeker // If the reader supports seeking, it's stored here for direct access
+	isSeekable bool      // Indicates if the reader supports reliable seeking operations
 
 	bufPool *pool.Pool     // Pool for storing buffers for reuse.
 	buf     *buffer.Buffer // Buffer for storing data under the threshold in memory.
@@ -53,32 +54,52 @@ type BufferedReadSeeker struct {
 	sizeKnown bool  // Whether the total size of the reader is known
 }
 
+// isSeekable checks if a reader reliably supports seeking operations.
+// Some types, like os.File when used as a pipe, may implement io.Seeker
+// but do not actually support seeking.
+func isSeekable(r io.Reader) bool {
+	seeker, ok := r.(io.Seeker)
+	if !ok {
+		return false
+	}
+
+	_, err := seeker.Seek(0, io.SeekCurrent)
+	return err == nil
+}
+
 // NewBufferedReaderSeeker creates and initializes a BufferedReadSeeker.
 // It takes an io.Reader and checks if it supports seeking.
 // If the reader supports seeking, it is stored in the seeker field.
 func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 	const defaultThreshold = 1 << 24 // 16MB threshold for switching to file buffering
 
-	seeker, _ := r.(io.Seeker)
+	var (
+		buf      *buffer.Buffer
+		seeker   io.Seeker
+		seekable bool
+	)
 
-	var buf *buffer.Buffer
-	if seeker == nil {
+	if isSeekable(r) {
+		seeker, _ = r.(io.Seeker)
+		seekable = true
+	} else {
 		buf = defaultBufferPool.Get()
 	}
 
 	return &BufferedReadSeeker{
-		reader:    r,
-		seeker:    seeker,
-		bufPool:   defaultBufferPool,
-		buf:       buf,
-		threshold: defaultThreshold,
+		reader:     r,
+		seeker:     seeker,
+		isSeekable: seekable,
+		bufPool:    defaultBufferPool,
+		buf:        buf,
+		threshold:  defaultThreshold,
 	}
 }
 
 // Read reads len(out) bytes from the reader starting at the current index.
 // It handles both seekable and non-seekable underlying readers efficiently.
 func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
-	if br.seeker != nil {
+	if br.isSeekable {
 		// For seekable readers, read directly from the underlying reader.
 		n, err := br.reader.Read(out)
 		if n > 0 {
@@ -98,6 +119,10 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 		n, err := br.tempFile.Read(out)
 		br.index += int64(n)
 		return n, err
+	}
+
+	if br.buf == nil {
+		br.buf = br.bufPool.Get()
 	}
 
 	var (
@@ -157,7 +182,7 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 // Seek sets the offset for the next Read or Write to offset.
 // It supports both seekable and non-seekable underlying readers.
 func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
-	if br.seeker != nil {
+	if br.isSeekable {
 		// Use the underlying Seeker if available.
 		return br.seeker.Seek(offset, whence)
 	}
@@ -301,18 +326,19 @@ func (br *BufferedReadSeeker) createTempFile() error {
 }
 
 func (br *BufferedReadSeeker) flushBufferToDisk() error {
-	if _, err := br.buf.WriteTo(br.tempFile); err != nil {
+	n, err := br.buf.WriteTo(br.tempFile)
+	if err != nil {
 		return err
 	}
-	br.diskBufferSize = int64(br.buf.Len())
+	br.diskBufferSize += n
 
-	return nil
+	return err
 }
 
 // ReadAt reads len(out) bytes into out starting at offset off in the underlying input source.
 // It uses Seek and Read to implement random access reading.
 func (br *BufferedReadSeeker) ReadAt(out []byte, offset int64) (int, error) {
-	if br.seeker != nil {
+	if br.isSeekable {
 		// Use the underlying Seeker if available.
 		_, err := br.Seek(offset, io.SeekStart)
 		if err != nil {
@@ -321,7 +347,6 @@ func (br *BufferedReadSeeker) ReadAt(out []byte, offset int64) (int, error) {
 		return br.Read(out)
 	}
 
-	// For non-seekable readers, use our buffering logic.
 	currentIndex := br.index
 
 	if _, err := br.Seek(offset, io.SeekStart); err != nil {

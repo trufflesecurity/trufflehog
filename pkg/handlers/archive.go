@@ -78,6 +78,9 @@ var ErrMaxDepthReached = errors.New("max archive depth reached")
 // it either decompresses or extracts the contents directly, sending data to the provided channel.
 // Returns an error if the archive cannot be processed due to issues like exceeding maximum depth or unsupported formats.
 func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader fileReader, archiveChan chan []byte) error {
+	ctx.Logger().V(4).Info("Starting archive processing", "depth", depth)
+	defer ctx.Logger().V(4).Info("Finished archive processing", "depth", depth)
+
 	if common.IsDone(ctx) {
 		return ctx.Err()
 	}
@@ -200,6 +203,7 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
 
+		lCtx.Logger().V(4).Info("Processed file successfully", "filename", file.Name(), "size", file.Size())
 		return h.openArchive(lCtx, depth, rdr, archiveChan)
 	}
 }
