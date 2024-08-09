@@ -154,7 +154,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		color.Red("[i] Token Expiration: does not expire")
 	} else {
 		timeRemaining := time.Until(expiry)
-		color.Yellow("[i] Token Expiration: %v (%v remaining)", expiry, timeRemaining)
+		color.Yellow("[i] Token Expiration: %v (%s remaining)", expiry, roughHumanReadableDuration(timeRemaining))
 	}
 	color.Yellow("[i] Token Type: %s\n\n", info.Metadata.Type)
 
@@ -163,4 +163,40 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		return
 	}
 	classic.PrintClassicToken(cfg, info)
+}
+
+// roughHumanReadableDuration converts a duration into a rough estimate for
+// human consumption. The larger the duration, the larger granularity is
+// returned.
+func roughHumanReadableDuration(d time.Duration) string {
+	var gran time.Duration
+	var unit string
+	switch {
+	case d < 1*time.Minute:
+		gran = time.Second
+		unit = "second"
+	case d < 1*time.Hour:
+		gran = time.Minute
+		unit = "minute"
+	case d < 24*time.Hour:
+		gran = time.Hour
+		unit = "hour"
+	case d < 4*7*24*time.Hour:
+		gran = 24 * time.Hour
+		unit = "day"
+	case d < 3*4*7*24*time.Hour:
+		gran = 7 * 24 * time.Hour
+		unit = "week"
+	case d < 5*365*24*time.Hour:
+		gran = 365 * 24 * time.Hour
+		unit = "month"
+	default:
+		gran = 365 * 24 * time.Hour
+		unit = "year"
+	}
+	num := d.Round(gran) / gran
+	if num != 1 {
+		unit += "s"
+	}
+	return fmt.Sprintf("%d %s", num, unit)
 }
