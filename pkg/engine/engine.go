@@ -733,11 +733,16 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		startTime := time.Now()
 		sourceVerify := chunk.Verify
 		for _, decoder := range e.decoders {
+			decodeStart := time.Now()
 			decoded := decoder.FromChunk(chunk)
+			decodeTime := time.Since(decodeStart).Microseconds()
+
 			if decoded == nil {
 				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
 				continue
 			}
+
+			decodeLatency.WithLabelValues(decoded.DecoderType.String(), decoded.SourceName).Observe(float64(decodeTime))
 
 			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
