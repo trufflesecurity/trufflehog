@@ -1,0 +1,27 @@
+permissions:
+- user:add
+- user:remove
+- team_admin:manage
+- team_developers:manage
+- sso:manage
+- custom_domain:add
+- custom_domain:edit
+- custom_domain:remove
+- audit_logs:view
+- usage_data:view
+- billing_members:manage
+- payment:manage
+- plan:update
+- team_workspaces:view
+- team_workspaces:create
+- team_public_profile:enable
+- team_private_api_network:manage
+- parterner_workspace:view
+- parterner_workspace:manage
+- parterner_workspace_visibility:manage
+- partners:manage
+- flow:add
+- flow:edit
+- flow:run
+- flow:publish
+
