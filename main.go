@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/felixge/fgprof"
@@ -542,7 +543,23 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 				}
 			}()
 
+			startTime := time.Now()
+			var totalBytes int64
+
 			for metrics := range finishedMetrics {
+				reportGenerationTotal.Inc()
+
+				unitType := "unknown"
+				if metrics.Unit != nil {
+					_, unitKind := metrics.Unit.SourceUnitID()
+					unitType = string(unitKind)
+				}
+				unitMetricsTotal.WithLabelValues(unitType).Inc()
+
+				if len(metrics.Errors) > 0 {
+					unitMetricsWithErrors.WithLabelValues(unitType).Inc()
+				}
+
 				metrics.Errors = common.ExportErrors(metrics.Errors...)
 				details, err := json.Marshal(map[string]any{
 					"version": 1,
@@ -550,12 +567,22 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 				})
 				if err != nil {
 					ctx.Logger().Error(err, "error marshalling job details")
+					reportGenerationErrors.WithLabelValues("marshal").Inc()
 					continue
 				}
-				if _, err := jobReportWriter.Write(append(details, '\n')); err != nil {
+
+				details = append(details, '\n')
+				totalBytes += int64(len(details))
+
+				if _, err := jobReportWriter.Write(details); err != nil {
 					ctx.Logger().Error(err, "error writing to file")
+					reportGenerationErrors.WithLabelValues("write").Inc()
 				}
 			}
+
+			duration := time.Since(startTime)
+			reportGenerationDuration.Observe(duration.Seconds())
+			reportFileSize.Set(float64(totalBytes))
 		}()
 	}
 

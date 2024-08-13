@@ -21,4 +21,11 @@ var (
 		Name:      "hooks_channel_size",
 		Help:      "Total number of metrics waiting in the finished channel.",
 	}, nil)
+
+	backPressureOccurrences = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "back_pressure_occurrences_total",
+		Help:      "Total number of times back pressure was detected",
+	})
 )

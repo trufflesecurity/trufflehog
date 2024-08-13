@@ -39,6 +39,7 @@ func NewUnitHook(ctx context.Context, opts ...UnitHookOpt) (*UnitHook, <-chan Un
 		logBackPressure: func() {
 			once.Do(func() {
 				ctx.Logger().Info("back pressure detected in unit hook")
+				backPressureOccurrences.Inc()
 			})
 		},
 	}
