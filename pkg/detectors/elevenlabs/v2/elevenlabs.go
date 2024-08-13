@@ -39,7 +39,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"elevenlabs", "xi-api-key", "el", "xi_api_key"}
+	return []string{"elevenlabs", "xi-api-key", "xi_api_key"}
 }
 
 // FromData will find and optionally verify Elevenlabs secrets in a given set of bytes.
