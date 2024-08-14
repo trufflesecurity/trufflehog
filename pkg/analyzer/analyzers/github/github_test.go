@@ -229,7 +229,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
               ],
               "UnboundedResources": null,
               "Metadata": {
-                "expiration": "0001-01-01T00:00:00Z",
+                "expiration": "2025-08-05T00:00:00-07:00",
                 "type": "Fine-Grained GitHub Personal Access Token"
               }
             }`,
