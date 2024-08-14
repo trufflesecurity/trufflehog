@@ -652,7 +652,7 @@ func printModelsTable(models []Model) {
 		}
 		if model.Private {
 			private = color.New(color.FgGreen).Sprintf("True")
-			name = color.New(color.FgGreen).Sprintf(model.Name)
+			name = color.New(color.FgGreen).Sprintf("%s", model.Name)
 		} else {
 			private = "False"
 			name = model.Name

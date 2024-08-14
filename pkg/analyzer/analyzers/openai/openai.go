@@ -157,13 +157,13 @@ func AnalyzePermissions(cfg *config.Config, key string) (*AnalyzerJSON, error) {
 
 	meJSON, err := getUserData(cfg, key)
 	if err != nil {
-		return nil, fmt.Errorf(err.Error())
+		return nil, err
 	}
 	data.me = meJSON
 
 	isAdmin, err := checkAdminKey(cfg, key)
 	if err != nil {
-		return nil, fmt.Errorf(err.Error())
+		return nil, err
 	}
 
 	if isAdmin {
@@ -171,7 +171,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*AnalyzerJSON, error) {
 	} else {
 		data.isRestricted = true
 		if err := analyzeScopes(key); err != nil {
-			return nil, fmt.Errorf(err.Error())
+			return nil, err
 		}
 		data.perms = getPermissions()
 	}
