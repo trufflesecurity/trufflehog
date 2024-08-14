@@ -207,7 +207,7 @@ func (c *unitChunker) ChunkUnit(ctx context.Context, unit SourceUnit, rep ChunkR
 			continue
 		}
 		if step.err != "" {
-			if err := rep.ChunkErr(ctx, fmt.Errorf(step.err)); err != nil {
+			if err := rep.ChunkErr(ctx, fmt.Errorf("%s", step.err)); err != nil {
 				return err
 			}
 		}

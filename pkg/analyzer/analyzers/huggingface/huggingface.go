@@ -550,12 +550,12 @@ func printOrgs(tokenJSON HFTokenJSON) {
 		enterprise := ""
 		role := ""
 		if org.IsEnterprise {
-			enterprise = color.New(color.FgGreen).Sprintf("True")
+			enterprise = color.New(color.FgGreen).Sprint("True")
 		} else {
 			enterprise = "False"
 		}
 		if org.Role == "admin" {
-			role = color.New(color.FgGreen).Sprintf("Admin")
+			role = color.New(color.FgGreen).Sprint("Admin")
 		} else {
 			role = org.Role
 		}
@@ -641,18 +641,18 @@ func printModelsTable(models []Model) {
 	for _, model := range models {
 		var name, read, write, private string
 		if model.Permissions.Read {
-			read = color.New(color.FgGreen).Sprintf("True")
+			read = color.New(color.FgGreen).Sprint("True")
 		} else {
 			read = "False"
 		}
 		if model.Permissions.Write {
-			write = color.New(color.FgGreen).Sprintf("True")
+			write = color.New(color.FgGreen).Sprint("True")
 		} else {
 			write = "False"
 		}
 		if model.Private {
-			private = color.New(color.FgGreen).Sprintf("True")
-			name = color.New(color.FgGreen).Sprintf(model.Name)
+			private = color.New(color.FgGreen).Sprint("True")
+			name = color.New(color.FgGreen).Sprint(model.Name)
 		} else {
 			private = "False"
 			name = model.Name
