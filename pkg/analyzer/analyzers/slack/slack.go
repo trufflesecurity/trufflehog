@@ -63,6 +63,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			"url":     info.User.Url,
 			"team":    info.User.Team,
 			"team_id": info.User.TeamId,
+			"scopes":  strings.Split(info.Scopes, ","),
 		},
 	}
 
@@ -78,11 +79,6 @@ func extractPermissions(info *SecretInfo) []analyzers.Permission {
 	var permissions []analyzers.Permission
 
 	for _, scope := range strings.Split(info.Scopes, ",") {
-		parentPermission := analyzers.Permission{
-			Value: scope,
-		}
-		permissions = append(permissions, parentPermission)
-
 		perms, ok := scope_mapping[scope]
 		if !ok {
 			continue
@@ -91,10 +87,9 @@ func extractPermissions(info *SecretInfo) []analyzers.Permission {
 		for _, perm := range perms {
 			permissions = append(permissions, analyzers.Permission{
 				Value:  perm,
-				Parent: &parentPermission,
+				Parent: nil,
 			})
 		}
-
 	}
 
 	return permissions

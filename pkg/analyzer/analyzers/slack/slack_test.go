@@ -29,650 +29,672 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			name: "valid Slack key",
 			key:  testSecrets.MustGetField("SLACK"),
 			want: `{
-				"AnalyzerType":16,
-				"Bindings":[
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"identify",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"channels:history",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"conversations.history",
-						 "Parent":{
-							"Value":"channels:history",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"conversations.replies",
-						 "Parent":{
-							"Value":"channels:history",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"groups:history",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"im:history",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"channels:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"channels.info",
-						 "Parent":{
-							"Value":"channels:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"conversations.info",
-						 "Parent":{
-							"Value":"channels:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"conversations.list",
-						 "Parent":{
-							"Value":"channels:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"conversations.members",
-						 "Parent":{
-							"Value":"channels:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"groups.info",
-						 "Parent":{
-							"Value":"channels:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"im.list",
-						 "Parent":{
-							"Value":"channels:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"mpim.list",
-						 "Parent":{
-							"Value":"channels:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"users.conversations",
-						 "Parent":{
-							"Value":"channels:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"emoji:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"emoji.list",
-						 "Parent":{
-							"Value":"emoji:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"files:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"files.info",
-						 "Parent":{
-							"Value":"files:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"files.list",
-						 "Parent":{
-							"Value":"files:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"groups:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"im:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"stars:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"stars.list",
-						 "Parent":{
-							"Value":"stars:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"pins:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"pins.list",
-						 "Parent":{
-							"Value":"pins:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"usergroups:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"usergroups.list",
-						 "Parent":{
-							"Value":"usergroups:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"usergroups.users.list",
-						 "Parent":{
-							"Value":"usergroups:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"dnd:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"dnd.info",
-						 "Parent":{
-							"Value":"dnd:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"dnd.teamInfo",
-						 "Parent":{
-							"Value":"dnd:read",
-							"Parent":null
-						 }
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"calls:read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"marge.haskell.bridge",
-						 "FullyQualifiedName":"USMD5JM0F",
-						 "Type":"user",
-						 "Metadata":{
-							"team":"ct.org",
-							"team_id":"TSMCXP5FH",
-							"url":"https://ctorgworkspace.slack.com/"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"calls.info",
-						 "Parent":{
-							"Value":"calls:read",
-							"Parent":null
-						 }
-					  }
-				   }
-				],
-				"UnboundedResources":null,
-				"Metadata":null
-			 }`,
+					"AnalyzerType": 16,
+					"Bindings": [
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "conversations.history",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "conversations.replies",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "channels.info",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "conversations.info",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "conversations.list",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "conversations.members",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "groups.info",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "im.list",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "mpim.list",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "users.conversations",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "emoji.list",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "files.info",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "files.list",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "stars.list",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "pins.list",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "usergroups.list",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "usergroups.users.list",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "dnd.info",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "dnd.teamInfo",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "marge.haskell.bridge",
+							"FullyQualifiedName": "USMD5JM0F",
+							"Type": "user",
+							"Metadata": {
+							"scopes": [
+								"identify",
+								"channels:history",
+								"groups:history",
+								"im:history",
+								"channels:read",
+								"emoji:read",
+								"files:read",
+								"groups:read",
+								"im:read",
+								"stars:read",
+								"pins:read",
+								"usergroups:read",
+								"dnd:read",
+								"calls:read"
+							],
+							"team": "ct.org",
+							"team_id": "TSMCXP5FH",
+							"url": "https://ctorgworkspace.slack.com/"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "calls.info",
+							"Parent": null
+						}
+						}
+					],
+					"UnboundedResources": null,
+					"Metadata": null
+					}`,
 			wantErr: false,
 		},
 	}
