@@ -1,3 +1,4 @@
+//go:generate generate_permissions permissions.yaml permissions.go asana
 package asana
 
 // ToDo: Add OAuth token support.
@@ -49,8 +50,9 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	// resoures/permission setup
 	permissions := allPermissions()
 	userResource := analyzers.Resource{
-		Name: info.Data.Name,
-		Type: "user",
+		Name:               info.Data.Name,
+		FullyQualifiedName: info.Data.ID,
+		Type:               "user",
 		Metadata: map[string]any{
 			"email": info.Data.Email,
 			"type":  info.Data.Type,
@@ -66,11 +68,12 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	// unbounded resources
-	result.UnboundedResources = make([]analyzers.Resource, len(info.Data.Workspaces))
+	result.UnboundedResources = make([]analyzers.Resource, 0, len(info.Data.Workspaces))
 	for _, workspace := range info.Data.Workspaces {
 		resource := analyzers.Resource{
-			Name: workspace.Name,
-			Type: "workspace",
+			Name:               workspace.Name,
+			FullyQualifiedName: workspace.ID,
+			Type:               "workspace",
 		}
 		result.UnboundedResources = append(result.UnboundedResources, resource)
 	}
@@ -80,10 +83,12 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 type SecretInfo struct {
 	Data struct {
+		ID         string `json:"gid"`
 		Email      string `json:"email"`
 		Name       string `json:"name"`
 		Type       string `json:"resource_type"`
 		Workspaces []struct {
+			ID   string `json:"gid"`
 			Name string `json:"name"`
 		} `json:"workspaces"`
 	} `json:"data"`
@@ -150,9 +155,11 @@ func printMetadata(me *SecretInfo) {
 }
 
 func allPermissions() []analyzers.Permission {
-	permissions := make([]analyzers.Permission, 1)
-	permissions = append(permissions, analyzers.Permission{
-		Value: "Full Access",
-	})
+	permissions := make([]analyzers.Permission, 0, len(PermissionStrings))
+	for permission := range PermissionStrings {
+		permissions = append(permissions, analyzers.Permission{
+			Value: PermissionStrings[permission],
+		})
+	}
 	return permissions
 }
