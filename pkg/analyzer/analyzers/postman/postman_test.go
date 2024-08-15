@@ -26,43 +26,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "valid Postman key",
-			key:  testSecrets.MustGetField("POSTMAN_TOKEN"),
-			want: `{
-				"AnalyzerType":13,
-				"Bindings":[
-				   {
-					  "Resource":{
-						 "Name":"rendyplayground",
-						 "FullyQualifiedName":"rendyplayground@gmail.com",
-						 "Type":"user",
-						 "Metadata":{
-							"full_name":"rendy",
-							"team_domain":"",
-							"team_name":""
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"user",
-						 "Parent":null
-					  }
-				   }
-				],
-				"UnboundedResources":[
-				   {
-					  "Name":"My Workspace",
-					  "FullyQualifiedName":"4d06fc0c-6402-4a26-857d-80787b10eabf",
-					  "Type":"workspace",
-					  "Metadata":{
-						 "type":"personal",
-						 "visibility":"personal"
-					  },
-					  "Parent":null
-				   }
-				],
-				"Metadata":null
-			 }`,
+			name:    "valid Postman key",
+			key:     testSecrets.MustGetField("POSTMAN_TOKEN"),
+			want:    `{"AnalyzerType":13,"Bindings":[{"Resource":{"Name":"rendy","FullyQualifiedName":"rendyplayground@gmail.com","Type":"user","Metadata":{"email":"rendyplayground@gmail.com","role":"user","team_domain":"","team_name":"","username":"rendyplayground"},"Parent":null},"Permission":{"Value":"team_workspaces:create","Parent":null}},{"Resource":{"Name":"rendy","FullyQualifiedName":"rendyplayground@gmail.com","Type":"user","Metadata":{"email":"rendyplayground@gmail.com","role":"user","team_domain":"","team_name":"","username":"rendyplayground"},"Parent":null},"Permission":{"Value":"team_workspaces:view","Parent":null}},{"Resource":{"Name":"rendy","FullyQualifiedName":"rendyplayground@gmail.com","Type":"user","Metadata":{"email":"rendyplayground@gmail.com","role":"user","team_domain":"","team_name":"","username":"rendyplayground"},"Parent":null},"Permission":{"Value":"usage_data:view","Parent":null}}],"UnboundedResources":[{"Name":"My Workspace","FullyQualifiedName":"4d06fc0c-6402-4a26-857d-80787b10eabf","Type":"workspace","Metadata":{"id":"4d06fc0c-6402-4a26-857d-80787b10eabf","type":"personal","visibility":"personal"},"Parent":null}],"Metadata":null}`,
 			wantErr: false,
 		},
 	}

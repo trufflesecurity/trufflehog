@@ -49,7 +49,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 	resource := analyzers.Resource{
 		Name:               info.User.User.FullName,
-		FullyQualifiedName: info.User.User.FullName,
+		FullyQualifiedName: info.User.User.Email,
 		Type:               "user",
 		Metadata: map[string]any{
 			"role":        strings.Join(info.User.User.Roles, ","),
@@ -68,7 +68,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	for _, workspace := range info.Workspace.Workspaces {
 		result.UnboundedResources = append(result.UnboundedResources, analyzers.Resource{
 			Name:               workspace.Name,
-			FullyQualifiedName: workspace.Name,
+			FullyQualifiedName: workspace.ID,
 			Type:               "workspace",
 			Metadata: map[string]any{
 				"id":         workspace.ID,
@@ -94,18 +94,16 @@ func bakePermissions(roles []string) []analyzers.Permission {
 		}
 	}
 
-	permissions := make([]analyzers.Permission, len(permissionMap))
-	count := 0
+	permissions := make([]analyzers.Permission, 0, len(permissionMap))
 	for perm := range permissionMap {
 		permStr, err := perm.ToString()
 		if err != nil {
 			continue
 		}
-		permissions[count] = analyzers.Permission{
+		permissions = append(permissions, analyzers.Permission{
 			Value:  permStr,
 			Parent: nil,
-		}
-		count++
+		})
 	}
 
 	return permissions
