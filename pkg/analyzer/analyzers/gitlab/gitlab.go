@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go gitlab
+
 package gitlab
 
 import (
@@ -329,7 +331,7 @@ func printTokenPermissions(token AccessTokenJSON) {
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Scope", "Access" /* Add more column headers if needed */})
 	for _, scope := range token.Scopes {
-		t.AppendRow([]any{color.GreenString(scope), color.GreenString(gitlab_scopes[scope])})
+		t.AppendRow([]any{color.GreenString(scope), color.GreenString(permissionDescriptions[scope])})
 	}
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 2, WidthMax: 100}, // Limit the width of the third column (Description) to 20 characters
