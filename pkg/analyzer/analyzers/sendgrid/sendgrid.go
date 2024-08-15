@@ -66,15 +66,16 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 		if len(scope.Permissions) == 0 {
 			result.UnboundedResources = append(result.UnboundedResources, *resource)
-		} else {
-			for _, permission := range scope.Permissions {
-				result.Bindings = append(result.Bindings, analyzers.Binding{
-					Resource: *resource,
-					Permission: analyzers.Permission{
-						Value: permission,
-					},
-				})
-			}
+			continue
+		}
+
+		for _, permission := range scope.Permissions {
+			result.Bindings = append(result.Bindings, analyzers.Binding{
+				Resource: *resource,
+				Permission: analyzers.Permission{
+					Value: permission,
+				},
+			})
 		}
 	}
 
@@ -92,7 +93,7 @@ func getCategoryResource(scope SendgridScope) *analyzers.Resource {
 	if scope.SubCategory != "" {
 		return &analyzers.Resource{
 			Name:               scope.SubCategory,
-			FullyQualifiedName: scope.SubCategory,
+			FullyQualifiedName: fmt.Sprintf("%s/%s", scope.Category, scope.SubCategory),
 			Type:               "category",
 			Metadata:           nil,
 			Parent:             categoryResource,
