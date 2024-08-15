@@ -50,14 +50,16 @@ func (t *detectorTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	return t.T.RoundTrip(req)
 }
 
+var defaultDialer = &net.Dialer{
+	Timeout:   2 * time.Second,
+	KeepAlive: 5 * time.Second,
+}
+
 func NewDetectorTransport(userAgent string, T http.RoundTripper) http.RoundTripper {
 	if T == nil {
 		T = &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   2 * time.Second,
-				KeepAlive: 5 * time.Second,
-			}).DialContext,
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           defaultDialer.DialContext,
 			MaxIdleConns:          100,
 			MaxIdleConnsPerHost:   5,
 			IdleConnTimeout:       90 * time.Second,
@@ -76,9 +78,32 @@ func isLocalIP(ip net.IP) bool {
 	return false
 }
 
+var ErrNoLocalIP = errors.New("dialing local IP addresses is not allowed")
+
 func WithNoLocalIP() ClientOption {
 	return func(c *http.Client) {
-		transport := c.Transport.(*http.Transport)
+		if c.Transport == nil {
+			c.Transport = &http.Transport{}
+		}
+
+		// Type assertion to get the underlying *http.Transport
+		transport, ok := c.Transport.(*http.Transport)
+		if !ok {
+			// If c.Transport is not *http.Transport, check if it is wrapped in a detectorTransport
+			dt, ok := c.Transport.(*detectorTransport)
+			if !ok {
+				panic("unsupported transport type")
+			}
+			transport, ok = dt.T.(*http.Transport)
+			if !ok {
+				panic("underlying transport is not *http.Transport")
+			}
+		}
+
+		// If the original DialContext is nil, set it to the default dialer
+		if transport.DialContext == nil {
+			transport.DialContext = defaultDialer.DialContext
+		}
 		originalDialContext := transport.DialContext
 		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			host, port, err := net.SplitHostPort(addr)
@@ -93,7 +118,7 @@ func WithNoLocalIP() ClientOption {
 
 			for _, ip := range ips {
 				if isLocalIP(ip) {
-					return nil, errors.New("dialing local IP addresses is not allowed")
+					return nil, ErrNoLocalIP
 				}
 			}
 

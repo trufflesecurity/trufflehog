@@ -9,7 +9,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -26,7 +25,8 @@ var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 var (
 	keyPat = regexp.MustCompile(`\b(?:https?:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 
-	defaultClient = common.SaneHttpClient()
+	// TODO: make local addr opt-out
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
