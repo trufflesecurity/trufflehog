@@ -15,7 +15,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -63,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				payload := url.Values{}
 				payload.Add("username", resEmailMatch)
 
-				req, err := http.NewRequest("GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
 				if err != nil {
 					continue
 				}

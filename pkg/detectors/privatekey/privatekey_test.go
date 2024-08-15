@@ -203,7 +203,7 @@ func Test_lookupFingerprint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotFingerprints, err := lookupFingerprint(tt.publicKeyFingerprintInHex, tt.includeExpired)
+			gotFingerprints, err := lookupFingerprint(context.TODO(), tt.publicKeyFingerprintInHex, tt.includeExpired)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("lookupFingerprint() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -19,13 +19,11 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/google/go-github/v61/github"
+	"github.com/google/go-github/v63/github"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -417,7 +415,14 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		cloneURL.User = params.userInfo
 	}
 
-	gitArgs := []string{"clone", cloneURL.String(), params.clonePath}
+	gitArgs := []string{
+		"clone",
+		cloneURL.String(),
+		params.clonePath,
+		"-c",
+		"remote.origin.fetch=+refs/*:refs/remotes/origin/*",
+		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
+	}
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
@@ -442,15 +447,14 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	}
 
 	if err != nil {
-		err = fmt.Errorf("error executing git clone: %w", err)
+		err = fmt.Errorf("error executing git clone: %w, %s", err, output)
 	}
 	logger.V(3).Info("git subcommand finished", "output", output)
 
 	if cloneCmd.ProcessState == nil {
 		return nil, fmt.Errorf("clone command exited with no output")
-	}
-	if cloneCmd.ProcessState != nil && cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "output", output, "error", err)
+	} else if cloneCmd.ProcessState.ExitCode() != 0 {
+		logger.V(1).Info("git clone failed", "error", err)
 		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
 	}
 
@@ -520,14 +524,32 @@ func (s *Git) CommitsScanned() uint64 {
 
 const gitDirName = ".git"
 
+// getGitDir returns the likely path of the ".git" directory.
+// If the repository is bare, it will be at the top-level; otherwise, it
+// exists in the ".git" directory at the root of the working tree.
+//
+// See: https://git-scm.com/docs/gitrepository-layout#_description
+func getGitDir(path string, options *ScanOptions) string {
+	if options.Bare {
+		return path
+	} else {
+		return filepath.Join(path, gitDirName)
+	}
+}
+
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the remote URL for reporting (may be empty)
 	remoteURL := getSafeRemoteURL(repo, "origin")
 	var repoCtx context.Context
-	if remoteURL != "" {
-		repoCtx = context.WithValue(ctx, "repo", remoteURL)
+
+	if ctx.Value("repo") == nil {
+		if remoteURL != "" {
+			repoCtx = context.WithValue(ctx, "repo", remoteURL)
+		} else {
+			repoCtx = context.WithValue(ctx, "repo", path)
+		}
 	} else {
-		repoCtx = context.WithValue(ctx, "repo", path)
+		repoCtx = ctx
 	}
 
 	logger := repoCtx.Logger()
@@ -550,12 +572,14 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		return nil
 	}
 
-	gitDir := filepath.Join(path, gitDirName)
+	logger.Info("scanning repo", logValues...)
 
-	logger.V(1).Info("scanning repo", logValues...)
+	var (
+		gitDir         = getGitDir(path, scanOptions)
+		depth          int64
+		lastCommitHash string
+	)
 
-	var depth int64
-	var lastCommitHash string
 	for diff := range diffChan {
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
 			logger.V(1).Info("reached max depth", "depth", depth)
@@ -778,11 +802,9 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		return nil
 	}
 
-	reachedBase := false
-	gitDir := filepath.Join(path, gitDirName)
-
 	logger := ctx.Logger()
 	var logValues []any
+	logValues = append(logValues, "path", path)
 	if scanOptions.BaseHash != "" {
 		logValues = append(logValues, "base", scanOptions.BaseHash)
 	}
@@ -792,12 +814,15 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	if scanOptions.MaxDepth > 0 {
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
-	logger.V(1).Info("scanning repo", logValues...)
 
-	ctx.Logger().V(1).Info("scanning staged changes", "path", path)
+	logger.V(1).Info("scanning staged changes", logValues...)
 
-	var depth int64
-	var lastCommitHash string
+	var (
+		reachedBase    = false
+		gitDir         = getGitDir(path, scanOptions)
+		depth          int64
+		lastCommitHash string
+	)
 	for diff := range diffChan {
 		fullHash := diff.Commit.Hash
 		logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
@@ -1212,71 +1237,48 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	var handlerOpts []handlers.Option
-
-	if s.skipArchives {
-		handlerOpts = append(handlerOpts, handlers.WithSkipArchives(true))
+	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
+	stdout, err := s.executeCatFileCmd(cmd)
+	if err != nil {
+		return err
 	}
 
-	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
+	done := make(chan error, 1)
+	// Read from stdout to prevent the pipe buffer from filling up and causing the command to hang.
+	// This allows us to stream the file contents to the handler.
+	go func() {
+		defer close(done)
+		done <- handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	}()
 
+	// Close to signal that we are done writing to the pipe, which allows the reading goroutine to finish.
+	if closeErr := stdout.Close(); closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
+		ctx.Logger().Error(fmt.Errorf("error closing stdout: %w", closeErr), "closing stdout failed")
+	}
+
+	if waitErr := cmd.Wait(); waitErr != nil {
+		return fmt.Errorf("error waiting for git cat-file: %w", waitErr)
+	}
+
+	// Wait for the command to finish and the handler to complete.
+	// Capture any error from the file handling process.
+	return <-done
+}
+
+func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, error) {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	fileReader, err := cmd.StdoutPipe()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
 	if err := cmd.Start(); err != nil {
-		return err
-	}
-	defer func() {
-		if err := fileReader.Close(); err != nil {
-			ctx.Logger().Error(err, "error closing fileReader")
-		}
-		if err := cmd.Wait(); err != nil {
-			ctx.Logger().Error(
-				err, "error waiting for command",
-				"command", cmd.String(),
-				"stderr", stderr.String(),
-				"commit", commitHash,
-			)
-		}
-	}()
-
-	bufferName := cleantemp.MkFilename()
-
-	reader, err := diskbufferreader.New(fileReader, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	if handlers.HandleFile(fileCtx, reader, chunkSkel, reporter, handlerOpts...) {
-		return nil
+		return nil, fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	fileCtx.Logger().V(1).Info("binary file not handled, chunking raw")
-	if err := reader.Reset(); err != nil {
-		return err
-	}
-	reader.Stop()
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(fileCtx, reader)
-	for data := range chunkResChan {
-		chunk := *chunkSkel
-		chunk.Data = data.Bytes()
-		if err := data.Error(); err != nil {
-			return err
-		}
-		if err := reporter.ChunkOk(fileCtx, chunk); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return stdout, nil
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {

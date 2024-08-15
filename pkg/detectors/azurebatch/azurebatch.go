@@ -18,6 +18,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -76,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				h := hmac.New(sha256.New, key)
 				h.Write([]byte(stringToSign))
 				signature := base64.StdEncoding.EncodeToString(h.Sum(nil))
-				req, err := http.NewRequest("GET", url, nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 				if err != nil {
 					continue
 				}
@@ -105,8 +106,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

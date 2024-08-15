@@ -24,6 +24,16 @@
 
 **...and more**
 
+To learn more about about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
+
+</div>
+
+# :globe_with_meridians: TruffleHog Enterprise
+
+Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Microsoft Teams, Sharepoint, and more..** for credentials? We have an enterprise product that can help! Learn more at <https://trufflesecurity.com/trufflehog-enterprise>.
+
+We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
+
 </div>
 
 # :loudspeaker: Join Our Community
@@ -54,7 +64,7 @@ brew install trufflehog
 
 ### Docker:
 
-<sub><i>*Ensure Docker engine is running before executing the following commands:*</i></sub>
+<sub><i>_Ensure Docker engine is running before executing the following commands:_</i></sub>
 
 #### &nbsp;&nbsp;&nbsp;&nbsp;Unix
 
@@ -251,11 +261,59 @@ trufflehog git file://. --since-commit main --branch feature-1 --only-verified -
 
 ## 12: Scan a Postman workspace
 
-Use the `--workspace`, `--collection`, `--environment` flags multiple times to scan multiple targets.
+Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
 
 ```bash
-trufflehog postman --token=<postman api token> --workspace=<workspace id>
+trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
+
+## 13: Scan a Jenkins server
+
+```bash
+trufflehog jenkins --url https://jenkins.example.com --username admin --password admin
+```
+
+## 14: Scan an Elasticsearch server
+
+### Scan a Local Cluster
+
+There are two ways to authenticate to a local cluster with TruffleHog: (1) username and password, (2) service token.
+
+#### Connect to a local cluster with username and password
+
+```bash
+trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --username truffle --password hog
+```
+
+#### Connect to a local cluster with a service token
+
+```bash
+trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --service-token ‘AAEWVaWM...Rva2VuaSDZ’
+```
+
+### Scan an Elastic Cloud Cluster
+
+To scan a cluster on Elastic Cloud, you’ll need a Cloud ID and API key.
+
+```bash
+trufflehog elasticsearch \
+  --cloud-id 'search-prod:dXMtY2Vx...YjM1ODNlOWFiZGRlNjI0NA==' \
+  --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
+```
+
+## 15. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
+
+The following command will enumerate deleted and hidden commits on a GitHub repository and then scan them for secrets. This is an alpha release feature.
+
+```bash
+trufflehog github-experimental --repo https://github.com/<USER>/<REPO>.git --object-discovery
+```
+
+In addition to the normal TruffleHog output, the `--object-discovery` flag creates two files in a new `$HOME/.trufflehog` directory:  `valid_hidden.txt` and `invalid.txt`. These are used to track state during commit enumeration, as well as to provide users with a complete list of all hidden and deleted commits (`valid_hidden.txt`). If you'd like to automatically remove these files after scanning, please add the flag `--delete-cached-data`. 
+
+**Note**: Enumerating all valid commits on a repository using this method takes between 20 minutes and a few hours, depending on the size of your repository. We added a progress bar to keep you updated on how long the enumeration will take. The actual secret scanning runs extremely fast.
+
+For more information on Cross Fork Object References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github). 
 
 # :question: FAQ
 
@@ -290,12 +348,15 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - github
 - gitlab
 - docker
-- S3
+- s3
 - filesystem (files and directories)
 - syslog
 - circleci
 - travisci
-- GCS (Google Cloud Storage)
+- gcs (Google Cloud Storage)
+- postman
+- jenkins
+- elasticsearch
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
@@ -487,7 +548,7 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
 ```yaml
 stages:
   - security
-  
+
 security-secrets:
   stage: security
   allow_failure: false
@@ -616,7 +677,7 @@ class Verifier(BaseHTTPRequestHandler):
             self.log_message("%s", request)
 
             # check the match, you'll need to implement validateToken, which takes an array of ID's and Secrets
-            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']): 
+            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']):
                 self.send_response(200)
                 self.end_headers()
             else:
@@ -633,6 +694,14 @@ with HTTPServer(('', 8000), Verifier) as server:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+```
+
+## :mag: Analyze
+
+TruffleHog supports running a deeper analysis of a credential to view its permissions and the resources it has access to.
+
+```bash
+trufflehog analyze
 ```
 
 # :heart: Contributors
@@ -661,9 +730,3 @@ the stability of the public APIs at this time.
 # License Change
 
 Since v3.0, TruffleHog is released under a AGPL 3 license, included in [`LICENSE`](LICENSE). TruffleHog v3.0 uses none of the previous codebase, but care was taken to preserve backwards compatibility on the command line interface. The work previous to this release is still available licensed under GPL 2.0 in the history of this repository and the previous package releases and tags. A completed CLA is required for us to accept contributions going forward.
-
-# :money_with_wings: Enterprise product
-
-Are you interested in continuously monitoring your Git, Jira, Slack, Confluence, etc.. for credentials? We have an enterprise product that can help. Reach out here to learn more <https://trufflesecurity.com/contact/>
-
-We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.

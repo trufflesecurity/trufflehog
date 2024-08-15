@@ -19,6 +19,7 @@ import (
 )
 
 type scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
 }

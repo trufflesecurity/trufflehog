@@ -4,6 +4,8 @@ package source_metadata;
 
 option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb";
 
+import "google/protobuf/timestamp.proto";
+
 message Azure {
   string container = 1;
   string file = 2;
@@ -132,6 +134,19 @@ message GCS {
   string updated_at = 6;
   repeated string acls = 7;
   string content_type = 8;
+}
+
+message Huggingface {
+  string link = 1;
+  string username = 2;
+  string repository = 3;
+  string commit = 4;
+  string email = 5;
+  string file = 6;
+  string timestamp = 7;
+  int64 line = 8;
+  Visibility visibility = 9;
+  string resource_type = 10;
 }
 
 message Jira {
@@ -298,6 +313,24 @@ message Postman {
   string variable_type = 15;
 }
 
+message Vector {
+  google.protobuf.Timestamp timestamp = 1;
+  string source_type = 2;
+  string host = 3;
+}
+
+message Webhook {
+  oneof data {
+    Vector vector = 1;
+  }
+}
+
+message Elasticsearch {
+  string index = 1;
+  string document_id = 2;
+  string timestamp = 3;
+}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -329,5 +362,8 @@ message MetaData {
     AzureRepos azureRepos = 27;
     TravisCI travisCI = 28;
     Postman postman = 29;
+    Webhook webhook = 30;
+    Elasticsearch elasticsearch = 31;
+    Huggingface huggingface = 32;
   }
 }

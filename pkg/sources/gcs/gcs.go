@@ -12,7 +12,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
@@ -20,7 +19,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -83,11 +81,11 @@ type Source struct {
 // at given increments.
 type persistableCache struct {
 	persistIncrement int
-	cache.Cache
+	cache.Cache[string]
 	*sources.Progress
 }
 
-func newPersistableCache(increment int, cache cache.Cache, p *sources.Progress) *persistableCache {
+func newPersistableCache(increment int, cache cache.Cache[string], p *sources.Progress) *persistableCache {
 	return &persistableCache{
 		persistIncrement: increment,
 		Cache:            cache,
@@ -97,7 +95,7 @@ func newPersistableCache(increment int, cache cache.Cache, p *sources.Progress) 
 
 // Set overrides the cache Set method of the cache to enable the persistence
 // of the cache contents the Progress of the source at given increments.
-func (c *persistableCache) Set(key string, val any) {
+func (c *persistableCache) Set(key string, val string) {
 	c.Cache.Set(key, val)
 	if ok, contents := c.shouldPersist(); ok {
 		c.Progress.EncodedResumeInfo = contents
@@ -295,18 +293,18 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 }
 
 func (s *Source) setupCache(ctx context.Context) *persistableCache {
-	var c cache.Cache
+	var c cache.Cache[string]
 	if s.Progress.EncodedResumeInfo != "" {
 		keys := strings.Split(s.Progress.EncodedResumeInfo, ",")
-		entries := make([]memory.CacheEntry, len(keys))
+		entries := make([]memory.CacheEntry[string], len(keys))
 		for i, val := range keys {
-			entries[i] = memory.CacheEntry{Key: val, Value: val}
+			entries[i] = memory.CacheEntry[string]{Key: val, Value: val}
 		}
 
-		c = memory.NewWithData(entries)
+		c = memory.NewWithData[string](entries)
 		ctx.Logger().V(3).Info("Loaded cache", "num_entries", len(entries))
 	} else {
-		c = memory.New()
+		c = memory.New[string]()
 	}
 
 	// TODO (ahrav): Make this configurable via conn.
@@ -314,7 +312,7 @@ func (s *Source) setupCache(ctx context.Context) *persistableCache {
 	return persistCache
 }
 
-func (s *Source) setProgress(ctx context.Context, md5, objName string, cache cache.Cache) {
+func (s *Source) setProgress(ctx context.Context, md5, objName string, cache cache.Cache[string]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -355,49 +353,5 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 		},
 	}
 
-	data, err := s.readObjectData(ctx, o, chunkSkel)
-	if err != nil {
-		return fmt.Errorf("error reading object data: %w", err)
-	}
-
-	// If data is nil, it means that the file was handled by a handler.
-	if data == nil {
-		return nil
-	}
-
-	chunkSkel.Data = data
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case s.chunksCh <- chunkSkel:
-	}
-
-	return nil
-}
-
-func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Chunk) ([]byte, error) {
-	bufferName := cleantemp.MkFilename()
-	reader, err := diskbufferreader.New(o, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return nil, fmt.Errorf("error creating disk buffer reader: %w", err)
-	}
-	defer reader.Close()
-
-	if handlers.HandleFile(ctx, reader, chunk, sources.ChanReporter{Ch: s.chunksCh}) {
-		ctx.Logger().V(3).Info("File was handled", "name", s.name, "bucket", o.bucket, "object", o.name)
-		return nil, nil
-	}
-
-	if err := reader.Reset(); err != nil {
-		return nil, fmt.Errorf("error resetting reader: %w", err)
-	}
-
-	reader.Stop()
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("error reading object: %w", err)
-	}
-
-	return data, nil
+	return handlers.HandleFile(ctx, io.NopCloser(o), chunkSkel, sources.ChanReporter{Ch: s.chunksCh})
 }

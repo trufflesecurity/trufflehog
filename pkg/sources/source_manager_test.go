@@ -207,7 +207,7 @@ func (c *unitChunker) ChunkUnit(ctx context.Context, unit SourceUnit, rep ChunkR
 			continue
 		}
 		if step.err != "" {
-			if err := rep.ChunkErr(ctx, fmt.Errorf(step.err)); err != nil {
+			if err := rep.ChunkErr(ctx, fmt.Errorf("%s", step.err)); err != nil {
 				return err
 			}
 		}
@@ -242,7 +242,7 @@ func TestSourceManagerNonFatalError(t *testing.T) {
 }
 
 func TestSourceManagerContextCancelled(t *testing.T) {
-	mgr := NewManager(WithBufferedOutput(8))
+	mgr := NewManager(WithBufferedOutput(16))
 	source, err := buildDummy(&counterChunker{count: 100})
 	assert.NoError(t, err)
 

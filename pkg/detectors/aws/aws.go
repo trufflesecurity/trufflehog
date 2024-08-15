@@ -26,6 +26,7 @@ import (
 type scanner struct {
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // resourceTypes derived from: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
@@ -52,6 +53,7 @@ var thinkstCanaryList = map[string]struct{}{
 	"717712589309": {},
 	"819147034852": {},
 	"992382622183": {},
+	"730335385048": {},
 }
 
 const thinkstMessage = "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries"
@@ -102,6 +104,7 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 
 // Ensure the scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*scanner)(nil)
+var _ detectors.MultiPartCredentialProvider = (*scanner)(nil)
 
 var (
 	defaultVerificationClient = common.SaneHttpClient()

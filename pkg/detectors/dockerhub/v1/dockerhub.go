@@ -1,4 +1,4 @@
-package dockerhubv2
+package dockerhub
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 func (s Scanner) Version() int { return 1 }

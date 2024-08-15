@@ -9,12 +9,10 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
@@ -111,7 +109,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 
 		if err != nil && !errors.Is(err, io.EOF) {
-			logger.Info("error scanning filesystem", "error", err)
+			if !errors.Is(err, skipSymlinkErr) {
+				logger.Error(err, "error scanning filesystem")
+			}
 		}
 	}
 
@@ -150,6 +150,8 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 	})
 }
 
+var skipSymlinkErr = errors.New("skipping symlink")
+
 func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	logger := ctx.Logger().WithValues("path", path)
 	fileStat, err := os.Lstat(path)
@@ -157,24 +159,16 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		return fmt.Errorf("unable to stat file: %w", err)
 	}
 	if fileStat.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("skipping symlink")
+		return skipSymlinkErr
 	}
 
 	inputFile, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("unable to open file: %w", err)
 	}
-
-	bufferName := cleantemp.MkFilename()
-
 	defer inputFile.Close()
-	logger.V(3).Info("scanning file")
 
-	reReader, err := diskbufferreader.New(inputFile, diskbufferreader.WithBufferName(bufferName))
-	if err != nil {
-		return fmt.Errorf("could not create re-readable reader: %w", err)
-	}
-	defer reReader.Close()
+	logger.V(3).Info("scanning file")
 
 	chunkSkel := &sources.Chunk{
 		SourceType: s.Type(),
@@ -190,44 +184,8 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		},
 		Verify: s.verify,
 	}
-	if handlers.HandleFile(ctx, reReader, chunkSkel, sources.ChanReporter{Ch: chunksChan}) {
-		return nil
-	}
 
-	if err := reReader.Reset(); err != nil {
-		return err
-	}
-	reReader.Stop()
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, reReader)
-	for data := range chunkResChan {
-		if err := data.Error(); err != nil {
-			s.log.Error(err, "error reading chunk.")
-			continue
-		}
-
-		chunk := &sources.Chunk{
-			SourceType: s.Type(),
-			SourceName: s.name,
-			SourceID:   s.SourceID(),
-			JobID:      s.JobID(),
-			Data:       data.Bytes(),
-			SourceMetadata: &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Filesystem{
-					Filesystem: &source_metadatapb.Filesystem{
-						File: sanitizer.UTF8(path),
-					},
-				},
-			},
-			Verify: s.verify,
-		}
-		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return handlers.HandleFile(ctx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 }
 
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply
@@ -306,8 +264,10 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		}
 	}
 
-	if scanErr != nil && scanErr != io.EOF {
-		logger.Info("error scanning filesystem", "error", scanErr)
+	if scanErr != nil && !errors.Is(scanErr, io.EOF) {
+		if !errors.Is(scanErr, skipSymlinkErr) {
+			logger.Error(scanErr, "error scanning filesystem")
+		}
 		return reporter.ChunkErr(ctx, scanErr)
 	}
 	return nil

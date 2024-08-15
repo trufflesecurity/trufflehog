@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
 )
 
 func TestBufferedFileWriterNewThreshold(t *testing.T) {
@@ -518,9 +518,8 @@ func TestNewFromReader(t *testing.T) {
 			wantData: "hello world",
 		},
 		{
-			name:    "Empty reader",
-			reader:  strings.NewReader(""),
-			wantErr: true,
+			name:   "Empty reader",
+			reader: strings.NewReader(""),
 		},
 		{
 			name:    "Error reader",
@@ -550,6 +549,10 @@ func TestNewFromReader(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+
+			if rdr == nil {
+				return
+			}
 			defer rdr.Close()
 
 			_, err = b.ReadFrom(rdr)
@@ -593,7 +596,7 @@ func TestNewFromReaderThresholdExceeded(t *testing.T) {
 }
 
 func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
-	bufPool := buffer.NewBufferPool()
+	bufPool := pool.NewBufferPool(defaultBufferSize)
 
 	buf := bufPool.Get()
 	writer := &BufferedFileWriter{
@@ -647,10 +650,18 @@ func TestBufferedFileWriter_ReadFrom(t *testing.T) {
 			expectedSize:   1 << 20,
 		},
 		{
-			name:           "Input greater than threshold",
+			name:           "Input slightly greater than threshold",
 			input:          string(make([]byte, defaultThreshold+1)),
 			expectedOutput: string(make([]byte, defaultThreshold+1)),
 			expectedSize:   defaultThreshold + 1,
+		},
+		// Test to ensure that anytime the buffer exceeds the threshold, the data is written to a file
+		// and the buffer is cleared.
+		{
+			name:           "Input much greater than threshold",
+			input:          string(make([]byte, (2*defaultThreshold)+largeBufferSize+1)),
+			expectedOutput: string(make([]byte, (2*defaultThreshold)+largeBufferSize+1)),
+			expectedSize:   (2 * defaultThreshold) + largeBufferSize + 1,
 		},
 	}
 
@@ -664,6 +675,10 @@ func TestBufferedFileWriter_ReadFrom(t *testing.T) {
 			reader := bytes.NewReader([]byte(tc.input))
 			size, err := writer.ReadFrom(reader)
 			assert.NoError(t, err)
+
+			if writer.buf != nil && writer.file != nil {
+				assert.Len(t, writer.buf.Bytes(), 0)
+			}
 
 			err = writer.CloseForWriting()
 			assert.NoError(t, err)

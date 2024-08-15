@@ -14,7 +14,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -88,7 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		// By appending resutls in the outer loop we can reduce false positives if there are multiple
+		// By appending results in the outer loop we can reduce false positives if there are multiple
 		// combinations of secrets and IDs found.
 		if len(apiSecretMatches) > 0 {
 			results = append(results, s1)

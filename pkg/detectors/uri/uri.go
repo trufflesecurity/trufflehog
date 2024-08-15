@@ -103,8 +103,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, error) {
@@ -118,7 +118,7 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 	u.User = nil
 	nonCredentialedURL := u.String()
 
-	req, err := http.NewRequest("GET", credentialedURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", credentialedURL, nil)
 	if err != nil {
 		return false, err
 	}
@@ -136,7 +136,7 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 
 	time.Sleep(time.Millisecond * 10)
 
-	req, err = http.NewRequest("GET", nonCredentialedURL, nil)
+	req, err = http.NewRequestWithContext(ctx, "GET", nonCredentialedURL, nil)
 	if err != nil {
 		return false, err
 	}

@@ -1,0 +1,470 @@
+{
+  "categories": {
+    "Analytics": {
+      "description": "View store metrics", 
+      "scopes": {
+          "read_analytics": "Read"
+      }
+    },
+    "Applications": {
+        "description": "View or manage apps", 
+        "scopes": {
+            "read_apps": "Read"
+        }
+    },
+    "Assigned fulfillment orders": {
+        "description": "View or manage fulfillment orders", 
+        "scopes": {
+            "write_assigned_fulfillment_orders": "Write", 
+            "read_assigned_fulfillment_orders": "Read"
+        }
+    },
+    "Browsing behavior": {
+        "description": "View or manage online-store browsing behavior including page views, cart updates, product views and searches", 
+        "scopes": {
+            "read_customer_events": "Read"
+        }
+    },
+    "Custom pixels": {
+        "description": "View or manage custom pixels", 
+        "scopes": {
+            "write_custom_pixels": "Write", 
+            "read_custom_pixels": "Read"
+        }
+    },
+    "Customers": {
+        "description": "View or manage customers, customer addresses, order history, and customer groups", 
+        "scopes": {
+            "write_customers": "Write", 
+            "read_customers": "Read"
+        }
+    },
+    "Discounts": {
+        "description": "View or manage automatic discounts and discount codes", 
+        "scopes": {
+            "write_discounts": "Write", 
+            "read_discounts": "Read"
+        }
+    },
+    "Discovery": {
+        "description": "View or manage Discovery API", 
+        "scopes": {
+            "write_discovery": "Write", 
+            "read_discovery": "Read"
+        }
+    },
+    "Draft orders": {
+        "description": "View or manage orders created by merchants on behalf of customers", 
+        "scopes": {
+            "write_draft_orders": "Write", 
+            "read_draft_orders": "Read"
+        }
+    },
+    "Files": {
+        "description": "View or manage files", 
+        "scopes": {
+            "write_files": "Write", 
+            "read_files": "Read"
+        }
+    },
+    "Fulfillment services": {
+        "description": "View or manage fulfillment services", 
+        "scopes": {
+            "write_fulfillments": "Write", 
+            "read_fulfillments": "Read"
+        }
+    },
+    "Gift cards": {
+        "description": "View or manage gift cards", 
+        "scopes": {
+            "write_gift_cards": "Write", 
+            "read_gift_cards": "Read"
+        }
+    },
+    "Inventory": {
+        "description": "View or manage inventory across multiple locations", 
+        "scopes": {
+            "write_inventory": "Write", 
+            "read_inventory": "Read"
+        }
+    },
+    "Legal policies": {
+        "description": "View or manage a shop's  legal policies", 
+        "scopes": {
+            "write_legal_policies": "Write", 
+            "read_legal_policies": "Read"
+        }
+    },
+    "Locations": {
+        "description": "View the geographic location of stores, headquarters, and warehouses", 
+        "scopes": {
+            "write_locations": "Write", 
+            "read_locations": "Read"
+        }
+    },
+    "Marketing events": {
+        "description": "View or manage marketing events and engagement data", 
+        "scopes": {
+            "write_marketing_events": "Write", 
+            "read_marketing_events": "Read"
+        }
+    },
+    "Merchant-managed fulfillment orders": {
+        "description": "View or manage fulfillment orders assigned to merchant-managed locations", 
+        "scopes": {
+            "write_merchant_managed_fulfillment_orders": "Write", 
+            "read_merchant_managed_fulfillment_orders": "Read"
+        }
+    },
+    "Metaobject definitions": {
+        "description": "View or manage definitions", 
+        "scopes": {
+            "write_metaobject_definitions": "Write", 
+            "read_metaobject_definitions": "Read"
+        }
+    },
+    "Metaobject entries": {
+        "description": "View or manage entries", 
+        "scopes": {
+            "write_metaobjects": "Write", 
+            "read_metaobjects": "Read"
+        }
+    },
+    "Online Store navigation": {
+        "description": "View menus for display on the storefront", 
+        "scopes": {
+            "write_online_store_navigation": "Write", 
+            "read_online_store_navigation": "Read"
+        }
+    },
+    "Online Store pages": {
+        "description": "View or manage Online Store pages", 
+        "scopes": {
+            "write_online_store_pages": "Write", 
+            "read_online_store_pages": "Read"
+        }
+    },
+    "Order editing": {
+        "description": "View or manage edits to orders", 
+        "scopes": {
+            "write_order_edits": "Write", 
+            "read_order_edits": "Read"
+        }
+    },
+    "Orders": {
+        "description": "View or manage orders, transactions, fulfillments, and abandoned checkouts", 
+        "scopes": {
+            "write_orders": "Write", 
+            "read_orders": "Read"
+        }
+    },
+    "Packing slip management": {
+        "description": "Edit and preview packing slip template", 
+        "scopes": {
+            "write_packing_slip_templates": "Write", 
+            "read_packing_slip_templates": "Read"
+        }
+    },
+    "Payment customizations": {
+        "description": "View or manage payment customizations", 
+        "scopes": {
+            "write_payment_customizations": "Write", 
+            "read_payment_customizations": "Read"
+        }
+    },
+    "Payment terms": {
+        "description": "View or manage payment terms", 
+        "scopes": {
+            "write_payment_terms": "Write", 
+            "read_payment_terms": "Read"
+        }
+    },
+    "Pixels": {
+        "description": "View or manage pixels", 
+        "scopes": {
+            "write_pixels": "Write", 
+            "read_pixels": "Read"
+        }
+    },
+    "Price rules": {
+        "description": "View or manage conditional discounts", 
+        "scopes": {
+            "write_price_rules": "Write", 
+            "read_price_rules": "Read"
+        }
+    },
+    "Product feeds": {
+        "description": "View or manage product feeds", 
+        "scopes": {
+            "write_product_feeds": "Write", 
+            "read_product_feeds": "Read"
+        }
+    },
+    "Product listings": {
+        "description": "View or manage product or collection listings", 
+        "scopes": {
+            "write_product_listings": "Write", 
+            "read_product_listings": "Read"
+        }
+    },
+    "Products": {
+        "description": "View or manage products, variants, and collections", 
+        "scopes": {
+            "write_products": "Write", 
+            "read_products": "Read"
+        }
+    },
+    "Publications": {
+        "description": "View or manage groups of products that have been published to an app", 
+        "scopes": {
+            "write_publications": "Write", 
+            "read_publications": "Read"
+        }
+    },
+    "Purchase options": {
+        "description": "View or manage purchase options owned by this app", 
+        "scopes": {
+            "write_purchase_options": "Write", 
+            "read_purchase_options": "Read"
+        }
+    },
+    "Reports": {
+        "description": "View or manage reports on the Reports page in the Shopify admin", 
+        "scopes": {
+            "write_reports": "Write", 
+            "read_reports": "Read"
+        }
+    },
+    "Resource feedback": {
+        "description": "View or manage the status of shops and resources", 
+        "scopes": {
+            "write_resource_feedbacks": "Write", 
+            "read_resource_feedbacks": "Read"
+        }
+    },
+    "Returns": {
+        "description": "View or manage returns", 
+        "scopes": {
+            "write_returns": "Write", 
+            "read_returns": "Read"
+        }
+    },
+    "Sales channels": {
+        "description": "View or manage sales channels", 
+        "scopes": {
+            "write_channels": "Write", 
+            "read_channels": "Read"
+        }
+    },
+    "Script tags": {
+        "description": "View or manage the JavaScript code in storefront or orders status pages", 
+        "scopes": {
+            "write_script_tags": "Write", 
+            "read_script_tags": "Read"
+        }
+    },
+    "Shipping": {
+        "description": "View or manage shipping carriers, countries, and provinces", 
+        "scopes": {
+            "write_shipping": "Write", 
+            "read_shipping": "Read"
+        }
+    },
+    "Shop locales": {
+        "description": "View or manage available locales for a shop", 
+        "scopes": {
+            "write_locales": "Write", 
+            "read_locales": "Read"
+        }
+    },
+    "Shopify Markets": {
+        "description": "View or manage Shopify Markets configuration", 
+        "scopes": {
+            "write_markets": "Write", 
+            "read_markets": "Read"
+        }
+    },
+    "Shopify Payments accounts": {
+        "description": "View Shopify Payments accounts", 
+        "scopes": {
+            "read_shopify_payments_accounts": "Read"
+        }
+    },
+    "Shopify Payments bank accounts": {
+        "description": "View bank accounts that can receive Shopify Payment payouts", 
+        "scopes": {
+            "read_shopify_payments_bank_accounts": "Read"
+        }
+    },
+    "Shopify Payments disputes": {
+        "description": "View Shopify Payment disputes raised by buyers", 
+        "scopes": {
+            "write_shopify_payments_disputes": "Write", 
+            "read_shopify_payments_disputes": "Read"
+        }
+    },
+    "Shopify Payments payouts": {
+        "description": "View Shopify Payments payouts and the account's current balance", 
+        "scopes": {
+            "read_shopify_payments_payouts": "Read"
+        }
+    },
+    "Store content": {
+        "description": "View or manage articles, blogs, comments, pages, and redirects", 
+        "scopes": {
+            "write_content": "Write", 
+            "read_content": "Read"
+        }
+    },
+    "Store credit account transactions": {
+        "description": "View or create store credit transactions", 
+        "scopes": {
+            "write_store_credit_account_transactions": "Write", 
+            "read_store_credit_account_transactions": "Read"
+        }
+    },
+    "Store credit accounts": {
+        "description": "View a customer's store credit balance and currency", 
+        "scopes": {
+            "read_store_credit_accounts": "Read"
+        }
+    },
+    "Themes": {
+        "description": "View or manage theme templates and assets", 
+        "scopes": {
+            "write_themes": "Write", 
+            "read_themes": "Read"
+        }
+    },
+    "Third-party fulfillment orders": {
+        "description": "View or manage fulfillment orders assigned to a location managed by any fulfillment service", 
+        "scopes": {
+            "write_third_party_fulfillment_orders": "Write", 
+            "read_third_party_fulfillment_orders": "Read"
+        }
+    },
+    "Translations": {
+        "description": "View or manage content that can be translated", 
+        "scopes": {
+            "write_translations": "Write", 
+            "read_translations": "Read"
+        }
+    },
+    "all_cart_transforms": {
+        "description": "", 
+        "scopes": {
+            "read_all_cart_transforms": "Read"
+        }
+    },
+    "all_checkout_completion_target_customizations": {
+        "description": "", 
+        "scopes": {
+            "write_all_checkout_completion_target_customizations": "Write", 
+            "read_all_checkout_completion_target_customizations": "Read"
+        }
+    },
+    "cart_transforms": {
+        "description": "", 
+        "scopes": {
+            "write_cart_transforms": "Write", 
+            "read_cart_transforms": "Read"
+        }
+    },
+    "cash_tracking": {
+        "description": "", 
+        "scopes": {
+            "read_cash_tracking": "Read"
+        }
+    },
+    "companies": {
+        "description": "", 
+        "scopes": {
+            "write_companies": "Write", 
+            "read_companies": "Read"
+        }
+    },
+    "custom_fulfillment_services": {
+        "description": "", 
+        "scopes": {
+            "write_custom_fulfillment_services": "Write", 
+            "read_custom_fulfillment_services": "Read"
+        }
+    },
+    "customer_data_erasure": {
+        "description": "", 
+        "scopes": {
+            "write_customer_data_erasure": "Write", 
+            "read_customer_data_erasure": "Read"
+        }
+    },
+    "customer_merge": {
+        "description": "", 
+        "scopes": {
+            "write_customer_merge": "Write", 
+            "read_customer_merge": "Read"
+        }
+    },
+    "delivery_customizations": {
+        "description": "", 
+        "scopes": {
+            "write_delivery_customizations": "Write", 
+            "read_delivery_customizations": "Read"
+        }
+    },
+    "delivery_option_generators": {
+        "description": "", 
+        "scopes": {
+            "write_delivery_option_generators": "Write", 
+            "read_delivery_option_generators": "Read"
+        }
+    },
+    "discounts_allocator_functions": {
+        "description": "", 
+        "scopes": {
+            "write_discounts_allocator_functions": "Write", 
+            "read_discounts_allocator_functions": "Read"
+        }
+    },
+    "fulfillment_constraint_rules": {
+        "description": "", 
+        "scopes": {
+            "write_fulfillment_constraint_rules": "Write", 
+            "read_fulfillment_constraint_rules": "Read"
+        }
+    },
+    "gates": {
+        "description": "", 
+        "scopes": {
+            "write_gates": "Write", 
+            "read_gates": "Read"
+        }
+    },
+    "order_submission_rules": {
+        "description": "", 
+        "scopes": {
+            "write_order_submission_rules": "Write", 
+            "read_order_submission_rules": "Read"
+        }
+    },
+    "privacy_settings": {
+        "description": "", 
+        "scopes": {
+            "write_privacy_settings": "Write", 
+            "read_privacy_settings": "Read"
+        }
+    },
+    "shopify_payments_provider_accounts_sensitive": {
+        "description": "", 
+        "scopes": {
+            "read_shopify_payments_provider_accounts_sensitive": "Read"
+        }
+    },
+    "validations": {
+        "description": "", 
+        "scopes": {
+            "write_validations": "Write", 
+            "read_validations": "Read"
+        }
+    }
+  }
+}

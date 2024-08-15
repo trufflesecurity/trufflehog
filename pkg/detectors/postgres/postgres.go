@@ -52,6 +52,7 @@ var (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	detectLoopback bool // Automated tests run against localhost, but we want to ignore those results in the wild
 }
 
@@ -147,8 +148,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func findUriMatches(data []byte) []map[string]string {

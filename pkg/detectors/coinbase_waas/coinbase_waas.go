@@ -6,9 +6,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/coinbase/waas-client-library-go/auth"
 	"github.com/coinbase/waas-client-library-go/clients"
@@ -47,6 +48,11 @@ var (
 func (s Scanner) Keywords() []string {
 	return []string{"organizations", "apiKeys", "begin ec"}
 }
+
+const maxPrivateKeySize = 4096
+
+// MaxSecretSize returns the maximum size of a secret that this detector can find.
+func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
 
 // FromData will find and optionally verify CoinbaseWaaS secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {

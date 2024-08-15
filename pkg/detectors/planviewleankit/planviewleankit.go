@@ -12,7 +12,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -56,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequest("GET", fmt.Sprintf("https://%s.leankit.com/io/account", resSubdomainMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.leankit.com/io/account", resSubdomainMatch), nil)
 				if err != nil {
 					continue
 				}

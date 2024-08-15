@@ -1493,6 +1493,125 @@ var _ interface {
 	ErrorName() string
 } = GCSValidationError{}
 
+// Validate checks the field values on Huggingface with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Huggingface) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Huggingface with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in HuggingfaceMultiError, or
+// nil if none found.
+func (m *Huggingface) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Huggingface) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Link
+
+	// no validation rules for Username
+
+	// no validation rules for Repository
+
+	// no validation rules for Commit
+
+	// no validation rules for Email
+
+	// no validation rules for File
+
+	// no validation rules for Timestamp
+
+	// no validation rules for Line
+
+	// no validation rules for Visibility
+
+	// no validation rules for ResourceType
+
+	if len(errors) > 0 {
+		return HuggingfaceMultiError(errors)
+	}
+
+	return nil
+}
+
+// HuggingfaceMultiError is an error wrapping multiple validation errors
+// returned by Huggingface.ValidateAll() if the designated constraints aren't met.
+type HuggingfaceMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m HuggingfaceMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m HuggingfaceMultiError) AllErrors() []error { return m }
+
+// HuggingfaceValidationError is the validation error returned by
+// Huggingface.Validate if the designated constraints aren't met.
+type HuggingfaceValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e HuggingfaceValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e HuggingfaceValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e HuggingfaceValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e HuggingfaceValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e HuggingfaceValidationError) ErrorName() string { return "HuggingfaceValidationError" }
+
+// Error satisfies the builtin error interface
+func (e HuggingfaceValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sHuggingface.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = HuggingfaceValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = HuggingfaceValidationError{}
+
 // Validate checks the field values on Jira with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
 // encountered is returned, or nil if there are no violations.
@@ -3399,6 +3518,387 @@ var _ interface {
 	ErrorName() string
 } = PostmanValidationError{}
 
+// Validate checks the field values on Vector with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Vector) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Vector with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in VectorMultiError, or nil if none found.
+func (m *Vector) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Vector) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetTimestamp()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, VectorValidationError{
+					field:  "Timestamp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, VectorValidationError{
+					field:  "Timestamp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTimestamp()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return VectorValidationError{
+				field:  "Timestamp",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for SourceType
+
+	// no validation rules for Host
+
+	if len(errors) > 0 {
+		return VectorMultiError(errors)
+	}
+
+	return nil
+}
+
+// VectorMultiError is an error wrapping multiple validation errors returned by
+// Vector.ValidateAll() if the designated constraints aren't met.
+type VectorMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m VectorMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m VectorMultiError) AllErrors() []error { return m }
+
+// VectorValidationError is the validation error returned by Vector.Validate if
+// the designated constraints aren't met.
+type VectorValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e VectorValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e VectorValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e VectorValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e VectorValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e VectorValidationError) ErrorName() string { return "VectorValidationError" }
+
+// Error satisfies the builtin error interface
+func (e VectorValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sVector.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = VectorValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = VectorValidationError{}
+
+// Validate checks the field values on Webhook with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Webhook) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Webhook with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in WebhookMultiError, or nil if none found.
+func (m *Webhook) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Webhook) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.Data.(type) {
+	case *Webhook_Vector:
+		if v == nil {
+			err := WebhookValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetVector()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, WebhookValidationError{
+						field:  "Vector",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, WebhookValidationError{
+						field:  "Vector",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetVector()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return WebhookValidationError{
+					field:  "Vector",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return WebhookMultiError(errors)
+	}
+
+	return nil
+}
+
+// WebhookMultiError is an error wrapping multiple validation errors returned
+// by Webhook.ValidateAll() if the designated constraints aren't met.
+type WebhookMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m WebhookMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m WebhookMultiError) AllErrors() []error { return m }
+
+// WebhookValidationError is the validation error returned by Webhook.Validate
+// if the designated constraints aren't met.
+type WebhookValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e WebhookValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e WebhookValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e WebhookValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e WebhookValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e WebhookValidationError) ErrorName() string { return "WebhookValidationError" }
+
+// Error satisfies the builtin error interface
+func (e WebhookValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sWebhook.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = WebhookValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = WebhookValidationError{}
+
+// Validate checks the field values on Elasticsearch with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Elasticsearch) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Elasticsearch with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ElasticsearchMultiError, or
+// nil if none found.
+func (m *Elasticsearch) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Elasticsearch) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Index
+
+	// no validation rules for DocumentId
+
+	// no validation rules for Timestamp
+
+	if len(errors) > 0 {
+		return ElasticsearchMultiError(errors)
+	}
+
+	return nil
+}
+
+// ElasticsearchMultiError is an error wrapping multiple validation errors
+// returned by Elasticsearch.ValidateAll() if the designated constraints
+// aren't met.
+type ElasticsearchMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ElasticsearchMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ElasticsearchMultiError) AllErrors() []error { return m }
+
+// ElasticsearchValidationError is the validation error returned by
+// Elasticsearch.Validate if the designated constraints aren't met.
+type ElasticsearchValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ElasticsearchValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ElasticsearchValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ElasticsearchValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ElasticsearchValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ElasticsearchValidationError) ErrorName() string { return "ElasticsearchValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ElasticsearchValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sElasticsearch.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ElasticsearchValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ElasticsearchValidationError{}
+
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -4605,6 +5105,129 @@ func (m *MetaData) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
 					field:  "Postman",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Webhook:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetWebhook()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Webhook",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Webhook",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetWebhook()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Webhook",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Elasticsearch:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetElasticsearch()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Elasticsearch",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Elasticsearch",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetElasticsearch()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Elasticsearch",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Huggingface:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetHuggingface()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Huggingface",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Huggingface",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetHuggingface()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Huggingface",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

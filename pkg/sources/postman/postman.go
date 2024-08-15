@@ -55,12 +55,13 @@ type Source struct {
 
 func (s *Source) addKeywords(keywords []string) {
 	for _, keyword := range keywords {
-		s.addKeyword(keyword)
+		s.attemptToAddKeyword(keyword)
 	}
 }
 
-func (s *Source) addKeyword(keyword string) {
+func (s *Source) attemptToAddKeyword(keyword string) {
 	// fast check
+	keyword = strings.ToLower(keyword)
 	if _, ok := s.DetectorKeywords[keyword]; ok {
 		s.keywords[keyword] = struct{}{}
 		return
@@ -238,7 +239,7 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) error {
 	// reset keywords for each workspace
 	s.resetKeywords()
-	s.addKeyword(workspace.Name)
+	s.attemptToAddKeyword(workspace.Name)
 
 	// initiate metadata to track the tree structure of postman data
 	metadata := Metadata{
@@ -252,7 +253,8 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	ctx.Logger().V(2).Info("starting scanning global variables")
 	globalVars, err := s.client.GetGlobalVariables(workspace.ID)
 	if err != nil {
-		return fmt.Errorf("error getting global variables for workspace %s, %w", workspace.ID, err)
+		// NOTE: global endpoint is finicky
+		ctx.Logger().V(2).Error(err, "skipping global variables")
 	}
 
 	metadata.Type = GLOBAL_TYPE
@@ -279,7 +281,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
 		for _, word := range strings.Split(envVars.Name, " ") {
-			s.addKeyword(word)
+			s.attemptToAddKeyword(word)
 		}
 
 		s.scanVariableData(ctx, chunksChan, metadata, envVars)
@@ -309,7 +311,7 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	ctx.Logger().V(2).Info("starting scanning collection", collection.Info.Name, "uuid", collection.Info.UID)
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
-	s.addKeyword(collection.Info.Name)
+	s.attemptToAddKeyword(collection.Info.Name)
 
 	if !metadata.fromLocal {
 		metadata.FullID = metadata.CollectionInfo.UID
@@ -333,7 +335,7 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 }
 
 func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item) {
-	s.addKeyword(item.Name)
+	s.attemptToAddKeyword(item.Name)
 
 	// override the base collection metadata with item-specific metadata
 	metadata.FolderID = item.ID
@@ -479,6 +481,8 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 		m.Type += " > authorization"
 	}
 
+	s.attemptToAddKeyword(authData)
+
 	m.FieldType = AUTH_TYPE
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, authData)), m)
 }
@@ -594,8 +598,9 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 
 	values := []string{}
 	for _, kv := range variableData.KeyValues {
-		s.addKeyword(kv.Key)
+		s.attemptToAddKeyword(kv.Key)
 		valStr := fmt.Sprintf("%v", kv.Value)
+		s.attemptToAddKeyword(valStr)
 		if valStr != "" {
 			s.sub.add(m, kv.Key, valStr)
 		} else if kv.SessionValue != "" {
