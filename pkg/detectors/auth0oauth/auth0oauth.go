@@ -2,13 +2,13 @@ package auth0oauth
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -21,7 +21,7 @@ type Scanner struct{
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithLocalAddresses
 
 	clientIdPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"auth0"}) + `\b([a-zA-Z0-9_-]{32,60})\b`)
 	clientSecretPat = regexp.MustCompile(`\b([a-zA-Z0-9_-]{64,})\b`)
@@ -102,7 +102,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 						if !strings.Contains(body, "access_denied") {
 							s1.Verified = true
-						} 
+						}
 					}
 				}
 

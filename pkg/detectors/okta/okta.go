@@ -9,7 +9,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -64,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("Authorization", fmt.Sprintf("SSWS %s", token))
 
-				resp, err := common.SaneHttpClient().Do(req)
+				resp, err := detectors.DetectorHttpClientWithNoLocalAddresses.Do(req)
 				if err != nil {
 					continue
 				}

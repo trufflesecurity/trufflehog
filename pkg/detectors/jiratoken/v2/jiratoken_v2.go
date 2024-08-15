@@ -9,7 +9,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -26,7 +25,7 @@ var _ detectors.Versioner = (*Scanner)(nil)
 func (Scanner) Version() int { return 2 }
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
 
 	// https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/
 	// Tokens created after Jan 18 2023 use a variable length
