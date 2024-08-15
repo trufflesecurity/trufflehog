@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go postgres
+
 package postgres
 
 import (
