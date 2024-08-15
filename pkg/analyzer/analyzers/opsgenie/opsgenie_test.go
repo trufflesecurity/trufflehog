@@ -44,7 +44,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 						"Parent": null
 					},
 					"Permission": {
-						"Value": "Configuration Access",
+						"Value": "configuration_access",
 						"Parent": null
 					}
 					},
@@ -59,7 +59,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 						"Parent": null
 					},
 					"Permission": {
-						"Value": "Read",
+						"Value": "read",
 						"Parent": null
 					}
 					},
@@ -74,7 +74,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 						"Parent": null
 					},
 					"Permission": {
-						"Value": "Delete",
+						"Value": "delete",
 						"Parent": null
 					}
 					},
@@ -89,7 +89,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 						"Parent": null
 					},
 					"Permission": {
-						"Value": "Create and Update",
+						"Value": "create_and_update",
 						"Parent": null
 					}
 					}
