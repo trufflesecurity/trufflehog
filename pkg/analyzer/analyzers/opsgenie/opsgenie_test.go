@@ -31,90 +31,83 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			name: "valid Opsgenie API key",
 			key:  key,
 			want: `{
-				"AnalyzerType": 11,
-				"Bindings": [
-					{
-					"Resource": {
-						"Name": "Opsgenie API Integration Key",
-						"FullyQualifiedName": "Opsgenie API Integration Key",
-						"Type": "API Key",
+					"AnalyzerType": 11,
+					"Bindings": [
+						{
+						"Resource": {
+							"Name": "Opsgenie API Integration Key",
+							"FullyQualifiedName": "Opsgenie API Integration Key",
+							"Type": "API Key",
+							"Metadata": {
+							"expires": "never"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "configuration_access",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "Opsgenie API Integration Key",
+							"FullyQualifiedName": "Opsgenie API Integration Key",
+							"Type": "API Key",
+							"Metadata": {
+							"expires": "never"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "read",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "Opsgenie API Integration Key",
+							"FullyQualifiedName": "Opsgenie API Integration Key",
+							"Type": "API Key",
+							"Metadata": {
+							"expires": "never"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "delete",
+							"Parent": null
+						}
+						},
+						{
+						"Resource": {
+							"Name": "Opsgenie API Integration Key",
+							"FullyQualifiedName": "Opsgenie API Integration Key",
+							"Type": "API Key",
+							"Metadata": {
+							"expires": "never"
+							},
+							"Parent": null
+						},
+						"Permission": {
+							"Value": "create_and_update",
+							"Parent": null
+						}
+						}
+					],
+					"UnboundedResources": [
+						{
+						"Name": "John Scanner",
+						"FullyQualifiedName": "secretscanner02@zohomail.com",
+						"Type": "user",
 						"Metadata": {
-						"expires": "never"
+							"role": "Owner",
+							"username": "secretscanner02@zohomail.com"
 						},
 						"Parent": null
-					},
-					"Permission": {
-						"Value": "configuration_access",
-						"Parent": null
-					}
-					},
-					{
-					"Resource": {
-						"Name": "Opsgenie API Integration Key",
-						"FullyQualifiedName": "Opsgenie API Integration Key",
-						"Type": "API Key",
-						"Metadata": {
-						"expires": "never"
-						},
-						"Parent": null
-					},
-					"Permission": {
-						"Value": "read",
-						"Parent": null
-					}
-					},
-					{
-					"Resource": {
-						"Name": "Opsgenie API Integration Key",
-						"FullyQualifiedName": "Opsgenie API Integration Key",
-						"Type": "API Key",
-						"Metadata": {
-						"expires": "never"
-						},
-						"Parent": null
-					},
-					"Permission": {
-						"Value": "delete",
-						"Parent": null
-					}
-					},
-					{
-					"Resource": {
-						"Name": "Opsgenie API Integration Key",
-						"FullyQualifiedName": "Opsgenie API Integration Key",
-						"Type": "API Key",
-						"Metadata": {
-						"expires": "never"
-						},
-						"Parent": null
-					},
-					"Permission": {
-						"Value": "create_and_update",
-						"Parent": null
-					}
-					}
-				],
-				"UnboundedResources": [
-					{
-					"Name": "",
-					"FullyQualifiedName": "",
-					"Type": "",
-					"Metadata": null,
-					"Parent": null
-					},
-					{
-					"Name": "John Scanner",
-					"FullyQualifiedName": "John Scanner",
-					"Type": "user",
-					"Metadata": {
-						"role": "Owner",
-						"username": "secretscanner02@zohomail.com"
-					},
-					"Parent": null
-					}
-				],
-				"Metadata": null
-				}`,
+						}
+					],
+					"Metadata": null
+					}`,
 			wantErr: false,
 		},
 	}

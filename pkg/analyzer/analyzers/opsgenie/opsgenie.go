@@ -74,16 +74,16 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	// We can find list of users in the current account
 	// if the API key has Configuration Access, so these can be
 	// unbounded resources
-	for _, user := range info.Users {
-		result.UnboundedResources = append(result.UnboundedResources, analyzers.Resource{
+	for idx, user := range info.Users {
+		result.UnboundedResources[idx] = analyzers.Resource{
 			Name:               user.FullName,
-			FullyQualifiedName: user.FullName,
+			FullyQualifiedName: user.Username,
 			Type:               "user",
 			Metadata: map[string]any{
 				"username": user.Username,
 				"role":     user.Role.Name,
 			},
-		})
+		}
 	}
 
 	return &result
@@ -268,7 +268,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	info.Permissions = permissions
 
-	if contains(permissions, "Configuration Access") {
+	if contains(permissions, "configuration_access") {
 		users, err := getUserList(cfg, key)
 		if err != nil {
 			return nil, fmt.Errorf("getting user list: %w", err)
