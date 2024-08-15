@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go shopify
+
 package shopify
 
 import (
@@ -59,13 +61,15 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 	for _, category := range categoryOrder {
 		if val, ok := info.Scopes[category]; ok {
-			result.Bindings = append(result.Bindings, analyzers.Binding{
-				Resource: *resource,
-				Permission: analyzers.Permission{
-					Value:       category,
-					AccessLevel: val.PrintScopes(),
-				},
-			})
+			for _, scope := range val.Scopes {
+				result.Bindings = append(result.Bindings, analyzers.Binding{
+					Resource: *resource,
+					Permission: analyzers.Permission{
+						Value: scope,
+					},
+				})
+			}
+
 		}
 	}
 
