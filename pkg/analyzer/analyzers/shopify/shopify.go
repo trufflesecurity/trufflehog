@@ -25,6 +25,11 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
+var (
+	// order the categories
+	categoryOrder = []string{"Analytics", "Applications", "Assigned fulfillment orders", "Browsing behavior", "Custom pixels", "Customers", "Discounts", "Discovery", "Draft orders", "Files", "Fulfillment services", "Gift cards", "Inventory", "Legal policies", "Locations", "Marketing events", "Merchant-managed fulfillment orders", "Metaobject definitions", "Metaobject entries", "Online Store navigation", "Online Store pages", "Order editing", "Orders", "Packing slip management", "Payment customizations", "Payment terms", "Pixels", "Price rules", "Product feeds", "Product listings", "Products", "Publications", "Purchase options", "Reports", "Resource feedback", "Returns", "Sales channels", "Script tags", "Shipping", "Shop locales", "Shopify Markets", "Shopify Payments accounts", "Shopify Payments bank accounts", "Shopify Payments disputes", "Shopify Payments payouts", "Store content", "Store credit account transactions", "Store credit accounts", "Themes", "Third-party fulfillment orders", "Translations", "all_cart_transforms", "all_checkout_completion_target_customizations", "cart_transforms", "cash_tracking", "companies", "custom_fulfillment_services", "customer_data_erasure", "customer_merge", "delivery_customizations", "delivery_option_generators", "discounts_allocator_functions", "fulfillment_constraint_rules", "gates", "order_submission_rules", "privacy_settings", "shopify_payments_provider_accounts_sensitive", "validations"}
+)
+
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Shopify }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
@@ -66,9 +71,6 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Parent: nil,
 	}
 	result.Bindings = make([]analyzers.Binding, 0)
-
-	// order the categories
-	categoryOrder := []string{"Analytics", "Applications", "Assigned fulfillment orders", "Browsing behavior", "Custom pixels", "Customers", "Discounts", "Discovery", "Draft orders", "Files", "Fulfillment services", "Gift cards", "Inventory", "Legal policies", "Locations", "Marketing events", "Merchant-managed fulfillment orders", "Metaobject definitions", "Metaobject entries", "Online Store navigation", "Online Store pages", "Order editing", "Orders", "Packing slip management", "Payment customizations", "Payment terms", "Pixels", "Price rules", "Product feeds", "Product listings", "Products", "Publications", "Purchase options", "Reports", "Resource feedback", "Returns", "Sales channels", "Script tags", "Shipping", "Shop locales", "Shopify Markets", "Shopify Payments accounts", "Shopify Payments bank accounts", "Shopify Payments disputes", "Shopify Payments payouts", "Store content", "Store credit account transactions", "Store credit accounts", "Themes", "Third-party fulfillment orders", "Translations", "all_cart_transforms", "all_checkout_completion_target_customizations", "cart_transforms", "cash_tracking", "companies", "custom_fulfillment_services", "customer_data_erasure", "customer_merge", "delivery_customizations", "delivery_option_generators", "discounts_allocator_functions", "fulfillment_constraint_rules", "gates", "order_submission_rules", "privacy_settings", "shopify_payments_provider_accounts_sensitive", "validations"}
 
 	for _, category := range categoryOrder {
 		if val, ok := info.Scopes[category]; ok {
@@ -296,9 +298,6 @@ func printAccessScopes(accessScopes map[string]OutputScopes) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Scope", "Description", "Access"})
-
-	// order the categories
-	categoryOrder := []string{"Analytics", "Applications", "Assigned fulfillment orders", "Browsing behavior", "Custom pixels", "Customers", "Discounts", "Discovery", "Draft orders", "Files", "Fulfillment services", "Gift cards", "Inventory", "Legal policies", "Locations", "Marketing events", "Merchant-managed fulfillment orders", "Metaobject definitions", "Metaobject entries", "Online Store navigation", "Online Store pages", "Order editing", "Orders", "Packing slip management", "Payment customizations", "Payment terms", "Pixels", "Price rules", "Product feeds", "Product listings", "Products", "Publications", "Purchase options", "Reports", "Resource feedback", "Returns", "Sales channels", "Script tags", "Shipping", "Shop locales", "Shopify Markets", "Shopify Payments accounts", "Shopify Payments bank accounts", "Shopify Payments disputes", "Shopify Payments payouts", "Store content", "Store credit account transactions", "Store credit accounts", "Themes", "Third-party fulfillment orders", "Translations", "all_cart_transforms", "all_checkout_completion_target_customizations", "cart_transforms", "cash_tracking", "companies", "custom_fulfillment_services", "customer_data_erasure", "customer_merge", "delivery_customizations", "delivery_option_generators", "discounts_allocator_functions", "fulfillment_constraint_rules", "gates", "order_submission_rules", "privacy_settings", "shopify_payments_provider_accounts_sensitive", "validations"}
 
 	for _, category := range categoryOrder {
 		if val, ok := accessScopes[category]; ok {
