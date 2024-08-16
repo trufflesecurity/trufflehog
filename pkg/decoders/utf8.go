@@ -15,7 +15,7 @@ func (d *UTF8) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 		return nil
 	}
 
-	decodableChunk := &DecodableChunk{Chunk: chunk, DecoderType: detectorspb.DecoderType_PLAIN}
+	decodableChunk := &DecodableChunk{Chunk: chunk, DecoderType: d.Type()}
 
 	if !utf8.Valid(chunk.Data) {
 		chunk.Data = extractSubstrings(chunk.Data)
@@ -23,6 +23,10 @@ func (d *UTF8) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	}
 
 	return decodableChunk
+}
+
+func (d *UTF8) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType_PLAIN
 }
 
 // extractSubstrings performs similarly to the strings binutil,

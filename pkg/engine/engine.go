@@ -733,7 +733,11 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		startTime := time.Now()
 		sourceVerify := chunk.Verify
 		for _, decoder := range e.decoders {
+			decodeStart := time.Now()
 			decoded := decoder.FromChunk(chunk)
+			decodeTime := time.Since(decodeStart).Microseconds()
+			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
+
 			if decoded == nil {
 				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
 				continue

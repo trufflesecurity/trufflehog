@@ -25,7 +25,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = http.DefaultClient
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	keyPat        = regexp.MustCompile(`DefaultEndpointsProtocol=https;AccountName=(?P<account_name>[^;]+);AccountKey=(?P<account_key>[^;]+);EndpointSuffix=core\.windows\.net`)
 )
 

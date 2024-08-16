@@ -3,11 +3,11 @@ package portainertoken
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -21,7 +21,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"portainertoken"}) + `\b(ptr_[A-Za-z0-9\/_\-+=]{20,60})`)
 	endpointPat = regexp.MustCompile(detectors.PrefixRegex([]string{"portainer"}) + `\b(https?:\/\/\S+(:[0-9]{4,5})?)\b`)
@@ -49,6 +49,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, endpointMatch := range endpointMatches {
 			resEndpointMatch := strings.TrimSpace(endpointMatch[1])
 
+			u, err := detectors.ParseURLAndStripPathAndParams(resEndpointMatch)
+			if err != nil {
+				// if the URL is invalid just move onto the next one
+				continue
+			}
+			u.Path = "/api/stacks"
+
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PortainerToken,
 				Raw:          []byte(resMatch),
@@ -60,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if client == nil {
 					client = defaultClient
 				}
-				req, err := http.NewRequestWithContext(ctx, "GET", resEndpointMatch+"/api/stacks", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 				if err != nil {
 					continue
 				}

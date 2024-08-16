@@ -3,12 +3,12 @@ package metabase
 import (
 	"context"
 	"encoding/json"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -21,7 +21,7 @@ type Scanner struct{
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"metabase"}) + `\b([a-zA-Z0-9-]{36})\b`)
@@ -54,6 +54,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			resURLMatch := strings.TrimSpace(urlMatch[1])
 
+			u, err := detectors.ParseURLAndStripPathAndParams(resURLMatch)
+			if err != nil {
+				// if the URL is invalid just move onto the next one
+				continue
+			}
+
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Metabase,
 				Raw:          []byte(resMatch),
@@ -61,7 +67,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, resURLMatch+"/api/user/current", nil)
+				u.Path = "/api/user/current"
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 				if err != nil {
 					continue
 				}

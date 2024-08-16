@@ -241,3 +241,13 @@ func RedactURL(u url.URL) string {
 	u.User = url.UserPassword(u.User.Username(), "********")
 	return strings.TrimSpace(strings.Replace(u.String(), "%2A", "*", -1))
 }
+
+func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
+	parsedURL, err := url.Parse(u)
+	if err != nil {
+		return nil, err
+	}
+	parsedURL.Path = ""
+	parsedURL.RawQuery = ""
+	return parsedURL, nil
+}
