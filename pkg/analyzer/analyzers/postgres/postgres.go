@@ -110,13 +110,13 @@ func bakeDatabaseBindings(userResource analyzers.Resource, info *SecretInfo) (ma
 		// populate map to reference later for tables
 		dbNameToResourceMap[db.DatabaseName] = &dbResource
 
-		DB_PRIVILIGES := map[string]bool{
+		dbPriviliges := map[string]bool{
 			"connect": db.Connect,
 			"create":  db.Create,
 			"temp":    db.CreateTemp,
 		}
 
-		for priv, exists := range DB_PRIVILIGES {
+		for priv, exists := range dbPriviliges {
 			if exists {
 				dbBindings = append(dbBindings, analyzers.Binding{
 					Resource: dbResource,
@@ -143,7 +143,7 @@ func bakeTableBindings(dbNameToResourceMap map[string]*analyzers.Resource, info 
 		for tableName, tableData := range tableMap {
 			tableResource := analyzers.Resource{
 				Name:               tableName,
-				FullyQualifiedName: tableName,
+				FullyQualifiedName: dbResource.Name + "." + tableName,
 				Type:               "table",
 				Metadata: map[string]any{
 					"size": tableData.Size,
