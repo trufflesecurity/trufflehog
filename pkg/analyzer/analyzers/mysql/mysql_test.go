@@ -1,45 +1,48 @@
 package mysql
 
 import (
-	"bytes"
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os/exec"
 	"sort"
-	"strings"
 	"testing"
-	"time"
 
+	"github.com/brianvoe/gofakeit/v7"
+	"github.com/testcontainers/testcontainers-go/modules/mysql"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-)
-
-const (
-	mysqlPass = "23201da=b56ca236f3dc6736c0f9afad"
-	mysqlHost = "localhost"
-	mysqlPort = "3308" // Do not use 3307, as local dev environments can use it for other things
-
-	inactivePass = "inactive"
-	inactiveHost = "192.0.2.0"
-
-	defaultPort = "3306"
 )
 
 //go:embed expected_output.json
 var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
-	if err := startMysql(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			t.Fatalf("could not start local mysql: %v w/stderr:\n%s", err, string(exitErr.Stderr))
-		} else {
-			t.Fatalf("could not start local mysql: %v", err)
-		}
+	mysqlUser := "root"
+	mysqlPass := gofakeit.Password(true, true, true, false, false, 10)
+	mysqlDatabase := "mysql"
+
+	ctx := context.Background()
+
+	mysqlC, err := mysql.Run(ctx, "mysql",
+		mysql.WithDatabase(mysqlDatabase),
+		mysql.WithUsername(mysqlUser),
+		mysql.WithPassword(mysqlPass),
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
-	defer stopMysql()
+
+	defer func() { _ = mysqlC.Terminate(ctx) }()
+
+	host, err := mysqlC.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := mysqlC.MappedPort(ctx, "3306")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name             string
@@ -49,7 +52,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:             "valid Mysql connection",
-			connectionString: fmt.Sprintf(`root:%s@%s:%s/mysql`, mysqlPass, mysqlHost, mysqlPort),
+			connectionString: fmt.Sprintf(`root:%s@%s:%s/%s`, mysqlPass, host, port.Port(), mysqlDatabase),
 			want:             expectedOutput,
 			wantErr:          false,
 		},
@@ -115,49 +118,4 @@ func sortBindings(bindings []analyzers.Binding) {
 		}
 		return bindings[i].Resource.Name < bindings[j].Resource.Name
 	})
-}
-
-var mysqlDockerHash string
-
-func dockerLogLine(hash string, needle string) chan struct{} {
-	ch := make(chan struct{}, 1)
-	go func() {
-		for {
-			out, err := exec.Command("docker", "logs", hash).CombinedOutput()
-			if err != nil {
-				panic(err)
-			}
-			if strings.Contains(string(out), needle) {
-				ch <- struct{}{}
-				return
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}()
-	return ch
-}
-
-func startMysql() error {
-	cmd := exec.Command(
-		"docker", "run", "--rm", "-p", mysqlPort+":"+defaultPort,
-		"-e", "MYSQL_ROOT_PASSWORD="+mysqlPass,
-		"-d", "mysql",
-	)
-	fmt.Println(cmd.String())
-	out, err := cmd.Output()
-	if err != nil {
-		return err
-	}
-	mysqlDockerHash = string(bytes.TrimSpace(out))
-	select {
-	case <-dockerLogLine(mysqlDockerHash, "MySQL init process done. Ready for start up."):
-		return nil
-	case <-time.After(30 * time.Second):
-		stopMysql()
-		return errors.New("timeout waiting for mysql database to be ready")
-	}
-}
-
-func stopMysql() {
-	exec.Command("docker", "kill", mysqlDockerHash).Run()
 }
