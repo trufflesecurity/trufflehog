@@ -1,7 +1,9 @@
+//go:generate generate_permissions permissions.yaml permissions.go bitbucket
 package bitbucket
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"sort"
@@ -25,21 +27,25 @@ var resource_name_map = map[string]string{
 
 type SecretInfo struct {
 	Type        string
-	OauthScopes []analyzers.Permission
+	OauthScopes []string
 	Repos       []Repo
 }
 
 type Repo struct {
+	ID       string `json:"uuid"`
 	FullName string `json:"full_name"`
 	RepoName string `json:"name"`
 	Project  struct {
+		ID   string `json:"uuid"`
 		Name string `json:"name"`
 	} `json:"project"`
 	Workspace struct {
+		ID   string `json:"uuid"`
 		Name string `json:"name"`
 	} `json:"workspace"`
 	IsPrivate bool `json:"is_private"`
 	Owner     struct {
+		ID       string `json:"uuid"`
 		Username string `json:"username"`
 	} `json:"owner"`
 	Role string
@@ -56,7 +62,11 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Bitbucket }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
@@ -76,17 +86,21 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result.UnboundedResources = make([]analyzers.Resource, len(info.Repos))
 	for i, repo := range info.Repos {
 		result.UnboundedResources[i] = analyzers.Resource{
-			Type: "repository",
-			Name: repo.FullName,
+			Type:               "repository",
+			Name:               "bitbucket.com/repository/" + repo.FullName,
+			FullyQualifiedName: repo.ID,
 			Parent: &analyzers.Resource{
-				Type: "project",
-				Name: repo.Project.Name,
+				Type:               "project",
+				FullyQualifiedName: "bitbucket.com/project/" + repo.Project.ID,
+				Name:               repo.Project.Name,
 				Parent: &analyzers.Resource{
-					Type: "workspace",
-					Name: repo.Workspace.Name,
+					Type:               "workspace",
+					FullyQualifiedName: "bitbucket.com/workspace/" + repo.Workspace.ID,
+					Name:               repo.Workspace.Name,
 				},
 			},
 			Metadata: map[string]any{
+				"owner_id":  repo.Owner.ID,
 				"owner":     repo.Owner.Username,
 				"isPrivate": repo.IsPrivate,
 				"role":      repo.Role,
@@ -94,25 +108,28 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		}
 	}
 
-	credentialResource := analyzers.Resource{
-		Type: info.Type,
-		Name: resource_name_map[info.Type],
+	credentialResource := &analyzers.Resource{
+		Type:               info.Type,
+		Name:               resource_name_map[info.Type],
+		FullyQualifiedName: "bitbucket.com/credential/" + info.Type,
 		Metadata: map[string]any{
 			"type": credential_type_map[info.Type],
 		},
 	}
 
-	for _, permission := range info.OauthScopes {
+	for _, scope := range info.OauthScopes {
 		result.Bindings = append(result.Bindings, analyzers.Binding{
-			Resource:   credentialResource,
-			Permission: permission,
+			Resource: *credentialResource,
+			Permission: analyzers.Permission{
+				Value: scope,
+			},
 		})
 	}
 
 	return &result
 }
 
-func getScopesAndType(cfg *config.Config, key string) (string, []analyzers.Permission, error) {
+func getScopesAndType(cfg *config.Config, key string) (string, []string, error) {
 	// client
 	client := analyzers.NewAnalyzeClient(cfg)
 
@@ -136,10 +153,7 @@ func getScopesAndType(cfg *config.Config, key string) (string, []analyzers.Permi
 	credentialType := resp.Header.Get("x-credential-type")
 	oauthScopes := resp.Header.Get("x-oauth-scopes")
 
-	var scopes []analyzers.Permission
-	for _, scope := range strings.Split(oauthScopes, ", ") {
-		scopes = append(scopes, analyzers.Permission{Value: scope})
-	}
+	scopes := strings.Split(oauthScopes, ", ")
 	return credentialType, scopes, nil
 }
 
@@ -237,13 +251,21 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}, nil
 }
 
+func convertScopeToAnalyzerPermissions(scopes []string) []analyzers.Permission {
+	permissions := make([]analyzers.Permission, len(scopes))
+	for _, scope := range scopes {
+		permissions = append(permissions, analyzers.Permission{Value: scope})
+	}
+	return permissions
+}
+
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
 		color.Red("[x] Error: %s", err.Error())
 		return
 	}
-	printScopes(info.Type, info.OauthScopes)
+	printScopes(info.Type, convertScopeToAnalyzerPermissions(info.OauthScopes))
 	printAccessibleRepositories(info.Repos)
 }
 
