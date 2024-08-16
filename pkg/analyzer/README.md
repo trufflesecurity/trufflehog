@@ -2,7 +2,10 @@
 
 ## Defining the Permissions
 
-Permissions are defined in lower snake case as `permission_name:access_level`.
+Permissions can be defined in:
+- lower snake case as `permission_name:access_level`
+- kebab case as `permission-name:read`
+- dot notation as `permission.name:read`
 
 The Permissions are initially defined as a [yaml file](analyzers/twilio/permissions.yaml).
 

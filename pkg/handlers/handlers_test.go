@@ -390,3 +390,30 @@ func BenchmarkHandleTar(b *testing.B) {
 		assert.NoError(b, err)
 	}
 }
+
+func TestHandleLargeHTTPJson(t *testing.T) {
+	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/md_random_data.json.zip")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 5121
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}

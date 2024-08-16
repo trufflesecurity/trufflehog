@@ -24,6 +24,17 @@ type DetectorKey struct {
 	customDetectorName string
 }
 
+func (k DetectorKey) Loggable() map[string]any {
+	res := map[string]any{"type": k.detectorType.String()}
+	if k.version > 0 {
+		res["version"] = k.version
+	}
+	if k.customDetectorName != "" {
+		res["name"] = k.customDetectorName
+	}
+	return res
+}
+
 // Type returns the detector type of the key.
 func (k DetectorKey) Type() detectorspb.DetectorType { return k.detectorType }
 

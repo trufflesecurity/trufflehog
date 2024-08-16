@@ -16,7 +16,7 @@ func (d *UTF16) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 		return nil
 	}
 
-	decodableChunk := &DecodableChunk{Chunk: chunk, DecoderType: detectorspb.DecoderType_UTF16}
+	decodableChunk := &DecodableChunk{Chunk: chunk, DecoderType: d.Type()}
 	if utf16Data, err := utf16ToUTF8(chunk.Data); err == nil {
 		if len(utf16Data) == 0 {
 			return nil
@@ -26,6 +26,10 @@ func (d *UTF16) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	}
 
 	return nil
+}
+
+func (d *UTF16) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType_UTF16
 }
 
 // utf16ToUTF8 converts a byte slice containing UTF-16 encoded data to a UTF-8 encoded byte slice.
