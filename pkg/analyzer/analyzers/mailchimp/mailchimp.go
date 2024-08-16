@@ -46,13 +46,13 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 	result := analyzers.AnalyzerResult{
 		AnalyzerType:       analyzerpb.AnalyzerType_Mailchimp,
-		Bindings:           make([]analyzers.Binding, len(StringToPermission)),
+		Bindings:           make([]analyzers.Binding, 0, len(StringToPermission)),
 		UnboundedResources: make([]analyzers.Resource, len(info.Domains.Domains)),
 	}
 
 	accountResource := analyzers.Resource{
 		Name:               info.Metadata.AccountName,
-		FullyQualifiedName: info.Metadata.AccountID,
+		FullyQualifiedName: "mailchimp.com/account/" + info.Metadata.AccountID,
 		Type:               "account",
 		Metadata: map[string]any{
 			"email":             info.Metadata.Email,
@@ -74,21 +74,19 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		},
 	}
 
-	count := 0
 	for perm := range StringToPermission {
-		result.Bindings[count] = analyzers.Binding{
+		result.Bindings = append(result.Bindings, analyzers.Binding{
 			Resource: accountResource,
 			Permission: analyzers.Permission{
 				Value: perm,
 			},
-		}
-		count++
+		})
 	}
 
 	for idx, domain := range info.Domains.Domains {
 		result.UnboundedResources[idx] = analyzers.Resource{
 			Name:               domain.Domain,
-			FullyQualifiedName: domain.Domain,
+			FullyQualifiedName: "mailchimp.com/domain/" + domain.Domain,
 			Type:               "domain",
 			Metadata: map[string]any{
 				"verified":      domain.Verified,
