@@ -1061,7 +1061,7 @@ func (e *Engine) filterResults(
 	results []detectors.Result,
 ) []detectors.Result {
 	if e.filterUnverified {
-		results = detectors.CleanResults(results)
+		results = detector.Detector.CleanResults(results)
 	}
 	if !e.retainFalsePositives {
 		results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results)
