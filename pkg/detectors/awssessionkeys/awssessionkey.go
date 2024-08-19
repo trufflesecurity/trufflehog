@@ -20,6 +20,7 @@ import (
 
 type scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
 }

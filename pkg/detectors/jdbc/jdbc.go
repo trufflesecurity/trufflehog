@@ -15,6 +15,7 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 	ignorePatterns []regexp.Regexp
 }
 

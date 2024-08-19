@@ -2,10 +2,11 @@ package mesibo
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -63,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				body := string(bodyBytes)
 
-				if (!strings.Contains(body, "AUTHFAIL")) {
+				if !strings.Contains(body, "AUTHFAIL") {
 					s1.Verified = true
 				}
 			}

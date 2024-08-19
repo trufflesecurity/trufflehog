@@ -3,8 +3,9 @@ package planetscaledb
 import (
 	"context"
 	"database/sql"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/go-sql-driver/mysql"
 
@@ -12,8 +13,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interface at compile time.

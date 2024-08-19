@@ -28,6 +28,11 @@ type CustomRegexWebhook struct {
 	*custom_detectorspb.CustomRegex
 }
 
+func (c *CustomRegexWebhook) CleanResults(results []detectors.Result) []detectors.Result {
+	cleaner := detectors.DefaultResultsCleaner{}
+	return cleaner.CleanResults(results)
+}
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*CustomRegexWebhook)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*CustomRegexWebhook)(nil)

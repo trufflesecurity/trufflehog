@@ -3,10 +3,11 @@ package braintreepayments
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -120,7 +121,7 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 	}
 
 	validResponse := `"data":{`
-	if strings.contains(bodyString, validResponse) {
+	if strings.Contains(bodyString, validResponse) {
 		return true, nil
 	}
 

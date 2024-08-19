@@ -64,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				bodyString := string(bodyBytes)
-				validResponse := strings.contains(bodyString, `"success":true`)
+				validResponse := strings.Contains(bodyString, `"success":true`)
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					if validResponse {

@@ -17,6 +17,7 @@ import (
 
 // Detector defines an interface for scanning for and verifying secrets.
 type Detector interface {
+	CleanResults(results []Result) []Result
 	// FromData will scan bytes for results, and optionally verify them.
 	FromData(ctx context.Context, verify bool, data []byte) ([]Result, error)
 	// Keywords are used for efficiently pre-filtering chunks using substring operations.

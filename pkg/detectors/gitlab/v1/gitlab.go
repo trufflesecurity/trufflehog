@@ -18,6 +18,7 @@ import (
 type Scanner struct {
 	client *http.Client
 	detectors.EndpointSetter
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.

@@ -13,7 +13,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{ detectors.EndpointSetter }
+type Scanner struct {
+	detectors.DefaultResultsCleaner
+	detectors.EndpointSetter
+}
 
 // Ensure the Scanner satisfies the interfaces at compile time.
 var _ detectors.Detector = (*Scanner)(nil)

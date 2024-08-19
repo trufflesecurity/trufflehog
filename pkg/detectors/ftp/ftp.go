@@ -26,6 +26,7 @@ const (
 type Scanner struct {
 	// Verification timeout. Defaults to 5 seconds if unset.
 	verificationTimeout time.Duration
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
