@@ -24,6 +24,8 @@ type Detector interface {
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
 
+	// ResultsCleaner is embedded to allow detectors to customize their "results cleaning" logic, which is the logic
+	// that runs to eliminate superfluous unverified results.
 	ResultsCleaner
 }
 
