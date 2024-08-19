@@ -30,8 +30,12 @@ import (
 
 const fakeDetectorKeyword = "fakedetector"
 
-type fakeDetectorV1 struct{}
-type fakeDetectorV2 struct{}
+type fakeDetectorV1 struct {
+	detectors.DefaultResultsCleaner
+}
+type fakeDetectorV2 struct {
+	detectors.DefaultResultsCleaner
+}
 
 var _ detectors.Detector = (*fakeDetectorV1)(nil)
 var _ detectors.Versioner = (*fakeDetectorV1)(nil)
@@ -456,7 +460,9 @@ const (
 
 var _ detectors.Detector = (*testDetectorV1)(nil)
 
-type testDetectorV1 struct{}
+type testDetectorV1 struct {
+	detectors.DefaultResultsCleaner
+}
 
 func (testDetectorV1) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	result := detectors.Result{
@@ -472,7 +478,9 @@ func (testDetectorV1) Type() detectorspb.DetectorType { return TestDetectorType 
 
 var _ detectors.Detector = (*testDetectorV2)(nil)
 
-type testDetectorV2 struct{}
+type testDetectorV2 struct {
+	detectors.DefaultResultsCleaner
+}
 
 func (testDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	result := detectors.Result{

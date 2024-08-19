@@ -15,6 +15,7 @@ import (
 const TestDetectorType = -1
 
 type testDetectorV1 struct {
+	detectors.DefaultResultsCleaner
 }
 
 func (testDetectorV1) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
@@ -30,6 +31,7 @@ func (testDetectorV1) Type() detectorspb.DetectorType {
 func (testDetectorV1) Version() int { return 1 }
 
 type testDetectorV2 struct {
+	detectors.DefaultResultsCleaner
 }
 
 func (testDetectorV2) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
@@ -47,6 +49,7 @@ func (testDetectorV2) Type() detectorspb.DetectorType {
 func (testDetectorV2) Version() int { return 2 }
 
 type testDetectorV3 struct {
+	detectors.DefaultResultsCleaner
 }
 
 func (testDetectorV3) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
@@ -67,7 +70,9 @@ var _ detectors.Detector = (*testDetectorV4)(nil)
 var _ detectors.MultiPartCredentialProvider = (*testDetectorV4)(nil)
 var _ detectors.StartOffsetProvider = (*testDetectorV4)(nil)
 
-type testDetectorV4 struct{}
+type testDetectorV4 struct {
+	detectors.DefaultResultsCleaner
+}
 
 func (testDetectorV4) FromData(context.Context, bool, []byte) ([]detectors.Result, error) {
 	return make([]detectors.Result, 0), nil
@@ -87,7 +92,9 @@ var _ detectors.Detector = (*testDetectorV5)(nil)
 var _ detectors.MaxSecretSizeProvider = (*testDetectorV5)(nil)
 var _ detectors.StartOffsetProvider = (*testDetectorV5)(nil)
 
-type testDetectorV5 struct{}
+type testDetectorV5 struct {
+	detectors.DefaultResultsCleaner
+}
 
 func (testDetectorV5) FromData(context.Context, bool, []byte) ([]detectors.Result, error) {
 	return make([]detectors.Result, 0), nil
@@ -107,7 +114,9 @@ var _ detectors.Detector = (*testDetectorV6)(nil)
 var _ detectors.Detector = (*testDetectorV6)(nil)
 var _ detectors.StartOffsetProvider = (*testDetectorV6)(nil)
 
-type testDetectorV6 struct{}
+type testDetectorV6 struct {
+	detectors.DefaultResultsCleaner
+}
 
 func (testDetectorV6) FromData(context.Context, bool, []byte) ([]detectors.Result, error) {
 	return make([]detectors.Result, 0), nil
