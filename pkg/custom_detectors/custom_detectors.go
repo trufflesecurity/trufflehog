@@ -29,8 +29,7 @@ type CustomRegexWebhook struct {
 }
 
 func (c *CustomRegexWebhook) CleanResults(results []detectors.Result) []detectors.Result {
-	cleaner := detectors.DefaultResultsCleaner{}
-	return cleaner.CleanResults(results)
+	return detectors.DefaultResultsCleaner{}.CleanResults(results)
 }
 
 func (c *CustomRegexWebhook) ShouldCleanIrrespectiveOfConfiguration() bool {
