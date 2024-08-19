@@ -27,7 +27,6 @@ type scanner struct {
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
 	detectors.DefaultMultiPartCredentialProvider
-	detectors.DefaultResultsCleaner
 }
 
 // resourceTypes derived from: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids
@@ -246,7 +245,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 	}
-	return awsCustomCleanResults(results), nil
+	return results, nil
 }
 
 func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOn403 bool) (bool, map[string]string, error) {
@@ -400,7 +399,7 @@ func (s scanner) verifyCanary(resIDMatch, resSecretMatch string) (bool, string, 
 	}
 }
 
-func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
+func (s scanner) CleanResults(results []detectors.Result) []detectors.Result {
 	if len(results) == 0 {
 		return results
 	}
