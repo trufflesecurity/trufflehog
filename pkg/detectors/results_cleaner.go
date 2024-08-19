@@ -1,7 +1,7 @@
 package detectors
 
-// ResultsCleaner defines an interface for "cleaning" results (eliminating superfluous unverified results) and
-// controlling aspects of when this cleaning runs.
+// ResultsCleaner defines an interface for "cleaning" results (eliminating superfluous results) and controlling aspects
+// of when this cleaning runs.
 type ResultsCleaner interface {
 	// CleanResults removes results from a set that are considered unnecessary. The default implementation removes all
 	// unverified results if any verified results are present, and all but one result if no verified results are

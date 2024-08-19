@@ -25,7 +25,7 @@ type Detector interface {
 	Type() detectorspb.DetectorType
 
 	// ResultsCleaner is embedded to allow detectors to customize their "results cleaning" logic, which is the logic
-	// that runs to eliminate superfluous unverified results.
+	// that runs to eliminate superfluous results. (The meaning of "superfluous" is detector-specific.)
 	ResultsCleaner
 }
 
