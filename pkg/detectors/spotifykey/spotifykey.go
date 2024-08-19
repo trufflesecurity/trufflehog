@@ -2,10 +2,11 @@ package spotifykey
 
 import (
 	"context"
+	"strings"
+
 	"golang.org/x/oauth2"
 
 	regexp "github.com/wasilibs/go-re2"
-	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -17,6 +18,7 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
