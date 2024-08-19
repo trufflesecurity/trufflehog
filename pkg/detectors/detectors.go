@@ -17,14 +17,14 @@ import (
 
 // Detector defines an interface for scanning for and verifying secrets.
 type Detector interface {
-	CleanResults(results []Result) []Result
-	// FromData will scan bytes for results, and optionally verify them.
 	FromData(ctx context.Context, verify bool, data []byte) ([]Result, error)
 	// Keywords are used for efficiently pre-filtering chunks using substring operations.
 	// Use unique identifiers that are part of the secret if you can, or the provider name.
 	Keywords() []string
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
+
+	ResultsCleaner
 }
 
 // Versioner is an optional interface that a detector can implement to

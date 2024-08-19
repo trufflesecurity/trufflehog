@@ -248,6 +248,10 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func (s scanner) ShouldCleanIrrespectiveOfConfiguration() bool {
+	return true
+}
+
 func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOn403 bool) (bool, map[string]string, error) {
 	// REQUEST VALUES.
 	method := "GET"

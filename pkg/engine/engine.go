@@ -1060,7 +1060,7 @@ func (e *Engine) filterResults(
 	detector *ahocorasick.DetectorMatch,
 	results []detectors.Result,
 ) []detectors.Result {
-	if e.filterUnverified {
+	if e.filterUnverified || detector.Detector.ShouldCleanIrrespectiveOfConfiguration() {
 		results = detector.Detector.CleanResults(results)
 	}
 	if !e.retainFalsePositives {
