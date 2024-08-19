@@ -163,33 +163,6 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 	}
 }
 
-// CleanResults returns all verified secrets, and if there are no verified secrets,
-// just one unverified secret if there are any.
-func CleanResults(results []Result) []Result {
-	if len(results) == 0 {
-		return results
-	}
-
-	var cleaned = make(map[string]Result, 0)
-
-	for _, s := range results {
-		if s.Verified {
-			cleaned[s.Redacted] = s
-		}
-	}
-
-	if len(cleaned) == 0 {
-		return results[:1]
-	}
-
-	results = results[:0]
-	for _, r := range cleaned {
-		results = append(results, r)
-	}
-
-	return results
-}
-
 // PrefixRegex ensures that at least one of the given keywords is within
 // 40 characters of the capturing group that follows.
 // This can help prevent false positives.
