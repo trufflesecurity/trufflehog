@@ -14,6 +14,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultResultsCleaner
 }
 
 const abstractURL = "https://exchange-rates.abstractapi.com"

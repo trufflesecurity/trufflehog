@@ -16,6 +16,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultResultsCleaner
 }
 
 func (s Scanner) Version() int { return 2 }

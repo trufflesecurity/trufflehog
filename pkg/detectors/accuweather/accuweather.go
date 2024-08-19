@@ -15,6 +15,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultResultsCleaner
 }
 
 const accuweatherURL = "https://dataservice.accuweather.com"

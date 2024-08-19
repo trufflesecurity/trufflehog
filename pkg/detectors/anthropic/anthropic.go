@@ -17,6 +17,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -83,7 +84,7 @@ func verifyToken(ctx context.Context, client *http.Client, apiKey string) (bool,
 	}
 
 	bodyBytes, err := json.Marshal(body)
-	if err != nil {
+	if (err != nil) {
 		return false, nil
 	}
 

@@ -21,7 +21,9 @@ type response struct {
 	} `json:"workplace"`
 }
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultResultsCleaner
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)

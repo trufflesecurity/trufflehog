@@ -20,6 +20,7 @@ import (
 type Scanner struct {
 	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 }
 
 func (s Scanner) Version() int { return 1 }

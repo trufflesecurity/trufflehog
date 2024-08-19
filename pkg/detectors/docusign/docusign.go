@@ -16,6 +16,7 @@ import (
 
 type Scanner struct{
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 }
 
 type Response struct {

@@ -44,6 +44,7 @@ func New() Scanner {
 
 type Scanner struct {
 	excludeMatchers []*regexp.Regexp
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interface at compile time.

@@ -27,6 +27,7 @@ type scanner struct {
 	verificationClient *http.Client
 	skipIDs            map[string]struct{}
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 }
 
 // resourceTypes derived from: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-unique-ids

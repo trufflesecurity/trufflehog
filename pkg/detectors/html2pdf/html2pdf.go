@@ -12,7 +12,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultResultsCleaner
+}
 
 type html2pdfRequest struct {
 	HTML   string `json:"html"`

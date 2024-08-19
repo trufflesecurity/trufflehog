@@ -14,7 +14,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultResultsCleaner
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -35,7 +37,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	// Surprisingly there are still a lot of false positives! So, also doing substring check for square.
-	if !strings.Contains(strings.ToLower(dataStr), "square") {
+	if (!strings.Contains(strings.ToLower(dataStr), "square")) {
 		return
 	}
 

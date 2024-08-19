@@ -17,6 +17,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultResultsCleaner
 }
 
 const abuseipdbURL = "https://api.abuseipdb.com"

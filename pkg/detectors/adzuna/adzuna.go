@@ -15,6 +15,7 @@ import (
 type Scanner struct {
 	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 }
 
 const adzunaURL = "https://api.adzuna.com"

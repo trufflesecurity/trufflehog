@@ -15,6 +15,7 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 	client     *http.Client
 	useTestURL bool
 }
@@ -119,7 +120,7 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 	}
 
 	validResponse := `"data":{`
-	if strings.Contains(bodyString, validResponse) {
+	if strings.contains(bodyString, validResponse) {
 		return true, nil
 	}
 

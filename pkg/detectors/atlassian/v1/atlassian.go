@@ -2,10 +2,10 @@ package atlassian
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"encoding/json"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -16,6 +16,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultResultsCleaner
 }
 
 func (s Scanner) Version() int { return 1 }
@@ -88,8 +89,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	if err != nil {
 		return false, nil, nil
 	}
-        req.Header.Add("Accept", "application/json")
-        req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	res, err := client.Do(req)
 	if err != nil {
 		return false, nil, err

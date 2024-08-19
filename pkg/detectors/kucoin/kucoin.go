@@ -18,6 +18,7 @@ import (
 
 type Scanner struct{
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interface at compile time.

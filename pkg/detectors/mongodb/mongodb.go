@@ -20,6 +20,7 @@ import (
 
 type Scanner struct {
 	timeout time.Duration // Zero value means "default timeout"
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interface at compile time.

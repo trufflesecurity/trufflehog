@@ -20,6 +20,7 @@ import (
 
 type Scanner struct {
 	IncludeExpired bool
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interface at compile time.

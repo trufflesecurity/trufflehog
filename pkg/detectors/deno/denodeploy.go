@@ -15,6 +15,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultResultsCleaner
 	client *http.Client
 }
 

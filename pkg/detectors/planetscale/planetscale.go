@@ -13,6 +13,7 @@ import (
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.DefaultResultsCleaner
 	client *http.Client
 }
 
