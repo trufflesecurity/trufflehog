@@ -33,6 +33,10 @@ func (c *CustomRegexWebhook) CleanResults(results []detectors.Result) []detector
 	return cleaner.CleanResults(results)
 }
 
+func (c *CustomRegexWebhook) ShouldCleanIrrespectiveOfConfiguration() bool {
+	return false
+}
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*CustomRegexWebhook)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*CustomRegexWebhook)(nil)
