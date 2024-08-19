@@ -54,7 +54,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	// Add token and it's permissions to bindings
 	tokenResource := analyzers.Resource{
 		Name:               info.AccessToken.Name,
-		FullyQualifiedName: info.AccessToken.Name,
+		FullyQualifiedName: fmt.Sprintf("github.com/token/%s", info.AccessToken.Name),
 		Type:               "access_token",
 		Metadata: map[string]any{
 			"last_used_at": info.AccessToken.LastUsedAt,
@@ -77,7 +77,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	for _, project := range info.Projects {
 		projectResource := analyzers.Resource{
 			Name:               project.NameWithNamespace,
-			FullyQualifiedName: project.NameWithNamespace,
+			FullyQualifiedName: fmt.Sprintf("github.com/project/%s", project.NameWithNamespace),
 			Type:               "project",
 		}
 
