@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultResultsCleaner
 }
 
@@ -96,5 +96,5 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
