@@ -26,14 +26,8 @@ const maxTotalMatches = 100
 // initialization).
 type CustomRegexWebhook struct {
 	*custom_detectorspb.CustomRegex
-}
 
-func (c *CustomRegexWebhook) CleanResults(results []detectors.Result) []detectors.Result {
-	return detectors.DefaultResultsCleaner{}.CleanResults(results)
-}
-
-func (c *CustomRegexWebhook) ShouldCleanIrrespectiveOfConfiguration() bool {
-	return false
+	detectors.DefaultResultsCleaner
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -62,7 +56,7 @@ func NewWebhookCustomRegex(pb *custom_detectorspb.CustomRegex) (*CustomRegexWebh
 	}
 
 	// TODO: Copy only necessary data out of pb.
-	return &CustomRegexWebhook{pb}, nil
+	return &CustomRegexWebhook{pb, detectors.DefaultResultsCleaner{}}, nil
 }
 
 var httpClient = common.SaneHttpClient()
