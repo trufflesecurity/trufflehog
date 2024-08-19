@@ -972,3 +972,7 @@ func TestEngine_ShouldVerifyChunk(t *testing.T) {
 		}
 	}
 }
+
+func TestFilterResults(t *testing.T) {
+	t.Fail()
+}
