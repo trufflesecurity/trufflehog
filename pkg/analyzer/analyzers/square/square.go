@@ -42,7 +42,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 	result := analyzers.AnalyzerResult{
 		AnalyzerType:       analyzerpb.AnalyzerType_Square,
-		UnboundedResources: getTeamMembersResources(info.Team),
+		UnboundedResources: []analyzers.Resource{},
 		Metadata: map[string]any{
 			"expires_at":  info.Permissions.ExpiresAt,
 			"client_id":   info.Permissions.ClientID,
@@ -54,6 +54,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 	result.Bindings = bindings
 	result.UnboundedResources = append(result.UnboundedResources, unboundedResources...)
+	result.UnboundedResources = append(result.UnboundedResources, getTeamMembersResources(info.Team)...)
 
 	return &result
 }
