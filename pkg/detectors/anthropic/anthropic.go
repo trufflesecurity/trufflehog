@@ -84,7 +84,7 @@ func verifyToken(ctx context.Context, client *http.Client, apiKey string) (bool,
 	}
 
 	bodyBytes, err := json.Marshal(body)
-	if (err != nil) {
+	if err != nil {
 		return false, nil
 	}
 
