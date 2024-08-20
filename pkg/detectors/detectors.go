@@ -27,11 +27,19 @@ type Detector interface {
 }
 
 // CustomResultsCleaner is an optional interface that a detector can implement to customize how its generated results
-// are "cleaned," which is a process whereby superfluous results are removed from the result set. (This logic should be
-// implemented outside results generation because there are circumstances under which the engine should not execute it.)
+// are "cleaned," which is defined as removing superfluous results from those found in a given chunk. The default
+// implementation of this logic removes all unverified results if there are any verified results, and all unverified
+// results except for one otherwise, but this interface allows a detector to specify different logic. (This logic must
+// be implemented outside results generation because there are circumstances under which the engine should not execute
+// it.)
 type CustomResultsCleaner interface {
+	// CleanResults removes "superfluous" results from a result set (where the definition of "superfluous" is detector-
+	// specific).
 	CleanResults(results []Result) []Result
-	ShouldCleanIrrespectiveOfConfiguration() bool
+	// ShouldCleanResultsIrrespectiveOfConfiguration allows a custom cleaner to instruct the engine to ignore
+	// user-provided configuration that controls whether results are cleaned. (User-provided configuration is not the
+	// only factor that determines whether the engine runs cleaning logic.)
+	ShouldCleanResultsIrrespectiveOfConfiguration() bool
 }
 
 // Versioner is an optional interface that a detector can implement to
