@@ -246,7 +246,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 	}
-	return s.CleanResults(results), nil
+	return results, nil
 }
 
 func (s scanner) ShouldCleanResultsIrrespectiveOfConfiguration() bool {
