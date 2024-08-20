@@ -1,4 +1,4 @@
-# trufflesecurity/protos:1.22
+# trufflesecurity/protos:1.23
 
 FROM golang:1.23-bullseye
 
