@@ -26,6 +26,14 @@ type Detector interface {
 	Type() detectorspb.DetectorType
 }
 
+// CustomResultsCleaner is an optional interface that a detector can implement to customize how its generated results
+// are "cleaned," which is a process whereby superfluous results are removed from the result set. (This logic should be
+// implemented outside results generation because there are circumstances under which the engine should not execute it.)
+type CustomResultsCleaner interface {
+	CleanResults(results []Result) []Result
+	ShouldCleanIrrespectiveOfConfiguration() bool
+}
+
 // Versioner is an optional interface that a detector can implement to
 // differentiate instances of the same detector type.
 type Versioner interface {
