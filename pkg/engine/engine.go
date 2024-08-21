@@ -1060,15 +1060,24 @@ func (e *Engine) filterResults(
 	detector *ahocorasick.DetectorMatch,
 	results []detectors.Result,
 ) []detectors.Result {
-	if e.filterUnverified {
-		results = detectors.CleanResults(results)
+	clean := detectors.CleanResults
+	ignoreConfig := false
+	if cleaner, ok := detector.Detector.(detectors.CustomResultsCleaner); ok {
+		clean = cleaner.CleanResults
+		ignoreConfig = cleaner.ShouldCleanResultsIrrespectiveOfConfiguration()
 	}
+	if e.filterUnverified || ignoreConfig {
+		results = clean(results)
+	}
+
 	if !e.retainFalsePositives {
 		results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results)
 	}
+
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
 	}
+
 	return results
 }
 
