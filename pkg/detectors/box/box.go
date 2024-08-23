@@ -24,7 +24,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"box", "access"}) + `\b([0-9a-zA-Z]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"box"}) + `\b([0-9a-zA-Z]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -110,29 +110,20 @@ func (s Scanner) Type() detectorspb.DetectorType {
 func bakeExtraDataFromUser(u user) map[string]string {
 	return map[string]string{
 		"user_id":           u.ID,
-		"user_name":         u.Name,
+		"user_full_name":    u.Name,
 		"username":          u.Login,
-		"user_timezone":     u.Timezone,
 		"user_space_amount": fmt.Sprintf("%d", u.SpaceAmount),
 		"user_space_used":   fmt.Sprintf("%d", u.SpaceUsed),
 		"user_status":       u.Status,
-		"user_job_title":    u.JobTitle,
-		"user_phone":        u.Phone,
-		"user_address":      u.Address,
 	}
 }
 
 // struct to represent a Box user.
 type user struct {
-	Type        string `json:"type"`
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Login       string `json:"login"`
-	Timezone    string `json:"timezone"`
 	SpaceAmount int64  `json:"space_amount"`
 	SpaceUsed   int64  `json:"space_used"`
 	Status      string `json:"status"`
-	JobTitle    string `json:"job_title"`
-	Phone       string `json:"phone"`
-	Address     string `json:"address"`
 }
