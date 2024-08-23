@@ -905,7 +905,15 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					detectorKeysWithResults[detector.Key] = detector
 				}
 
-				results = e.filterResults(ctx, detector, results)
+				// If results filtration eliminates a rotated secret, then that rotation will never be reported. This
+				// problem can theoretically occur for any scan, but we've only actually seen it in practice during
+				// targeted scans. (The reason for this discrepancy is unclear.) The simplest fix is therefore to
+				// disable filtration for targeted scans, but if you're here because this problem surfaced for a
+				// non-targeted scan then we'll have to solve it correctly.
+				if chunk.chunk.SecretID == 0 {
+					results = e.filterResults(ctx, detector, results)
+				}
+
 				for _, res := range results {
 					var val []byte
 					if res.RawV2 != nil {
@@ -1043,7 +1051,14 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
 		}
 
-		results = e.filterResults(ctx, data.detector, results)
+		// If results filtration eliminates a rotated secret, then that rotation will never be reported. This problem
+		// can theoretically occur for any scan, but we've only actually seen it in practice during targeted scans. (The
+		// reason for this discrepancy is unclear.) The simplest fix is therefore to disable filtration for targeted
+		// scans, but if you're here because this problem surfaced for a non-targeted scan then we'll have to solve it
+		// correctly.
+		if data.chunk.SecretID == 0 {
+			results = e.filterResults(ctx, data.detector, results)
+		}
 
 		for _, res := range results {
 			e.processResult(ctx, data, res, isFalsePositive)
