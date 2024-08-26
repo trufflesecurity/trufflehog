@@ -11,6 +11,7 @@ import (
 )
 
 func TestPostmanEngine(t *testing.T) {
+	dummy := "postman_dummy_token"
 	tests := []struct {
 		name          string
 		postmanConfig sources.PostmanConfig
@@ -20,7 +21,7 @@ func TestPostmanEngine(t *testing.T) {
 		{
 			name: "scanned Postman with a token",
 			postmanConfig: sources.PostmanConfig{
-				Token: "postman_dummy_token",
+				Token: dummy,
 			},
 		},
 		{
