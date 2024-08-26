@@ -20,7 +20,7 @@ func TestPostmanEngine(t *testing.T) {
 		{
 			name: "scanned Postman with a token",
 			postmanConfig: sources.PostmanConfig{
-				Token: "PMAK-66c885ef8263e50001469b8e-30f557a09f1a6f95aea0a29f5c72957a04",
+				Token: "postman_dummy_token",
 			},
 		},
 		{
