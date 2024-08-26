@@ -1408,7 +1408,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		SourceID:   s.SourceID(),
 		JobID:      s.JobID(),
 		SecretID:   target.SecretID,
-		Data:       []byte(res),
+		Data:       []byte(stripLeadingPlusMinus(res)),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},
 		},
@@ -1416,4 +1416,11 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 	}
 
 	return common.CancellableWrite(ctx, chunksChan, chunk)
+}
+
+// stripLeadingPlusMinus removes leading + and - characters from lines in a diff string. These characters exist in the
+// diffs returned when performing a targeted scan and need to be removed so that detectors are operating on the correct
+// text.
+func stripLeadingPlusMinus(diff string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(diff, "\n+", "\n"), "\n-", "\n")
 }
