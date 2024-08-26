@@ -18,6 +18,12 @@ func TestPostmanEngine(t *testing.T) {
 		errMsg        string
 	}{
 		{
+			name: "scanned Postman with a token",
+			postmanConfig: sources.PostmanConfig{
+				Token: "Dummy_key",
+			},
+		},
+		{
 			name: "scanned Postman with workspacePath",
 			postmanConfig: sources.PostmanConfig{
 				WorkspacePaths: []string{"Downloads/Test API.postman_collection.json"},
