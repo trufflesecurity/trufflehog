@@ -15,12 +15,11 @@ func TestPostmanEngine(t *testing.T) {
 		name          string
 		postmanConfig sources.PostmanConfig
 		wantErr       bool
-		errMsg        string
 	}{
 		{
 			name: "scanned Postman with a token",
 			postmanConfig: sources.PostmanConfig{
-				Token: "Dummy_key",
+				Token: "dummy_key",
 			},
 		},
 		{
@@ -36,10 +35,8 @@ func TestPostmanEngine(t *testing.T) {
 			},
 		},
 		{
-			name: "no token or file path provided",
-			// postmanConfig: sources.PostmanConfig{},
+			name:    "no token or file path provided",
 			wantErr: true,
-			errMsg:  "no path to locally exported data or API token provided",
 		},
 	}
 	for _, test := range tests {
@@ -77,7 +74,7 @@ func TestPostmanEngine(t *testing.T) {
 			}()
 
 			err = e.ScanPostman(ctx, test.postmanConfig)
-			if err != nil && !test.wantErr && err.Error() != test.errMsg {
+			if err != nil && !test.wantErr {
 				t.Errorf("ScanPostman() got: %v, want: %v", err, nil)
 				return
 			}
