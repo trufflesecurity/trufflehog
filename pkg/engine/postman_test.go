@@ -63,16 +63,7 @@ func TestPostmanEngine(t *testing.T) {
 
 			e, err := NewEngine(ctx, &conf)
 			assert.NoError(t, err)
-
 			e.Start(ctx)
-
-			go func() {
-				resultCount := 0
-				for range e.ResultsChan() {
-					resultCount++
-				}
-			}()
-
 			err = e.ScanPostman(ctx, test.postmanConfig)
 			if err != nil && !test.wantErr {
 				t.Errorf("ScanPostman() got: %v, want: %v", err, nil)
