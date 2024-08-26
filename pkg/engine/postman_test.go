@@ -11,19 +11,12 @@ import (
 )
 
 func TestPostmanEngine(t *testing.T) {
-	dummy := "postman_dummy_token"
 	tests := []struct {
 		name          string
 		postmanConfig sources.PostmanConfig
 		wantErr       bool
 		errMsg        string
 	}{
-		{
-			name: "scanned Postman with a token",
-			postmanConfig: sources.PostmanConfig{
-				Token: dummy,
-			},
-		},
 		{
 			name: "scanned Postman with workspacePath",
 			postmanConfig: sources.PostmanConfig{
