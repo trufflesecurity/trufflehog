@@ -1,7 +1,9 @@
 package postman
 
 import (
+	_ "embed"
 	"encoding/json"
+	"sort"
 	"testing"
 	"time"
 
@@ -11,8 +13,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
+//go:embed expected_output.json
+var expectedOutput []byte
+
 func TestAnalyzer_Analyze(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {
@@ -28,7 +33,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		{
 			name:    "valid Postman key",
 			key:     testSecrets.MustGetField("POSTMAN_TOKEN"),
-			want:    `{"AnalyzerType":13,"Bindings":[{"Resource":{"Name":"rendy","FullyQualifiedName":"rendyplayground@gmail.com","Type":"user","Metadata":{"email":"rendyplayground@gmail.com","role":"user","team_domain":"","team_name":"","username":"rendyplayground"},"Parent":null},"Permission":{"Value":"team_workspaces:create","Parent":null}},{"Resource":{"Name":"rendy","FullyQualifiedName":"rendyplayground@gmail.com","Type":"user","Metadata":{"email":"rendyplayground@gmail.com","role":"user","team_domain":"","team_name":"","username":"rendyplayground"},"Parent":null},"Permission":{"Value":"team_workspaces:view","Parent":null}},{"Resource":{"Name":"rendy","FullyQualifiedName":"rendyplayground@gmail.com","Type":"user","Metadata":{"email":"rendyplayground@gmail.com","role":"user","team_domain":"","team_name":"","username":"rendyplayground"},"Parent":null},"Permission":{"Value":"usage_data:view","Parent":null}}],"UnboundedResources":[{"Name":"My Workspace","FullyQualifiedName":"4d06fc0c-6402-4a26-857d-80787b10eabf","Type":"workspace","Metadata":{"id":"4d06fc0c-6402-4a26-857d-80787b10eabf","type":"personal","visibility":"personal"},"Parent":null}],"Metadata":null}`,
+			want:    string(expectedOutput),
 			wantErr: false,
 		},
 	}
@@ -42,6 +47,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				return
 			}
 
+			// bindings need to be in the same order to be comparable
+			sortBindings(got.Bindings)
+
 			// Marshal the actual result to JSON
 			gotJSON, err := json.Marshal(got)
 			if err != nil {
@@ -53,6 +61,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			if err := json.Unmarshal([]byte(tt.want), &wantObj); err != nil {
 				t.Fatalf("could not unmarshal want JSON string: %s", err)
 			}
+
+			// bindings need to be in the same order to be comparable
+			sortBindings(wantObj.Bindings)
 
 			// Marshal the expected result to JSON (to normalize)
 			wantJSON, err := json.Marshal(wantObj)
@@ -76,4 +87,14 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Helper function to sort bindings
+func sortBindings(bindings []analyzers.Binding) {
+	sort.SliceStable(bindings, func(i, j int) bool {
+		if bindings[i].Resource.Name == bindings[j].Resource.Name {
+			return bindings[i].Permission.Value < bindings[j].Permission.Value
+		}
+		return bindings[i].Resource.Name < bindings[j].Resource.Name
+	})
 }
