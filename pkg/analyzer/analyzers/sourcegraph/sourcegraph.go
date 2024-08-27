@@ -52,10 +52,9 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			{
 				Resource: analyzers.Resource{
 					Name:               info.User.Data.CurrentUser.Username,
-					FullyQualifiedName: info.User.Data.CurrentUser.Username,
+					FullyQualifiedName: "sourcegraph/" + info.User.Data.CurrentUser.Email,
 					Type:               "user",
 					Metadata: map[string]any{
-						"email":      info.User.Data.CurrentUser.Email,
 						"created_at": info.User.Data.CurrentUser.CreatedAt,
 					},
 					Parent: nil,

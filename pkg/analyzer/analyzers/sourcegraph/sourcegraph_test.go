@@ -36,7 +36,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 					{
 					"Resource": {
 						"Name": "ahrav",
-						"FullyQualifiedName": "ahravdutta02@gmail.com",
+						"FullyQualifiedName": "sourcegraph/ahravdutta02@gmail.com",
 						"Type": "user",
 						"Metadata": {
 						"created_at": "2023-07-23T04:16:31Z"
