@@ -1,6 +1,7 @@
 package shopify
 
 import (
+	_ "embed"
 	"encoding/json"
 	"testing"
 	"time"
@@ -10,6 +11,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+//go:embed expected_output.json
+var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -23,233 +27,15 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		name     string
 		key      string
 		storeUrl string
-		want     string // JSON string
+		want     string
 		wantErr  bool
 	}{
 		{
 			name:     "valid Shopify key",
 			key:      testSecrets.MustGetField("SHOPIFY_ADMIN_SECRET"),
 			storeUrl: testSecrets.MustGetField("SHOPIFY_DOMAIN"),
-			want: `{
-				"AnalyzerType":15,
-				"Bindings":[
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Write",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Write",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Write",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Write",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Write",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Write",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"My Store",
-						 "FullyQualifiedName":"detectors@trufflesec.com",
-						 "Type":"shop",
-						 "Metadata":{
-							"created_at":"2024-08-16T17:16:17+05:00"
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Read",
-						 "Parent":null
-					  }
-				   }
-				],
-				"UnboundedResources":null,
-				"Metadata":{
-				   "status_code":200
-				}
-			 }`,
-			wantErr: false,
+			want:     string(expectedOutput),
+			wantErr:  false,
 		},
 	}
 
