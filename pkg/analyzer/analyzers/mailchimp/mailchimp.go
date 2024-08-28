@@ -47,7 +47,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
 		AnalyzerType:       analyzerpb.AnalyzerType_Mailchimp,
 		Bindings:           make([]analyzers.Binding, 0, len(StringToPermission)),
-		UnboundedResources: make([]analyzers.Resource, len(info.Domains.Domains)),
+		UnboundedResources: make([]analyzers.Resource, 0, len(info.Domains.Domains)),
 	}
 
 	accountResource := analyzers.Resource{
@@ -56,21 +56,12 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Type:               "account",
 		Metadata: map[string]any{
 			"email":             info.Metadata.Email,
-			"first_name":        info.Metadata.FirstName,
-			"last_name":         info.Metadata.LastName,
 			"role":              info.Metadata.Role,
 			"member_since":      info.Metadata.MemberSince,
 			"pricing_plan":      info.Metadata.PricingPlan,
 			"account_timezone":  info.Metadata.AccountTimezone,
 			"last_login":        info.Metadata.LastLogin,
 			"total_subscribers": info.Metadata.TotalSubscribers,
-			"company":           info.Metadata.Contact.Company,
-			"address1":          info.Metadata.Contact.Address1,
-			"address2":          info.Metadata.Contact.Address2,
-			"city":              info.Metadata.Contact.City,
-			"state":             info.Metadata.Contact.State,
-			"zip":               info.Metadata.Contact.Zip,
-			"country":           info.Metadata.Contact.Country,
 		},
 	}
 
@@ -83,8 +74,8 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		})
 	}
 
-	for idx, domain := range info.Domains.Domains {
-		result.UnboundedResources[idx] = analyzers.Resource{
+	for _, domain := range info.Domains.Domains {
+		result.UnboundedResources = append(result.UnboundedResources, analyzers.Resource{
 			Name:               domain.Domain,
 			FullyQualifiedName: "mailchimp.com/domain/" + domain.Domain,
 			Type:               "domain",
@@ -93,7 +84,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 				"authenticated": domain.Authenticated,
 			},
 			Parent: &accountResource,
-		}
+		})
 	}
 
 	return &result
