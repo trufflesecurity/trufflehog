@@ -59,13 +59,8 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		},
 	}
 
-	for _, perm := range permissions {
-		binding := analyzers.Binding{
-			Resource:   userResource,
-			Permission: perm,
-		}
-		result.Bindings = append(result.Bindings, binding)
-	}
+	// bindings to all permissions to resources
+	analyzers.BindAllPermissions(userResource, permissions...)
 
 	// unbounded resources
 	result.UnboundedResources = make([]analyzers.Resource, 0, len(info.Data.Workspaces))
@@ -156,9 +151,9 @@ func printMetadata(me *SecretInfo) {
 
 func allPermissions() []analyzers.Permission {
 	permissions := make([]analyzers.Permission, 0, len(PermissionStrings))
-	for permission := range PermissionStrings {
+	for _, permission := range PermissionStrings {
 		permissions = append(permissions, analyzers.Permission{
-			Value: PermissionStrings[permission],
+			Value: permission,
 		})
 	}
 	return permissions
