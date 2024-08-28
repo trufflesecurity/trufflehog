@@ -78,12 +78,12 @@ func bakeUserBindings(info *SecretInfo) (analyzers.Resource, []analyzers.Binding
 
 	var bindings []analyzers.Binding
 
-	for role_priv, exists := range info.RolePrivs {
+	for rolePriv, exists := range info.RolePrivs {
 		if exists {
 			bindings = append(bindings, analyzers.Binding{
 				Resource: userResource,
 				Permission: analyzers.Permission{
-					Value: role_priv,
+					Value: rolePriv,
 				},
 			})
 		}
