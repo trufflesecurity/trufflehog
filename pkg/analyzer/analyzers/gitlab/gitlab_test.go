@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	_ "embed"
 	"encoding/json"
 	"testing"
 	"time"
@@ -9,6 +10,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+//go:embed expected_output.json
+var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -25,67 +29,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "valid gitlab access token",
-			key:  testSecrets.MustGetField("GITLABV2"),
-			want: `{
-				"AnalyzerType":5,
-				"Bindings":[
-				   {
-					  "Resource":{
-						 "Name":"test-project-token",
-						 "FullyQualifiedName":"test-project-token",
-						 "Type":"access_token",
-						 "Metadata":{
-							"created_at":"2024-08-15T06:33:00.337Z",
-							"expires_at":"2025-08-15",
-							"last_used_at":"2024-08-15T07:21:41.127Z",
-							"revoked":false
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"read_api",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"test-project-token",
-						 "FullyQualifiedName":"test-project-token",
-						 "Type":"access_token",
-						 "Metadata":{
-							"created_at":"2024-08-15T06:33:00.337Z",
-							"expires_at":"2025-08-15",
-							"last_used_at":"2024-08-15T07:21:41.127Z",
-							"revoked":false
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"read_repository",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"truffletester / trufflehog",
-						 "FullyQualifiedName":"truffletester / trufflehog",
-						 "Type":"project",
-						 "Metadata":null,
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"Developer",
-						 "Parent":null
-					  }
-				   }
-				],
-				"UnboundedResources":null,
-				"Metadata":{
-				   "enterprise":true,
-				   "version":"17.3.0-pre"
-				}
-			 }`,
+			name:    "valid gitlab access token",
+			key:     testSecrets.MustGetField("GITLABV2"),
+			want:    string(expectedOutput),
 			wantErr: false,
 		},
 	}
