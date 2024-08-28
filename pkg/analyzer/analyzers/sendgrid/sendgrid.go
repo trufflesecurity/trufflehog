@@ -63,7 +63,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		UnboundedResources: []analyzers.Resource{},
 	}
 
-	for _, scope := range SCOPES {
+	for _, scope := range info.Scopes {
 		resource := getCategoryResource(scope)
 
 		if len(scope.Permissions) == 0 {
@@ -111,9 +111,10 @@ type ScopesJSON struct {
 
 type SecretInfo struct {
 	RawScopes []string
+	Scopes    []SendgridScope
 }
 
-func printPermissions(show_all bool) {
+func printPermissions(info *SecretInfo, show_all bool) {
 	fmt.Print("\n\n")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -123,7 +124,7 @@ func printPermissions(show_all bool) {
 		t.AppendHeader(table.Row{"Scope", "Sub-Scope", "Access"})
 	}
 	// Print the scopes
-	for _, s := range SCOPES {
+	for _, s := range info.Scopes {
 		writer := analyzers.GetWriterFromStatus(s.PermissionType)
 		if show_all {
 			t.AppendRow([]interface{}{writer(s.Category), writer(s.SubCategory), writer(s.PermissionType), writer(strings.Join(s.Permissions, "\n"))})
@@ -139,11 +140,11 @@ func printPermissions(show_all bool) {
 // It will return the most specific category possible.
 // For example, if the scope is "mail.send.read", it will return "Mail Send", not just "Mail"
 // since it's searching "mail.send.read" -> "mail.send" -> "mail"
-func getScopeIndex(scope string) int {
+func getScopeIndex(categories []SendgridScope, scope string) int {
 	splitScope := strings.Split(scope, ".")
 	for i := len(splitScope); i > 0; i-- {
 		searchScope := strings.Join(splitScope[:i], ".")
-		for i, s := range SCOPES {
+		for i, s := range categories {
 			for _, prefix := range s.Prefixes {
 				if strings.HasPrefix(searchScope, prefix) {
 					return i
@@ -154,24 +155,36 @@ func getScopeIndex(scope string) int {
 	return -1
 }
 
-func processPermissions(rawScopes []string) {
+func processPermissions(rawScopes []string) []SendgridScope {
+	categoryPermissions := make([]SendgridScope, len(SCOPES))
+
+	// copy all scope categories to the categoryPermissions slice
+	copy(categoryPermissions, SCOPES)
 	for _, scope := range rawScopes {
 		// Skip these scopes since they are not useful for this analysis
 		if scope == "2fa_required" || scope == "sender_verification_eligible" {
 			continue
 		}
-		ind := getScopeIndex(scope)
+
+		// must be part of generated permissions
+		if _, ok := StringToPermission[scope]; !ok {
+			continue
+		}
+		ind := getScopeIndex(categoryPermissions, scope)
 		if ind == -1 {
 			//color.Red("[!] Scope not found: %v", scope)
 			continue
 		}
-		s := &SCOPES[ind]
+		s := &categoryPermissions[ind]
 		s.AddPermission(scope)
 	}
+
 	// Run tests to determine the permission type
-	for i := range SCOPES {
-		SCOPES[i].RunTests()
+	for i := range categoryPermissions {
+		categoryPermissions[i].RunTests()
 	}
+
+	return categoryPermissions
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
@@ -195,7 +208,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		color.Yellow("[i] 2FA Required for this account")
 	}
 
-	printPermissions(cfg.ShowAll)
+	printPermissions(info, cfg.ShowAll)
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
@@ -223,7 +236,10 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// Now you can access the scopes
 	rawScopes := jsonScopes.Scopes
 
-	processPermissions(rawScopes)
+	categoryScope := processPermissions(rawScopes)
 
-	return &SecretInfo{RawScopes: rawScopes}, nil
+	return &SecretInfo{
+		RawScopes: rawScopes,
+		Scopes:    categoryScope,
+	}, nil
 }
