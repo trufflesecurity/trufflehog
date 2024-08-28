@@ -1,6 +1,7 @@
 package bitbucket
 
 import (
+	_ "embed"
 	"encoding/json"
 	"sort"
 	"testing"
@@ -10,6 +11,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+//go:embed expected_output.json
+var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -29,7 +33,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		{
 			name:    "valid Bitbucket key",
 			key:     testSecrets.MustGetField("BITBUCKET_ANALYZE_TOKEN"),
-			want:    `{"AnalyzerType":3,"Bindings":[{"Resource":{"Name":"Repository","FullyQualifiedName":"bitbucket.com/credential/repo_access_token","Type":"repo_access_token","Metadata":{"type":"Repository Access Token (Can access 1 repository)"},"Parent":null},"Permission":{"Value":"pullrequest","Parent":null}},{"Resource":{"Name":"Repository","FullyQualifiedName":"bitbucket.com/credential/repo_access_token","Type":"repo_access_token","Metadata":{"type":"Repository Access Token (Can access 1 repository)"},"Parent":null},"Permission":{"Value":"webhook","Parent":null}},{"Resource":{"Name":"Repository","FullyQualifiedName":"bitbucket.com/credential/repo_access_token","Type":"repo_access_token","Metadata":{"type":"Repository Access Token (Can access 1 repository)"},"Parent":null},"Permission":{"Value":"pipeline","Parent":null}},{"Resource":{"Name":"Repository","FullyQualifiedName":"bitbucket.com/credential/repo_access_token","Type":"repo_access_token","Metadata":{"type":"Repository Access Token (Can access 1 repository)"},"Parent":null},"Permission":{"Value":"runner","Parent":null}}],"UnboundedResources":[{"Name":"bitbucket.com/repository/basit-trufflesec/repo1","FullyQualifiedName":"{8961ef70-000c-47ca-9348-5f9ecee875d6}","Type":"repository","Metadata":{"isPrivate":true,"owner":"basit-trufflesec","owner_id":"{521b49b6-7709-484a-8aa8-ecc3a6da08eb}","role":"admin"},"Parent":{"Name":"repo-analyzer","FullyQualifiedName":"bitbucket.com/project/{8a693e10-087f-41fc-ba67-2d1414ab1c86}","Type":"project","Metadata":null,"Parent":{"Name":"basit-trufflesec","FullyQualifiedName":"bitbucket.com/workspace/{521b49b6-7709-484a-8aa8-ecc3a6da08eb}","Type":"workspace","Metadata":null,"Parent":null}}}],"Metadata":null}`,
+			want:    string(expectedOutput),
 			wantErr: false,
 		},
 	}

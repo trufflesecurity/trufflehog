@@ -87,23 +87,23 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	for i, repo := range info.Repos {
 		result.UnboundedResources[i] = analyzers.Resource{
 			Type:               "repository",
-			Name:               "bitbucket.com/repository/" + repo.FullName,
-			FullyQualifiedName: repo.ID,
+			Name:               repo.FullName,
+			FullyQualifiedName: "bitbucket.com/repository/" + repo.ID,
 			Parent: &analyzers.Resource{
 				Type:               "project",
-				FullyQualifiedName: "bitbucket.com/project/" + repo.Project.ID,
 				Name:               repo.Project.Name,
+				FullyQualifiedName: "bitbucket.com/project/" + repo.Project.ID,
 				Parent: &analyzers.Resource{
 					Type:               "workspace",
-					FullyQualifiedName: "bitbucket.com/workspace/" + repo.Workspace.ID,
 					Name:               repo.Workspace.Name,
+					FullyQualifiedName: "bitbucket.com/workspace/" + repo.Workspace.ID,
 				},
 			},
 			Metadata: map[string]any{
-				"owner_id":  repo.Owner.ID,
-				"owner":     repo.Owner.Username,
-				"isPrivate": repo.IsPrivate,
-				"role":      repo.Role,
+				"owner_id":   repo.Owner.ID,
+				"owner":      repo.Owner.Username,
+				"is_private": repo.IsPrivate,
+				"role":       repo.Role,
 			},
 		}
 	}
