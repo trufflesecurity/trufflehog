@@ -1424,10 +1424,3 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		Verify: s.verify}
 	return handlers.HandleFile(ctx, readCloser, &chunkSkel, reporter)
 }
-
-// stripLeadingPlusMinus removes leading + and - characters from lines in a diff string. These characters exist in the
-// diffs returned when performing a targeted scan and need to be removed so that detectors are operating on the correct
-// text.
-func stripLeadingPlusMinus(diff string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(diff, "\n+", "\n"), "\n-", "\n")
-}
