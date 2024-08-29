@@ -1,10 +1,7 @@
 package engine
 
 import (
-	"strings"
-
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -61,24 +58,6 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 		return err
 	}
 	githubSource.WithScanOptions(scanOptions)
-
-	if c.Target != "" {
-		parts := strings.Split(c.Target, "@")
-		target := sources.ChunkingTarget{
-			QueryCriteria: &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Github{
-					Github: &source_metadatapb.Github{
-						Link:   c.Repos[0],
-						File:   parts[0],
-						Commit: parts[1],
-					},
-				},
-			},
-		}
-		_, err = e.sourceManager.Run(ctx, sourceName, githubSource, target)
-		return err
-	}
-
 	_, err = e.sourceManager.Run(ctx, sourceName, githubSource)
 	return err
 }
