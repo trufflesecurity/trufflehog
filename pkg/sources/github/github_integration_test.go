@@ -774,7 +774,7 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 					},
 				},
 			},
-			wantChunks: 1,
+			wantChunks: 607,
 		},
 		{
 			name: "no file in commit",
