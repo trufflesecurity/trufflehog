@@ -236,6 +236,8 @@ type GithubConfig struct {
 	SkipBinaries bool
 	// IncludeWikis indicates whether to include repository wikis in the scan.
 	IncludeWikis bool
+
+	Target string
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.
