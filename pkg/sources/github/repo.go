@@ -281,14 +281,6 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 	return wikiURL == res.Request.URL.String()
 }
 
-// commitQuery represents the details required to fetch a commit.
-type commitQuery struct {
-	repo     string
-	owner    string
-	sha      string
-	filename string
-}
-
 func (s *Source) normalizeRepo(repo string) (string, error) {
 	// If there's a '/', assume it's a URL and try to normalize it.
 	if strings.ContainsRune(repo, '/') {
