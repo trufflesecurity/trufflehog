@@ -759,6 +759,24 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			wantChunks: 1,
 		},
 		{
+			name: "targeted scan, binary file",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/truffle-sandbox/test-secrets.git",
+							Link:       "https://github.com/truffle-sandbox/test-secrets/blob/70bef8590f87257c0992eecc7db529827a12b801/null_text_w_ptp.ipynb",
+							Commit:     "70bef8590f87257c0992eecc7db529827a12b801",
+							File:       "null_text_w_ptp.ipynb",
+						},
+					},
+				},
+			},
+			wantChunks: 607,
+		},
+		{
 			name: "no file in commit",
 			init: init{
 				name:       "test source",
