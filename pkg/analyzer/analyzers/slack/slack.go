@@ -50,7 +50,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	resourceType := "user"
-	fullyQualifiedName := info.User.UserId
+	fullyQualifiedName := info.User.TeamId + "/" + info.User.UserId
 	if info.User.BotId != "" {
 		resourceType = "bot"
 		fullyQualifiedName = info.User.BotId
@@ -85,6 +85,11 @@ func extractPermissions(info *SecretInfo) []analyzers.Permission {
 		}
 
 		for _, perm := range perms {
+			if _, ok := StringToPermission[perm]; !ok {
+				// not in out generated permissions,
+				continue
+			}
+
 			permissions = append(permissions, analyzers.Permission{
 				Value:  perm,
 				Parent: nil,
