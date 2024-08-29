@@ -10,7 +10,6 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v63/github"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -292,13 +291,7 @@ type commitQuery struct {
 
 // getDiffForFileInCommit retrieves the diff for a specified file in a commit.
 // If the file or its diff is not found, it returns an error.
-func (s *Source) getDiffForFileInCommit(
-	ctx context.Context,
-	query commitQuery,
-	reporter sources.ChunkReporter,
-	secretID int64,
-	meta *source_metadatapb.MetaData_Github,
-) (string, error) {
+func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
 	var (
 		commit *github.RepositoryCommit
 		err    error
@@ -339,18 +332,7 @@ func (s *Source) getDiffForFileInCommit(
 		return "", fmt.Errorf("commit %s does not contain patch for file %s", query.sha, query.filename)
 	}
 
-	return "", reporter.ChunkOk(ctx, sources.Chunk{
-		SourceType: s.Type(),
-		SourceName: s.name,
-		SourceID:   s.SourceID(),
-		JobID:      s.JobID(),
-		SecretID:   secretID,
-		Data:       []byte(stripLeadingPlusMinus(res.String())),
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: meta,
-		},
-		Verify: s.verify,
-	})
+	return res.String(), nil
 }
 
 func (s *Source) normalizeRepo(repo string) (string, error) {
