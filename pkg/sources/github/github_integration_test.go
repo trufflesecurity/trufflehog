@@ -759,6 +759,24 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			wantChunks: 1,
 		},
 		{
+			name: "targeted scan, binary file",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/google/prompt-to-prompt.git",
+							Link:       "https://github.com/google/prompt-to-prompt/blob/160965d6d4a54ce93eac183371625fe2f8446c10/null_text_w_ptp.ipynb",
+							Commit:     "160965d6d4a54ce93eac183371625fe2f8446c10",
+							File:       "null_text_w_ptp.ipynb",
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+		{
 			name: "no file in commit",
 			init: init{
 				name:       "test source",
