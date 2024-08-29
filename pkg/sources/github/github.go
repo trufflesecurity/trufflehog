@@ -1398,24 +1398,13 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		sha:      meta.GetCommit(),
 		filename: meta.GetFile(),
 	}
-	res, err := s.getDiffForFileInCommit(ctx, qry)
-	if err != nil {
-		return err
-	}
-	chunk := &sources.Chunk{
-		SourceType: s.Type(),
-		SourceName: s.name,
-		SourceID:   s.SourceID(),
-		JobID:      s.JobID(),
-		SecretID:   target.SecretID,
-		Data:       []byte(stripLeadingPlusMinus(res)),
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Github{Github: meta},
-		},
-		Verify: s.verify,
-	}
-
-	return common.CancellableWrite(ctx, chunksChan, chunk)
+	_, err = s.getDiffForFileInCommit(
+		ctx,
+		qry,
+		sources.ChanReporter{Ch: chunksChan},
+		target.SecretID,
+		&source_metadatapb.MetaData_Github{Github: meta})
+	return err
 }
 
 // stripLeadingPlusMinus removes leading + and - characters from lines in a diff string. These characters exist in the
