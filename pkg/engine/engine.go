@@ -457,6 +457,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 		// This reflects the anticipated lower volume of data that needs re-verification.
 		// The buffer size is a trade-off between memory usage and the need to prevent blocking.
 		verificationOverlapChunksChanMultiplier = 25
+		resultsChanMultiplier                   = detectableChunksChanMultiplier
 	)
 
 	// Channels are used for communication between different parts of the engine,
@@ -467,7 +468,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 	e.verificationOverlapChunksChan = make(
 		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
 	)
-	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
+	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer*resultsChanMultiplier)
 	e.dedupeCache = cache
 	ctx.Logger().V(4).Info("engine initialized")
 
@@ -651,7 +652,7 @@ func (e *Engine) startVerificationOverlapWorkers(ctx context.Context) {
 }
 
 func (e *Engine) startNotifierWorkers(ctx context.Context) {
-	const notifierWorkerRatio = 4
+	const notifierWorkerRatio = 2
 	maxNotifierWorkers := 1
 	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
 		maxNotifierWorkers = numWorkers
