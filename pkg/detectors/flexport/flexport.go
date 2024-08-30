@@ -23,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"flexport"}) + `\b(shltm_[0-9a-zA-Z-_]{40})\b`)
+	keyPat = regexp.MustCompile(`\b(shltm_[0-9a-zA-Z-_]{40})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
