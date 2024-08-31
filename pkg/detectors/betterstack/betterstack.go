@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_BetterStack,
 			Raw:          []byte(resMatch),
+			Description:  "Betterstack is a monitoring service for uptime and performance of websites and APIs. Betterstack API keys can be used to access and manage these monitoring services.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Imagga,
 			Raw:          []byte(resMatch),
+			Description:  "Imagga is a cloud-based image recognition and categorization service. Imagga API keys can be used to access and utilize these image processing services.",
 		}
 
 		if verify {

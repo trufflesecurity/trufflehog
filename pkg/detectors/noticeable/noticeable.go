@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Noticeable,
 			Raw:          []byte(resMatch),
+			Description:  "Noticeable is a service used for creating and managing changelogs and release notes. Noticeable API keys can be used to access and modify this data.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Everhour,
 			Raw:          []byte(resMatch),
+			Description:  "Everhour is a time tracking software for teams. Everhour API keys can be used to access and manage project and time tracking data.",
 		}
 
 		if verify {

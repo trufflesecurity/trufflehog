@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Twitch,
 				Raw:          []byte(resMatch),
+				Description:  "Twitch is a live streaming service. Twitch API keys can be used to access and modify data on the Twitch platform.",
 			}
 
 			if verify {

@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Repairshopr,
 				Raw:          []byte(resMatch),
+				Description:  "RepairShopr is a CRM and ticketing system designed for repair shops. The API keys allow access to various functionalities such as managing appointments, customers, and invoices.",
 			}
 
 			if verify {

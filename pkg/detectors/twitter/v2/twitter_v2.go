@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Twitter,
 			Raw:          []byte(match),
+			Description:  "Twitter API keys can be used to access and interact with Twitter's platform programmatically.",
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},

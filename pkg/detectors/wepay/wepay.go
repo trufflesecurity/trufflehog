@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WePay,
 			Raw:          []byte(resMatch),
+			Description:  "WePay is an online payment service provider. WePay API keys can be used to process payments and access account information.",
 		}
 
 		if verify {

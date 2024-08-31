@@ -30,7 +30,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Scrapeowl secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Scrapeowl,
 			Raw:          []byte(resMatch),
+			Description:  "ScrapeOwl is a web scraping service that allows users to extract data from websites. ScrapeOwl API keys can be used to automate data extraction tasks.",
 		}
 
 		if verify {

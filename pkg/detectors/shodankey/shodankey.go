@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ShodanKey,
 			Raw:          []byte(resMatch),
+			Description:  "Shodan is a search engine for Internet-connected devices. Shodan API keys can be used to query the Shodan database for information on these devices.",
 		}
 
 		if verify {

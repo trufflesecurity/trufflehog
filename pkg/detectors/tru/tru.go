@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Tru,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecret),
+				Description:  "Tru is a service that provides APIs for phone number verification and other identity verification services. Tru credentials can be used to access these APIs and perform verification operations."
 			}
 
 			if verify {

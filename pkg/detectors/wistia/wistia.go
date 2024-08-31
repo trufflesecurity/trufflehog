@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Wistia,
 			Raw:          []byte(resMatch),
+			Description:  "Wistia is a video hosting platform designed for businesses. Wistia API keys can be used to access and manage video content and account settings.",
 		}
 
 		if verify {

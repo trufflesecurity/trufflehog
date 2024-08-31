@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_PortainerToken,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resEndpointMatch),
+				Description:  "Portainer is a management UI for Docker environments. Portainer tokens can be used to authenticate and interact with the Portainer API.",
 			}
 
 			if verify {

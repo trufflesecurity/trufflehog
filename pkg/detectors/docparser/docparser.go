@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Docparser,
 			Raw:          []byte(resMatch),
+			Description:  "Docparser is a document processing service that extracts data from PDFs and scanned documents. Docparser API keys can be used to access and manipulate this data.",
 		}
 
 		if verify {

@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_SquareApp,
 				Raw:          []byte(match),
 				Redacted:     match,
+				Description:  "Square is a financial services and mobile payment company. Square credentials can be used to access and manage payment processing and other financial services.",
 			}
 
 			if verify {

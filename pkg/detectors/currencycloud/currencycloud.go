@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_CurrencyCloud,
 				Raw:          []byte(resMatch),
+				Description:  "Currencycloud provides a global payments platform that allows businesses to make payments and manage currency risk. Currencycloud API keys can be used to access and manage these financial services.",
 			}
 			environments := []string{"devapi", "api"}
 			if verify {

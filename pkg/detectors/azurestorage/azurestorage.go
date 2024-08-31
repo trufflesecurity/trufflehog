@@ -65,6 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AzureStorage,
 			Raw:          []byte(accountKey),
+			Description:  "Azure Storage is a Microsoft-managed cloud service that provides storage that is highly available, secure, durable, scalable, and redundant. Azure Storage Account keys can be used to access and manage data within storage accounts.",
 			ExtraData: map[string]string{
 				"account_name": accountName,
 			},

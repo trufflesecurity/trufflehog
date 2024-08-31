@@ -62,6 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_BraintreePayments,
 				Raw:          []byte(resMatch),
+				Description:  "Braintree is a full-stack payment platform that makes it easy to accept payments in your mobile app or website. Braintree API keys can be used to access and manage payment transactions, customer data, and other payment-related operations.",
 			}
 
 			if verify {
@@ -119,7 +120,7 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 	}
 
 	validResponse := `"data":{`
-	if strings.Contains(bodyString, validResponse) {
+	if strings.contains(bodyString, validResponse) {
 		return true, nil
 	}
 

@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Pagarme,
 			Raw:          []byte(match),
+			Description:  "Pagarme is a payment service provider. Pagarme API keys can be used to access and manage payment transactions and other related services.",
 		}
 
 		if verify {

@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Alegra,
 				Raw:          []byte(tokenPatMatch),
 				RawV2:        []byte(tokenPatMatch + userPatMatch),
+				Description:  "Alegra is a cloud-based accounting software. Alegra API keys can be used to access and modify accounting data and user information.",
 			}
 
 			if verify {

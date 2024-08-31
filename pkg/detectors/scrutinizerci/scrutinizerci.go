@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ScrutinizerCi,
 			Raw:          []byte(resMatch),
+			Description:  "Scrutinizer CI is a continuous integration service. The access token allows access to user repositories data.",
 		}
 
 		if verify {

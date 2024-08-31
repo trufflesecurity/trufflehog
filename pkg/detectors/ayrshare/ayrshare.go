@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Ayrshare,
 			Raw:          []byte(resMatch),
+			Description:  "Ayrshare provides social media management services. Ayrshare API keys can be used to manage social media accounts and posts.",
 		}
 
 		if verify {

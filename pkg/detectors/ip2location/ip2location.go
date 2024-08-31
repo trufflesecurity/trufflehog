@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Ip2location,
 			Raw:          []byte(resMatch),
+			Description:  "Ip2location is a service that provides IP geolocation data. Ip2location keys can be used to access this geolocation data.",
 		}
 
 		if verify {

@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SmartyStreets,
 				Raw:          []byte(resMatch),
+				Description:  "SmartyStreets provides address validation services. The detected API keys can be used to access and validate addresses.",
 			}
 
 			if verify {

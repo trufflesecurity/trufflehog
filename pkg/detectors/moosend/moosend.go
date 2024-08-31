@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Moosend,
 			Raw:          []byte(resMatch),
+			Description:  "Moosend is an email marketing service provider. Moosend API keys can be used to access and manage email marketing campaigns, subscriber lists, and other related data.",
 		}
 
 		if verify {

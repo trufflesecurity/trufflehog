@@ -42,6 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Numverify,
 			Raw:          []byte(resMatch),
+			Description:  "Numverify is a service used to validate phone numbers and gather information about them. Numverify API keys can be used to access this service and validate phone numbers.",
 		}
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://apilayer.net/api/validate?access_key=%s&number=14158586273", resMatch), nil)

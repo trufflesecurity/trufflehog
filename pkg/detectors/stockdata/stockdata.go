@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Stockdata,
 			Raw:          []byte(resMatch),
+			Description:  "Stockdata is a service providing stock market data. Stockdata API keys can be used to access and retrieve stock market information.",
 		}
 
 		if verify {

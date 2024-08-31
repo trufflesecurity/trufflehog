@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LocationIQ,
 			Raw:          []byte(resMatch),
+			Description:  "LocationIQ provides location-based services such as geocoding and reverse geocoding. LocationIQ API keys can be used to access these services and retrieve location data.",
 		}
 
 		if verify {

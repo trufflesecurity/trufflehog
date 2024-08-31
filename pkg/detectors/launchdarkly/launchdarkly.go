@@ -66,6 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_LaunchDarkly,
 			Raw:          []byte(resMatch),
 			ExtraData:    make(map[string]string),
+			Description:  "LaunchDarkly is a feature management platform that allows teams to control the visibility of features to users. LaunchDarkly API keys can be used to access and modify feature flags and other resources within a LaunchDarkly account.",
 		}
 
 		if verify {

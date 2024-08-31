@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Enigma,
 			Raw:          []byte(resMatch),
+			Description:  "Enigma is a data intelligence company that provides comprehensive data about businesses. Enigma API keys can be used to access and interact with this data.",
 		}
 
 		if verify {

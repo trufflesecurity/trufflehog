@@ -51,6 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Opsgenie,
 			Raw:          []byte(resMatch),
+			Description:  "Opsgenie is an alerting and incident management platform. Opsgenie API keys can be used to interact with the Opsgenie API to manage alerts and incidents.",
 		}
 
 		if strings.Contains(match[0], "opsgenie.com/alert/detail/") {

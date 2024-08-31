@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_IpStack,
 			Raw:          []byte(resMatch),
+			Description:  "IpStack provides a REST API for IP geolocation services. IpStack API keys can be used to access geolocation data for IP addresses.",
 		}
 
 		if verify {

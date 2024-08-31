@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
 			Raw:          []byte(token),
+			Description:  "Snyk is a developer security platform that helps developers find and fix vulnerabilities in their code. Snyk API keys can be used to access and manage Snyk services.",
 		}
 
 		if verify {

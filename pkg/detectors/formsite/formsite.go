@@ -35,7 +35,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Formsite secrets in a given set of bytes..
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Formsite,
 					Raw:          []byte(resMatch),
+					Description:  "Formsite is an online form builder service. Formsite API keys can be used to access and manage forms and data submissions.",
 				}
 
 				if verify {

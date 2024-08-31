@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Apilayer,
 			Raw:          []byte(resMatch),
+			Description:  "Apilayer is a service providing various APIs for data verification and other utilities. Apilayer API keys can be used to access these services and perform operations such as number verification.",
 		}
 
 		if verify {

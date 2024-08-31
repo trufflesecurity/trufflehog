@@ -47,7 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		keyMatches[match[1]] = struct{}{}
 	}
 	secretMatches := make(map[string]struct{})
-	for _, match := range secretPat.FindAllStringSubmatch(dataStr, -1) {
+	for _, match := secretPat.FindAllStringSubmatch(dataStr, -1) {
 		secretMatches[match[1]] = struct{}{}
 	}
 
@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_TwitterConsumerkey,
 				Raw:          []byte(key),
 				RawV2:        []byte(key + secret),
+				Description:  "Twitter Consumer Keys and Secrets are used to authenticate API requests to Twitter. They allow access to Twitter's API to manage user data and perform actions on behalf of users.",
 			}
 
 			if verify {

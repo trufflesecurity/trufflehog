@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Groovehq,
 			Raw:          []byte(resMatch),
+			Description:  "GrooveHQ is a simple help desk software. GrooveHQ API keys can be used to access and manage support tickets and customer interactions.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Documo,
 			Raw:          []byte(resMatch),
+			Description:  "A service for creating and modifying documents. API keys can create read update and delete documents",
 		}
 
 		if verify {

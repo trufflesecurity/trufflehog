@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Skrappio,
 			Raw:          []byte(resMatch),
+			Description:  "Skrapio is a service used for email verification and enrichment. Skrapio API keys can be used to access and utilize its services for verifying and enriching email addresses.",
 		}
 
 		if verify {

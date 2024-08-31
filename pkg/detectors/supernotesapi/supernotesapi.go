@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SuperNotesAPI,
 			Raw:          []byte(resMatch),
+			Description:  "SuperNotes is a note-taking application. SuperNotes API keys can be used to access and manage user notes and other data within the application.",
 		}
 
 		if verify {

@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Sigopt,
 			Raw:          []byte(resMatch),
+			Description:  "Sigopt is a platform for optimizing machine learning models. Sigopt API keys can be used to access and manage experiments on the Sigopt platform.",
 		}
 
 		if verify {

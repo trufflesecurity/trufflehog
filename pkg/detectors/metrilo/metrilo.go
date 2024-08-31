@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Metrilo,
 			Raw:          []byte(resMatch),
+			Description:  "Metrilo is an analytics and CRM platform for e-commerce. Metrilo API keys can be used to access and manage e-commerce data.",
 		}
 
 		if verify {

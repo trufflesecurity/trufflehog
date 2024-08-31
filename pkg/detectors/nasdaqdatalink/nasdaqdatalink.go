@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_NasdaqDataLink,
 			Raw:          []byte(resMatch),
+			Description:  "Nasdaq Data Link provides financial, economic and alternative datasets. The API key can be used to access and retrieve this data.",
 		}
 
 		if verify {

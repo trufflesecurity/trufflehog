@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Enablex,
 				Raw:          []byte(tokenPatMatch),
+				Description:  "Enablex is a communication platform offering voice, video, and messaging APIs. Enablex credentials can be used to access and manage communication services provided by Enablex.",
 			}
 
 			if verify {

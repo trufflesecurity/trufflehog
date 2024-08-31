@@ -58,6 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(clientSecret[2]),
 					RawV2:        []byte(clientID[2] + clientSecret[2] + tenantID[2]),
 					Redacted:     clientID[2],
+					Description:  "Azure is a cloud service offering a wide range of services including compute, analytics, storage, and networking. Azure credentials can be used to access and manage these services.",
 				}
 				// Set the RotationGuideURL in the ExtraData
 				s.ExtraData = map[string]string{

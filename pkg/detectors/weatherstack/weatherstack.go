@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WeatherStack,
 			Raw:          []byte(resMatch),
+			Description:  "Weatherstack is a weather service that provides real-time weather information. Weatherstack API keys can be used to access weather data from their API.",
 		}
 
 		if verify {

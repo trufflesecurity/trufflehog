@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Thinkific,
 				Raw:          []byte(resMatch),
+				Description:  "Thinkific is an online course platform that allows users to create, market, and sell online courses. Thinkific API keys can be used to access and manage course data and user information.",
 			}
 
 			if verify {

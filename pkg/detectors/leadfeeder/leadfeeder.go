@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Leadfeeder,
 			Raw:          []byte(resMatch),
+			Description:  "Leadfeeder is a tool that shows you the companies visiting your website, how they found you, and what they’re interested in. Leadfeeder API keys can be used to access and manage this data.",
 		}
 
 		if verify {

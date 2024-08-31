@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Hive,
 				Raw:          []byte(idMatch),
+				Description:  "Hive is a project management and collaboration tool. Hive API keys can be used to access and manage projects, tasks, and other data within a Hive workspace.",
 			}
 
 			if verify {

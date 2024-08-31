@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Geocodio,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSearchMatch),
+				Description:  "Geocodio is a service that provides geocoding and reverse geocoding. Geocodio API keys can be used to convert addresses into geographic coordinates and vice versa.",
 			}
 
 			if verify {

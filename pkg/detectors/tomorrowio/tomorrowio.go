@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TomorrowIO,
 			Raw:          []byte(resMatch),
+			Description:  "TomorrowIO is a weather intelligence platform providing weather data and insights. TomorrowIO API keys can be used to access and retrieve weather information.",
 		}
 
 		if verify {

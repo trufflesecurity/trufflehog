@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ChecklyHQ,
 			Raw:          []byte(resMatch),
+			Description:  "ChecklyHQ is a monitoring service for API and browser checks. ChecklyHQ API keys can be used to access and manage these checks.",
 		}
 
 		if verify {

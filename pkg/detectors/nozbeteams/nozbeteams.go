@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_NozbeTeams,
 			Raw:          []byte(resMatch),
+			Description:  "NozbeTeams is a collaborative task and project management tool. NozbeTeams API keys can be used to access and manage tasks and projects within a NozbeTeams account.",
 		}
 
 		if verify {

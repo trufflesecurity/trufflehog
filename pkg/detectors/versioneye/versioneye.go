@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_VersionEye,
 			Raw:          []byte(resMatch),
+			Description:  "VersionEye is a service that monitors your project dependencies and alerts you of any vulnerabilities. VersionEye API keys can be used to access and manage your project data.",
 		}
 
 		if verify {

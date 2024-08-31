@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_EcoStruxureIT,
 			Raw:          []byte(resMatch),
+			Description:  "EcoStruxure IT is a cloud-based platform that provides IT infrastructure management. EcoStruxure IT API keys can be used to access and manage IT infrastructure data and operations.",
 		}
 
 		if verify {

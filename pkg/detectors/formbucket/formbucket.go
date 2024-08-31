@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FormBucket,
 			Raw:          []byte(resMatch),
+			Description:  "FormBucket is a service used to collect and manage form submissions. The detected credential can be used to access and modify form data.",
 		}
 
 		if verify {

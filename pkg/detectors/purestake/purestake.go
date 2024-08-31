@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PureStake,
 			Raw:          []byte(resMatch),
+			Description:  "PureStake is a blockchain infrastructure provider. PureStake API keys can be used to interact with the Algorand blockchain network.",
 		}
 
 		if verify {

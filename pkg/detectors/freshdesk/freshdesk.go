@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Freshdesk,
 				Raw:          []byte(resMatch),
+				Description:  "Freshdesk is a customer support software. Freshdesk API keys can be used to access and manage support tickets, contacts, and other customer support data.",
 			}
 
 			if verify {

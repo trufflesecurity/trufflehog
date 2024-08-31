@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Lemlist,
 			Raw:          []byte(resMatch),
+			Description:  "Lemlist is an email outreach platform used for sending personalized emails. Lemlist API keys can be used to access and manage email campaigns and contacts.",
 		}
 
 		if verify {

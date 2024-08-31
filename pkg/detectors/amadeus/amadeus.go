@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Amadeus,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecret),
+				Description:  "Amadeus provides travel technology solutions. Amadeus API keys can be used to access and modify travel-related data and services.",
 			}
 
 			if verify {

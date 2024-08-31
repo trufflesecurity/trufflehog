@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(key),
 				RawV2:        []byte(key + secret),
 				Redacted:     key,
+				Description:  "RazorPay is a payment gateway service that allows businesses to accept, process, and disburse payments. RazorPay keys can be used to access and manage payment transactions.",
 			}
 
 			if verify {

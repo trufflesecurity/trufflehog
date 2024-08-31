@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TravelPayouts,
 			Raw:          []byte(resMatch),
+			Description:  "TravelPayouts is a travel affiliate network that provides access to various travel-related APIs. TravelPayouts keys can be used to interact with these APIs to retrieve travel data and earn commissions on bookings.",
 		}
 
 		if verify {

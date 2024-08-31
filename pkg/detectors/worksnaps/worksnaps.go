@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Worksnaps,
 			Raw:          []byte(resMatch),
+			Description:  "Worksnaps is a time tracking service that helps manage and monitor remote work. Worksnaps API keys can be used to access and manage project data and time tracking information.",
 		}
 
 		if verify {

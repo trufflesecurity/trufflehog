@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PandaScore,
 			Raw:          []byte(resMatch),
+			Description:  "PandaScore is an esports data provider offering a wide range of statistics and live data for various video games. PandaScore API keys can be used to access and retrieve this data.",
 		}
 
 		if verify {

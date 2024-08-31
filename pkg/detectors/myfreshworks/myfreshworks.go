@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Myfreshworks,
 				Raw:          []byte(resMatch),
+				Description:  "Freshworks is a customer engagement platform offering various services like CRM, IT service management, and more. Freshworks API keys can be used to access and manage these services.",
 			}
 
 			if verify {
@@ -100,7 +101,7 @@ func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resI
 		}
 
 		return json.Valid(body), nil
-	} else if !(res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden) {
+	} else if (!(res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden)) {
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 

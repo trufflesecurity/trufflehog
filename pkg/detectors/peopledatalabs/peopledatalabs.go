@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PeopleDataLabs,
 			Raw:          []byte(resMatch),
+			Description:  "PeopleDataLabs provides access to person and company data through their API. The API keys can be used to enrich profiles with additional data.",
 		}
 
 		if verify {

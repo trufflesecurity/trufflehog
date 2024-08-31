@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MailJetBasicAuth,
 			Raw:          []byte(resMatch),
+			Description:  "Mailjet is an email delivery service that allows you to send transactional and marketing emails. Mailjet Basic Auth credentials can be used to authenticate and send emails through the Mailjet API.",
 		}
 
 		if verify {

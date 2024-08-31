@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Sherpadesk,
 			Raw:          []byte(resMatch),
+			Description:  "Sherpadesk is a helpdesk and service desk software. Sherpadesk keys can be used to access and manage support tickets and other related data.",
 		}
 
 		if verify {

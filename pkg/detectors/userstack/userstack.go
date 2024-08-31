@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_UserStack,
 			Raw:          []byte(resMatch),
+			Description:  "UserStack is a service that provides detailed information about the technology stack used by a website. UserStack API keys can be used to access this information.",
 		}
 
 		if verify {

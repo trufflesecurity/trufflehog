@@ -68,6 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Agora,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecret),
+				Description:  "Agora is a real-time engagement platform providing APIs for voice, video, and messaging. Agora API keys can be used to access and manage these services.",
 			}
 
 			if verify {

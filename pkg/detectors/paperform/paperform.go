@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Paperform,
 			Raw:          []byte(resMatch),
+			Description:  "An API for building and creating forms. API keys could be used to read proprietary or not public form data",
 		}
 
 		if verify {

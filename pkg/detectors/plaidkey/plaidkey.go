@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PlaidKey,
 				Raw:          []byte(resMatch),
+				Description:  "Plaid is a financial services company that provides a way to connect applications to users' bank accounts. Plaid API keys can be used to access and manage financial data.",
 			}
 			environments := []string{"development", "production"}
 			if verify {

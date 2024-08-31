@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CalendlyApiKey,
 			Raw:          []byte(resMatch),
+			Description:  "Calendly is an online scheduling tool that allows users to schedule meetings and appointments. Calendly API keys can be used to access and manage Calendly accounts and data.",
 		}
 
 		if verify {

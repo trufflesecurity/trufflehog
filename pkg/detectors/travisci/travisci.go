@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TravisCI,
 			Raw:          []byte(resMatch),
+			Description:  "Travis CI is a continuous integration service used to build and test software projects hosted on GitHub and Bitbucket. Travis CI tokens can be used to interact with the Travis CI API.",
 		}
 
 		if verify {

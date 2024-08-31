@@ -34,7 +34,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Html2Pdf secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -48,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Html2Pdf,
 			Raw:          []byte(resMatch),
+			Description:  "Html2Pdf is a service that converts HTML content into PDF documents. API keys for Html2Pdf can be used to authenticate and authorize access to this service.",
 		}
 
 		if verify {

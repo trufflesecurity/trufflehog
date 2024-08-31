@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Duply,
 				Raw:          []byte(resMatch),
+				Description:  "An API for generating images. API keys can fetch and create images",
 			}
 
 			if verify {

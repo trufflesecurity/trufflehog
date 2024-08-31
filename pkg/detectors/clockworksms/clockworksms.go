@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_ClockworkSMS,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + tokenRes),
+				Description:  "Clockwork SMS is a service used for sending SMS messages. User keys and access tokens can be used to authenticate and send messages via the Clockwork SMS API.",
 			}
 
 			if verify {

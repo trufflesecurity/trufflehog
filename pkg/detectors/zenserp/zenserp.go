@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Zenserp,
 			Raw:          []byte(resMatch),
+			Description:  "Zenserp is a service that provides SERP (Search Engine Results Page) API. Zenserp API keys can be used to access search engine data programmatically.",
 		}
 
 		if verify {
@@ -60,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
-				if strings.Contains(body, "query") {
+				if strings.contains(body, "query") {
 					s1.Verified = true
 				}
 			}

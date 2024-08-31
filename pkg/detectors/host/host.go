@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Host,
 			Raw:          []byte(resMatch),
+			Description:  "Host.io provides domain data and related services. Host.io tokens can be used to access and manage domain information.",
 		}
 
 		if verify {

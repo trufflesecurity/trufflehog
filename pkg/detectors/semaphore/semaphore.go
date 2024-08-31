@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Semaphore,
 			Raw:          []byte(resMatch),
+			Description:  "Semaphore is a hosted continuous integration and deployment service used to automate software development workflows. Semaphore API keys can be used to access and manage CI/CD pipelines.",
 		}
 
 		if verify {
@@ -66,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
-				if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, "account_id") {
+				if res.StatusCode >= 200 && res.StatusCode < 300 && strings.contains(body, "account_id") {
 					s1.Verified = true
 				}
 			}

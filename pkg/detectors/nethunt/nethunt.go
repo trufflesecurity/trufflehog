@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Nethunt,
 				Raw:          []byte(tokenPatMatch),
+				Description:  "Nethunt is a CRM tool. Credentials found can be used to access and manage CRM data.",
 			}
 
 			if verify {

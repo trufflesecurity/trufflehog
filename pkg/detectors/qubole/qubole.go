@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Qubole,
 			Raw:          []byte(resMatch),
+			Description:  "Qubole is a cloud-based data platform that provides data processing, management, and analytics services. Qubole API keys can be used to access and manage data workflows and resources.",
 		}
 
 		if verify {

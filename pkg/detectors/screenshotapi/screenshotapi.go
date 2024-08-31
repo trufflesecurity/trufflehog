@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ScreenshotAPI,
 			Raw:          []byte(resMatch),
+			Description   "A service for taking screenshots of websites. Websites can include internal or sensitive websites, API keys can access the screenshots",
 		}
 
 		if verify {

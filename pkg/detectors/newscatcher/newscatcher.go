@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Newscatcher,
 			Raw:          []byte(resMatch),
+			Description:  "Newscatcher is an API service used to search and retrieve news articles from various sources. Newscatcher API keys can be used to access and query this service.",
 		}
 
 		if verify {

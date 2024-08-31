@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SimplyNoted,
 			Raw:          []byte(resMatch),
+			Description:  "SimplyNoted is a service used for sending personalized handwritten notes. SimplyNoted API keys can be used to access and send these notes programmatically.",
 		}
 
 		if verify {

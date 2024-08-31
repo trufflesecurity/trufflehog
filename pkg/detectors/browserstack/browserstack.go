@@ -70,6 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_BrowserStack,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resUserMatch),
+				Description:  "BrowserStack is a cloud web and mobile testing platform. BrowserStack credentials can be used to access and manage testing environments.",
 			}
 
 			if verify {

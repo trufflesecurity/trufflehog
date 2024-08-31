@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_FlowFlu,
 				Raw:          []byte(resMatch),
+				Description:  "FlowFlu is a service used for managing customer relationships and projects. FlowFlu API keys can be used to access and manipulate CRM data.",
 			}
 
 			if verify {

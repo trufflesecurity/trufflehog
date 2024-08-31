@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ZenkitAPI,
 			Raw:          []byte(resMatch),
+			Description:  "Zenkit is a collaborative SaaS platform for project management, database building, and more. Zenkit API keys can be used to access and interact with Zenkit's services programmatically.",
 		}
 
 		if verify {

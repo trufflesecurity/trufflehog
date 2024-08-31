@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TatumIO,
 			Raw:          []byte(resMatch),
+			Description:  "Tatum is a blockchain infrastructure platform. Tatum API keys can be used to access and interact with blockchain services provided by Tatum.",
 		}
 
 		if verify {

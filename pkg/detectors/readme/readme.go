@@ -42,6 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ReadMe,
 			Raw:          []byte(resMatch),
+			Description:  "ReadMe is a documentation platform that helps you build out your API and product documentation. ReadMe API keys can be used to access and modify your documentation data.",
 		}
 
 		if verify {

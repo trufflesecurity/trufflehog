@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WorldWeather,
 			Raw:          []byte(resMatch),
+			Description:  "Worldweather provides weather data services through its API. The keys can be used to access various weather data endpoints.",
 		}
 
 		if verify {

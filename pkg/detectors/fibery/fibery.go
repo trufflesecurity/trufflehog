@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Fibery,
 				Raw:          []byte(resMatch),
+				Description:  "Fibery is a work management platform that combines various tools for project management, knowledge management, and software development. Fibery API tokens can be used to access and modify data within a Fibery workspace.",
 			}
 
 			if verify {

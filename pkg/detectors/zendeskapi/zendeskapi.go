@@ -64,6 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZendeskApi,
 					Raw:          []byte(resMatch),
+					Description:  "Zendesk is a customer service platform. Zendesk API tokens can be used to access and modify customer service data.",
 				}
 
 				if verify {

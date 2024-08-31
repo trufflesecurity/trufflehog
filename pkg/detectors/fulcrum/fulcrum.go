@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Fulcrum,
 			Raw:          []byte(resMatch),
+			Description:  "Fulcrum is a data collection platform used to gather and analyze geospatial data. Fulcrum API tokens can be used to access and manage this data.",
 		}
 
 		if verify {

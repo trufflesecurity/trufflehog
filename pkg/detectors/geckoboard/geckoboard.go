@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Geckoboard,
 			Raw:          []byte(resMatch),
+			Description:  "Geckoboard is a data visualization tool that allows users to create real-time dashboards. Geckoboard API keys can be used to access and modify these dashboards.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s := detectors.Result{
 				DetectorType: detectorspb.DetectorType_RechargePayments,
 				Raw:          []byte(token),
+				Description:  "Recharge is a subscription payment solution. Recharge API keys can be used to access and manage subscription data and transactions.",
 			}
 			if verify {
 				client := common.SaneHttpClient()

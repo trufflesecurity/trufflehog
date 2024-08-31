@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Beebole,
 			Raw:          []byte(resMatch),
+			Description:  "Beebole is a time tracking and business management tool. Beebole API keys can be used to access and manage time tracking data and other business-related information.",
 		}
 
 		if verify {

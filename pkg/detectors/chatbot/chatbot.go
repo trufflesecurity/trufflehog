@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Chatbot,
 			Raw:          []byte(resMatch),
+			Description:  "Chatbot API keys are used to interact with the Chatbot service, allowing access to create, modify, and retrieve chatbot stories and other resources.",
 		}
 
 		if verify {

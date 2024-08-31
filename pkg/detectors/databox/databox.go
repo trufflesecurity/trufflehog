@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Databox,
 			Raw:          []byte(resMatch),
+			Description:  "Databox is a business analytics platform that pulls all your data into one place, so you can track performance and discover insights in real-time. Databox API keys can be used to access and modify data within your Databox account.",
 		}
 		if verify {
 			data := fmt.Sprintf("%s:", resMatch)

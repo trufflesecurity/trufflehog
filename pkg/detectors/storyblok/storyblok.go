@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Storyblok,
 			Raw:          []byte(resMatch),
+			Description:  "Storyblok is a headless CMS that allows developers to build flexible and powerful content management solutions. Storyblok tokens can be used to access and modify content within a Storyblok space.",
 		}
 
 		if verify {

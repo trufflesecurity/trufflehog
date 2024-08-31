@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_IPInfo,
 			Raw:          []byte(resMatch),
+			Description:  "IPInfo provides detailed information about IP addresses. IPInfo API keys can be used to access and retrieve this information.",
 		}
 
 		if verify {

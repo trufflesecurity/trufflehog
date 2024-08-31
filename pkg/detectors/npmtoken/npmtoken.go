@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_NpmToken,
 			Raw:          []byte(resMatch),
+			Description:  "NPM tokens are used to authenticate and publish packages to the npm registry.",
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/npm/",

@@ -58,6 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SauceLabs,
 				Raw:          []byte(idMatch),
+				Description:  "A service for cross browser testing, API keys can create and access tests from potentially sensitive internal websites",
 			}
 
 			if verify {

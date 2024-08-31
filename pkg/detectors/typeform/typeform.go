@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Typeform,
 			Raw:          []byte(resMatch),
+			Description:  "Typeform is a service for creating forms and surveys. Typeform API keys can be used to access and manage forms and responses.",
 		}
 
 		if verify {

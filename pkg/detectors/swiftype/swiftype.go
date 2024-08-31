@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Swiftype,
 			Raw:          []byte(resMatch),
+			Description:  "Swiftype is a search technology that provides powerful search solutions for websites and applications. Swiftype keys can be used to access and manipulate search data.",
 		}
 
 		if verify {

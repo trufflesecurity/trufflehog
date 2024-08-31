@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_BlockNative,
 			Raw:          []byte(resMatch),
+			Description:  "Blocknative is a platform that provides real-time blockchain transaction monitoring and notification services. Blocknative API keys can be used to access and interact with these services.",
 		}
 
 		if verify {

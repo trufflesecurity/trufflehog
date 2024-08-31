@@ -52,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
 				"version":        fmt.Sprintf("%d", s.Version()),
 			},
+			Description: "MaxMind provides IP intelligence through its GeoIP databases and services. MaxMind license keys are used to access these services and databases.",
 		}
 
 		if verify {
@@ -60,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			verified, vErr := s.verify(ctx, client, key)
+			verified, vErr = s.verify(ctx, client, key)
 			r.Verified = verified
 			r.SetVerificationError(vErr, key)
 		}

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SecurityTrails,
 			Raw:          []byte(resMatch),
+			Description:  "SecurityTrails provides comprehensive domain and IP intelligence data. SecurityTrails API keys can be used to access this data.",
 		}
 
 		if verify {

@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SurveyAnyplace,
 				Raw:          []byte(resMatch),
+				Description:  "SurveyAnyplace is a platform for creating surveys and quizzes. The detected credential can be used to access and manage surveys on this platform.",
 			}
 
 			if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Tiingo,
 			Raw:          []byte(resMatch),
+			Description:  "Tiingo is a financial data platform that provides access to various financial data and APIs. Tiingo API keys can be used to access and retrieve financial data.",
 		}
 
 		if verify {

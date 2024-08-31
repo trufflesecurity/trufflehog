@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Simvoly,
 			Raw:          []byte(resMatch),
+			Description:  "Simvoly is a platform for building websites and online stores. Simvoly API keys can be used to access and manage site data and functionalities.",
 		}
 
 		if verify {

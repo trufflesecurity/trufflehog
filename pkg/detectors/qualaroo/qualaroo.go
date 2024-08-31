@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Qualaroo,
 			Raw:          []byte(resMatch),
+			Description:  "Qualaroo is a customer survey tool that helps in collecting feedback from users. Qualaroo API keys can be used to access and manage survey data.",
 		}
 
 		if verify {

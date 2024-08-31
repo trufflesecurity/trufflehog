@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_RoninApp,
 				Raw:          []byte(resMatch),
+				Description:  "RoninApp is a platform for online invoicing and time tracking. RoninApp keys can be used to access and manage invoices and other resources.",
 			}
 
 			if verify {

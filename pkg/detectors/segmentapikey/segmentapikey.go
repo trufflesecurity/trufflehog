@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SegmentApiKey,
 			Raw:          []byte(resMatch),
+			Description:  "Segment is a customer data platform that helps you collect, clean, and control your customer data. Segment API keys can be used to access and manage this data.",
 		}
 
 		if verify {

@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_MattermostPersonalToken,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + serverRes),
+				Description:  "Mattermost is an open-source, self-hostable online chat service with file sharing, search, and integrations. Mattermost Personal Tokens can be used to authenticate API requests to a Mattermost server.",
 			}
 
 			if verify {

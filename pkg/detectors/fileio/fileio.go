@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FileIO,
 			Raw:          []byte(resMatch),
+			Description:  "FileIO is a service for temporary file sharing. The detected key can be used to access and manage shared files.",
 		}
 
 		if verify {

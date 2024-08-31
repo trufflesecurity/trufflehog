@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CapsuleCRM,
 			Raw:          []byte(resMatch),
+			Description:  "CapsuleCRM is a customer relationship management (CRM) platform. CapsuleCRM API keys can be used to access and manage customer data and interactions.",
 		}
 
 		if verify {

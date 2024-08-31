@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SurveyBot,
 			Raw:          []byte(resMatch),
+			Description:  "SurveyBot is a service used for conducting surveys. SurveyBot API keys can be used to access and manage surveys.",
 		}
 
 		if verify {

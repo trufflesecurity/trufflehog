@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Aylien,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
+				Description:  "Aylien is a text analysis platform that provides natural language processing and machine learning APIs. Aylien API keys can be used to access and analyze text data.",
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.aylien.com/news/stories", nil)

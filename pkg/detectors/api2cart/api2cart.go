@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Api2Cart,
 			Raw:          []byte(resMatch),
+			Description:  "Api2Cart is a unified shopping cart data interface that allows interaction with multiple shopping cart platforms. Api2Cart API keys can be used to access and manipulate shopping cart data.",
 		}
 
 		if verify {

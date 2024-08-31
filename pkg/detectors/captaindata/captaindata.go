@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CaptainData,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resProjIdMatch + resMatch),
+				Description:  "CaptainData is a service for automating data extraction and processing. The API keys can be used to access and control these automation processes.",
 			}
 
 			if verify {

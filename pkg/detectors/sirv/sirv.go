@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Sirv,
 				Raw:          []byte(resMatch),
+				Description:  "Sirv is a media management service used for image optimization and delivery. Sirv API keys can be used to access and manage media files.",
 			}
 
 			if verify {

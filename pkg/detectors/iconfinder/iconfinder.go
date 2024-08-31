@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_IconFinder,
 			Raw:          []byte(resMatch),
+			Description:  "IconFinder is a platform that provides a large collection of icons. IconFinder API keys can be used to access and retrieve icons from the platform.",
 		}
 
 		if verify {

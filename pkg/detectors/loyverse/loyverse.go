@@ -36,7 +36,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
+	for _, match := matches {
 		if len(match) != 2 {
 			continue
 		}
@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Loyverse,
 			Raw:          []byte(resMatch),
+			Description:  "Loyverse is a point of sale (POS) system that allows businesses to manage sales, inventory, and customer relationships. Loyverse API keys can be used to access and modify this data.",
 		}
 
 		if verify {

@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TechnicalAnalysisApi,
 			Raw:          []byte(resMatch),
+			Description:  "TechnicalAnalysisApi is a service used for technical analysis of financial markets. The API key can be used to access and retrieve market analysis data.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Oanda,
 			Raw:          []byte(resMatch),
+			Description:  "Oanda is a forex trading platform. Oanda API keys can be used to access and manage trading accounts, execute trades, and retrieve market data.",
 		}
 
 		if verify {

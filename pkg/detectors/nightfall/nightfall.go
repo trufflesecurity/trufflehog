@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Nightfall,
 			Raw:          []byte(resMatch),
+			Description:  "Nightfall is a data security platform providing sensitive data detection and protection. The detected key can be used to interact with Nightfall's API.",
 		}
 
 		if verify {

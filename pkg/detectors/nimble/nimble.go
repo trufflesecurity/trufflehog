@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Nimble,
 			Raw:          []byte(resMatch),
+			Description:  "Nimble is a customer relationship management (CRM) tool designed to help businesses manage their customer interactions and data. Nimble API keys can be used to access and modify customer records and other CRM functionalities.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Owlbot,
 			Raw:          []byte(resMatch),
+			Description:  "Owlbot is an API service providing dictionary definitions, synonyms, and example sentences. Owlbot API keys can be used to access and retrieve this data.",
 		}
 
 		if verify {

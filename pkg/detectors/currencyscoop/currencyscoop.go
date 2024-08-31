@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CurrencyScoop,
 			Raw:          []byte(resMatch),
+			Description:  "CurrencyScoop is a currency data service providing real-time and historical exchange rates. CurrencyScoop API keys can be used to access currency data.",
 		}
 
 		if verify {

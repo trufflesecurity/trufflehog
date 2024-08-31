@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Baremetrics,
 			Raw:          []byte(resMatch),
+			Description:  "Baremetrics is a subscription analytics and insights tool. Baremetrics API keys can be used to access and analyze subscription data.",
 		}
 
 		if verify {

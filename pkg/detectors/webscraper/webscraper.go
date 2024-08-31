@@ -31,7 +31,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify WebScraper secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WebScraper,
 			Raw:          []byte(resMatch),
+			Description:  "WebScraper is a web scraping service that allows you to extract data from websites. WebScraper API keys can be used to create, manage, and run sitemaps for web scraping tasks.",
 		}
 
 		if verify {

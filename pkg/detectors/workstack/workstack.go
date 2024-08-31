@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Workstack,
 			Raw:          []byte(resMatch),
+			Description:  "Workstack is a project management tool. Workstack API keys can be used to access and modify project data and manage tasks.",
 		}
 
 		if verify {

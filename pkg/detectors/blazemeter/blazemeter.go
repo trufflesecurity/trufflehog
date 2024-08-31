@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Blazemeter,
 			Raw:          []byte(resMatch),
+			Description:  "Blazemeter is a continuous testing platform for DevOps. The keys can be used to access and manage performance tests and other resources.",
 		}
 
 		if verify {

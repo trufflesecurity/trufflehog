@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Parsehub,
 			Raw:          []byte(resMatch),
+			Description:  "Parsehub is a web scraping service that allows users to extract data from websites. Parsehub API keys can be used to access and manage scraping projects.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AlienVault,
 			Raw:          []byte(resMatch),
+			Description:  "AlienVault is a threat intelligence platform providing real-time data on emerging threats. AlienVault API keys can be used to access threat data and other services.",
 		}
 
 		if verify {

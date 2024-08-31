@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Serphouse,
 			Raw:          []byte(resMatch),
+			Description:  "Serphouse is a service that provides search engine result page data. Serphouse API keys can be used to access this data and perform various operations on it.",
 		}
 
 		if verify {

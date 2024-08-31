@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_NuGetApiKey,
 			Raw:          []byte(resMatch),
+			Description:  "NuGet is a package manager for .NET. NuGet API keys can be used to publish and manage packages in the NuGet repository.",
 		}
 
 		if verify {

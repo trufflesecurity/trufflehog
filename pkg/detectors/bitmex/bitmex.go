@@ -61,6 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Bitmex,
 				Raw:          []byte(resSecretMatch),
 				RawV2:        []byte(resMatch + resSecretMatch),
+				Description:  "Bitmex is a cryptocurrency exchange and derivative trading platform. Bitmex API keys can be used to access and trade on the platform programmatically.",
 			}
 
 			if verify {

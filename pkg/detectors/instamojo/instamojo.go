@@ -59,6 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Instamojo,
 				Raw:          []byte(resClientId),
+				Description:  "An Ecomerce service, API keys can be used to create and access customer data",
 			}
 
 			if verify {

@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Autodesk,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecret),
+				Description:  "Autodesk provides software services for design and engineering. Autodesk API keys can be used to access and modify data within Autodesk services.",
 			}
 
 			if verify {

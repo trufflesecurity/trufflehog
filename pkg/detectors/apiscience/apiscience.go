@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ApiScience,
 			Raw:          []byte(resMatch),
+			Description:  "ApiScience is a tool for monitoring the performance of APIs. ApiScience keys can be used to access and manage API monitors.",
 		}
 
 		if verify {

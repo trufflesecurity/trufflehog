@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Verimail,
 			Raw:          []byte(resMatch),
+			Description:  "Verimail is an email verification service that helps ensure email addresses are valid and deliverable. Verimail keys can be used to access the Verimail API for verifying email addresses.",
 		}
 
 		if verify {

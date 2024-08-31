@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_OnepageCRM,
 				Raw:          []byte(tokenPatMatch),
+				Description:  "OnepageCRM is a simple CRM system designed for small businesses. The API keys can be used to access and manage contacts, deals, and other CRM data.",
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://app.onepagecrm.com/api/v3/contacts.json?per_page=20&page=1", nil)

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TinesWebhook,
 			Raw:          []byte(resMatch),
+			Description:  "Tines is an automation platform. Tines Webhook URLs can be used to trigger and interact with Tines workflows.",
 		}
 
 		if verify {

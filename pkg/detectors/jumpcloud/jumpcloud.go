@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Jumpcloud,
 			Raw:          []byte(resMatch),
+			Description:  "Jumpcloud is a cloud-based directory service platform that offers user and device management, single sign-on, and other identity and access management (IAM) features. Jumpcloud API keys can be used to access and manage these services.",
 		}
 
 		if verify {

@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Square,
 			Raw:          []byte(resMatch),
+			Description:  "Square is a financial services and mobile payment company. Square API keys can be used to access and manage payments, transactions, and other financial data.",
 		}
 		s.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/square/",

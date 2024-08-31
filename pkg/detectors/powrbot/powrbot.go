@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Powrbot,
 			Raw:          []byte(resMatch),
+			Description:  "Powrbot is a service that provides company information. Powrbot API keys can be used to access and retrieve data from their database.",
 		}
 
 		if verify {

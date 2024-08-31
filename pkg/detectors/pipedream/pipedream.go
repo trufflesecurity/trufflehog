@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Pipedream,
 			Raw:          []byte(resMatch),
+			Description:  "Pipedream is an integration platform for developers to build and run workflows that integrate apps, data, and APIs. Pipedream API keys can be used to access and modify these workflows and data.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ZonkaFeedback,
 			Raw:          []byte(resMatch),
+			Description:  "ZonkaFeedback is a platform for collecting and analyzing customer feedback. The API token can be used to access and manage feedback data.",
 		}
 
 		if verify {

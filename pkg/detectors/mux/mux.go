@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Mux,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecretMatch),
+				Description:  "Mux is a video streaming service that provides APIs for video hosting, live streaming, and video analytics. Mux API keys can be used to access and manage video assets and streaming data.",
 			}
 
 			if verify {

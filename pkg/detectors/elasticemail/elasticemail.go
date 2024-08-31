@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ElasticEmail,
 			Raw:          []byte(resMatch),
+			Description:  "ElasticEmail is an email marketing service. ElasticEmail API keys can be used to send emails, manage contacts, and access other features of the service.",
 		}
 
 		if verify {

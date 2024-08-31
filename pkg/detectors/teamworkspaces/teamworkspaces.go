@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TeamworkSpaces,
 			Raw:          []byte(resMatch),
+			Description:  "TeamworkSpaces is a collaboration tool for teams to share documents and information. The detected key can be used to access and modify spaces and documents within TeamworkSpaces.",
 		}
 
 		if verify {

@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Fmfw,
 				Raw:          []byte(tokenPatMatch),
+				Description:  "FMFW is a cryptocurrency exchange platform. FMFW API keys can be used to access and manage account data and perform trading operations.",
 			}
 
 			if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Smartsheets,
 			Raw:          []byte(resMatch),
+			Description:  "Smartsheets is a platform for work management and automation. Smartsheets API keys can be used to access and modify data and automate workflows within the platform.",
 		}
 
 		if verify {

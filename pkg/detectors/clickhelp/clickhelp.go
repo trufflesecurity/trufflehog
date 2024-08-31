@@ -64,6 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_ClickHelp,
 					Raw:          []byte(resServer),
 					RawV2:        []byte(resServer + resEmail),
+					Description:  "ClickHelp is a documentation tool that allows users to create and manage online documentation. ClickHelp API keys can be used to access and modify documentation data.",
 				}
 
 				if verify {

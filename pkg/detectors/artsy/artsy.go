@@ -39,7 +39,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idmatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
+	for _, match := matches {
 		if len(match) != 2 {
 			continue
 		}
@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Artsy,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
+				Description:  "Artsy is an online platform for discovering, buying, and selling art. Artsy API keys can be used to access Artsy's services and data.",
 			}
 
 			if verify {

@@ -48,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_HuggingFace,
 			Raw:          []byte(resMatch),
+			Description:  "Hugging Face is a platform for natural language processing tasks and model hosting. Hugging Face API keys can be used to access various services and resources on the platform.",
 		}
 
 		if verify {

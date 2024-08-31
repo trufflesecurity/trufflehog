@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Upwave,
 			Raw:          []byte(resMatch),
+			Description:  "Upwave is a project management tool. Upwave API keys can be used to access and manage project data.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_OpenWeather,
 			Raw:          []byte(resMatch),
+			Description:  "OpenWeather provides weather data and forecasting services. OpenWeather API keys can be used to access these weather data services.",
 		}
 
 		if verify {

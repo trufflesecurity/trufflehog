@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Tomtom,
 			Raw:          []byte(resMatch),
+			Description:  "TomTom provides mapping and location technologies. TomTom API keys can be used to access and manipulate mapping data.",
 		}
 
 		if verify {

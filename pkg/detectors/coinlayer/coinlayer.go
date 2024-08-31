@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Coinlayer,
 			Raw:          []byte(resMatch),
+			Description:  "Coinlayer provides real-time and historical cryptocurrency exchange rates. The API key can be used to access this data.",
 		}
 
 		if verify {

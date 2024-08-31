@@ -41,6 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mailchimp,
 			Raw:          []byte(match),
+			Description:  "Mailchimp is a marketing automation platform and email marketing service. Mailchimp API keys can be used to access and manage email campaigns, audience data, and other marketing resources.",
 		}
 		s.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/mailchimp/",

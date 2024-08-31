@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Demio,
 				Raw:          []byte(resMatch),
+				Description:  "Demio is a webinar platform that allows users to host, promote, and analyze webinars. Demio API keys can be used to access and manage webinar data.",
 			}
 
 			if verify {

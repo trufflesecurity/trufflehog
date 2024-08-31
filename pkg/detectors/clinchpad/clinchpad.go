@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Clinchpad,
 			Raw:          []byte(resMatch),
+			Description:  "Clinchpad is a CRM tool. Clinchpad API keys can be used to access and modify data within Clinchpad.",
 		}
 
 		if verify {

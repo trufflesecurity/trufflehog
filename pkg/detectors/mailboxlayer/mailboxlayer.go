@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mailboxlayer,
 			Raw:          []byte(resMatch),
+			Description:  "Mailboxlayer is an email validation and verification service. Mailboxlayer API keys can be used to validate and verify email addresses.",
 		}
 
 		if verify {

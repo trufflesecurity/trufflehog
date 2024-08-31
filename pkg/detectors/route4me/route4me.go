@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Route4me,
 			Raw:          []byte(resMatch),
+			Description:  "Route4Me is a route planning service that optimizes and manages routes for delivery and service fleets. Route4Me API keys can be used to access and modify routing data and services.",
 		}
 
 		if verify {

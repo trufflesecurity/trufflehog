@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Vercel,
 			Raw:          []byte(resMatch),
+			Description:  "Vercel is a platform for frontend frameworks and static sites, built to integrate with your headless content, commerce, or database. Vercel API keys can be used to access and manage your Vercel projects and deployments.",
 		}
 
 		if verify {

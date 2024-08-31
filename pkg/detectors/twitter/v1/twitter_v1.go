@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},
+			Description: "Twitter API keys can be used to interact with the Twitter API to post tweets, read timelines, and access other Twitter functionalities.",
 		}
 
 		if verify {

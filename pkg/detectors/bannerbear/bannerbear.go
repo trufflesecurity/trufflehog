@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Bannerbear,
 			Raw:          []byte(resMatch),
+			Description:  "Bannerbear is an API for generating dynamic images, videos, and GIFs. Bannerbear API keys can be used to access and manipulate these resources.",
 		}
 
 		if verify {

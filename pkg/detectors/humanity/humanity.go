@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Humanity,
 			Raw:          []byte(resMatch),
+			Description:  "Humanity is a workforce management platform. Humanity API keys can be used to access and manage workforce data and operations.",
 		}
 
 		if verify {

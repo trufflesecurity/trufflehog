@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_RestpackScreenshotAPI,
 			Raw:          []byte(resMatch),
+			Description:  "Restpack Screenshot API is a service used to capture screenshots of web pages. The API key can be used to authenticate requests to the service.",
 		}
 
 		if verify {

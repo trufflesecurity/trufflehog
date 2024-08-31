@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_ApiDeck,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
+				Description:  "ApiDeck is a platform that provides a unified API to connect multiple services. ApiDeck keys can be used to access and manage these services.",
 			}
 
 			if verify {

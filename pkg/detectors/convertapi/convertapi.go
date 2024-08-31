@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ConvertApi,
 			Raw:          []byte(resMatch),
+			Description:  "ConvertAPI is a service that provides file conversion capabilities via API. ConvertAPI keys can be used to access and perform file conversions.",
 		}
 
 		if verify {

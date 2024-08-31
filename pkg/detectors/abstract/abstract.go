@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Abstract,
 			Raw:          []byte(resMatch),
+			Description:  "Abstract API provides various services including exchange rates. The API keys can be used to access these services and retrieve data.",
 		}
 
 		if verify {

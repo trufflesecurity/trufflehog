@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Dareboost,
 			Raw:          []byte(resMatch),
+			Description:  "Dareboost is a website performance monitoring tool. Dareboost API keys can be used to access and modify performance monitoring configurations.",
 		}
 
 		if verify {

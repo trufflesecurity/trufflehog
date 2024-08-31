@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Mrticktock,
 				Raw:          []byte(resMatch),
+				Description:  "Mrticktock is a service that tracks time-based activities. These credentials can be used to access and manage timers and associated data.",
 			}
 
 			if verify {

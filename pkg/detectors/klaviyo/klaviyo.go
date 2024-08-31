@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Klaviyo,
 			Raw:          []byte(resMatch),
+			Description:  "Klaviyo is a marketing automation platform. Klaviyo API keys can be used to access and modify marketing data and configurations.",
 		}
 
 		if verify {

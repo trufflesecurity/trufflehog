@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SpeechTextAI,
 			Raw:          []byte(resMatch),
+			Description:  "SpeechTextAI is a service that provides speech-to-text conversion. The API key can be used to access and utilize the speech-to-text services offered by SpeechTextAI.",
 		}
 
 		if verify {

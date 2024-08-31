@@ -40,6 +40,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Stripe,
 			Raw:          []byte(match),
+			Description:  "Stripe is a payment processing platform. Stripe API keys can be used to interact with Stripe's services for processing payments, managing subscriptions, and more.",
 		}
 		s.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/stripe/",

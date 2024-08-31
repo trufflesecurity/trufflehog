@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ScraperBox,
 			Raw:          []byte(resMatch),
+			Description:  "ScraperBox is a web scraping service that allows users to extract data from websites. The provided token can be used to authenticate and perform scraping operations.",
 		}
 
 		if verify {

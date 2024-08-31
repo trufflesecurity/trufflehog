@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_AzureDevopsPersonalAccessToken,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resOrgMatch),
+				Description:  "Azure DevOps is a suite of development tools provided by Microsoft. Personal Access Tokens (PATs) are used to authenticate and authorize access to Azure DevOps services and resources.",
 			}
 
 			if verify {

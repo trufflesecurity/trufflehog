@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CloudflareCaKey,
 			Raw:          []byte(resMatch),
+			Description:  "Cloudflare is a web infrastructure and website security company. Cloudflare CA keys can be used to manage SSL/TLS certificates and other security settings.",
 		}
 
 		if verify {

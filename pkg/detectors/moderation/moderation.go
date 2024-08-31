@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Moderation,
 			Raw:          []byte(resMatch),
+			Description:  "Moderation API keys are used to access the Moderation API, which provides services for analyzing and moderating content.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Moralis,
 			Raw:          []byte(resMatch),
+			Description:  "Moralis is a platform for building and deploying decentralized applications (dApps). Moralis API keys can be used to interact with blockchain data and services.",
 		}
 
 		if verify {

@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Websitepulse,
 				Raw:          []byte(resMatch),
+				Description:  "Websitepulse is a web-based service that monitors websites and servers. The keys and IDs can be used to access and manage monitoring configurations.",
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.websitepulse.com/textserver.php?method=GetContacts&username=%s&key=%s", resIdMatch, resMatch), nil)

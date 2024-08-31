@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Tokeet,
 				Raw:          []byte(resMatch),
+				Description:  "Tokeet is a property management software used for managing rental properties. Tokeet API keys can be used to access and modify property data and manage bookings.",
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://capi.tokeet.com/v1/user?account=%s", resIdMatch), nil)

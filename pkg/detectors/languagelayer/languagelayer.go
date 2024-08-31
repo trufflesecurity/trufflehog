@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LanguageLayer,
 			Raw:          []byte(resMatch),
+			Description:  "LanguageLayer is an API service for language detection. The access key can be used to authenticate and use the API.",
 		}
 
 		if verify {

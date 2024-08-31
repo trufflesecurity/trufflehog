@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PivotalTracker,
 			Raw:          []byte(token),
+			Description:  "PivotalTracker is a project management tool. PivotalTracker tokens can be used to access and manage projects and data within PivotalTracker.",
 		}
 
 		if verify {

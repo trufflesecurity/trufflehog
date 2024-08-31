@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PushBulletApiKey,
 			Raw:          []byte(resMatch),
+			Description:  "Pushbullet is a service that allows you to send notifications between your devices. Pushbullet API keys can be used to interact with the Pushbullet API to send and receive notifications.",
 		}
 
 		if verify {

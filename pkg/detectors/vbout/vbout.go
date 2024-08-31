@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Vbout,
 			Raw:          []byte(resMatch),
+			Description:  "Vbout is a marketing automation platform. Vbout API keys can be used to access and manage marketing data and campaigns.",
 		}
 
 		if verify {

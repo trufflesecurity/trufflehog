@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ExtractorAPI,
 			Raw:          []byte(resMatch),
+			Description:  "ExtractorAPI is a service for extracting data from various sources. ExtractorAPI keys can be used to access and extract data from these sources.",
 		}
 
 		if verify {

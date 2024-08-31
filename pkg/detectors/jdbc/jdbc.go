@@ -78,6 +78,7 @@ matchLoop:
 			DetectorType: detectorspb.DetectorType_JDBC,
 			Raw:          []byte(jdbcConn),
 			Redacted:     tryRedactAnonymousJDBC(jdbcConn),
+			Description:  "JDBC (Java Database Connectivity) is an API for connecting and executing queries with databases. JDBC connection strings can be used to access and manipulate databases.",
 		}
 
 		if verify {
@@ -223,7 +224,7 @@ func newJDBC(conn string) (jdbc, error) {
 	}
 	conn = conn[len("jdbc:"):]
 	subprotocol, subname, found := strings.Cut(conn, ":")
-	if !found {
+	if (!found) {
 		return nil, errors.New("expected a colon separated subprotocol and subname")
 	}
 	// get the subprotocol parser

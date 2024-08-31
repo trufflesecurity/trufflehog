@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_TestingBot,
 				Raw:          []byte(resMatch),
+				Description:  "TestingBot provides cross-browser testing services. TestingBot credentials can be used to automate tests on various browsers and devices.",
 			}
 
 			if verify {

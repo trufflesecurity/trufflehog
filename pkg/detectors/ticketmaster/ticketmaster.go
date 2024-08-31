@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TicketMaster,
 			Raw:          []byte(resMatch),
+			Description:  "TicketMaster API keys can be used to access and modify event data and other related services provided by TicketMaster.",
 		}
 
 		if verify {

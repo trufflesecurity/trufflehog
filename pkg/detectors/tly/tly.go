@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TLy,
 			Raw:          []byte(resMatch),
+			Description:  "TLy is a URL shortening service. TLy API keys can be used to access and manage shortened URLs.",
 		}
 
 		if verify {

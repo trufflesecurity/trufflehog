@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ScreenshotLayer,
 			Raw:          []byte(resMatch),
+			Description:  "ScreenshotLayer is a service that provides website screenshots. Access keys can be used to capture and retrieve screenshots.",
 		}
 
 		if verify {

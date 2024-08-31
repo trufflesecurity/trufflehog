@@ -37,7 +37,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
+	for _, match := matches {
 		if len(match) != 2 {
 			continue
 		}
@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Streak,
 			Raw:          []byte(resMatch),
+			Description:  "Streak is a CRM software that integrates with Gmail. Streak API keys can be used to access and manage CRM data within Streak.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Browshot,
 			Raw:          []byte(resMatch),
+			Description:  "Browshot is a service that allows you to take screenshots of web pages from different browsers and devices. Browshot API keys can be used to automate and manage these screenshots.",
 		}
 
 		if verify {

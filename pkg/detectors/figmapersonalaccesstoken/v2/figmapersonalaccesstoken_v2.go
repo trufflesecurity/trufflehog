@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 			Raw:          []byte(resMatch),
+			Description:  "Figma is a collaborative interface design tool. Figma Personal Access Tokens can be used to access and manipulate design files and other resources on behalf of a user.",
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},

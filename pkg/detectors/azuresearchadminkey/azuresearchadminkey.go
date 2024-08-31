@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_AzureSearchAdminKey,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resServiceMatch),
+				Description:  "Azure Search is a search-as-a-service solution that allows developers to incorporate search capabilities into their applications. Azure Search Admin Keys can be used to manage and query search services.",
 			}
 
 			if verify {

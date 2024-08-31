@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Clockify,
 			Raw:          []byte(resMatch),
+			Description:  "Clockify is a time tracking software. Clockify API keys can be used to access and modify time tracking data.",
 		}
 
 		if verify {

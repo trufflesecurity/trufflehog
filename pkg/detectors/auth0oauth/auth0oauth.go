@@ -65,6 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Redacted:     clientIdRes,
 					Raw:          []byte(clientSecretRes),
 					RawV2:        []byte(clientIdRes + clientSecretRes),
+					Description:  "Auth0 is a service designed to handle authentication and authorization for users. Oauth API keys can be used to impersonate applications and other things related to Auth0's API",
 				}
 
 				if verify {

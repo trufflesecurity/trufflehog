@@ -69,6 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_LDAP,
 					Raw:          []byte(strings.Join([]string{ldapURL.String(), username[1], password[1]}, "\t")),
+					Description:  "LDAP (Lightweight Directory Access Protocol) is an open, vendor-neutral, industry standard application protocol for accessing and maintaining distributed directory information services over an Internet Protocol (IP) network.",
 				}
 
 				if verify {
@@ -99,6 +100,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LDAP,
 			Raw:          []byte(strings.Join([]string{ldapURL.String(), username, password}, "\t")),
+			Description:  "LDAP (Lightweight Directory Access Protocol) is an open, vendor-neutral, industry standard application protocol for accessing and maintaining distributed directory information services over an Internet Protocol (IP) network.",
 		}
 
 		if verify {

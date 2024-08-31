@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Manifest,
 			Raw:          []byte(resMatch),
+			Description:  "Manifest API keys are used to interact with the Manifest service, which provides checklist management and other features.",
 		}
 
 		if verify {

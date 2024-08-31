@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Loggly,
 				Raw:          []byte(key),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", domainRes, key)),
+				Description:  "Loggly is a cloud-based log management service. Loggly API keys can be used to send, search, and analyze log data.",
 			}
 
 			if verify {

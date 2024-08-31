@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Cloze,
 				Raw:          []byte(resMatch),
+				Description:  "Cloze is a relationship management tool that helps users manage their connections and interactions. Cloze API keys can be used to access and manage user data and interactions.",
 			}
 
 			if verify {

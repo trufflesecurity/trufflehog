@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CannyIo,
 			Raw:          []byte(resMatch),
+			Description:  "Canny is a user feedback tool that helps you track and prioritize feature requests. Canny API keys can be used to access and manage feedback boards and other related data.",
 		}
 
 		if verify {

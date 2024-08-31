@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Dnscheck,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
+				Description:  "Dnscheck is a service used to monitor DNS records. The API keys can be used to access and manage DNS monitoring configurations.",
 			}
 
 			if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Urlscan,
 			Raw:          []byte(resMatch),
+			Description:  "Urlscan is a service for scanning and analyzing websites. Urlscan API keys can be used to interact with the Urlscan service programmatically.",
 		}
 
 		if verify {

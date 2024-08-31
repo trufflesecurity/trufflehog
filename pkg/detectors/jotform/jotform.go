@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Jotform,
 			Raw:          []byte(resMatch),
+			Description:  "Jotform is an online form builder and survey tool. Jotform API keys can be used to access and manage form submissions and data.",
 		}
 
 		if verify {

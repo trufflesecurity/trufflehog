@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mockaroo,
 			Raw:          []byte(resMatch),
+			Description:  "Mockaroo is a tool for generating realistic data for testing and development. Mockaroo API keys can be used to access and generate this data.",
 		}
 
 		if verify {

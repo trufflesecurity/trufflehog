@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ScrapingBee,
 			Raw:          []byte(resMatch),
+			Description:  "ScrapingBee is a web scraping service that handles headless browsers and proxies for you. ScrapingBee API keys can be used to access and control web scraping tasks.",
 		}
 
 		if verify {

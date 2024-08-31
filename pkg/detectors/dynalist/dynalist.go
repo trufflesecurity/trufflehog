@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Dynalist,
 			Raw:          []byte(resMatch),
+			Description:  "Dynalist is a web-based outlining app that allows users to create and manage hierarchical lists. Dynalist API tokens can be used to access and manipulate these lists programmatically.",
 		}
 
 		if verify {

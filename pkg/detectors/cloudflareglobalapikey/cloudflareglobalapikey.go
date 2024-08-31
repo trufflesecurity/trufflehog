@@ -61,6 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     emailRes,
 				Raw:          []byte(apiKeyRes),
 				RawV2:        []byte(apiKeyRes + emailRes),
+				Description:  "Cloudflare is a web infrastructure and website security company. Its services include content delivery network (CDN), DDoS mitigation, Internet security, and distributed domain name server (DNS) services. Cloudflare API keys can be used to access and modify these services.",
 			}
 
 			if verify {

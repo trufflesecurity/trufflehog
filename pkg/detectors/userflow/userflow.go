@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Userflow,
 			Raw:          []byte(resMatch),
+			Description:  "Userflow is a service for creating user onboarding experiences. Userflow API keys can be used to access and modify user onboarding data and workflows.",
 		}
 
 		if verify {

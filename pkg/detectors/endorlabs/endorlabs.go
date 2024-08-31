@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_EndorLabs,
 				Raw:          []byte(key),
 				RawV2:        []byte(key + secret),
+				Description:  "Endorlabs provides API keys that can be used to authenticate and interact with its services. These keys should be kept confidential to prevent unauthorized access.",
 			}
 
 			if verify {

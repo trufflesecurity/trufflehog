@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Cashboard,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resUser),
+				Description:  "Cashboard is a financial management service. Cashboard credentials can be used to access and manage financial data and accounts.",
 			}
 
 			if verify {

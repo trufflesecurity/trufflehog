@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Clarifai,
 			Raw:          []byte(resMatch),
+			Description:  "Clarifai is an AI platform for visual recognition. Clarifai API keys can be used to access and manage visual recognition models and data.",
 		}
 
 		if verify {

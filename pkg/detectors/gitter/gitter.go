@@ -31,7 +31,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Gitter secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gitter,
 			Raw:          []byte(resMatch),
+			Description:  "Gitter is a chat and networking platform. Gitter API keys can be used to access and interact with Gitter services and data.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Nylas,
 			Raw:          []byte(resMatch),
+			Description:  "Nylas is a platform providing email, calendar, and contacts APIs. Nylas API keys can be used to access and manage these services.",
 		}
 
 		if verify {

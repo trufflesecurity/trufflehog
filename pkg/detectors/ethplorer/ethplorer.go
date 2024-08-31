@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Ethplorer,
 			Raw:          []byte(resMatch),
+			Description:  "Ethplorer API keys can be used to interact with the Ethplorer service, which provides access to Ethereum blockchain data and analytics.",
 		}
 
 		if verify {

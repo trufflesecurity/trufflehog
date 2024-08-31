@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AutoPilot,
 			Raw:          []byte(resMatch),
+			Description:  "AutoPilot is a marketing automation platform. AutoPilot API keys can be used to access and manage marketing data and campaigns.",
 		}
 
 		if verify {

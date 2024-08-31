@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Scalr,
 				Raw:          []byte(resMatch),
+				Description:  "Scalr is a cloud management platform that allows users to manage and automate cloud infrastructure. Scalr keys can be used to access and manage cloud resources within the Scalr platform.",
 			}
 
 			if verify {

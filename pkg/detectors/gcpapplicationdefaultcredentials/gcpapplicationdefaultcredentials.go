@@ -58,7 +58,7 @@ const startOffset = maxGCPADCKeySize
 func (Scanner) StartOffset() int64 { return startOffset }
 
 // FromData will find and optionally verify Gcpapplicationdefaultcredentials secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllString(dataStr, -1)
@@ -79,6 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GCPApplicationDefaultCredentials,
 			Raw:          []byte(detectedClientID),
+			Description:  "GCP Application Default Credentials are used to authenticate and authorize API requests to Google Cloud services.",
 		}
 
 		if verify {

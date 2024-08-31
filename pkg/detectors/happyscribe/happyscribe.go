@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Happyscribe,
 			Raw:          []byte(resMatch),
+			Description:  "Happyscribe is a transcription service that converts audio to text. Happyscribe API keys can be used to access and manage these transcription services.",
 		}
 
 		if verify {

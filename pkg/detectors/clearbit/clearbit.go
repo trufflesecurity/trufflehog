@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Clearbit,
 			Raw:          []byte(resMatch),
+			Description:  "Clearbit provides powerful APIs for enriching data about companies and people. Clearbit API keys can be used to access and retrieve detailed information about these entities.",
 		}
 
 		if verify {

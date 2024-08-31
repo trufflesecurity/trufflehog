@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_VultrApiKey,
 			Raw:          []byte(resMatch),
+			Description:  "Vultr is a cloud service provider offering various services including computing, storage, and networking. Vultr API keys can be used to access and manage these services.",
 		}
 
 		if verify {

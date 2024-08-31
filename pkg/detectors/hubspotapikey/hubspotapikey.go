@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_HubSpotApiKey,
 			Raw:          []byte(resMatch),
+			Description:  "HubSpot is a CRM platform that provides tools for marketing, sales, and customer service. HubSpot API keys can be used to access and modify data within the HubSpot platform.",
 		}
 
 		if verify {

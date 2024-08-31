@@ -39,6 +39,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Circle,
 			Raw:          []byte(token),
+			Description:  "CircleCI is a continuous integration and delivery platform used to build, test, and deploy software. CircleCI tokens can be used to interact with the CircleCI API and access various resources and functionalities.",
 		}
 
 		if verify {

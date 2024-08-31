@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Chartmogul,
 			Raw:          []byte(resMatch),
+			Description:  "ChartMogul is a subscription analytics platform that helps businesses measure, understand, and grow their subscription revenue. ChartMogul API keys can be used to access and manage subscription data.",
 		}
 
 		if verify {

@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Collect2,
 			Raw:          []byte(resMatch),
+			Description:  "An API to Collect, Modify, Filter and Export Data using webhooks. API keys can create read update and delete data",
 		}
 
 		if verify {

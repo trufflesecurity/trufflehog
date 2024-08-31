@@ -68,6 +68,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
 			Raw:          []byte(token),
+			Description:  "Docker is a platform used to develop, ship, and run applications. Docker access tokens can be used to authenticate and interact with Docker services.",
 		}
 
 		for username := range usernames {

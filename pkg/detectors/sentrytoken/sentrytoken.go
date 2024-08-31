@@ -51,6 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SentryToken,
 			Raw:          []byte(resMatch),
+			Description:  "Sentry is an error tracking service that helps developers monitor and fix crashes in real time. Sentry tokens can be used to access and manage projects and organizations within Sentry.",
 		}
 
 		if verify {

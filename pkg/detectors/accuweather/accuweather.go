@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Accuweather,
 			Raw:          []byte(resMatch),
+			Description:  "Accuweather is a weather forecasting service. Accuweather API keys can be used to access weather data and forecasts.",
 		}
 
 		if verify {

@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Typetalk,
 				Raw:          []byte(resMatch),
+				Description:  "Typetalk is a Japanese chat app. API keys can be used to read potentially sensitive chat messages",
 			}
 
 			if verify {

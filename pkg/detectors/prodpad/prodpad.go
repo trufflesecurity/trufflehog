@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Prodpad,
 			Raw:          []byte(resMatch),
+			Description:  "Prodpad is a product management tool that helps teams plan and manage product development. Prodpad API keys can be used to access and modify product data and configurations.",
 		}
 
 		if verify {

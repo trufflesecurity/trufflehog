@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SplunkOberservabilityToken,
 			Raw:          []byte(resMatch),
+			Description:  "Splunk Observability Tokens are used to access and interact with Splunk's observability suite, allowing for monitoring and analyzing application performance and infrastructure.",
 		}
 
 		if verify {

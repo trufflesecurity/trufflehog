@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Copper,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
+				Description:  "Copper is a CRM platform that helps businesses manage their relationships with customers and leads. Copper API keys can be used to access and modify customer data and interactions.",
 			}
 
 			if verify {

@@ -58,6 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_EightxEight,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
+				Description:  "8x8 is a provider of cloud-based communication services including voice, video, chat, and contact center solutions. The credentials found can be used to access and manage these services.",
 			}
 
 			if verify {

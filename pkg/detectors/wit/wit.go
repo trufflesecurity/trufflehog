@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Wit,
 			Raw:          []byte(resMatch),
+			Description:  "Wit.ai is a natural language processing service that provides an API for building conversational interfaces. Wit.ai API keys can be used to access and modify this data and compute.",
 		}
 
 		if verify {

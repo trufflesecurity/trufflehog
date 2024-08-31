@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Stormboard,
 			Raw:          []byte(resMatch),
+			Description:  "Stormboard is a digital workspace for brainstorming and collaboration. Stormboard API keys can be used to access and modify data within the workspace.",
 		}
 
 		if verify {

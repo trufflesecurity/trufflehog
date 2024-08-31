@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_BombBomb,
 			Raw:          []byte(resMatch),
+			Description:  "BombBomb is a video messaging platform that allows users to create and send video emails. BombBomb API keys can be used to access and manage video email campaigns and contacts.",
 		}
 
 		if verify {

@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Bulbul,
 			Raw:          []byte(resMatch),
+			Description:  "Bulbul is an API service. Bulbul API keys can be used to access and modify data within the service.",
 		}
 
 		if verify {

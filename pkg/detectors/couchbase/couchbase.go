@@ -94,6 +94,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Couchbase,
 					Raw:          []byte(fmt.Sprintf("%s:%s@%s", resUsernameMatch, resPasswordMatch, resConnectionStringMatch)),
+					Description:  "Couchbase is a distributed NoSQL cloud database. Couchbase credentials can be used to access and modify data within the Couchbase database.",
 				}
 
 				if verify {

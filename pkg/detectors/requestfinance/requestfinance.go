@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_RequestFinance,
 			Raw:          []byte(resMatch),
+			Description:  "Request Finance is a platform for managing and automating invoices and payments. Request Finance credentials can be used to access and manage these financial operations.",
 		}
 
 		if verify {

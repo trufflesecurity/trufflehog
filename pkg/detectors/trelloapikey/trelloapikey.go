@@ -52,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_TrelloApiKey,
 					Redacted:     resMatch,
 					Raw:          []byte(resMatch),
+					Description:  "Trello is a collaboration tool that organizes your projects into boards. Trello API keys can be used to access and modify data within Trello.",
 				}
 
 				if verify {

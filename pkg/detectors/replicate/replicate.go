@@ -42,6 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Replicate,
 			Raw:          []byte(resMatch),
+			Description:  "Replicate is a platform for running machine learning models in the cloud. Replicate API keys can be used to manage and run these models.",
 		}
 
 		if verify {

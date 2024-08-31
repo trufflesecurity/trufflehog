@@ -61,6 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Intra42,
 				Raw:          []byte(resMatch),
+				Description:  "Intra42 is an API service used to interact with the 42 school's internal systems. Intra42 API keys can be used to access and modify data within these systems.",
 			}
 
 			if verify {

@@ -134,6 +134,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Redacted:     resIDMatch,
 					RawV2:        []byte(resIDMatch + resSecretMatch + resSessionMatch),
 					ExtraData:    make(map[string]string),
+					Description:  "AWS is a cloud service used offering over 200 API's to transact data and compute. AWS API keys can be used to access and modify this data and compute.",
 				}
 
 				if verify {

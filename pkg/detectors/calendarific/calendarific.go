@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Calendarific,
 			Raw:          []byte(resMatch),
+			Description:  "Calendarific provides a public API for obtaining holiday information. The API key can be used to access holiday data for various countries and years.",
 		}
 
 		if verify {

@@ -65,6 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Adzuna,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
+				Description:  "Adzuna is a job search engine used to find job listings. Adzuna API keys can be used to access job listing data.",
 			}
 
 			if verify {

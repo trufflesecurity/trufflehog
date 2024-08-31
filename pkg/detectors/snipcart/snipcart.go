@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Snipcart,
 			Raw:          []byte(resMatch),
+			Description:  "Snipcart is an easy-to-implement shopping cart platform for developers. Snipcart API keys can be used to access and manage e-commerce functionalities.",
 		}
 
 		if verify {

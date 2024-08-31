@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SonarCloud,
 			Raw:          []byte(resMatch),
+			Description:  "SonarCloud is a cloud-based code quality and security service. SonarCloud tokens can be used to access project analysis and quality reports.",
 		}
 
 		if verify {

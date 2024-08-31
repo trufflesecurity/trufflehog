@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AvazaPersonalAccessToken,
 			Raw:          []byte(resMatch),
+			Description:  "Avaza is a business management tool that offers project management, time tracking, and financial management. Avaza Personal Access Tokens can be used to access and interact with Avaza's API.",
 		}
 
 		if verify {

@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Roaring,
 				Raw:          []byte(resClient),
 				RawV2:        []byte(resClient + resSecret),
+				Description:  "Roaring credentials can be used to access the Roaring API, which provides services for high-performance, compressed bitmaps.",
 			}
 
 			if verify {

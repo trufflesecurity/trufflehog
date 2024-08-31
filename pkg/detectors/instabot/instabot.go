@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Instabot,
 			Raw:          []byte(resMatch),
+			Description:  "Instabot is a service that provides automated social media interactions. Instabot API keys can be used to access and interact with the service programmatically.",
 		}
 
 		if verify {

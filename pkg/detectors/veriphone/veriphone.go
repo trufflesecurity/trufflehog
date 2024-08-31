@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Veriphone,
 			Raw:          []byte(resMatch),
+			Description:  "Veriphone is a service that provides phone number validation. Veriphone API keys can be used to access the phone validation service.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GetGeoAPI,
 			Raw:          []byte(resMatch),
+			Description:  "GetGeoAPI provides geolocation and currency conversion services. The API keys can be used to access these services and retrieve data.",
 		}
 
 		if verify {

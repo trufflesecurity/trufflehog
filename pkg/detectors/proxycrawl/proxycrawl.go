@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ProxyCrawl,
 			Raw:          []byte(resMatch),
+			Description:  "ProxyCrawl is a service that provides web scraping and crawling capabilities. ProxyCrawl tokens can be used to access and control these services.",
 		}
 
 		if verify {

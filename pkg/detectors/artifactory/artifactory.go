@@ -65,6 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
 			Raw:          []byte(resMatch),
 			RawV2:        []byte(resMatch + resURLMatch),
+			Description:  "Artifactory is a repository manager that supports all major package formats. Artifactory access tokens can be used to authenticate and perform operations on repositories.",
 		}
 
 		if verify {

@@ -63,6 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(resIDMatch),
 				Redacted:     resIDMatch,
 				RawV2:        []byte(resIDMatch + resSecretMatch),
+				Description:  "Docusign is an electronic signature and digital transaction management service. Docusign credentials can be used to access and manage digital transactions and documents.",
 			}
 
 			// Verify client id and secret pair by using an *undocumented* client_credentials grant type on the oauth2 endpoint.

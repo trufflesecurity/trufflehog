@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Shotstack,
 			Raw:          []byte(resMatch),
+			Description:  "Shotstack is a video editing API service. Shotstack API keys can be used to access and utilize the video rendering and editing capabilities of the Shotstack platform.",
 		}
 
 		if verify {

@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Siteleaf,
 				Raw:          []byte(resMatch),
+				Description:  "Siteleaf is a content management system (CMS) designed for managing websites. Siteleaf API keys can be used to access and modify site content and settings.",
 			}
 
 			if verify {

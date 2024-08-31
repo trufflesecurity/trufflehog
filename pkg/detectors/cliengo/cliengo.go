@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Cliengo,
 			Raw:          []byte(resMatch),
+			Description:  "Cliengo is a chatbot service that helps businesses convert website visitors into leads. Cliengo API keys can be used to access and manage the chatbot configurations and data.",
 		}
 
 		if verify {

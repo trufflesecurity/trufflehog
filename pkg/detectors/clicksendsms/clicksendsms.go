@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_ClickSendsms,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
+				Description:  "ClickSend is a global leader in business communication solutions, providing a range of services including SMS, email, and voice. ClickSend API keys can be used to access and manage these communication services.",
 			}
 
 			if verify {

@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Checkvist,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resEmailMatch),
+				Description:  "Checkvist is an online task management tool. The credentials found can be used to access and manage tasks and data within Checkvist.",
 			}
 
 			if verify {

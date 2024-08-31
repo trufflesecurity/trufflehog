@@ -79,6 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(rawURL.String()),
 			RawV2:        []byte(rawURLStr),
 			Redacted:     detectors.RedactURL(*rawURL),
+			Description:  "This detector identifies URLs with embedded credentials, which can be used to access web resources without explicit user interaction.",
 		}
 
 		if verify {

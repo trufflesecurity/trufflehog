@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Pepipost,
 			Raw:          []byte(resMatch),
+			Description:  "Pepipost is an email delivery service. The API keys can be used to send and track emails through Pepipost's infrastructure.",
 		}
 
 		if verify {

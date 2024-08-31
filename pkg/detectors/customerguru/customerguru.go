@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CustomerGuru,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
+				Description:  "CustomerGuru is a feedback platform used to collect and analyze customer feedback. API keys and secrets can be used to access and manage this feedback data.",
 			}
 
 			if verify {

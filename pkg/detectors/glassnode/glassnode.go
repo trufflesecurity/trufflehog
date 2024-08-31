@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Glassnode,
 			Raw:          []byte(resMatch),
+			Description:  "Glassnode is an on-chain market intelligence platform providing data and insights on blockchain and cryptocurrency markets. Glassnode API keys can be used to access various blockchain metrics and data points.",
 		}
 
 		if verify {

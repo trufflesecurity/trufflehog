@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_KarmaCRM,
 			Raw:          []byte(resMatch),
+			Description:  "KarmaCRM is a customer relationship management tool. API tokens can be used to access and modify CRM data.",
 		}
 
 		if verify {

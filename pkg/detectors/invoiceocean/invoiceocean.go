@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_InvoiceOcean,
 				Raw:          []byte(resMatch),
+				Description:  "InvoiceOcean is an online invoicing service. InvoiceOcean API tokens can be used to access and manage invoices and other financial data.",
 			}
 
 			if verify {

@@ -41,6 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_D7Network,
 			Raw:          []byte(resMatch),
+			Description:  "D7Network provides messaging services through their API. The credentials can be used to send SMS and other types of messages via their platform.",
 		}
 
 		if verify {

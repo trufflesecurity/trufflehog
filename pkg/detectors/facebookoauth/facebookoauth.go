@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     apiIdRes,
 				Raw:          []byte(apiSecretRes),
 				RawV2:        []byte(apiIdRes + apiSecretRes),
+				Description:  "Facebook OAuth tokens are used to authenticate users and provide access to Facebook's API services.",
 			}
 
 			if verify {

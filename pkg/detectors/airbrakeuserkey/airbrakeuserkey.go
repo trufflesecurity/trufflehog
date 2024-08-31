@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AirbrakeUserKey,
 			Raw:          []byte(resMatch),
+			Description:  "Airbrake is an error and performance monitoring service. Airbrake User Keys can be used to access and manage error reports and performance data.",
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/airbrake/",

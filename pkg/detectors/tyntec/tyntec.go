@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Tyntec,
 			Raw:          []byte(resMatch),
+			Description:  "Tyntec is a service providing communication APIs for messaging, voice, and phone number verification. Tyntec API keys can be used to access and manage these services.",
 		}
 
 		if verify {

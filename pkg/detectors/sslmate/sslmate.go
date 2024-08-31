@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SslMate,
 			Raw:          []byte(resMatch),
+			Description:  "SslMate is a service that helps manage and automate SSL certificates. SslMate API keys can be used to access and manage SSL certificates.",
 		}
 
 		if verify {

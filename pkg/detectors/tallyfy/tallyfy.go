@@ -48,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Tallyfy,
 			Raw:          []byte(resMatch),
+			Description:  "Tallyfy is a process management and workflow automation platform. Tallyfy API keys can be used to access and automate workflows and processes within the platform.",
 		}
 
 		if verify {

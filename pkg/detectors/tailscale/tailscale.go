@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Tailscale,
 			Raw:          []byte(resMatch),
+			Description:  "Tailscale is a zero-config VPN for building secure networks. Tailscale API keys can be used to authenticate and interact with the Tailscale API.",
 		}
 
 		if verify {

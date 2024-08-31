@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Paymoapp,
 			Raw:          []byte(resMatch),
+			Description:  "Paymoapp is a project management and collaboration tool. Paymoapp API keys can be used to access and modify project data and user information.",
 		}
 
 		if verify {

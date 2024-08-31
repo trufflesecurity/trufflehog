@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Lob,
 			Raw:          []byte(resMatch),
+			Description:  "Lob is a service for automating the creation and sending of letters, checks, and postcards. Lob API keys can be used to access and manage these services.",
 		}
 
 		if verify {

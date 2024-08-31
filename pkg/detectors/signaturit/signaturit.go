@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Signaturit,
 			Raw:          []byte(resMatch),
+			Description:  "Signaturit is a service for electronic signatures. Signaturit API keys can be used to access and manage signature requests and related data.",
 		}
 
 		if verify {

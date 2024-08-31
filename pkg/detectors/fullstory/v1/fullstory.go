@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Fullstory,
 			Raw:          []byte(resMatch),
+			Description:  "Fullstory is a digital experience analytics platform that captures and analyzes customer interactions on websites and mobile apps. Fullstory API keys can be used to access and analyze this data.",
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},

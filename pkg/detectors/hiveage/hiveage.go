@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Hiveage,
 			Raw:          []byte(resMatch),
+			Description:  "Hiveage is an online invoicing and billing software. Hiveage API keys can be used to access and manage invoicing and billing data.",
 		}
 
 		if verify {

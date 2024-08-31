@@ -30,7 +30,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Interseller secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Interseller,
 			Raw:          []byte(resMatch),
+			Description:  "Interseller is a platform for automating email outreach. Interseller API keys can be used to manage and send email campaigns.",
 		}
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://interseller.io/api/campaigns/list", nil)

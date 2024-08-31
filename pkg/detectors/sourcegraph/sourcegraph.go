@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Sourcegraph,
 			Raw:          []byte(resMatch),
+			Description:  "Sourcegraph is a code search and navigation engine. Sourcegraph tokens can be used to access and interact with Sourcegraph APIs.",
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/sourcegraph/",

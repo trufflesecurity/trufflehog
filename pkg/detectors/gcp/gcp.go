@@ -107,6 +107,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          raw,
 			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
+			Description:  "GCP (Google Cloud Platform) is a suite of cloud computing services that runs on the same infrastructure that Google uses internally for its end-user products. GCP keys can be used to access and manage these services.",
 		}
 		// Set the RotationGuideURL in the ExtraData
 		s.ExtraData = map[string]string{

@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_ZipBooks,
 				Raw:          []byte(resMatch),
+				Description:  "ZipBooks is an accounting software service that allows businesses to manage their finances online. The credentials can be used to access and manage financial data.",
 			}
 
 			if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_YouSign,
 			Raw:          []byte(resMatch),
+			Description:  "Yousign is an electronic signature service used to sign and manage documents online. Yousign API keys can be used to access and manage these documents.",
 		}
 
 		if verify {

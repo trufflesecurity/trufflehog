@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Ambee,
 			Raw:          []byte(resMatch),
+			Description:  "Ambee provides environmental and climate data APIs. Ambee API keys can be used to access this data for various applications such as weather forecasting, air quality monitoring, and more.",
 		}
 
 		if verify {

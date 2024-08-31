@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Kanban,
 				Raw:          []byte(resMatch),
+				Description:  "KanbanTool is a project management software that helps visualize and optimize workflow. Kanban API keys can be used to access and modify project data.",
 			}
 
 			if verify {

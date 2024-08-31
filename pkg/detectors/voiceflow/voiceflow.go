@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Voiceflow,
 			Raw:          []byte(resMatch),
+			Description:  "Voiceflow is an AI service designed to transact with customers. API keys may be used to access customer data",
 		}
 
 		if verify {

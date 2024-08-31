@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Scrapfly,
 			Raw:          []byte(resMatch),
+			Description:  "Scrapfly is a web scraping service providing APIs to extract and process web data. Scrapfly API keys can be used to access and manipulate this data.",
 		}
 
 		if verify {

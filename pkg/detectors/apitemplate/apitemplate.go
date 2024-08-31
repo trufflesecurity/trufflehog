@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_APITemplate,
 			Raw:          []byte(resMatch),
+			Description:  "APITemplate is a service used to generate documents and images from templates. APITemplate API keys can be used to access and generate these documents and images.",
 		}
 
 		if verify {

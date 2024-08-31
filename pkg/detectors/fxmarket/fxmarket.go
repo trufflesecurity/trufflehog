@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FXMarket,
 			Raw:          []byte(resMatch),
+			Description:  "Fxmarket is a financial market for trading currencies. Fxmarket API keys can be used to access and modify currency trading data.",
 		}
 
 		if verify {

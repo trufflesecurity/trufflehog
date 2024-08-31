@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Intercom,
 			Raw:          []byte(resMatch),
+			Description:  "Intercom is a customer messaging platform that allows businesses to communicate with customers. Intercom tokens can be used to access and manage customer data and communication.",
 		}
 
 		if verify {

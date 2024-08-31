@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_YouNeedABudget,
 			Raw:          []byte(resMatch),
+			Description:  "YouNeedABudget is a budgeting tool that allows users to manage their personal finances. The API keys can be used to access and modify a user's financial data.",
 		}
 
 		if verify {

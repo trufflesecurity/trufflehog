@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Cloudplan,
 			Raw:          []byte(resMatch),
+			Description:  "Cloudplan is a service that offers cloud-based business solutions. Cloudplan session IDs can be used to access and manage user sessions and data.",
 		}
 
 		if verify {

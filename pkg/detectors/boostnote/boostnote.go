@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_BoostNote,
 			Raw:          []byte(resMatch),
+			Description:  "BoostNote is a note-taking application. The secret detected here is likely an API key or token used to access BoostNote services.",
 		}
 
 		if verify {

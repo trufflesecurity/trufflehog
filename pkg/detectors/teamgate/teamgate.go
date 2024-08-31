@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Teamgate,
 				Raw:          []byte(resMatch),
+				Description:  "Teamgate is a sales CRM platform. Teamgate tokens and keys can be used to access and manage sales data and CRM functionalities.",
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.teamgate.com/v4/users", nil)

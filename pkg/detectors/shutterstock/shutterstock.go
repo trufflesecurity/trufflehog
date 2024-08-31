@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Shutterstock,
 				Raw:          []byte(resSecretMatch),
+				Description:  "Shutterstock is a global provider of stock photography, footage, music, and editing tools. Shutterstock API keys can be used to access and modify this content.",
 			}
 
 			if verify {

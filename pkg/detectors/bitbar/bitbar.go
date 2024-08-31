@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Bitbar,
 			Raw:          []byte(resMatch),
+			Description:  "Bitbar provides a cloud-based mobile app testing platform. Bitbar API keys can be used to access and manage testing resources and data.",
 		}
 
 		if verify {

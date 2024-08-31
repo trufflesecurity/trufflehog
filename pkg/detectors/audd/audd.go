@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Audd,
 			Raw:          []byte(resMatch),
+			Description:  "Audd is a music recognition service. Audd API tokens can be used to access the Audd API services for recognizing music and obtaining metadata.",
 		}
 
 		if verify {

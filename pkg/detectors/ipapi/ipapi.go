@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Ipapi,
 			Raw:          []byte(resMatch),
+			Description:  "Ipapi provides an API for IP address lookup and geolocation. Ipapi keys can be used to access this service and retrieve geolocation data for IP addresses.",
 		}
 
 		if verify {

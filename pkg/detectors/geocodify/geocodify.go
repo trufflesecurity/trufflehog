@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Geocodify,
 			Raw:          []byte(resMatch),
+			Description:  "Geocodify is a service that provides geocoding and reverse geocoding capabilities. Geocodify API keys can be used to access these geocoding services.",
 		}
 
 		if verify {

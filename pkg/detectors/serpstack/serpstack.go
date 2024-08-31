@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SerpStack,
 			Raw:          []byte(resMatch),
+			Description:  "SerpStack is an API service used to scrape search engine results. SerpStack keys can be used to access and retrieve search data.",
 		}
 
 		if verify {

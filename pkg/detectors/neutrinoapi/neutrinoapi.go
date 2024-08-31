@@ -59,6 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_NeutrinoApi,
 				Raw:          []byte(resMatch),
+				Description:  "Neutrino API provides a variety of services including data tools, security tools, and more. Neutrino API keys can be used to access these services.",
 			}
 
 			if verify {

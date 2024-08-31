@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ContentfulPersonalAccessToken,
 			Raw:          []byte(keyRes),
+			Description:  "Contentful is a content management system (CMS) that allows users to manage and deliver digital content. Contentful Personal Access Tokens can be used to access and modify this content.",
 		}
 
 		if verify {

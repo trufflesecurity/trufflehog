@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Miro,
 			Raw:          []byte(resMatch),
+			Description:  "Miro is an online collaborative whiteboarding platform. Miro API keys can be used to access and modify data and collaborate on whiteboards.",
 		}
 
 		if verify {

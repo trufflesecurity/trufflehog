@@ -43,6 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Blogger,
 			Raw:          []byte(resMatch),
+			Description:  "Blogger API keys can be used to access and manage blogs on the Blogger platform.",
 		}
 
 		if verify {

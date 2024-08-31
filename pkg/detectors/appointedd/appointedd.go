@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Appointedd,
 			Raw:          []byte(resMatch),
+			Description:  "Appointedd provides online booking and scheduling services. The API key can be used to access and manage booking data.",
 		}
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.appointedd.com/v1/availability/slots", nil)
@@ -61,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				body := string(bodyBytes)
 
-				if strings.Contains(body, "total") {
+				if strings.contains(body, "total") {
 					s1.Verified = true
 				}
 			}

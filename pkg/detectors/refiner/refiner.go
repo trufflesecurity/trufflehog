@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Refiner,
 			Raw:          []byte(resMatch),
+			Description:  "Refiner is a user feedback platform. Refiner keys can be used to authenticate and identify users within the Refiner platform.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Omnisend,
 			Raw:          []byte(resMatch),
+			Description:  "Omnisend is a marketing automation platform focused on e-commerce. Omnisend API keys can be used to access and manage marketing campaigns, contacts, and other resources within the Omnisend platform.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Transferwise,
 			Raw:          []byte(resMatch),
+			Description:  "TransferWise (now known as Wise) is an international money transfer service. TransferWise API keys can be used to access and manage money transfers.",
 		}
 
 		if verify {

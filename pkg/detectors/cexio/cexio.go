@@ -71,6 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_CexIO,
 					Raw:          []byte(resKeyMatch),
 					RawV2:        []byte(resUserIdMatch + resSecretMatch),
+					Description:  "CexIO is a cryptocurrency exchange platform. CexIO API keys can be used to access and manage cryptocurrency accounts and transactions.",
 				}
 
 				if verify {

@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_MapBox,
 					Raw:          []byte(resMatch),
+					Description:  "Mapbox provides location-based services and APIs. Mapbox access tokens can be used to interact with these services and modify data.",
 				}
 
 				if verify {

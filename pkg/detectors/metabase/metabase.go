@@ -64,6 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Metabase,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resURLMatch),
+				Description:  "Metabase is an open-source business intelligence tool. Metabase session tokens can be used to access and interact with the Metabase API.",
 			}
 
 			if verify {

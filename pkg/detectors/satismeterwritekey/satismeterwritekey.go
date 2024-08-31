@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SatismeterWritekey,
 			Raw:          []byte(resMatch),
+			Description:  "Satismeter is a customer feedback platform. Satismeter Writekeys can be used to send event data to Satismeter's API.",
 		}
 
 		if verify {

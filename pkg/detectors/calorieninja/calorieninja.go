@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CalorieNinja,
 			Raw:          []byte(resMatch),
+			Description:  "CalorieNinja is a service that provides nutritional information for various foods. CalorieNinja API keys can be used to access this nutritional data.",
 		}
 
 		if verify {

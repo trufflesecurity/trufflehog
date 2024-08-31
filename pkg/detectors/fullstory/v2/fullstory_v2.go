@@ -52,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},
+			Description: "Fullstory is a digital experience analytics platform. Fullstory keys can be used to access user session data and analytics.",
 		}
 
 		if verify {

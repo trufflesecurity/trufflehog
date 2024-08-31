@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FrameIO,
 			Raw:          []byte(resMatch),
+			Description:  "Frame.io is a video review and collaboration platform. Frame.io API keys can be used to access and manage video projects and assets.",
 		}
 
 		if verify {

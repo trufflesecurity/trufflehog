@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Heroku,
 			Raw:          []byte(resMatch),
+			Description:  "Heroku is a cloud platform that lets companies build, deliver, monitor and scale apps. Heroku API keys can be used to access and manage Heroku applications and services.",
 		}
 
 		if verify {

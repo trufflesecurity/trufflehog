@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Restpack,
 			Raw:          []byte(resMatch),
+			Description:  "Restpack is a service that provides APIs for converting HTML to PDF, taking screenshots, and more. Restpack API keys can be used to access these services.",
 		}
 
 		if verify {

@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Confluent,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecret),
+				Description:  "Confluent provides a streaming platform based on Apache Kafka to help companies harness their data in real-time. Confluent API keys can be used to access and manage Kafka clusters.",
 			}
 
 			if verify {

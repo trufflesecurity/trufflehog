@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_VirusTotal,
 			Raw:          []byte(resMatch),
+			Description:  "VirusTotal is an online service that analyzes files and URLs for viruses, worms, trojans, and other kinds of malicious content. VirusTotal API keys can be used to access and integrate this service into applications.",
 		}
 
 		if verify {

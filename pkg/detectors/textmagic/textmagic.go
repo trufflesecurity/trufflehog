@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Textmagic,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resUser),
+				Description:  "Textmagic is a service for sending and receiving text messages. Textmagic API keys can be used to access and manage text messaging services.",
 			}
 
 			if verify {

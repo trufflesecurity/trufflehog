@@ -58,6 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Dotmailer,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resPassMatch),
+				Description:  "Dotmailer is an email marketing automation platform. API keys can be used to access and manage email campaigns and related data.",
 			}
 			if verify {
 				timeout := 10 * time.Second

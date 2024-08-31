@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     resId,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resId),
+				Description:  "Discord bot tokens are used to authenticate and control Discord bots. These tokens can be used to interact with the Discord API to perform various bot-related operations.",
 			}
 
 			if verify {

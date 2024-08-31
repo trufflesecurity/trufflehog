@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Onesignal,
 			Raw:          []byte(resMatch),
+			Description:  "OneSignal is a customer engagement platform that enables businesses to send push notifications, in-app messages, SMS, and emails. OneSignal API keys can be used to access and send messages through these channels.",
 		}
 
 		if verify {

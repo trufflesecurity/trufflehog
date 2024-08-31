@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AppOptics,
 			Raw:          []byte(resMatch),
+			Description:  "AppOptics is a cloud-based infrastructure monitoring service. AppOptics API keys can be used to access and manage monitoring data and configurations.",
 		}
 
 		if verify {

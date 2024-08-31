@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Ubidots,
 			Raw:          []byte(resMatch),
+			Description:  "Ubidots is an IoT platform that provides tools to manage and analyze IoT devices. Ubidots tokens can be used to access and manipulate data from IoT devices.",
 		}
 
 		if verify {

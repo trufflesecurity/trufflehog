@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Finage,
 			Raw:          []byte(resMatch),
+			Description:  "Finage provides financial data APIs for stocks, forex, and cryptocurrencies. Finage API keys can be used to access and retrieve financial data.",
 		}
 
 		if verify {

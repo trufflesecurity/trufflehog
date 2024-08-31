@@ -51,6 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_NGC,
 				Raw:          []byte(resMatch),
+				Description:  "Nvidia's API for AI related things",
 			}
 
 			if verify {

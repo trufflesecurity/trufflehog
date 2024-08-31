@@ -52,6 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MeaningCloud,
 			Raw:          []byte(resMatch),
+			Description:  "MeaningCloud is a text analytics service used to extract insights from unstructured content. MeaningCloud API keys can be used to access and utilize these text analytics services.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Yandex,
 			Raw:          []byte(resMatch),
+			Description:  "Yandex is a technology company that builds intelligent products and services powered by machine learning. Yandex API keys can be used to access and interact with various Yandex services.",
 		}
 
 		if verify {

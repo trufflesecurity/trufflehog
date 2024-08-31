@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Dandelion,
 			Raw:          []byte(resMatch),
+			Description:  "Dandelion is a text analysis service. Dandelion tokens can be used to access and analyze text data using their APIs.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Geoapify,
 			Raw:          []byte(resMatch),
+			Description:  "Geoapify provides APIs for geolocation services, including geocoding, routing, and places. Geoapify API keys can be used to access these services.",
 		}
 
 		if verify {

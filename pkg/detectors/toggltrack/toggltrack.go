@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TogglTrack,
 			Raw:          []byte(resMatch),
+			Description:  "TogglTrack is a time tracking tool. TogglTrack API keys can be used to access and manage time tracking data.",
 		}
 
 		if verify {

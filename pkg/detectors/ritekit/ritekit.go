@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_RiteKit,
 			Raw:          []byte(resMatch),
+			Description:  "RiteKit is a social media toolkit that provides various APIs for managing social media content and analytics. RiteKit API keys can be used to access and manage social media data.",
 		}
 
 		if verify {

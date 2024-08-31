@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PlanviewLeanKit,
 				Raw:          []byte(resMatch),
+				Description:  "Planview LeanKit is a visual project delivery tool that enables teams to apply Lean management principles to their work. The detected credential can be used to access and manage LeanKit accounts.",
 			}
 
 			if verify {

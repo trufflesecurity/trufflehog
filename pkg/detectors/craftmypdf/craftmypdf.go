@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CraftMyPDF,
 			Raw:          []byte(resMatch),
+			Description:  "CraftMyPDF is a service for generating PDFs from templates and data. CraftMyPDF API keys can be used to access and manage PDF generation tasks.",
 		}
 
 		if verify {

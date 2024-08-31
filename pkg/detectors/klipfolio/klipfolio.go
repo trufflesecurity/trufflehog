@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Klipfolio,
 			Raw:          []byte(resMatch),
+			Description:  "Klipfolio is a cloud-based business intelligence platform that provides dashboards and reporting tools. Klipfolio API keys can be used to access and manage data and visualizations within the platform.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ZipCodeAPI,
 			Raw:          []byte(resMatch),
+			Description:  "ZipCodeAPI provides a service for retrieving zip code information and calculating distances between zip codes. ZipCodeAPI keys can be used to access these services.",
 		}
 
 		if verify {

@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: s.Type(),
 			Raw:          []byte(token),
+			Description:  "Google OAuth 2.0 tokens are used for authenticating and authorizing access to Google APIs and services.",
 		}
 
 		if verify {

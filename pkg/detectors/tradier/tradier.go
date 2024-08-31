@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Tradier,
 			Raw:          []byte(resMatch),
+			Description:  "Tradier is a financial services provider that offers a trading platform and API. Tradier API keys can be used to access and manage trading accounts and execute trades.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Meistertask,
 			Raw:          []byte(resMatch),
+			Description:  "Meistertask is a task management tool that allows users to manage projects and tasks. Meistertask API keys can be used to access and modify project and task data.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mailsac,
 			Raw:          []byte(resMatch),
+			Description:  "Mailsac is a disposable email service used for testing and temporary email purposes. Mailsac API keys can be used to access and manage email addresses and messages.",
 		}
 
 		if verify {

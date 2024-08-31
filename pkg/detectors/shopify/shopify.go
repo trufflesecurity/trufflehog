@@ -51,6 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Shopify,
 				Redacted:     domainRes,
 				Raw:          []byte(key + domainRes),
+				Description:  "An ecommerce platform, API keys can be used to access customer data",
 			}
 
 			if verify {

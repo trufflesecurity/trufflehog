@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Uplead,
 			Raw:          []byte(resMatch),
+			Description:  "Uplead is a B2B contact data provider. Uplead API keys can be used to access and manage contact data.",
 		}
 
 		if verify {

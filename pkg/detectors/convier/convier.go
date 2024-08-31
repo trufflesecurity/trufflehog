@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Convier,
 			Raw:          []byte(resMatch),
+			Description:  "Convier is a service for managing and verifying event data. Convier keys can be used to interact with the Convier API to manage event data.",
 		}
 
 		if verify {

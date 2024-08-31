@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_OpenVpn,
 					Raw:          []byte(clientSecretRes),
 					RawV2:        []byte(clientIDRes + clientSecretRes),
+					Description:  "OpenVPN is a virtual private network (VPN) solution. OpenVPN API credentials can be used to manage and configure VPN connections and settings.",
 				}
 
 				if verify {

@@ -64,6 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(sid),
 				RawV2:        []byte(sid + key),
 				Redacted:     sid,
+				Description:  "Twilio is a cloud communications platform that allows software developers to programmatically make and receive phone calls, send and receive text messages, and perform other communication functions using its web service APIs.",
 			}
 
 			s1.ExtraData = map[string]string{

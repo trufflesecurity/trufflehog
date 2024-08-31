@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_HelpCrunch,
 			Raw:          []byte(resMatch),
+			Description:  "HelpCrunch is a customer communication platform offering live chat, email automation, and more. HelpCrunch API keys can be used to access and manage customer interactions and data.",
 		}
 
 		if verify {

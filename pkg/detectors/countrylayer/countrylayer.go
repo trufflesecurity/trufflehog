@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CountryLayer,
 			Raw:          []byte(resMatch),
+			Description:  "CountryLayer is a service that provides information about countries. CountryLayer API keys can be used to access this information.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Salescookie,
 			Raw:          []byte(resMatch),
+			Description:  "Salescookie is a sales performance management tool. Salescookie API keys can be used to create and manage transactions within the platform.",
 		}
 
 		if verify {

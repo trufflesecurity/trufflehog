@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Planyo,
 			Raw:          []byte(resMatch),
+			Description:  "Planyo is an online reservation system that offers various API methods to interact with its services. Planyo API keys can be used to access and modify reservation data.",
 		}
 
 		if verify {

@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ParallelDots,
 			Raw:          []byte(resMatch),
+			Description:  "ParallelDots is an AI service offering various APIs for text analysis. API keys can be used to access these services.",
 		}
 
 		if verify {
@@ -82,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "intent") {
+				if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.contains(body, "intent") {
 					s1.Verified = true
 				}
 			}

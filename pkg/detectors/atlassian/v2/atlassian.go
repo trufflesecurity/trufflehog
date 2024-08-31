@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Atlassian,
 			Raw:          []byte(match),
+			Description:  "Atlassian is a software company that provides tools for project management, software development, and collaboration. Atlassian tokens can be used to access and manage these tools and services.",
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
 				"version":        fmt.Sprintf("%d", s.Version()),

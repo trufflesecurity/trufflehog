@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Okta,
 				Raw:          []byte(token),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", domain, token)),
+				Description:  "Okta is an identity and access management service. Okta tokens can be used to authenticate and access various resources and APIs within an organization.",
 			}
 
 			if verify {
@@ -70,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer resp.Body.Close()
 				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 					body, _ := io.ReadAll(resp.Body)
-					if strings.Contains(string(body), "activated") {
+					if strings.contains(string(body), "activated") {
 						s.Verified = true
 					}
 				}

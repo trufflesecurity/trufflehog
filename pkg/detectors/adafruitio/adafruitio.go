@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AdafruitIO,
 			Raw:          []byte(resMatch),
+			Description:  "Adafruit IO is a cloud service used for IoT applications. Adafruit IO keys can be used to access and control data and devices connected to the platform.",
 		}
 
 		if verify {

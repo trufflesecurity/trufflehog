@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Wrike,
 			Raw:          []byte(resMatch),
+			Description:  "Wrike is a collaborative work management platform that helps teams organize and manage their work. Wrike API keys can be used to access and modify data within Wrike.",
 		}
 
 		if verify {

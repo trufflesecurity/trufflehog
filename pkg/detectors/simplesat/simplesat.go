@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Simplesat,
 			Raw:          []byte(resMatch),
+			Description:  "Simplesat is a customer satisfaction survey tool. Simplesat API keys can be used to access and manage customer feedback data.",
 		}
 
 		if verify {

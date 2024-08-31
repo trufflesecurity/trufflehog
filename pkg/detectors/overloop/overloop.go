@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Overloop,
 			Raw:          []byte(resMatch),
+			Description:  "Overloop is a service that provides API keys for accessing its platform. These keys can be used to interact with the Overloop API to manage and retrieve user data.",
 		}
 
 		if verify {

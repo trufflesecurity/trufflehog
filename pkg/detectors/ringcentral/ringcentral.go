@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_RingCentral,
 				Raw:          []byte(resMatch),
+				Description:  "RingCentral is a cloud-based communication system that offers messaging, video conferencing, and phone services. RingCentral API keys can be used to access and manage these services.",
 			}
 
 			if verify {

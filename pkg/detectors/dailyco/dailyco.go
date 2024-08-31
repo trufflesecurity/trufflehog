@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_DailyCO,
 			Raw:          []byte(resMatch),
+			Description:  "DailyCO is a video calling service that provides APIs to create and manage video calls. The API keys can be used to access and control these video call services.",
 		}
 
 		if verify {

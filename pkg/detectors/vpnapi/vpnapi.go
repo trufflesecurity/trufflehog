@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Vpnapi,
 			Raw:          []byte(resMatch),
+			Description:  "Vpnapi provides information about IP addresses, including geolocation and VPN detection. Vpnapi keys can be used to access this information.",
 		}
 
 		if verify {

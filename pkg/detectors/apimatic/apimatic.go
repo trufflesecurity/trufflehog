@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_APIMatic,
 				Raw:          []byte(userPatMatch),
 				RawV2:        []byte(userPatMatch + passPatMatch),
+				Description:  "APIMatic provides tools for generating SDKs, API documentation, and code snippets. APIMatic credentials can be used to access and manage these tools and services.",
 			}
 			if verify {
 				timeout := 10 * time.Second

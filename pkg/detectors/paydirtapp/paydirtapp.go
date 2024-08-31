@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Paydirtapp,
 			Raw:          []byte(resMatch),
+			Description:  "Paydirtapp is a time tracking and invoicing app. Paydirtapp API keys can be used to access and manage user data and billing information.",
 		}
 
 		if verify {

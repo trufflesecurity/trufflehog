@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Coinlib,
 			Raw:          []byte(resMatch),
+			Description:  "Coinlib is a cryptocurrency data provider. Coinlib API keys can be used to access and retrieve cryptocurrency data.",
 		}
 
 		if verify {

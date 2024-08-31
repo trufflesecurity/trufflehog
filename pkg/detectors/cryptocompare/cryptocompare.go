@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CryptoCompare,
 			Raw:          []byte(resMatch),
+			Description:  "CryptoCompare is a cryptocurrency market data provider. CryptoCompare API keys can be used to access and retrieve market data.",
 		}
 
 		if verify {

@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Sparkpost,
 			Raw:          []byte(resMatch),
+			Description:  "Sparkpost is an email delivery service. Sparkpost API keys can be used to send and manage emails through Sparkpost's API.",
 		}
 
 		if verify {

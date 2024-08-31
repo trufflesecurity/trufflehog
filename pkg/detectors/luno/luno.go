@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Luno,
 				Raw:          []byte(tokenPatMatch),
+				Description:  "Luno is a cryptocurrency exchange platform that allows users to buy, sell, and store digital currencies. Luno API keys can be used to access account information and perform transactions.",
 			}
 
 			if verify {

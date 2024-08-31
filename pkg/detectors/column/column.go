@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Column,
 			Raw:          []byte(resMatch),
+			Description:  "Column is a service used for managing entity data. Column keys can be used to access and modify this data.",
 		}
 
 		if verify {

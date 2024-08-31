@@ -63,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
+	for _, match := matches {
 		// First match is entire regex, second is the first group.
 		if len(match) != 2 {
 			continue
@@ -86,6 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"version":        fmt.Sprintf("%d", s.Version()),
 			},
 			AnalysisInfo: map[string]string{"key": token},
+			Description:  "GitHub is a web-based platform used for version control and collaborative software development. GitHub tokens can be used to access and modify repositories and other resources.",
 		}
 
 		if verify {

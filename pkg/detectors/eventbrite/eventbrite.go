@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Eventbrite,
 			Raw:          []byte(resMatch),
+			Description:  "Eventbrite is an event management and ticketing website. Eventbrite API keys can be used to access and manage event data.",
 		}
 
 		if verify {

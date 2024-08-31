@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SkyBiometry,
 				Raw:          []byte(resSecretMatch),
+				Description:  "SkyBiometry is a facial recognition service. SkyBiometry API keys can be used to access and utilize their facial recognition API.",
 			}
 
 			if verify {

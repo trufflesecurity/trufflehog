@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Postman,
 			Raw:          []byte(resMatch),
+			Description:  "Postman is a collaboration platform for API development. Postman API keys can be used to access and modify collections, environments, and other resources.",
 		}
 
 		if verify {

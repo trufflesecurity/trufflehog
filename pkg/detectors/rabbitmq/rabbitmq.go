@@ -57,6 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_RabbitMQ,
 			Raw:          []byte(urlMatch),
 			Redacted:     redact,
+			Description:  "RabbitMQ is an open-source message broker software that originally implemented the Advanced Message Queuing Protocol (AMQP). RabbitMQ credentials can be used to access and manage message queues.",
 		}
 
 		if verify {

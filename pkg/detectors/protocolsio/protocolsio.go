@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ProtocolsIO,
 			Raw:          []byte(resMatch),
+			Description:  "Protocols.io is a platform for developing and sharing reproducible research protocols. The API keys can be used to access and manage protocols and data on the platform.",
 		}
 
 		if verify {

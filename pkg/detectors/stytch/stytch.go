@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Stytch,
 				Raw:          []byte(tokenPatMatch),
+				Description:  "Stytch is a platform for passwordless authentication. Stytch API keys can be used to access and manage authentication services.",
 			}
 
 			if verify {

@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WalkScore,
 			Raw:          []byte(resMatch),
+			Description:  "Walkscore API keys can be used to access Walkscore's services for retrieving walkability scores and related data.",
 		}
 
 		if verify {
@@ -62,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, `distance`) {
+				if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.contains(body, `distance`) {
 					s1.Verified = true
 				}
 			}

@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Tickettailor,
 			Raw:          []byte(resMatch),
+			Description:  "Tickettailor is an online ticketing platform that allows event organizers to sell tickets. Tickettailor API keys can be used to manage events, orders, and tickets programmatically.",
 		}
 
 		if verify {

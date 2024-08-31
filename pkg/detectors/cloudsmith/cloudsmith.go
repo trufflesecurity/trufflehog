@@ -50,6 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Cloudsmith,
 			Raw:          []byte(resMatch),
+			Description:  "Cloudsmith is a cloud-native package management service. Cloudsmith API keys can be used to manage and distribute packages.",
 		}
 
 		if verify {

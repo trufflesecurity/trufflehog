@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SinchMessage,
 				Raw:          []byte(resMatch),
+				Description:  "Sinch is a cloud-based communications platform that enables businesses to send and receive messages, calls, and other communications. Sinch API keys can be used to access and manage these communication services.",
 			}
 
 			if verify {

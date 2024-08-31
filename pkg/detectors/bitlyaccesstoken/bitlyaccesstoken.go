@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_BitLyAccessToken,
 			Raw:          []byte(resMatch),
+			Description:  "Bitly is a URL shortening service. Bitly access tokens can be used to interact with the Bitly API, allowing users to create, manage, and track shortened URLs.",
 		}
 
 		if verify {

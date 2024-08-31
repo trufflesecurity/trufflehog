@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Flutterwave,
 			Raw:          []byte(resMatch),
+			Description:  "Flutterwave is a payment technology company providing seamless and secure payment solutions for businesses. Flutterwave API keys can be used to access and manage payment services and transactions.",
 		}
 
 		if verify {

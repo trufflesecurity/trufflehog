@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_LarkSuiteApiKey,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecretMatch),
+				Description:  "LarkSuite is a collaboration platform that provides tools for communication, calendar, and cloud storage. LarkSuite API keys can be used to access and manage these services programmatically.",
 			}
 
 			if verify {

@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Anthropic,
 			Raw:          []byte(resMatch),
+			Description:  "Anthropic is an AI research company. The API keys can be used to access their AI models and services.",
 		}
 
 		if verify {

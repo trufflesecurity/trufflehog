@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Currencylayer,
 			Raw:          []byte(resMatch),
+			Description:  "An API for converting and exchanging currencies. API keys can read currency data",
 		}
 
 		if verify {

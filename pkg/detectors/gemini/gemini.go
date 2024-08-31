@@ -66,6 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Gemini,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecretMatch),
+				Description:  "Gemini is a cryptocurrency exchange platform. API keys can be used to access and manage account details and perform transactions.",
 			}
 
 			if verify {

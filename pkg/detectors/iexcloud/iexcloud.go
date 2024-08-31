@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Iexcloud,
 			Raw:          []byte(resMatch),
+			Description:  "IEX Cloud is a financial data platform providing access to a wide range of financial data APIs. IEX Cloud tokens can be used to access and retrieve financial data.",
 		}
 
 		if verify {

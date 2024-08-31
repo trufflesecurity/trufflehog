@@ -72,6 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     appRes,
 				Raw:          []byte(keyRes),
 				RawV2:        []byte(keyRes + appRes),
+				Description:  "Airtable is a cloud collaboration service that offers database-like features. Airtable API keys can be used to access and modify data within Airtable bases.",
 			}
 
 			if verify {

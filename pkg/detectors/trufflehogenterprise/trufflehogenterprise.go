@@ -64,6 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_TrufflehogEnterprise,
 					Raw:          []byte(resKeyMatch),
+					Description:  "TruffleHog Enterprise is a tool for detecting and verifying secrets in your codebase. The keys and secrets detected can be used to access TruffleHog Enterprise services.",
 				}
 
 				if verify {

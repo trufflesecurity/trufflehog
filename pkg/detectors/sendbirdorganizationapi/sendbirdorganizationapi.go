@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SendbirdOrganizationAPI,
 			Raw:          []byte(resMatch),
+			Description:  "Sendbird is a chat and messaging platform. Sendbird API tokens can be used to access and manage Sendbird applications and services.",
 		}
 
 		if verify {

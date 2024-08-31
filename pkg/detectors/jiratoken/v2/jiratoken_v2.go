@@ -74,6 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_JiraToken,
 					Raw:          []byte(resToken),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", resEmail, resToken, resDomain)),
+					Description:  "Jira is a proprietary issue tracking product developed by Atlassian that allows bug tracking and agile project management. Jira tokens can be used to authenticate API requests.",
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
 						"version":        fmt.Sprintf("%d", s.Version()),

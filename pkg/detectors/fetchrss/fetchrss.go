@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Fetchrss,
 			Raw:          []byte(resMatch),
+			Description:  "FetchRSS is a service used to convert web content into RSS feeds. FetchRSS API keys can be used to manage and access these feeds.",
 		}
 
 		if verify {
@@ -61,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				body := string(bodyBytes)
 
-				if !strings.Contains(body, "Not authorised") {
+				if !strings.contains(body, "Not authorised") {
 					s1.Verified = true
 				}
 			}

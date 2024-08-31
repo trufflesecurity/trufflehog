@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Insightly,
 			Raw:          []byte(resMatch),
+			Description:  "Insightly is a customer relationship management (CRM) platform. Insightly API keys can be used to access and manage CRM data.",
 		}
 
 		if verify {

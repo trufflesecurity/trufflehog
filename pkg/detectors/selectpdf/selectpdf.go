@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SelectPDF,
 			Raw:          []byte(resMatch),
+			Description:  "SelectPDF is a service that allows users to convert web pages to PDF documents. SelectPDF API keys can be used to perform these conversions programmatically.",
 		}
 
 		if verify {

@@ -30,7 +30,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Zipcodebase secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Zipcodebase,
 			Raw:          []byte(resMatch),
+			Description:  "Zipcodebase is a service that provides access to a database of postal codes. The API keys can be used to query this database for information related to postal codes.",
 		}
 
 		if verify {

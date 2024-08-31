@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FixerIO,
 			Raw:          []byte(resMatch),
+			Description:  "Fixer.io is a foreign exchange rates and currency conversion API. Fixer.io API keys can be used to access and retrieve current and historical foreign exchange rates.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Bugsnag,
 			Raw:          []byte(resMatch),
+			Description:  "Bugsnag is an error monitoring service for web and mobile applications. Bugsnag API keys can be used to report and manage errors.",
 		}
 
 		if verify {

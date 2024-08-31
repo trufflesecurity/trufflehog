@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Mite,
 				Raw:          []byte(resMatch),
+				Description:  "Mite is a time tracking tool. Mite API keys can be used to access and modify time tracking data.",
 			}
 
 			if verify {

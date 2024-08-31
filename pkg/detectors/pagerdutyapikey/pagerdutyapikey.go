@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PagerDutyApiKey,
 			Raw:          []byte(resMatch),
+			Description:  "PagerDuty is an incident management platform that provides reliable notifications, automatic escalations, on-call scheduling, and other functionality to help teams detect and fix infrastructure problems quickly. PagerDuty API keys can be used to access and manage these functionalities.",
 		}
 
 		if verify {

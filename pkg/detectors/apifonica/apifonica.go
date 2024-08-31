@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_ApiFonica,
 				Raw:          []byte(resMatch),
+				Description:  "Apifonica is a cloud communication platform that provides APIs for messaging, voice, and other communication services. Apifonica keys can be used to access and manage these services.",
 			}
 
 			if verify {

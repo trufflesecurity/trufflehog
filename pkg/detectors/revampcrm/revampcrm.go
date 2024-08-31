@@ -55,6 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_RevampCRM,
 				Raw:          []byte(tokenPatMatch),
+				Description:  "RevampCRM is a customer relationship management service. The credentials can be used to access and manage customer data.",
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://app.revampcrm.com/api/1.0/User/WhoAmI", nil)

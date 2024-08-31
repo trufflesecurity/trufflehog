@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AsanaPersonalAccessToken,
 			Raw:          []byte(resMatch),
+			Description:  "Asana is a web and mobile application designed to help teams organize, track, and manage their work. Asana Personal Access Tokens can be used to access and modify data within Asana.",
 		}
 
 		if verify {

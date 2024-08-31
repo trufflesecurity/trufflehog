@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FlightApi,
 			Raw:          []byte(resMatch),
+			Description:  "FlightApi is a service used for accessing flight-related data. FlightApi keys can be used to query flight information and other related services.",
 		}
 
 		if verify {

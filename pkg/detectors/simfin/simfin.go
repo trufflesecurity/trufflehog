@@ -32,7 +32,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify SimFin secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SimFin,
 			Raw:          []byte(resMatch),
+			Description:  "SimFin provides financial data and APIs for accessing this data. SimFin API keys can be used to access and retrieve financial data.",
 		}
 
 		if verify {

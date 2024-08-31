@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TerraformCloudPersonalToken,
 			Raw:          []byte(resMatch),
+			Description:  "Terraform Cloud is a service that provides infrastructure automation. Terraform Cloud personal tokens can be used to access and manage infrastructure as code.",
 		}
 
 		if verify {

@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_OpenCageData,
 			Raw:          []byte(resMatch),
+			Description:  "OpenCageData provides a geocoding API to convert coordinates to and from places. OpenCageData keys can be used to access the service's geocoding capabilities.",
 		}
 
 		if verify {

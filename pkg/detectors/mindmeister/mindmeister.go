@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mindmeister,
 			Raw:          []byte(resMatch),
+			Description:  "Mindmeister is a mind mapping tool that helps users organize and visualize their thoughts. Mindmeister API keys can be used to access and manipulate mind maps and other data within the platform.",
 		}
 
 		if verify {

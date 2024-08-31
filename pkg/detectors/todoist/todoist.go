@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Todoist,
 			Raw:          []byte(resMatch),
+			Description:  "Todoist is a task management application. Todoist API keys can be used to access and manage tasks and projects within a user's account.",
 		}
 
 		if verify {

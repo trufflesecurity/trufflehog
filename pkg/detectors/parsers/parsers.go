@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Parsers,
 			Raw:          []byte(resMatch),
+			Description:  "Parsers is a service used for parsing SQL queries. Parsers API keys can be used to access and modify this data.",
 		}
 
 		if verify {

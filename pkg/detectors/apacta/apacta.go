@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Apacta,
 			Raw:          []byte(resMatch),
+			Description:  "Apacta is a project management tool designed for the construction industry. Apacta API keys can be used to access and manage project data within the Apacta platform.",
 		}
 
 		if verify {

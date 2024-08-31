@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Lexigram,
 			Raw:          []byte(resMatch),
+			Description:  "Lexigram is a healthcare data service that provides an API for medical terminology and data. Lexigram API keys can be used to access and retrieve medical data.",
 		}
 
 		if verify {

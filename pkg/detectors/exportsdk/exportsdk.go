@@ -53,6 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_ExportSDK,
 				Raw:          []byte(resMatch),
+				Description:  "ExportSDK is a service used for exporting data and generating PDFs. ExportSDK keys can be used to authenticate API requests and generate documents.",
 			}
 
 			if verify {

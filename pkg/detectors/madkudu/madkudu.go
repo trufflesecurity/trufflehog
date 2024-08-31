@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MadKudu,
 			Raw:          []byte(resMatch),
+			Description:  "MadKudu is a predictive lead scoring service that helps B2B companies identify the best-fit leads based on data. MadKudu API keys can be used to access and manipulate lead scoring data.",
 		}
 
 		if verify {

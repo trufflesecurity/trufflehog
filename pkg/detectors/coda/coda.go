@@ -46,6 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Coda,
 			Raw:          []byte(resMatch),
+			Description:  "Coda is a platform for building collaborative documents and applications. Coda API keys can be used to access and manipulate data within Coda documents and applications.",
 		}
 
 		if verify {

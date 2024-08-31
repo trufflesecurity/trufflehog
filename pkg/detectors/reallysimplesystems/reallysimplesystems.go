@@ -47,6 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ReallySimpleSystems,
 			Raw:          []byte(resMatch),
+			Description:  "ReallySimpleSystems is a CRM system. The detected credentials can be used to access and manage customer relationship data and workflows within the ReallySimpleSystems platform.",
 		}
 
 		if verify {

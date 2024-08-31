@@ -56,6 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_ElevenLabs,
 			Raw:          []byte(match),
 			ExtraData:    map[string]string{"version": "1"},
+			Description:  "Elevenlabs is an AI-driven voice synthesis platform. Elevenlabs API keys can be used to access and manipulate voice synthesis features and services.",
 		}
 
 		if verify {

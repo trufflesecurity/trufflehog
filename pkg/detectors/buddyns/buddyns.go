@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_BuddyNS,
 			Raw:          []byte(resMatch),
+			Description:  "BuddyNS is a DNS hosting service. BuddyNS API keys can be used to manage DNS zones and records.",
 		}
 
 		if verify {

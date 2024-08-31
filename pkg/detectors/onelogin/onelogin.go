@@ -54,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(clientID[1]),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", clientID[1], clientSecret[1])),
 				Redacted:     clientID[1],
+				Description:  "OneLogin is an identity and access management provider. OneLogin OAuth client IDs and secrets can be used to authenticate and authorize API requests.",
 			}
 
 			if verify {

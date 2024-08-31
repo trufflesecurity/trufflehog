@@ -49,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(paramsUnsafe.Password),
 			RawV2:        []byte(paramsUnsafe.URL().String()),
 			Redacted:     detectors.RedactURL(*paramsUnsafe.URL()),
+			Description:  "SQL Server is a relational database management system developed by Microsoft. SQL Server credentials can be used to access and manage databases.",
 		}
 
 		if verify {

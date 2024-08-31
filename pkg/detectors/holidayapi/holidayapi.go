@@ -45,6 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_HolidayAPI,
 			Raw:          []byte(resMatch),
+			Description:  "HolidayAPI keys are used to access holiday data for various countries and years. These keys can be used to query and retrieve holiday information programmatically.",
 		}
 
 		if verify {

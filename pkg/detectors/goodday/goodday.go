@@ -44,6 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GoodDay,
 			Raw:          []byte(resMatch),
+			Description:  "GoodDay is a project management tool. GoodDay API tokens can be used to access and manage project data.",
 		}
 
 		if verify {
