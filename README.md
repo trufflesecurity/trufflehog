@@ -1,4 +1,5 @@
 
+v2 is EOL, see `main` for v3 and beyond
 
 # truffleHog
 [![codecov](https://codecov.io/gh/trufflesecurity/truffleHog/branch/master/graph/badge.svg)](https://codecov.io/gh/trufflesecurity/truffleHog)
