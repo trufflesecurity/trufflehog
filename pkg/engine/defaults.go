@@ -480,6 +480,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onelogin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepagecrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onesignal"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onfido"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onfleet"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/openai"
@@ -1628,6 +1629,7 @@ func DefaultDetectors() []detectors.Detector {
 		atlassianv2.Scanner{},
 		netsuite.Scanner{},
 		robinhoodcrypto.Scanner{},
+		onfido.Scanner{},
 	}
 }
 
