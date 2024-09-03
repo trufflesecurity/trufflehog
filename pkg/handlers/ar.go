@@ -25,7 +25,7 @@ func newARHandler() *arHandler {
 func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
-	if feature.ForceSkipArchives {
+	if feature.ForceSkipArchives.Load() {
 		close(archiveChan)
 		return archiveChan, nil
 	}

@@ -51,7 +51,7 @@ func newArchiveHandler() *archiveHandler {
 func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	dataChan := make(chan []byte, defaultBufferSize)
 
-	if feature.ForceSkipArchives {
+	if feature.ForceSkipArchives.Load() {
 		close(dataChan)
 		return dataChan, nil
 	}

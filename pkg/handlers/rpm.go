@@ -25,7 +25,7 @@ func newRPMHandler() *rpmHandler {
 func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
 
-	if feature.ForceSkipArchives {
+	if feature.ForceSkipArchives.Load() {
 		close(archiveChan)
 		return archiveChan, nil
 	}

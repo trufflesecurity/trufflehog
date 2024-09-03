@@ -1,6 +1,8 @@
 package feature
 
+import "sync/atomic"
+
 var (
-	ForceSkipBinaries = false
-	ForceSkipArchives = false
+	ForceSkipBinaries = atomic.Bool{}
+	ForceSkipArchives = atomic.Bool{}
 )
