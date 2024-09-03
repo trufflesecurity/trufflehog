@@ -69,16 +69,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		rawURL, _ := url.Parse(urlMatch)
-		rawURLStr := rawURL.String()
+		//rawURL, _ := url.Parse(urlMatch)
+		parsedURLStr := parsedURL.String()
 		// Removing the path causes possible deduplication issues if some paths have basic auth and some do not.
-		rawURL.Path = ""
+		//rawURL.Path = ""
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_URI,
-			Raw:          []byte(rawURL.String()),
-			RawV2:        []byte(rawURLStr),
-			Redacted:     detectors.RedactURL(*rawURL),
+			Raw:          []byte(parsedURL.String()),
+			RawV2:        []byte(parsedURLStr),
+			Redacted:     detectors.RedactURL(*parsedURL),
 		}
 
 		if verify {
