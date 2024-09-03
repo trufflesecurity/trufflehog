@@ -53,6 +53,7 @@ var thinkstCanaryList = map[string]struct{}{
 	"717712589309": {},
 	"819147034852": {},
 	"992382622183": {},
+	"730335385048": {},
 }
 
 const thinkstMessage = "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries"
@@ -104,6 +105,7 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 // Ensure the scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*scanner)(nil)
 var _ detectors.MultiPartCredentialProvider = (*scanner)(nil)
+var _ detectors.CustomResultsCleaner = (*scanner)(nil)
 
 var (
 	defaultVerificationClient = common.SaneHttpClient()
@@ -244,7 +246,11 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 	}
-	return awsCustomCleanResults(results), nil
+	return results, nil
+}
+
+func (s scanner) ShouldCleanResultsIrrespectiveOfConfiguration() bool {
+	return true
 }
 
 func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOn403 bool) (bool, map[string]string, error) {
@@ -398,7 +404,7 @@ func (s scanner) verifyCanary(resIDMatch, resSecretMatch string) (bool, string, 
 	}
 }
 
-func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
+func (s scanner) CleanResults(results []detectors.Result) []detectors.Result {
 	if len(results) == 0 {
 		return results
 	}

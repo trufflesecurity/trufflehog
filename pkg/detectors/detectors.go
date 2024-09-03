@@ -26,6 +26,22 @@ type Detector interface {
 	Type() detectorspb.DetectorType
 }
 
+// CustomResultsCleaner is an optional interface that a detector can implement to customize how its generated results
+// are "cleaned," which is defined as removing superfluous results from those found in a given chunk. The default
+// implementation of this logic removes all unverified results if there are any verified results, and all unverified
+// results except for one otherwise, but this interface allows a detector to specify different logic. (This logic must
+// be implemented outside results generation because there are circumstances under which the engine should not execute
+// it.)
+type CustomResultsCleaner interface {
+	// CleanResults removes "superfluous" results from a result set (where the definition of "superfluous" is detector-
+	// specific).
+	CleanResults(results []Result) []Result
+	// ShouldCleanResultsIrrespectiveOfConfiguration allows a custom cleaner to instruct the engine to ignore
+	// user-provided configuration that controls whether results are cleaned. (User-provided configuration is not the
+	// only factor that determines whether the engine runs cleaning logic.)
+	ShouldCleanResultsIrrespectiveOfConfiguration() bool
+}
+
 // Versioner is an optional interface that a detector can implement to
 // differentiate instances of the same detector type.
 type Versioner interface {
@@ -82,6 +98,11 @@ type Result struct {
 	// This field should only be populated if the verification process itself failed in a way that provides no
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
 	verificationError error
+
+	// AnalysisInfo should be set with information required for credential
+	// analysis to run. The keys of the map are analyzer specific and
+	// should match what is expected in the corresponding analyzer.
+	AnalysisInfo map[string]string
 }
 
 // SetVerificationError is the only way to set a verification error. Any sensitive values should be passed-in as secrets to be redacted.
@@ -235,4 +256,14 @@ func MustGetBenchmarkData() map[string][]byte {
 func RedactURL(u url.URL) string {
 	u.User = url.UserPassword(u.User.Username(), "********")
 	return strings.TrimSpace(strings.Replace(u.String(), "%2A", "*", -1))
+}
+
+func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
+	parsedURL, err := url.Parse(u)
+	if err != nil {
+		return nil, err
+	}
+	parsedURL.Path = ""
+	parsedURL.RawQuery = ""
+	return parsedURL, nil
 }

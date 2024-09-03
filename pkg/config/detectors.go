@@ -127,7 +127,7 @@ func (id DetectorID) String() string {
 	return fmt.Sprintf("%s.v%d", name, id.Version)
 }
 
-// allDetectors reutrns an ordered slice of all detector types.
+// allDetectors returns an ordered slice of all detector types.
 func allDetectors() []DetectorID {
 	all := make([]DetectorID, 0, len(dpb.DetectorType_name))
 	for id := range dpb.DetectorType_name {

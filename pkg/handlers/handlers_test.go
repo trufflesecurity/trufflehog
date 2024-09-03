@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -26,27 +27,109 @@ func TestHandleFileCancelledContext(t *testing.T) {
 }
 
 func TestHandleFile(t *testing.T) {
-	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 2)}
+	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, 513)}
 
 	// Only one chunk is sent on the channel.
 	// TODO: Embed a zip without making an HTTP request.
 	resp, err := http.Get("https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip")
 	assert.NoError(t, err)
-	if resp != nil && resp.Body != nil {
-		defer resp.Body.Close()
-	}
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	assert.Equal(t, 0, len(reporter.Ch))
 	assert.NoError(t, HandleFile(context.Background(), resp.Body, &sources.Chunk{}, reporter))
 	assert.Equal(t, 1, len(reporter.Ch))
 }
 
+func TestHandleHTTPJson(t *testing.T) {
+	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm_random_data.json")
+	assert.NoError(t, err)
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 513
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func TestHandleHTTPJsonZip(t *testing.T) {
+	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm.zip")
+	assert.NoError(t, err)
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 513
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func BenchmarkHandleHTTPJsonZip(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		func() {
+			resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/sm.zip")
+			assert.NoError(b, err)
+
+			defer func() {
+				if resp != nil && resp.Body != nil {
+					resp.Body.Close()
+				}
+			}()
+
+			chunkCh := make(chan *sources.Chunk, 1)
+
+			b.StartTimer()
+			go func() {
+				defer close(chunkCh)
+				err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+				assert.NoError(b, err)
+			}()
+
+			for range chunkCh {
+			}
+
+			b.StopTimer()
+		}()
+	}
+}
+
 func BenchmarkHandleFile(b *testing.B) {
+	file, err := os.Open("testdata/test.tgz")
+	assert.Nil(b, err)
+	defer file.Close()
+
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		sourceChan := make(chan *sources.Chunk, 1)
-		file, err := os.Open("testdata/test.tgz")
-		assert.Nil(b, err)
-
 		b.StartTimer()
 		go func() {
 			defer close(sourceChan)
@@ -57,6 +140,9 @@ func BenchmarkHandleFile(b *testing.B) {
 		for range sourceChan {
 		}
 		b.StopTimer()
+
+		_, err = file.Seek(0, io.SeekStart)
+		assert.NoError(b, err)
 	}
 }
 
@@ -201,6 +287,31 @@ func TestHandleFileAR(t *testing.T) {
 	assert.Equal(t, wantChunkCount, len(reporter.Ch))
 }
 
+func BenchmarkHandleAR(b *testing.B) {
+	file, err := os.Open("testdata/test.deb")
+	assert.Nil(b, err)
+	defer file.Close()
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		sourceChan := make(chan *sources.Chunk, 1)
+
+		b.StartTimer()
+		go func() {
+			defer close(sourceChan)
+			err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			assert.NoError(b, err)
+		}()
+
+		for range sourceChan {
+		}
+		b.StopTimer()
+
+		_, err = file.Seek(0, io.SeekStart)
+		assert.NoError(b, err)
+	}
+}
+
 func TestHandleFileNonArchive(t *testing.T) {
 	wantChunkCount := 6
 	reporter := sources.ChanReporter{Ch: make(chan *sources.Chunk, wantChunkCount)}
@@ -220,7 +331,7 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 	file, err := os.Open("testdata/testdir.zip")
 	assert.Nil(t, err)
 
-	chunkCh := make(chan *sources.Chunk)
+	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
 		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
@@ -228,6 +339,78 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 	}()
 
 	wantCount := 4
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func TestHandleTar(t *testing.T) {
+	file, err := os.Open("testdata/test.tar")
+	assert.Nil(t, err)
+	defer file.Close()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 1
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func BenchmarkHandleTar(b *testing.B) {
+	file, err := os.Open("testdata/test.tar")
+	assert.Nil(b, err)
+	defer file.Close()
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		sourceChan := make(chan *sources.Chunk, 1)
+
+		b.StartTimer()
+		go func() {
+			defer close(sourceChan)
+			err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: sourceChan})
+			assert.NoError(b, err)
+		}()
+
+		for range sourceChan {
+		}
+		b.StopTimer()
+
+		_, err = file.Seek(0, io.SeekStart)
+		assert.NoError(b, err)
+	}
+}
+
+func TestHandleLargeHTTPJson(t *testing.T) {
+	resp, err := http.Get("https://raw.githubusercontent.com/ahrav/nothing-to-see-here/main/md_random_data.json.zip")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 5121
 	count := 0
 	for range chunkCh {
 		count++

@@ -55,6 +55,11 @@ func TestTwilio_FromChunk(t *testing.T) {
 					Verified:     true,
 					Redacted:     id,
 					RawV2:        []byte(id + secret),
+					ExtraData: map[string]string{
+						"account_sid":    "ACa5b6165773490f33f226d71e7ffacff5",
+						"friendly_name":  "MyServiceName",
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/twilio/",
+					},
 				},
 			},
 			wantErr: false,
@@ -73,6 +78,9 @@ func TestTwilio_FromChunk(t *testing.T) {
 					Verified:     false,
 					Redacted:     id,
 					RawV2:        []byte(id + secretInactive),
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/twilio/",
+					},
 				},
 			},
 			wantErr: false,
@@ -102,6 +110,9 @@ func TestTwilio_FromChunk(t *testing.T) {
 					Verified:     false,
 					Redacted:     id,
 					RawV2:        []byte(id + secret),
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/twilio/",
+					},
 				},
 			},
 			wantErr:             false,
@@ -121,6 +132,9 @@ func TestTwilio_FromChunk(t *testing.T) {
 					Verified:     false,
 					Redacted:     id,
 					RawV2:        []byte(id + secret),
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/twilio/",
+					},
 				},
 			},
 			wantErr:             false,
@@ -142,7 +156,7 @@ func TestTwilio_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Twilio.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

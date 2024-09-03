@@ -90,7 +90,12 @@ func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 			fileSize := fileInfo.Size()
 			fileCtx := logContext.WithValues(ctx, "filename", fileInfo.Name, "size", fileSize)
 
-			if err := h.handleNonArchiveContent(fileCtx, reader, archiveChan); err != nil {
+			rdr, err := newMimeTypeReader(reader)
+			if err != nil {
+				return fmt.Errorf("error creating mime-type reader: %w", err)
+			}
+
+			if err := h.handleNonArchiveContent(fileCtx, rdr, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in RPM")
 				h.metrics.incErrors()
 			}

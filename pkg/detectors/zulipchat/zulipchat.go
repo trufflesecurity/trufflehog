@@ -2,10 +2,12 @@ package zulipchat
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
-	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,12 +23,12 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(common.BuildRegex(common.AlphaNumPattern, "", 32))
 	idPat     = regexp.MustCompile(`\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b`)
-	domainPat = regexp.MustCompile(`\b([a-z0-9-]+\.zulip(?:(?:chat)?\.com|\.org))\b`)
+	domainPat = regexp.MustCompile(`(?i)\b([a-z0-9-]+\.zulip(?:chat)?\.com|chat\.zulip\.org)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -39,31 +41,30 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
+	keyMatches := make(map[string]struct{})
+	for _, m := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		keyMatches[m[1]] = struct{}{}
+	}
+	idMatches := make(map[string]struct{})
+	for _, m := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		idMatches[m[1]] = struct{}{}
+	}
+	domainMatches := make(map[string]struct{})
+	for _, m := range domainPat.FindAllStringSubmatch(dataStr, -1) {
+		domainMatches[m[1]] = struct{}{}
+	}
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
-
-		for _, idMatch := range idMatches {
-			// getting the last word of the string
-			resIdMatch := strings.TrimSpace(idMatch[1])
-
-			for _, domainMatch := range domainMatches {
-				if len(domainMatch) != 2 {
-					continue
-				}
-
-				resDomainMatch := strings.TrimSpace(domainMatch[1])
-
+	for key := range keyMatches {
+		for id := range idMatches {
+			for domain := range domainMatches {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZulipChat,
-					Raw:          []byte(resMatch),
-					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", resMatch, resIdMatch, resDomainMatch)),
+					Raw:          []byte(key),
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", key, id, domain)),
+					ExtraData: map[string]string{
+						"Domain": domain,
+						"Id":     id,
+					},
 				}
 
 				if verify {
@@ -71,26 +72,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if client == nil {
 						client = defaultClient
 					}
-					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/api/v1/users", resDomainMatch), nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Content-Type", "application/json")
-					req.SetBasicAuth(resIdMatch, resMatch)
-					res, err := client.Do(req)
-
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-						} else if res.StatusCode == 401 {
-							// This secret is determinately not verified, nothing to do here
-						} else {
-							s1.SetVerificationError(fmt.Errorf("unexpected HTTP response status %d", res.StatusCode), resMatch)
-						}
-					} else {
-						s1.SetVerificationError(err, resMatch)
-					}
+					verified, verificationErr := verifyResult(ctx, client, domain, id, key)
+					s1.Verified = verified
+					s1.SetVerificationError(verificationErr)
 				}
 
 				results = append(results, s1)
@@ -99,6 +83,49 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyResult(ctx context.Context, client *http.Client, domain, id, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s/api/v1/users", domain), nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(id, key)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		var users usersResponse
+		if err := json.NewDecoder(res.Body).Decode(&users); err != nil {
+			return false, nil
+		}
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+}
+
+type usersResponse struct {
+	Result  string   `json:"result"`
+	Members []member `json:"members"`
+}
+
+type member struct {
+	FullName string `json:"full_name"`
+	Email    string `json:"email"`
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

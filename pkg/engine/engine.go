@@ -29,6 +29,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+const detectionTimeout = 10 * time.Second
+
 var errOverlap = errors.New(
 	"More than one detector has found this result. For your safety, verification has been disabled." +
 		"You can override this behavior by using the --allow-verification-overlap flag.",
@@ -308,6 +310,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 		e.decoders = decoders.DefaultDecoders()
 	}
 
+	// Only use the default detectors if none are provided.
 	if len(e.detectors) == 0 {
 		e.detectors = DefaultDetectors()
 	}
@@ -454,6 +457,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 		// This reflects the anticipated lower volume of data that needs re-verification.
 		// The buffer size is a trade-off between memory usage and the need to prevent blocking.
 		verificationOverlapChunksChanMultiplier = 25
+		resultsChanMultiplier                   = detectableChunksChanMultiplier
 	)
 
 	// Channels are used for communication between different parts of the engine,
@@ -464,7 +468,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 	e.verificationOverlapChunksChan = make(
 		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
 	)
-	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
+	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer*resultsChanMultiplier)
 	e.dedupeCache = cache
 	ctx.Logger().V(4).Info("engine initialized")
 
@@ -620,9 +624,8 @@ func (e *Engine) startScannerWorkers(ctx context.Context) {
 	}
 }
 
-const detectorWorkerMultiplier = 50
-
 func (e *Engine) startDetectorWorkers(ctx context.Context) {
+	const detectorWorkerMultiplier = 4
 	ctx.Logger().V(2).Info("starting detector workers", "count", e.concurrency*detectorWorkerMultiplier)
 	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
 		e.wgDetectorWorkers.Add(1)
@@ -636,9 +639,8 @@ func (e *Engine) startDetectorWorkers(ctx context.Context) {
 }
 
 func (e *Engine) startVerificationOverlapWorkers(ctx context.Context) {
-	const verificationOverlapWorkerMultiplier = detectorWorkerMultiplier
 	ctx.Logger().V(2).Info("starting verificationOverlap workers", "count", e.concurrency)
-	for worker := uint64(0); worker < uint64(e.concurrency*verificationOverlapWorkerMultiplier); worker++ {
+	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
 		e.verificationOverlapWg.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "verification_overlap_worker_id", common.RandomID(5))
@@ -650,7 +652,7 @@ func (e *Engine) startVerificationOverlapWorkers(ctx context.Context) {
 }
 
 func (e *Engine) startNotifierWorkers(ctx context.Context) {
-	const notifierWorkerRatio = 4
+	const notifierWorkerRatio = 2
 	maxNotifierWorkers := 1
 	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
 		maxNotifierWorkers = numWorkers
@@ -732,7 +734,11 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		startTime := time.Now()
 		sourceVerify := chunk.Verify
 		for _, decoder := range e.decoders {
+			decodeStart := time.Now()
 			decoded := decoder.FromChunk(chunk)
+			decodeTime := time.Since(decodeStart).Microseconds()
+			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
+
 			if decoded == nil {
 				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
 				continue
@@ -883,9 +889,14 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			// DO NOT VERIFY at this stage of the pipeline.
 			matchedBytes := detector.Matches()
 			for _, match := range matchedBytes {
+				ctx, cancel := context.WithTimeout(ctx, time.Second*2)
 				results, err := detector.FromData(ctx, false, match)
+				cancel()
 				if err != nil {
-					ctx.Logger().Error(err, "error verifying chunk")
+					ctx.Logger().V(2).Error(
+						err, "error finding results in chunk during verification overlap",
+						"detector", detector.Key.Type().String(),
+					)
 				}
 
 				if len(results) == 0 {
@@ -895,7 +906,15 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					detectorKeysWithResults[detector.Key] = detector
 				}
 
-				results = e.filterResults(ctx, detector, results)
+				// If results filtration eliminates a rotated secret, then that rotation will never be reported. This
+				// problem can theoretically occur for any scan, but we've only actually seen it in practice during
+				// targeted scans. (The reason for this discrepancy is unclear.) The simplest fix is therefore to
+				// disable filtration for targeted scans, but if you're here because this problem surfaced for a
+				// non-targeted scan then we'll have to solve it correctly.
+				if chunk.chunk.SecretID == 0 {
+					results = e.filterResults(ctx, detector, results)
+				}
+
 				for _, res := range results {
 					var val []byte
 					if res.RawV2 != nil {
@@ -980,9 +999,9 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	if e.printAvgDetectorTime {
 		start = time.Now()
 	}
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer common.Recover(ctx)
-	defer cancel()
+
+	ctx = context.WithValue(ctx, "detector", data.detector.Key.Loggable())
 
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
 
@@ -996,9 +1015,16 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	for _, matchBytes := range matches {
 		matchCount++
 		detectBytesPerMatch.Observe(float64(len(matchBytes)))
+
+		ctx, cancel := context.WithTimeout(ctx, detectionTimeout)
+		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
+			ctx.Logger().Error(nil, "a detector ignored the context timeout")
+		})
 		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
+		t.Stop()
+		cancel()
 		if err != nil {
-			ctx.Logger().Error(err, "error scanning chunk")
+			ctx.Logger().Error(err, "error finding results in chunk")
 			continue
 		}
 
@@ -1026,7 +1052,14 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
 		}
 
-		results = e.filterResults(ctx, data.detector, results)
+		// If results filtration eliminates a rotated secret, then that rotation will never be reported. This problem
+		// can theoretically occur for any scan, but we've only actually seen it in practice during targeted scans. (The
+		// reason for this discrepancy is unclear.) The simplest fix is therefore to disable filtration for targeted
+		// scans, but if you're here because this problem surfaced for a non-targeted scan then we'll have to solve it
+		// correctly.
+		if data.chunk.SecretID == 0 {
+			results = e.filterResults(ctx, data.detector, results)
+		}
 
 		for _, res := range results {
 			e.processResult(ctx, data, res, isFalsePositive)
@@ -1043,15 +1076,24 @@ func (e *Engine) filterResults(
 	detector *ahocorasick.DetectorMatch,
 	results []detectors.Result,
 ) []detectors.Result {
-	if e.filterUnverified {
-		results = detectors.CleanResults(results)
+	clean := detectors.CleanResults
+	ignoreConfig := false
+	if cleaner, ok := detector.Detector.(detectors.CustomResultsCleaner); ok {
+		clean = cleaner.CleanResults
+		ignoreConfig = cleaner.ShouldCleanResultsIrrespectiveOfConfiguration()
 	}
+	if e.filterUnverified || ignoreConfig {
+		results = clean(results)
+	}
+
 	if !e.retainFalsePositives {
 		results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results)
 	}
+
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
 	}
+
 	return results
 }
 
