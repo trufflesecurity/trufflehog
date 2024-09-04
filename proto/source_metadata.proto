@@ -332,7 +332,7 @@ message Elasticsearch {
 }
 
 message Sentry {
-  string id = 1;
+  string event_id = 1;
   string organization_id = 2;
   string organization_slug = 3;
   string organization_date_created = 4;
