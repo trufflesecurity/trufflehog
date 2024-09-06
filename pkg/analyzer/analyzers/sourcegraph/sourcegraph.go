@@ -56,6 +56,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 					Type:               "user",
 					Metadata: map[string]any{
 						"created_at": info.User.Data.CurrentUser.CreatedAt,
+						"email":      info.User.Data.CurrentUser.Email,
 					},
 					Parent: nil,
 				},
