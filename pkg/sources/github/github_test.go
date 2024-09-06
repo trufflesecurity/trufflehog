@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v63/github"
 	"github.com/stretchr/testify/assert"
@@ -369,7 +368,8 @@ func TestNormalizeRepos(t *testing.T) {
 
 func TestHandleRateLimit(t *testing.T) {
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
-	assert.False(t, s.handleRateLimit(nil))
+	l := context.Background().Logger()
+	assert.False(t, s.handleRateLimit(l, nil))
 
 	// Request
 	reqUrl, _ := url.Parse("https://github.com/trufflesecurity/trufflehog")
@@ -400,7 +400,7 @@ func TestHandleRateLimit(t *testing.T) {
 		Message:  "Too Many Requests",
 	}
 
-	assert.True(t, s.handleRateLimit(err))
+	assert.True(t, s.handleRateLimit(l, err))
 }
 
 func TestEnumerateUnauthenticated(t *testing.T) {
@@ -721,7 +721,6 @@ func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 
 	s := &Source{
 		repos: []string{},
-		log:   logr.Discard(),
 	}
 
 	for _, tt := range tests {
@@ -772,7 +771,6 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 	for _, tt := range tests {
 		s := &Source{
 			repos: tt.repos,
-			log:   logr.Discard(),
 		}
 
 		s.setProgressCompleteWithRepo(tt.index, tt.offset, "")
