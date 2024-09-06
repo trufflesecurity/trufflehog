@@ -69,7 +69,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 func bakeUserBindings(info *SecretInfo) (analyzers.Resource, []analyzers.Binding) {
 	userResource := analyzers.Resource{
 		Name:               info.User,
-		FullyQualifiedName: info.User,
+		FullyQualifiedName: info.Host + "/" + info.User,
 		Type:               "user",
 		Metadata: map[string]any{
 			"role": info.Role,
@@ -99,7 +99,7 @@ func bakeDatabaseBindings(userResource analyzers.Resource, info *SecretInfo) (ma
 	for _, db := range info.DBs {
 		dbResource := analyzers.Resource{
 			Name:               db.DatabaseName,
-			FullyQualifiedName: db.DatabaseName,
+			FullyQualifiedName: info.Host + "/" + db.DatabaseName,
 			Type:               "database",
 			Metadata: map[string]any{
 				"owner": db.Owner,
@@ -143,7 +143,7 @@ func bakeTableBindings(dbNameToResourceMap map[string]*analyzers.Resource, info 
 		for tableName, tableData := range tableMap {
 			tableResource := analyzers.Resource{
 				Name:               tableName,
-				FullyQualifiedName: dbResource.Name + "." + tableName,
+				FullyQualifiedName: info.Host + "/" + dbResource.Name + "/" + tableName,
 				Type:               "table",
 				Metadata: map[string]any{
 					"size": tableData.Size,
@@ -224,6 +224,7 @@ const (
 var connStrPartPattern = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
 
 type SecretInfo struct {
+	Host       string
 	User       string
 	Role       string
 	RolePrivs  map[string]bool
@@ -294,6 +295,7 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, 
 	}
 
 	return &SecretInfo{
+		Host:       params[pg_host],
 		User:       currentUser,
 		Role:       role,
 		RolePrivs:  privs,
