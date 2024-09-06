@@ -60,7 +60,8 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	// bindings to all permissions to resources
-	analyzers.BindAllPermissions(userResource, permissions...)
+	bindings := analyzers.BindAllPermissions(userResource, permissions...)
+	result.Bindings = append(result.Bindings, bindings...)
 
 	// unbounded resources
 	result.UnboundedResources = make([]analyzers.Resource, 0, len(info.Data.Workspaces))
