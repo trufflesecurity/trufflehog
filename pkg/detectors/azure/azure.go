@@ -33,7 +33,7 @@ var (
 	tenantIDPat = mustFmtPat("tenant_id", idPatFmt)
 
 	// TODO: support old patterns
-	secretPatFmt    = `(?i)(%s).{0,20}([a-z0-9_\.\-~]{34})`
+	secretPatFmt    = `(?i)(%s).{0,20}?([A-Za-z0-9_\.\-~]{40}|[A-Za-z0-9_\.\-~]{34})`
 	clientSecretPat = mustFmtPat("client_secret", secretPatFmt)
 )
 
