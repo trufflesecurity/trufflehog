@@ -39,7 +39,7 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/envoyproxy/protoc-gen-validate v1.1.0
 	github.com/fatih/color v1.17.0
-	github.com/felixge/fgprof v0.9.4
+	github.com/felixge/fgprof v0.9.5
 	github.com/gabriel-vasile/mimetype v1.4.5
 	github.com/getsentry/sentry-go v0.28.1
 	github.com/go-errors/errors v1.5.1
