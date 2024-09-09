@@ -54,7 +54,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	// Add token and it's permissions to bindings
 	tokenResource := analyzers.Resource{
 		Name:               info.AccessToken.Name,
-		FullyQualifiedName: fmt.Sprintf("github.com/token/%s", info.AccessToken.Name),
+		FullyQualifiedName: fmt.Sprintf("github.com/token/%d", info.AccessToken.ID),
 		Type:               "access_token",
 		Metadata: map[string]any{
 			"last_used_at": info.AccessToken.LastUsedAt,
@@ -77,7 +77,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	for _, project := range info.Projects {
 		projectResource := analyzers.Resource{
 			Name:               project.NameWithNamespace,
-			FullyQualifiedName: fmt.Sprintf("github.com/project/%s", project.NameWithNamespace),
+			FullyQualifiedName: fmt.Sprintf("github.com/project/%d", project.ID),
 			Type:               "project",
 		}
 
@@ -102,6 +102,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 // we'll call /api/v4/personal_access_tokens and /api/v4/user and then filter down to scopes.
 
 type AccessTokenJSON struct {
+	ID         int      `json:"id"`
 	Name       string   `json:"name"`
 	Revoked    bool     `json:"revoked"`
 	CreatedAt  string   `json:"created_at"`
@@ -111,6 +112,7 @@ type AccessTokenJSON struct {
 }
 
 type ProjectsJSON struct {
+	ID                int    `json:"id"`
 	NameWithNamespace string `json:"name_with_namespace"`
 	Permissions       struct {
 		ProjectAccess struct {
