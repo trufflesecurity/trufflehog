@@ -533,7 +533,7 @@ func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Cl
 func (s *Source) scan(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	var scannedCount uint64 = 1
 
-	ctx.Logger().Info("Found repos to scan", "count", len(s.repos))
+	ctx.Logger().V(2).Info("Found repos to scan", "count", len(s.repos))
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
