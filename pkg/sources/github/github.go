@@ -116,13 +116,13 @@ type filteredRepoCache struct {
 	include, exclude []glob.Glob
 }
 
-func (s *Source) newFilteredRepoCache(log logr.Logger, c cache.Cache[string], include, exclude []string) *filteredRepoCache {
+func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string], include, exclude []string) *filteredRepoCache {
 	includeGlobs := make([]glob.Glob, 0, len(include))
 	excludeGlobs := make([]glob.Glob, 0, len(exclude))
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			log.V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			ctx.Logger().V(1).Info("invalid include glob", "include_value", ig, "err", err)
 			continue
 		}
 		includeGlobs = append(includeGlobs, g)
@@ -130,7 +130,7 @@ func (s *Source) newFilteredRepoCache(log logr.Logger, c cache.Cache[string], in
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			log.V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			ctx.Logger().V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
 			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
@@ -205,7 +205,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.memberCache = make(map[string]struct{})
 
-	s.filteredRepoCache = s.newFilteredRepoCache(aCtx.Logger(),
+	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
 		memory.New[string](),
 		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
