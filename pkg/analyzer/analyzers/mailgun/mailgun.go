@@ -71,7 +71,7 @@ func secretInfoToAnalyzerResult(info *DomainsJSON) *analyzers.AnalyzerResult {
 	for idx, domain := range info.Items {
 		result.UnboundedResources[idx] = analyzers.Resource{
 			Name:               domain.URL,
-			FullyQualifiedName: domain.URL,
+			FullyQualifiedName: "mailgun/" + domain.ID + "/" + domain.URL,
 			Type:               "domain",
 			Metadata: map[string]any{
 				"created_at":  domain.CreatedAt,
@@ -87,6 +87,7 @@ func secretInfoToAnalyzerResult(info *DomainsJSON) *analyzers.AnalyzerResult {
 }
 
 type Domain struct {
+	ID         string `json:"id"`
 	URL        string `json:"name"`
 	IsDisabled bool   `json:"is_disabled"`
 	Type       string `json:"type"`
