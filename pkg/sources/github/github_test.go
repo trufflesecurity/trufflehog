@@ -368,8 +368,8 @@ func TestNormalizeRepos(t *testing.T) {
 
 func TestHandleRateLimit(t *testing.T) {
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
-	l := context.Background().Logger()
-	assert.False(t, s.handleRateLimit(l, nil))
+	ctx := context.Background()
+	assert.False(t, s.handleRateLimit(ctx, nil))
 
 	// Request
 	reqUrl, _ := url.Parse("https://github.com/trufflesecurity/trufflehog")
@@ -400,7 +400,7 @@ func TestHandleRateLimit(t *testing.T) {
 		Message:  "Too Many Requests",
 	}
 
-	assert.True(t, s.handleRateLimit(l, err))
+	assert.True(t, s.handleRateLimit(ctx, err))
 }
 
 func TestEnumerateUnauthenticated(t *testing.T) {

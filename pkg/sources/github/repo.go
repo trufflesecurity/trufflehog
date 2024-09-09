@@ -191,7 +191,7 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if s.handleRateLimit(logger, err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {

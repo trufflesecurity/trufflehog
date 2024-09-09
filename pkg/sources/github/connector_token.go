@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/go-logr/logr"
 	"github.com/google/go-github/v63/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -18,14 +17,14 @@ type tokenConnector struct {
 	apiClient          *github.Client
 	token              string
 	isGitHubEnterprise bool
-	handleRateLimit    func(logr.Logger, error) bool
+	handleRateLimit    func(context.Context, error) bool
 	user               string
 	userMu             sync.Mutex
 }
 
 var _ connector = (*tokenConnector)(nil)
 
-func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(logr.Logger, error) bool) (*tokenConnector, error) {
+func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(context.Context, error) bool) (*tokenConnector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
@@ -69,7 +68,7 @@ func (c *tokenConnector) getUser(ctx context.Context) (string, error) {
 	)
 	for {
 		user, _, err = c.apiClient.Users.Get(ctx, "")
-		if c.handleRateLimit(ctx.Logger(), err) {
+		if c.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {

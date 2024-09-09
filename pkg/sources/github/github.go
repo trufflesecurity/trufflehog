@@ -358,7 +358,7 @@ RepoLoop:
 					// Normalize the URL to the Gist's pull URL.
 					// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
 					repo = gist.GetGitPullURL()
-					if s.handleRateLimit(repoCtx.Logger(), err) {
+					if s.handleRateLimit(repoCtx, err) {
 						continue
 					}
 					if err != nil {
@@ -372,7 +372,7 @@ RepoLoop:
 				// Cache repository info.
 				for {
 					ghRepo, _, err := s.connector.APIClient().Repositories.Get(repoCtx, urlParts[1], urlParts[2])
-					if s.handleRateLimit(repoCtx.Logger(), err) {
+					if s.handleRateLimit(repoCtx, err) {
 						continue
 					}
 					if err != nil {
@@ -438,7 +438,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	var err error
 	for {
 		ghUser, _, err = s.connector.APIClient().Users.Get(ctx, "")
-		if s.handleRateLimit(ctx.Logger(), err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -663,7 +663,7 @@ var (
 // Authenticated users have a rate limit of 5,000 requests per hour,
 // however, certain actions are subject to a stricter "secondary" limit.
 // https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
-func (s *Source) handleRateLimit(log logr.Logger, errIn error) bool {
+func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
 	if errIn == nil {
 		return false
 	}
@@ -702,12 +702,12 @@ func (s *Source) handleRateLimit(log logr.Logger, errIn error) bool {
 		if retryAfter > 0 {
 			retryAfter = retryAfter + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
-			log.V(0).Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
+			ctx.Logger().V(0).Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 		} else {
 			retryAfter = (5 * time.Minute) + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
 			// TODO: Use exponential backoff instead of static retry time.
-			log.V(0).Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
+			ctx.Logger().V(0).Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 		}
 
 		rateLimitMu.Unlock()
@@ -741,7 +741,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 
 	for {
 		gists, res, err := s.connector.APIClient().Gists.List(ctx, user, gistOpts)
-		if s.handleRateLimit(logger, err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -798,7 +798,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 	}
 	for {
 		orgs, _, err := s.connector.APIClient().Organizations.ListAll(ctx, orgOpts)
-		if s.handleRateLimit(ctx.Logger(), err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -837,7 +837,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	logger := ctx.Logger().WithValues("user", user)
 	for {
 		orgs, resp, err := s.connector.APIClient().Organizations.List(ctx, "", orgOpts)
-		if s.handleRateLimit(logger, err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -870,7 +870,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 	logger := ctx.Logger().WithValues("org", org)
 	for {
 		members, res, err := s.connector.APIClient().Organizations.ListMembers(ctx, org, opts)
-		if s.handleRateLimit(logger, err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil || len(members) == 0 {
@@ -992,7 +992,7 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 	}
 	for {
 		comments, _, err := s.connector.APIClient().Gists.ListComments(ctx, gistID, options)
-		if s.handleRateLimit(ctx.Logger(), err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -1105,7 +1105,7 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, chunksCha
 
 	for {
 		issues, _, err := s.connector.APIClient().Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
-		if s.handleRateLimit(ctx.Logger(), err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 
@@ -1177,7 +1177,7 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, ch
 
 	for {
 		issueComments, _, err := s.connector.APIClient().Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
-		if s.handleRateLimit(ctx.Logger(), err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -1242,7 +1242,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, chunksChan c
 
 	for {
 		prs, _, err := s.connector.APIClient().PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
-		if s.handleRateLimit(ctx.Logger(), err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -1274,7 +1274,7 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, chunk
 
 	for {
 		prComments, _, err := s.connector.APIClient().PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
-		if s.handleRateLimit(ctx.Logger(), err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
