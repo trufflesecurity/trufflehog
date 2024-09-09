@@ -71,7 +71,7 @@ func bakeUserBindings(info *SecretInfo) ([]analyzers.Binding, *analyzers.Resourc
 	// add user and their priviliges to bindings
 	userResource := analyzers.Resource{
 		Name:               info.User,
-		FullyQualifiedName: info.User,
+		FullyQualifiedName: info.Host + "/" + info.User,
 		Type:               "user",
 	}
 
@@ -93,7 +93,7 @@ func bakeDatabaseBindings(userResource *analyzers.Resource, info *SecretInfo) []
 	for _, database := range info.Databases {
 		dbResource := analyzers.Resource{
 			Name:               database.Name,
-			FullyQualifiedName: database.Name,
+			FullyQualifiedName: info.Host + "/" + database.Name,
 			Type:               "database",
 			Metadata: map[string]any{
 				"default":      database.Default,
@@ -131,7 +131,7 @@ func bakeTableBindings(dbResource *analyzers.Resource, database *Database) []ana
 	for _, table := range *database.Tables {
 		tableResource := analyzers.Resource{
 			Name:               table.Name,
-			FullyQualifiedName: table.Name,
+			FullyQualifiedName: dbResource.FullyQualifiedName + "/" + table.Name,
 			Type:               "table",
 			Metadata: map[string]any{
 				"bytes":        table.Bytes,
@@ -153,7 +153,7 @@ func bakeTableBindings(dbResource *analyzers.Resource, database *Database) []ana
 		for _, column := range table.Columns {
 			columnResource := analyzers.Resource{
 				Name:               column.Name,
-				FullyQualifiedName: column.Name,
+				FullyQualifiedName: tableResource.FullyQualifiedName + "/" + column.Name,
 				Type:               "column",
 				Parent:             &tableResource,
 			}
@@ -181,7 +181,7 @@ func bakeRoutineBindings(dbResource *analyzers.Resource, database *Database) []a
 	for _, routine := range *database.Routines {
 		routineResource := analyzers.Resource{
 			Name:               routine.Name,
-			FullyQualifiedName: routine.Name,
+			FullyQualifiedName: dbResource.FullyQualifiedName + "/" + routine.Name,
 			Type:               "routine",
 			Metadata: map[string]any{
 				"non_existent": routine.Nonexistent,
@@ -257,6 +257,7 @@ type Routine struct {
 // USER() returns `doadmin@localhost`
 
 type SecretInfo struct {
+	Host        string
 	User        string
 	Databases   map[string]*Database
 	GlobalPrivs GlobalPrivs
@@ -282,8 +283,13 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 }
 
 func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, error) {
+	// Parse the connection string
+	u, err := parseConnectionStr(connectionStr)
+	if err != nil {
+		return nil, fmt.Errorf("parsing the connection string: %w", err)
+	}
 
-	db, err := createConnection(connectionStr)
+	db, err := createConnection(u)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to the MySQL database: %w", err)
 	}
@@ -322,13 +328,14 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, 
 	processGrants(grants, databases, &globalPrivs)
 
 	return &SecretInfo{
+		Host:        u.Hostname(),
 		User:        user,
 		Databases:   databases,
 		GlobalPrivs: globalPrivs,
 	}, nil
 }
 
-func createConnection(connection string) (*sql.DB, error) {
+func parseConnectionStr(connection string) (*dburl.URL, error) {
 	// Check if the connection string starts with 'mysql://'
 	if !strings.HasPrefix(connection, "mysql://") {
 		color.Yellow("[i] The connection string should start with 'mysql://'. Adding it for you.")
@@ -346,7 +353,10 @@ func createConnection(connection string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	return u, nil
+}
 
+func createConnection(u *dburl.URL) (*sql.DB, error) {
 	// Connect to the MySQL database
 	db, err := sql.Open("mysql", u.DSN)
 	if err != nil {

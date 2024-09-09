@@ -4,10 +4,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v7"
+	"github.com/google/go-cmp/cmp"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
@@ -67,9 +67,6 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				return
 			}
 
-			// bindings need to be in the same order to be comparable
-			sortBindings(got.Bindings)
-
 			// Marshal the actual result to JSON
 			gotJSON, err := json.Marshal(got)
 			if err != nil {
@@ -82,40 +79,26 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				t.Fatalf("could not unmarshal want JSON string: %s", err)
 			}
 
-			// bindings need to be in the same order to be comparable
-			sortBindings(wantObj.Bindings)
-
 			// Marshal the expected result to JSON (to normalize)
 			wantJSON, err := json.Marshal(wantObj)
 			if err != nil {
 				t.Fatalf("could not marshal want to JSON: %s", err)
 			}
 
-			// Compare the JSON strings
-			if string(gotJSON) != string(wantJSON) {
-				// Pretty-print both JSON strings for easier comparison
-				var gotIndented, wantIndented []byte
-				gotIndented, err = json.MarshalIndent(got, "", " ")
-				if err != nil {
-					t.Fatalf("could not marshal got to indented JSON: %s", err)
-				}
-				wantIndented, err = json.MarshalIndent(wantObj, "", " ")
-				if err != nil {
-					t.Fatalf("could not marshal want to indented JSON: %s", err)
-				}
+			// Compare bindings separately because they are not guaranteed to be in the same order
+			if len(got.Bindings) != len(wantObj.Bindings) {
+				t.Errorf("Analyzer.Analyze() = %s, want %s", gotJSON, wantJSON)
+				return
+			}
 
-				t.Errorf("Analyzer.Analyze() = %s, want %s", gotIndented, wantIndented)
+			got.Bindings = nil
+			wantObj.Bindings = nil
+
+			// Compare the rest of the Object
+			if diff := cmp.Diff(&wantObj, got); diff != "" {
+				t.Errorf("%s: (-want +got)\n%s", tt.name, diff)
+				return
 			}
 		})
 	}
-}
-
-// Helper function to sort bindings
-func sortBindings(bindings []analyzers.Binding) {
-	sort.SliceStable(bindings, func(i, j int) bool {
-		if bindings[i].Resource.Name == bindings[j].Resource.Name {
-			return bindings[i].Permission.Value < bindings[j].Permission.Value
-		}
-		return bindings[i].Resource.Name < bindings[j].Resource.Name
-	})
 }
