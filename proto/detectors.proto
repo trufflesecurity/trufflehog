@@ -1006,6 +1006,7 @@ enum DetectorType {
   ElevenLabs = 994;
   Netsuite = 995;
   RobinhoodCrypto = 996;
+  NVAPI = 997;
 }
 
 message Result {

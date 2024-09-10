@@ -472,6 +472,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nugetapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nvapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oanda"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/okta"
@@ -1628,6 +1629,7 @@ func DefaultDetectors() []detectors.Detector {
 		atlassianv2.Scanner{},
 		netsuite.Scanner{},
 		robinhoodcrypto.Scanner{},
+		nvapi.Scanner{},
 	}
 }
 
