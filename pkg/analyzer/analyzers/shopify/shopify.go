@@ -63,7 +63,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 	resource := &analyzers.Resource{
 		Name:               info.ShopInfo.Shop.Name,
-		FullyQualifiedName: info.ShopInfo.Shop.Email,
+		FullyQualifiedName: info.ShopInfo.Shop.Domain + "/" + info.ShopInfo.Shop.Email,
 		Type:               "shop",
 		Metadata: map[string]any{
 			"created_at": info.ShopInfo.Shop.CreatedAt,
@@ -74,15 +74,35 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 	for _, category := range categoryOrder {
 		if val, ok := info.Scopes[category]; ok {
-			for _, scope := range val.Scopes {
+			cateogryResource := &analyzers.Resource{
+				Name:               category,
+				FullyQualifiedName: resource.FullyQualifiedName + "/" + category, // shop.domain/shop.email/category
+				Type:               "category",
+				Parent:             resource,
+			}
+
+			if sliceContains(val.Scopes, "Read") && sliceContains(val.Scopes, "Write") {
 				result.Bindings = append(result.Bindings, analyzers.Binding{
-					Resource: *resource,
+					Resource: *cateogryResource,
 					Permission: analyzers.Permission{
-						Value: scope,
+						Value: PermissionStrings[FullAccess],
+					},
+				})
+				continue
+			}
+
+			for _, scope := range val.Scopes {
+				lowerScope := strings.ToLower(scope)
+				if _, ok := StringToPermission[lowerScope]; !ok { // skip unknown scopes/permission
+					continue
+				}
+				result.Bindings = append(result.Bindings, analyzers.Binding{
+					Resource: *cateogryResource,
+					Permission: analyzers.Permission{
+						Value: lowerScope,
 					},
 				})
 			}
-
 		}
 	}
 
@@ -165,6 +185,7 @@ func determineScopes(data ScopeDataJSON, input string) map[string]OutputScopes {
 
 type ShopInfoJSON struct {
 	Shop struct {
+		Domain    string `json:"domain"`
 		Name      string `json:"name"`
 		Email     string `json:"email"`
 		CreatedAt string `json:"created_at"`
