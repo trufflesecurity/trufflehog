@@ -43,46 +43,28 @@ func secretInfoToAnalyzerResult(info *DomainsJSON) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType:       analyzerpb.AnalyzerType_Mailgun,
-		Bindings:           make([]analyzers.Binding, len(StringToPermission)),
-		UnboundedResources: make([]analyzers.Resource, info.TotalCount),
-	}
-
-	apiResource := analyzers.Resource{
-		Name:               "Mailgun API Key",
-		FullyQualifiedName: "Mailgun API Key",
-		Type:               "api key",
-		Metadata: map[string]any{
-			"domains_count": info.TotalCount,
-		},
-	}
-
-	count := 0
-	for perm := range StringToPermission {
-		result.Bindings[count] = analyzers.Binding{
-			Resource: apiResource,
-			Permission: analyzers.Permission{
-				Value: perm,
-			},
-		}
-		count++
+		AnalyzerType: analyzerpb.AnalyzerType_Mailgun,
+		Bindings:     make([]analyzers.Binding, len(info.Items)),
 	}
 
 	for idx, domain := range info.Items {
-		result.UnboundedResources[idx] = analyzers.Resource{
-			Name:               domain.URL,
-			FullyQualifiedName: "mailgun/" + domain.ID + "/" + domain.URL,
-			Type:               "domain",
-			Metadata: map[string]any{
-				"created_at":  domain.CreatedAt,
-				"type":        domain.Type,
-				"state":       domain.State,
-				"is_disabled": domain.IsDisabled,
+		result.Bindings[idx] = analyzers.Binding{
+			Resource: analyzers.Resource{
+				Name:               domain.URL,
+				FullyQualifiedName: "mailgun/" + domain.ID + "/" + domain.URL,
+				Type:               "domain",
+				Metadata: map[string]any{
+					"created_at":  domain.CreatedAt,
+					"type":        domain.Type,
+					"state":       domain.State,
+					"is_disabled": domain.IsDisabled,
+				},
 			},
-			Parent: &apiResource,
+			Permission: analyzers.Permission{
+				Value: PermissionStrings[FullAccess],
+			},
 		}
 	}
-
 	return &result
 }
 
