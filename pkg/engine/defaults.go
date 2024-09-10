@@ -472,6 +472,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nugetapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/numverify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nutritionix"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nvapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oanda"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/okta"
@@ -577,6 +578,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ringcentral"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ritekit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roaring"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/robinhoodcrypto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rocketreach"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rockset"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roninapp"
@@ -1626,6 +1628,8 @@ func DefaultDetectors() []detectors.Detector {
 		atlassianv1.Scanner{},
 		atlassianv2.Scanner{},
 		netsuite.Scanner{},
+		robinhoodcrypto.Scanner{},
+		nvapi.Scanner{},
 	}
 }
 

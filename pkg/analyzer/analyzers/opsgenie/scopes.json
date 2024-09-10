@@ -1,6 +1,6 @@
 [
     {
-        "name": "Configuration Access",
+        "name": "configuration_access",
         "test": {
             "endpoint": "https://api.opsgenie.com/v2/account",
             "method": "GET",
@@ -9,7 +9,7 @@
         }
     },
     {
-        "name": "Read",
+        "name": "read",
         "test": {
             "endpoint": "https://api.opsgenie.com/v2/alerts",
             "method": "GET",
@@ -18,7 +18,7 @@
         }
     },
     {
-        "name": "Delete",
+        "name": "delete",
         "test": {
             "endpoint": "https://api.opsgenie.com/v2/alerts/`nowaythiscanexist",
             "method": "DELETE",
@@ -27,7 +27,7 @@
         }
     },
     {
-        "name": "Create and Update",
+        "name": "create_and_update",
         "test": {
             "endpoint": "https://api.opsgenie.com/v2/alerts/`nowaycanthisexist/message",
             "method": "PUT",

@@ -8,7 +8,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -22,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithLocalAddresses
 
 	// long jwt token but note this is default 8640000 seconds = 24 hours but could be set to maximum 2592000 seconds = 720 hours = 30 days
 	// at https://manage.auth0.com/dashboard/us/dev-63memjo3/apis/management/explorer

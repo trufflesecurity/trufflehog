@@ -68,6 +68,7 @@ type TokenMetadata struct {
 	FineGrained bool
 	User        *gh.User
 	Expiration  time.Time
+	// OauthScopes is only set for classic tokens.
 	OauthScopes []analyzers.Permission
 }
 
@@ -80,7 +81,7 @@ func GetTokenMetadata(token string, client *gh.Client) (*TokenMetadata, error) {
 		return nil, err
 	}
 
-	expiration, _ := time.Parse("2006-01-02 15:04:05 MST", resp.Header.Get("github-authentication-token-expiration"))
+	expiration, _ := time.Parse("2006-01-02 15:04:05 -0700", resp.Header.Get("github-authentication-token-expiration"))
 
 	var oauthScopes []analyzers.Permission
 	for _, scope := range resp.Header.Values("X-OAuth-Scopes") {

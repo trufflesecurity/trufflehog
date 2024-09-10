@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -95,7 +96,7 @@ func ToCamelCase(s string) string {
 	parts := strings.Split(s, ":")
 	caser := cases.Title(language.English)
 	for i := range parts {
-		subParts := strings.Split(parts[i], "_")
+		subParts := regexp.MustCompile(`[\_\.\-]+`).Split(parts[i], -1)
 		for j := range subParts {
 			subParts[j] = caser.String(subParts[j])
 		}

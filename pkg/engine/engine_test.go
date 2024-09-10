@@ -841,6 +841,75 @@ func TestLikelyDuplicate(t *testing.T) {
 	}
 }
 
+type customCleaner struct {
+	ignoreConfig bool
+}
+
+var _ detectors.CustomResultsCleaner = (*customCleaner)(nil)
+var _ detectors.Detector = (*customCleaner)(nil)
+
+func (c customCleaner) FromData(aCtx.Context, bool, []byte) ([]detectors.Result, error) {
+	return []detectors.Result{}, nil
+}
+
+func (c customCleaner) Keywords() []string             { return []string{} }
+func (c customCleaner) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+
+func (c customCleaner) CleanResults([]detectors.Result) []detectors.Result {
+	return []detectors.Result{}
+}
+func (c customCleaner) ShouldCleanResultsIrrespectiveOfConfiguration() bool { return c.ignoreConfig }
+
+func TestFilterResults_CustomCleaner(t *testing.T) {
+	testCases := []struct {
+		name               string
+		cleaningConfigured bool
+		ignoreConfig       bool
+		resultsToClean     []detectors.Result
+		wantResults        []detectors.Result
+	}{
+		{
+			name:               "respect config to clean",
+			cleaningConfigured: true,
+			ignoreConfig:       false,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{},
+		},
+		{
+			name:               "respect config to not clean",
+			cleaningConfigured: false,
+			ignoreConfig:       false,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{{}},
+		},
+		{
+			name:               "clean irrespective of config",
+			cleaningConfigured: false,
+			ignoreConfig:       true,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			match := ahocorasick.DetectorMatch{
+				Detector: customCleaner{
+					ignoreConfig: tt.ignoreConfig,
+				},
+			}
+			engine := Engine{
+				filterUnverified:     tt.cleaningConfigured,
+				retainFalsePositives: true,
+			}
+
+			cleaned := engine.filterResults(context.Background(), &match, tt.resultsToClean)
+
+			assert.ElementsMatch(t, tt.wantResults, cleaned)
+		})
+	}
+}
+
 func BenchmarkPopulateMatchingDetectors(b *testing.B) {
 	allDetectors := DefaultDetectors()
 	ac := ahocorasick.NewAhoCorasickCore(allDetectors)

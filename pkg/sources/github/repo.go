@@ -181,7 +181,7 @@ func isGitHub404Error(err error) bool {
 }
 
 func (s *Source) processRepos(ctx context.Context, target string, listRepos repoLister, listOpts repoListOptions) error {
-	logger := s.log.WithValues("target", target)
+	logger := ctx.Logger().WithValues("target", target)
 	opts := listOpts.getListOptions()
 
 	var (
@@ -191,14 +191,14 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if s.handleRateLimit(err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
 
-		s.log.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
+		ctx.Logger().V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
 			if r.GetFork() {
 				if !s.conn.IncludeForks {
@@ -279,60 +279,6 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 
 	// If the wiki is disabled, or is enabled but has no content, the request should be redirected.
 	return wikiURL == res.Request.URL.String()
-}
-
-// commitQuery represents the details required to fetch a commit.
-type commitQuery struct {
-	repo     string
-	owner    string
-	sha      string
-	filename string
-}
-
-// getDiffForFileInCommit retrieves the diff for a specified file in a commit.
-// If the file or its diff is not found, it returns an error.
-func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
-	var (
-		commit *github.RepositoryCommit
-		err    error
-	)
-	for {
-		commit, _, err = s.connector.APIClient().Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
-		if s.handleRateLimit(err) {
-			continue
-		}
-		if err != nil {
-			return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
-		}
-		break
-	}
-
-	if len(commit.Files) == 0 {
-		return "", fmt.Errorf("commit %s does not contain any files", query.sha)
-	}
-
-	res := new(strings.Builder)
-	// Only return the diff if the file is in the commit.
-	for _, file := range commit.Files {
-		if *file.Filename != query.filename {
-			continue
-		}
-
-		if file.Patch == nil {
-			return "", fmt.Errorf("commit %s file %s does not have a diff", query.sha, query.filename)
-		}
-
-		if _, err := res.WriteString(*file.Patch); err != nil {
-			return "", fmt.Errorf("buffer write error for commit %s file %s: %w", query.sha, query.filename, err)
-		}
-		res.WriteString("\n")
-	}
-
-	if res.Len() == 0 {
-		return "", fmt.Errorf("commit %s does not contain patch for file %s", query.sha, query.filename)
-	}
-
-	return res.String(), nil
 }
 
 func (s *Source) normalizeRepo(repo string) (string, error) {

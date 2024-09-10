@@ -1,9 +1,11 @@
+//go:generate generate_permissions permissions.yaml permissions.go asana
 package asana
 
 // ToDo: Add OAuth token support.
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -25,19 +27,64 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Asana }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("not implemented")
+
+	return secretInfoToAnalyzerResult(info), nil
 }
 
-type MeJSON struct {
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	result := analyzers.AnalyzerResult{}
+
+	// resoures/permission setup
+	permissions := allPermissions()
+	userResource := analyzers.Resource{
+		Name:               info.Data.Name,
+		FullyQualifiedName: info.Data.ID,
+		Type:               "user",
+		Metadata: map[string]any{
+			"email": info.Data.Email,
+			"type":  info.Data.Type,
+		},
+	}
+
+	// bindings to all permissions to resources
+	bindings := analyzers.BindAllPermissions(userResource, permissions...)
+	result.Bindings = append(result.Bindings, bindings...)
+
+	// unbounded resources
+	result.UnboundedResources = make([]analyzers.Resource, 0, len(info.Data.Workspaces))
+	for _, workspace := range info.Data.Workspaces {
+		resource := analyzers.Resource{
+			Name:               workspace.Name,
+			FullyQualifiedName: workspace.ID,
+			Type:               "workspace",
+		}
+		result.UnboundedResources = append(result.UnboundedResources, resource)
+	}
+
+	return &result
+}
+
+type SecretInfo struct {
 	Data struct {
+		ID         string `json:"gid"`
 		Email      string `json:"email"`
 		Name       string `json:"name"`
 		Type       string `json:"resource_type"`
 		Workspaces []struct {
+			ID   string `json:"gid"`
 			Name string `json:"name"`
 		} `json:"workspaces"`
 	} `json:"data"`
@@ -52,8 +99,8 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	printMetadata(me)
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) (*MeJSON, error) {
-	var me MeJSON
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+	var me SecretInfo
 
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://app.asana.com/api/1.0/users/me", nil)
@@ -84,7 +131,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*MeJSON, error) {
 	return &me, nil
 }
 
-func printMetadata(me *MeJSON) {
+func printMetadata(me *SecretInfo) {
 	color.Green("[!] Valid Asana API Key\n\n")
 	color.Yellow("[i] User Information")
 	color.Yellow("    Name: %s", me.Data.Name)
@@ -101,4 +148,14 @@ func printMetadata(me *MeJSON) {
 		t.AppendRow(table.Row{color.GreenString(workspace.Name)})
 	}
 	t.Render()
+}
+
+func allPermissions() []analyzers.Permission {
+	permissions := make([]analyzers.Permission, 0, len(PermissionStrings))
+	for _, permission := range PermissionStrings {
+		permissions = append(permissions, analyzers.Permission{
+			Value: permission,
+		})
+	}
+	return permissions
 }

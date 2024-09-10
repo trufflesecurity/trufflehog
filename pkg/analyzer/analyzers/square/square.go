@@ -41,21 +41,41 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_Square,
+		AnalyzerType:       analyzerpb.AnalyzerType_Square,
+		UnboundedResources: []analyzers.Resource{},
 		Metadata: map[string]any{
-			"team_members": info.Team.TeamMembers,
-			"expires_at":   info.Permissions.ExpiresAt,
-			"client_id":    info.Permissions.ClientID,
-			"merchant_id":  info.Permissions.MerchantID,
+			"expires_at":  info.Permissions.ExpiresAt,
+			"client_id":   info.Permissions.ClientID,
+			"merchant_id": info.Permissions.MerchantID,
 		},
 	}
 
 	bindings, unboundedResources := getBindingsAndUnboundedResources(info.Permissions.Scopes)
 
 	result.Bindings = bindings
-	result.UnboundedResources = unboundedResources
+	result.UnboundedResources = append(result.UnboundedResources, unboundedResources...)
+	result.UnboundedResources = append(result.UnboundedResources, getTeamMembersResources(info.Team)...)
 
 	return &result
+}
+
+// Convert given list of team members into resources
+func getTeamMembersResources(team TeamJSON) []analyzers.Resource {
+	teamMembersResources := make([]analyzers.Resource, len(team.TeamMembers))
+
+	for idx, teamMember := range team.TeamMembers {
+		teamMembersResources[idx] = analyzers.Resource{
+			Name:               teamMember.FirstName + " " + teamMember.LastName,
+			FullyQualifiedName: teamMember.Email,
+			Type:               "team_member",
+			Metadata: map[string]any{
+				"is_owner":   teamMember.IsOwner,
+				"created_at": teamMember.CreatedAt,
+			},
+		}
+	}
+
+	return teamMembersResources
 }
 
 // Build a list of Bindings and UnboundedResources by referencing the category permissions list and

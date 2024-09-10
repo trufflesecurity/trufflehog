@@ -3,11 +3,11 @@ package portainer
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -21,7 +21,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	endpointPat = regexp.MustCompile(detectors.PrefixRegex([]string{"portainer"}) + `\b(https?:\/\/\S+(:[0-9]{4,5})?)\b`)
 	tokenPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"portainer"}) + `\b(eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[0-9A-Za-z]{50,310}\.[0-9A-Z-a-z\-_]{43})\b`)
@@ -49,6 +49,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, endpointMatch := range endpointMatches {
 			resEndpointMatch := strings.TrimSpace(endpointMatch[1])
 
+			u, err := detectors.ParseURLAndStripPathAndParams(resEndpointMatch)
+			if err != nil {
+				// if the URL is invalid just move onto the next one
+				continue
+			}
+			u.Path = "/api/endpoints"
+
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Portainer,
 				Raw:          []byte(resMatch),
@@ -60,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if client == nil {
 					client = defaultClient
 				}
-				req, err := http.NewRequestWithContext(ctx, "GET", resEndpointMatch+"/api/endpoints", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 				if err != nil {
 					continue
 				}
@@ -80,8 +87,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.SetVerificationError(err, resMatch)
 				}
 			}
-
-			
 
 			if len(endpointMatches) > 0 {
 				results = append(results, s1)
