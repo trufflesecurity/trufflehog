@@ -6,12 +6,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
+
+	"golang.org/x/net/publicsuffix"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/net/publicsuffix"
 )
 
 type Scanner struct {
