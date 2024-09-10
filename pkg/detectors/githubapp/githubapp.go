@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 
 	"github.com/golang-jwt/jwt"
 

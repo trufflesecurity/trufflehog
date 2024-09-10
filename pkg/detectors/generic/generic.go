@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"

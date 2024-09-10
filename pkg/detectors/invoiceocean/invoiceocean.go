@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"strings"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 

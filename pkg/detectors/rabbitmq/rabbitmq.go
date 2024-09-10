@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 

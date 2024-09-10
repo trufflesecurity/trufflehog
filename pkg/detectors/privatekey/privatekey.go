@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
-	regexp "github.com/wasilibs/go-re2"
 	"golang.org/x/crypto/ssh"
+	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"

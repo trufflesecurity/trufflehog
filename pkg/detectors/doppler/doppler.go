@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -30,7 +30,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	//keyPat = regexp.MustCompile(`\b(dp\.pt\.[a-zA-Z0-9]{43})\b`)
+	// keyPat = regexp.MustCompile(`\b(dp\.pt\.[a-zA-Z0-9]{43})\b`)
 	keyPat = regexp.MustCompile(`\b(dp\.(?:ct|pt|st(?:\.[a-z0-9\-_]{2,35})?|sa|scim|audit)\.[a-zA-Z0-9]{40,44})\b`)
 )
 

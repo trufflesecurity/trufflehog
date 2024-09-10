@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	//req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.pagar.me/1/balance", nil) send a post to this endpoint with the parameters api_key=token
+	// req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.pagar.me/1/balance", nil) send a post to this endpoint with the parameters api_key=token
 	data := `{"api_key":"` + token + `"}`
 	payload := strings.NewReader(data)
 

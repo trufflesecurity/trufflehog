@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 
 	"github.com/coinbase/waas-client-library-go/auth"
 	"github.com/coinbase/waas-client-library-go/clients"

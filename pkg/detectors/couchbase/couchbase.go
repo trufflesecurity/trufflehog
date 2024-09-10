@@ -7,7 +7,7 @@ import (
 	"time"
 	"unicode"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 
 	"github.com/couchbase/gocb/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 

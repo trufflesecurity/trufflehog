@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 
 	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/microsoft/go-mssqldb/msdsn"

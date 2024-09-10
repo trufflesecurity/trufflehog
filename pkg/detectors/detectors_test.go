@@ -6,7 +6,7 @@ package detectors
 import (
 	"testing"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 )
 
 func TestPrefixRegex(t *testing.T) {

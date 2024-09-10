@@ -4,7 +4,7 @@ import (
 	"context"
 	"golang.org/x/oauth2"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"

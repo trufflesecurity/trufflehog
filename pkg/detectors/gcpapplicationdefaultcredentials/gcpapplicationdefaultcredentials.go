@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	regexp "github.com/wasilibs/go-re2"
+	"regexp"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
