@@ -98,10 +98,6 @@ func decodeCodePoint(input []byte) []byte {
 	return input
 }
 
-func (d *EscapedUnicode) Type() detectorspb.DecoderType {
-	return detectorspb.DecoderType_ESCAPED_UNICODE
-}
-
 func decodeEscaped(input []byte) []byte {
 	// Find all Unicode escape sequences in the input byte slice
 	indices := escapePat.FindAllSubmatchIndex(input, -1)

@@ -32,10 +32,6 @@ func (d *UTF16) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	return nil
 }
 
-func (d *UTF16) Type() detectorspb.DecoderType {
-	return detectorspb.DecoderType_UTF16
-}
-
 // utf16ToUTF8 converts a byte slice containing UTF-16 encoded data to a UTF-8 encoded byte slice.
 func utf16ToUTF8(b []byte) ([]byte, error) {
 	var bufBE, bufLE bytes.Buffer

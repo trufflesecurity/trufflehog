@@ -29,10 +29,6 @@ func (d *UTF8) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	return decodableChunk
 }
 
-func (d *UTF8) Type() detectorspb.DecoderType {
-	return detectorspb.DecoderType_PLAIN
-}
-
 // extractSubstrings performs similarly to the strings binutil,
 // extacting contigous portions of printable characters that we care
 // about from some bytes

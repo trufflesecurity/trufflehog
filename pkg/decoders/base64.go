@@ -71,10 +71,6 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	return nil
 }
 
-func (d *Base64) Type() detectorspb.DecoderType {
-	return detectorspb.DecoderType_BASE64
-}
-
 func isASCII(b []byte) bool {
 	for i := 0; i < len(b); i++ {
 		if b[i] > unicode.MaxASCII {
