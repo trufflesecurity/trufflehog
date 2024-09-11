@@ -391,91 +391,18 @@ func (s *Source) enumerateAll(ctx context.Context, reporter sources.UnitReporter
 	// this felt like a compromise that allowed me to isolate connection logic without rewriting the entire source.
 	switch c := s.connector.(type) {
 	case *appConnector:
-		// getReposByApp
-		//	totalRepoSize
-		//	filteredRepoCache
-		//	repoInfoCache
-		// addMembersByApp
-		//	addMembersByOrg
-		//		memberCache
-		// addUserGistsToCache
-		//	filteredRepoCache
-		//	repoInfoCache
-		// getReposByUser
-		//	totalRepoSize
-		//	filteredRepoCache
-		//	repoInfoCache
 		if err := s.enumerateWithApp(ctx, c.InstallationClient(), reporter); err != nil {
 			_ = reporter.UnitErr(ctx, err)
 		}
 	case *basicAuthConnector:
-		// getReposByOrgOrUser
-		//	getReposByOrg
-		//		totalRepoSize
-		//		filteredRepoCache
-		//		repoInfoCache
-		//	getReposByUser
-		//		totalRepoSize
-		//		filteredRepoCache
-		//		repoInfoCache
-		//	addUserGistsToCache
-		//		filteredRepoCache
-		//		repoInfoCache
-		// addMembersByOrg
-		//	memberCache
 		if err := s.enumerateBasicAuth(ctx, reporter); err != nil {
 			_ = reporter.UnitErr(ctx, err)
 		}
 	case *tokenConnector:
-		// getReposByUser
-		//	totalRepoSize
-		//	filteredRepoCache
-		//	repoInfoCache
-		// addUserGistsToCache
-		//	filteredRepoCache
-		//	repoInfoCache
-		// addAllVisibleOrgs
-		//	orgsCache
-		// addOrgsByUser
-		//	orgsCache
-		// getReposByOrgOrUser
-		//	getReposByOrg
-		//		totalRepoSize
-		//		filteredRepoCache
-		//		repoInfoCache
-		//	getReposByUser
-		//		totalRepoSize
-		//		filteredRepoCache
-		//		repoInfoCache
-		//	addUserGistsToCache
-		//		filteredRepoCache
-		//		repoInfoCache
-		// addMembersByOrg
-		//	memberCache
-		// addReposForMembers
-		//	addUserGistsToCache
-		//		filteredRepoCache
-		//		repoInfoCache
-		//	getReposByUser
-		//		totalRepoSize
-		//		filteredRepoCache
-		//		repoInfoCache
 		if err := s.enumerateWithToken(ctx, c.IsGithubEnterprise(), reporter); err != nil {
 			_ = reporter.UnitErr(ctx, err)
 		}
 	case *unauthenticatedConnector:
-		// getReposByOrgOrUser
-		//	getReposByOrg
-		//		totalRepoSize
-		//		filteredRepoCache
-		//		repoInfoCache
-		//	getReposByUser
-		//		totalRepoSize
-		//		filteredRepoCache
-		//		repoInfoCache
-		//	addUserGistsToCache
-		//		filteredRepoCache
-		//		repoInfoCache
 		s.enumerateUnauthenticated(ctx, reporter)
 	}
 }
