@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -58,12 +57,11 @@ func TestSource_Token(t *testing.T) {
 
 	s := Source{
 		conn:          src,
-		log:           logr.Discard(),
 		memberCache:   map[string]struct{}{},
 		repoInfoCache: newRepoInfoCache(),
 	}
 	s.Init(ctx, "github integration test source", 0, 0, false, conn, 1)
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New[string](), nil, nil)
+	s.filteredRepoCache = s.newFilteredRepoCache(ctx, memory.New[string](), nil, nil)
 
 	err = s.enumerateWithApp(ctx, s.connector.(*appConnector).InstallationClient())
 	assert.NoError(t, err)
