@@ -75,6 +75,32 @@ type Source struct {
 	sources.CommonSourceUnitUnmarshaller
 }
 
+// --------------------------------------------------------------------------------
+// RepoUnit and GistUnit are implementations of SourceUnit used during
+// enumeration. The different types aren't strictly necessary, but are a bit
+// more explicit and allow type checking/safety.
+
+var _ sources.SourceUnit = (*RepoUnit)(nil)
+var _ sources.SourceUnit = (*GistUnit)(nil)
+
+type RepoUnit struct {
+	name string
+	url  string
+}
+
+func (r RepoUnit) SourceUnitID() (string, sources.SourceUnitKind) { return r.url, "repo" }
+func (r RepoUnit) Display() string                                { return r.name }
+
+type GistUnit struct {
+	name string
+	url  string
+}
+
+func (g GistUnit) SourceUnitID() (string, sources.SourceUnitKind) { return g.url, "gist" }
+func (g GistUnit) Display() string                                { return g.name }
+
+// --------------------------------------------------------------------------------
+
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
 func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
 
@@ -313,25 +339,30 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 }
 
 func (s *Source) enumerate(ctx context.Context) error {
+	// Create a reporter that does nothing for now.
+	noopReporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
+			return nil
+		},
+	}
 	// I'm not wild about switching on the connector type here (as opposed to dispatching to the connector itself) but
 	// this felt like a compromise that allowed me to isolate connection logic without rewriting the entire source.
 	switch c := s.connector.(type) {
 	case *appConnector:
-		if err := s.enumerateWithApp(ctx, c.InstallationClient()); err != nil {
+		if err := s.enumerateWithApp(ctx, c.InstallationClient(), noopReporter); err != nil {
 			return err
 		}
 	case *basicAuthConnector:
-		if err := s.enumerateBasicAuth(ctx); err != nil {
+		if err := s.enumerateBasicAuth(ctx, noopReporter); err != nil {
 			return err
 		}
 	case *tokenConnector:
-		if err := s.enumerateWithToken(ctx, c.IsGithubEnterprise()); err != nil {
+		if err := s.enumerateWithToken(ctx, c.IsGithubEnterprise(), noopReporter); err != nil {
 			return err
 		}
 	case *unauthenticatedConnector:
-		s.enumerateUnauthenticated(ctx)
+		s.enumerateUnauthenticated(ctx, noopReporter)
 	}
-
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
 
 RepoLoop:
@@ -393,15 +424,17 @@ RepoLoop:
 	return nil
 }
 
-func (s *Source) enumerateBasicAuth(ctx context.Context) error {
+func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
-		userType, err := s.getReposByOrgOrUser(ctx, org)
+		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
 		if err != nil {
 			orgCtx.Logger().Error(err, "error fetching repos for org or user")
 			continue
 		}
 
+		// TODO: This modifies s.memberCache but it doesn't look like
+		// we do anything with it.
 		if userType == organization && s.conn.ScanUsers {
 			if err := s.addMembersByOrg(ctx, org); err != nil {
 				orgCtx.Logger().Error(err, "Unable to add members by org")
@@ -412,14 +445,14 @@ func (s *Source) enumerateBasicAuth(ctx context.Context) error {
 	return nil
 }
 
-func (s *Source) enumerateUnauthenticated(ctx context.Context) {
+func (s *Source) enumerateUnauthenticated(ctx context.Context, reporter sources.UnitReporter) {
 	if s.orgsCache.Count() > unauthGithubOrgRateLimt {
 		ctx.Logger().Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
 
 	for _, org := range s.orgsCache.Keys() {
 		orgCtx := context.WithValue(ctx, "account", org)
-		userType, err := s.getReposByOrgOrUser(ctx, org)
+		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
 		if err != nil {
 			orgCtx.Logger().Error(err, "error fetching repos for org or user")
 			continue
@@ -431,7 +464,7 @@ func (s *Source) enumerateUnauthenticated(ctx context.Context) {
 	}
 }
 
-func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool) error {
+func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool, reporter sources.UnitReporter) error {
 	ctx.Logger().V(1).Info("Enumerating with token")
 
 	var ghUser *github.User
@@ -450,10 +483,10 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	specificScope := len(s.repos) > 0 || s.orgsCache.Count() > 0
 	if !specificScope {
 		// Enumerate the user's orgs and repos if none were specified.
-		if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
+		if err := s.getReposByUser(ctx, ghUser.GetLogin(), reporter); err != nil {
 			ctx.Logger().Error(err, "Unable to fetch repos for the current user", "user", ghUser.GetLogin())
 		}
-		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
+		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin(), reporter); err != nil {
 			ctx.Logger().Error(err, "Unable to fetch gists for the current user", "user", ghUser.GetLogin())
 		}
 
@@ -469,7 +502,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	if len(s.orgsCache.Keys()) > 0 {
 		for _, org := range s.orgsCache.Keys() {
 			orgCtx := context.WithValue(ctx, "account", org)
-			userType, err := s.getReposByOrgOrUser(ctx, org)
+			userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
 			if err != nil {
 				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
 				continue
@@ -484,17 +517,17 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 
 		if s.conn.ScanUsers && len(s.memberCache) > 0 {
 			ctx.Logger().Info("Fetching repos for org members", "org_count", s.orgsCache.Count(), "member_count", len(s.memberCache))
-			s.addReposForMembers(ctx)
+			s.addReposForMembers(ctx, reporter)
 		}
 	}
 
 	return nil
 }
 
-func (s *Source) enumerateWithApp(ctx context.Context, installationClient *github.Client) error {
+func (s *Source) enumerateWithApp(ctx context.Context, installationClient *github.Client, reporter sources.UnitReporter) error {
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
-		if err := s.getReposByApp(ctx); err != nil {
+		if err := s.getReposByApp(ctx, reporter); err != nil {
 			return err
 		}
 
@@ -505,12 +538,13 @@ func (s *Source) enumerateWithApp(ctx context.Context, installationClient *githu
 				return err
 			}
 			ctx.Logger().Info("Scanning repos", "org_members", len(s.memberCache))
+			// TODO: Replace loop below with a call to s.addReposForMembers(ctx, reporter)
 			for member := range s.memberCache {
 				logger := ctx.Logger().WithValues("member", member)
-				if err := s.addUserGistsToCache(ctx, member); err != nil {
+				if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
 					logger.Error(err, "error fetching gists by user")
 				}
-				if err := s.getReposByUser(ctx, member); err != nil {
+				if err := s.getReposByUser(ctx, member, reporter); err != nil {
 					logger.Error(err, "error fetching repos by user")
 				}
 			}
@@ -721,13 +755,13 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
 	return true
 }
 
-func (s *Source) addReposForMembers(ctx context.Context) {
+func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
 	ctx.Logger().Info("Fetching repos from members", "members", len(s.memberCache))
 	for member := range s.memberCache {
-		if err := s.addUserGistsToCache(ctx, member); err != nil {
+		if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
 			ctx.Logger().Info("Unable to fetch gists by user", "user", member, "error", err)
 		}
-		if err := s.getReposByUser(ctx, member); err != nil {
+		if err := s.getReposByUser(ctx, member, reporter); err != nil {
 			ctx.Logger().Info("Unable to fetch repos by user", "user", member, "error", err)
 		}
 	}
@@ -735,7 +769,7 @@ func (s *Source) addReposForMembers(ctx context.Context) {
 
 // addUserGistsToCache collects all the gist urls for a given user,
 // and adds them to the filteredRepoCache.
-func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
+func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter sources.UnitReporter) error {
 	gistOpts := &github.GistListOptions{}
 	logger := ctx.Logger().WithValues("user", user)
 
@@ -751,6 +785,9 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 		for _, gist := range gists {
 			s.filteredRepoCache.Set(gist.GetID(), gist.GetGitPullURL())
 			s.cacheGistInfo(gist)
+			if err := reporter.UnitOk(ctx, GistUnit{name: gist.GetID(), url: gist.GetGitPullURL()}); err != nil {
+				return err
+			}
 		}
 
 		if res == nil || res.NextPage == 0 {
