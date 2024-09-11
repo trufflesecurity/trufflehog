@@ -82,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	passwordRegexState := common.PasswordRegexCheck(" ") // No explicit character exclusions by Snowflake for passwords
 	passwordMatches := passwordRegexState.Matches(data)
 
-	for accountMatch := range uniqueAccountMatches {
+	for resAccountMatch := range uniqueAccountMatches {
 		for _, resUsernameMatch := range usernameMatches {
 			for _, resPasswordMatch := range passwordMatches {
 				_, metPasswordRequirements := meetsSnowflakePasswordRequirements(resPasswordMatch)
@@ -92,13 +92,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				// Override default timeout of 60 seconds to 3 seconds to prevent long scan times/improve performance.
-				uri := fmt.Sprintf("%s:%s@%s/%s?loginTimeout=%d", resUsernameMatch, resPasswordMatch, accountMatch, database, timeout)
+				uri := fmt.Sprintf("%s:%s@%s/%s?loginTimeout=%d", resUsernameMatch, resPasswordMatch, resAccountMatch, database, timeout)
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Snowflake,
 					Raw:          []byte(resPasswordMatch),
 					ExtraData: map[string]string{
-						"account":  accountMatch,
+						"account":  resAccountMatch,
 						"username": resUsernameMatch,
 					},
 				}
