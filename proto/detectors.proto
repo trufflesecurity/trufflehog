@@ -1007,6 +1007,7 @@ enum DetectorType {
   Netsuite = 995;
   RobinhoodCrypto = 996;
   NVAPI = 997;
+  PyPI = 998;
 }
 
 message Result {
