@@ -181,7 +181,7 @@ func isGitHub404Error(err error) bool {
 }
 
 func (s *Source) processRepos(ctx context.Context, target string, listRepos repoLister, listOpts repoListOptions) error {
-	logger := s.log.WithValues("target", target)
+	logger := ctx.Logger().WithValues("target", target)
 	opts := listOpts.getListOptions()
 
 	var (
@@ -191,14 +191,14 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if s.handleRateLimit(err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
 
-		s.log.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
+		ctx.Logger().V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
 			if r.GetFork() {
 				if !s.conn.IncludeForks {

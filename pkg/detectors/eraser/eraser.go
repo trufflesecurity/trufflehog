@@ -46,6 +46,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Eraser,
 			Raw:          []byte(match),
+			ExtraData: map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/eraser/",
+			},
 		}
 
 		if verify {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
 type ctxKey int
@@ -49,6 +50,11 @@ func newArchiveHandler() *archiveHandler {
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
 func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	dataChan := make(chan []byte, defaultBufferSize)
+
+	if feature.ForceSkipArchives.Load() {
+		close(dataChan)
+		return dataChan, nil
+	}
 
 	go func() {
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
