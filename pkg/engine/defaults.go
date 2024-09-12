@@ -550,6 +550,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/purestake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pushbulletapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pusherchannelkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pypi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qualaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qubole"
@@ -805,6 +806,7 @@ import (
 func DefaultDetectors() []detectors.Detector {
 	return []detectors.Detector{
 		&heroku.Scanner{},
+		&pypi.Scanner{},
 		&linearapi.Scanner{},
 		&alibaba.Scanner{},
 		aws.New(),
