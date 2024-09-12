@@ -28,8 +28,8 @@ func TestPypi_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "typical pattern",
-			input: "pypi_token = '3aBcDFE5678901234567890_1a2b3c4d'",
-			want:  []string{"3aBcDFE5678901234567890_1a2b3c4d"},
+			input: "pypi_token = 'pypi-AgEIcHlwaS5vcmcCJDQyM2M0Yjg4LWUyNDnnnnhhMy1hNigyLWI2ZWUyMTMwYzI2MgACKlszLCJhOWQwMWE0MS01Nzk4LTQyOWYtOTk4MS1lYzE5NTJhM2E3YzgiXQAABiBeGtDnnnnnV32VpiyeU-YUDKplSv0E5ngmwsnHaV2jGg'",
+			want:  []string{"pypi-AgEIcHlwaS5vcmcCJDQyM2M0Yjg4LWUyNDnnnnhhMy1hNigyLWI2ZWUyMTMwYzI2MgACKlszLCJhOWQwMWE0MS01Nzk4LTQyOWYtOTk4MS1lYzE5NTJhM2E3YzgiXQAABiBeGtDnnnnnV32VpiyeU-YUDKplSv0E5ngmwsnHaV2jGg"},
 		},
 	}
 
@@ -109,7 +109,7 @@ func TestPypi_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_pypi,
+					DetectorType: detectorspb.DetectorType_PyPI,
 					Verified:     true,
 				},
 			},
@@ -126,7 +126,7 @@ func TestPypi_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_pypi,
+					DetectorType: detectorspb.DetectorType_PyPI,
 					Verified:     false,
 				},
 			},
@@ -155,7 +155,7 @@ func TestPypi_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_pypi,
+					DetectorType: detectorspb.DetectorType_PyPI,
 					Verified:     false,
 				},
 			},
@@ -172,7 +172,7 @@ func TestPypi_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_pypi,
+					DetectorType: detectorspb.DetectorType_PyPI,
 					Verified:     false,
 				},
 			},

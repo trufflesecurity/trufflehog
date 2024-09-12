@@ -1,13 +1,12 @@
 package pypi
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"strings"
 	"io"
-	"net/http"
-	"bytes"
 	"mime/multipart"
+	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -105,14 +104,11 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 	// Check for expected status codes for verification
 	if res.StatusCode == http.StatusBadRequest {
-		// Read the response body to check for the "Include at least one message digest" string
-		bodyBytes, err := io.ReadAll(res.Body)
+		verified, err := common.ResponseContainsSubstring(res.Body, "Include at least one message digest.")
 		if err != nil {
 			return false, nil, err
 		}
-		bodyString := string(bodyBytes)
-		if strings.Contains(bodyString, "Include at least one message digest.") {
-			// If the body contains the expected message, the key is valid
+		if verified {
 			return true, nil, nil
 		}
 	} else if res.StatusCode == http.StatusForbidden {
@@ -123,8 +119,6 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	// For all other status codes, return an error
 	return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 }
-
-
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PyPI
