@@ -28,6 +28,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/gitparse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -419,9 +420,12 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		"clone",
 		cloneURL.String(),
 		params.clonePath,
-		"-c",
-		"remote.origin.fetch=+refs/*:refs/remotes/origin/*",
 		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
+	}
+	if !feature.SkipAdditionalRefs.Load() {
+		gitArgs = append(gitArgs,
+			"-c",
+			"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
 	}
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
@@ -968,17 +972,17 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 // If either commit cannot be resolved, it returns early.
 // If both are resolved, it finds and sets the merge base in scanOptions.
 func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
-	baseCommit, baseSet, err := resolveAndSetCommit(repo, &scanOptions.BaseHash)
+	baseCommit, err := resolveAndSetCommit(repo, &scanOptions.BaseHash)
 	if err != nil {
 		return err
 	}
 
-	headCommit, headSet, err := resolveAndSetCommit(repo, &scanOptions.HeadHash)
+	headCommit, err := resolveAndSetCommit(repo, &scanOptions.HeadHash)
 	if err != nil {
 		return err
 	}
 
-	if !(baseSet && headSet) {
+	if baseCommit == nil || headCommit == nil {
 		return nil
 	}
 
@@ -997,32 +1001,31 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
 }
 
 // resolveAndSetCommit resolves a Git reference to a commit object and updates the reference if it was not a direct hash.
-// Returns the commit object, a boolean indicating if the commit was successfully set, and any error encountered.
-func resolveAndSetCommit(repo *git.Repository, ref *string) (*object.Commit, bool, error) {
+// Returns the commit object and any error encountered.
+func resolveAndSetCommit(repo *git.Repository, ref *string) (*object.Commit, error) {
 	if repo == nil || ref == nil {
-		return nil, false, fmt.Errorf("repo and ref must be non-nil")
+		return nil, fmt.Errorf("repo and ref must be non-nil")
 	}
 	if len(*ref) == 0 {
-		return nil, false, nil
+		return nil, nil
 	}
 
 	originalRef := *ref
 	resolvedRef, err := resolveHash(repo, originalRef)
 	if err != nil {
-		return nil, false, fmt.Errorf("unable to resolve ref: %w", err)
+		return nil, fmt.Errorf("unable to resolve ref: %w", err)
 	}
 
 	commit, err := repo.CommitObject(plumbing.NewHash(resolvedRef))
 	if err != nil {
-		return nil, false, fmt.Errorf("unable to resolve commit: %w", err)
+		return nil, fmt.Errorf("unable to resolve commit: %w", err)
 	}
 
-	wasSet := originalRef != resolvedRef
-	if wasSet {
+	if originalRef != resolvedRef {
 		*ref = resolvedRef
 	}
 
-	return commit, wasSet, nil
+	return commit, nil
 }
 
 func resolveHash(repo *git.Repository, ref string) (string, error) {
@@ -1232,7 +1235,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	if s.skipBinaries {
+	if s.skipBinaries || feature.ForceSkipBinaries.Load() {
 		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
 		return nil
 	}
