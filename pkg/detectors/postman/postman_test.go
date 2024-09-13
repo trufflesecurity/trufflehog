@@ -133,7 +133,7 @@ func TestPostman_FromChunk(t *testing.T) {
 					t.Errorf("Postman.FromData() error = %v, wantErr %v", got[i].VerificationError(), tt.wantVerificationErr)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Postman.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

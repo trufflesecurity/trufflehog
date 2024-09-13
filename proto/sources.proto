@@ -50,6 +50,7 @@ enum SourceType {
   SOURCE_TYPE_ELASTICSEARCH = 35;
   SOURCE_TYPE_HUGGINGFACE = 36;
   SOURCE_TYPE_GITHUB_EXPERIMENTAL = 37;
+  SOURCE_TYPE_SENTRY = 38;
 }
 
 message LocalSource {
@@ -457,4 +458,15 @@ message Elasticsearch {
   string query_json = 8;
   string since_timestamp = 9;
   bool best_effort_scan = 10;
+}
+
+message Sentry {
+  string endpoint = 1;
+  oneof credential {
+    string auth_token = 2;
+    string dsn_key = 3;
+    string api_key = 4;
+  }
+  bool insecure_skip_verify_tls = 5;
+  string projects = 6;
 }

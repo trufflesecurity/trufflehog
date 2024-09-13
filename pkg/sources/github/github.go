@@ -16,6 +16,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v63/github"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -1392,28 +1393,34 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("invalid GitHub URL")
 	}
 
-	qry := commitQuery{
-		repo:     segments[2],
-		owner:    segments[1],
-		sha:      meta.GetCommit(),
-		filename: meta.GetFile(),
+	readCloser, resp, err := s.connector.APIClient().Repositories.DownloadContents(
+		ctx,
+		segments[1],
+		segments[2],
+		meta.GetFile(),
+		&github.RepositoryContentGetOptions{Ref: meta.GetCommit()})
+	// As of this writing, if the returned readCloser is not nil, it's just the Body of the returned github.Response, so
+	// there's no need to independently close it.
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
 	}
-	res, err := s.getDiffForFileInCommit(ctx, qry)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not download file for scan: %w", err)
 	}
-	chunk := &sources.Chunk{
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected HTTP response status when trying to download file for scan: %v", resp.Status)
+	}
+
+	reporter := sources.ChanReporter{Ch: chunksChan}
+	chunkSkel := sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
 		JobID:      s.JobID(),
 		SecretID:   target.SecretID,
-		Data:       []byte(res),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},
 		},
-		Verify: s.verify,
-	}
-
-	return common.CancellableWrite(ctx, chunksChan, chunk)
+		Verify: s.verify}
+	return handlers.HandleFile(ctx, readCloser, &chunkSkel, reporter)
 }
