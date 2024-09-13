@@ -1633,7 +1633,7 @@ func DefaultDetectors() []detectors.Detector {
 		netsuite.Scanner{},
 		robinhoodcrypto.Scanner{},
 		nvapi.Scanner{},
-    onfido.Scanner{},
+		onfido.Scanner{},
 	}
 }
 
