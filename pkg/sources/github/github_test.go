@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v63/github"
 	"github.com/stretchr/testify/assert"
@@ -100,7 +99,7 @@ func TestAddReposByOrg(t *testing.T) {
 		Repositories: nil,
 		IgnoreRepos:  []string{"secret/super-*-repo2"},
 	})
-	err := s.getReposByOrg(context.Background(), "super-secret-org")
+	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
@@ -128,7 +127,7 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 		IncludeRepos:  []string{"super-secret-org/super*"},
 		Organizations: []string{"super-secret-org"},
 	})
-	err := s.getReposByOrg(context.Background(), "super-secret-org")
+	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
@@ -156,7 +155,7 @@ func TestAddReposByUser(t *testing.T) {
 		},
 		IgnoreRepos: []string{"super-secret-user/super-secret-repo2"},
 	})
-	err := s.getReposByUser(context.Background(), "super-secret-user")
+	err := s.getReposByUser(context.Background(), "super-secret-user", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
@@ -174,7 +173,7 @@ func TestAddGistsByUser(t *testing.T) {
 		JSON([]map[string]string{{"id": "aa5a315d61ae9438b18d", "git_pull_url": "https://gist.github.com/aa5a315d61ae9438b18d.git"}})
 
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
-	err := s.addUserGistsToCache(context.Background(), "super-secret-user")
+	err := s.addUserGistsToCache(context.Background(), "super-secret-user", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("aa5a315d61ae9438b18d")
@@ -266,7 +265,7 @@ func TestAddReposByApp(t *testing.T) {
 		})
 
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
-	err := s.getReposByApp(context.Background())
+	err := s.getReposByApp(context.Background(), noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("ssr1")
@@ -369,7 +368,8 @@ func TestNormalizeRepos(t *testing.T) {
 
 func TestHandleRateLimit(t *testing.T) {
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
-	assert.False(t, s.handleRateLimit(nil))
+	ctx := context.Background()
+	assert.False(t, s.handleRateLimit(ctx, nil))
 
 	// Request
 	reqUrl, _ := url.Parse("https://github.com/trufflesecurity/trufflehog")
@@ -400,7 +400,7 @@ func TestHandleRateLimit(t *testing.T) {
 		Message:  "Too Many Requests",
 	}
 
-	assert.True(t, s.handleRateLimit(err))
+	assert.True(t, s.handleRateLimit(ctx, err))
 }
 
 func TestEnumerateUnauthenticated(t *testing.T) {
@@ -419,7 +419,7 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 	s.orgsCache = memory.New[string]()
 	s.orgsCache.Set("super-secret-org", "super-secret-org")
 	//s.enumerateUnauthenticated(context.Background(), apiEndpoint)
-	s.enumerateUnauthenticated(context.Background())
+	s.enumerateUnauthenticated(context.Background(), noopReporter())
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
 	assert.True(t, ok)
@@ -458,7 +458,7 @@ func TestEnumerateWithToken(t *testing.T) {
 			Token: "token",
 		},
 	})
-	err := s.enumerateWithToken(context.Background(), false)
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
@@ -502,7 +502,7 @@ func BenchmarkEnumerateWithToken(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = s.enumerateWithToken(context.Background(), false)
+		_ = s.enumerateWithToken(context.Background(), false, noopReporter())
 	}
 }
 
@@ -660,7 +660,7 @@ func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 	})
 	s.repos = []string{"some-special-repo"}
 
-	err := s.enumerateWithToken(context.Background(), false)
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"some-special-repo"}, s.repos)
@@ -693,7 +693,7 @@ func TestEnumerateWithApp(t *testing.T) {
 			},
 		},
 	})
-	err := s.enumerateWithApp(context.Background(), s.connector.(*appConnector).InstallationClient())
+	err := s.enumerateWithApp(context.Background(), s.connector.(*appConnector).InstallationClient(), noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(s.repos))
 	assert.False(t, gock.HasUnmatchedRequest())
@@ -721,7 +721,6 @@ func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 
 	s := &Source{
 		repos: []string{},
-		log:   logr.Discard(),
 	}
 
 	for _, tt := range tests {
@@ -772,7 +771,6 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 	for _, tt := range tests {
 		s := &Source{
 			repos: tt.repos,
-			log:   logr.Discard(),
 		}
 
 		s.setProgressCompleteWithRepo(tt.index, tt.offset, "")
@@ -908,5 +906,13 @@ func Test_ScanMultipleTargets_MultipleErrors(t *testing.T) {
 	if assert.True(t, ok, "returned error was not unwrappable") {
 		got := unwrappable.Unwrap()
 		assert.ElementsMatch(t, got, want)
+	}
+}
+
+func noopReporter() sources.UnitReporter {
+	return sources.VisitorReporter{
+		VisitUnit: func(context.Context, sources.SourceUnit) error {
+			return nil
+		},
 	}
 }

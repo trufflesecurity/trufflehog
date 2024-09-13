@@ -31,7 +31,7 @@ var (
 	// Tokens created after Jan 18 2023 use a variable length
 	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})\b`)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{5,24}\.[a-zA-Z-0-9]{3,16}\.[a-zA-Z-0-9]{3,16})\b`)
-	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`)
+	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})\b`)
 )
 
 const (
@@ -54,11 +54,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	emails := emailPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, email := range emails {
-		email = strings.Split(email[0], " ")
 		if len(email) != 2 {
 			continue
 		}
 		resEmail := strings.TrimSpace(email[1])
+
 		for _, token := range tokens {
 			if len(token) != 2 {
 				continue

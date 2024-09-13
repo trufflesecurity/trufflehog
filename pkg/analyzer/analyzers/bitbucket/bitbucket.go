@@ -252,7 +252,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 }
 
 func convertScopeToAnalyzerPermissions(scopes []string) []analyzers.Permission {
-	permissions := make([]analyzers.Permission, len(scopes))
+	permissions := make([]analyzers.Permission, 0, len(scopes))
 	for _, scope := range scopes {
 		permissions = append(permissions, analyzers.Permission{Value: scope})
 	}

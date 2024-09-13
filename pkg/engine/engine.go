@@ -771,7 +771,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
 
 			if decoded == nil {
-				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+				ctx.Logger().V(4).Info("decoder not applicable for chunk", "decoder", decoder.Type().String(), "chunk", chunk)
 				continue
 			}
 
@@ -797,7 +797,6 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 					wgDoneFn: wgDetect.Done,
 				}
 			}
-			continue
 		}
 
 		dataSize := float64(len(chunk.Data))

@@ -39,7 +39,7 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/envoyproxy/protoc-gen-validate v1.1.0
 	github.com/fatih/color v1.17.0
-	github.com/felixge/fgprof v0.9.4
+	github.com/felixge/fgprof v0.9.5
 	github.com/gabriel-vasile/mimetype v1.4.5
 	github.com/getsentry/sentry-go v0.28.1
 	github.com/go-errors/errors v1.5.1
@@ -78,7 +78,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.20.1
+	github.com/prometheus/client_golang v1.20.3
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/sassoftware/go-rpmutils v0.4.0
 	github.com/schollz/progressbar/v3 v3.14.6

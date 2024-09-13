@@ -2,11 +2,8 @@ package bufferedfilewriter
 
 import (
 	"bytes"
-	"crypto/rand"
-	"fmt"
 	"io"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -498,103 +495,6 @@ func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
 	}
 }
 
-// Create a custom reader that can simulate errors.
-type errorReader struct{}
-
-func (errorReader) Read([]byte) (n int, err error) { return 0, fmt.Errorf("error reading") }
-
-func TestNewFromReader(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name     string
-		reader   io.Reader
-		wantErr  bool
-		wantData string
-	}{
-		{
-			name:     "Success case",
-			reader:   strings.NewReader("hello world"),
-			wantData: "hello world",
-		},
-		{
-			name:   "Empty reader",
-			reader: strings.NewReader(""),
-		},
-		{
-			name:    "Error reader",
-			reader:  errorReader{},
-			wantErr: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			bufWriter, err := NewFromReader(tc.reader)
-			if err != nil && tc.wantErr {
-				return
-			}
-
-			assert.NoError(t, err)
-			assert.NotNil(t, bufWriter)
-
-			err = bufWriter.CloseForWriting()
-			assert.NoError(t, err)
-
-			b := new(bytes.Buffer)
-			rdr, err := bufWriter.ReadCloser()
-			if err != nil && tc.wantErr {
-				return
-			}
-			assert.NoError(t, err)
-
-			if rdr == nil {
-				return
-			}
-			defer rdr.Close()
-
-			_, err = b.ReadFrom(rdr)
-			assert.NoError(t, err)
-			assert.Equal(t, tc.wantData, b.String())
-		})
-	}
-}
-
-func TestNewFromReaderThresholdExceeded(t *testing.T) {
-	t.Parallel()
-
-	// Create a large data buffer that exceeds the threshold.
-	largeData := make([]byte, 1024*1024) // 1 MB
-	_, err := rand.Read(largeData)
-	assert.NoError(t, err)
-
-	// Create a BufferedFileWriter with a smaller threshold.
-	threshold := uint64(1024) // 1 KB
-	bufWriter, err := NewFromReader(bytes.NewReader(largeData), WithThreshold(threshold))
-	assert.NoError(t, err)
-
-	err = bufWriter.CloseForWriting()
-	assert.NoError(t, err)
-
-	rdr, err := bufWriter.ReadCloser()
-	assert.NoError(t, err)
-	defer rdr.Close()
-
-	// Verify that the data was written to a file.
-	assert.NotEmpty(t, bufWriter.filename)
-	assert.NotNil(t, bufWriter.file)
-
-	// Read the data from the BufferedFileWriter.
-	readData, err := io.ReadAll(rdr)
-	assert.NoError(t, err)
-	assert.Equal(t, largeData, readData)
-
-	// Verify the size of the data written.
-	assert.Equal(t, uint64(len(largeData)), bufWriter.size)
-}
-
 func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
 	bufPool := pool.NewBufferPool(defaultBufferSize)
 
@@ -698,76 +598,5 @@ func TestBufferedFileWriter_ReadFrom(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedOutput, result.String())
 		})
-	}
-}
-
-// simpleReader wraps a string, allowing it to be read as an io.Reader without implementing io.WriterTo.
-type simpleReader struct {
-	data   []byte
-	offset int
-}
-
-func newSimpleReader(s string) *simpleReader { return &simpleReader{data: []byte(s)} }
-
-// Read implements the io.Reader interface.
-func (sr *simpleReader) Read(p []byte) (n int, err error) {
-	if sr.offset >= len(sr.data) {
-		return 0, io.EOF // no more data to read
-	}
-	n = copy(p, sr.data[sr.offset:]) // copy data to p
-	sr.offset += n                   // move offset for next read
-	return
-}
-
-func TestNewFromReaderThresholdExceededSimpleReader(t *testing.T) {
-	t.Parallel()
-
-	// Create a large data buffer that exceeds the threshold.
-	largeData := strings.Repeat("a", 1024*1024) // 1 MB
-
-	// Create a BufferedFileWriter with a smaller threshold.
-	threshold := uint64(1024) // 1 KB
-	bufWriter, err := NewFromReader(newSimpleReader(largeData), WithThreshold(threshold))
-	assert.NoError(t, err)
-
-	err = bufWriter.CloseForWriting()
-	assert.NoError(t, err)
-
-	rdr, err := bufWriter.ReadCloser()
-	assert.NoError(t, err)
-	defer rdr.Close()
-
-	// Verify that the data was written to a file.
-	assert.NotEmpty(t, bufWriter.filename)
-	assert.NotNil(t, bufWriter.file)
-
-	// Read the data from the BufferedFileWriter.
-	readData, err := io.ReadAll(rdr)
-	assert.NoError(t, err)
-	assert.Equal(t, largeData, string(readData))
-
-	// Verify the size of the data written.
-	assert.Equal(t, uint64(len(largeData)), bufWriter.size)
-}
-
-func BenchmarkNewFromReader(b *testing.B) {
-	largeData := strings.Repeat("a", 1024*1024) // 1 MB
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		reader := newSimpleReader(largeData)
-
-		b.StartTimer()
-		bufWriter, err := NewFromReader(reader)
-		assert.NoError(b, err)
-		b.StopTimer()
-
-		err = bufWriter.CloseForWriting()
-		assert.NoError(b, err)
-
-		rdr, err := bufWriter.ReadCloser()
-		assert.NoError(b, err)
-		rdr.Close()
 	}
 }
