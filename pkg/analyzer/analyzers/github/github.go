@@ -47,10 +47,13 @@ func secretInfoToAnalyzerResult(info *common.SecretInfo) *analyzers.AnalyzerResu
 	result.Bindings = append(result.Bindings, secretInfoToRepoBindings(info)...)
 	result.Bindings = append(result.Bindings, secretInfoToGistBindings(info)...)
 	for _, repo := range append(info.Repos, info.AccessibleRepos...) {
-		if *repo.Owner.Type != "Organization" {
+		if repo.Owner.GetType() != "Organization" {
 			continue
 		}
-		name := *repo.Owner.Name
+		name := repo.Owner.GetName()
+		if name == "" {
+			continue
+		}
 		result.UnboundedResources = append(result.UnboundedResources, analyzers.Resource{
 			Name:               name,
 			FullyQualifiedName: fmt.Sprintf("github.com/%s", name),
