@@ -54,17 +54,20 @@ type BufferedReadSeeker struct {
 	sizeKnown bool  // Whether the total size of the reader is known
 }
 
-// isSeekable checks if a reader reliably supports seeking operations.
+// asSeeker checks if a reader reliably supports seeking operations.
 // Some types, like os.File when used as a pipe, may implement io.Seeker
 // but do not actually support seeking.
-func isSeekable(r io.Reader) bool {
+func asSeeker(r io.Reader) io.Seeker {
 	seeker, ok := r.(io.Seeker)
 	if !ok {
-		return false
+		return nil
 	}
 
 	_, err := seeker.Seek(0, io.SeekCurrent)
-	return err == nil
+	if err != nil {
+		return nil
+	}
+	return seeker
 }
 
 // NewBufferedReaderSeeker creates and initializes a BufferedReadSeeker.
@@ -74,22 +77,21 @@ func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 	const defaultThreshold = 1 << 24 // 16MB threshold for switching to file buffering
 
 	var (
-		buf      *buffer.Buffer
-		seeker   io.Seeker
-		seekable bool
+		buf        *buffer.Buffer
+		seeker     io.Seeker
+		isSeekable bool
 	)
 
-	if isSeekable(r) {
-		seeker, _ = r.(io.Seeker)
-		seekable = true
-	} else {
+	seeker = asSeeker(r)
+	if seeker == nil {
+		isSeekable = true
 		buf = defaultBufferPool.Get()
 	}
 
 	return &BufferedReadSeeker{
 		reader:     r,
 		seeker:     seeker,
-		isSeekable: seekable,
+		isSeekable: isSeekable,
 		bufPool:    defaultBufferPool,
 		buf:        buf,
 		threshold:  defaultThreshold,
