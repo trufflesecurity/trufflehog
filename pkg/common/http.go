@@ -91,7 +91,7 @@ type CustomTransport struct {
 
 func userAgent() string {
 	if len(feature.UserAgentSuffix.Load()) > 0 {
-		return "TruffleHog" + " " + feature.UserAgentSuffix.Load()
+		return "TruffleHog " + feature.UserAgentSuffix.Load()
 	}
 	return "TruffleHog"
 }
