@@ -63,7 +63,7 @@ func TestSource_Token(t *testing.T) {
 	s.Init(ctx, "github integration test source", 0, 0, false, conn, 1)
 	s.filteredRepoCache = s.newFilteredRepoCache(ctx, memory.New[string](), nil, nil)
 
-	err = s.enumerateWithApp(ctx, s.connector.(*appConnector).InstallationClient())
+	err = s.enumerateWithApp(ctx, s.connector.(*appConnector).InstallationClient(), noopReporter())
 	assert.NoError(t, err)
 
 	_, _, err = s.cloneRepo(ctx, "https://github.com/truffle-test-integration-org/another-test-repo.git")
@@ -631,7 +631,7 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				assert.NoError(t, s.addUserGistsToCache(ctx, tt.user))
+				assert.NoError(t, s.addUserGistsToCache(ctx, tt.user, noopReporter()))
 				chunksCh <- &sources.Chunk{}
 			}()
 			var wantedRepo string
