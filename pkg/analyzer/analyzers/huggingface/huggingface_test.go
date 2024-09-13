@@ -34,7 +34,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				   {
 					  "Resource":{
 						 "Name":"zubairkhan/test",
-						 "FullyQualifiedName":"",
+						 "FullyQualifiedName": "huggingface.com/model/64d8220c0d879296892ab835",
 						 "Type":"model",
 						 "Metadata":{
 							"private":false
@@ -49,7 +49,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				   {
 					  "Resource":{
 						 "Name":"zubairkhan/first_repo",
-						 "FullyQualifiedName":"",
+						 "FullyQualifiedName": "huggingface.com/model/64d82349a787c9bc7bbb2ab4",
 						 "Type":"model",
 						 "Metadata":{
 							"private":true
@@ -58,36 +58,6 @@ func TestAnalyzer_Analyze(t *testing.T) {
 					  },
 					  "Permission":{
 						 "Value":"Read",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"zubairkhan/test",
-						 "FullyQualifiedName":"",
-						 "Type":"model",
-						 "Metadata":{
-							"private":false
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"",
-						 "Parent":null
-					  }
-				   },
-				   {
-					  "Resource":{
-						 "Name":"zubairkhan/first_repo",
-						 "FullyQualifiedName":"",
-						 "Type":"model",
-						 "Metadata":{
-							"private":true
-						 },
-						 "Parent":null
-					  },
-					  "Permission":{
-						 "Value":"",
 						 "Parent":null
 					  }
 				   }
