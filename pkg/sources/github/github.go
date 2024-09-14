@@ -84,20 +84,20 @@ var _ sources.SourceUnit = (*RepoUnit)(nil)
 var _ sources.SourceUnit = (*GistUnit)(nil)
 
 type RepoUnit struct {
-	name string
-	url  string
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
-func (r RepoUnit) SourceUnitID() (string, sources.SourceUnitKind) { return r.url, "repo" }
-func (r RepoUnit) Display() string                                { return r.name }
+func (r RepoUnit) SourceUnitID() (string, sources.SourceUnitKind) { return r.URL, "repo" }
+func (r RepoUnit) Display() string                                { return r.Name }
 
 type GistUnit struct {
-	name string
-	url  string
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
-func (g GistUnit) SourceUnitID() (string, sources.SourceUnitKind) { return g.url, "gist" }
-func (g GistUnit) Display() string                                { return g.name }
+func (g GistUnit) SourceUnitID() (string, sources.SourceUnitKind) { return g.URL, "gist" }
+func (g GistUnit) Display() string                                { return g.Name }
 
 // --------------------------------------------------------------------------------
 
@@ -373,7 +373,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// Report any values that were already configured.
 	for _, name := range s.filteredRepoCache.Keys() {
 		url, _ := s.filteredRepoCache.Get(name)
-		_ = dedupeReporter.UnitOk(ctx, RepoUnit{name: name, url: url})
+		_ = dedupeReporter.UnitOk(ctx, RepoUnit{Name: name, URL: url})
 	}
 
 	// I'm not wild about switching on the connector type here (as opposed to dispatching to the connector itself) but
@@ -820,7 +820,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 		for _, gist := range gists {
 			s.filteredRepoCache.Set(gist.GetID(), gist.GetGitPullURL())
 			s.cacheGistInfo(gist)
-			if err := reporter.UnitOk(ctx, GistUnit{name: gist.GetID(), url: gist.GetGitPullURL()}); err != nil {
+			if err := reporter.UnitOk(ctx, GistUnit{Name: gist.GetID(), URL: gist.GetGitPullURL()}); err != nil {
 				return err
 			}
 		}
