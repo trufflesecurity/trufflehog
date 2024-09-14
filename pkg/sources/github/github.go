@@ -118,6 +118,7 @@ func (s *Source) setScanOptions(base, head string) {
 // Ensure the Source satisfies the interfaces at compile time
 var _ sources.Source = (*Source)(nil)
 var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
+var _ sources.SourceUnitEnumChunker = (*Source)(nil)
 
 var endsWithGithub = regexp.MustCompile(`github\.com/?$`)
 
@@ -338,7 +339,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 			return nil
 		},
 	}
-	err := s.enumerate(ctx, noopReporter)
+	err := s.Enumerate(ctx, noopReporter)
 	if err != nil {
 		return fmt.Errorf("error enumerating: %w", err)
 	}
@@ -346,11 +347,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	return s.scan(ctx, chunksReporter)
 }
 
-// enumerate enumerates the GitHub source based on authentication method and
+// Enumerate enumerates the GitHub source based on authentication method and
 // user configuration. It populates s.filteredRepoCache, s.repoInfoCache,
 // s.memberCache, s.totalRepoSize, s.orgsCache, and s.repos. Additionally,
 // repositories and gists are reported to the provided UnitReporter.
-func (s *Source) enumerate(ctx context.Context, reporter sources.UnitReporter) error {
+func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	seenUnits := make(map[sources.SourceUnit]struct{})
 	// Wrapper reporter to deduplicate and filter found units.
 	dedupeReporter := sources.VisitorReporter{
@@ -603,7 +604,6 @@ func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
 	s.repos = reposToScan
 
-	scanErrs := sources.NewScanErrors()
 	// Setup scan options if it wasn't provided.
 	if s.scanOptions == nil {
 		s.scanOptions = &git.ScanOptions{}
@@ -615,6 +615,7 @@ func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error
 			if common.IsDone(ctx) {
 				return nil
 			}
+			ctx := context.WithValue(ctx, "repo", repoURL)
 
 			// TODO: set progress complete is being called concurrently with i
 			s.setProgressCompleteWithRepo(i, progressIndexOffset, repoURL)
@@ -625,64 +626,68 @@ func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error
 				s.resumeInfoSlice = sources.RemoveRepoFromResumeInfo(s.resumeInfoSlice, repoURL)
 			}(s, repoURL)
 
-			if !strings.HasSuffix(repoURL, ".git") {
-				scanErrs.Add(fmt.Errorf("repo %s does not end in .git", repoURL))
+			if err := s.scanRepo(ctx, repoURL, reporter); err != nil {
+				ctx.Logger().Error(err, "error scanning repo")
 				return nil
 			}
 
-			// Scan the repository
-			repoInfo, ok := s.repoInfoCache.get(repoURL)
-			if !ok {
-				// This should never happen.
-				err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
-				ctx.Logger().Error(err, "failed to scan repository")
-				return nil
-			}
-			repoCtx := context.WithValues(ctx, "repo", repoURL)
-			duration, err := s.cloneAndScanRepo(repoCtx, repoURL, repoInfo, reporter)
-			if err != nil {
-				scanErrs.Add(err)
-				return nil
-			}
-
-			// Scan the wiki, if enabled, and the repo has one.
-			if s.conn.IncludeWikis && repoInfo.hasWiki && s.wikiIsReachable(ctx, repoURL) {
-				wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
-				wikiCtx := context.WithValue(ctx, "repo", wikiURL)
-
-				_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
-				if err != nil {
-					// Ignore "Repository not found" errors.
-					// It's common for GitHub's API to say a repo has a wiki when it doesn't.
-					if !strings.Contains(err.Error(), "not found") {
-						scanErrs.Add(fmt.Errorf("error scanning wiki: %w", err))
-					}
-
-					// Don't return, it still might be possible to scan comments.
-				}
-			}
-
-			// Scan comments, if enabled.
-			if s.includeGistComments || s.includeIssueComments || s.includePRComments {
-				if err = s.scanComments(repoCtx, repoURL, repoInfo, reporter); err != nil {
-					scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
-					return nil
-				}
-			}
-
-			repoCtx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d repos", scannedCount, len(s.repos)), "duration_seconds", duration)
-			githubReposScanned.WithLabelValues(s.name).Inc()
 			atomic.AddUint64(&scannedCount, 1)
 			return nil
 		})
 	}
 
 	_ = s.jobPool.Wait()
-	if scanErrs.Count() > 0 {
-		ctx.Logger().Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs.String())
-	}
 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed GitHub scan", "")
 
+	return nil
+}
+
+func (s *Source) scanRepo(ctx context.Context, repoURL string, reporter sources.ChunkReporter) error {
+	if !strings.HasSuffix(repoURL, ".git") {
+		return fmt.Errorf("repo does not end in .git")
+	}
+	// Scan the repository
+	repoInfo, ok := s.repoInfoCache.get(repoURL)
+	if !ok {
+		// This should never happen.
+		return fmt.Errorf("no repoInfo for URL: %s", repoURL)
+	}
+	duration, err := s.cloneAndScanRepo(ctx, repoURL, repoInfo, reporter)
+	if err != nil {
+		return err
+	}
+
+	// Scan the wiki, if enabled, and the repo has one.
+	if s.conn.IncludeWikis && repoInfo.hasWiki && s.wikiIsReachable(ctx, repoURL) {
+		wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
+		wikiCtx := context.WithValue(ctx, "repo", wikiURL)
+
+		_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
+		if err != nil {
+			// Ignore "Repository not found" errors.
+			// It's common for GitHub's API to say a repo has a wiki when it doesn't.
+			if !strings.Contains(err.Error(), "not found") {
+				if err := reporter.ChunkErr(ctx, fmt.Errorf("error scanning wiki: %w", err)); err != nil {
+					return err
+				}
+			}
+
+			// Don't return, it still might be possible to scan comments.
+		}
+	}
+
+	// Scan comments, if enabled.
+	if s.includeGistComments || s.includeIssueComments || s.includePRComments {
+		if err := s.scanComments(ctx, repoURL, repoInfo, reporter); err != nil {
+			err := fmt.Errorf("error scanning comments: %w", err)
+			if err := reporter.ChunkErr(ctx, err); err != nil {
+				return err
+			}
+		}
+	}
+
+	ctx.Logger().V(2).Info("finished scanning repo", "duration_seconds", duration)
+	githubReposScanned.WithLabelValues(s.name).Inc()
 	return nil
 }
 
@@ -1477,4 +1482,10 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		},
 		Verify: s.verify}
 	return handlers.HandleFile(ctx, readCloser, &chunkSkel, reporter)
+}
+
+func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
+	repoURL, _ := unit.SourceUnitID()
+	ctx = context.WithValue(ctx, "repo", repoURL)
+	return s.scanRepo(ctx, repoURL, reporter)
 }
