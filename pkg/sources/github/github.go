@@ -373,6 +373,10 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// Report any values that were already configured.
 	for _, name := range s.filteredRepoCache.Keys() {
 		url, _ := s.filteredRepoCache.Get(name)
+		url, err := s.ensureRepoInfoCache(ctx, url)
+		if err != nil {
+			_ = dedupeReporter.UnitErr(ctx, err)
+		}
 		_ = dedupeReporter.UnitOk(ctx, RepoUnit{Name: name, URL: url})
 	}
 
@@ -396,55 +400,12 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	}
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
 
-RepoLoop:
 	for _, repo := range s.filteredRepoCache.Values() {
-		repoCtx := context.WithValue(ctx, "repo", repo)
+		ctx := context.WithValue(ctx, "repo", repo)
 
-		// Ensure that |s.repoInfoCache| contains an entry for |repo|.
-		// This compensates for differences in enumeration logic between `--org` and `--repo`.
-		// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
-		if _, ok := s.repoInfoCache.get(repo); !ok {
-			repoCtx.Logger().V(2).Info("Caching repository info")
-
-			_, urlParts, err := getRepoURLParts(repo)
-			if err != nil {
-				repoCtx.Logger().Error(err, "Failed to parse repository URL")
-				continue
-			}
-
-			if isGistUrl(urlParts) {
-				// Cache gist info.
-				for {
-					gistID := extractGistID(urlParts)
-					gist, _, err := s.connector.APIClient().Gists.Get(repoCtx, gistID)
-					// Normalize the URL to the Gist's pull URL.
-					// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
-					repo = gist.GetGitPullURL()
-					if s.handleRateLimit(repoCtx, err) {
-						continue
-					}
-					if err != nil {
-						repoCtx.Logger().Error(err, "Failed to fetch gist")
-						continue RepoLoop
-					}
-					s.cacheGistInfo(gist)
-					break
-				}
-			} else {
-				// Cache repository info.
-				for {
-					ghRepo, _, err := s.connector.APIClient().Repositories.Get(repoCtx, urlParts[1], urlParts[2])
-					if s.handleRateLimit(repoCtx, err) {
-						continue
-					}
-					if err != nil {
-						repoCtx.Logger().Error(err, "Failed to fetch repository")
-						continue RepoLoop
-					}
-					s.cacheRepoInfo(ghRepo)
-					break
-				}
-			}
+		repo, err := s.ensureRepoInfoCache(ctx, repo)
+		if err != nil {
+			ctx.Logger().Error(err, "error caching repo info")
 		}
 		s.repos = append(s.repos, repo)
 	}
@@ -453,6 +414,58 @@ RepoLoop:
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
 	return nil
+}
+
+// ensureRepoInfoCache checks that s.repoInfoCache has an entry for the
+// provided repository URL. If not, it fetches and stores the metadata for the
+// repository. In some cases, the gist URL needs to be normalized, which is
+// returned by this function.
+func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string) (string, error) {
+	if _, ok := s.repoInfoCache.get(repo); ok {
+		return repo, nil
+	}
+	// Ensure that |s.repoInfoCache| contains an entry for |repo|.
+	// This compensates for differences in enumeration logic between `--org` and `--repo`.
+	// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
+	ctx.Logger().V(2).Info("Caching repository info")
+
+	_, urlParts, err := getRepoURLParts(repo)
+	if err != nil {
+		return repo, fmt.Errorf("failed to parse repository URL: %w", err)
+	}
+
+	if isGistUrl(urlParts) {
+		// Cache gist info.
+		for {
+			gistID := extractGistID(urlParts)
+			gist, _, err := s.connector.APIClient().Gists.Get(ctx, gistID)
+			// Normalize the URL to the Gist's pull URL.
+			// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
+			repo = gist.GetGitPullURL()
+			if s.handleRateLimit(ctx, err) {
+				continue
+			}
+			if err != nil {
+				return repo, fmt.Errorf("failed to fetch gist")
+			}
+			s.cacheGistInfo(gist)
+			break
+		}
+	} else {
+		// Cache repository info.
+		for {
+			ghRepo, _, err := s.connector.APIClient().Repositories.Get(ctx, urlParts[1], urlParts[2])
+			if s.handleRateLimit(ctx, err) {
+				continue
+			}
+			if err != nil {
+				return repo, fmt.Errorf("failed to fetch repository")
+			}
+			s.cacheRepoInfo(ghRepo)
+			break
+		}
+	}
+	return repo, nil
 }
 
 func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitReporter) error {
