@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
@@ -28,12 +29,15 @@ func CreateLogFileName(baseName string) string {
 }
 
 func NewAnalyzeClient(cfg *config.Config) *http.Client {
+	client := &http.Client{
+		Transport: AnalyzerRoundTripper{parent: http.DefaultTransport},
+	}
 	if cfg == nil || !cfg.LoggingEnabled {
-		return &http.Client{}
+		return client
 	}
 	return &http.Client{
 		Transport: LoggingRoundTripper{
-			parent:  http.DefaultTransport,
+			parent:  client.Transport,
 			logFile: cfg.LogFile,
 		},
 	}
@@ -48,13 +52,29 @@ type LoggingRoundTripper struct {
 func (r LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	startTime := time.Now()
 
-	resp, err := r.parent.RoundTrip(req)
-	if err != nil {
-		return resp, err
+	resp, parentErr := r.parent.RoundTrip(req)
+	if resp == nil {
+		return resp, parentErr
 	}
 
 	// TODO: JSON
-	logEntry := fmt.Sprintf("Date: %s, Method: %s, Path: %s, Status: %d\n", startTime.Format(time.RFC3339), req.Method, req.URL.Path, resp.StatusCode)
+	var logEntry string
+	if parentErr != nil {
+		logEntry = fmt.Sprintf("Date: %s, Method: %s, Path: %s, Status: %d, Error: %s\n",
+			startTime.Format(time.RFC3339),
+			req.Method,
+			req.URL.Path,
+			resp.StatusCode,
+			parentErr.Error(),
+		)
+	} else {
+		logEntry = fmt.Sprintf("Date: %s, Method: %s, Path: %s, Status: %d\n",
+			startTime.Format(time.RFC3339),
+			req.Method,
+			req.URL.Path,
+			resp.StatusCode,
+		)
+	}
 
 	// Open log file in append mode.
 	file, err := os.OpenFile(r.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -68,5 +88,32 @@ func (r LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 		return resp, fmt.Errorf("failed to write log entry to file: %w", err)
 	}
 
+	return resp, parentErr
+}
+
+type AnalyzerRoundTripper struct {
+	parent http.RoundTripper
+}
+
+func (r AnalyzerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := r.parent.RoundTrip(req)
+	if err != nil || methodIsSafe(req.Method) {
+		return resp, err
+	}
+	// Check that unsafe methods did NOT return a valid status code.
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return resp, fmt.Errorf("non-safe request returned success")
+	}
 	return resp, nil
+}
+
+// methodIsSafe is a helper method to check whether the HTTP method is safe according to MDN Web Docs.
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods#safe_idempotent_and_cacheable_request_methods
+func methodIsSafe(method string) bool {
+	switch strings.ToUpper(method) {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace:
+		return true
+	default:
+		return false
+	}
 }
