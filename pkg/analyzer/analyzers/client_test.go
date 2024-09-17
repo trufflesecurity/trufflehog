@@ -82,6 +82,9 @@ func TestAnalyzerClientUnsafeSuccess(t *testing.T) {
 
 			// Perform the request
 			resp, err := client.Do(req)
+			if resp != nil {
+				_ = resp.Body.Close()
+			}
 
 			// Check the error
 			if err != nil && !tc.expectedError {
