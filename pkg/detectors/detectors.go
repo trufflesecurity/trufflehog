@@ -73,7 +73,12 @@ type MultiPartCredentialProvider interface {
 // support verifying against user-supplied endpoints.
 type EndpointCustomizer interface {
 	SetEndpoints(...string) error
-	DefaultEndpoint() string
+	UseCloudEndpoint(bool)
+	UseFoundEndpoints(bool)
+}
+
+type CloudProvider interface {
+	CloudEndpoint() string
 }
 
 type Result struct {
