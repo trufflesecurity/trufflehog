@@ -39,18 +39,17 @@ set PATH=%PATH%;C:\Program Files\nodejs\;C:\Program Files\Git\cmd`,
 		//	{
 		//		name: "curl example",
 		//		`curl --get \
-		//-H "Authorization: token ccc9ae71-913f-46bd-9d23-03356323400a" \
-		//--data-urlencode "version=2023-03-20" \
-		//--data-urlencode "format=cyclonedx1.4%2Bjson" \
-		//https://api.snyk.io/rest/orgs/1234/projects/1234/sbom`,
+		// -H "Authorization: token ccc9ae71-913f-46bd-9d23-03356323400a" \
+		// --data-urlencode "version=2023-03-20" \
+		// --data-urlencode "format=cyclonedx1.4%2Bjson" \
+		// https://api.snyk.io/rest/orgs/1234/projects/1234/sbom`,
 		//	},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, 2)
-			ahoCorasickCore.PopulateMatchingDetectors(test.input, chunkSpecificDetectors)
-			if len(chunkSpecificDetectors) == 0 {
+			matches := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matches) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}

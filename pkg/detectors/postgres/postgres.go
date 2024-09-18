@@ -52,6 +52,7 @@ var (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	detectLoopback bool // Automated tests run against localhost, but we want to ignore those results in the wild
 }
 
@@ -130,6 +131,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			isVerified, verificationErr := verifyPostgres(params)
 			result.Verified = isVerified
 			result.SetVerificationError(verificationErr, password)
+			result.AnalysisInfo = map[string]string{
+				"connection_string": string(raw),
+			}
 		}
 
 		// We gather SSL information into ExtraData in case it's useful for later reporting.
@@ -147,8 +151,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func findUriMatches(data []byte) []map[string]string {

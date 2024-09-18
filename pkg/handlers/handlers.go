@@ -1,33 +1,133 @@
 package handlers
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/mholt/archiver/v4"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/readers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-// readSeekCloser is an interface that combines the functionality of io.ReadSeekCloser and io.ReaderAt.
-// It supports reading data, seeking within an open resource, and closing the resource once operations are complete.
-// Additionally, it allows reading from a specific offset within the resource without altering its current position,
-// enabling efficient and flexible data access patterns. This interface is particularly useful for handling files
-// or other data streams where random access and sequential processing are required.
-type readSeekCloser interface {
-	io.ReadSeekCloser
-	io.ReaderAt
+// fileReader is a custom reader that wraps an io.Reader and provides additional functionality for identifying
+// and handling different file types. It abstracts away the complexity of detecting file formats, MIME types,
+// and archive types, allowing for a more modular and extensible file handling process.
+//
+// fileReader leverages the archiver and mimetype packages for file type identification and provides information
+// about the detected file format, MIME type, and whether the file is an archive. This information can be
+// used by FileHandler implementations to make decisions on how to process the file.
+//
+// The IsGenericArchive field indicates whether the file represents an archive format that is supported by the
+// archiver library. This allows FileHandler implementations to determine if the file can be processed using
+// the default archive handling capabilities provided by the archiver package.
+//
+// By encapsulating the file type detection logic, fileReader simplifies the implementation of FileHandler and
+// promotes a more cohesive and maintainable codebase. It also embeds a BufferedFileReader to provide efficient
+// random access to the file content.
+type fileReader struct {
+	format           archiver.Format
+	mime             *mimetype.MIME
+	isGenericArchive bool
+
+	*iobuf.BufferedReadSeeker
+}
+
+var ErrEmptyReader = errors.New("reader is empty")
+
+// mimeTypeReader wraps an io.Reader with MIME type information.
+// This type is used to pass content through the processing pipeline
+// while carrying its detected MIME type, avoiding redundant type detection.
+type mimeTypeReader struct {
+	mimeExt  string
+	mimeName mimeType
+	io.Reader
+}
+
+// newMimeTypeReaderFromFileReader creates a new mimeTypeReader from a fileReader.
+func newMimeTypeReaderFromFileReader(r fileReader) mimeTypeReader {
+	return mimeTypeReader{
+		mimeExt:  r.mime.Extension(),
+		mimeName: mimeType(r.mime.String()),
+		Reader:   r.BufferedReadSeeker,
+	}
+}
+
+// newMimeTypeReader creates a new mimeTypeReader from an io.Reader.
+// It uses a bufio.Reader to perform MIME type detection on the input reader
+// without consuming it, by peeking into the first 3072 bytes of the input.
+// This encapsulates both the original reader and the detected MIME type information.
+// This function is particularly useful for specialized archive handlers
+// that need to pass extracted content to the default handler without modifying the original reader.
+func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
+	const defaultMinBufferSize = 3072
+	bufReader := bufio.NewReaderSize(r, defaultMinBufferSize)
+	// A buffer of 512 bytes is used since many file formats store their magic numbers within the first 512 bytes.
+	// If fewer bytes are read, MIME type detection may still succeed.
+	buffer, err := bufReader.Peek(defaultMinBufferSize)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return mimeTypeReader{}, fmt.Errorf("unable to read file for MIME type detection: %w", err)
+	}
+
+	mime := mimetype.Detect(buffer)
+
+	return mimeTypeReader{mimeExt: mime.Extension(), mimeName: mimeType(mime.String()), Reader: bufReader}, nil
+}
+
+// newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
+func newFileReader(r io.Reader) (fileReader, error) {
+	var fReader fileReader
+
+	fReader.BufferedReadSeeker = iobuf.NewBufferedReaderSeeker(r)
+
+	mime, err := mimetype.DetectReader(fReader)
+	if err != nil {
+		return fReader, fmt.Errorf("unable to detect MIME type: %w", err)
+	}
+	fReader.mime = mime
+
+	// Reset the reader to the beginning because DetectReader consumes the reader.
+	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
+	}
+
+	// If a MIME type is known to not be an archive type, we might as well return here rather than
+	// paying the I/O penalty of an archiver.Identify() call that won't identify anything.
+	if _, ok := skipArchiverMimeTypes[mimeType(mime.String())]; ok {
+		return fReader, nil
+	}
+
+	format, _, err := archiver.Identify("", fReader)
+	switch {
+	case err == nil:
+		fReader.isGenericArchive = true
+		fReader.format = format
+
+	case errors.Is(err, archiver.ErrNoMatch):
+		// Not an archive handled by archiver.
+		// Continue with the default reader.
+	default:
+		return fReader, fmt.Errorf("error identifying archive: %w", err)
+	}
+
+	// Reset the reader to the beginning again to allow the handler to read from the start.
+	// This is necessary because Identify consumes the reader.
+	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+		return fReader, fmt.Errorf("error resetting reader after archive identification: %w", err)
+	}
+
+	return fReader, nil
 }
 
 // FileHandler represents a handler for files.
-// It has a single method, HandleFile, which takes a context and a readSeekCloser as input,
+// It has a single method, HandleFile, which takes a context and a fileReader as input,
 // and returns a channel of byte slices and an error.
-// The readSeekCloser extends io.ReadSeekCloser with io.ReaderAt capabilities,
-// allowing handlers to perform random and direct access on the file content efficiently.
 type FileHandler interface {
-	HandleFile(ctx logContext.Context, reader readSeekCloser) (chan []byte, error)
+	HandleFile(ctx logContext.Context, reader fileReader) (chan []byte, error)
 }
 
 // fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
@@ -35,10 +135,10 @@ type fileHandlingConfig struct{ skipArchives bool }
 
 // newFileHandlingConfig creates a default fileHandlingConfig with default settings.
 // Optional functional parameters can customize the configuration.
-func newFileHandlingConfig(options ...func(*fileHandlingConfig)) *fileHandlingConfig {
-	config := new(fileHandlingConfig)
+func newFileHandlingConfig(options ...func(*fileHandlingConfig)) fileHandlingConfig {
+	config := fileHandlingConfig{}
 	for _, option := range options {
-		option(config)
+		option(&config)
 	}
 
 	return config
@@ -53,99 +153,108 @@ func WithSkipArchives(skip bool) func(*fileHandlingConfig) {
 type handlerType string
 
 const (
-	defaultHandlerType handlerType = "default"
+	archiveHandlerType handlerType = "archive"
 	arHandlerType      handlerType = "ar"
 	rpmHandlerType     handlerType = "rpm"
+	defaultHandlerType handlerType = "default"
 )
 
 type mimeType string
 
 const (
-	sevenZMime          mimeType = "application/x-7z-compressed"
-	bzip2Mime           mimeType = "application/x-bzip2"
-	rarCompressedMime   mimeType = "application/x-rar-compressed"
-	rarMime             mimeType = "application/x-rar"
-	tarMime             mimeType = "application/x-tar"
-	zipMime             mimeType = "application/zip"
-	gxzipMime           mimeType = "application/x-gzip"
-	gzipMime            mimeType = "application/gzip"
-	gunzipMime          mimeType = "application/x-gunzip"
-	gzippedMime         mimeType = "application/gzipped"
-	gzipCompressedMime  mimeType = "application/x-gzip-compressed"
-	gzipDocumentMime    mimeType = "gzip/document"
-	xzMime              mimeType = "application/x-xz"
-	msCabCompressedMime mimeType = "application/vnd.ms-cab-compressed"
-	rpmMime             mimeType = "application/x-rpm"
-	fitsMime            mimeType = "application/fits"
-	xarMime             mimeType = "application/x-xar"
-	warcMime            mimeType = "application/warc"
-	cpioMime            mimeType = "application/cpio"
-	unixArMime          mimeType = "application/x-unix-archive"
-	arMime              mimeType = "application/x-archive"
-	debMime             mimeType = "application/vnd.debian.binary-package"
-	lzipMime            mimeType = "application/lzip"
-	lzipXMime           mimeType = "application/x-lzip"
+	rpmMime      mimeType = "application/x-rpm"
+	cpioMime     mimeType = "application/cpio"
+	unixArMime   mimeType = "application/x-unix-archive"
+	arMime       mimeType = "application/x-archive"
+	debMime      mimeType = "application/vnd.debian.binary-package"
+	textMime     mimeType = "text/plain; charset=utf-8"
+	xmlMime      mimeType = "text/xml"
+	jsonMime     mimeType = "application/json"
+	csvMime      mimeType = "text/csv"
+	tsvMime      mimeType = "text/tab-separated-values"
+	geoJSONMine  mimeType = "application/vnd.geo+json"
+	ndjsonMime   mimeType = "application/x-ndjson"
+	htmlMime     mimeType = "text/html"
+	phpTextMime  mimeType = "text/x-php"
+	rtfTextMime  mimeType = "text/rtf"
+	jsAppMime    mimeType = "application/javascript"
+	jsTextMime   mimeType = "text/javascript"
+	jsMime       mimeType = "application/x-javascript"
+	srtMime      mimeType = "application/x-subrip"
+	srtXMime     mimeType = "application/x-srt"
+	srtTextMime  mimeType = "text/x-srt"
+	vttMime      mimeType = "text/vtt"
+	luaMime      mimeType = "text/x-lua"
+	perlMime     mimeType = "text/x-perl"
+	pythonMime   mimeType = "text/x-python"
+	pyAppMime    mimeType = "application/x-python"
+	pyScriptMime mimeType = "application/x-script.python"
+	tclTextMime  mimeType = "text/x-tcl"
+	tclMime      mimeType = "application/x-tcl"
 )
 
-var knownArchiveMimeTypes = map[mimeType]struct{}{
-	sevenZMime:          {},
-	bzip2Mime:           {},
-	gzipMime:            {},
-	gxzipMime:           {},
-	rarCompressedMime:   {},
-	rarMime:             {},
-	tarMime:             {},
-	zipMime:             {},
-	gunzipMime:          {},
-	gzippedMime:         {},
-	gzipCompressedMime:  {},
-	gzipDocumentMime:    {},
-	xzMime:              {},
-	msCabCompressedMime: {},
-	rpmMime:             {},
-	fitsMime:            {},
-	xarMime:             {},
-	warcMime:            {},
-	cpioMime:            {},
-	unixArMime:          {},
-	arMime:              {},
-	debMime:             {},
-	lzipMime:            {},
-	lzipXMime:           {},
+// skipArchiverMimeTypes is a set of MIME types that should bypass archiver library processing because they are either
+// text-based or archives not supported by the library.
+var skipArchiverMimeTypes = map[mimeType]struct{}{
+	arMime:       {},
+	unixArMime:   {},
+	debMime:      {},
+	rpmMime:      {},
+	cpioMime:     {},
+	textMime:     {},
+	xmlMime:      {},
+	jsonMime:     {},
+	csvMime:      {},
+	tsvMime:      {},
+	geoJSONMine:  {},
+	ndjsonMime:   {},
+	htmlMime:     {},
+	phpTextMime:  {},
+	rtfTextMime:  {},
+	jsAppMime:    {},
+	jsTextMime:   {},
+	jsMime:       {},
+	srtMime:      {},
+	srtXMime:     {},
+	srtTextMime:  {},
+	vttMime:      {},
+	luaMime:      {},
+	perlMime:     {},
+	pythonMime:   {},
+	pyAppMime:    {},
+	pyScriptMime: {},
+	tclTextMime:  {},
+	tclMime:      {},
 }
 
-// getHandlerForType dynamically selects and configures a FileHandler based on the provided MIME type.
-// This method uses specialized handlers for specific archive types and RPM packages:
-// - arHandler is used for 'arMime', 'unixArMime', and 'debMime' which include Unix archives and Debian packages.
-// - rpmHandler is used for 'rpmMime' and 'cpioMime', handling RPM and CPIO archives.
-// For all other MIME types, which typically include common archive formats like .zip, .tar, .gz, etc.,
-// a defaultHandler is used, leveraging the archiver library to manage these formats.
-// The chosen handler is then configured with provided options, adapting it to specific operational needs.
-// Returns the configured handler or an error if the handler type does not match the expected type.
-func getHandlerForType(mimeT mimeType) (FileHandler, error) {
-	var handler FileHandler
+// selectHandler dynamically selects and configures a FileHandler based on the provided |mimetype| type and archive flag.
+// The fileReader contains information about the MIME type and whether the file is an archive.
+// This method uses specialized handlers for specific file types:
+// - arHandler is used for Unix archives and Debian packages ('arMime', 'unixArMime', and 'debMime').
+// - rpmHandler is used for RPM and CPIO archives ('rpmMime' and 'cpioMime').
+// - archiveHandler is used for common archive formats supported by the archiver library (.zip, .tar, .gz, etc.).
+// - defaultHandler is used for non-archive files.
+// The selected handler is then returned, ready to handle the file according to its specific format and requirements.
+func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 	switch mimeT {
 	case arMime, unixArMime, debMime:
-		handler = newARHandler()
+		return newARHandler()
 	case rpmMime, cpioMime:
-		handler = newRPMHandler()
+		return newRPMHandler()
 	default:
-		handler = newDefaultHandler(defaultHandlerType)
+		if isGenericArchive {
+			return newArchiveHandler()
+		}
+		return newDefaultHandler(defaultHandlerType)
 	}
-
-	return handler, nil
 }
 
 // HandleFile orchestrates the complete file handling process for a given file.
 // It determines the MIME type of the file, selects the appropriate handler based on this type, and processes the file.
 // This function initializes the handling process and delegates to the specific handler to manage file
-// extraction or processing. Errors at any stage (MIME type determination, handler retrieval,
-// seeking, or file handling) result in an error return value.
+// extraction or processing. Errors at any stage result in an error return value.
 // Successful handling passes the file content through a channel to be chunked and reported.
-//
-// The function takes an io.Reader as input and wraps it with a diskbufferreader.DiskBufferReader to support
-// seeking and to provide an io.ReaderAt interface. This is necessary for certain file handlers that require
-// random access to the file content.
+// The function will close the reader when it has consumed all the data.
 //
 // If the skipArchives option is set to true and the detected MIME type is a known archive type,
 // the function will skip processing the file and return nil.
@@ -156,35 +265,28 @@ func HandleFile(
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
 ) error {
-	config := newFileHandlingConfig(options...)
+	if reader == nil {
+		return fmt.Errorf("reader is nil")
+	}
 
-	rdr, err := readers.NewBufferedFileReader(reader)
+	rdr, err := newFileReader(reader)
 	if err != nil {
-		return fmt.Errorf("error creating random access reader: %w", err)
+		if errors.Is(err, ErrEmptyReader) {
+			ctx.Logger().V(5).Info("empty reader, skipping file")
+			return nil
+		}
+		return fmt.Errorf("error creating custom reader: %w", err)
 	}
 	defer rdr.Close()
 
-	mimeT, err := mimetype.DetectReader(rdr)
-	if err != nil {
-		return fmt.Errorf("error detecting MIME type: %w", err)
-	}
-
-	mime := mimeType(mimeT.String())
-	if _, ok := knownArchiveMimeTypes[mime]; ok && config.skipArchives {
-		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT.String())
+	mimeT := mimeType(rdr.mime.String())
+	config := newFileHandlingConfig(options...)
+	if config.skipArchives && rdr.isGenericArchive {
+		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT)
 		return nil
 	}
 
-	// Reset the reader to the start of the file since the MIME type detection may have read some bytes.
-	if _, err := rdr.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("error seeking to start of file: %w", err)
-	}
-
-	handler, err := getHandlerForType(mime)
-	if err != nil {
-		return fmt.Errorf("error getting handler for type: %w", err)
-	}
-
+	handler := selectHandler(mimeT, rdr.isGenericArchive)
 	archiveChan, err := handler.HandleFile(ctx, rdr) // Delegate to the specific handler to process the file.
 	if err != nil {
 		return fmt.Errorf("error handling file: %w", err)

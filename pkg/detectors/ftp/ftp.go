@@ -103,7 +103,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(result detectors.Result) bool {
+func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
 	return detectors.IsKnownFalsePositive(string(result.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false)
 }
 

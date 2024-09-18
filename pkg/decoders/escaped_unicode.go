@@ -24,6 +24,10 @@ var (
 	escapePat = regexp.MustCompile(`(?i:\\{1,2}u)([a-fA-F0-9]{4})`)
 )
 
+func (d *EscapedUnicode) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType_ESCAPED_UNICODE
+}
+
 func (d *EscapedUnicode) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	if chunk == nil || len(chunk.Data) == 0 {
 		return nil
@@ -41,7 +45,7 @@ func (d *EscapedUnicode) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 
 	if matched {
 		decodableChunk := &DecodableChunk{
-			DecoderType: detectorspb.DecoderType_ESCAPED_UNICODE,
+			DecoderType: d.Type(),
 			Chunk:       chunk,
 		}
 		return decodableChunk

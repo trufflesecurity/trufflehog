@@ -57,3 +57,20 @@ func (s *ScanErrors) Errors() error {
 	defer s.mu.RUnlock()
 	return errors.Join(s.errors...)
 }
+
+// TargetedScanError is an error with a secret ID attached. Collections of them can be returned by targeted scans that
+// scan multiple targets in order to associate individual errors with individual scan targets.
+type TargetedScanError struct {
+	Err      error
+	SecretID int64
+}
+
+var _ error = (*TargetedScanError)(nil)
+
+func (t TargetedScanError) Error() string {
+	return t.Err.Error()
+}
+
+func (t TargetedScanError) Unwrap() error {
+	return t.Err
+}

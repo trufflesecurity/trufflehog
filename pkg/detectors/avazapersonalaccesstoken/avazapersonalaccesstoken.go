@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequest("GET", "https://api.avaza.com/api/Account", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.avaza.com/api/Account", nil)
 			if err != nil {
 				continue
 			}

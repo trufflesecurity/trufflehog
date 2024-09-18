@@ -41,9 +41,8 @@ wiz_client_secret = 'lmSlx1fe6yCfwAbDa8pMp9sJDM9rZzDblmSlx1fe6yCfwAbDa8pMp9sJDM9
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, 2)
-			ahoCorasickCore.PopulateMatchingDetectors(test.input, chunkSpecificDetectors)
-			if len(chunkSpecificDetectors) == 0 {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}

@@ -8,19 +8,20 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(`\b(shppa_|shpat_)([0-9A-Fa-f]{32})\b`)
@@ -73,6 +74,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.ExtraData = map[string]string{
 								"access_scopes": strings.Join(handleArray, ","),
 							}
+							s1.AnalysisInfo = map[string]string{
+								"key":       key,
+								"store_url": domainRes,
+							}
 						}
 						res.Body.Close()
 					}
@@ -89,8 +94,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 type shopifyTokenAccessScopes struct {

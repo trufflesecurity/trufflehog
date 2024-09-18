@@ -1,21 +1,20 @@
 package github
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v61/github"
+	"github.com/google/go-github/v63/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 type repoInfoCache struct {
@@ -52,107 +51,8 @@ type repoInfo struct {
 	visibility source_metadatapb.Visibility
 }
 
-func (s *Source) cloneRepo(
-	ctx context.Context,
-	repoURL string,
-	installationClient *github.Client,
-) (string, *gogit.Repository, error) {
-	var (
-		path string
-		repo *gogit.Repository
-		err  error
-	)
-
-	switch s.conn.GetCredential().(type) {
-	case *sourcespb.GitHub_BasicAuth:
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.conn.GetBasicAuth().GetPassword(), repoURL, s.conn.GetBasicAuth().GetUsername())
-		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
-		}
-	case *sourcespb.GitHub_Unauthenticated:
-		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
-		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
-		}
-
-	case *sourcespb.GitHub_GithubApp:
-		s.githubUser, s.githubToken, err = s.userAndToken(ctx, installationClient)
-		if err != nil {
-			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
-		}
-
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
-		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
-		}
-
-	case *sourcespb.GitHub_Token:
-		if err := s.getUserAndToken(ctx, repoURL, installationClient); err != nil {
-			return "", nil, fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
-		}
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.githubToken, repoURL, s.githubUser)
-		if err != nil {
-			return "", nil, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
-		}
-	default:
-		return "", nil, fmt.Errorf("unhandled credential type for repo %s", repoURL)
-	}
-	return path, repo, nil
-}
-
-func (s *Source) getUserAndToken(ctx context.Context, repoURL string, installationClient *github.Client) error {
-	// We never refresh user provided tokens, so if we already have them, we never need to try and fetch them again.
-	s.userMu.Lock()
-	defer s.userMu.Unlock()
-	if s.githubUser == "" || s.githubToken == "" {
-		var err error
-		s.githubUser, s.githubToken, err = s.userAndToken(ctx, installationClient)
-		if err != nil {
-			return fmt.Errorf("error getting token for repo %s: %w", repoURL, err)
-		}
-	}
-	return nil
-}
-
-func (s *Source) userAndToken(ctx context.Context, installationClient *github.Client) (string, string, error) {
-	switch cred := s.conn.GetCredential().(type) {
-	case *sourcespb.GitHub_BasicAuth:
-		return cred.BasicAuth.Username, cred.BasicAuth.Password, nil
-	case *sourcespb.GitHub_Unauthenticated:
-		// do nothing
-	case *sourcespb.GitHub_GithubApp:
-		id, err := strconv.ParseInt(cred.GithubApp.InstallationId, 10, 64)
-		if err != nil {
-			return "", "", fmt.Errorf("unable to parse installation id: %w", err)
-		}
-		// TODO: Check rate limit for this call.
-		token, _, err := installationClient.Apps.CreateInstallationToken(
-			ctx, id, &github.InstallationTokenOptions{})
-		if err != nil {
-			return "", "", fmt.Errorf("unable to create installation token: %w", err)
-		}
-		return "x-access-token", token.GetToken(), nil // TODO: multiple workers request this, track the TTL
-	case *sourcespb.GitHub_Token:
-		var (
-			ghUser *github.User
-			err    error
-		)
-		for {
-			ghUser, _, err = s.apiClient.Users.Get(ctx, "")
-			if s.handleRateLimit(err) {
-				continue
-			}
-			if err != nil {
-				return "", "", fmt.Errorf("unable to get user: %w", err)
-			}
-			break
-		}
-		return ghUser.GetLogin(), cred.Token, nil
-	default:
-		return "", "", fmt.Errorf("unhandled credential type")
-	}
-
-	return "", "", fmt.Errorf("unhandled credential type")
+func (s *Source) cloneRepo(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
+	return s.connector.Clone(ctx, repoURL)
 }
 
 type repoListOptions interface {
@@ -169,20 +69,20 @@ func (a *appListOptions) getListOptions() *github.ListOptions {
 	return &a.ListOptions
 }
 
-func (s *Source) getReposByApp(ctx context.Context) error {
-	return s.processRepos(ctx, "", s.appListReposWrapper, &appListOptions{
-		ListOptions: github.ListOptions{
-			PerPage: defaultPagination,
-		},
-	})
-}
-
 func (s *Source) appListReposWrapper(ctx context.Context, _ string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	someRepos, res, err := s.apiClient.Apps.ListRepos(ctx, opts.getListOptions())
+	someRepos, res, err := s.connector.APIClient().Apps.ListRepos(ctx, opts.getListOptions())
 	if someRepos != nil {
 		return someRepos.Repositories, res, err
 	}
 	return nil, res, err
+}
+
+func (s *Source) getReposByApp(ctx context.Context, reporter sources.UnitReporter) error {
+	return s.processRepos(ctx, "", reporter, s.appListReposWrapper, &appListOptions{
+		ListOptions: github.ListOptions{
+			PerPage: defaultPagination,
+		},
+	})
 }
 
 type userListOptions struct {
@@ -193,18 +93,18 @@ func (u *userListOptions) getListOptions() *github.ListOptions {
 	return &u.ListOptions
 }
 
-func (s *Source) getReposByUser(ctx context.Context, user string) error {
-	return s.processRepos(ctx, user, s.userListReposWrapper, &userListOptions{
+func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
+	return s.connector.APIClient().Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
+}
+
+func (s *Source) getReposByUser(ctx context.Context, user string, reporter sources.UnitReporter) error {
+	return s.processRepos(ctx, user, reporter, s.userListReposWrapper, &userListOptions{
 		RepositoryListByUserOptions: github.RepositoryListByUserOptions{
 			ListOptions: github.ListOptions{
 				PerPage: defaultPagination,
 			},
 		},
 	})
-}
-
-func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	return s.apiClient.Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
 }
 
 type orgListOptions struct {
@@ -215,8 +115,13 @@ func (o *orgListOptions) getListOptions() *github.ListOptions {
 	return &o.ListOptions
 }
 
-func (s *Source) getReposByOrg(ctx context.Context, org string) error {
-	return s.processRepos(ctx, org, s.orgListReposWrapper, &orgListOptions{
+func (s *Source) orgListReposWrapper(ctx context.Context, org string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
+	// TODO: It's possible to exclude forks when making the API request rather than doing post-request filtering
+	return s.connector.APIClient().Repositories.ListByOrg(ctx, org, &opts.(*orgListOptions).RepositoryListByOrgOptions)
+}
+
+func (s *Source) getReposByOrg(ctx context.Context, org string, reporter sources.UnitReporter) error {
+	return s.processRepos(ctx, org, reporter, s.orgListReposWrapper, &orgListOptions{
 		RepositoryListByOrgOptions: github.RepositoryListByOrgOptions{
 			ListOptions: github.ListOptions{
 				PerPage: defaultPagination,
@@ -225,12 +130,59 @@ func (s *Source) getReposByOrg(ctx context.Context, org string) error {
 	})
 }
 
-func (s *Source) orgListReposWrapper(ctx context.Context, org string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
-	return s.apiClient.Repositories.ListByOrg(ctx, org, &opts.(*orgListOptions).RepositoryListByOrgOptions)
+// userType indicates whether an account belongs to a person or organization.
+//
+// See:
+// - https://docs.github.com/en/get-started/learning-about-github/types-of-github-accounts
+// - https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-a-user
+type userType int
+
+const (
+	// Default invalid state.
+	unknown userType = iota
+	// The account is a person (https://docs.github.com/en/rest/users/users).
+	user
+	// The account is an organization (https://docs.github.com/en/rest/orgs/orgs).
+	organization
+)
+
+func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, reporter sources.UnitReporter) (userType, error) {
+	var err error
+
+	// List repositories for the organization |name|.
+	err = s.getReposByOrg(ctx, name, reporter)
+	if err == nil {
+		return organization, nil
+	} else if !isGitHub404Error(err) {
+		return unknown, err
+	}
+
+	// List repositories for the user |name|.
+	err = s.getReposByUser(ctx, name, reporter)
+	if err == nil {
+		if err := s.addUserGistsToCache(ctx, name, reporter); err != nil {
+			ctx.Logger().Error(err, "Unable to add user to cache")
+		}
+		return user, nil
+	} else if !isGitHub404Error(err) {
+		return unknown, err
+	}
+
+	return unknown, fmt.Errorf("account '%s' not found", name)
 }
 
-func (s *Source) processRepos(ctx context.Context, target string, listRepos repoLister, listOpts repoListOptions) error {
-	logger := s.log.WithValues("target", target)
+// isGitHub404Error returns true if |err| is a `github.ErrorResponse` and has the status code `404`.
+func isGitHub404Error(err error) bool {
+	var ghErr *github.ErrorResponse
+	if !errors.As(err, &ghErr) {
+		return false
+	}
+
+	return ghErr.Response.StatusCode == http.StatusNotFound
+}
+
+func (s *Source) processRepos(ctx context.Context, target string, reporter sources.UnitReporter, listRepos repoLister, listOpts repoListOptions) error {
+	logger := ctx.Logger().WithValues("target", target)
 	opts := listOpts.getListOptions()
 
 	var (
@@ -240,14 +192,14 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if s.handleRateLimit(err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
 
-		s.log.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
+		ctx.Logger().V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
 			if r.GetFork() {
 				if !s.conn.IncludeForks {
@@ -264,8 +216,10 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
-
 			s.cacheRepoInfo(r)
+			if err := reporter.UnitOk(ctx, RepoUnit{name: repoName, url: repoURL}); err != nil {
+				return err
+			}
 			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
@@ -319,7 +273,7 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 		return false
 	}
 
-	res, err := s.httpClient.Do(req)
+	res, err := s.connector.APIClient().Client().Do(req)
 	if err != nil {
 		return false
 	}
@@ -328,60 +282,6 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 
 	// If the wiki is disabled, or is enabled but has no content, the request should be redirected.
 	return wikiURL == res.Request.URL.String()
-}
-
-// commitQuery represents the details required to fetch a commit.
-type commitQuery struct {
-	repo     string
-	owner    string
-	sha      string
-	filename string
-}
-
-// getDiffForFileInCommit retrieves the diff for a specified file in a commit.
-// If the file or its diff is not found, it returns an error.
-func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
-	var (
-		commit *github.RepositoryCommit
-		err    error
-	)
-	for {
-		commit, _, err = s.apiClient.Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
-		if s.handleRateLimit(err) {
-			continue
-		}
-		if err != nil {
-			return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
-		}
-		break
-	}
-
-	if len(commit.Files) == 0 {
-		return "", fmt.Errorf("commit %s does not contain any files", query.sha)
-	}
-
-	res := new(strings.Builder)
-	// Only return the diff if the file is in the commit.
-	for _, file := range commit.Files {
-		if *file.Filename != query.filename {
-			continue
-		}
-
-		if file.Patch == nil {
-			return "", fmt.Errorf("commit %s file %s does not have a diff", query.sha, query.filename)
-		}
-
-		if _, err := res.WriteString(*file.Patch); err != nil {
-			return "", fmt.Errorf("buffer write error for commit %s file %s: %w", query.sha, query.filename, err)
-		}
-		res.WriteString("\n")
-	}
-
-	if res.Len() == 0 {
-		return "", fmt.Errorf("commit %s does not contain patch for file %s", query.sha, query.filename)
-	}
-
-	return res.String(), nil
 }
 
 func (s *Source) normalizeRepo(repo string) (string, error) {

@@ -9,10 +9,10 @@ import (
 	"pault.ag/go/debian/deb"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
-// arHandler specializes defaultHandler to handle AR archive formats. By embedding defaultHandler,
-// arHandler inherits and can further customize the common handling behavior such as skipping binaries.
+// arHandler handles AR archive formats.
 type arHandler struct{ *defaultHandler }
 
 // newARHandler creates an arHandler.
@@ -22,8 +22,13 @@ func newARHandler() *arHandler {
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.
-func (h *arHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (chan []byte, error) {
+func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
+
+	if feature.ForceSkipArchives.Load() {
+		close(archiveChan)
+		return archiveChan, nil
+	}
 
 	go func() {
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
@@ -33,7 +38,23 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input readSeekCloser) (ch
 		// Update the metrics for the file processing.
 		start := time.Now()
 		var err error
-		defer h.measureLatencyAndHandleErrors(start, err)
+		defer func() {
+			h.measureLatencyAndHandleErrors(start, err)
+			h.metrics.incFilesProcessed()
+		}()
+
+		// Defer a panic recovery to handle any panics that occur during the AR processing.
+		defer func() {
+			if r := recover(); r != nil {
+				// Return the panic as an error.
+				if e, ok := r.(error); ok {
+					err = e
+				} else {
+					err = fmt.Errorf("panic occurred: %v", r)
+				}
+				ctx.Logger().Error(err, "Panic occurred when reading ar archive")
+			}
+		}()
 
 		var arReader *deb.Ar
 		arReader, err = deb.LoadAr(input)
@@ -68,7 +89,12 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 			fileSize := arEntry.Size
 			fileCtx := logContext.WithValues(ctx, "filename", arEntry.Name, "size", fileSize)
 
-			if err := h.handleNonArchiveContent(fileCtx, arEntry.Data, archiveChan); err != nil {
+			rdr, err := newMimeTypeReader(arEntry.Data)
+			if err != nil {
+				return fmt.Errorf("error creating mime-type reader: %w", err)
+			}
+
+			if err := h.handleNonArchiveContent(fileCtx, rdr, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in AR")
 				h.metrics.incErrors()
 			}

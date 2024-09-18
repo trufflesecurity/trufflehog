@@ -9,9 +9,8 @@ import (
 	"sync"
 	"time"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
+	regexp "github.com/wasilibs/go-re2"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -26,6 +25,7 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 
 var (
 	// TODO: add base64 encoded key support
@@ -38,6 +38,11 @@ var (
 func (s Scanner) Keywords() []string {
 	return []string{"private key"}
 }
+
+const maxPrivateKeySize = 4096
+
+// ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
+func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
 
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -90,7 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
+				data, err := lookupFingerprint(ctx, fingerprint, s.IncludeExpired)
 				if err == nil {
 					if data != nil {
 						extraData.Add("certificate_urls", strings.Join(data.CertificateURLs, ", "))
@@ -104,7 +109,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				user, err := verifyGitHubUser(parsedKey)
+				user, err := verifyGitHubUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
 				}
@@ -117,7 +122,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				user, err := verifyGitLabUser(parsedKey)
+				user, err := verifyGitLabUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
 				}
@@ -146,15 +151,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool { return false }
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
+}
 
 type result struct {
 	CertificateURLs []string
 	GitHubUsername  string
 }
 
-func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
+func lookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
 	if err != nil {
 		return nil, err
 	}

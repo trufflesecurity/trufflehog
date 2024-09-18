@@ -221,7 +221,15 @@ func NewParser(options ...Option) *Parser {
 
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool, sinceDate string) (chan *Diff, error) {
+func (c *Parser) RepoPath(
+	ctx context.Context,
+	source string,
+	head string,
+	abbreviatedLog bool,
+	excludedGlobs []string,
+	isBare bool,
+	sinceDate string,
+) (chan *Diff, error) {
 	args := []string{
 		"-C", source,
 		"log",
@@ -240,7 +248,7 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 		args = append(args, "--all")
 	}
 	for _, glob := range excludedGlobs {
-		args = append(args, "--", ".", fmt.Sprintf(":(exclude)%s", glob))
+		args = append(args, "--", ".", ":(exclude)"+glob)
 	}
 	if sinceDate != "" {
 		args = append(args, fmt.Sprintf("--after=%s", sinceDate))
@@ -279,7 +287,7 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 
 	absPath, err := filepath.Abs(source)
 	if err == nil {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
+		cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
 	}
 
 	return c.executeCommand(ctx, cmd, true)

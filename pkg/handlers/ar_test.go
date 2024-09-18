@@ -18,8 +18,12 @@ func TestHandleARFile(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	rdr, err := newFileReader(file)
+	assert.NoError(t, err)
+	defer rdr.Close()
+
 	handler := newARHandler()
-	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), file)
+	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 
 	wantChunkCount := 102
