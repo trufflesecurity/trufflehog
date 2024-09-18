@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -28,7 +29,7 @@ func (d fakeDetector) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType(0)
 }
 
-func (d customFalsePositiveChecker) IsFalsePositive(result Result) bool {
+func (d customFalsePositiveChecker) IsFalsePositive(result Result) (bool, string) {
 	return IsKnownFalsePositive(string(result.Raw), []FalsePositive{"a specific magic string"}, false)
 }
 
@@ -41,7 +42,7 @@ func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
 	expected := []Result{
 		{Raw: []byte("hga8adshla3434g")},
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results, false)
+	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results)
 	assert.ElementsMatch(t, expected, filtered)
 }
 
@@ -57,7 +58,7 @@ func TestFilterKnownFalsePositives_CustomLogic(t *testing.T) {
 		{Raw: []byte("number")},
 		{Raw: []byte("hga8adshla3434g")},
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results, false)
+	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results)
 	assert.ElementsMatch(t, expected, filtered)
 }
 
@@ -120,7 +121,7 @@ func TestIsFalsePositive(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsKnownFalsePositive(tt.args.match, tt.args.falsePositives, tt.args.useWordlist); got != tt.want {
+			if got, _ := IsKnownFalsePositive(tt.args.match, tt.args.falsePositives, tt.args.useWordlist); got != tt.want {
 				t.Errorf("IsKnownFalsePositive() = %v, want %v", got, tt.want)
 			}
 		})

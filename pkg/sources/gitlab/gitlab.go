@@ -82,7 +82,7 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init returns an initialized Gitlab source.
-func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
 	s.sourceID = sourceId
 	s.jobID = jobId
@@ -102,6 +102,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 	s.repos = conn.Repositories
 	s.ignoreRepos = conn.IgnoreRepos
+	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
 
 	switch cred := conn.GetCredential().(type) {
 	case *sourcespb.GitLab_Token:
@@ -407,21 +408,30 @@ func (s *Source) getAllProjectRepos(
 	var projectsWithNamespace []string
 
 	// Used to filter out duplicate projects.
-	processProjects := func(projList []*gitlab.Project) error {
+	processProjects := func(ctx context.Context, projList []*gitlab.Project) error {
 		for _, proj := range projList {
+			ctx := context.WithValues(ctx,
+				"project_id", proj.ID,
+				"project_name", proj.NameWithNamespace)
 			// Skip projects we've already seen.
 			if _, exists := uniqueProjects[proj.ID]; exists {
+				ctx.Logger().V(3).Info("skipping project", "reason", "ID already seen")
 				continue
 			}
 			// Skip projects configured to be ignored.
 			if ignoreRepo(proj.PathWithNamespace) {
+				ctx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
 				continue
 			}
 			// Record that we've seen this project.
 			uniqueProjects[proj.ID] = proj
-			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
 			// Report an error if we could not convert the project into a URL.
 			if _, err := url.Parse(proj.HTTPURLToRepo); err != nil {
+				ctx.Logger().V(3).Info("skipping project",
+					"reason", "URL parse failure",
+					"url", proj.HTTPURLToRepo,
+					"parse_error", err)
+
 				err = fmt.Errorf("could not parse url %q given by project: %w", proj.HTTPURLToRepo, err)
 				if err := reporter.UnitErr(ctx, err); err != nil {
 					return err
@@ -429,8 +439,10 @@ func (s *Source) getAllProjectRepos(
 				continue
 			}
 			// Report the unit.
+			ctx.Logger().V(3).Info("accepting project")
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
+			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
@@ -439,8 +451,8 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	const (
-		orderBy         = "last_activity_at"
-		paginationLimit = 100 // Default is 20, max is 100.
+		orderBy         = "id" // TODO: Use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
+		paginationLimit = 100  // Default is 20, max is 100.
 	)
 	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
 
@@ -455,7 +467,7 @@ func (s *Source) getAllProjectRepos(
 			break
 		}
 		ctx.Logger().V(3).Info("listed user projects", "count", len(userProjects))
-		if err := processProjects(userProjects); err != nil {
+		if err := processProjects(ctx, userProjects); err != nil {
 			return err
 		}
 		projectQueryOptions.Page = res.NextPage
@@ -503,6 +515,7 @@ func (s *Source) getAllProjectRepos(
 	ctx.Logger().V(2).Info("got groups", "groups", groups)
 
 	for _, group := range groups {
+		ctx := context.WithValue(ctx, "group_id", group.ID)
 		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
 			ListOptions:      listOpts,
 			OrderBy:          gitlab.Ptr(orderBy),
@@ -521,7 +534,7 @@ func (s *Source) getAllProjectRepos(
 				break
 			}
 			ctx.Logger().V(3).Info("listed group projects", "count", len(grpPrjs))
-			if err := processProjects(grpPrjs); err != nil {
+			if err := processProjects(ctx, grpPrjs); err != nil {
 				return err
 			}
 			listGroupProjectOptions.Page = res.NextPage

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,27 +11,25 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
-	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
-	"google.golang.org/protobuf/types/known/anypb"
+	"go.uber.org/automaxprocs/maxprocs"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
@@ -52,10 +51,12 @@ var (
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Bool()
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified. Defaults to all types.").Hidden().String()
 
-	allowVerificationOverlap = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
-	filterUnverified         = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
-	filterEntropy            = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
-	configFilename           = cli.Flag("config", "Path to configuration file.").ExistingFile()
+	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
+	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
+	filterEntropy              = cli.Flag("filter-entropy", "Filter unverified results with Shannon entropy. Start with 3.0.").Float64()
+	scanEntireChunk            = cli.Flag("scan-entire-chunk", "Scan the entire chunk for secrets.").Hidden().Default("false").Bool()
+	compareDetectionStrategies = cli.Flag("compare-detection-strategies", "Compare different detection strategies for matching spans").Hidden().Default("false").Bool()
+	configFilename             = cli.Flag("config", "Path to configuration file.").ExistingFile()
 	// rules = cli.Flag("rules", "Path to file with custom rules.").String()
 	printAvgDetectorTime = cli.Flag("print-avg-detector-time", "Print the average time spent on each detector.").Bool()
 	noUpdate             = cli.Flag("no-update", "Don't check for updates.").Bool()
@@ -100,6 +101,16 @@ var (
 	githubScanPRComments    = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments  = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 	githubScanSinceDate     = githubScan.Flag("since", "Scan commits more recent than a specific date.").String()
+
+	// GitHub Cross Fork Object Reference Experimental Feature
+	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
+	// GitHub Experimental SubModules
+	githubExperimentalObjectDiscovery = githubExperimentalScan.Flag("object-discovery", "Discover hidden data objects in GitHub repositories.").Bool()
+	// GitHub Experimental Options
+	githubExperimentalToken              = githubExperimentalScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
+	githubExperimentalRepo               = githubExperimentalScan.Flag("repo", "GitHub repository to scan. Example: https://github.com/<user>/<repo>.git").Required().String()
+	githubExperimentalCollisionThreshold = githubExperimentalScan.Flag("collision-threshold", "Threshold for short-sha collisions in object-discovery submodule. Default is 1.").Default("1").Int()
+	githubExperimentalDeleteCache        = githubExperimentalScan.Flag("delete-cached-data", "Delete cached data after object-discovery secret scanning.").Bool()
 
 	gitlabScan = cli.Command("gitlab", "Find credentials in GitLab repositories.")
 	// TODO: Add more GitLab options
@@ -152,6 +163,7 @@ var (
 
 	dockerScan       = cli.Command("docker", "Scan Docker Image")
 	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+	dockerScanToken  = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
@@ -180,9 +192,53 @@ var (
 	postmanWorkspacePaths      = postmanScan.Flag("workspace-paths", "Path to Postman workspaces.").Strings()
 	postmanCollectionPaths     = postmanScan.Flag("collection-paths", "Path to Postman collections.").Strings()
 	postmanEnvironmentPaths    = postmanScan.Flag("environment-paths", "Path to Postman environments.").Strings()
+
+	elasticsearchScan           = cli.Command("elasticsearch", "Scan Elasticsearch")
+	elasticsearchNodes          = elasticsearchScan.Flag("nodes", "Elasticsearch nodes").Envar("ELASTICSEARCH_NODES").Strings()
+	elasticsearchUsername       = elasticsearchScan.Flag("username", "Elasticsearch username").Envar("ELASTICSEARCH_USERNAME").String()
+	elasticsearchPassword       = elasticsearchScan.Flag("password", "Elasticsearch password").Envar("ELASTICSEARCH_PASSWORD").String()
+	elasticsearchServiceToken   = elasticsearchScan.Flag("service-token", "Elasticsearch service token").Envar("ELASTICSEARCH_SERVICE_TOKEN").String()
+	elasticsearchCloudId        = elasticsearchScan.Flag("cloud-id", "Elasticsearch cloud ID. Can also be provided with environment variable").Envar("ELASTICSEARCH_CLOUD_ID").String()
+	elasticsearchAPIKey         = elasticsearchScan.Flag("api-key", "Elasticsearch API key. Can also be provided with environment variable").Envar("ELASTICSEARCH_API_KEY").String()
+	elasticsearchIndexPattern   = elasticsearchScan.Flag("index-pattern", "Filters the indices to search").Default("*").Envar("ELASTICSEARCH_INDEX_PATTERN").String()
+	elasticsearchQueryJSON      = elasticsearchScan.Flag("query-json", "Filters the documents to search").Envar("ELASTICSEARCH_QUERY_JSON").String()
+	elasticsearchSinceTimestamp = elasticsearchScan.Flag("since-timestamp", "Filters the documents to search to those created since this timestamp; overrides any timestamp from --query-json").Envar("ELASTICSEARCH_SINCE_TIMESTAMP").String()
+	elasticsearchBestEffortScan = elasticsearchScan.Flag("best-effort-scan", "Attempts to continuously scan a cluster").Envar("ELASTICSEARCH_BEST_EFFORT_SCAN").Bool()
+
+	jenkinsScan                  = cli.Command("jenkins", "Scan Jenkins")
+	jenkinsURL                   = jenkinsScan.Flag("url", "Jenkins URL").Envar("JENKINS_URL").Required().String()
+	jenkinsUsername              = jenkinsScan.Flag("username", "Jenkins username").Envar("JENKINS_USERNAME").String()
+	jenkinsPassword              = jenkinsScan.Flag("password", "Jenkins password").Envar("JENKINS_PASSWORD").String()
+	jenkinsInsecureSkipVerifyTLS = jenkinsScan.Flag("insecure-skip-verify-tls", "Skip TLS verification").Envar("JENKINS_INSECURE_SKIP_VERIFY_TLS").Bool()
+
+	huggingfaceScan     = cli.Command("huggingface", "Find credentials in HuggingFace datasets, models and spaces.")
+	huggingfaceEndpoint = huggingfaceScan.Flag("endpoint", "HuggingFace endpoint.").Default("https://huggingface.co").String()
+	huggingfaceModels   = huggingfaceScan.Flag("model", "HuggingFace model to scan. You can repeat this flag. Example: 'username/model'").Strings()
+	huggingfaceSpaces   = huggingfaceScan.Flag("space", "HuggingFace space to scan. You can repeat this flag. Example: 'username/space'").Strings()
+	huggingfaceDatasets = huggingfaceScan.Flag("dataset", "HuggingFace dataset to scan. You can repeat this flag. Example: 'username/dataset'").Strings()
+	huggingfaceOrgs     = huggingfaceScan.Flag("org", `HuggingFace organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	huggingfaceUsers    = huggingfaceScan.Flag("user", `HuggingFace user to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	huggingfaceToken    = huggingfaceScan.Flag("token", "HuggingFace token. Can be provided with environment variable HUGGINGFACE_TOKEN.").Envar("HUGGINGFACE_TOKEN").String()
+
+	huggingfaceIncludeModels      = huggingfaceScan.Flag("include-models", "Models to include in scan. You can repeat this flag. Must use HuggingFace model full name. Example: 'username/model' (Only used with --user or --org)").Strings()
+	huggingfaceIncludeSpaces      = huggingfaceScan.Flag("include-spaces", "Spaces to include in scan. You can repeat this flag. Must use HuggingFace space full name. Example: 'username/space' (Only used with --user or --org)").Strings()
+	huggingfaceIncludeDatasets    = huggingfaceScan.Flag("include-datasets", "Datasets to include in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)").Strings()
+	huggingfaceIgnoreModels       = huggingfaceScan.Flag("ignore-models", "Models to ignore in scan. You can repeat this flag. Must use HuggingFace model full name. Example: 'username/model' (Only used with --user or --org)").Strings()
+	huggingfaceIgnoreSpaces       = huggingfaceScan.Flag("ignore-spaces", "Spaces to ignore in scan. You can repeat this flag. Must use HuggingFace space full name. Example: 'username/space' (Only used with --user or --org)").Strings()
+	huggingfaceIgnoreDatasets     = huggingfaceScan.Flag("ignore-datasets", "Datasets to ignore in scan. You can repeat this flag. Must use HuggingFace dataset full name. Example: 'username/dataset' (Only used with --user or --org)").Strings()
+	huggingfaceSkipAllModels      = huggingfaceScan.Flag("skip-all-models", "Skip all model scans. (Only used with --user or --org)").Bool()
+	huggingfaceSkipAllSpaces      = huggingfaceScan.Flag("skip-all-spaces", "Skip all space scans. (Only used with --user or --org)").Bool()
+	huggingfaceSkipAllDatasets    = huggingfaceScan.Flag("skip-all-datasets", "Skip all dataset scans. (Only used with --user or --org)").Bool()
+	huggingfaceIncludeDiscussions = huggingfaceScan.Flag("include-discussions", "Include discussions in scan.").Bool()
+	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
+
+	analyzeCmd = analyzer.Command(cli)
+	usingTUI   = false
 )
 
 func init() {
+	_, _ = maxprocs.Set()
+
 	for i, arg := range os.Args {
 		if strings.HasPrefix(arg, "--") {
 			split := strings.SplitN(arg, "=", 2)
@@ -205,6 +261,7 @@ func init() {
 		// Overwrite the Args slice so overseer works properly.
 		os.Args = os.Args[:1]
 		os.Args = append(os.Args, args...)
+		usingTUI = true
 	}
 
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
@@ -244,7 +301,8 @@ func main() {
 	}
 
 	if !*noUpdate {
-		updateCfg.Fetcher = updater.Fetcher(version.BuildVersion)
+		topLevelCmd, _, _ := strings.Cut(cmd, " ")
+		updateCfg.Fetcher = updater.Fetcher(topLevelCmd, usingTUI)
 	}
 	if version.BuildVersion == "dev" {
 		updateCfg.Fetcher = nil
@@ -257,6 +315,7 @@ func main() {
 }
 
 func run(state overseer.State) {
+
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
 
@@ -281,9 +340,6 @@ func run(state overseer.State) {
 		} else {
 			logger.Info("cleaned temporary artifacts")
 		}
-
-		time.Sleep(time.Second * 10)
-		logger.Info("10 seconds elapsed. Forcing shutdown.")
 		os.Exit(0)
 	}()
 
@@ -301,6 +357,8 @@ func run(state overseer.State) {
 	}
 
 	if *profile {
+		runtime.SetBlockProfileRate(1)
+		runtime.SetMutexProfileFraction(-1)
 		go func() {
 			router := http.NewServeMux()
 			router.Handle("/debug/pprof/", http.DefaultServeMux)
@@ -331,88 +389,6 @@ func run(state overseer.State) {
 		handlers.SetArchiveMaxTimeout(*archiveTimeout)
 	}
 
-	// Build include and exclude detector sets for filtering on engine initialization.
-	// Exit if there was an error to inform the user of the misconfiguration.
-	var includeDetectorSet, excludeDetectorSet map[config.DetectorID]struct{}
-	var detectorsWithCustomVerifierEndpoints map[config.DetectorID][]string
-	{
-		includeList, err := config.ParseDetectors(*includeDetectors)
-		if err != nil {
-			logFatal(err, "invalid include list detector configuration")
-		}
-		excludeList, err := config.ParseDetectors(*excludeDetectors)
-		if err != nil {
-			logFatal(err, "invalid exclude list detector configuration")
-		}
-		detectorsWithCustomVerifierEndpoints, err = config.ParseVerifierEndpoints(*verifiers)
-		if err != nil {
-			logFatal(err, "invalid verifier detector configuration")
-		}
-		includeDetectorSet = detectorTypeToSet(includeList)
-		excludeDetectorSet = detectorTypeToSet(excludeList)
-	}
-
-	// Verify that all the user-provided detectors support the optional
-	// detector features.
-	{
-		if id, err := verifyDetectorsAreVersioner(includeDetectorSet); err != nil {
-			logFatal(err, "invalid include list detector configuration", "detector", id)
-		}
-		if id, err := verifyDetectorsAreVersioner(excludeDetectorSet); err != nil {
-			logFatal(err, "invalid exclude list detector configuration", "detector", id)
-		}
-		if id, err := verifyDetectorsAreVersioner(detectorsWithCustomVerifierEndpoints); err != nil {
-			logFatal(err, "invalid verifier detector configuration", "detector", id)
-		}
-		// Extra check for endpoint customization.
-		isEndpointCustomizer := engine.DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
-		for id := range detectorsWithCustomVerifierEndpoints {
-			if _, ok := isEndpointCustomizer[id.ID]; !ok {
-				logFatal(
-					fmt.Errorf("endpoint provided but detector does not support endpoint customization"),
-					"invalid custom verifier endpoint detector configuration",
-					"detector", id,
-				)
-			}
-		}
-	}
-
-	includeFilter := func(d detectors.Detector) bool {
-		_, ok := getWithDetectorID(d, includeDetectorSet)
-		return ok
-	}
-	excludeFilter := func(d detectors.Detector) bool {
-		_, ok := getWithDetectorID(d, excludeDetectorSet)
-		return !ok
-	}
-	// Abuse filter to cause a side-effect.
-	endpointCustomizer := func(d detectors.Detector) bool {
-		urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
-		if !ok {
-			return true
-		}
-		id := config.GetDetectorID(d)
-		customizer, ok := d.(detectors.EndpointCustomizer)
-		if !ok {
-			// NOTE: We should never reach here due to validation above.
-			logFatal(
-				fmt.Errorf("failed to configure a detector endpoint"),
-				"the provided detector does not support endpoint configuration",
-				"detector", id,
-			)
-		}
-		if !*customVerifiersOnly || len(urls) == 0 {
-			urls = append(urls, customizer.DefaultEndpoint())
-		}
-		if err := customizer.SetEndpoints(urls...); err != nil {
-			logFatal(err, "failed configuring custom endpoint for detector", "detector", id)
-		}
-		logger.Info("configured detector with verification urls",
-			"detector", id, "urls", urls,
-		)
-		return true
-	}
-
 	// Set how the engine will print its results.
 	var printer engine.Printer
 	switch {
@@ -430,11 +406,6 @@ func run(state overseer.State) {
 		fmt.Fprintf(os.Stderr, "🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷\n\n")
 	}
 
-	var jobReportWriter io.WriteCloser
-	if *jobReportFile != nil {
-		jobReportWriter = *jobReportFile
-	}
-
 	// Parse --results flag.
 	if *onlyVerified {
 		r := "verified"
@@ -445,30 +416,183 @@ func run(state overseer.State) {
 		logFatal(err, "failed to configure results flag")
 	}
 
-	e, err := engine.Start(ctx,
-		engine.WithConcurrency(*concurrency),
-		engine.WithDecoders(decoders.DefaultDecoders()...),
-		engine.WithDetectors(engine.DefaultDetectors()...),
-		engine.WithDetectors(conf.Detectors...),
-		engine.WithVerify(!*noVerification),
-		engine.WithFilterDetectors(includeFilter),
-		engine.WithFilterDetectors(excludeFilter),
-		engine.WithFilterDetectors(endpointCustomizer),
-		engine.WithFilterUnverified(*filterUnverified),
-		engine.WithResults(parsedResults),
-		engine.WithPrintAvgDetectorTime(*printAvgDetectorTime),
-		engine.WithPrinter(printer),
-		engine.WithFilterEntropy(*filterEntropy),
-		engine.WithVerificationOverlap(*allowVerificationOverlap),
-		engine.WithJobReportWriter(jobReportWriter),
-	)
-	if err != nil {
-		logFatal(err, "error initializing engine")
+	engConf := engine.Config{
+		Concurrency: *concurrency,
+		// The engine must always be configured with the list of
+		// default detectors, which can be further filtered by the
+		// user. The filters are applied by the engine and are only
+		// subtractive.
+		Detectors:             append(engine.DefaultDetectors(), conf.Detectors...),
+		Verify:                !*noVerification,
+		IncludeDetectors:      *includeDetectors,
+		ExcludeDetectors:      *excludeDetectors,
+		CustomVerifiersOnly:   *customVerifiersOnly,
+		VerifierEndpoints:     *verifiers,
+		Dispatcher:            engine.NewPrinterDispatcher(printer),
+		FilterUnverified:      *filterUnverified,
+		FilterEntropy:         *filterEntropy,
+		VerificationOverlap:   *allowVerificationOverlap,
+		Results:               parsedResults,
+		PrintAvgDetectorTime:  *printAvgDetectorTime,
+		ShouldScanEntireChunk: *scanEntireChunk,
 	}
+
+	if *compareDetectionStrategies {
+		if err := compareScans(ctx, cmd, engConf); err != nil {
+			logFatal(err, "error comparing detection strategies")
+		}
+		return
+	}
+
+	topLevelSubCommand, _, _ := strings.Cut(cmd, " ")
+	switch topLevelSubCommand {
+	case analyzeCmd.FullCommand():
+		analyzer.Run(cmd)
+	default:
+		metrics, err := runSingleScan(ctx, cmd, engConf)
+		if err != nil {
+			logFatal(err, "error running scan")
+		}
+
+		// Print results.
+		logger.Info("finished scanning",
+			"chunks", metrics.ChunksScanned,
+			"bytes", metrics.BytesScanned,
+			"verified_secrets", metrics.VerifiedSecretsFound,
+			"unverified_secrets", metrics.UnverifiedSecretsFound,
+			"scan_duration", metrics.ScanDuration.String(),
+			"trufflehog_version", version.BuildVersion,
+		)
+
+		if metrics.hasFoundResults && *fail {
+			logger.V(2).Info("exiting with code 183 because results were found")
+			os.Exit(183)
+		}
+	}
+}
+
+func compareScans(ctx context.Context, cmd string, cfg engine.Config) error {
+	var (
+		entireMetrics    metrics
+		maxLengthMetrics metrics
+		err              error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		// Run scan with entire chunk span calculator.
+		cfg.ShouldScanEntireChunk = true
+		entireMetrics, err = runSingleScan(ctx, cmd, cfg)
+		if err != nil {
+			ctx.Logger().Error(err, "error running scan with entire chunk span calculator")
+		}
+	}()
+
+	// Run scan with max-length span calculator.
+	maxLengthMetrics, err = runSingleScan(ctx, cmd, cfg)
+	if err != nil {
+		return fmt.Errorf("error running scan with custom span calculator: %v", err)
+	}
+
+	wg.Wait()
+
+	return compareMetrics(maxLengthMetrics.Metrics, entireMetrics.Metrics)
+}
+
+func compareMetrics(customMetrics, entireMetrics engine.Metrics) error {
+	fmt.Printf("Comparison of scan results: \n")
+	fmt.Printf("Custom span - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
+		customMetrics.ChunksScanned, customMetrics.BytesScanned, customMetrics.VerifiedSecretsFound, customMetrics.UnverifiedSecretsFound, customMetrics.ScanDuration.String())
+	fmt.Printf("Entire chunk - Chunks: %d, Bytes: %d, Verified Secrets: %d, Unverified Secrets: %d, Duration: %s\n",
+		entireMetrics.ChunksScanned, entireMetrics.BytesScanned, entireMetrics.VerifiedSecretsFound, entireMetrics.UnverifiedSecretsFound, entireMetrics.ScanDuration.String())
+
+	// Check for differences in scan metrics.
+	if customMetrics.ChunksScanned != entireMetrics.ChunksScanned ||
+		customMetrics.BytesScanned != entireMetrics.BytesScanned ||
+		customMetrics.VerifiedSecretsFound != entireMetrics.VerifiedSecretsFound {
+		return fmt.Errorf("scan metrics do not match")
+	}
+
+	return nil
+}
+
+type metrics struct {
+	engine.Metrics
+	hasFoundResults bool
+}
+
+func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics, error) {
+	var scanMetrics metrics
+
+	// Setup job report writer if provided
+	var jobReportWriter io.WriteCloser
+	if *jobReportFile != nil {
+		jobReportWriter = *jobReportFile
+	}
+
+	handleFinishedMetrics := func(ctx context.Context, finishedMetrics <-chan sources.UnitMetrics, jobReportWriter io.WriteCloser) {
+		go func() {
+			defer func() {
+				jobReportWriter.Close()
+				if namer, ok := jobReportWriter.(interface{ Name() string }); ok {
+					ctx.Logger().Info("report written", "path", namer.Name())
+				} else {
+					ctx.Logger().Info("report written")
+				}
+			}()
+
+			for metrics := range finishedMetrics {
+				metrics.Errors = common.ExportErrors(metrics.Errors...)
+				details, err := json.Marshal(map[string]any{
+					"version": 1,
+					"data":    metrics,
+				})
+				if err != nil {
+					ctx.Logger().Error(err, "error marshalling job details")
+					continue
+				}
+				if _, err := jobReportWriter.Write(append(details, '\n')); err != nil {
+					ctx.Logger().Error(err, "error writing to file")
+				}
+			}
+		}()
+	}
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithConcurrentSources(cfg.Concurrency),
+		sources.WithConcurrentUnits(cfg.Concurrency),
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	if jobReportWriter != nil {
+		unitHook, finishedMetrics := sources.NewUnitHook(ctx)
+		opts = append(opts, sources.WithReportHook(unitHook))
+		handleFinishedMetrics(ctx, finishedMetrics, jobReportWriter)
+	}
+
+	cfg.SourceManager = sources.NewManager(opts...)
+
+	eng, err := engine.NewEngine(ctx, &cfg)
+	if err != nil {
+		return scanMetrics, fmt.Errorf("error initializing engine: %v", err)
+	}
+	eng.Start(ctx)
+
+	defer func() {
+		// Clean up temporary artifacts.
+		if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
+			ctx.Logger().Error(err, "error cleaning temp artifacts")
+		}
+	}()
 
 	switch cmd {
 	case gitScan.FullCommand():
-		cfg := sources.GitConfig{
+		gitCfg := sources.GitConfig{
 			URI:              *gitScanURI,
 			IncludePathsFile: *gitScanIncludePaths,
 			ExcludePathsFile: *gitScanExcludePaths,
@@ -479,16 +603,16 @@ func run(state overseer.State) {
 			ExcludeGlobs:     *gitScanExcludeGlobs,
 			SinceDate:        *gitScanSinceDate,
 		}
-		if err = e.ScanGit(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Git.")
+		if err = eng.ScanGit(ctx, gitCfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
 		}
 	case githubScan.FullCommand():
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
 		if err != nil {
-			logFatal(err, "could not create filter")
+			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
 		}
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
-			logFatal(fmt.Errorf("invalid config"), "You must specify at least one organization or repository.")
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization or repository")
 		}
 
 		cfg := sources.GithubConfig{
@@ -508,13 +632,24 @@ func run(state overseer.State) {
 			Filter:                     filter,
 			SinceDate:                  *githubScanSinceDate,
 		}
-		if err := e.ScanGitHub(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Github.")
+		if err := eng.ScanGitHub(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)
+		}
+	case githubExperimentalScan.FullCommand():
+		cfg := sources.GitHubExperimentalConfig{
+			Token:              *githubExperimentalToken,
+			Repository:         *githubExperimentalRepo,
+			ObjectDiscovery:    *githubExperimentalObjectDiscovery,
+			CollisionThreshold: *githubExperimentalCollisionThreshold,
+			DeleteCachedData:   *githubExperimentalDeleteCache,
+		}
+		if err := eng.ScanGitHubExperimental(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan using Github Experimental: %v", err)
 		}
 	case gitlabScan.FullCommand():
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
 		if err != nil {
-			logFatal(err, "could not create filter")
+			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
 		}
 
 		cfg := sources.GitlabConfig{
@@ -523,8 +658,8 @@ func run(state overseer.State) {
 			Repos:    *gitlabScanRepos,
 			Filter:   filter,
 		}
-		if err := e.ScanGitLab(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan GitLab.")
+		if err := eng.ScanGitLab(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)
 		}
 	case filesystemScan.FullCommand():
 		if len(*filesystemDirectories) > 0 {
@@ -538,8 +673,8 @@ func run(state overseer.State) {
 			IncludePathsFile: *filesystemScanIncludePaths,
 			ExcludePathsFile: *filesystemScanExcludePaths,
 		}
-		if err = e.ScanFileSystem(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan filesystem")
+		if err = eng.ScanFileSystem(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
@@ -552,8 +687,8 @@ func run(state overseer.State) {
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
 		}
-		if err := e.ScanS3(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan S3.")
+		if err := eng.ScanS3(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)
 		}
 	case syslogScan.FullCommand():
 		cfg := sources.SyslogConfig{
@@ -564,16 +699,16 @@ func run(state overseer.State) {
 			KeyPath:     *syslogTLSKey,
 			Concurrency: *concurrency,
 		}
-		if err := e.ScanSyslog(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan syslog.")
+		if err := eng.ScanSyslog(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan syslog: %v", err)
 		}
 	case circleCiScan.FullCommand():
-		if err := e.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
-			logFatal(err, "Failed to scan CircleCI.")
+		if err := eng.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan CircleCI: %v", err)
 		}
 	case travisCiScan.FullCommand():
-		if err := e.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
-			logFatal(err, "Failed to scan TravisCI.")
+		if err := eng.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan TravisCI: %v", err)
 		}
 	case gcsScan.FullCommand():
 		cfg := sources.GCSConfig{
@@ -589,22 +724,17 @@ func run(state overseer.State) {
 			Concurrency:    *concurrency,
 			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
-		if err := e.ScanGCS(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan GCS.")
+		if err := eng.ScanGCS(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan GCS: %v", err)
 		}
 	case dockerScan.FullCommand():
-		dockerConn := sourcespb.Docker{
-			Images: *dockerScanImages,
-			Credential: &sourcespb.Docker_DockerKeychain{
-				DockerKeychain: true,
-			},
+		cfg := sources.DockerConfig{
+			BearerToken:       *dockerScanToken,
+			Images:            *dockerScanImages,
+			UseDockerKeychain: *dockerScanToken == "",
 		}
-		anyConn, err := anypb.New(&dockerConn)
-		if err != nil {
-			logFatal(err, "Failed to marshal Docker connection")
-		}
-		if err := e.ScanDocker(ctx, anyConn); err != nil {
-			logFatal(err, "Failed to scan Docker.")
+		if err := eng.ScanDocker(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)
 		}
 	case postmanScan.FullCommand():
 		// handle deprecated flag
@@ -640,40 +770,82 @@ func run(state overseer.State) {
 			WorkspacePaths:      *postmanWorkspacePaths,
 			EnvironmentPaths:    *postmanEnvironmentPaths,
 		}
-		if err := e.ScanPostman(ctx, cfg); err != nil {
-			logFatal(err, "Failed to scan Postman.")
+		if err := eng.ScanPostman(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Postman: %v", err)
+		}
+	case elasticsearchScan.FullCommand():
+		cfg := sources.ElasticsearchConfig{
+			Nodes:          *elasticsearchNodes,
+			Username:       *elasticsearchUsername,
+			Password:       *elasticsearchPassword,
+			CloudID:        *elasticsearchCloudId,
+			APIKey:         *elasticsearchAPIKey,
+			ServiceToken:   *elasticsearchServiceToken,
+			IndexPattern:   *elasticsearchIndexPattern,
+			QueryJSON:      *elasticsearchQueryJSON,
+			SinceTimestamp: *elasticsearchSinceTimestamp,
+			BestEffortScan: *elasticsearchBestEffortScan,
+		}
+		if err := eng.ScanElasticsearch(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Elasticsearch: %v", err)
+		}
+	case jenkinsScan.FullCommand():
+		cfg := engine.JenkinsConfig{
+			Endpoint:              *jenkinsURL,
+			InsecureSkipVerifyTLS: *jenkinsInsecureSkipVerifyTLS,
+			Username:              *jenkinsUsername,
+			Password:              *jenkinsPassword,
+		}
+		if err := eng.ScanJenkins(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
+		}
+	case huggingfaceScan.FullCommand():
+		if *huggingfaceEndpoint != "" {
+			*huggingfaceEndpoint = strings.TrimRight(*huggingfaceEndpoint, "/")
+		}
+
+		if len(*huggingfaceModels) == 0 && len(*huggingfaceSpaces) == 0 && len(*huggingfaceDatasets) == 0 && len(*huggingfaceOrgs) == 0 && len(*huggingfaceUsers) == 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization, user, model, space or dataset")
+		}
+
+		cfg := engine.HuggingfaceConfig{
+			Endpoint:           *huggingfaceEndpoint,
+			Models:             *huggingfaceModels,
+			Spaces:             *huggingfaceSpaces,
+			Datasets:           *huggingfaceDatasets,
+			Organizations:      *huggingfaceOrgs,
+			Users:              *huggingfaceUsers,
+			Token:              *huggingfaceToken,
+			IncludeModels:      *huggingfaceIncludeModels,
+			IncludeSpaces:      *huggingfaceIncludeSpaces,
+			IncludeDatasets:    *huggingfaceIncludeDatasets,
+			IgnoreModels:       *huggingfaceIgnoreModels,
+			IgnoreSpaces:       *huggingfaceIgnoreSpaces,
+			IgnoreDatasets:     *huggingfaceIgnoreDatasets,
+			SkipAllModels:      *huggingfaceSkipAllModels,
+			SkipAllSpaces:      *huggingfaceSkipAllSpaces,
+			SkipAllDatasets:    *huggingfaceSkipAllDatasets,
+			IncludeDiscussions: *huggingfaceIncludeDiscussions,
+			IncludePrs:         *huggingfaceIncludePrs,
+			Concurrency:        *concurrency,
+		}
+		if err := eng.ScanHuggingface(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan HuggingFace: %v", err)
 		}
 	default:
-		logFatal(fmt.Errorf("invalid command"), "Command not recognized.")
+		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
 	}
 
 	// Wait for all workers to finish.
-	if err = e.Finish(ctx); err != nil {
-		logFatal(err, "engine failed to finish execution")
+	if err = eng.Finish(ctx); err != nil {
+		return scanMetrics, fmt.Errorf("engine failed to finish execution: %v", err)
 	}
-	if err := cleantemp.CleanTempArtifacts(ctx); err != nil {
-		ctx.Logger().Error(err, "error cleaning temp artifacts")
-	}
-
-	metrics := e.GetMetrics()
-	// Print results.
-	logger.Info("finished scanning",
-		"chunks", metrics.ChunksScanned,
-		"bytes", metrics.BytesScanned,
-		"verified_secrets", metrics.VerifiedSecretsFound,
-		"unverified_secrets", metrics.UnverifiedSecretsFound,
-		"scan_duration", metrics.ScanDuration.String(),
-		"trufflehog_version", version.BuildVersion,
-	)
 
 	if *printAvgDetectorTime {
-		printAverageDetectorTime(e)
+		printAverageDetectorTime(eng)
 	}
 
-	if e.HasFoundResults() && *fail {
-		logger.V(2).Info("exiting with code 183 because results were found")
-		os.Exit(183)
-	}
+	return metrics{Metrics: eng.GetMetrics(), hasFoundResults: eng.HasFoundResults()}, nil
 }
 
 // parseResults ensures that users provide valid CSV input to `--results`.
@@ -735,48 +907,4 @@ func printAverageDetectorTime(e *engine.Engine) {
 	for detectorName, duration := range e.GetDetectorsMetrics() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
-}
-
-// detectorTypeToSet is a helper function to convert a slice of detector IDs into a set.
-func detectorTypeToSet(detectors []config.DetectorID) map[config.DetectorID]struct{} {
-	out := make(map[config.DetectorID]struct{}, len(detectors))
-	for _, d := range detectors {
-		out[d] = struct{}{}
-	}
-	return out
-}
-
-// getWithDetectorID is a helper function to get a value from a map using a
-// detector's ID. This function behaves like a normal map lookup, with an extra
-// step of checking for the non-specific version of a detector.
-func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T) (T, bool) {
-	key := config.GetDetectorID(d)
-	// Check if the specific ID is provided.
-	if t, ok := data[key]; ok || key.Version == 0 {
-		return t, ok
-	}
-	// Check if the generic type is provided without a version.
-	// This means "all" versions of a type.
-	key.Version = 0
-	t, ok := data[key]
-	return t, ok
-}
-
-// verifyDetectorsAreVersioner checks all keys in a provided map to verify the
-// provided type is actually a Versioner.
-func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (config.DetectorID, error) {
-	isVersioner := engine.DefaultDetectorTypesImplementing[detectors.Versioner]()
-	for id := range data {
-		if id.Version == 0 {
-			// Version not provided.
-			continue
-		}
-		if _, ok := isVersioner[id.ID]; ok {
-			// Version provided for a Versioner detector.
-			continue
-		}
-		// Version provided on a non-Versioner detector.
-		return id, fmt.Errorf("version provided but detector does not have a version")
-	}
-	return config.DetectorID{}, nil
 }

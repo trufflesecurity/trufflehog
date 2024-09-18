@@ -1,0 +1,5 @@
+permissions:
+ - configuration_access
+ - read
+ - delete
+ - create_and_update

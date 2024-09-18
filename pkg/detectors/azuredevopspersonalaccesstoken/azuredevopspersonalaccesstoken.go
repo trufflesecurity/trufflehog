@@ -15,6 +15,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -24,7 +25,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-z]{52})\b`)
-	orgPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-z]{7,40})\b`)
+	orgPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-zA-Z][0-9a-zA-Z-]{5,48}[0-9a-zA-Z])\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.

@@ -2,11 +2,11 @@ package discordwebhook
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -17,7 +17,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`(https:\/\/discord\.com\/api\/webhooks\/[0-9]{18}\/[0-9a-zA-Z-]{68})`)
@@ -25,9 +25,7 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string {
-	return []string{"discord"}
-}
+func (s Scanner) Keywords() []string { return []string{"https://discord.com/api/webhooks/"} }
 
 // FromData will find and optionally verify DiscordWebhook secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -46,7 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", resMatch, nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, resMatch, nil)
 			if err != nil {
 				continue
 			}
@@ -60,7 +58,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		results = append(results, s1)
-
 	}
 
 	return results, nil

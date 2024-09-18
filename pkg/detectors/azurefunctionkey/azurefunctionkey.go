@@ -8,20 +8,20 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([a-zA-Z0-9_-]{20,56})\b={0,2}`)
 	azureUrlPat = regexp.MustCompile(`\bhttps:\/\/([a-zA-Z0-9-]{2,30})\.azurewebsites\.net\/api\/([a-zA-Z0-9-]{2,30})\b`)

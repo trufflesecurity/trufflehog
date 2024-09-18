@@ -10,15 +10,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/buffer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cleantemp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer"
 )
-
-// sharedBufferPool is the shared buffer pool used by all BufferedFileWriters.
-// This allows for efficient reuse of buffers across multiple writers.
-var sharedBufferPool *buffer.Pool
-
-func init() { sharedBufferPool = buffer.NewBufferPool() }
 
 type bufferedFileWriterMetrics struct{}
 
@@ -31,6 +26,30 @@ func (bufferedFileWriterMetrics) recordDiskWrite(size int64) {
 	diskWriteCount.Inc()
 	fileSizeHistogram.Observe(float64(size))
 }
+
+type PoolSize int
+
+const (
+	Default PoolSize = iota
+	Large
+)
+
+const (
+	defaultBufferSize = 1 << 12 // 4KB
+	largeBufferSize   = 1 << 16 // 64KB
+)
+
+func init() {
+	defaultBufferPool = pool.NewBufferPool(defaultBufferSize)
+	largeBufferPool = pool.NewBufferPool(largeBufferSize)
+}
+
+// Different buffer pools for different buffer sizes.
+// This allows for more efficient memory management based on the size of the data being written.
+var (
+	defaultBufferPool *pool.Pool
+	largeBufferPool   *pool.Pool
+)
 
 // state represents the current mode of BufferedFileWriter.
 type state uint8
@@ -48,7 +67,7 @@ type BufferedFileWriter struct {
 	threshold uint64 // Threshold for switching to file writing.
 	size      uint64 // Total size of the data written.
 
-	bufPool  *buffer.Pool   // Pool for storing buffers for reuse.
+	bufPool  *pool.Pool     // Pool for storing buffers for reuse.
 	buf      *buffer.Buffer // Buffer for storing data under the threshold in memory.
 	filename string         // Name of the temporary file.
 	file     *os.File       // File for storing data over the threshold.
@@ -66,29 +85,37 @@ func WithThreshold(threshold uint64) Option {
 	return func(w *BufferedFileWriter) { w.threshold = threshold }
 }
 
+// WithBufferSize sets the buffer size for the BufferedFileWriter.
+func WithBufferSize(size PoolSize) Option {
+	return func(w *BufferedFileWriter) {
+		switch size {
+		case Default:
+			w.bufPool = defaultBufferPool
+		case Large:
+			w.bufPool = largeBufferPool
+		default:
+			w.bufPool = defaultBufferPool
+		}
+	}
+}
+
 const defaultThreshold = 10 * 1024 * 1024 // 10MB
 // New creates a new BufferedFileWriter with the given options.
 func New(opts ...Option) *BufferedFileWriter {
 	w := &BufferedFileWriter{
 		threshold: defaultThreshold,
 		state:     writeOnly,
-		bufPool:   sharedBufferPool,
 	}
+
 	for _, opt := range opts {
 		opt(w)
 	}
 
-	return w
-}
-
-// NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
-func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
-	writer := New(opts...)
-	if _, err := io.Copy(writer, r); err != nil {
-		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
+	if w.bufPool == nil {
+		w.bufPool = defaultBufferPool
 	}
 
-	return writer, nil
+	return w
 }
 
 // Len returns the number of bytes written to the buffer or file.
@@ -162,9 +189,18 @@ func (w *BufferedFileWriter) Write(data []byte) (int, error) {
 		// This ensures all the data is in one place - either entirely in the buffer or the file.
 		if bufferLength > 0 {
 			if _, err := w.buf.WriteTo(w.file); err != nil {
+				if err := os.RemoveAll(w.filename); err != nil {
+					return 0, fmt.Errorf("failed to remove file: %w", err)
+				}
 				return 0, err
 			}
-			w.bufPool.Put(w.buf)
+		}
+	}
+
+	// Write any remaining data in the buffer to the file before writing new data.
+	if w.buf.Len() > 0 {
+		if _, err := w.buf.WriteTo(w.file); err != nil {
+			return 0, fmt.Errorf("error flushing buffer to file: %w", err)
 		}
 	}
 
@@ -232,8 +268,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 	defer w.bufPool.Put(w.buf)
 
 	if w.buf.Len() > 0 {
-		_, err := w.buf.WriteTo(w.file)
-		if err != nil {
+		if _, err := w.buf.WriteTo(w.file); err != nil {
 			return err
 		}
 	}
@@ -245,14 +280,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 // If the content is stored in memory, it returns a custom reader that handles returning the buffer to the pool.
 // The caller should call Close() on the returned io.Reader when done to ensure resources are properly released.
 // This method can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) { return w.ReadSeekCloser() }
-
-// ReadSeekCloser returns an io.ReadSeekCloser to read the written content.
-// If the content is stored in a file, it opens the file and returns a file reader.
-// If the content is stored in memory, it returns a custom reader that allows seeking and handles returning
-// the buffer to the pool.
-// This method can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
+func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 	if w.state != readOnly {
 		return nil, fmt.Errorf("BufferedFileWriter must be in read-only mode to read")
 	}
@@ -267,7 +295,7 @@ func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
 	}
 
 	if w.buf == nil {
-		return nil, fmt.Errorf("BufferedFileWriter has not buffer data to read")
+		return nil, nil
 	}
 
 	// Data is in memory.

@@ -40,6 +40,8 @@ type UserRes struct {
 	Name      string `json:"name"`
 	Company   string `json:"company"`
 	UserURL   string `json:"html_url"`
+	Email     string `json:"email"`
+	Location  string `json:"location"`
 	// Included in GitHub Enterprise Server.
 	LdapDN string `json:"ldap_dn"`
 }
@@ -72,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		// Note that this false positive check happens **before** verification! I don't know why it's written this way
 		// but that's why this logic wasn't moved into a CustomFalsePositiveChecker implementation.
 		specificFPs := []detectors.FalsePositive{"github commit"}
-		if detectors.IsKnownFalsePositive(token, specificFPs, false) {
+		if isFp, _ := detectors.IsKnownFalsePositive(token, specificFPs, false); isFp {
 			continue
 		}
 
@@ -83,6 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 				"version":        fmt.Sprintf("%d", s.Version()),
 			},
+			AnalysisInfo: map[string]string{"key": token},
 		}
 
 		if verify {
@@ -156,6 +159,14 @@ func SetUserResponse(userResponse *UserRes, s1 *detectors.Result) {
 	}
 	if userResponse.LdapDN != "" {
 		s1.ExtraData["ldap_dn"] = userResponse.LdapDN
+	}
+
+	// email & location if user has made them public
+	if userResponse.Email != "" {
+		s1.ExtraData["email"] = userResponse.Email
+	}
+	if userResponse.Location != "" {
+		s1.ExtraData["location"] = userResponse.Location
 	}
 }
 

@@ -13,7 +13,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -57,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequest("GET", fmt.Sprintf("https://api.flightstats.com/flex/aircraft/rest/v1/json/availableFields?appId=%s&appKey=%s", resId, resMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.flightstats.com/flex/aircraft/rest/v1/json/availableFields?appId=%s&appKey=%s", resId, resMatch), nil)
 				if err != nil {
 					continue
 				}

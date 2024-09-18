@@ -144,6 +144,16 @@ type SourceUnit interface {
 	Display() string
 }
 
+// DockerConfig defines the optional configuration for a Docker source.
+type DockerConfig struct {
+	// Images is the list of images to scan.
+	Images []string
+	// BearerToken is the token to use to authenticate with the source.
+	BearerToken string
+	// UseDockerKeychain determines whether to use the Docker keychain.
+	UseDockerKeychain bool
+}
+
 // GCSConfig defines the optional configuration for a GCS source.
 type GCSConfig struct {
 	// CloudCred determines whether to use cloud credentials.
@@ -229,6 +239,20 @@ type GithubConfig struct {
 	IncludeWikis bool
 	// SinceDate indicates the last X days commits to scan
 	SinceDate string
+}
+
+// GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.
+type GitHubExperimentalConfig struct {
+	// Repository is the repository to scan.
+	Repository string
+	// Token is the token to use to authenticate with the source.
+	Token string
+	// ObjectDiscovery indicates whether to discover all commit objects (CFOR) in the repository.
+	ObjectDiscovery bool
+	// CollisionThreshold is the number of short-sha collisions tolerated during hidden data enumeration. Default is 1.
+	CollisionThreshold int
+	// DeleteCachedData indicates whether to delete cached data.
+	DeleteCachedData bool
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.
@@ -320,6 +344,19 @@ type PostmanConfig struct {
 	EnvironmentPaths []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
+}
+
+type ElasticsearchConfig struct {
+	Nodes          []string
+	Username       string
+	Password       string
+	CloudID        string
+	APIKey         string
+	ServiceToken   string
+	IndexPattern   string
+	QueryJSON      string
+	SinceTimestamp string
+	BestEffortScan bool
 }
 
 // Progress is used to update job completion progress across sources.

@@ -3,22 +3,24 @@ package repairshopr
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"repairshopr"}) + `\b([a-zA-Z0-9-]{51})\b`)
@@ -55,7 +57,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequest("GET", "https://"+resDomainMatch+".repairshopr.com/api/v1/appointment_types", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomainMatch+".repairshopr.com/api/v1/appointment_types", nil)
 				if err != nil {
 					continue
 				}

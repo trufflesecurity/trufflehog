@@ -46,9 +46,9 @@ func TestSource_KeywordCombinations(t *testing.T) {
 		},
 		keywords: make(map[string]struct{}),
 	}
-	s.addKeyword("keyword1")
-	s.addKeyword("keyword2")
-	s.addKeyword("keyword3")
+	s.attemptToAddKeyword("keyword1")
+	s.attemptToAddKeyword("keyword2")
+	s.attemptToAddKeyword("keyword3")
 
 	// remove that \n from the end of the string
 	got := strings.Split(strings.TrimSuffix(s.keywordCombinations("test"), "\n"), "\n")
@@ -122,9 +122,9 @@ func TestSource_FormatAndInjectKeywords(t *testing.T) {
 		},
 		keywords: make(map[string]struct{}),
 	}
-	s.addKeyword("keyword1")
-	s.addKeyword("keyword2")
-	s.addKeyword("keyword3")
+	s.attemptToAddKeyword("keyword1")
+	s.attemptToAddKeyword("keyword2")
+	s.attemptToAddKeyword("keyword3")
 
 	testCases := []struct {
 		input    []string

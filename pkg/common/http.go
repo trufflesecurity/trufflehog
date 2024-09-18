@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
 var caCerts = []string{
@@ -88,8 +89,15 @@ type CustomTransport struct {
 	T http.RoundTripper
 }
 
+func userAgent() string {
+	if len(feature.UserAgentSuffix.Load()) > 0 {
+		return "TruffleHog " + feature.UserAgentSuffix.Load()
+	}
+	return "TruffleHog"
+}
+
 func (t *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Add("User-Agent", "TruffleHog")
+	req.Header.Add("User-Agent", userAgent())
 	return t.T.RoundTrip(req)
 }
 

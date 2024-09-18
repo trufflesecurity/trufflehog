@@ -4,16 +4,17 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -21,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	clientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"openvpn"}) + `\b([A-Za-z0-9-]{3,40}\.[A-Za-z0-9-]{3,40})\b`)
 	clientSecretPat = regexp.MustCompile(`\b([a-zA-Z0-9_-]{64,})\b`)
@@ -89,7 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.SetVerificationError(err, clientSecretRes)
 					}
 				}
-				
+
 				results = append(results, s1)
 			}
 		}

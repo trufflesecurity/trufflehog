@@ -8,19 +8,16 @@ import (
 	"os"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/exp/rand"
-
-	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
-	"github.com/google/go-github/v61/github"
-	"golang.org/x/oauth2"
+	"github.com/google/go-github/v63/github"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -30,7 +27,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
@@ -49,15 +45,10 @@ const (
 type Source struct {
 	name string
 
-	// Protects the user and token.
-	userMu      sync.Mutex
-	githubUser  string
-	githubToken string
-
 	sourceID          sources.SourceID
 	jobID             sources.JobID
 	verify            bool
-	orgsCache         cache.Cache
+	orgsCache         cache.Cache[string]
 	memberCache       map[string]struct{}
 	repos             []string
 	filteredRepoCache *filteredRepoCache
@@ -70,13 +61,11 @@ type Source struct {
 	scanOptMu   sync.Mutex // protects the scanOptions
 	scanOptions *git.ScanOptions
 
-	httpClient      *http.Client
-	log             logr.Logger
 	conn            *sourcespb.GitHub
 	jobPool         *errgroup.Group
 	resumeInfoMutex sync.Mutex
 	resumeInfoSlice []string
-	apiClient       *github.Client
+	connector       connector
 
 	includePRComments    bool
 	includeIssueComments bool
@@ -85,6 +74,32 @@ type Source struct {
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
+
+// --------------------------------------------------------------------------------
+// RepoUnit and GistUnit are implementations of SourceUnit used during
+// enumeration. The different types aren't strictly necessary, but are a bit
+// more explicit and allow type checking/safety.
+
+var _ sources.SourceUnit = (*RepoUnit)(nil)
+var _ sources.SourceUnit = (*GistUnit)(nil)
+
+type RepoUnit struct {
+	name string
+	url  string
+}
+
+func (r RepoUnit) SourceUnitID() (string, sources.SourceUnitKind) { return r.url, "repo" }
+func (r RepoUnit) Display() string                                { return r.name }
+
+type GistUnit struct {
+	name string
+	url  string
+}
+
+func (g GistUnit) SourceUnitID() (string, sources.SourceUnitKind) { return g.url, "gist" }
+func (g GistUnit) Display() string                                { return g.name }
+
+// --------------------------------------------------------------------------------
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
 func (s *Source) WithCustomContentWriter() { s.useCustomContentWriter = true }
@@ -123,17 +138,17 @@ func (s *Source) JobID() sources.JobID {
 // filteredRepoCache is a wrapper around cache.Cache that filters out repos
 // based on include and exclude globs.
 type filteredRepoCache struct {
-	cache.Cache
+	cache.Cache[string]
 	include, exclude []glob.Glob
 }
 
-func (s *Source) newFilteredRepoCache(c cache.Cache, include, exclude []string) *filteredRepoCache {
+func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string], include, exclude []string) *filteredRepoCache {
 	includeGlobs := make([]glob.Glob, 0, len(include))
 	excludeGlobs := make([]glob.Glob, 0, len(exclude))
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			s.log.V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			ctx.Logger().V(1).Info("invalid include glob", "include_value", ig, "err", err)
 			continue
 		}
 		includeGlobs = append(includeGlobs, g)
@@ -141,7 +156,7 @@ func (s *Source) newFilteredRepoCache(c cache.Cache, include, exclude []string) 
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			s.log.V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			ctx.Logger().V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
 			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
@@ -190,17 +205,12 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		return err
 	}
 
-	s.log = aCtx.Logger()
-
 	s.name = name
 	s.sourceID = sourceID
 	s.jobID = jobID
 	s.verify = verify
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
-
-	s.httpClient = common.RetryableHTTPClientTimeout(60)
-	s.apiClient = github.NewClient(s.httpClient)
 
 	var conn sourcespb.GitHub
 	err = anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
@@ -209,13 +219,20 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	s.orgsCache = memory.New()
+	connector, err := newConnector(s)
+	if err != nil {
+		return fmt.Errorf("could not create connector: %w", err)
+	}
+	s.connector = connector
+
+	s.orgsCache = memory.New[string]()
 	for _, org := range s.conn.Organizations {
 		s.orgsCache.Set(org, org)
 	}
 	s.memberCache = make(map[string]struct{})
 
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(),
+	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
+		memory.New[string](),
 		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
 	)
@@ -271,63 +288,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	return nil
 }
 
-// Validate is used by enterprise CLI to validate the Github config file.
+// Validate is used by enterprise CLI to validate the GitHub config file.
 func (s *Source) Validate(ctx context.Context) []error {
-	var (
-		errs     []error
-		ghClient *github.Client
-		err      error
-	)
-	apiEndpoint := s.conn.Endpoint
-
-	switch cred := s.conn.GetCredential().(type) {
-	case *sourcespb.GitHub_BasicAuth:
-		s.httpClient.Transport = &github.BasicAuthTransport{
-			Username: cred.BasicAuth.Username,
-			Password: cred.BasicAuth.Password,
-		}
-		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
-		}
-	case *sourcespb.GitHub_Unauthenticated:
-		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
-		}
-	case *sourcespb.GitHub_Token:
-		s.githubToken = cred.Token
-
-		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: s.githubToken},
-		)
-		s.httpClient.Transport = &oauth2.Transport{
-			Base:   s.httpClient.Transport,
-			Source: oauth2.ReuseTokenSource(nil, ts),
-		}
-
-		ghClient, err = createGitHubClient(s.httpClient, apiEndpoint)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("error creating GitHub client: %+v", err))
-		}
-	default:
-		errs = append(errs, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type()))
+	if _, _, err := s.connector.APIClient().Users.Get(ctx, ""); err != nil {
+		return []error{err}
 	}
 
-	// Run a simple query to check if the client is actually valid
-	if ghClient != nil {
-		err = checkGitHubConnection(ctx, ghClient)
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	return errs
-}
-
-func checkGitHubConnection(ctx context.Context, client *github.Client) error {
-	_, _, err := client.Users.Get(ctx, "")
-	return err
+	return nil
 }
 
 func (s *Source) visibilityOf(ctx context.Context, repoURL string) source_metadatapb.Visibility {
@@ -348,20 +315,15 @@ func (s *Source) visibilityOf(ctx context.Context, repoURL string) source_metada
 	return repoInfo.visibility
 }
 
-const cloudEndpoint = "https://api.github.com"
-
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
-	apiEndpoint := s.conn.Endpoint
-	if len(apiEndpoint) == 0 || endsWithGithub.MatchString(apiEndpoint) {
-		apiEndpoint = cloudEndpoint
-	}
-
+	chunksReporter := sources.ChanReporter{Ch: chunksChan}
 	// If targets are provided, we're only scanning the data in those targets.
 	// Otherwise, we're scanning all data.
 	// This allows us to only scan the commit where a vulnerability was found.
 	if len(targets) > 0 {
-		return s.scanTargets(ctx, targets, chunksChan)
+		errs := s.scanTargets(ctx, targets, chunksReporter)
+		return errors.Join(errs...)
 	}
 
 	// Reset consumption and rate limit metrics on each run.
@@ -369,70 +331,66 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
 	githubReposScanned.WithLabelValues(s.name).Set(0)
 
-	installationClient, err := s.enumerate(ctx, apiEndpoint)
+	err := s.enumerate(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("error enumerating: %w", err)
 	}
 
-	return s.scan(ctx, installationClient, chunksChan)
+	return s.scan(ctx, chunksReporter)
 }
 
-func (s *Source) enumerate(ctx context.Context, apiEndpoint string) (*github.Client, error) {
-	var (
-		installationClient *github.Client
-		err                error
-	)
-
-	switch cred := s.conn.GetCredential().(type) {
-	case *sourcespb.GitHub_BasicAuth:
-		if err = s.enumerateBasicAuth(ctx, apiEndpoint, cred.BasicAuth); err != nil {
-			return nil, err
-		}
-	case *sourcespb.GitHub_Unauthenticated:
-		s.enumerateUnauthenticated(ctx, apiEndpoint)
-	case *sourcespb.GitHub_Token:
-		if err = s.enumerateWithToken(ctx, apiEndpoint, cred.Token); err != nil {
-			return nil, err
-		}
-	case *sourcespb.GitHub_GithubApp:
-		if installationClient, err = s.enumerateWithApp(ctx, apiEndpoint, cred.GithubApp); err != nil {
-			return nil, err
-		}
-	default:
-		// TODO: move this error to Init
-		return nil, fmt.Errorf("Invalid configuration given for source. Name: %s, Type: %s", s.name, s.Type())
+func (s *Source) enumerate(ctx context.Context) error {
+	// Create a reporter that does nothing for now.
+	noopReporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
+			return nil
+		},
 	}
-
+	// I'm not wild about switching on the connector type here (as opposed to dispatching to the connector itself) but
+	// this felt like a compromise that allowed me to isolate connection logic without rewriting the entire source.
+	switch c := s.connector.(type) {
+	case *appConnector:
+		if err := s.enumerateWithApp(ctx, c.InstallationClient(), noopReporter); err != nil {
+			return err
+		}
+	case *basicAuthConnector:
+		if err := s.enumerateBasicAuth(ctx, noopReporter); err != nil {
+			return err
+		}
+	case *tokenConnector:
+		if err := s.enumerateWithToken(ctx, c.IsGithubEnterprise(), noopReporter); err != nil {
+			return err
+		}
+	case *unauthenticatedConnector:
+		s.enumerateUnauthenticated(ctx, noopReporter)
+	}
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
 
 RepoLoop:
 	for _, repo := range s.filteredRepoCache.Values() {
 		repoCtx := context.WithValue(ctx, "repo", repo)
 
-		r, ok := repo.(string)
-		if !ok {
-			repoCtx.Logger().Error(fmt.Errorf("type assertion failed"), "Unexpected value in cache")
-			continue
-		}
-
 		// Ensure that |s.repoInfoCache| contains an entry for |repo|.
 		// This compensates for differences in enumeration logic between `--org` and `--repo`.
 		// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
-		if _, ok := s.repoInfoCache.get(r); !ok {
+		if _, ok := s.repoInfoCache.get(repo); !ok {
 			repoCtx.Logger().V(2).Info("Caching repository info")
 
-			_, urlParts, err := getRepoURLParts(r)
+			_, urlParts, err := getRepoURLParts(repo)
 			if err != nil {
 				repoCtx.Logger().Error(err, "Failed to parse repository URL")
 				continue
 			}
 
-			if strings.EqualFold(urlParts[0], "gist.github.com") {
+			if isGistUrl(urlParts) {
 				// Cache gist info.
 				for {
 					gistID := extractGistID(urlParts)
-					gist, _, err := s.apiClient.Gists.Get(repoCtx, gistID)
-					if s.handleRateLimit(err) {
+					gist, _, err := s.connector.APIClient().Gists.Get(repoCtx, gistID)
+					// Normalize the URL to the Gist's pull URL.
+					// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
+					repo = gist.GetGitPullURL()
+					if s.handleRateLimit(repoCtx, err) {
 						continue
 					}
 					if err != nil {
@@ -445,8 +403,8 @@ RepoLoop:
 			} else {
 				// Cache repository info.
 				for {
-					ghRepo, _, err := s.apiClient.Repositories.Get(repoCtx, urlParts[1], urlParts[2])
-					if s.handleRateLimit(err) {
+					ghRepo, _, err := s.connector.APIClient().Repositories.Get(repoCtx, urlParts[1], urlParts[2])
+					if s.handleRateLimit(repoCtx, err) {
 						continue
 					}
 					if err != nil {
@@ -458,99 +416,63 @@ RepoLoop:
 				}
 			}
 		}
-		s.repos = append(s.repos, r)
+		s.repos = append(s.repos, repo)
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
-	s.log.Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
-
+	ctx.Logger().Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
-	return installationClient, nil
+	return nil
 }
 
-func (s *Source) enumerateBasicAuth(ctx context.Context, apiEndpoint string, basicAuth *credentialspb.BasicAuth) error {
-	s.httpClient.Transport = &github.BasicAuthTransport{
-		Username: basicAuth.Username,
-		Password: basicAuth.Password,
-	}
-	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
-	if err != nil {
-		s.log.Error(err, "error creating GitHub client")
-	}
-	s.apiClient = ghClient
-
+func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, org := range s.orgsCache.Keys() {
-		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org or user")
+		orgCtx := context.WithValue(ctx, "account", org)
+		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+		if err != nil {
+			orgCtx.Logger().Error(err, "error fetching repos for org or user")
+			continue
+		}
+
+		// TODO: This modifies s.memberCache but it doesn't look like
+		// we do anything with it.
+		if userType == organization && s.conn.ScanUsers {
+			if err := s.addMembersByOrg(ctx, org); err != nil {
+				orgCtx.Logger().Error(err, "Unable to add members by org")
+			}
 		}
 	}
 
 	return nil
 }
 
-func (s *Source) enumerateUnauthenticated(ctx context.Context, apiEndpoint string) {
-	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
-	if err != nil {
-		s.log.Error(err, "error creating GitHub client")
-	}
-	s.apiClient = ghClient
+func (s *Source) enumerateUnauthenticated(ctx context.Context, reporter sources.UnitReporter) {
 	if s.orgsCache.Count() > unauthGithubOrgRateLimt {
-		s.log.Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
+		ctx.Logger().Info("You may experience rate limiting when using the unauthenticated GitHub api. Consider using an authenticated scan instead.")
 	}
 
 	for _, org := range s.orgsCache.Keys() {
-		if err := s.getReposByOrg(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for org")
+		orgCtx := context.WithValue(ctx, "account", org)
+		userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+		if err != nil {
+			orgCtx.Logger().Error(err, "error fetching repos for org or user")
+			continue
 		}
 
-		// We probably don't need to do this, since getting repos by org makes more sense?
-		if err := s.getReposByUser(ctx, org); err != nil {
-			s.log.Error(err, "error fetching repos for user")
-		}
-
-		if s.conn.ScanUsers {
-			s.log.Info("Enumerating unauthenticated does not support scanning organization members")
+		if userType == organization && s.conn.ScanUsers {
+			orgCtx.Logger().Info("WARNING: Enumerating unauthenticated does not support scanning organization members (--include-members)")
 		}
 	}
 }
 
-func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token string) error {
-	// Needed for clones.
-	s.githubToken = token
+func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool, reporter sources.UnitReporter) error {
+	ctx.Logger().V(1).Info("Enumerating with token")
 
-	// Needed to list repos.
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	s.httpClient.Transport = &oauth2.Transport{
-		Base:   s.httpClient.Transport,
-		Source: oauth2.ReuseTokenSource(nil, ts),
-	}
-
-	// If we're using public GitHub, make a regular client.
-	// Otherwise, make an enterprise client.
-	ghClient, err := createGitHubClient(s.httpClient, apiEndpoint)
-	if err != nil {
-		s.log.Error(err, "error creating GitHub client")
-	}
-	s.apiClient = ghClient
-
-	// TODO: this should support scanning users too
-
-	specificScope := false
-
-	if len(s.repos) > 0 {
-		specificScope = true
-	}
-
-	var (
-		ghUser *github.User
-	)
-
-	ctx.Logger().V(1).Info("Enumerating with token", "endpoint", apiEndpoint)
+	var ghUser *github.User
+	var err error
 	for {
-		ghUser, _, err = s.apiClient.Users.Get(ctx, "")
-		if s.handleRateLimit(err) {
+		ghUser, _, err = s.connector.APIClient().Users.Get(ctx, "")
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -559,151 +481,78 @@ func (s *Source) enumerateWithToken(ctx context.Context, apiEndpoint, token stri
 		break
 	}
 
-	if s.orgsCache.Count() > 0 {
-		specificScope = true
-		for _, org := range s.orgsCache.Keys() {
-			logger := s.log.WithValues("org", org)
-			if err := s.getReposByOrg(ctx, org); err != nil {
-				logger.Error(err, "error fetching repos for org")
-			}
-
-			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, org)
-				if err != nil {
-					logger.Error(err, "Unable to add members by org")
-					continue
-				}
-			}
-		}
-	}
-
-	// If no scope was provided, enumerate them.
+	specificScope := len(s.repos) > 0 || s.orgsCache.Count() > 0
 	if !specificScope {
-		if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-			s.log.Error(err, "error fetching repos by user")
+		// Enumerate the user's orgs and repos if none were specified.
+		if err := s.getReposByUser(ctx, ghUser.GetLogin(), reporter); err != nil {
+			ctx.Logger().Error(err, "Unable to fetch repos for the current user", "user", ghUser.GetLogin())
+		}
+		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin(), reporter); err != nil {
+			ctx.Logger().Error(err, "Unable to fetch gists for the current user", "user", ghUser.GetLogin())
 		}
 
-		isGHE := !strings.EqualFold(apiEndpoint, cloudEndpoint)
-		if isGHE {
+		if isGithubEnterprise {
 			s.addAllVisibleOrgs(ctx)
 		} else {
-			// Scan for orgs is default with a token. GitHub App enumerates the repositories
-			// that were assigned to it in GitHub App settings.
+			// Scan for orgs is default with a token.
+			// GitHub App enumerates the repos that were assigned to it in GitHub App settings.
 			s.addOrgsByUser(ctx, ghUser.GetLogin())
 		}
+	}
 
+	if len(s.orgsCache.Keys()) > 0 {
 		for _, org := range s.orgsCache.Keys() {
-			logger := s.log.WithValues("org", org)
-			if err := s.getReposByOrg(ctx, org); err != nil {
-				logger.Error(err, "error fetching repos by org")
+			orgCtx := context.WithValue(ctx, "account", org)
+			userType, err := s.getReposByOrgOrUser(ctx, org, reporter)
+			if err != nil {
+				orgCtx.Logger().Error(err, "Unable to fetch repos for org or user")
+				continue
 			}
 
-			if err := s.getReposByUser(ctx, ghUser.GetLogin()); err != nil {
-				logger.Error(err, "error fetching repos by user")
-			}
-
-			if s.conn.ScanUsers {
-				err := s.addMembersByOrg(ctx, org)
-				if err != nil {
-					logger.Error(err, "Unable to add members by org for org")
+			if userType == organization && s.conn.ScanUsers {
+				if err := s.addMembersByOrg(ctx, org); err != nil {
+					orgCtx.Logger().Error(err, "Unable to add members for org")
 				}
 			}
 		}
 
-		// If we enabled ScanUsers above, we've already added the gists for the current user and users from the orgs.
-		// So if we don't have ScanUsers enabled, add the user gists as normal.
-		if err := s.addUserGistsToCache(ctx, ghUser.GetLogin()); err != nil {
-			s.log.Error(err, "error fetching gists", "user", ghUser.GetLogin())
+		if s.conn.ScanUsers && len(s.memberCache) > 0 {
+			ctx.Logger().Info("Fetching repos for org members", "org_count", s.orgsCache.Count(), "member_count", len(s.memberCache))
+			s.addReposForMembers(ctx, reporter)
 		}
-
-		return nil
-	}
-
-	if s.conn.ScanUsers {
-		s.log.Info("Adding repos", "orgs", s.orgsCache.Count(), "members", len(s.memberCache))
-		s.addReposForMembers(ctx)
-		return nil
 	}
 
 	return nil
 }
 
-func (s *Source) enumerateWithApp(ctx context.Context, apiEndpoint string, app *credentialspb.GitHubApp) (installationClient *github.Client, err error) {
-	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	appID, err := strconv.ParseInt(app.AppId, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	// This client is required to create installation tokens for cloning.
-	// Otherwise, the required JWT is not in the request for the token :/
-	// This client uses the source's original HTTP transport, so make sure
-	// to build it before modifying that transport (such as is done during
-	// the creation of the other API client below).
-	appItr, err := ghinstallation.NewAppsTransport(
-		s.httpClient.Transport,
-		appID,
-		[]byte(app.PrivateKey))
-	if err != nil {
-		return nil, err
-	}
-	appItr.BaseURL = apiEndpoint
-
-	// Does this need to be separate from |s.httpClient|?
-	instHTTPClient := common.RetryableHTTPClientTimeout(60)
-	instHTTPClient.Transport = appItr
-	installationClient, err = github.NewClient(instHTTPClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	// This client is used for most APIs.
-	itr, err := ghinstallation.New(
-		s.httpClient.Transport,
-		appID,
-		installationID,
-		[]byte(app.PrivateKey))
-	if err != nil {
-		return nil, err
-	}
-	itr.BaseURL = apiEndpoint
-
-	s.httpClient.Transport = itr
-	s.apiClient, err = github.NewClient(s.httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Source) enumerateWithApp(ctx context.Context, installationClient *github.Client, reporter sources.UnitReporter) error {
 	// If no repos were provided, enumerate them.
 	if len(s.repos) == 0 {
-		if err = s.getReposByApp(ctx); err != nil {
-			return nil, err
+		if err := s.getReposByApp(ctx, reporter); err != nil {
+			return err
 		}
 
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
 			err := s.addMembersByApp(ctx, installationClient)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			s.log.Info("Scanning repos", "org_members", len(s.memberCache))
+			ctx.Logger().Info("Scanning repos", "org_members", len(s.memberCache))
+			// TODO: Replace loop below with a call to s.addReposForMembers(ctx, reporter)
 			for member := range s.memberCache {
-				logger := s.log.WithValues("member", member)
-				if err := s.getReposByUser(ctx, member); err != nil {
+				logger := ctx.Logger().WithValues("member", member)
+				if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
 					logger.Error(err, "error fetching gists by user")
 				}
-				if err := s.getReposByUser(ctx, member); err != nil {
+				if err := s.getReposByUser(ctx, member, reporter); err != nil {
 					logger.Error(err, "error fetching repos by user")
 				}
 			}
 		}
 	}
 
-	return installationClient, nil
+	return nil
 }
 
 func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Client, error) {
@@ -716,10 +565,10 @@ func createGitHubClient(httpClient *http.Client, apiEndpoint string) (*github.Cl
 	return github.NewClient(httpClient).WithEnterpriseURLs(apiEndpoint, apiEndpoint)
 }
 
-func (s *Source) scan(ctx context.Context, installationClient *github.Client, chunksChan chan *sources.Chunk) error {
+func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error {
 	var scannedCount uint64 = 1
 
-	s.log.V(2).Info("Found repos to scan", "count", len(s.repos))
+	ctx.Logger().V(2).Info("Found repos to scan", "count", len(s.repos))
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
@@ -757,11 +606,11 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 			if !ok {
 				// This should never happen.
 				err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
-				s.log.Error(err, "failed to scan repository")
+				ctx.Logger().Error(err, "failed to scan repository")
 				return nil
 			}
 			repoCtx := context.WithValues(ctx, "repo", repoURL)
-			duration, err := s.cloneAndScanRepo(repoCtx, installationClient, repoURL, repoInfo, chunksChan)
+			duration, err := s.cloneAndScanRepo(repoCtx, repoURL, repoInfo, reporter)
 			if err != nil {
 				scanErrs.Add(err)
 				return nil
@@ -772,16 +621,21 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 				wikiURL := strings.TrimSuffix(repoURL, ".git") + ".wiki.git"
 				wikiCtx := context.WithValue(ctx, "repo", wikiURL)
 
-				_, err := s.cloneAndScanRepo(wikiCtx, installationClient, wikiURL, repoInfo, chunksChan)
+				_, err := s.cloneAndScanRepo(wikiCtx, wikiURL, repoInfo, reporter)
 				if err != nil {
-					scanErrs.Add(fmt.Errorf("error scanning wiki: %s", wikiURL))
+					// Ignore "Repository not found" errors.
+					// It's common for GitHub's API to say a repo has a wiki when it doesn't.
+					if !strings.Contains(err.Error(), "not found") {
+						scanErrs.Add(fmt.Errorf("error scanning wiki: %w", err))
+					}
+
 					// Don't return, it still might be possible to scan comments.
 				}
 			}
 
 			// Scan comments, if enabled.
 			if s.includeGistComments || s.includeIssueComments || s.includePRComments {
-				if err = s.scanComments(repoCtx, repoURL, repoInfo, chunksChan); err != nil {
+				if err = s.scanComments(repoCtx, repoURL, repoInfo, reporter); err != nil {
 					scanErrs.Add(fmt.Errorf("error scanning comments in repo %s: %w", repoURL, err))
 					return nil
 				}
@@ -796,20 +650,20 @@ func (s *Source) scan(ctx context.Context, installationClient *github.Client, ch
 
 	_ = s.jobPool.Wait()
 	if scanErrs.Count() > 0 {
-		s.log.V(0).Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs.String())
+		ctx.Logger().Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs.String())
 	}
 	s.SetProgressComplete(len(s.repos), len(s.repos), "Completed GitHub scan", "")
 
 	return nil
 }
 
-func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, repoURL string, repoInfo repoInfo, chunksChan chan *sources.Chunk) (time.Duration, error) {
+func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo repoInfo, reporter sources.ChunkReporter) (time.Duration, error) {
 	var duration time.Duration
 
 	ctx.Logger().V(2).Info("attempting to clone repo")
-	path, repo, err := s.cloneRepo(ctx, repoURL, client)
+	path, repo, err := s.cloneRepo(ctx, repoURL)
 	if err != nil {
-		return duration, fmt.Errorf("error cloning repo %s: %w", repoURL, err)
+		return duration, err
 	}
 	defer os.RemoveAll(path)
 
@@ -826,7 +680,7 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, client *github.Client, re
 	logger.V(2).Info("scanning repo")
 
 	start := time.Now()
-	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, sources.ChanReporter{Ch: chunksChan}); err != nil {
+	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter); err != nil {
 		return duration, fmt.Errorf("error scanning repo %s: %w", repoURL, err)
 	}
 	duration = time.Since(start)
@@ -844,7 +698,7 @@ var (
 // Authenticated users have a rate limit of 5,000 requests per hour,
 // however, certain actions are subject to a stricter "secondary" limit.
 // https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
-func (s *Source) handleRateLimit(errIn error) bool {
+func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
 	if errIn == nil {
 		return false
 	}
@@ -883,12 +737,12 @@ func (s *Source) handleRateLimit(errIn error) bool {
 		if retryAfter > 0 {
 			retryAfter = retryAfter + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
-			s.log.V(0).Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
+			ctx.Logger().Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 		} else {
 			retryAfter = (5 * time.Minute) + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
 			// TODO: Use exponential backoff instead of static retry time.
-			s.log.V(0).Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
+			ctx.Logger().Error(errIn, "unexpected rate limit error", "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 		}
 
 		rateLimitMu.Unlock()
@@ -902,26 +756,27 @@ func (s *Source) handleRateLimit(errIn error) bool {
 	return true
 }
 
-func (s *Source) addReposForMembers(ctx context.Context) {
-	s.log.Info("Fetching repos from members", "members", len(s.memberCache))
+func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
+	ctx.Logger().Info("Fetching repos from members", "members", len(s.memberCache))
 	for member := range s.memberCache {
-		if err := s.addUserGistsToCache(ctx, member); err != nil {
-			s.log.Info("Unable to fetch gists by user", "user", member, "error", err)
+		if err := s.addUserGistsToCache(ctx, member, reporter); err != nil {
+			ctx.Logger().Info("Unable to fetch gists by user", "user", member, "error", err)
 		}
-		if err := s.getReposByUser(ctx, member); err != nil {
-			s.log.Info("Unable to fetch repos by user", "user", member, "error", err)
+		if err := s.getReposByUser(ctx, member, reporter); err != nil {
+			ctx.Logger().Info("Unable to fetch repos by user", "user", member, "error", err)
 		}
 	}
 }
 
 // addUserGistsToCache collects all the gist urls for a given user,
 // and adds them to the filteredRepoCache.
-func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
+func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter sources.UnitReporter) error {
 	gistOpts := &github.GistListOptions{}
-	logger := s.log.WithValues("user", user)
+	logger := ctx.Logger().WithValues("user", user)
+
 	for {
-		gists, res, err := s.apiClient.Gists.List(ctx, user, gistOpts)
-		if s.handleRateLimit(err) {
+		gists, res, err := s.connector.APIClient().Gists.List(ctx, user, gistOpts)
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -931,6 +786,9 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string) error {
 		for _, gist := range gists {
 			s.filteredRepoCache.Set(gist.GetID(), gist.GetGitPullURL())
 			s.cacheGistInfo(gist)
+			if err := reporter.UnitOk(ctx, GistUnit{name: gist.GetID(), url: gist.GetGitPullURL()}); err != nil {
+				return err
+			}
 		}
 
 		if res == nil || res.NextPage == 0 {
@@ -966,7 +824,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 }
 
 func (s *Source) addAllVisibleOrgs(ctx context.Context) {
-	s.log.V(2).Info("enumerating all visible organizations on GHE")
+	ctx.Logger().V(2).Info("enumerating all visible organizations on GHE")
 	// Enumeration on this endpoint does not use pages it uses a since ID.
 	// The endpoint will return organizations with an ID greater than the given since ID.
 	// Empty org response is our cue to break the enumeration loop.
@@ -977,12 +835,12 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 		},
 	}
 	for {
-		orgs, _, err := s.apiClient.Organizations.ListAll(ctx, orgOpts)
-		if s.handleRateLimit(err) {
+		orgs, _, err := s.connector.APIClient().Organizations.ListAll(ctx, orgOpts)
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
-			s.log.Error(err, "could not list all organizations")
+			ctx.Logger().Error(err, "could not list all organizations")
 			return
 		}
 
@@ -991,7 +849,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 		}
 
 		lastOrgID := *orgs[len(orgs)-1].ID
-		s.log.V(2).Info(fmt.Sprintf("listed organization IDs %d through %d", orgOpts.Since, lastOrgID))
+		ctx.Logger().V(2).Info(fmt.Sprintf("listed organization IDs %d through %d", orgOpts.Since, lastOrgID))
 		orgOpts.Since = lastOrgID
 
 		for _, org := range orgs {
@@ -1005,7 +863,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 				continue
 			}
 			s.orgsCache.Set(name, name)
-			s.log.V(2).Info("adding organization for repository enumeration", "id", org.ID, "name", name)
+			ctx.Logger().V(2).Info("adding organization for repository enumeration", "id", org.ID, "name", name)
 		}
 	}
 }
@@ -1014,10 +872,10 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	orgOpts := &github.ListOptions{
 		PerPage: defaultPagination,
 	}
-	logger := s.log.WithValues("user", user)
+	logger := ctx.Logger().WithValues("user", user)
 	for {
-		orgs, resp, err := s.apiClient.Organizations.List(ctx, "", orgOpts)
-		if s.handleRateLimit(err) {
+		orgs, resp, err := s.connector.APIClient().Organizations.List(ctx, "", orgOpts)
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
@@ -1047,10 +905,10 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 		},
 	}
 
-	logger := s.log.WithValues("org", org)
+	logger := ctx.Logger().WithValues("org", org)
 	for {
-		members, res, err := s.apiClient.Organizations.ListMembers(ctx, org, opts)
-		if s.handleRateLimit(err) {
+		members, res, err := s.connector.APIClient().Organizations.ListMembers(ctx, org, opts)
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil || len(members) == 0 {
@@ -1091,16 +949,16 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 	s.SetProgressComplete(index+offset, len(s.repos)+offset, fmt.Sprintf("Repo: %s", repoURL), encodedResumeInfo)
 }
 
-func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	urlString, urlParts, err := getRepoURLParts(repoPath)
 	if err != nil {
 		return err
 	}
 
-	if s.includeGistComments && urlParts[0] == "gist.github.com" {
-		return s.processGistComments(ctx, urlString, urlParts, repoInfo, chunksChan)
+	if s.includeGistComments && isGistUrl(urlParts) {
+		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter)
 	} else if s.includeIssueComments || s.includePRComments {
-		return s.processRepoComments(ctx, repoInfo, chunksChan)
+		return s.processRepoComments(ctx, repoInfo, reporter)
 	}
 	return nil
 }
@@ -1112,34 +970,55 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 // - "https://github.com/trufflesecurity/trufflehog" => ["github.com", "trufflesecurity", "trufflehog"]
 // - "https://gist.github.com/nat/5fdbb7f945d121f197fb074578e53948" => ["gist.github.com", "nat", "5fdbb7f945d121f197fb074578e53948"]
 // - "https://gist.github.com/ff0e5e8dc8ec22f7a25ddfc3492d3451.git" => ["gist.github.com", "ff0e5e8dc8ec22f7a25ddfc3492d3451"]
-func getRepoURLParts(repoURL string) (string, []string, error) {
+// - "https://github.company.org/gist/nat/5fdbb7f945d121f197fb074578e53948.git" => ["github.company.org", "gist", "nat", "5fdbb7f945d121f197fb074578e53948"]
+func getRepoURLParts(repoURLString string) (string, []string, error) {
 	// Support ssh and https URLs.
-	url, err := git.GitURLParse(repoURL)
+	repoURL, err := git.GitURLParse(repoURLString)
 	if err != nil {
-		return "", []string{}, err
+		return "", nil, err
 	}
 
 	// Remove the user information.
 	// e.g., `git@github.com` -> `github.com`
-	if url.User != nil {
-		url.User = nil
+	if repoURL.User != nil {
+		repoURL.User = nil
 	}
 
-	urlString := url.String()
-	trimmedURL := strings.TrimPrefix(urlString, url.Scheme+"://")
+	urlString := repoURL.String()
+	trimmedURL := strings.TrimPrefix(urlString, repoURL.Scheme+"://")
 	trimmedURL = strings.TrimSuffix(trimmedURL, ".git")
-	splitURL := strings.Split(trimmedURL, "/")
+	urlParts := strings.Split(trimmedURL, "/")
 
-	if len(splitURL) < 2 || len(splitURL) > 3 {
-		return "", []string{}, fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be 2 or 3", urlString)
+	// Validate
+	switch len(urlParts) {
+	case 2:
+		// gist.github.com/<gist_id>
+		if !strings.EqualFold(urlParts[0], "gist.github.com") {
+			err = fmt.Errorf("failed to parse repository or gist URL (%s): 2 path segments are only expected if the host is 'gist.github.com' ('gist.github.com', '<gist_id>')", urlString)
+		}
+	case 3:
+		// github.com/<user>/repo>
+		// gist.github.com/<user>/<gist_id>
+		// github.company.org/<user>/repo>
+		// github.company.org/gist/<gist_id>
+	case 4:
+		// github.company.org/gist/<user/<id>
+		if !strings.EqualFold(urlParts[1], "gist") || (strings.EqualFold(urlParts[0], "github.com") && strings.EqualFold(urlParts[1], "gist")) {
+			err = fmt.Errorf("failed to parse repository or gist URL (%s): 4 path segments are only expected if the host isn't 'github.com' and the path starts with 'gist' ('github.example.com', 'gist', '<owner>', '<gist_id>')", urlString)
+		}
+	default:
+		err = fmt.Errorf("invalid repository or gist URL (%s): length of URL segments should be between 2 and 4, not %d (%v)", urlString, len(urlParts), urlParts)
 	}
 
-	return urlString, splitURL, nil
+	if err != nil {
+		return "", nil, err
+	}
+	return urlString, urlParts, nil
 }
 
 const initialPage = 1 // page to start listing from
 
-func (s *Source) processGistComments(ctx context.Context, gistURL string, urlParts []string, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processGistComments(ctx context.Context, gistURL string, urlParts []string, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	ctx.Logger().V(2).Info("Scanning GitHub Gist comments")
 
 	// GitHub Gist URL.
@@ -1150,15 +1029,15 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 		Page:    initialPage,
 	}
 	for {
-		comments, _, err := s.apiClient.Gists.ListComments(ctx, gistID, options)
-		if s.handleRateLimit(err) {
+		comments, _, err := s.connector.APIClient().Gists.ListComments(ctx, gistID, options)
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
 
-		if err = s.chunkGistComments(ctx, gistURL, repoInfo, comments, chunksChan); err != nil {
+		if err = s.chunkGistComments(ctx, gistURL, repoInfo, comments, reporter); err != nil {
 			return err
 		}
 
@@ -1174,10 +1053,14 @@ func extractGistID(urlParts []string) string {
 	return urlParts[len(urlParts)-1]
 }
 
-func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, chunksChan chan *sources.Chunk) error {
+func isGistUrl(urlParts []string) bool {
+	return strings.EqualFold(urlParts[0], "gist.github.com") || (len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist"))
+}
+
+func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
-		chunk := &sources.Chunk{
+		chunk := sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
@@ -1198,10 +1081,8 @@ func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo
 			Verify: s.verify,
 		}
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case chunksChan <- chunk:
+		if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1222,23 +1103,23 @@ var (
 	state = "all"
 )
 
-func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
-		if err := s.processIssues(ctx, repoInfo, chunksChan); err != nil {
+		if err := s.processIssues(ctx, repoInfo, reporter); err != nil {
 			return err
 		}
-		if err := s.processIssueComments(ctx, repoInfo, chunksChan); err != nil {
+		if err := s.processIssueComments(ctx, repoInfo, reporter); err != nil {
 			return err
 		}
 	}
 
 	if s.includePRComments {
 		ctx.Logger().V(2).Info("Scanning pull requests")
-		if err := s.processPRs(ctx, repoInfo, chunksChan); err != nil {
+		if err := s.processPRs(ctx, repoInfo, reporter); err != nil {
 			return err
 		}
-		if err := s.processPRComments(ctx, repoInfo, chunksChan); err != nil {
+		if err := s.processPRComments(ctx, repoInfo, reporter); err != nil {
 			return err
 		}
 	}
@@ -1247,7 +1128,7 @@ func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, chu
 
 }
 
-func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	bodyTextsOpts := &github.IssueListByRepoOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1259,8 +1140,8 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, chunksCha
 	}
 
 	for {
-		issues, _, err := s.apiClient.Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
-		if s.handleRateLimit(err) {
+		issues, _, err := s.connector.APIClient().Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 
@@ -1268,7 +1149,7 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, chunksCha
 			return err
 		}
 
-		if err = s.chunkIssues(ctx, repoInfo, issues, chunksChan); err != nil {
+		if err = s.chunkIssues(ctx, repoInfo, issues, reporter); err != nil {
 			return err
 		}
 
@@ -1281,7 +1162,7 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, chunksCha
 	return nil
 }
 
-func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, reporter sources.ChunkReporter) error {
 	for _, issue := range issues {
 
 		// Skip pull requests since covered by processPRs.
@@ -1290,7 +1171,7 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 		}
 
 		// Create chunk and send it to the channel.
-		chunk := &sources.Chunk{
+		chunk := sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			JobID:      s.JobID(),
@@ -1311,16 +1192,14 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 			Verify: s.verify,
 		}
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case chunksChan <- chunk:
+		if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
 		Direction: &directionType,
@@ -1331,15 +1210,15 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, ch
 	}
 
 	for {
-		issueComments, _, err := s.apiClient.Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
-		if s.handleRateLimit(err) {
+		issueComments, _, err := s.connector.APIClient().Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
 
-		if err = s.chunkIssueComments(ctx, repoInfo, issueComments, chunksChan); err != nil {
+		if err = s.chunkIssueComments(ctx, repoInfo, issueComments, reporter); err != nil {
 			return err
 		}
 
@@ -1351,10 +1230,10 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, ch
 	return nil
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
-		chunk := &sources.Chunk{
+		chunk := sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			JobID:      s.JobID(),
@@ -1375,16 +1254,14 @@ func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comm
 			Verify: s.verify,
 		}
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case chunksChan <- chunk:
+		if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	prOpts := &github.PullRequestListOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1396,15 +1273,15 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, chunksChan c
 	}
 
 	for {
-		prs, _, err := s.apiClient.PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
-		if s.handleRateLimit(err) {
+		prs, _, err := s.connector.APIClient().PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
 
-		if err = s.chunkPullRequests(ctx, repoInfo, prs, chunksChan); err != nil {
+		if err = s.chunkPullRequests(ctx, repoInfo, prs, reporter); err != nil {
 			return err
 		}
 
@@ -1417,7 +1294,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, chunksChan c
 	return nil
 }
 
-func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, chunksChan chan *sources.Chunk) error {
+func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
 	prOpts := &github.PullRequestListCommentsOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1428,15 +1305,15 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, chunk
 	}
 
 	for {
-		prComments, _, err := s.apiClient.PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
-		if s.handleRateLimit(err) {
+		prComments, _, err := s.connector.APIClient().PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
 
-		if err = s.chunkPullRequestComments(ctx, repoInfo, prComments, chunksChan); err != nil {
+		if err = s.chunkPullRequestComments(ctx, repoInfo, prComments, reporter); err != nil {
 			return err
 		}
 
@@ -1449,10 +1326,10 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, chunk
 	return nil
 }
 
-func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs []*github.PullRequest, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs []*github.PullRequest, reporter sources.ChunkReporter) error {
 	for _, pr := range prs {
 		// Create chunk and send it to the channel.
-		chunk := &sources.Chunk{
+		chunk := sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
@@ -1473,19 +1350,17 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 			Verify: s.verify,
 		}
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case chunksChan <- chunk:
+		if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, chunksChan chan *sources.Chunk) error {
+func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter) error {
 	for _, comment := range comments {
 		// Create chunk and send it to the channel.
-		chunk := &sources.Chunk{
+		chunk := sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
 			SourceType: s.Type(),
@@ -1506,26 +1381,26 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 			Verify: s.verify,
 		}
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case chunksChan <- chunk:
+		if err := reporter.ChunkOk(ctx, chunk); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, reporter sources.ChunkReporter) []error {
+	var errs []error
 	for _, tgt := range targets {
-		if err := s.scanTarget(ctx, tgt, chunksChan); err != nil {
+		if err := s.scanTarget(ctx, tgt, reporter); err != nil {
 			ctx.Logger().Error(err, "error scanning target")
+			errs = append(errs, &sources.TargetedScanError{Err: err, SecretID: tgt.SecretID})
 		}
 	}
 
-	return nil
+	return errs
 }
 
-func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
+func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, reporter sources.ChunkReporter) error {
 	metaType, ok := target.QueryCriteria.GetData().(*source_metadatapb.MetaData_Github)
 	if !ok {
 		return fmt.Errorf("unable to cast metadata type for targeted scan")
@@ -1544,28 +1419,33 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("invalid GitHub URL")
 	}
 
-	qry := commitQuery{
-		repo:     segments[2],
-		owner:    segments[1],
-		sha:      meta.GetCommit(),
-		filename: meta.GetFile(),
+	readCloser, resp, err := s.connector.APIClient().Repositories.DownloadContents(
+		ctx,
+		segments[1],
+		segments[2],
+		meta.GetFile(),
+		&github.RepositoryContentGetOptions{Ref: meta.GetCommit()})
+	// As of this writing, if the returned readCloser is not nil, it's just the Body of the returned github.Response, so
+	// there's no need to independently close it.
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
 	}
-	res, err := s.getDiffForFileInCommit(ctx, qry)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not download file for scan: %w", err)
 	}
-	chunk := &sources.Chunk{
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected HTTP response status when trying to download file for scan: %v", resp.Status)
+	}
+
+	chunkSkel := sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
 		JobID:      s.JobID(),
 		SecretID:   target.SecretID,
-		Data:       []byte(res),
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},
 		},
-		Verify: s.verify,
-	}
-
-	return common.CancellableWrite(ctx, chunksChan, chunk)
+		Verify: s.verify}
+	return handlers.HandleFile(ctx, readCloser, &chunkSkel, reporter)
 }
