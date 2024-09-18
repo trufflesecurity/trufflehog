@@ -65,7 +65,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			url := fmt.Sprintf("https://api.%s.onfido.com/v3/validate_api_token", region)
 			req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 
-			// req, err := http.NewRequestWithContext(ctx, "POST", "https://api.eu.onfido.com/v3/validate_api_token", nil)
 			if err != nil {
 				continue
 			}
