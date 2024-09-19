@@ -86,8 +86,10 @@ func GetHMAC(key []byte, data []byte) []byte {
 	return hasher.Sum(nil)
 }
 
+// Reference: https://nitter.poast.org/TalBeerySec/status/1816449053841838223#m
 func checkSessionToken(sessionToken string, secret string) bool {
-	if !strings.Contains(sessionToken, "YXdz") || strings.Contains(sessionToken, secret) {
+	if !(strings.Contains(sessionToken, "YXdz") || strings.Contains(sessionToken, "Jb3JpZ2luX2Vj")) ||
+		strings.Contains(sessionToken, secret) {
 		// Handle error if the sessionToken is not a valid base64 string
 		return false
 	}
