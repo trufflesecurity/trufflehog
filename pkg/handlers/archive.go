@@ -23,9 +23,8 @@ const (
 var (
 	// NOTE: This is a temporary workaround for |openArchive| incrementing depth twice per archive.
 	// See: https://github.com/trufflesecurity/trufflehog/issues/2942
-	maxDepth   = 5 * 2
-	maxSize    = 2 << 30 // 2 GB
-	maxTimeout = time.Duration(30) * time.Second
+	maxDepth = 5 * 2
+	maxSize  = 2 << 30 // 2 GB
 )
 
 // SetArchiveMaxSize sets the maximum size of the archive.
@@ -33,9 +32,6 @@ func SetArchiveMaxSize(size int) { maxSize = size }
 
 // SetArchiveMaxDepth sets the maximum depth of the archive.
 func SetArchiveMaxDepth(depth int) { maxDepth = depth }
-
-// SetArchiveMaxTimeout sets the maximum timeout for the archive handler.
-func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 
 // archiveHandler is a handler for common archive files that are supported by the archiver library.
 type archiveHandler struct{ *defaultHandler }
@@ -57,8 +53,6 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 	}
 
 	go func() {
-		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
-		defer cancel()
 		defer close(dataChan)
 
 		// Update the metrics for the file processing.
