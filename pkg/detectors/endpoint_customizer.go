@@ -10,27 +10,39 @@ import (
 // of the EndpointCustomizer interface. A detector can embed this struct to
 // gain the functionality.
 type EndpointSetter struct {
-	endpoints []string
+	configuredEndpoints []string
+	cloudEndpoint       string
+	useCloudEndpoint    bool
+	useFoundEndpoints   bool
 }
 
-func (e *EndpointSetter) SetEndpoints(endpoints ...string) error {
-	if len(endpoints) == 0 {
+func (e *EndpointSetter) SetConfiguredEndpoints(userConfiguredEndpoints ...string) error {
+	if len(userConfiguredEndpoints) == 0 {
 		return fmt.Errorf("at least one endpoint required")
 	}
-	deduped := make([]string, 0, len(endpoints))
-	for _, endpoint := range endpoints {
+	deduped := make([]string, 0, len(userConfiguredEndpoints))
+	for _, endpoint := range userConfiguredEndpoints {
 		common.AddStringSliceItem(endpoint, &deduped)
 	}
-	e.endpoints = deduped
+	e.configuredEndpoints = deduped
 	return nil
 }
 
-func (e *EndpointSetter) Endpoints(defaultEndpoint string) []string {
-	// The only valid time len(e.endpoints) == 0 is when EndpointSetter is
-	// initializetd to its default state. That means SetEndpoints was never
-	// called and we should use the default.
-	if len(e.endpoints) == 0 {
-		return []string{defaultEndpoint}
+func (e *EndpointSetter) UseCloudEndpoint(enabled bool) {
+	e.useCloudEndpoint = true
+}
+
+func (e *EndpointSetter) UseFoundEndpoints(enabled bool) {
+	e.useFoundEndpoints = true
+}
+
+func (e *EndpointSetter) Endpoints(foundEndpoints ...string) []string {
+	endpoints := e.configuredEndpoints
+	if e.useCloudEndpoint {
+		endpoints = append(endpoints, e.cloudEndpoint)
 	}
-	return e.endpoints
+	if e.useFoundEndpoints {
+		endpoints = append(endpoints, foundEndpoints...)
+	}
+	return endpoints
 }

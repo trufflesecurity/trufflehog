@@ -72,7 +72,8 @@ type MultiPartCredentialProvider interface {
 // EndpointCustomizer is an optional interface that a detector can implement to
 // support verifying against user-supplied endpoints.
 type EndpointCustomizer interface {
-	SetEndpoints(...string) error
+	SetConfiguredEndpoints(...string) error
+	SetCloudEndpoint(string)
 	UseCloudEndpoint(bool)
 	UseFoundEndpoints(bool)
 }
