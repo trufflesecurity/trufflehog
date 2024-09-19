@@ -280,11 +280,19 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 			}
 
 			if !cfg.CustomVerifiersOnly || len(urls) == 0 {
-				urls = append(urls, customizer.DefaultEndpoint())
+				customizer.UseFoundEndpoints(true)
+				customizer.UseCloudEndpoint(true)
 			}
-			if err := customizer.SetEndpoints(urls...); err != nil {
+
+			if err := customizer.SetConfiguredEndpoints(urls...); err != nil {
 				return false
 			}
+
+			cloudProvider, ok := d.(detectors.CloudProvider)
+			if ok {
+				customizer.SetCloudEndpoint(cloudProvider.CloudEndpoint())
+			}
+
 			return true
 		})
 	}

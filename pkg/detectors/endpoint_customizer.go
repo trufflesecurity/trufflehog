@@ -28,12 +28,16 @@ func (e *EndpointSetter) SetConfiguredEndpoints(userConfiguredEndpoints ...strin
 	return nil
 }
 
+func (e *EndpointSetter) SetCloudEndpoint(url string) {
+	e.cloudEndpoint = url
+}
+
 func (e *EndpointSetter) UseCloudEndpoint(enabled bool) {
-	e.useCloudEndpoint = true
+	e.useCloudEndpoint = enabled
 }
 
 func (e *EndpointSetter) UseFoundEndpoints(enabled bool) {
-	e.useFoundEndpoints = true
+	e.useFoundEndpoints = enabled
 }
 
 func (e *EndpointSetter) Endpoints(foundEndpoints ...string) []string {
