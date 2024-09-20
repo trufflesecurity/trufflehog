@@ -371,13 +371,19 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		VisitErr: reporter.UnitErr,
 	}
 	// Report any values that were already configured.
+	// This compensates for differences in enumeration logic between `--org` and `--repo`.
+	// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
 	for _, name := range s.filteredRepoCache.Keys() {
 		url, _ := s.filteredRepoCache.Get(name)
 		url, err := s.ensureRepoInfoCache(ctx, url)
 		if err != nil {
-			_ = dedupeReporter.UnitErr(ctx, err)
+			if err := dedupeReporter.UnitErr(ctx, err); err != nil {
+				return err
+			}
 		}
-		_ = dedupeReporter.UnitOk(ctx, RepoUnit{Name: name, URL: url})
+		if err := dedupeReporter.UnitOk(ctx, RepoUnit{Name: name, URL: url}); err != nil {
+			return err
+		}
 	}
 
 	// I'm not wild about switching on the connector type here (as opposed to dispatching to the connector itself) but
@@ -400,6 +406,8 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	}
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
 
+	// Double make sure that all enumerated repositories in the
+	// filteredRepoCache have an entry in the repoInfoCache.
 	for _, repo := range s.filteredRepoCache.Values() {
 		ctx := context.WithValue(ctx, "repo", repo)
 
@@ -424,9 +432,6 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string) (string, 
 	if _, ok := s.repoInfoCache.get(repo); ok {
 		return repo, nil
 	}
-	// Ensure that |s.repoInfoCache| contains an entry for |repo|.
-	// This compensates for differences in enumeration logic between `--org` and `--repo`.
-	// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
 	ctx.Logger().V(2).Info("Caching repository info")
 
 	_, urlParts, err := getRepoURLParts(repo)
