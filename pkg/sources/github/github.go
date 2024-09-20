@@ -213,6 +213,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
 
+	// Setup scan options if it wasn't provided.
+	if s.scanOptions == nil {
+		s.scanOptions = &git.ScanOptions{}
+	}
+
 	var conn sourcespb.GitHub
 	err = anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{})
 	if err != nil {
@@ -621,11 +626,6 @@ func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
 	s.repos = reposToScan
-
-	// Setup scan options if it wasn't provided.
-	if s.scanOptions == nil {
-		s.scanOptions = &git.ScanOptions{}
-	}
 
 	for i, repoURL := range s.repos {
 		i, repoURL := i, repoURL
