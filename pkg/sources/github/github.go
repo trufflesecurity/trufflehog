@@ -331,7 +331,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Set(0)
 	githubReposScanned.WithLabelValues(s.name).Set(0)
 
-	err := s.enumerate(ctx)
+	// We don't care about handling enumerated values as they happen during
+	// the normal Chunks flow because we enumerate and scan in two steps.
+	noopReporter := sources.VisitorReporter{
+		VisitUnit: func(context.Context, sources.SourceUnit) error {
+			return nil
+		},
+	}
+	err := s.enumerate(ctx, noopReporter)
 	if err != nil {
 		return fmt.Errorf("error enumerating: %w", err)
 	}
@@ -339,30 +346,52 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	return s.scan(ctx, chunksReporter)
 }
 
-func (s *Source) enumerate(ctx context.Context) error {
-	// Create a reporter that does nothing for now.
-	noopReporter := sources.VisitorReporter{
+// enumerate enumerates the GitHub source based on authentication method and
+// user configuration. It populates s.filteredRepoCache, s.repoInfoCache,
+// s.memberCache, s.totalRepoSize, s.orgsCache, and s.repos. Additionally,
+// repositories and gists are reported to the provided UnitReporter.
+func (s *Source) enumerate(ctx context.Context, reporter sources.UnitReporter) error {
+	seenUnits := make(map[sources.SourceUnit]struct{})
+	// Wrapper reporter to deduplicate and filter found units.
+	dedupeReporter := sources.VisitorReporter{
 		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
-			return nil
+			// Only report units that passed the user configured filter.
+			name := su.Display()
+			if !s.filteredRepoCache.Exists(name) {
+				return ctx.Err()
+			}
+			// Only report a unit once.
+			if _, ok := seenUnits[su]; ok {
+				return ctx.Err()
+			}
+			seenUnits[su] = struct{}{}
+			return reporter.UnitOk(ctx, su)
 		},
+		VisitErr: reporter.UnitErr,
 	}
+	// Report any values that were already configured.
+	for _, name := range s.filteredRepoCache.Keys() {
+		url, _ := s.filteredRepoCache.Get(name)
+		_ = dedupeReporter.UnitOk(ctx, RepoUnit{name: name, url: url})
+	}
+
 	// I'm not wild about switching on the connector type here (as opposed to dispatching to the connector itself) but
 	// this felt like a compromise that allowed me to isolate connection logic without rewriting the entire source.
 	switch c := s.connector.(type) {
 	case *appConnector:
-		if err := s.enumerateWithApp(ctx, c.InstallationClient(), noopReporter); err != nil {
+		if err := s.enumerateWithApp(ctx, c.InstallationClient(), dedupeReporter); err != nil {
 			return err
 		}
 	case *basicAuthConnector:
-		if err := s.enumerateBasicAuth(ctx, noopReporter); err != nil {
+		if err := s.enumerateBasicAuth(ctx, dedupeReporter); err != nil {
 			return err
 		}
 	case *tokenConnector:
-		if err := s.enumerateWithToken(ctx, c.IsGithubEnterprise(), noopReporter); err != nil {
+		if err := s.enumerateWithToken(ctx, c.IsGithubEnterprise(), dedupeReporter); err != nil {
 			return err
 		}
 	case *unauthenticatedConnector:
-		s.enumerateUnauthenticated(ctx, noopReporter)
+		s.enumerateUnauthenticated(ctx, dedupeReporter)
 	}
 	s.repos = make([]string, 0, s.filteredRepoCache.Count())
 
