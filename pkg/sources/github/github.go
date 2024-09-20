@@ -1509,5 +1509,11 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
 	repoURL, _ := unit.SourceUnitID()
 	ctx = context.WithValue(ctx, "repo", repoURL)
+	// ChunkUnit is not guaranteed to be called from Enumerate, so we must
+	// check and fetch the repoInfoCache for this repo.
+	repoURL, err := s.ensureRepoInfoCache(ctx, repoURL)
+	if err != nil {
+		return err
+	}
 	return s.scanRepo(ctx, repoURL, reporter)
 }
