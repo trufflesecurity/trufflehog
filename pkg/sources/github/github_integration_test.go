@@ -843,3 +843,38 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 		})
 	}
 }
+
+func TestChunkUnit(t *testing.T) {
+	ctx := context.Background()
+	conn, _ := anypb.New(&sourcespb.GitHub{
+		Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
+		Credential:   &sourcespb.GitHub_Unauthenticated{},
+	})
+	s := Source{}
+	if err := s.Init(ctx, "github integration test source", 0, 0, false, conn, 1); err != nil {
+		t.Errorf("Init() failed: %v", err)
+	}
+
+	unit := RepoUnit{Name: "driftwood", URL: "https://github.com/trufflesecurity/driftwood.git"}
+	reporter := &countChunkReporter{}
+	if err := s.ChunkUnit(ctx, unit, reporter); err != nil {
+		t.Errorf("ChunkUnit() failed: %v", err)
+	}
+	assert.GreaterOrEqual(t, reporter.chunkCount, 65)
+	assert.Equal(t, 0, reporter.errCount)
+}
+
+type countChunkReporter struct {
+	chunkCount int
+	errCount   int
+}
+
+func (m *countChunkReporter) ChunkOk(ctx context.Context, chunk sources.Chunk) error {
+	m.chunkCount++
+	return nil
+}
+
+func (m *countChunkReporter) ChunkErr(ctx context.Context, err error) error {
+	m.errCount++
+	return nil
+}
