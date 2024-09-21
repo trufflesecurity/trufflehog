@@ -36,7 +36,7 @@ require (
 	github.com/couchbase/gocb/v2 v2.9.1
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/dustin/go-humanize v1.0.1
-	github.com/elastic/go-elasticsearch/v8 v8.14.0
+	github.com/elastic/go-elasticsearch/v8 v8.15.0
 	github.com/envoyproxy/protoc-gen-validate v1.1.0
 	github.com/fatih/color v1.17.0
 	github.com/felixge/fgprof v0.9.5
