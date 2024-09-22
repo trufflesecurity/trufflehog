@@ -357,10 +357,10 @@ func TestBufferedReadSeekerSize(t *testing.T) {
 	tests := []struct {
 		name           string
 		reader         io.Reader
-		setup          func(*BufferedReadSeeker) // Optional setup before calling Size
+		setup          func(*BufferedReadSeeker)
 		expectedSize   int64
 		expectError    bool
-		verifyPosition func(*BufferedReadSeeker, int64) // Optional verification after Size
+		verifyPosition func(*BufferedReadSeeker, int64)
 	}{
 		{
 			name:         "size of seekable reader",
@@ -424,6 +424,12 @@ func TestBufferedReadSeekerSize(t *testing.T) {
 			expectedSize: 0,
 			expectError:  true,
 		},
+		{
+			name:         "size with limited reader simulating EOF",
+			reader:       io.LimitReader(strings.NewReader("Limited data"), 7),
+			expectedSize: 7,
+			expectError:  false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -452,6 +458,7 @@ func TestBufferedReadSeekerSize(t *testing.T) {
 }
 
 // errorReader is an io.Reader that returns an error after reading a specified number of bytes.
+// It's used to simulate non-EOF errors during read operations.
 type errorReader struct {
 	data       string
 	errorAfter int // Number of bytes to read before returning an error
