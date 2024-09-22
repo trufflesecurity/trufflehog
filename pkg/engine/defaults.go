@@ -210,6 +210,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docker"
 	dockerhubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v1"
 	dockerhubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
@@ -1632,6 +1633,7 @@ func DefaultDetectors() []detectors.Detector {
 		netsuite.Scanner{},
 		robinhoodcrypto.Scanner{},
 		nvapi.Scanner{},
+		&docker.Scanner{},
 	}
 }
 
