@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -39,12 +40,6 @@ type gcpKey struct {
 	ClientX509CertURL       string `json:"client_x509_cert_url"`
 }
 
-func trimCarrots(s string) string {
-	s = strings.TrimPrefix(s, "<")
-	s = strings.TrimSuffix(s, ">")
-	return s
-}
-
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
@@ -65,18 +60,16 @@ func (Scanner) StartOffset() int64 { return startOffset }
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllString(dataStr, -1)
+	uniqueMatches := make(map[string]struct{})
+	for _, match := range keyPat.FindAllString(dataStr, -1) {
+		uniqueMatches[match] = struct{}{}
+	}
 
-	for _, match := range matches {
-		key := match
-
-		key = strings.ReplaceAll(key, `,\\n`, `\n`)
-		key = strings.ReplaceAll(key, `\"\\n`, `\n`)
-		key = strings.ReplaceAll(key, `\\"`, `"`)
+	for match := range uniqueMatches {
+		key := cleanInput(match)
 
 		creds := gcpKey{}
-		err := json.Unmarshal([]byte(key), &creds)
-		if err != nil {
+		if err := json.Unmarshal([]byte(key), &creds); err != nil {
 			continue
 		}
 
@@ -84,10 +77,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if strings.Contains(creds.ClientEmail, `<mailto:`) {
 			creds.ClientEmail = strings.Split(strings.Split(creds.ClientEmail, `<mailto:`)[1], `|`)[0]
 		}
-		creds.AuthProviderX509CertURL = trimCarrots(creds.AuthProviderX509CertURL)
-		creds.AuthURI = trimCarrots(creds.AuthURI)
-		creds.ClientX509CertURL = trimCarrots(creds.ClientX509CertURL)
-		creds.TokenURI = trimCarrots(creds.TokenURI)
+		creds.AuthProviderX509CertURL = trimCarets(creds.AuthProviderX509CertURL)
+		creds.AuthURI = trimCarets(creds.AuthURI)
+		creds.ClientX509CertURL = trimCarets(creds.ClientX509CertURL)
+		creds.TokenURI = trimCarets(creds.TokenURI)
 
 		// Not sure why this might happen, but we've observed this with a verified cred
 		raw := []byte(creds.ClientEmail)
@@ -101,30 +94,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		credBytes, _ := json.Marshal(creds)
-
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GCP,
 			Raw:          raw,
 			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
-		}
-		// Set the RotationGuideURL in the ExtraData
-		s.ExtraData = map[string]string{
-			"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
-			"project":        creds.ProjectID,
+			ExtraData: map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
+				"project":        creds.ProjectID,
+			},
 		}
 
 		if verify {
 			credentials, err := google.CredentialsFromJSON(ctx, credBytes, "https://www.googleapis.com/auth/cloud-platform")
 			if err != nil {
+				s.SetVerificationError(err)
 				continue
 			}
-			if credentials != nil {
-				_, err = credentials.TokenSource.Token()
-				if err == nil {
-					s.Verified = true
-				}
+
+			if _, err = credentials.TokenSource.Token(); err != nil {
+				s.SetVerificationError(err)
+				continue
 			}
+
+			s.Verified = true
 		}
 
 		results = append(results, s)
@@ -140,3 +133,29 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GCP
 }
+
+// region Helper methods
+func cleanInput(input string) string {
+	input = strings.ReplaceAll(input, `,\\n`, `\n`)
+	input = strings.ReplaceAll(input, `\"\\n`, `\n`)
+	input = strings.ReplaceAll(input, `\\"`, `"`)
+
+	// If the JSON is encoded, it needs to be unquoted for `json.Unmarshal` to succeed.
+	// https://github.com/trufflesecurity/trufflehog/issues/2864
+	if strings.Contains(input, `\"auth_provider_x509_cert_url\"`) {
+		unquoted, err := strconv.Unquote(`"` + input + `"`)
+		if err == nil {
+			return unquoted
+		}
+	}
+
+	return input
+}
+
+func trimCarets(s string) string {
+	s = strings.TrimPrefix(s, "<")
+	s = strings.TrimSuffix(s, ">")
+	return s
+}
+
+//endregion
