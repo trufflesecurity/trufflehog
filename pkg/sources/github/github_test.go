@@ -577,7 +577,7 @@ func TestEnumerate(t *testing.T) {
 	}
 
 	// Act
-	err := s.enumerate(context.Background(), reporter)
+	err := s.Enumerate(context.Background(), reporter)
 	slices.Sort(reportedRepos)
 
 	// Assert
@@ -653,7 +653,7 @@ func BenchmarkEnumerate(b *testing.B) {
 		setupMocks(b)
 
 		b.StartTimer()
-		_ = s.enumerate(context.Background(), noopReporter())
+		_ = s.Enumerate(context.Background(), noopReporter())
 	}
 }
 
