@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if timeout == 0 {
 				timeout = defaultTimeout
 			}
-			err := verifyUri(resMatch, timeout)
+			err := verifyUri(ctx, resMatch, timeout)
 			s1.Verified = err == nil
 			if !isErrDeterminate(err) {
 				s1.SetVerificationError(err, resMatch)
@@ -91,7 +91,7 @@ func isErrDeterminate(err error) bool {
 	}
 }
 
-func verifyUri(uri string, timeout time.Duration) error {
+func verifyUri(ctx context.Context, uri string, timeout time.Duration) error {
 	parsed, err := url.Parse(uri)
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ func verifyUri(uri string, timeout time.Duration) error {
 	parsed.Path = "/"
 	uri = parsed.String()
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	client, err := mongo.Connect(ctx, options.Client().SetTimeout(timeout).ApplyURI(uri))
 	if err != nil {
