@@ -71,6 +71,9 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			result.UnboundedResources = append(result.UnboundedResources, *parentResource)
 		} else {
 			for _, permission := range permissionCategory.Permissions {
+				if _, ok := StringToPermission[*permission.Value]; !ok { // skip unknown scopes/permission
+					continue
+				}
 				result.Bindings = append(result.Bindings, analyzers.Binding{
 					Resource: *parentResource,
 					Permission: analyzers.Permission{
