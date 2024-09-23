@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archiver/v4"
@@ -249,6 +250,11 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 	}
 }
 
+var maxTimeout = time.Duration(30) * time.Second
+
+// SetArchiveMaxTimeout sets the maximum timeout for the archive handler.
+func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
+
 // HandleFile orchestrates the complete file handling process for a given file.
 // It determines the MIME type of the file, selects the appropriate handler based on this type, and processes the file.
 // This function initializes the handling process and delegates to the specific handler to manage file
@@ -279,6 +285,13 @@ func HandleFile(
 	}
 	defer rdr.Close()
 
+	size, err := rdr.Size()
+	if err != nil {
+		ctx.Logger().Error(err, "error getting file size")
+	}
+
+	ctx = logContext.WithValues(ctx, "mime", rdr.mime.String(), "size_bytes", size)
+
 	mimeT := mimeType(rdr.mime.String())
 	config := newFileHandlingConfig(options...)
 	if config.skipArchives && rdr.isGenericArchive {
@@ -286,13 +299,16 @@ func HandleFile(
 		return nil
 	}
 
+	processingCtx, cancel := logContext.WithTimeout(ctx, maxTimeout)
+	defer cancel()
+
 	handler := selectHandler(mimeT, rdr.isGenericArchive)
-	archiveChan, err := handler.HandleFile(ctx, rdr) // Delegate to the specific handler to process the file.
+	archiveChan, err := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
 	if err != nil {
 		return fmt.Errorf("error handling file: %w", err)
 	}
 
-	return handleChunks(ctx, archiveChan, chunkSkel, reporter)
+	return handleChunks(processingCtx, archiveChan, chunkSkel, reporter)
 }
 
 // handleChunks reads data from the handlerChan and uses it to fill chunks according to a predefined skeleton (chunkSkel).

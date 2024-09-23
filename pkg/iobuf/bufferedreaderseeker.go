@@ -2,6 +2,7 @@ package iobuf
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -354,4 +355,30 @@ func (br *BufferedReadSeeker) Close() error {
 		return os.Remove(br.tempFileName)
 	}
 	return nil
+}
+
+// Size returns the total size of the reader.
+func (br *BufferedReadSeeker) Size() (int64, error) {
+	if br.sizeKnown {
+		return br.totalSize, nil
+	}
+
+	currentPos, err := br.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get current position: %w", err)
+	}
+
+	endPos, err := br.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, fmt.Errorf("failed to seek to end: %w", err)
+	}
+
+	if _, err = br.Seek(currentPos, io.SeekStart); err != nil {
+		return 0, fmt.Errorf("failed to restore position: %w", err)
+	}
+
+	br.totalSize = endPos
+	br.sizeKnown = true
+
+	return br.totalSize, nil
 }
