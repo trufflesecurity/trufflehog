@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for token := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_OpenAI,
-			Redacted:     token[:3] + "..." + token[47:],
+			Redacted:     token[:3] + "..." + token[min(len(token)-1, 47):],
 			Raw:          []byte(token),
 		}
 
