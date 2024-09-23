@@ -33,9 +33,8 @@ func init() { defaultBufferPool = pool.NewBufferPool(defaultBufferSize) }
 // on it. For non-seekable readers, seeking is emulated using the buffer or
 // temporary file.
 type BufferedReadSeeker struct {
-	reader     io.Reader
-	seeker     io.Seeker // If the reader supports seeking, it's stored here for direct access
-	isSeekable bool      // Indicates if the reader supports reliable seeking operations
+	reader io.Reader
+	seeker io.Seeker // If the reader supports seeking, it's stored here for direct access
 
 	bufPool *pool.Pool     // Pool for storing buffers for reuse.
 	buf     *buffer.Buffer // Buffer for storing data under the threshold in memory.
@@ -77,31 +76,28 @@ func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 	const defaultThreshold = 1 << 24 // 16MB threshold for switching to file buffering
 
 	var (
-		buf        *buffer.Buffer
-		seeker     io.Seeker
-		isSeekable bool
+		buf    *buffer.Buffer
+		seeker io.Seeker
 	)
 
 	seeker = asSeeker(r)
 	if seeker == nil {
-		isSeekable = true
 		buf = defaultBufferPool.Get()
 	}
 
 	return &BufferedReadSeeker{
-		reader:     r,
-		seeker:     seeker,
-		isSeekable: isSeekable,
-		bufPool:    defaultBufferPool,
-		buf:        buf,
-		threshold:  defaultThreshold,
+		reader:    r,
+		seeker:    seeker,
+		bufPool:   defaultBufferPool,
+		buf:       buf,
+		threshold: defaultThreshold,
 	}
 }
 
 // Read reads len(out) bytes from the reader starting at the current index.
 // It handles both seekable and non-seekable underlying readers efficiently.
 func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
-	if br.isSeekable {
+	if br.seeker != nil {
 		// For seekable readers, read directly from the underlying reader.
 		n, err := br.reader.Read(out)
 		if n > 0 {
@@ -184,7 +180,7 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 // Seek sets the offset for the next Read or Write to offset.
 // It supports both seekable and non-seekable underlying readers.
 func (br *BufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
-	if br.isSeekable {
+	if br.seeker != nil {
 		// Use the underlying Seeker if available.
 		return br.seeker.Seek(offset, whence)
 	}
@@ -340,7 +336,7 @@ func (br *BufferedReadSeeker) flushBufferToDisk() error {
 // ReadAt reads len(out) bytes into out starting at offset off in the underlying input source.
 // It uses Seek and Read to implement random access reading.
 func (br *BufferedReadSeeker) ReadAt(out []byte, offset int64) (int, error) {
-	if br.isSeekable {
+	if br.seeker != nil {
 		// Use the underlying Seeker if available.
 		_, err := br.Seek(offset, io.SeekStart)
 		if err != nil {
