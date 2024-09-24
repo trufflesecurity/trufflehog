@@ -64,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					result.Verified = true
 				}
 			}
-			s.AnalysisInfo = map[string]string{
+			result.AnalysisInfo = map[string]string{
 				"key": match,
 			}
 		}

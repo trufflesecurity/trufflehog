@@ -97,7 +97,7 @@ matchLoop:
 				err = pingRes.err
 				result.SetVerificationError(err, jdbcConn)
 			}
-			s.AnalysisInfo = map[string]string{
+			result.AnalysisInfo = map[string]string{
 				"connection_string": jdbcConn,
 			}
 			// TODO: specialized redaction
@@ -226,7 +226,7 @@ func newJDBC(conn string) (jdbc, error) {
 	}
 	conn = conn[len("jdbc:"):]
 	subprotocol, subname, found := strings.Cut(conn, ":")
-	if (!found) {
+	if !found {
 		return nil, errors.New("expected a colon separated subprotocol and subname")
 	}
 	// get the subprotocol parser
