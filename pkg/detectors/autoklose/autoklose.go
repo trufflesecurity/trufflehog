@@ -80,3 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Autoklose
 }
+
+func (s Scanner) Description() string {
+	return "Autoklose is a sales automation tool that allows users to streamline their email outreach and follow-up processes. Autoklose API tokens can be used to access and manage campaigns, contacts, and other related data."
+}

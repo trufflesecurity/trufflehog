@@ -85,3 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GitHubOauth2
 }
+
+func (s Scanner) Description() string {
+	return "GitHub OAuth2 credentials are used to authenticate and authorize applications to access GitHub's API on behalf of a user or organization. These credentials include a client ID and client secret, which can be used to obtain access tokens for accessing GitHub resources."
+}

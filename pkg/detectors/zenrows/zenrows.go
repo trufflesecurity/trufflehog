@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ZenRows
 }
+
+func (s Scanner) Description() string {
+	return "ZenRows is a web scraping API service that allows users to extract data from websites. ZenRows API keys can be used to access and scrape web data."
+}

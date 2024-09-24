@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Urlscan
 }
+
+func (s Scanner) Description() string {
+	return "Urlscan is a service for scanning and analyzing websites. Urlscan API keys can be used to interact with the Urlscan service programmatically."
+}

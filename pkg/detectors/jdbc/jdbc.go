@@ -74,14 +74,14 @@ matchLoop:
 		}
 		jdbcConn := match[0]
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_JDBC,
 			Raw:          []byte(jdbcConn),
 			Redacted:     tryRedactAnonymousJDBC(jdbcConn),
 		}
 
 		if verify {
-			s.Verified = false
+			result.Verified = false
 			j, err := newJDBC(jdbcConn)
 			if err != nil {
 				continue
@@ -89,21 +89,21 @@ matchLoop:
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 			pingRes := j.ping(ctx)
-			s.Verified = pingRes.err == nil
+			result.Verified = pingRes.err == nil
 			// If there's a ping error that is marked as "determinate" we throw it away. We do this because this was the
 			// behavior before tri-state verification was introduced and preserving it allows us to gradually migrate
 			// detectors to use tri-state verification.
 			if pingRes.err != nil && !pingRes.determinate {
 				err = pingRes.err
-				s.SetVerificationError(err, jdbcConn)
+				result.SetVerificationError(err, jdbcConn)
 			}
-			s.AnalysisInfo = map[string]string{
+			result.AnalysisInfo = map[string]string{
 				"connection_string": jdbcConn,
 			}
 			// TODO: specialized redaction
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return
@@ -264,4 +264,8 @@ func pingErr(ctx context.Context, driverName, conn string) error {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_JDBC
+}
+
+func (s Scanner) Description() string {
+	return "JDBC (Java Database Connectivity) is an API for connecting and executing queries with databases. JDBC connection strings can be used to access and manipulate databases."
 }

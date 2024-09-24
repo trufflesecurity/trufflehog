@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AvazaPersonalAccessToken
 }
+
+func (s Scanner) Description() string {
+	return "Avaza is a business management tool that offers project management, time tracking, and financial management. Avaza Personal Access Tokens can be used to access and interact with Avaza's API."
+}

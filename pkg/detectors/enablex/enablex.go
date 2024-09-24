@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Enablex
 }
+
+func (s Scanner) Description() string {
+	return "Enablex is a communication platform offering voice, video, and messaging APIs. Enablex credentials can be used to access and manage communication services provided by Enablex."
+}

@@ -111,3 +111,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SlackWebhook
 }
+
+func (s Scanner) Description() string {
+	return "Slack webhooks are used to send messages from external sources into Slack channels. If compromised, they can be used to send unauthorized messages."
+}

@@ -69,3 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gyazo
 }
+
+func (s Scanner) Description() string {
+	return "Gyazo is an image sharing service. Gyazo access tokens can be used to access and manage images stored in a Gyazo account."
+}

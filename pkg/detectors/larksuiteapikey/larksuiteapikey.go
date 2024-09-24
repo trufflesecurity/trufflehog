@@ -83,6 +83,10 @@ func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LarkSuiteApiKey
 }
 
+func (s Scanner) Description() string {
+	return "LarkSuite is a collaboration platform that provides tools for communication, calendar, and cloud storage. LarkSuite API keys can be used to access and manage these services programmatically."
+}
+
 func verifyCredentials(ctx context.Context, client *http.Client, appId, appSecret string) (bool, error) {
 	payload := strings.NewReader(fmt.Sprintf(`{"app_id": "%s", "app_secret": "%s"}`, appId, appSecret))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal", payload)

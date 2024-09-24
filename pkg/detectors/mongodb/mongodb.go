@@ -84,6 +84,10 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
 }
 
+func (s Scanner) Description() string {
+	return "MongoDB is a NoSQL database that uses a document-oriented data model. MongoDB credentials can be used to access and manipulate the database."
+}
+
 func isErrDeterminate(err error) bool {
 	var authErr *auth.Error
 	return errors.As(err, &authErr)

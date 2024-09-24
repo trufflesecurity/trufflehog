@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Stitchdata
 }
+
+func (s Scanner) Description() string {
+	return "Stitchdata is a cloud ETL service for consolidating data from various sources into a data warehouse. Stitchdata API keys can be used to manage and automate data pipelines."
+}

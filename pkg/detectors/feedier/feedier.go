@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Feedier
 }
+
+func (s Scanner) Description() string {
+	return "Feedier is a feedback management platform that allows businesses to collect and analyze customer feedback. Feedier API keys can be used to access and manage feedback data."
+}

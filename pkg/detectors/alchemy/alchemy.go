@@ -95,3 +95,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Alchemy
 }
+
+func (s Scanner) Description() string {
+	return "Alchemy is a blockchain development platform that provides a suite of tools and services for building and scaling decentralized applications. Alchemy API keys can be used to access these services."
+}

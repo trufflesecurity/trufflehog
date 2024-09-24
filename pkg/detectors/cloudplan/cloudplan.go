@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Cloudplan
 }
+
+func (s Scanner) Description() string {
+	return "Cloudplan is a service that offers cloud-based business solutions. Cloudplan session IDs can be used to access and manage user sessions and data."
+}

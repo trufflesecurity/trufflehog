@@ -67,7 +67,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-
 					req, err := http.NewRequestWithContext(ctx, "GET", "https://api.rownd.io/applications/"+resId+"/users/data", nil)
 					if err != nil {
 						continue
@@ -93,4 +92,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Rownd
+}
+
+func (s Scanner) Description() string {
+	return "Rownd is a platform for user data management. Rownd credentials can be used to access and modify user data and application settings."
 }

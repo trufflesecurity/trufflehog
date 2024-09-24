@@ -86,3 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MaxMindLicense
 }
+
+func (s Scanner) Description() string {
+	return "MaxMind provides IP intelligence through their GeoIP service which can be used to determine geographical location and other information about an IP address."
+}

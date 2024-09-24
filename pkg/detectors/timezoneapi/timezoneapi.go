@@ -74,3 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Timezoneapi
 }
+
+func (s Scanner) Description() string {
+	return "Timezoneapi is a service that provides time zone information. Timezoneapi keys can be used to access and retrieve time zone data."
+}

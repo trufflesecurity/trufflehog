@@ -84,3 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LogzIO
 }
+
+func (s Scanner) Description() string {
+	return "Logz.io is a cloud observability platform for log analysis and monitoring. Logz.io API tokens can be used to access and manage log data."
+}

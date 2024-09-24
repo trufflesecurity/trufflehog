@@ -81,3 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Typetalk
 }
+
+func (s Scanner) Description() string {
+	return "Typetalk is a Japanese chat app. API keys can be used to read potentially sensitive chat messages."
+}

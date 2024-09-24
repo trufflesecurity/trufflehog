@@ -113,3 +113,7 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, error
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gitlab
 }
+
+func (s Scanner) Description() string {
+	return "GitLab is a web-based DevOps lifecycle tool that provides a Git repository manager providing wiki, issue-tracking, and CI/CD pipeline features. GitLab Personal Access Tokens (PATs) can be used to authenticate and access GitLab resources."
+}

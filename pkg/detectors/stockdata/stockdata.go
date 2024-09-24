@@ -69,3 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Stockdata
 }
+
+func (s Scanner) Description() string {
+	return "Stockdata is a service providing stock market data. Stockdata API keys can be used to access and retrieve stock market information."
+}

@@ -78,3 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_UserStack
 }
+
+func (s Scanner) Description() string {
+	return "UserStack is a service that provides detailed information about the technology stack used by a website. UserStack API keys can be used to access this information."
+}

@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Survicate
 }
+
+func (s Scanner) Description() string {
+	return "Survicate is a survey platform that allows users to collect feedback and insights from customers. Survicate API keys can be used to access and manage surveys and responses."
+}

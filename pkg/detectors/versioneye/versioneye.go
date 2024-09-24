@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_VersionEye
 }
+
+func (s Scanner) Description() string {
+	return "VersionEye is a service that monitors your project dependencies and alerts you of any vulnerabilities. VersionEye API keys can be used to access and manage your project data."
+}

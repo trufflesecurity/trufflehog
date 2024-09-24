@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_YouNeedABudget
 }
+
+func (s Scanner) Description() string {
+	return "YouNeedABudget is a budgeting tool that allows users to manage their personal finances. The API keys can be used to access and modify a user's financial data."
+}

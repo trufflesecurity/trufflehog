@@ -121,6 +121,10 @@ func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_OpenAI
 }
 
+func (s Scanner) Description() string {
+	return "OpenAI provides various AI models and services. The API keys can be used to access and interact with these models and services."
+}
+
 type response struct {
 	Object                   string `json:"object"`
 	ID                       string `json:"id"`

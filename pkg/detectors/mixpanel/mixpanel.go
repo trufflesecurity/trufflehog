@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mixpanel
 }
+
+func (s Scanner) Description() string {
+	return "Mixpanel is an analytics service that tracks user interactions with web and mobile applications. Mixpanel keys can be used to access and analyze user data."
+}

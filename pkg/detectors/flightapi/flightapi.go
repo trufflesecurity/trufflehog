@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FlightApi
 }
+
+func (s Scanner) Description() string {
+	return "FlightApi is a service used for accessing flight-related data. FlightApi keys can be used to query flight information and other related services."
+}

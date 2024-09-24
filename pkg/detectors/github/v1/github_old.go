@@ -183,3 +183,7 @@ func SetHeaderInfo(headers *HeaderInfo, s1 *detectors.Result) {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Github
 }
+
+func (s Scanner) Description() string {
+	return "GitHub is a web-based platform used for version control and collaborative software development. GitHub tokens can be used to access and modify repositories and other resources."
+}

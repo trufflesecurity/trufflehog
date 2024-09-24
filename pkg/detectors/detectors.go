@@ -24,6 +24,8 @@ type Detector interface {
 	Keywords() []string
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
+	// Description returns a description for the result being detected
+	Description() string
 }
 
 // CustomResultsCleaner is an optional interface that a detector can implement to customize how its generated results

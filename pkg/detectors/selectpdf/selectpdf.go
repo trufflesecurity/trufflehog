@@ -73,3 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SelectPDF
 }
+
+func (s Scanner) Description() string {
+	return "SelectPDF is a service that allows users to convert web pages to PDF documents. SelectPDF API keys can be used to perform these conversions programmatically."
+}

@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_YouSign
 }
+
+func (s Scanner) Description() string {
+	return "Yousign is an electronic signature service used to sign and manage documents online. Yousign API keys can be used to access and manage these documents."
+}

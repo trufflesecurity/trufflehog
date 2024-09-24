@@ -114,3 +114,7 @@ func verifyArtifactory(ctx context.Context, client *http.Client, resURLMatch, re
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ArtifactoryAccessToken
 }
+
+func (s Scanner) Description() string {
+	return "Artifactory is a repository manager that supports all major package formats. Artifactory access tokens can be used to authenticate and perform operations on repositories."
+}

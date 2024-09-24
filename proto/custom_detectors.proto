@@ -15,6 +15,7 @@ message CustomRegex {
   repeated string keywords = 2;
   map<string, string> regex = 3;
   repeated VerifierConfig verify = 4;
+  string description = 5;
 }
 
 message VerifierConfig {

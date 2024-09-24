@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GetGeoAPI
 }
+
+func (s Scanner) Description() string {
+	return "GetGeoAPI provides geolocation and currency conversion services. The API keys can be used to access these services and retrieve data."
+}

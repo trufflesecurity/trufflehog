@@ -107,3 +107,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Docusign
 }
+
+func (s Scanner) Description() string {
+	return "Docusign is an electronic signature and digital transaction management service. Docusign credentials can be used to access and manage digital transactions and documents."
+}

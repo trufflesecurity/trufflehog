@@ -342,3 +342,7 @@ type identityRes struct {
 func (s scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AWSSessionKey
 }
+
+func (s scanner) Description() string {
+	return "AWS is a cloud service used offering over 200 API's to transact data and compute. AWS API keys can be used to access and modify this data and compute."
+}
