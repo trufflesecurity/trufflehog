@@ -1,4 +1,4 @@
-name: detector test aggregation
+name: Detectors Aggregation
 
 on:
   workflow_dispatch:
