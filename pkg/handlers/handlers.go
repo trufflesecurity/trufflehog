@@ -250,7 +250,7 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 	}
 }
 
-var maxTimeout = time.Duration(30) * time.Second
+var maxTimeout = time.Duration(60) * time.Second
 
 // SetArchiveMaxTimeout sets the maximum timeout for the archive handler.
 func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
