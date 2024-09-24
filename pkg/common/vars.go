@@ -18,6 +18,7 @@ var (
 		"ico":  {}, // Icon file
 		"jpg":  {},
 		"jpeg": {},
+		"jxl":  {},
 		"png":  {},
 		"svg":  {},
 		"svgz": {}, // Compressed Scalable Vector Graphics file
