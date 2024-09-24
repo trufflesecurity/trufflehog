@@ -102,3 +102,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_NVAPI
 }
+
+func (s Scanner) Description() string {
+	return "NVAPI keys are used to authenticate API requests to NVIDIA's NGC API. They allow access to NVIDIA's NGC API to manage user data and perform actions on behalf of users."
+}
