@@ -69,6 +69,10 @@ var (
 		"ttf":   {}, // TrueType font
 		"woff":  {}, // Web Open Font Format
 		"woff2": {}, // Web Open Font Format 2
+
+		// misc
+		"glb":  {}, // 3d models (binary)
+		"gltf": {}, // 3d models (JSON/ASCII)
 	}
 
 	binaryExtensions = map[string]struct{}{
