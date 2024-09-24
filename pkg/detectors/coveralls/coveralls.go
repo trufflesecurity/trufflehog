@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Coveralls,
 			Raw:          []byte(resMatch),
-			Description:  "Coveralls is a web service to help you track your code coverage over time, and ensure that all your new code is fully covered. Coveralls tokens can be used to access and modify coverage data.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Coveralls
+}
+
+func (s Scanner) Description() string {
+	return "Coveralls is a web service to help you track your code coverage over time, and ensure that all your new code is fully covered. Coveralls tokens can be used to access and modify coverage data."
 }

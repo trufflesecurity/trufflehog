@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Magnetic,
 			Raw:          []byte(resMatch),
-			Description:  "Magnetic is a service used for managing accounts and item types. Magnetic tokens can be used to access and modify these resources.",
 		}
 
 		if verify {
@@ -66,6 +65,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	return results, nil
 }
+
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Magnetic
+}
+
+func (s Scanner) Description() string {
+	return "Magnetic is a service used for managing accounts and item types. Magnetic tokens can be used to access and modify these resources."
 }

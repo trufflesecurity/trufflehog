@@ -43,7 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Shortcut,
 			Raw:          []byte(resMatch),
-			Description:  "Shortcut is a project management tool. Shortcut API keys can be used to access and modify project data.",
 		}
 
 		if verify {
@@ -84,4 +83,8 @@ func verifyResult(ctx context.Context, client *http.Client, apiKey string) (bool
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Shortcut
+}
+
+func (s Scanner) Description() string {
+	return "Shortcut is a project management tool. Shortcut API keys can be used to access and modify project data."
 }

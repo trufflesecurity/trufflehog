@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FlatIO,
 			Raw:          []byte(resMatch),
-			Description:  "FlatIO is a music notation software. FlatIO keys can be used to access and modify musical scores and related data.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FlatIO
+}
+
+func (s Scanner) Description() string {
+	return "FlatIO is a music notation software. FlatIO keys can be used to access and modify musical scores and related data."
 }

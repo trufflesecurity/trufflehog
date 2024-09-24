@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     id,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + id),
-				Description:  "Plivo is a cloud-based communications platform that provides API services for voice and messaging. Plivo credentials can be used to access and manage these services.",
 			}
 			stringResMatch := fmt.Sprintf("%s:%s", id, resMatch)
 			decodeSecret := b64.StdEncoding.EncodeToString([]byte(stringResMatch))
@@ -85,4 +84,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Plivo
+}
+
+func (s Scanner) Description() string {
+	return "Plivo is a cloud-based communications platform that provides API services for voice and messaging. Plivo credentials can be used to access and manage these services."
 }

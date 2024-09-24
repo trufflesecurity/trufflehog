@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Pulumi,
 			Raw:          []byte(resMatch),
-			Description:  "Pulumi is an Infrastructure as Code platform. Pulumi API keys can be used to manage cloud infrastructure and services.",
 		}
 
 		if verify {
@@ -73,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Pulumi
+}
+
+func (s Scanner) Description() string {
+	return "Pulumi is an Infrastructure as Code platform. Pulumi API keys can be used to manage cloud infrastructure and services."
 }

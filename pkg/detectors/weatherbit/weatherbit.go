@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WeatherBit,
 			Raw:          []byte(resMatch),
-			Description:  "Weatherbit is a weather data service provider. Weatherbit API keys can be used to access weather data and related services.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_WeatherBit
+}
+
+func (s Scanner) Description() string {
+	return "Weatherbit is a weather data service provider. Weatherbit API keys can be used to access weather data and related services."
 }

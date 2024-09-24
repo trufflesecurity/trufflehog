@@ -3,9 +3,10 @@ package gitter
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -31,7 +32,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Gitter secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -45,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gitter,
 			Raw:          []byte(resMatch),
-			Description:  "Gitter is a chat and networking platform. Gitter API keys can be used to access and interact with Gitter services and data.",
 		}
 
 		if verify {
@@ -71,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gitter
+}
+
+func (s Scanner) Description() string {
+	return "Gitter is a chat and networking platform. Gitter API keys can be used to access and interact with Gitter services and data."
 }

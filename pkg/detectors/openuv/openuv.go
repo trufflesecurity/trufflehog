@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Openuv,
 			Raw:          []byte(resMatch),
-			Description:  "Openuv provides UV index data through its API. These API keys can be used to access UV index information.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Openuv
+}
+
+func (s Scanner) Description() string {
+	return "Openuv provides UV index data through its API. These API keys can be used to access UV index information."
 }

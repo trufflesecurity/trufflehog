@@ -47,14 +47,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, domainmatch := range domainMatches {
-			if len(match) != 2 {
+			if len(domainmatch) != 2 {
 				continue
 			}
 			resDomainMatch := strings.TrimSpace(domainmatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Repairshopr,
 				Raw:          []byte(resMatch),
-				Description:  "RepairShopr is a CRM and ticketing system designed for repair shops. The API keys allow access to various functionalities such as managing appointments, customers, and invoices.",
 			}
 
 			if verify {
@@ -84,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Repairshopr
+}
+
+func (s Scanner) Description() string {
+	return "RepairShopr is a CRM and ticketing system designed for repair shops. The API keys allow access to various functionalities such as managing appointments, customers, and invoices."
 }

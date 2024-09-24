@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Reachmail,
 			Raw:          []byte(resMatch),
-			Description:  "Reachmail is an email marketing service. Reachmail API keys can be used to access and manage email marketing campaigns and user data.",
 		}
 
 		if verify {
@@ -73,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Reachmail
+}
+
+func (s Scanner) Description() string {
+	return "Reachmail is an email marketing service. Reachmail API keys can be used to access and manage email marketing campaigns and user data."
 }

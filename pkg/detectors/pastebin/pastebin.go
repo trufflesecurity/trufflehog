@@ -47,7 +47,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Pastebin,
 			Raw:          []byte(resMatch),
-			Description:  "Pastebin is a website where users can store plain text. Pastebin keys can be used to access and manipulate stored data.",
 		}
 
 		if verify {
@@ -100,4 +99,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Pastebin
+}
+
+func (s Scanner) Description() string {
+	return "Pastebin is a website where users can store plain text. Pastebin keys can be used to access and manipulate stored data."
 }

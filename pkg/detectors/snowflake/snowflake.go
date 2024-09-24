@@ -104,7 +104,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						"account":  resAccountMatch,
 						"username": resUsernameMatch,
 					},
-					Description: "Snowflake is a cloud data platform that provides data warehousing, data lakes, data sharing, and data exchange capabilities. Snowflake credentials can be used to access and manipulate data stored in Snowflake.",
 				}
 
 				if verify {
@@ -166,4 +165,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Snowflake
+}
+
+func (s Scanner) Description() string {
+	return "Snowflake is a cloud data platform that provides data warehousing, data lakes, data sharing, and data exchange capabilities. Snowflake credentials can be used to access and manipulate data stored in Snowflake."
 }

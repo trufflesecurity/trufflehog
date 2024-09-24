@@ -56,11 +56,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Checkvist,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resEmailMatch),
-				Description:  "Checkvist is an online task management tool. The credentials found can be used to access and manage tasks and data within Checkvist.",
 			}
 
 			if verify {
-
 				payload := url.Values{}
 				payload.Add("username", resEmailMatch)
 				payload.Add("remote_key", resMatch)
@@ -88,4 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Checkvist
+}
+
+func (s Scanner) Description() string {
+	return "Checkvist is an online task management tool. The credentials found can be used to access and manage tasks and data within Checkvist."
 }

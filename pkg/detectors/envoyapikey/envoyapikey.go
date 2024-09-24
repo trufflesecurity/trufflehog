@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_EnvoyApiKey,
 			Raw:          []byte(resMatch),
-			Description:  "Envoy is a cloud-based platform that provides visitor management solutions. Envoy API keys can be used to access and manage visitor data and other resources within the Envoy platform.",
 		}
 
 		if verify {
@@ -77,4 +76,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_EnvoyApiKey
+}
+
+func (s Scanner) Description() string {
+	return "Envoy is a cloud-based platform that provides visitor management solutions. Envoy API keys can be used to access and manage visitor data and other resources within the Envoy platform."
 }

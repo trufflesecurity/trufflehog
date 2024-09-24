@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LinearAPI,
 			Raw:          []byte(resMatch),
-			Description:  "LinearAPI is a project management software. LinearAPI keys can be used to access and modify project data.",
 		}
 
 		if verify {
@@ -65,7 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
-				if res.StatusCode >= 200 && res.StatusCode < 300 && strings.contains(body, `"data":`) {
+				if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(body, `"data":`) {
 					s1.Verified = true
 				}
 			}
@@ -79,4 +78,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LinearAPI
+}
+
+func (s Scanner) Description() string {
+	return "LinearAPI is a project management software. LinearAPI keys can be used to access and modify project data."
 }

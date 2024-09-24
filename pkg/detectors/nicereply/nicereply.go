@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Nicereply,
 			Raw:          []byte(resMatch),
-			Description:  "Nicereply is a customer satisfaction survey tool. Nicereply API keys can be used to access and manage survey data and user statistics.",
 		}
 
 		if verify {
@@ -74,4 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Nicereply
+}
+
+func (s Scanner) Description() string {
+	return "Nicereply is a customer satisfaction survey tool. Nicereply API keys can be used to access and manage survey data and user statistics."
 }

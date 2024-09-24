@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Cloverly,
 			Raw:          []byte(resMatch),
-			Description:  "Cloverly is a platform that allows businesses to integrate carbon offsetting into their products and services. Cloverly API keys can be used to access and manage these offsetting services.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Cloverly
+}
+
+func (s Scanner) Description() string {
+	return "Cloverly is a platform that allows businesses to integrate carbon offsetting into their products and services. Cloverly API keys can be used to access and manage these offsetting services."
 }

@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Bugherd,
 			Raw:          []byte(resMatch),
-			Description:  "Bugherd is a visual feedback and bug tracking tool for websites. Bugherd API keys can be used to access and manage projects, tasks, and feedback data.",
 		}
 
 		if verify {
@@ -75,4 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Bugherd
+}
+
+func (s Scanner) Description() string {
+	return "Bugherd is a visual feedback and bug tracking tool for websites. Bugherd API keys can be used to access and manage projects, tasks, and feedback data."
 }

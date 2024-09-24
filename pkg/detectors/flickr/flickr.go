@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Flickr,
 			Raw:          []byte(resMatch),
-			Description:  "Flickr is an image and video hosting service. Flickr API keys can be used to access and modify user data and perform various operations within the Flickr ecosystem.",
 		}
 
 		if verify {
@@ -63,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				body := string(bodyBytes)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.contains(body, "owner=") {
+				if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "owner=") {
 					s1.Verified = true
 				}
 			}
@@ -77,4 +76,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Flickr
+}
+
+func (s Scanner) Description() string {
+	return "Flickr is an image and video hosting service. Flickr API keys can be used to access and modify user data and perform various operations within the Flickr ecosystem."
 }

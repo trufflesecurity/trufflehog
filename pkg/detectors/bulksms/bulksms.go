@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Bulksms,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
-				Description:  "BulkSMS is a service used for sending SMS messages in bulk. BulkSMS credentials can be used to access and send messages through the BulkSMS API.",
 			}
 
 			if verify {
@@ -86,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Bulksms
+}
+
+func (s Scanner) Description() string {
+	return "BulkSMS is a service used for sending SMS messages in bulk. BulkSMS credentials can be used to access and send messages through the BulkSMS API."
 }

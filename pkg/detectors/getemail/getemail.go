@@ -47,7 +47,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GetEmail,
 			Raw:          []byte(resMatch),
-			Description:  "GetEmail is a service used to find email addresses based on names and domains. GetEmail API keys can be used to access and retrieve email addresses.",
 		}
 
 		if verify {
@@ -82,4 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GetEmail
+}
+
+func (s Scanner) Description() string {
+	return "GetEmail is a service used to find email addresses based on names and domains. GetEmail API keys can be used to access and retrieve email addresses."
 }

@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_AzureSearchQueryKey,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resUrlMatch),
-				Description:  "Azure Search Query Keys are used to authenticate search requests to Azure Search service. They should be kept confidential to prevent unauthorized access to search indexes and data.",
 			}
 			if verify {
 				client := s.client
@@ -91,4 +90,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureSearchQueryKey
+}
+
+func (s Scanner) Description() string {
+	return "Azure Search Query Keys are used to authenticate search requests to Azure Search service. They should be kept confidential to prevent unauthorized access to search indexes and data."
 }

@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_RubyGems,
 			Raw:          []byte(resMatch),
-			Description:  "RubyGems is a package manager for the Ruby programming language. RubyGems API keys can be used to publish and manage gems (libraries) on the RubyGems platform.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RubyGems
+}
+
+func (s Scanner) Description() string {
+	return "RubyGems is a package manager for the Ruby programming language. RubyGems API keys can be used to publish and manage gems (libraries) on the RubyGems platform."
 }

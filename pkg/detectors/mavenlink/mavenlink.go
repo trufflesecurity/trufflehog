@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mavenlink,
 			Raw:          []byte(resMatch),
-			Description:  "Mavenlink is a project management software that provides tools to plan, manage, and analyze projects. Mavenlink API keys can be used to access and modify project data.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mavenlink
+}
+
+func (s Scanner) Description() string {
+	return "Mavenlink is a project management software that provides tools to plan, manage, and analyze projects. Mavenlink API keys can be used to access and modify project data."
 }

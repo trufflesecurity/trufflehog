@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Getgist,
 			Raw:          []byte(resMatch),
-			Description:  "Getgist is a service used for managing contacts and communications. Getgist API keys can be used to access and manage contact data and communication settings.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Getgist
+}
+
+func (s Scanner) Description() string {
+	return "Getgist is a service used for managing contacts and communications. Getgist API keys can be used to access and manage contact data and communication settings."
 }

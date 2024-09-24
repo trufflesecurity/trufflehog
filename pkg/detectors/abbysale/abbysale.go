@@ -57,7 +57,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Abbysale,
 			Raw:          []byte(resMatch),
-			Description:  "Abbysale is a service offering various API functionalities for marketing automation and services such as images and ad campaigns. Abbysale API keys can be used to access and interact with this data.",
 		}
 
 		if verify {
@@ -98,4 +97,8 @@ func verifyAbbysale(ctx context.Context, client *http.Client, resMatch string) (
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Abbysale
+}
+
+func (s Scanner) Description() string {
+	return "Abbysale is a service offering various API functionalities for marketing automation and services such as images and ad campaigns. Abbysale API keys can be used to access and interact with this data."
 }

@@ -62,7 +62,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Github,
 			Raw:          []byte(token),
-			Description:  "GitHub is a platform for version control and collaboration. Personal access tokens (PATs) can be used to access and modify repositories and other resources.",
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 				"version":        fmt.Sprintf("%d", s.Version()),
@@ -93,4 +92,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Github
+}
+
+func (s Scanner) Description() string {
+	return "GitHub is a platform for version control and collaboration. Personal access tokens (PATs) can be used to access and modify repositories and other resources."
 }

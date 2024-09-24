@@ -49,7 +49,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MicrosoftTeamsWebhook,
 			Raw:          []byte(resMatch),
-			Description:  "Microsoft Teams Webhooks allow external services to communicate with Teams channels by sending messages to a unique URL.",
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/microsoftteams/",
@@ -106,4 +105,8 @@ func verifyWebhook(ctx context.Context, client *http.Client, webhookURL string) 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MicrosoftTeamsWebhook
+}
+
+func (s Scanner) Description() string {
+	return "Microsoft Teams Webhooks allow external services to communicate with Teams channels by sending messages to a unique URL."
 }

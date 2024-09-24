@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_PlanetScaleDb,
 					Raw:          []byte(strings.Join([]string{host, username[0], password[0]}, "\t")),
-					Description:  "PlanetScaleDB is a serverless database platform built on Vitess. Credentials found here can be used to connect to the database and perform operations.",
 				}
 
 				if verify {
@@ -80,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PlanetScaleDb
+}
+
+func (s Scanner) Description() string {
+	return "PlanetScaleDB is a serverless database platform built on Vitess. Credentials found here can be used to connect to the database and perform operations."
 }

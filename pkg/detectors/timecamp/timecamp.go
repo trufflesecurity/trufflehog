@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TimeCamp,
 			Raw:          []byte(resMatch),
-			Description:  "TimeCamp is a time tracking software for teams and freelancers. TimeCamp API keys can be used to access and modify time tracking data.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TimeCamp
+}
+
+func (s Scanner) Description() string {
+	return "TimeCamp is a time tracking software for teams and freelancers. TimeCamp API keys can be used to access and modify time tracking data."
 }

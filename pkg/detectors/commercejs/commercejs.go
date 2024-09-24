@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CommerceJS,
 			Raw:          []byte(resMatch),
-			Description:  "CommerceJS is a headless commerce platform that provides APIs for building custom e-commerce experiences. CommerceJS API keys can be used to access and manage e-commerce functionalities.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CommerceJS
+}
+
+func (s Scanner) Description() string {
+	return "CommerceJS is a headless commerce platform that provides APIs for building custom e-commerce experiences. CommerceJS API keys can be used to access and manage e-commerce functionalities."
 }

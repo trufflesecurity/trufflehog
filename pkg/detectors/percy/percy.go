@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Percy,
 			Raw:          []byte(resMatch),
-			Description:  "Percy is a visual testing and review platform. Percy tokens can be used to access and manage visual testing projects.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Percy
+}
+
+func (s Scanner) Description() string {
+	return "Percy is a visual testing and review platform. Percy tokens can be used to access and manage visual testing projects."
 }

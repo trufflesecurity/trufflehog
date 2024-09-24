@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resAppIDMatch = strings.TrimSpace(appIDMatch[1])
-
 	}
 
 	for _, match := range matches {
@@ -57,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WePay,
 			Raw:          []byte(resMatch),
-			Description:  "WePay is an online payment service provider. WePay API keys can be used to process payments and access account information.",
 		}
 
 		if verify {
@@ -88,4 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_WePay
+}
+
+func (s Scanner) Description() string {
+	return "WePay is an online payment service provider. WePay API keys can be used to process payments and access account information."
 }

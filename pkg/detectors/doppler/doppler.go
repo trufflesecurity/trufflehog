@@ -63,7 +63,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_Doppler,
 			Raw:          []byte(resMatch),
 			ExtraData:    map[string]string{},
-			Description:  "Doppler is a secrets management platform that allows teams to manage and secure environment variables and secrets. Doppler tokens can be used to access and manage these secrets.",
 		}
 
 		if verify {
@@ -101,4 +100,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Doppler
+}
+
+func (s Scanner) Description() string {
+	return "Doppler is a secrets management platform that allows teams to manage and secure environment variables and secrets. Doppler tokens can be used to access and manage these secrets."
 }

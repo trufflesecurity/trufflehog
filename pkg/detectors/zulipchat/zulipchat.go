@@ -61,7 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_ZulipChat,
 					Raw:          []byte(key),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", key, id, domain)),
-					Description:  "ZulipChat is a group chat application used for team communication. ZulipChat API keys can be used to access and manage various functionalities of the chat service.",
 					ExtraData: map[string]string{
 						"Domain": domain,
 						"Id":     id,
@@ -131,4 +130,8 @@ type member struct {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ZulipChat
+}
+
+func (s Scanner) Description() string {
+	return "ZulipChat is a group chat application used for team communication. ZulipChat API keys can be used to access and manage various functionalities of the chat service."
 }

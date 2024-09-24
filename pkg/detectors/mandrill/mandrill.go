@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mandrill,
 			Raw:          []byte(resMatch),
-			Description:  "Mandrill is a transactional email API for Mailchimp users. Mandrill API keys can be used to send and track email messages.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mandrill
+}
+
+func (s Scanner) Description() string {
+	return "Mandrill is a transactional email API for Mailchimp users. Mandrill API keys can be used to send and track email messages."
 }

@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Netlify,
 			Raw:          []byte(resMatch),
-			Description:  "Netlify is a cloud platform for web developers that provides hosting and serverless backend services for web applications and static websites. Netlify API keys can be used to manage sites, deploy applications, and access various services offered by the platform.",
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
@@ -73,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Netlify
+}
+
+func (s Scanner) Description() string {
+	return "Netlify is a cloud platform for web developers that provides hosting and serverless backend services for web applications and static websites. Netlify API keys can be used to manage sites, deploy applications, and access various services offered by the platform."
 }

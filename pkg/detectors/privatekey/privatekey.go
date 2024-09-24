@@ -60,7 +60,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(token),
 			Redacted:     token[0:64],
 			ExtraData:    make(map[string]string),
-			Description:  "Private keys are used for securely connecting and authenticating to various systems and services. Exposure of private keys can lead to unauthorized access and data breaches.",
 		}
 
 		var passphrase string
@@ -154,6 +153,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
+}
+
+func (s Scanner) Description() string {
+	return "Private keys are used for securely connecting and authenticating to various systems and services. Exposure of private keys can lead to unauthorized access and data breaches."
 }
 
 type result struct {

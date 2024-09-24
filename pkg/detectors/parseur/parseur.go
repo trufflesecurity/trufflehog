@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Parseur,
 			Raw:          []byte(resMatch),
-			Description:  "Parseur is a document parsing software used to extract data from emails and other documents. Parseur API keys can be used to access and manage this data.",
 		}
 
 		if verify {
@@ -85,4 +84,8 @@ func verifyResult(ctx context.Context, client *http.Client, token string) (bool,
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Parseur
+}
+
+func (s Scanner) Description() string {
+	return "Parseur is a document parsing software used to extract data from emails and other documents. Parseur API keys can be used to access and manage this data."
 }

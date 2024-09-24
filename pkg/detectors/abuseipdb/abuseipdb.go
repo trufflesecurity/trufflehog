@@ -59,7 +59,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AbuseIPDB,
 			Raw:          []byte(resMatch),
-			Description:  "AbuseIPDB is a project dedicated to helping combat the spread of hackers, spammers, and abusive activity on the internet. AbuseIPDB API keys can be used to report and check IP addresses for abusive activities.",
 		}
 
 		if verify {
@@ -109,4 +108,8 @@ func verifyAbuseIPDB(ctx context.Context, client *http.Client, resMatch string) 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AbuseIPDB
+}
+
+func (s Scanner) Description() string {
+	return "AbuseIPDB is a project dedicated to helping combat the spread of hackers, spammers, and abusive activity on the internet. AbuseIPDB API keys can be used to report and check IP addresses for abusive activities."
 }

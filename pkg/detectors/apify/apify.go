@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Apify,
 			Raw:          []byte(resMatch),
-			Description:  "Apify is a platform for web scraping and automation. Apify API keys can be used to access and control Apify actors and tasks.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Apify
+}
+
+func (s Scanner) Description() string {
+	return "Apify is a platform for web scraping and automation. Apify API keys can be used to access and control Apify actors and tasks."
 }

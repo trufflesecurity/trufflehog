@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_VisualCrossing,
 			Raw:          []byte(resMatch),
-			Description:  "Visual Crossing provides weather data services. Visual Crossing API keys can be used to access weather data and services.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_VisualCrossing
+}
+
+func (s Scanner) Description() string {
+	return "Visual Crossing provides weather data services. Visual Crossing API keys can be used to access weather data and services."
 }

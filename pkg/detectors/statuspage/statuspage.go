@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Statuspage,
 			Raw:          []byte(resMatch),
-			Description:  "Statuspage is an incident communication tool that helps you inform your users about outages and scheduled maintenance. Statuspage API keys can be used to manage and update your status pages.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Statuspage
+}
+
+func (s Scanner) Description() string {
+	return "Statuspage is an incident communication tool that helps you inform your users about outages and scheduled maintenance. Statuspage API keys can be used to manage and update your status pages."
 }

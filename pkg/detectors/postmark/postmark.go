@@ -43,7 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Postmark,
 			Raw:          []byte(resMatch),
-			Description:  "Postmark is an email delivery service. Postmark server tokens can be used to access and manage email delivery and statistics.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Postmark
+}
+
+func (s Scanner) Description() string {
+	return "Postmark is an email delivery service. Postmark server tokens can be used to access and manage email delivery and statistics."
 }

@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PdfShift,
 			Raw:          []byte(resMatch),
-			Description:  "PdfShift is a service for converting HTML documents to PDF. PdfShift API keys can be used to access and utilize this conversion service.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PdfShift
+}
+
+func (s Scanner) Description() string {
+	return "PdfShift is a service for converting HTML documents to PDF. PdfShift API keys can be used to access and utilize this conversion service."
 }

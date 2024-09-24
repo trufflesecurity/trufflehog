@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Courier,
 			Raw:          []byte(resMatch),
-			Description:  "Courier is a notification service that allows developers to send notifications through multiple channels. Courier API keys can be used to manage and send notifications.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Courier
+}
+
+func (s Scanner) Description() string {
+	return "Courier is a notification service that allows developers to send notifications through multiple channels. Courier API keys can be used to manage and send notifications."
 }

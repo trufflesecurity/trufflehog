@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Sportsmonk,
 			Raw:          []byte(resMatch),
-			Description:  "Sportsmonk is a sports data provider offering various API endpoints to access sports data. Sportsmonk API keys can be used to query and retrieve this data.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Sportsmonk
+}
+
+func (s Scanner) Description() string {
+	return "Sportsmonk is a sports data provider offering various API endpoints to access sports data. Sportsmonk API keys can be used to query and retrieve this data."
 }

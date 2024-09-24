@@ -64,7 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Redacted:     domainRes,
 				Raw:          []byte(managementAPITokenRes),
 				RawV2:        []byte(managementAPITokenRes + domainRes),
-				Description:  "Auth0 provides authentication and authorization as a service. Auth0 Management API tokens can be used to manage users, roles, permissions, and other aspects of the Auth0 service.",
 			}
 
 			if verify {
@@ -95,4 +94,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Auth0ManagementApiToken
+}
+
+func (s Scanner) Description() string {
+	return "Auth0 provides authentication and authorization as a service. Auth0 Management API tokens can be used to manage users, roles, permissions, and other aspects of the Auth0 service."
 }

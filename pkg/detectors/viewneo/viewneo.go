@@ -50,7 +50,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Viewneo,
 			Raw:          []byte(resMatch),
-			Description:  "Viewneo is a digital signage platform. Viewneo API keys can be used to access and manage digital signage content and settings.",
 		}
 
 		if verify {
@@ -77,4 +76,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Viewneo
+}
+
+func (s Scanner) Description() string {
+	return "Viewneo is a digital signage platform. Viewneo API keys can be used to access and manage digital signage content and settings."
 }

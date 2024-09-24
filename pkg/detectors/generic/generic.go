@@ -93,7 +93,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Generic,
 			Raw:          []byte(token),
-			Description:  "Generic secret key that may provide access to sensitive data or systems.",
 		}
 
 		results = append(results, s)
@@ -113,4 +112,8 @@ func hasReMatch(matchers []*regexp.Regexp, token string) bool {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Generic
+}
+
+func (s Scanner) Description() string {
+	return "Generic secret key that may provide access to sensitive data or systems."
 }

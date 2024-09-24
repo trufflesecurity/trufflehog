@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Paystack,
 			Raw:          []byte(resMatch),
-			Description:  "Paystack is a payment processing service. Paystack API keys can be used to access and manage payment transactions and customer data.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Paystack
+}
+
+func (s Scanner) Description() string {
+	return "Paystack is a payment processing service. Paystack API keys can be used to access and manage payment transactions and customer data."
 }

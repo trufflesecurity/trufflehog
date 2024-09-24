@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ZapierWebhook,
 			Raw:          []byte(resMatch),
-			Description:  "Zapier is an automation tool that connects your apps and services. Zapier webhooks can be used to automate workflows by sending HTTP requests to a unique URL.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ZapierWebhook
+}
+
+func (s Scanner) Description() string {
+	return "Zapier is an automation tool that connects your apps and services. Zapier webhooks can be used to automate workflows by sending HTTP requests to a unique URL."
 }

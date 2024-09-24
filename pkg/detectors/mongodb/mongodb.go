@@ -51,7 +51,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MongoDB,
 			Raw:          []byte(resMatch),
-			Description:  "MongoDB is a NoSQL database that uses a document-oriented data model. MongoDB credentials can be used to access and manipulate the database.",
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
@@ -76,6 +75,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
+}
+
+func (s Scanner) Description() string {
+	return "MongoDB is a NoSQL database that uses a document-oriented data model. MongoDB credentials can be used to access and manipulate the database."
 }
 
 func isErrDeterminate(err error) bool {

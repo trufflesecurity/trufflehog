@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Sheety,
 				Raw:          []byte(resMatch),
-				Description:  "Sheety is a service that allows you to turn Google Sheets into a REST API. Sheety API keys can be used to access and modify the data in your Google Sheets.",
 			}
 
 			if verify {
@@ -83,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Sheety
+}
+
+func (s Scanner) Description() string {
+	return "Sheety is a service that allows you to turn Google Sheets into a REST API. Sheety API keys can be used to access and modify the data in your Google Sheets."
 }

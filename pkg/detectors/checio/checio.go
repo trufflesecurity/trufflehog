@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ChecIO,
 			Raw:          []byte(resMatch),
-			Description:  "ChecIO is an eCommerce platform that provides APIs for managing products, carts, and orders. ChecIO API keys can be used to access and manage these eCommerce resources.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ChecIO
+}
+
+func (s Scanner) Description() string {
+	return "ChecIO is an eCommerce platform that provides APIs for managing products, carts, and orders. ChecIO API keys can be used to access and manage these eCommerce resources."
 }

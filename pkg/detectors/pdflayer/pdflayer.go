@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PdfLayer,
 			Raw:          []byte(resMatch),
-			Description:  "PdfLayer is a service for converting HTML documents to PDF. PdfLayer API keys can be used to access and utilize the PDF conversion service.",
 		}
 
 		if verify {
@@ -80,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PdfLayer
+}
+
+func (s Scanner) Description() string {
+	return "PdfLayer is a service for converting HTML documents to PDF. PdfLayer API keys can be used to access and utilize the PDF conversion service."
 }

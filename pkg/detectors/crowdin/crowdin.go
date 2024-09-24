@@ -44,11 +44,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Crowdin,
 			Raw:          []byte(resMatch),
-			Description:  "Crowdin is a cloud-based localization management platform. Crowdin API keys can be used to access and manage localization projects and resources.",
 		}
 
 		if verify {
-
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.crowdin.com/api/v2/storages", nil)
 			if err != nil {
 				continue
@@ -70,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Crowdin
+}
+
+func (s Scanner) Description() string {
+	return "Crowdin is a cloud-based localization management platform. Crowdin API keys can be used to access and manage localization projects and resources."
 }

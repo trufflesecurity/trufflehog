@@ -50,7 +50,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_BitcoinAverage,
 			Raw:          []byte(resMatch),
-			Description:  "BitcoinAverage is a service that provides cryptocurrency market data. BitcoinAverage API keys can be used to access and retrieve this market data.",
 		}
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://apiv2.bitcoinaverage.com/websocket/v3/get_ticket", nil)
@@ -82,4 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BitcoinAverage
+}
+
+func (s Scanner) Description() string {
+	return "BitcoinAverage is a service that provides cryptocurrency market data. BitcoinAverage API keys can be used to access and retrieve this market data."
 }

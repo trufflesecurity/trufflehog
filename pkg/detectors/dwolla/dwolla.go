@@ -59,7 +59,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Dwolla,
 				Raw:          []byte(idMatch),
 				RawV2:        []byte(idMatch + secretMatch),
-				Description:  "Dwolla is a payment services provider that allows businesses to send, receive, and facilitate payments. Dwolla API keys can be used to access and manage these payment services.",
 			}
 
 			if verify {
@@ -92,4 +91,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Dwolla
+}
+
+func (s Scanner) Description() string {
+	return "Dwolla is a payment services provider that allows businesses to send, receive, and facilitate payments. Dwolla API keys can be used to access and manage these payment services."
 }

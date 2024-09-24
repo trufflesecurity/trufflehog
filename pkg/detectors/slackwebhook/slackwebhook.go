@@ -52,7 +52,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SlackWebhook,
 				Raw:          []byte(resMatch),
-				Description:  "Slack webhooks are used to send messages from external sources into Slack channels. If compromised, they can be used to send unauthorized messages.",
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/slack-webhook/",
@@ -111,4 +110,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SlackWebhook
+}
+
+func (s Scanner) Description() string {
+	return "Slack webhooks are used to send messages from external sources into Slack channels. If compromised, they can be used to send unauthorized messages."
 }

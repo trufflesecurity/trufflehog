@@ -43,7 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ReplyIO,
 			Raw:          []byte(resMatch),
-			Description:  "Reply.io is a sales engagement platform used for automating communication with prospects. The API key can be used to access and manage communication data.",
 		}
 
 		if verify {
@@ -80,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ReplyIO
+}
+
+func (s Scanner) Description() string {
+	return "Reply.io is a sales engagement platform used for automating communication with prospects. The API key can be used to access and manage communication data."
 }

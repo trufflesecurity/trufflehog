@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Zerobounce,
 			Raw:          []byte(resMatch),
-			Description:  "Zerobounce is an email validation and verification service. Zerobounce API keys can be used to access and utilize this service.",
 		}
 
 		if verify {
@@ -62,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				body := string(bodyBytes)
 
-				if strings.contains(body, "found") {
+				if strings.Contains(body, "found") {
 					s1.Verified = true
 				}
 			}
@@ -76,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Zerobounce
+}
+
+func (s Scanner) Description() string {
+	return "Zerobounce is an email validation and verification service. Zerobounce API keys can be used to access and utilize this service."
 }

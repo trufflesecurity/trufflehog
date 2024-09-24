@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Newsapi,
 			Raw:          []byte(resMatch),
-			Description:  "NewsAPI provides access to news articles from various sources. NewsAPI keys can be used to query and retrieve news data.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Newsapi
+}
+
+func (s Scanner) Description() string {
+	return "NewsAPI provides access to news articles from various sources. NewsAPI keys can be used to query and retrieve news data."
 }

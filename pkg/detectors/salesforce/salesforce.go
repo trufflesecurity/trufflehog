@@ -62,7 +62,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Salesforce,
 				Raw:          []byte(tokenMatch),
-				Description:  "Salesforce is a cloud-based software company that provides customer relationship management (CRM) service. Salesforce access tokens can be used to authenticate and interact with Salesforce APIs.",
 			}
 
 			if verify {
@@ -112,4 +111,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Salesforce
+}
+
+func (s Scanner) Description() string {
+	return "Salesforce is a cloud-based software company that provides customer relationship management (CRM) service. Salesforce access tokens can be used to authenticate and interact with Salesforce APIs."
 }

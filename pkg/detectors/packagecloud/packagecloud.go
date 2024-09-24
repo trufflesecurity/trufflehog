@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PackageCloud,
 			Raw:          []byte(resMatch),
-			Description:  "PackageCloud is a cloud-based service for hosting and distributing software packages. PackageCloud API keys can be used to manage and access these packages.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PackageCloud
+}
+
+func (s Scanner) Description() string {
+	return "PackageCloud is a cloud-based service for hosting and distributing software packages. PackageCloud API keys can be used to manage and access these packages."
 }

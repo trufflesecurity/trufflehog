@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Bitfinex,
 			Raw:          []byte(apiKeyRes),
-			Description:  "Bitfinex is a cryptocurrency exchange offering various trading options. Bitfinex API keys can be used to access and manage trading accounts.",
 		}
 
 		for _, apiSecretMatch := range apiSecretMatches {
@@ -103,4 +102,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Bitfinex
+}
+
+func (s Scanner) Description() string {
+	return "Bitfinex is a cryptocurrency exchange offering various trading options. Bitfinex API keys can be used to access and manage trading accounts."
 }

@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_DronaHQ,
 			Raw:          []byte(resMatch),
-			Description:  "DronaHQ is a platform for building internal tools and applications. DronaHQ keys can be used to access and manage these tools and applications.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_DronaHQ
+}
+
+func (s Scanner) Description() string {
+	return "DronaHQ is a platform for building internal tools and applications. DronaHQ keys can be used to access and manage these tools and applications."
 }

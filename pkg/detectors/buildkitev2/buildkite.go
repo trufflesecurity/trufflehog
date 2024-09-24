@@ -49,7 +49,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Buildkite,
 			Raw:          []byte(resMatch),
-			Description:  "Buildkite is a platform for running fast, secure, and scalable continuous integration and delivery pipelines. Buildkite access tokens can be used to interact with the Buildkite API.",
 		}
 
 		if verify {
@@ -75,4 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Buildkite
+}
+
+func (s Scanner) Description() string {
+	return "Buildkite is a platform for running fast, secure, and scalable continuous integration and delivery pipelines. Buildkite access tokens can be used to interact with the Buildkite API."
 }

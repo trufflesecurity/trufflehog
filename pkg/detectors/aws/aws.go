@@ -176,7 +176,6 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				ExtraData: map[string]string{
 					"resource_type": resourceTypes[idMatch[2]],
 				},
-				Description: "AWS is a cloud service used offering over 200 API's to transact data and compute. AWS API keys can be used to access and modify this data and compute.",
 			}
 
 			account, err := common.GetAccountNumFromAWSID(resIDMatch)
@@ -456,4 +455,8 @@ type identityRes struct {
 
 func (s scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AWS
+}
+
+func (s scanner) Description() string {
+	return "AWS is a cloud service used offering over 200 API's to transact data and compute. AWS API keys can be used to access and modify this data and compute."
 }

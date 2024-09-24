@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Iexapis,
 			Raw:          []byte(resMatch),
-			Description:  "IEX Cloud provides data services for financial markets. IEX Cloud API keys can be used to access and retrieve financial data.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Iexapis
+}
+
+func (s Scanner) Description() string {
+	return "IEX Cloud provides data services for financial markets. IEX Cloud API keys can be used to access and retrieve financial data."
 }

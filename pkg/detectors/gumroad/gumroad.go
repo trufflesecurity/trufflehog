@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gumroad,
 			Raw:          []byte(resMatch),
-			Description:  "Gumroad is an online platform that facilitates the sale of products by creators. Gumroad API keys can be used to access and manage these products.",
 		}
 		payload := strings.NewReader("access_token=" + resMatch)
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gumroad
+}
+
+func (s Scanner) Description() string {
+	return "Gumroad is an online platform that facilitates the sale of products by creators. Gumroad API keys can be used to access and manage these products."
 }

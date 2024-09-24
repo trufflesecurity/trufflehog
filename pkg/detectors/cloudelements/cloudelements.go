@@ -57,7 +57,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CloudElements,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resOrgMatch),
-				Description:  "CloudElements is an API integration platform that enables developers to connect their applications with various cloud services. CloudElements credentials can be used to access and manage these integrations.",
 			}
 
 			if verify {
@@ -84,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CloudElements
+}
+
+func (s Scanner) Description() string {
+	return "CloudElements is an API integration platform that enables developers to connect their applications with various cloud services. CloudElements credentials can be used to access and manage these integrations."
 }

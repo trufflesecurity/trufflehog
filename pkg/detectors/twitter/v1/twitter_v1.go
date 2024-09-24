@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},
-			Description: "Twitter API keys can be used to interact with the Twitter API to post tweets, read timelines, and access other Twitter functionalities.",
 		}
 
 		if verify {
@@ -77,6 +76,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Twitter
+}
+
+func (s Scanner) Description() string {
+	return "Twitter API keys can be used to interact with the Twitter API to post tweets, read timelines, and access other Twitter functionalities."
 }
 
 func (s Scanner) VerifyTwitterToken(ctx context.Context, client *http.Client, token string) (bool, error) {

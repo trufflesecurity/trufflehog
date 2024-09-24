@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CarbonInterface,
 			Raw:          []byte(resMatch),
-			Description:  "CarbonInterface provides an API for estimating carbon emissions for various activities. The API keys can be used to access and utilize this service.",
 		}
 
 		if verify {
@@ -73,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CarbonInterface
+}
+
+func (s Scanner) Description() string {
+	return "CarbonInterface provides an API for estimating carbon emissions for various activities. The API keys can be used to access and utilize this service."
 }

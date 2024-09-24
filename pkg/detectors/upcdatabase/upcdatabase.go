@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_UPCDatabase,
 			Raw:          []byte(resMatch),
-			Description:  "UPCDatabase is a service that provides access to a database of product information via API. The API key can be used to query product details.",
 		}
 
 		if verify {
@@ -80,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_UPCDatabase
+}
+
+func (s Scanner) Description() string {
+	return "UPCDatabase is a service that provides access to a database of product information via API. The API key can be used to query product details."
 }

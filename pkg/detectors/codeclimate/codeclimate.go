@@ -52,7 +52,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Codeclimate,
 			Raw:          []byte(resMatch),
-			Description:  "Codeclimate is a tool for automated code review and analysis. Codeclimate tokens can be used to access and manage repositories and their analysis results.",
 		}
 
 		if verify {
@@ -86,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Codeclimate
+}
+
+func (s Scanner) Description() string {
+	return "Codeclimate is a tool for automated code review and analysis. Codeclimate tokens can be used to access and manage repositories and their analysis results."
 }

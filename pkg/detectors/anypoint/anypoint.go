@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Anypoint,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + orgRes),
-				Description:  "Anypoint is a unified platform that allows organizations to build and manage APIs and integrations. Anypoint credentials can be used to access and manipulate these integrations and API data.",
 			}
 
 			if verify {
@@ -83,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Anypoint
+}
+
+func (s Scanner) Description() string {
+	return "Anypoint is a unified platform that allows organizations to build and manage APIs and integrations. Anypoint credentials can be used to access and manipulate these integrations and API data."
 }

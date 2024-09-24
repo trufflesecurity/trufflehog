@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LineMessaging,
 			Raw:          []byte(resMatch),
-			Description:  "Line Messaging is a communication app that allows users to send messages, photos, videos, and audio. Line Messaging API keys can be used to access and modify this data and communication.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LineMessaging
+}
+
+func (s Scanner) Description() string {
+	return "Line Messaging is a communication app that allows users to send messages, photos, videos, and audio. Line Messaging API keys can be used to access and modify this data and communication."
 }

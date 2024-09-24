@@ -45,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, idmatch := range idMatches {
-			if len(match) != 2 {
+			if len(idmatch) != 2 {
 				continue
 			}
 			resIdMatch := strings.TrimSpace(idmatch[1])
@@ -53,7 +53,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Demio,
 				Raw:          []byte(resMatch),
-				Description:  "Demio is a webinar platform that allows users to host, promote, and analyze webinars. Demio API keys can be used to access and manage webinar data.",
 			}
 
 			if verify {
@@ -81,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Demio
+}
+
+func (s Scanner) Description() string {
+	return "Demio is a webinar platform that allows users to host, promote, and analyze webinars. Demio API keys can be used to access and manage webinar data."
 }

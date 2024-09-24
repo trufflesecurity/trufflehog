@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_FourSquare,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecret),
-				Description:  "Foursquare is a technology company that uses location intelligence to build meaningful consumer experiences and business solutions. Foursquare API keys can be used to access and interact with their services.",
 			}
 
 			if verify {
@@ -81,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FourSquare
+}
+
+func (s Scanner) Description() string {
+	return "Foursquare is a technology company that uses location intelligence to build meaningful consumer experiences and business solutions. Foursquare API keys can be used to access and interact with their services."
 }

@@ -63,7 +63,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_Strava,
 					Raw:          []byte(resId),
 					RawV2:        []byte(resId + resSecret),
-					Description:  "An workout app, Oauth API keys can potentially be used to access user workout data",
 				}
 
 				if verify {
@@ -93,4 +92,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Strava
+}
+
+func (s Scanner) Description() string {
+	return "An workout app, Oauth API keys can potentially be used to access user workout data"
 }

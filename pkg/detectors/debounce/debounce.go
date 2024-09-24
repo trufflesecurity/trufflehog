@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Debounce,
 			Raw:          []byte(resMatch),
-			Description:  "Debounce is an email validation service that helps in reducing bounce rates by verifying email addresses. Debounce API keys can be used to access and validate email addresses.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Debounce
+}
+
+func (s Scanner) Description() string {
+	return "Debounce is an email validation service that helps in reducing bounce rates by verifying email addresses. Debounce API keys can be used to access and validate email addresses."
 }

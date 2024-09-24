@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Uclassify,
 			Raw:          []byte(resMatch),
-			Description:  "Uclassify is a text classification service. Uclassify API keys can be used to classify text into various categories such as sentiment, topic, etc.",
 		}
 
 		if verify {
@@ -73,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Uclassify
+}
+
+func (s Scanner) Description() string {
+	return "Uclassify is a text classification service. Uclassify API keys can be used to classify text into various categories such as sentiment, topic, etc."
 }

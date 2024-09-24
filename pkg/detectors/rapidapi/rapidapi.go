@@ -34,7 +34,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := matches {
+	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
@@ -43,7 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_RapidApi,
 			Raw:          []byte(resMatch),
-			Description:  "RapidAPI is a platform for connecting to thousands of APIs. RapidAPI keys can be used to access and interact with these APIs.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RapidApi
+}
+
+func (s Scanner) Description() string {
+	return "RapidAPI is a platform for connecting to thousands of APIs. RapidAPI keys can be used to access and interact with these APIs."
 }

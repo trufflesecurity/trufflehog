@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Edamam,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resId),
-				Description:  "Edamam provides nutrition analysis and diet recommendations. Edamam API keys can be used to access and modify nutrition data and perform diet analysis.",
 			}
 
 			if verify {
@@ -81,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Edamam
+}
+
+func (s Scanner) Description() string {
+	return "Edamam provides nutrition analysis and diet recommendations. Edamam API keys can be used to access and modify nutrition data and perform diet analysis."
 }

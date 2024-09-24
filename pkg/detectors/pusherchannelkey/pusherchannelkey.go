@@ -75,7 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_PusherChannelKey,
 					Raw:          []byte(resappMatch),
 					RawV2:        []byte(resappMatch + reskeyMatch),
-					Description:  "Pusher is a service for adding real-time functionality to web and mobile apps. Pusher Channel keys can be used to authenticate and send messages to channels.",
 				}
 
 				if verify {
@@ -135,4 +134,8 @@ func hmacBytes(toSign, secret []byte) []byte {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PusherChannelKey
+}
+
+func (s Scanner) Description() string {
+	return "Pusher is a service for adding real-time functionality to web and mobile apps. Pusher Channel keys can be used to authenticate and send messages to channels."
 }

@@ -61,7 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Sendbird,
 				Raw:          []byte(resMatch),
-				Description:  "Sendbird is a communication platform providing chat, voice, and video services. Sendbird API tokens can be used to access and manage communication services.",
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/sendbird/",
@@ -115,4 +114,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Sendbird
+}
+
+func (s Scanner) Description() string {
+	return "Sendbird is a communication platform providing chat, voice, and video services. Sendbird API tokens can be used to access and manage communication services."
 }

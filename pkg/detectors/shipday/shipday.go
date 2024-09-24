@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Shipday,
 			Raw:          []byte(resMatch),
-			Description:  "Shipday is a delivery management software used by businesses to manage and track their deliveries. Shipday API keys can be used to access and modify delivery data.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Shipday
+}
+
+func (s Scanner) Description() string {
+	return "Shipday is a delivery management software used by businesses to manage and track their deliveries. Shipday API keys can be used to access and modify delivery data."
 }

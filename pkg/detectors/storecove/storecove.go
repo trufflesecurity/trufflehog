@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Storecove,
 			Raw:          []byte(resMatch),
-			Description:  "Storecove is an API service for electronic invoicing. Storecove API keys can be used to access and manage electronic invoicing data.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Storecove
+}
+
+func (s Scanner) Description() string {
+	return "Storecove is an API service for electronic invoicing. Storecove API keys can be used to access and manage electronic invoicing data."
 }

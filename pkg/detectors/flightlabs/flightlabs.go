@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FlightLabs,
 			Raw:          []byte(resMatch),
-			Description:  "FlightLabs provides a comprehensive API for accessing real-time and historical flight data. The API keys can be used to query flight information, schedules, and other related data.",
 		}
 
 		if verify {
@@ -78,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FlightLabs
+}
+
+func (s Scanner) Description() string {
+	return "FlightLabs provides a comprehensive API for accessing real-time and historical flight data. The API keys can be used to query flight information, schedules, and other related data."
 }

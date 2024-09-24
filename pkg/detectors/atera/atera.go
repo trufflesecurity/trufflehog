@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Atera,
 			Raw:          []byte(resMatch),
-			Description:  "Atera is an IT management platform that provides remote monitoring and management for IT professionals. Atera API keys can be used to interact with the Atera API to manage alerts, tickets, devices, and more.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Atera
+}
+
+func (s Scanner) Description() string {
+	return "Atera is an IT management platform that provides remote monitoring and management for IT professionals. Atera API keys can be used to interact with the Atera API to manage alerts, tickets, devices, and more."
 }

@@ -53,6 +53,10 @@ func (s Scanner) Keywords() []string {
 	return []string{"LTAI"}
 }
 
+func (s Scanner) Description() string {
+	return "Alibaba Cloud is a cloud computing service that provides a suite of cloud computing services including data storage, relational databases, big-data processing, and content delivery networks (CDNs). Alibaba Cloud API keys can be used to access and manage these services."
+}
+
 func randString(n int) string {
 	const alphanum = "0123456789abcdefghijklmnopqrstuvwxyz"
 	var bytes = make([]byte, n)
@@ -108,7 +112,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Alibaba,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
-				Description:  "Alibaba Cloud is a cloud computing service that provides a suite of cloud computing services including data storage, relational databases, big-data processing, and content delivery networks (CDNs). Alibaba Cloud API keys can be used to access and manage these services.",
 			}
 
 			if verify {

@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_MaxMindLicense,
 				Redacted:     idRes,
 				Raw:          []byte(keyRes),
-				Description:  "MaxMind provides IP intelligence through their GeoIP service which can be used to determine geographical location and other information about an IP address.",
 				ExtraData: map[string]string{
 					"rotation_guide": "https://howtorotate.com/docs/tutorials/maxmind/",
 					"version":        fmt.Sprintf("%d", s.Version()),
@@ -86,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MaxMindLicense
+}
+
+func (s Scanner) Description() string {
+	return "MaxMind provides IP intelligence through their GeoIP service which can be used to determine geographical location and other information about an IP address."
 }

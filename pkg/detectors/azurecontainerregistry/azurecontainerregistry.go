@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(endpoint),
 				RawV2:        []byte(endpoint + password),
 				Redacted:     endpoint,
-				Description:  "Azure's container registry is used to store docker containers. An API key can be used to override existing containers, read sensitive data, and do other operations inside the container registry",
 			}
 
 			if verify {
@@ -103,4 +102,8 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureContainerRegistry
+}
+
+func (s Scanner) Description() string {
+	return "Azure's container registry is used to store docker containers. An API key can be used to override existing containers, read sensitive data, and do other operations inside the container registry."
 }

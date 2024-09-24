@@ -34,6 +34,11 @@ func (s Scanner) Keywords() []string {
 	return []string{"fibery"}
 }
 
+// Description returns a description for the result being detected
+func (s Scanner) Description() string {
+	return "Fibery is a work management platform that combines various tools for project management, knowledge management, and software development. Fibery API tokens can be used to access and modify data within a Fibery workspace."
+}
+
 // FromData will find and optionally verify Fibery secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -57,7 +62,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Fibery,
 				Raw:          []byte(resMatch),
-				Description:  "Fibery is a work management platform that combines various tools for project management, knowledge management, and software development. Fibery API tokens can be used to access and modify data within a Fibery workspace.",
 			}
 
 			if verify {

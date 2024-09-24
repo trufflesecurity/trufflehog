@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Etherscan,
 			Raw:          []byte(resMatch),
-			Description:  "Etherscan is a Block Explorer and Analytics Platform for Ethereum, a decentralized smart contracts platform. Etherscan API keys can be used to access various functionalities provided by Etherscan.",
 		}
 
 		if verify {
@@ -76,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Etherscan
+}
+
+func (s Scanner) Description() string {
+	return "Etherscan is a Block Explorer and Analytics Platform for Ethereum, a decentralized smart contracts platform. Etherscan API keys can be used to access various functionalities provided by Etherscan."
 }

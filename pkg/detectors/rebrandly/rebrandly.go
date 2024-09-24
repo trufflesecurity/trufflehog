@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Rebrandly,
 			Raw:          []byte(resMatch),
-			Description:  "Rebrandly is a link management platform that allows users to brand, track, and share short URLs. Rebrandly API keys can be used to manage and analyze links programmatically.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Rebrandly
+}
+
+func (s Scanner) Description() string {
+	return "Rebrandly is a link management platform that allows users to brand, track, and share short URLs. Rebrandly API keys can be used to manage and analyze links programmatically."
 }

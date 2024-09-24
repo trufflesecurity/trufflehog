@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_UnifyID,
 			Raw:          []byte(resMatch),
-			Description:  "UnifyID provides human detection services. These API keys can be used to verify human presence.",
 		}
 
 		if verify {
@@ -78,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_UnifyID
+}
+
+func (s Scanner) Description() string {
+	return "UnifyID provides human detection services. These API keys can be used to verify human presence."
 }

@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GoCardless,
 			Raw:          []byte(resMatch),
-			Description:  "GoCardless is an online payments service that makes collecting payments by direct debit easy for everyone. GoCardless API keys can be used to access and manage payment transactions.",
 		}
 
 		if verify {
@@ -74,4 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GoCardless
+}
+
+func (s Scanner) Description() string {
+	return "GoCardless is an online payments service that makes collecting payments by direct debit easy for everyone. GoCardless API keys can be used to access and manage payment transactions."
 }

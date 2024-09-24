@@ -47,7 +47,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LemonSqueezy,
 			Raw:          []byte(resMatch),
-			Description:  "LemonSqueezy is a platform for selling digital products. Its API tokens can be used to manage products, orders, and other resources.",
 		}
 
 		if verify {
@@ -84,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LemonSqueezy
+}
+
+func (s Scanner) Description() string {
+	return "LemonSqueezy is a platform for selling digital products. Its API tokens can be used to manage products, orders, and other resources."
 }

@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Statuspal,
 			Raw:          []byte(resMatch),
-			Description:  "Statuspal is a status page service. Statuspal API keys can be used to manage status pages and subscriptions.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Statuspal
+}
+
+func (s Scanner) Description() string {
+	return "Statuspal is a status page service. Statuspal API keys can be used to manage status pages and subscriptions."
 }

@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Coinbase,
 			Raw:          []byte(resMatch),
-			Description:  "Coinbase is a digital currency exchange that allows users to buy, sell, and store various cryptocurrencies. A Coinbase API key can be used to access and manage a user's account and transactions.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Coinbase
+}
+
+func (s Scanner) Description() string {
+	return "Coinbase is a digital currency exchange that allows users to buy, sell, and store various cryptocurrencies. A Coinbase API key can be used to access and manage a user's account and transactions."
 }

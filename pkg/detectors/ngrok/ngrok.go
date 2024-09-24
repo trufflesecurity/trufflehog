@@ -42,7 +42,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Ngrok,
 			Raw:          []byte(resMatch),
-			Description:  "Ngrok is a service that provides secure introspectable tunnels to localhost. Ngrok keys can be used to manage and control these tunnels.",
 		}
 
 		if verify {
@@ -80,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Ngrok
+}
+
+func (s Scanner) Description() string {
+	return "Ngrok is a service that provides secure introspectable tunnels to localhost. Ngrok keys can be used to manage and control these tunnels."
 }

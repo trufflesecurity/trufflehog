@@ -43,7 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_HereAPI,
 			Raw:          []byte(resMatch),
-			Description:  "HereAPI provides access to a wide range of location-based services including maps, geocoding, and traffic information. HereAPI keys can be used to authenticate and access these services.",
 		}
 
 		if verify {
@@ -67,4 +66,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_HereAPI
+}
+
+func (s Scanner) Description() string {
+	return "HereAPI provides access to a wide range of location-based services including maps, geocoding, and traffic information. HereAPI keys can be used to authenticate and access these services."
 }

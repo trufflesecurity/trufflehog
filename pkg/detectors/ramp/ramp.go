@@ -59,7 +59,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Ramp,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + ":" + resSecret),
-				Description:  "Ramp provides financial services including expense management and corporate cards. Ramp credentials can be used to access and manage these financial services.",
 			}
 
 			if verify {
@@ -104,4 +103,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Ramp
+}
+
+func (s Scanner) Description() string {
+	return "Ramp provides financial services including expense management and corporate cards. Ramp credentials can be used to access and manage these financial services."
 }

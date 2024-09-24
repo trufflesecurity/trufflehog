@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PaypalOauth,
 				Raw:          []byte(resSecretMatch),
-				Description:  "PaypalOauth is used for authenticating with PayPal's API. These credentials can be used to access and perform transactions on behalf of a PayPal account.",
 			}
 
 			if verify {
@@ -89,4 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PaypalOauth
+}
+
+func (s Scanner) Description() string {
+	return "PaypalOauth is used for authenticating with PayPal's API. These credentials can be used to access and perform transactions on behalf of a PayPal account."
 }

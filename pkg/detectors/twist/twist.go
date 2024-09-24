@@ -50,7 +50,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Twist,
 			Raw:          []byte(resMatch),
-			Description:  "Twist is a team communication app. Twist access tokens can be used to access and manage Twist accounts and data.",
 		}
 
 		if verify {
@@ -74,4 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Twist
+}
+
+func (s Scanner) Description() string {
+	return "Twist is a team communication app. Twist access tokens can be used to access and manage Twist accounts and data."
 }

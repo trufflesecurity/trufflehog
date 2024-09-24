@@ -46,11 +46,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Currencylayer,
 			Raw:          []byte(resMatch),
-			Description:  "An API for converting and exchanging currencies. API keys can read currency data",
 		}
 
 		if verify {
-
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.currencylayer.com/live?access_key=%s", resMatch), nil)
 			if err != nil {
 				continue
@@ -81,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Currencylayer
+}
+
+func (s Scanner) Description() string {
+	return "An API for converting and exchanging currencies. API keys can read currency data."
 }

@@ -41,7 +41,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_DiscordWebhook,
 			Raw:          []byte(resMatch),
-			Description:  "Discord webhooks are used to send messages to a Discord channel. They can be used to automate messages and send data updates.",
 		}
 
 		if verify {
@@ -66,4 +65,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_DiscordWebhook
+}
+
+func (s Scanner) Description() string {
+	return "Discord webhooks are used to send messages to a Discord channel. They can be used to automate messages and send data updates."
 }

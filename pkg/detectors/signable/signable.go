@@ -40,7 +40,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := tokenPat.FindAllStringSubmatch(dataStr, -1)
-	for _, match := matches {
+	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
@@ -53,7 +53,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Signable,
 			Raw:          []byte(resMatch),
-			Description:  "Signable is a service used for electronic signatures. Signable tokens can be used to authenticate and access Signable's API services.",
 		}
 
 		if verify {
@@ -111,4 +110,8 @@ func verifyResult(ctx context.Context, client *http.Client, token string) (bool,
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Signable
+}
+
+func (s Scanner) Description() string {
+	return "Signable is a service used for electronic signatures. Signable tokens can be used to authenticate and access Signable's API services."
 }

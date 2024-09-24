@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AppSynergy,
 			Raw:          []byte(resMatch),
-			Description:  "AppSynergy is a platform for building cloud applications. AppSynergy API keys can be used to access and manage applications and data within the platform.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AppSynergy
+}
+
+func (s Scanner) Description() string {
+	return "AppSynergy is a platform for building cloud applications. AppSynergy API keys can be used to access and manage applications and data within the platform."
 }

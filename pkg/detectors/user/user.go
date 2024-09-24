@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_User,
 			Raw:          []byte(resMatch),
-			Description:  "User credentials can be used to authenticate and authorize actions within the User service, potentially allowing access to sensitive data and operations.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_User
+}
+
+func (s Scanner) Description() string {
+	return "User credentials can be used to authenticate and authorize actions within the User service, potentially allowing access to sensitive data and operations."
 }

@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FastForex,
 			Raw:          []byte(resMatch),
-			Description:  "FastForex provides foreign exchange rate data. FastForex API keys can be used to access and retrieve this data.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FastForex
+}
+
+func (s Scanner) Description() string {
+	return "FastForex provides foreign exchange rate data. FastForex API keys can be used to access and retrieve this data."
 }

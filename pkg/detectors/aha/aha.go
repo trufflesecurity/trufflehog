@@ -64,7 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Aha,
 			Raw:          []byte(resMatch),
-			Description:  "Aha is a product management software suite. Aha API keys can be used to access and modify product data and workflows.",
 		}
 
 		if verify {
@@ -108,4 +107,8 @@ func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch s
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Aha
+}
+
+func (s Scanner) Description() string {
+	return "Aha is a product management software suite. Aha API keys can be used to access and modify product data and workflows."
 }

@@ -60,7 +60,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Portainer,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resEndpointMatch),
-				Description:  "Portainer is a management UI for Docker, Docker Swarm, Kubernetes, and Azure ACI. Portainer API tokens can be used to access and control these environments.",
 			}
 
 			if verify {
@@ -101,4 +100,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Portainer
+}
+
+func (s Scanner) Description() string {
+	return "Portainer is a management UI for Docker, Docker Swarm, Kubernetes, and Azure ACI. Portainer API tokens can be used to access and control these environments."
 }

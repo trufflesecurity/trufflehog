@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ClustDoc,
 			Raw:          []byte(resMatch),
-			Description:  "ClustDoc is a document management platform. ClustDoc API keys can be used to access and manage documents and workflows within the ClustDoc platform.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ClustDoc
+}
+
+func (s Scanner) Description() string {
+	return "ClustDoc is a document management platform. ClustDoc API keys can be used to access and manage documents and workflows within the ClustDoc platform."
 }

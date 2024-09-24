@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_ElevenLabs,
 			Raw:          []byte(match),
 			ExtraData:    map[string]string{"version": "2"},
-			Description:  "ElevenLabs is a service that provides API keys for accessing their voice synthesis and other AI-powered tools. These keys can be used to interact with ElevenLabs' services programmatically.",
 		}
 
 		if verify {
@@ -78,6 +77,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return
+}
+
+func (s Scanner) Description() string {
+	return "ElevenLabs is a service that provides API keys for accessing their voice synthesis and other AI-powered tools. These keys can be used to interact with ElevenLabs' services programmatically."
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, *UserRes, error) {

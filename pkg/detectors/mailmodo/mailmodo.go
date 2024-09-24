@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mailmodo,
 			Raw:          []byte(resMatch),
-			Description:  "Mailmodo is a platform for creating and sending interactive emails. Mailmodo API keys can be used to access and manage email campaigns and contacts.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mailmodo
+}
+
+func (s Scanner) Description() string {
+	return "Mailmodo is a platform for creating and sending interactive emails. Mailmodo API keys can be used to access and manage email campaigns and contacts."
 }

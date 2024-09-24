@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Unsplash,
 			Raw:          []byte(resMatch),
-			Description:  "Unsplash is a website dedicated to sharing stock photography under the Unsplash license. Unsplash API keys can be used to access and modify Unsplash data.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Unsplash
+}
+
+func (s Scanner) Description() string {
+	return "Unsplash is a website dedicated to sharing stock photography under the Unsplash license. Unsplash API keys can be used to access and modify Unsplash data."
 }

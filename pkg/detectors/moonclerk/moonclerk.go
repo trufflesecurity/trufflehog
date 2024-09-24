@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Moonclerk,
 			Raw:          []byte(resMatch),
-			Description:  "Moonclerk is an online payment system that allows businesses to accept recurring payments. Moonclerk API keys can be used to manage and access payment data.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Moonclerk
+}
+
+func (s Scanner) Description() string {
+	return "Moonclerk is an online payment system that allows businesses to accept recurring payments. Moonclerk API keys can be used to manage and access payment data."
 }

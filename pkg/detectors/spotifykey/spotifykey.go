@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SpotifyKey,
 				Raw:          []byte(resMatch),
-				Description:  "Spotify API keys can be used to access and modify data within Spotify's services.",
 			}
 
 			if verify {
@@ -83,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SpotifyKey
+}
+
+func (s Scanner) Description() string {
+	return "Spotify API keys can be used to access and modify data within Spotify's services."
 }

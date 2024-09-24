@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Verifier,
 				Raw:          []byte(resMatch),
-				Description:  "Verifier is a service used to verify the authenticity of a credential. The tokens can be used to validate user identities.",
 			}
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://verifier.meetchopra.com/verify/%s?token=%s", userPatMatch, resMatch), nil)
@@ -80,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Verifier
+}
+
+func (s Scanner) Description() string {
+	return "Verifier is a service used to verify the authenticity of a credential. The tokens can be used to validate user identities."
 }

@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CompanyHub,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
-				Description:  "CompanyHub is a CRM tool used to manage customer relationships. CompanyHub keys can be used to access and manipulate CRM data.",
 			}
 
 			if verify {
@@ -85,4 +84,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CompanyHub
+}
+
+func (s Scanner) Description() string {
+	return "CompanyHub is a CRM tool used to manage customer relationships. CompanyHub keys can be used to access and manipulate CRM data."
 }

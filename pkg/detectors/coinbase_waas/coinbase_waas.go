@@ -75,7 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CoinbaseWaaS,
 				Raw:          []byte(resPrivKeyMatch),
 				RawV2:        []byte(resKeyNameMatch + ":" + resPrivKeyMatch),
-				Description:  "Coinbase WaaS (Wallet as a Service) provides a secure and scalable infrastructure for managing cryptocurrency wallets. The API keys allow access to this service to perform operations such as creating and managing wallets.",
 			}
 
 			if verify {
@@ -147,4 +146,8 @@ func (s Scanner) verifyMatch(ctx context.Context, apiKeyName, privKey string) (b
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CoinbaseWaaS
+}
+
+func (s Scanner) Description() string {
+	return "Coinbase WaaS (Wallet as a Service) provides a secure and scalable infrastructure for managing cryptocurrency wallets. The API keys allow access to this service to perform operations such as creating and managing wallets."
 }

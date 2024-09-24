@@ -61,7 +61,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Poloniex,
 				Raw:          []byte(resSecretMatch),
 				RawV2:        []byte(resMatch + resSecretMatch),
-				Description:  "Poloniex is a cryptocurrency exchange that allows users to trade various digital assets. Poloniex API keys can be used to access and manage account data and perform trading operations.",
 			}
 
 			if verify {
@@ -106,4 +105,8 @@ func getPoloniexSignature(secret string, payload string) string {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Poloniex
+}
+
+func (s Scanner) Description() string {
+	return "Poloniex is a cryptocurrency exchange that allows users to trade various digital assets. Poloniex API keys can be used to access and manage account data and perform trading operations."
 }

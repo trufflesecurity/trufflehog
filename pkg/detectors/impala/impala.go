@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Impala,
 			Raw:          []byte(resMatch),
-			Description:  "Impala is a travel API service used for managing bookings and reservations. Impala API keys can be used to access and modify booking data.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Impala
+}
+
+func (s Scanner) Description() string {
+	return "Impala is a travel API service used for managing bookings and reservations. Impala API keys can be used to access and modify booking data."
 }

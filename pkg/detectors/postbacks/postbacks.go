@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Postbacks,
 			Raw:          []byte(resMatch),
-			Description:  "Postbacks are used to send data to a specified URL based on certain events or triggers. Postback URLs are often used in affiliate marketing, ad tracking, and analytics.",
 		}
 
 		if verify {
@@ -75,4 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Postbacks
+}
+
+func (s Scanner) Description() string {
+	return "Postbacks are used to send data to a specified URL based on certain events or triggers. Postback URLs are often used in affiliate marketing, ad tracking, and analytics."
 }

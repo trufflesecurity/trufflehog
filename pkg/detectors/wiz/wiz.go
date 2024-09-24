@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Wiz,
 				Raw:          []byte(idMatch),
 				RawV2:        []byte(idMatch + secretMatch),
-				Description:  "Wiz is a cloud security platform. Wiz credentials can be used to access and manage cloud security configurations.",
 			}
 
 			if verify {
@@ -121,4 +120,8 @@ func verifyMatch(ctx context.Context, client *http.Client, clientID, clientSecre
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Wiz
+}
+
+func (s Scanner) Description() string {
+	return "Wiz is a cloud security platform. Wiz credentials can be used to access and manage cloud security configurations."
 }

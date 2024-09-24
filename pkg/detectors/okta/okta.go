@@ -40,11 +40,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, domainMatch := range domainPat.FindAll(data, -1) {
 			domain := string(domainMatch)
 
-			s := detectors.Result{
+			result := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Okta,
 				Raw:          []byte(token),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", domain, token)),
-				Description:  "Okta is an identity and access management service. Okta tokens can be used to authenticate and access various resources and APIs within an organization.",
 			}
 
 			if verify {
@@ -71,13 +70,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer resp.Body.Close()
 				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 					body, _ := io.ReadAll(resp.Body)
-					if strings.contains(string(body), "activated") {
-						s.Verified = true
+					if strings.Contains(string(body), "activated") {
+						result.Verified = true
 					}
 				}
 			}
 
-			results = append(results, s)
+			results = append(results, result)
 		}
 	}
 
@@ -86,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Okta
+}
+
+func (s Scanner) Description() string {
+	return "Okta is an identity and access management service. Okta tokens can be used to authenticate and access various resources and APIs within an organization."
 }

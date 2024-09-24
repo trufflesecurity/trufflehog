@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Tmetric,
 			Raw:          []byte(resMatch),
-			Description:  "Tmetric is a time tracking service. Tmetric API keys can be used to access and manage time tracking data.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Tmetric
+}
+
+func (s Scanner) Description() string {
+	return "Tmetric is a time tracking service. Tmetric API keys can be used to access and manage time tracking data."
 }

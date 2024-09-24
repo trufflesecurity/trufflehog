@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AviationStack,
 			Raw:          []byte(resMatch),
-			Description:  "AviationStack is a service providing real-time flight status and aviation data. The API key can be used to access this data.",
 		}
 
 		if verify {
@@ -73,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AviationStack
+}
+
+func (s Scanner) Description() string {
+	return "AviationStack is a service providing real-time flight status and aviation data. The API key can be used to access this data."
 }

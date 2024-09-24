@@ -79,7 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(rawURL.String()),
 			RawV2:        []byte(rawURLStr),
 			Redacted:     detectors.RedactURL(*rawURL),
-			Description:  "This detector identifies URLs with embedded credentials, which can be used to access web resources without explicit user interaction.",
 		}
 
 		if verify {
@@ -160,4 +159,8 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_URI
+}
+
+func (s Scanner) Description() string {
+	return "This detector identifies URLs with embedded credentials, which can be used to access web resources without explicit user interaction."
 }

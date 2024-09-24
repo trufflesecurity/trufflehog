@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_HelloSign,
 			Raw:          []byte(resMatch),
-			Description:  "HelloSign is an eSignature provider that allows users to sign documents online. HelloSign API keys can be used to interact with the HelloSign API for managing and sending documents.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_HelloSign
+}
+
+func (s Scanner) Description() string {
+	return "HelloSign is an eSignature provider that allows users to sign documents online. HelloSign API keys can be used to interact with the HelloSign API for managing and sending documents."
 }

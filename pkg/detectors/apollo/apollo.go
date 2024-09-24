@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Apollo,
 			Raw:          []byte(resMatch),
-			Description:  "Apollo is a sales intelligence platform. Apollo API keys can be used to access and modify data within the Apollo platform.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Apollo
+}
+
+func (s Scanner) Description() string {
+	return "Apollo is a sales intelligence platform. Apollo API keys can be used to access and modify data within the Apollo platform."
 }

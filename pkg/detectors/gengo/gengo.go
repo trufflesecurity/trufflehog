@@ -64,7 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Gengo,
 				Raw:          []byte(resSecretMatch),
 				RawV2:        []byte(resMatch + resSecretMatch),
-				Description:  "Gengo is a platform for professional human translation services. Gengo API keys can be used to access and manage translation projects and resources.",
 			}
 
 			if verify {
@@ -116,4 +115,8 @@ func getGengoSignature(timeStamp string, secret string) string {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gengo
+}
+
+func (s Scanner) Description() string {
+	return "Gengo is a platform for professional human translation services. Gengo API keys can be used to access and manage translation projects and resources."
 }

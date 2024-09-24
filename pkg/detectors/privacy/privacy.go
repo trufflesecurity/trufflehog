@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Privacy,
 			Raw:          []byte(resMatch),
-			Description:  "Privacy provides virtual cards for secure online payments. Privacy API keys can be used to manage and create these virtual cards.",
 		}
 
 		if verify {
@@ -83,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Privacy
+}
+
+func (s Scanner) Description() string {
+	return "Privacy provides virtual cards for secure online payments. Privacy API keys can be used to manage and create these virtual cards."
 }

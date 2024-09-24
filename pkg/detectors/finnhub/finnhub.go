@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Finnhub,
 			Raw:          []byte(resMatch),
-			Description:  "Finnhub is a financial data provider offering APIs to access market data. Finnhub API keys can be used to retrieve economic calendars, stock prices, and other financial information.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Finnhub
+}
+
+func (s Scanner) Description() string {
+	return "Finnhub is a financial data provider offering APIs to access market data. Finnhub API keys can be used to retrieve economic calendars, stock prices, and other financial information."
 }

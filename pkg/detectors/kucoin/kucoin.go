@@ -68,7 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_KuCoin,
 					Raw:          []byte(resKeyMatch),
 					RawV2:        []byte(resKeyMatch + resPassphraseMatch),
-					Description:  "KuCoin is a cryptocurrency exchange that provides various digital asset trading services. KuCoin API keys can be used to access and manage trading accounts, execute trades, and retrieve market data.",
 				}
 
 				if verify {
@@ -128,4 +127,8 @@ func getKucoinSignature(apiSecret string, timestamp string, method string, endpo
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_KuCoin
+}
+
+func (s Scanner) Description() string {
+	return "KuCoin is a cryptocurrency exchange that provides various digital asset trading services. KuCoin API keys can be used to access and manage trading accounts, execute trades, and retrieve market data."
 }

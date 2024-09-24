@@ -66,7 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_LarkSuite,
 				Raw:          []byte(token),
-				Description:  "LarkSuite is a collaborative suite that includes chat, calendar, and cloud storage features. The detected token can be used to access and interact with these services.",
 			}
 			s1.ExtraData = map[string]string{
 				"token_type": string(key),
@@ -96,6 +95,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LarkSuite
+}
+
+func (s Scanner) Description() string {
+	return "LarkSuite is a collaborative suite that includes chat, calendar, and cloud storage features. The detected token can be used to access and interact with these services."
 }
 
 func verifyAccessToken(ctx context.Context, client *http.Client, url string, token string) (bool, error) {

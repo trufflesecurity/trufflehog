@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_FacePlusPlus,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resSecret),
-				Description:  "Face++ is a facial recognition service that provides APIs for detecting and analyzing faces. Face++ API keys and secrets can be used to access and manipulate these services.",
 			}
 
 			if verify {
@@ -82,4 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FacePlusPlus
+}
+
+func (s Scanner) Description() string {
+	return "Face++ is a facial recognition service that provides APIs for detecting and analyzing faces. Face++ API keys and secrets can be used to access and manipulate these services."
 }

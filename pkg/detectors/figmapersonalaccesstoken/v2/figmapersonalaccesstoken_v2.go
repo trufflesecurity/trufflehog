@@ -34,6 +34,11 @@ func (s Scanner) Keywords() []string {
 	return []string{"figma"}
 }
 
+// Description returns a description for the result being detected.
+func (s Scanner) Description() string {
+	return "Figma is a collaborative interface design tool. Figma Personal Access Tokens can be used to access and manipulate design files and other resources on behalf of a user."
+}
+
 // FromData will find and optionally verify FigmaPersonalAccessToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -49,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 			Raw:          []byte(resMatch),
-			Description:  "Figma is a collaborative interface design tool. Figma Personal Access Tokens can be used to access and manipulate design files and other resources on behalf of a user.",
 			ExtraData: map[string]string{
 				"version": fmt.Sprintf("%d", s.Version()),
 			},

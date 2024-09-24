@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ScrapeStack,
 			Raw:          []byte(resMatch),
-			Description:  "ScrapeStack is a web scraping API service. ScrapeStack API keys can be used to scrape web data and access various scraping functionalities.",
 		}
 
 		if verify {
@@ -80,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ScrapeStack
+}
+
+func (s Scanner) Description() string {
+	return "ScrapeStack is a web scraping API service. ScrapeStack API keys can be used to scrape web data and access various scraping functionalities."
 }

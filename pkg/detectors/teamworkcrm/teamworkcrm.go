@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_TeamworkCRM,
 			Raw:          []byte(resMatch),
-			Description:  "TeamworkCRM is a customer relationship management tool that helps teams manage their sales pipeline and customer interactions. TeamworkCRM tokens can be used to access and manage CRM data and functionalities.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TeamworkCRM
+}
+
+func (s Scanner) Description() string {
+	return "TeamworkCRM is a customer relationship management tool that helps teams manage their sales pipeline and customer interactions. TeamworkCRM tokens can be used to access and manage CRM data and functionalities."
 }

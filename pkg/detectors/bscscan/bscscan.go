@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_BscScan,
 			Raw:          []byte(resMatch),
-			Description:  "BscScan is a block explorer and analytics platform for Binance Smart Chain. BscScan API keys can be used to access data from the Binance Smart Chain blockchain.",
 		}
 
 		if verify {
@@ -62,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 				body := string(bodyBytes)
 
-				if !strings.contains(body, "NOTOK") {
+				if !strings.Contains(body, "NOTOK") {
 					s1.Verified = true
 				}
 			}
@@ -76,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BscScan
+}
+
+func (s Scanner) Description() string {
+	return "BscScan is a block explorer and analytics platform for Binance Smart Chain. BscScan API keys can be used to access data from the Binance Smart Chain blockchain."
 }

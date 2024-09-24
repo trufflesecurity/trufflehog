@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ConversionTools,
 			Raw:          []byte(resMatch),
-			Description:  "ConversionTools is a service used for various data conversion tasks. The API keys can be used to access and perform these tasks.",
 		}
 
 		if verify {
@@ -73,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ConversionTools
+}
+
+func (s Scanner) Description() string {
+	return "ConversionTools is a service used for various data conversion tasks. The API keys can be used to access and perform these tasks."
 }

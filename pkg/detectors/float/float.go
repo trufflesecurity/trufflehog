@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Float,
 			Raw:          []byte(resMatch),
-			Description:  "Float is a resource management software used for planning and scheduling projects. Float API keys can be used to access and modify project data and schedules.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Float
+}
+
+func (s Scanner) Description() string {
+	return "Float is a resource management software used for planning and scheduling projects. Float API keys can be used to access and modify project data and schedules."
 }

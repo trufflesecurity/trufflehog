@@ -52,6 +52,8 @@ func (f fakeDetectorV1) Keywords() []string             { return []string{fakeDe
 func (f fakeDetectorV1) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
 func (f fakeDetectorV1) Version() int                   { return 1 }
 
+func (f fakeDetectorV1) Description() string { return "" }
+
 func (f fakeDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
 		{
@@ -65,6 +67,8 @@ func (f fakeDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.
 func (f fakeDetectorV2) Keywords() []string             { return []string{fakeDetectorKeyword} }
 func (f fakeDetectorV2) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
 func (f fakeDetectorV2) Version() int                   { return 2 }
+
+func (f fakeDetectorV2) Description() string { return "" }
 
 func TestFragmentLineOffset(t *testing.T) {
 	tests := []struct {
@@ -470,6 +474,8 @@ func (testDetectorV1) Keywords() []string { return []string{"sample"} }
 
 func (testDetectorV1) Type() detectorspb.DetectorType { return TestDetectorType }
 
+func (testDetectorV1) Description() string { return "" }
+
 var _ detectors.Detector = (*testDetectorV2)(nil)
 
 type testDetectorV2 struct{}
@@ -485,6 +491,8 @@ func (testDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Re
 func (testDetectorV2) Keywords() []string { return []string{"ample"} }
 
 func (testDetectorV2) Type() detectorspb.DetectorType { return TestDetectorType2 }
+
+func (testDetectorV2) Description() string { return "" }
 
 func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	ctx := context.Background()
@@ -854,6 +862,8 @@ func (c customCleaner) FromData(aCtx.Context, bool, []byte) ([]detectors.Result,
 
 func (c customCleaner) Keywords() []string             { return []string{} }
 func (c customCleaner) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+
+func (customCleaner) Description() string { return "" }
 
 func (c customCleaner) CleanResults([]detectors.Result) []detectors.Result {
 	return []detectors.Result{}

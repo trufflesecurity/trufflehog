@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MailJetSMS,
 			Raw:          []byte(resMatch),
-			Description:  "Mailjet is a cloud-based email service provider. Mailjet API keys can be used to send SMS messages and manage email campaigns.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MailJetSMS
+}
+
+func (s Scanner) Description() string {
+	return "Mailjet is a cloud-based email service provider. Mailjet API keys can be used to send SMS messages and manage email campaigns."
 }

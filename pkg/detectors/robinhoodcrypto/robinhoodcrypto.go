@@ -62,7 +62,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_RobinhoodCrypto,
 				Raw:          []byte(apiKey),
 				RawV2:        []byte(apiKey + base64PrivateKey),
-				Description:  "Robinhood Crypto API keys can be used to access and trade cryptocurrencies on the Robinhood platform.",
 			}
 
 			if verify {
@@ -71,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				isVerified, extraData, verificationErr = verifyMatch(ctx, client, apiKey, base64PrivateKey)
+				isVerified, extraData, verificationErr := verifyMatch(ctx, client, apiKey, base64PrivateKey)
 				s1.Verified = isVerified
 				s1.ExtraData = extraData
 				s1.SetVerificationError(verificationErr, apiKey, base64PrivateKey)
@@ -193,4 +192,8 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey, base64Private
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RobinhoodCrypto
+}
+
+func (s Scanner) Description() string {
+	return "Robinhood Crypto API keys can be used to access and trade cryptocurrencies on the Robinhood platform."
 }

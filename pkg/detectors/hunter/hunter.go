@@ -43,7 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Hunter,
 			Raw:          []byte(resMatch),
-			Description:  "Hunter is a service that helps find and verify professional email addresses. Hunter API keys can be used to access and retrieve data from the Hunter service.",
 		}
 
 		if verify {
@@ -68,4 +67,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Hunter
+}
+
+func (s Scanner) Description() string {
+	return "Hunter is a service that helps find and verify professional email addresses. Hunter API keys can be used to access and retrieve data from the Hunter service."
 }

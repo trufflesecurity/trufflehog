@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Voicegain,
 			Raw:          []byte(resMatch),
-			Description:  "Voicegain is a speech recognition and natural language processing service. Voicegain API keys can be used to access and manage Voicegain services and data.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Voicegain
+}
+
+func (s Scanner) Description() string {
+	return "Voicegain is a speech recognition and natural language processing service. Voicegain API keys can be used to access and manage Voicegain services and data."
 }

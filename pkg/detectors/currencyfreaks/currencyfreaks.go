@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Currencyfreaks,
 			Raw:          []byte(resMatch),
-			Description:  "Currencyfreaks provides exchange rates and currency conversion API services. The API keys can be used to access and retrieve exchange rate data.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Currencyfreaks
+}
+
+func (s Scanner) Description() string {
+	return "Currencyfreaks provides exchange rates and currency conversion API services. The API keys can be used to access and retrieve exchange rate data."
 }

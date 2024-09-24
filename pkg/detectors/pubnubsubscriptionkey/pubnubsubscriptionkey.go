@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PubNubSubscriptionKey,
 			Raw:          []byte(resMatch),
-			Description:  "PubNub is a real-time communication platform. A PubNub Subscription Key allows access to the PubNub API for subscribing to channels and receiving messages.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PubNubSubscriptionKey
+}
+
+func (s Scanner) Description() string {
+	return "PubNub is a real-time communication platform. A PubNub Subscription Key allows access to the PubNub API for subscribing to channels and receiving messages."
 }

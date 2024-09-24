@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_DetectLanguage,
 			Raw:          []byte(resMatch),
-			Description:  "DetectLanguage is a language detection API service. The API key can be used to access the language detection functionalities provided by DetectLanguage.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_DetectLanguage
+}
+
+func (s Scanner) Description() string {
+	return "DetectLanguage is a language detection API service. The API key can be used to access the language detection functionalities provided by DetectLanguage."
 }

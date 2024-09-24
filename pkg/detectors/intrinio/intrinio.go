@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Intrinio,
 			Raw:          []byte(resMatch),
-			Description:  "Intrinio provides financial data APIs. Intrinio API keys can be used to access various financial datasets and services.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Intrinio
+}
+
+func (s Scanner) Description() string {
+	return "Intrinio provides financial data APIs. Intrinio API keys can be used to access various financial datasets and services."
 }

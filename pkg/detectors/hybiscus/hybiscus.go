@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Hybiscus,
 			Raw:          []byte(resMatch),
-			Description:  "Hybiscus is a service that provides API keys to access its resources and perform operations. These keys should be kept secure to prevent unauthorized access.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Hybiscus
+}
+
+func (s Scanner) Description() string {
+	return "Hybiscus is a service that provides API keys to access its resources and perform operations. These keys should be kept secure to prevent unauthorized access."
 }

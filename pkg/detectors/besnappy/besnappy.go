@@ -37,7 +37,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := matches {
+	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Besnappy,
 			Raw:          []byte(resMatch),
-			Description:  "Besnappy is a customer service platform. The detected key can be used to access Besnappy's API, potentially exposing sensitive customer service data.",
 		}
 		if verify {
 			data := fmt.Sprintf("%s:x", resMatch)
@@ -73,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Besnappy
+}
+
+func (s Scanner) Description() string {
+	return "Besnappy is a customer service platform. The detected key can be used to access Besnappy's API, potentially exposing sensitive customer service data."
 }

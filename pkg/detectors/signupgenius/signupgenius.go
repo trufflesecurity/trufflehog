@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Signupgenius,
 			Raw:          []byte(resMatch),
-			Description:  "SignupGenius is an online tool for creating and managing sign-up forms for events and activities. SignupGenius API keys can be used to access and manage these forms and related data.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Signupgenius
+}
+
+func (s Scanner) Description() string {
+	return "SignupGenius is an online tool for creating and managing sign-up forms for events and activities. SignupGenius API keys can be used to access and manage these forms and related data."
 }

@@ -29,7 +29,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify ScalewayKey secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -43,7 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ScalewayKey,
 			Raw:          []byte(resMatch),
-			Description:  "Scaleway is a cloud service provider offering various services including virtual instances, storage, and networking. Scaleway API keys can be used to access and manage these services.",
 		}
 
 		if verify {
@@ -69,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ScalewayKey
+}
+
+func (s Scanner) Description() string {
+	return "Scaleway is a cloud service provider offering various services including virtual instances, storage, and networking. Scaleway API keys can be used to access and manage these services."
 }

@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LessAnnoyingCRM,
 			Raw:          []byte(resMatch),
-			Description:  "Less Annoying CRM is a customer relationship management system. The API token can be used to access and manage customer data.",
 		}
 
 		if verify {
@@ -73,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LessAnnoyingCRM
+}
+
+func (s Scanner) Description() string {
+	return "Less Annoying CRM is a customer relationship management system. The API token can be used to access and manage customer data."
 }

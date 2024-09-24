@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CloudImage,
 			Raw:          []byte(resMatch),
-			Description:  "CloudImage is a service that provides image optimization and delivery. CloudImage API keys can be used to access and modify image data.",
 		}
 
 		if verify {
@@ -76,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CloudImage
+}
+
+func (s Scanner) Description() string {
+	return "CloudImage is a service that provides image optimization and delivery. CloudImage API keys can be used to access and modify image data."
 }

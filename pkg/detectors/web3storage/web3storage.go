@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Web3Storage,
 			Raw:          []byte(resMatch),
-			Description:  "Web3.storage is a service offering decentralized storage solutions. Web3.storage API keys can be used to access and manage stored data.",
 		}
 
 		if verify {
@@ -83,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Web3Storage
+}
+
+func (s Scanner) Description() string {
+	return "Web3.storage is a service offering decentralized storage solutions. Web3.storage API keys can be used to access and manage stored data."
 }

@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Flightstats,
 				Raw:          []byte(resMatch),
-				Description:  "Flightstats provides APIs for accessing flight data and statistics. Flightstats API keys can be used to retrieve and manipulate flight-related information.",
 			}
 
 			if verify {
@@ -89,4 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Flightstats
+}
+
+func (s Scanner) Description() string {
+	return "Flightstats provides APIs for accessing flight data and statistics. Flightstats API keys can be used to retrieve and manipulate flight-related information."
 }

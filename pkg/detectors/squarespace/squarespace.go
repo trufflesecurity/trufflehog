@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Squarespace,
 			Raw:          []byte(resMatch),
-			Description:  "Squarespace is a website building and hosting service. Squarespace API keys can be used to manage and modify website content and configuration.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Squarespace
+}
+
+func (s Scanner) Description() string {
+	return "Squarespace is a website building and hosting service. Squarespace API keys can be used to manage and modify website content and configuration."
 }

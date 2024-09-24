@@ -51,7 +51,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CloudConvert,
 			Raw:          []byte(resMatch),
-			Description:  "CloudConvert is a file conversion service. CloudConvert API keys can be used to access and manage file conversion operations.",
 		}
 
 		if verify {
@@ -78,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CloudConvert
+}
+
+func (s Scanner) Description() string {
+	return "CloudConvert is a file conversion service. CloudConvert API keys can be used to access and manage file conversion operations."
 }

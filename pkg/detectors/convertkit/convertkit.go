@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Convertkit,
 			Raw:          []byte(resMatch),
-			Description:  "Convertkit is an email marketing service provider. API keys can be used to access and manage email marketing campaigns and subscriber data.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Convertkit
+}
+
+func (s Scanner) Description() string {
+	return "Convertkit is an email marketing service provider. API keys can be used to access and manage email marketing campaigns and subscriber data."
 }

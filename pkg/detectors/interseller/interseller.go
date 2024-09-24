@@ -2,9 +2,10 @@ package interseller
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -30,7 +31,7 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Interseller secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -44,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Interseller,
 			Raw:          []byte(resMatch),
-			Description:  "Interseller is a platform for automating email outreach. Interseller API keys can be used to manage and send email campaigns.",
 		}
 		if verify {
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://interseller.io/api/campaigns/list", nil)
@@ -70,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Interseller
+}
+
+func (s Scanner) Description() string {
+	return "Interseller is a platform for automating email outreach. Interseller API keys can be used to manage and send email campaigns."
 }

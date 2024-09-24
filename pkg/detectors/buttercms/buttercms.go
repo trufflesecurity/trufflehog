@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ButterCMS,
 			Raw:          []byte(resMatch),
-			Description:  "ButterCMS is a headless CMS that enables developers to build websites and applications with a content management system. The API keys can be used to access and modify content stored in ButterCMS.",
 		}
 
 		if verify {
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ButterCMS
+}
+
+func (s Scanner) Description() string {
+	return "ButterCMS is a headless CMS that enables developers to build websites and applications with a content management system. The API keys can be used to access and modify content stored in ButterCMS."
 }

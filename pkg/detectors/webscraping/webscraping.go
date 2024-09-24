@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Webscraping,
 			Raw:          []byte(resMatch),
-			Description:  "Webscraping API keys can be used to access web scraping services to extract data from websites.",
 		}
 
 		if verify {
@@ -76,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Webscraping
+}
+
+func (s Scanner) Description() string {
+	return "Webscraping API keys can be used to access web scraping services to extract data from websites."
 }

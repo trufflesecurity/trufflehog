@@ -76,7 +76,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_FTP,
 			Raw:          []byte(rawURL.String()),
 			Redacted:     redact,
-			Description:  "FTP is a protocol for reading and writing files. An FTP password can be used to read and sometimes write files",
 		}
 
 		if verify {
@@ -130,4 +129,8 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FTP
+}
+
+func (s Scanner) Description() string {
+	return "FTP is a protocol for reading and writing files. An FTP password can be used to read and sometimes write files."
 }

@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Hypertrack,
 				Raw:          []byte(resMatch),
-				Description:  "Hypertrack is a service that provides live location tracking for fleets and other mobile workforce management. Hypertrack keys can be used to access and manage these tracking services.",
 			}
 
 			if verify {
@@ -83,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Hypertrack
+}
+
+func (s Scanner) Description() string {
+	return "Hypertrack is a service that provides live location tracking for fleets and other mobile workforce management. Hypertrack keys can be used to access and manage these tracking services."
 }

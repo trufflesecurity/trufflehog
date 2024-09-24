@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ProspectCRM,
 			Raw:          []byte(resMatch),
-			Description:  "ProspectCRM is a customer relationship management system. The API keys can be used to access and manage customer data within ProspectCRM.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ProspectCRM
+}
+
+func (s Scanner) Description() string {
+	return "ProspectCRM is a customer relationship management system. The API keys can be used to access and manage customer data within ProspectCRM."
 }

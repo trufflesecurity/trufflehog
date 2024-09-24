@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_CustomerIO,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
-				Description:  "CustomerIO is a platform for sending automated emails, push notifications, and SMS messages. CustomerIO API keys can be used to interact with the CustomerIO service to manage customer data and trigger events.",
 			}
 
 			if verify {
@@ -89,4 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CustomerIO
+}
+
+func (s Scanner) Description() string {
+	return "CustomerIO is a platform for sending automated emails, push notifications, and SMS messages. CustomerIO API keys can be used to interact with the CustomerIO service to manage customer data and trigger events."
 }

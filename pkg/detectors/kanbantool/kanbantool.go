@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Kanbantool,
 				Raw:          []byte(resMatch),
-				Description:  "Kanbantool is a project management software that uses API keys for accessing and modifying project data.",
 			}
 			if verify {
 				url := fmt.Sprintf("https://%s.kanbantool.com/api/v3/users/current.json", resIdMatch)
@@ -82,4 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Kanbantool
+}
+
+func (s Scanner) Description() string {
+	return "Kanbantool is a project management software that uses API keys for accessing and modifying project data."
 }

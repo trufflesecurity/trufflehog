@@ -58,7 +58,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Guru,
 				Raw:          []byte(unameMatch),
-				Description:  "Guru is a knowledge management solution. Guru credentials can be used to access and manage knowledge within an organization.",
 			}
 
 			if verify {
@@ -88,4 +87,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Guru
+}
+
+func (s Scanner) Description() string {
+	return "Guru is a knowledge management solution. Guru credentials can be used to access and manage knowledge within an organization."
 }

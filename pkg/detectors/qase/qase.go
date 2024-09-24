@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Qase,
 			Raw:          []byte(resMatch),
-			Description:  "Qase is a test management platform that allows users to manage test cases, plans, and runs. Qase API tokens can be used to access and modify test data and settings.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Qase
+}
+
+func (s Scanner) Description() string {
+	return "Qase is a test management platform that allows users to manage test cases, plans, and runs. Qase API tokens can be used to access and modify test data and settings."
 }

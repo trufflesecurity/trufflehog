@@ -44,6 +44,11 @@ func (s Scanner) Keywords() []string {
 	return []string{"ATCTT3xFfG"}
 }
 
+// Description returns a description for the result being detected
+func (s Scanner) Description() string {
+	return "Atlassian is a software company that provides tools for project management, software development, and collaboration. Atlassian tokens can be used to access and manage these tools and services."
+}
+
 // FromData will find and optionally verify Atlassian secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -57,7 +62,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Atlassian,
 			Raw:          []byte(match),
-			Description:  "Atlassian is a software company that provides tools for project management, software development, and collaboration. Atlassian tokens can be used to access and manage these tools and services.",
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
 				"version":        fmt.Sprintf("%d", s.Version()),

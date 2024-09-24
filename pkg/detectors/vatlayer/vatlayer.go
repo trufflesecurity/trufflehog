@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_VatLayer,
 			Raw:          []byte(resMatch),
-			Description:  "VatLayer is a service that provides VAT number validation and VAT rate data for businesses. VatLayer keys can be used to access this service and retrieve VAT-related information.",
 		}
 
 		if verify {
@@ -80,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_VatLayer
+}
+
+func (s Scanner) Description() string {
+	return "VatLayer is a service that provides VAT number validation and VAT rate data for businesses. VatLayer keys can be used to access this service and retrieve VAT-related information."
 }

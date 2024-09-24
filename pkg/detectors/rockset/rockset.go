@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Rockset,
 			Raw:          []byte(resMatch),
-			Description:  "Rockset is a real-time analytics platform that allows for fast SQL queries on raw data. Rockset API keys can be used to access and manage data within the Rockset platform.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Rockset
+}
+
+func (s Scanner) Description() string {
+	return "Rockset is a real-time analytics platform that allows for fast SQL queries on raw data. Rockset API keys can be used to access and manage data within the Rockset platform."
 }

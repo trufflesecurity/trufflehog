@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Onfleet,
 			Raw:          []byte(match),
-			Description:  "Onfleet is a delivery management software that allows businesses to manage and analyze their delivery operations. Onfleet API keys can be used to access and manage the delivery data and operations.",
 		}
 
 		if verify {
@@ -98,4 +97,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Onfleet
+}
+
+func (s Scanner) Description() string {
+	return "Onfleet is a delivery management software that allows businesses to manage and analyze their delivery operations. Onfleet API keys can be used to access and manage the delivery data and operations."
 }

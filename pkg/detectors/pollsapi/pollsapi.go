@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PollsAPI,
 			Raw:          []byte(resMatch),
-			Description:  "PollsAPI is a service used for creating and managing polls. PollsAPI keys can be used to access and modify poll data.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PollsAPI
+}
+
+func (s Scanner) Description() string {
+	return "PollsAPI is a service used for creating and managing polls. PollsAPI keys can be used to access and modify poll data."
 }

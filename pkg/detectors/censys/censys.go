@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Censys,
 				Raw:          []byte(tokenPatMatch),
 				RawV2:        []byte(tokenPatMatch + userPatMatch),
-				Description:  "Censys is a search engine that enables researchers to ask questions about the hosts and networks that compose the Internet. Censys API keys can be used to access and query this data.",
 			}
 
 			if verify {
@@ -81,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Censys
+}
+
+func (s Scanner) Description() string {
+	return "Censys is a search engine that enables researchers to ask questions about the hosts and networks that compose the Internet. Censys API keys can be used to access and query this data."
 }

@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ZeroTier,
 			Raw:          []byte(resMatch),
-			Description:  "ZeroTier is a network virtualization technology that provides secure and flexible network connections. ZeroTier API keys can be used to manage and control these network connections.",
 		}
 
 		if verify {
@@ -84,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ZeroTier
+}
+
+func (s Scanner) Description() string {
+	return "ZeroTier is a network virtualization technology that provides secure and flexible network connections. ZeroTier API keys can be used to manage and control these network connections."
 }

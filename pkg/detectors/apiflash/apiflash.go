@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Apiflash,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resUrlMatch),
-				Description:  "Apiflash is a screenshot API service. Apiflash keys can be used to access and utilize the screenshot API service.",
 			}
 
 			if verify {
@@ -81,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Apiflash
+}
+
+func (s Scanner) Description() string {
+	return "Apiflash is a screenshot API service. Apiflash keys can be used to access and utilize the screenshot API service."
 }

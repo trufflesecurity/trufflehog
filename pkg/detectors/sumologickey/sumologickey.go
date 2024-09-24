@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SumoLogicKey,
 				Raw:          []byte(resMatch),
-				Description:  "Sumo Logic is a cloud-based machine data analytics service. Sumo Logic keys can be used to access and manage data within the Sumo Logic platform.",
 				ExtraData: map[string]string{
 					"rotation_guide": "https://howtorotate.com/docs/tutorials/sumologic/",
 				},
@@ -87,4 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SumoLogicKey
+}
+
+func (s Scanner) Description() string {
+	return "Sumo Logic is a cloud-based machine data analytics service. Sumo Logic keys can be used to access and manage data within the Sumo Logic platform."
 }

@@ -37,7 +37,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := matches {
+	for _, match := range matches {
 		if len(match) != 2 {
 			continue
 		}
@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Alconost,
 			Raw:          []byte(resMatch),
-			Description:  "Alconost is a translation and localization service. Alconost API keys can be used to access and modify translation data.",
 		}
 
 		if verify {
@@ -75,4 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Alconost
+}
+
+func (s Scanner) Description() string {
+	return "Alconost is a translation and localization service. Alconost API keys can be used to access and modify translation data."
 }

@@ -58,11 +58,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_GoCanvas,
 				Raw:          []byte(resMatch),
-				Description:  "GoCanvas is a platform for automating business processes using mobile forms. GoCanvas API keys can be used to access and modify data within the GoCanvas platform.",
 			}
 
 			if verify {
-
 				payload := url.Values{}
 				payload.Add("username", resEmailMatch)
 
@@ -105,4 +103,8 @@ type Response struct {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GoCanvas
+}
+
+func (s Scanner) Description() string {
+	return "GoCanvas is a platform for automating business processes using mobile forms. GoCanvas API keys can be used to access and modify data within the GoCanvas platform."
 }

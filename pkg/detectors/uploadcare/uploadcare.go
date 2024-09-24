@@ -54,7 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_UploadCare,
 				Raw:          []byte(resMatch),
-				Description:  "UploadCare is a service for handling file uploads and transformations. UploadCare keys can be used to manage and access files within the UploadCare system.",
 			}
 
 			if verify {
@@ -82,4 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_UploadCare
+}
+
+func (s Scanner) Description() string {
+	return "UploadCare is a service for handling file uploads and transformations. UploadCare keys can be used to manage and access files within the UploadCare system."
 }

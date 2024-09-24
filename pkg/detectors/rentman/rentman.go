@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Rentman,
 			Raw:          []byte(resMatch),
-			Description:  "Rentman is a resource management software for AV & Event production. Rentman API keys can be used to access and manage resources and data within the Rentman platform.",
 		}
 
 		if verify {
@@ -72,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Rentman
+}
+
+func (s Scanner) Description() string {
+	return "Rentman is a resource management software for AV & Event production. Rentman API keys can be used to access and manage resources and data within the Rentman platform."
 }

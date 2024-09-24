@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PostageApp,
 			Raw:          []byte(resMatch),
-			Description:  "PostageApp is a service for sending emails via their API. The API keys can be used to send emails and access account information.",
 		}
 
 		if verify {
@@ -55,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Content-Transfer-Encoding", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.close()
+				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
 				}
@@ -70,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PostageApp
+}
+
+func (s Scanner) Description() string {
+	return "PostageApp is a service for sending emails via their API. The API keys can be used to send emails and access account information."
 }

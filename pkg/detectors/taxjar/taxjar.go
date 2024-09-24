@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Taxjar,
 			Raw:          []byte(resMatch),
-			Description:  "Taxjar is a sales tax API that allows businesses to automate sales tax calculations, reporting, and filings. Taxjar API keys can be used to access and manage these services.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Taxjar
+}
+
+func (s Scanner) Description() string {
+	return "Taxjar is a sales tax API that allows businesses to automate sales tax calculations, reporting, and filings. Taxjar API keys can be used to access and manage these services."
 }

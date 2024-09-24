@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Ditto,
 			Raw:          []byte(resMatch),
-			Description:  "Ditto is a service that provides API access to various word variants. Ditto API keys can be used to access this service and retrieve word variants.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Ditto
+}
+
+func (s Scanner) Description() string {
+	return "Ditto is a service that provides API access to various word variants. Ditto API keys can be used to access this service and retrieve word variants."
 }

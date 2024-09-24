@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Geocode,
 			Raw:          []byte(resMatch),
-			Description:  "Geocode API keys can be used to access geolocation services, converting addresses into geographic coordinates and vice versa.",
 		}
 
 		if verify {
@@ -79,4 +78,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Geocode
+}
+
+func (s Scanner) Description() string {
+	return "Geocode API keys can be used to access geolocation services, converting addresses into geographic coordinates and vice versa."
 }

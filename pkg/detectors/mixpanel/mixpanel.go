@@ -55,7 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Mixpanel,
 				Raw:          []byte(tokenPatMatch),
-				Description:  "Mixpanel is an analytics service that tracks user interactions with web and mobile applications. Mixpanel keys can be used to access and analyze user data.",
 			}
 
 			if verify {
@@ -82,4 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mixpanel
+}
+
+func (s Scanner) Description() string {
+	return "Mixpanel is an analytics service that tracks user interactions with web and mobile applications. Mixpanel keys can be used to access and analyze user data."
 }

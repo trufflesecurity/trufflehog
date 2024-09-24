@@ -50,7 +50,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Mailgun,
 				Raw:          []byte(resMatch),
-				Description:  "Mailgun is an email automation service. Mailgun tokens can be used to send, receive, and track emails.",
 			}
 
 			if verify {
@@ -85,4 +84,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mailgun
+}
+
+func (s Scanner) Description() string {
+	return "Mailgun is an email automation service. Mailgun tokens can be used to send, receive, and track emails."
 }

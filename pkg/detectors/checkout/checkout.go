@@ -56,7 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_Checkout,
 				Raw:          []byte(resMatch),
 				RawV2:        []byte(resMatch + resIdMatch),
-				Description:  "Checkout is a global payment solution provider. Checkout API keys can be used to process payments and manage customer data.",
 			}
 
 			if verify {
@@ -84,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Checkout
+}
+
+func (s Scanner) Description() string {
+	return "Checkout is a global payment solution provider. Checkout API keys can be used to process payments and manage customer data."
 }

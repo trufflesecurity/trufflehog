@@ -45,7 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SurveySparrow,
 			Raw:          []byte(resMatch),
-			Description:  "SurveySparrow is a survey platform for collecting feedback and data. The detected key can be used to access and manage surveys and responses.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SurveySparrow
+}
+
+func (s Scanner) Description() string {
+	return "SurveySparrow is a survey platform for collecting feedback and data. The detected key can be used to access and manage surveys and responses."
 }

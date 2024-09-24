@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AssemblyAI,
 			Raw:          []byte(resMatch),
-			Description:  "AssemblyAI is a service that provides speech-to-text transcription. AssemblyAI keys can be used to access and utilize the transcription services provided by AssemblyAI.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AssemblyAI
+}
+
+func (s Scanner) Description() string {
+	return "AssemblyAI is a service that provides speech-to-text transcription. AssemblyAI keys can be used to access and utilize the transcription services provided by AssemblyAI."
 }

@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Whoxy,
 			Raw:          []byte(resMatch),
-			Description:  "Whoxy is a service used to retrieve WHOIS data for domain names. Whoxy API keys can be used to query WHOIS information.",
 		}
 
 		if verify {
@@ -77,4 +76,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Whoxy
+}
+
+func (s Scanner) Description() string {
+	return "Whoxy is a service used to retrieve WHOIS data for domain names. Whoxy API keys can be used to query WHOIS information."
 }

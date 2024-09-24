@@ -46,7 +46,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Eraser,
 			Raw:          []byte(match),
-			Description:  "Eraser is a tool used for generating diagrams from DSL. Eraser API tokens can be used to authenticate and interact with the Eraser API.",
 		}
 
 		if verify {
@@ -106,4 +105,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Eraser
+}
+
+func (s Scanner) Description() string {
+	return "Eraser is a tool used for generating diagrams from DSL. Eraser API tokens can be used to authenticate and interact with the Eraser API."
 }

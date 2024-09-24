@@ -43,7 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_LinkPreview,
 			Raw:          []byte(resMatch),
-			Description:  "LinkPreview is a service that provides information about a web page when given a URL. LinkPreview API keys can be used to access this service and retrieve metadata about web pages.",
 		}
 
 		if verify {
@@ -66,4 +65,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LinkPreview
+}
+
+func (s Scanner) Description() string {
+	return "LinkPreview is a service that provides information about a web page when given a URL. LinkPreview API keys can be used to access this service and retrieve metadata about web pages."
 }

@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Nftport,
 			Raw:          []byte(resMatch),
-			Description:  "Nftport is a service that allows users to interact with NFTs. Nftport API keys can be used to access and manage NFT data and transactions.",
 		}
 
 		if verify {
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Nftport
+}
+
+func (s Scanner) Description() string {
+	return "Nftport is a service that allows users to interact with NFTs. Nftport API keys can be used to access and manage NFT data and transactions."
 }
