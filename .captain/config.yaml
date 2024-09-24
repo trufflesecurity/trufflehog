@@ -1,6 +1,6 @@
 test-suites:
   detectors:
-    command: gotestsum --jsonfile tmp/go-test.json --raw-command -- go test -tags=detectors -timeout=15m -json -count=1 -vet=off ./pkg/detectors
+    command: gotestsum --jsonfile tmp/go-test.json --raw-command -- go test -tags=detectors -timeout=15m -json -count=1 -vet=off ./pkg/detectors/...
     results:
       path: tmp/go-test.json
     output:
