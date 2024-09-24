@@ -42,7 +42,7 @@ func (e *EndpointSetter) UseFoundEndpoints(enabled bool) {
 
 func (e *EndpointSetter) Endpoints(foundEndpoints ...string) []string {
 	endpoints := e.configuredEndpoints
-	if e.useCloudEndpoint {
+	if e.useCloudEndpoint && e.cloudEndpoint != "" {
 		endpoints = append(endpoints, e.cloudEndpoint)
 	}
 	if e.useFoundEndpoints {
