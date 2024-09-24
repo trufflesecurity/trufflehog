@@ -11,6 +11,10 @@ import (
 
 type UTF16 struct{}
 
+func (d *UTF16) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType_UTF16
+}
+
 func (d *UTF16) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	if chunk == nil || len(chunk.Data) == 0 {
 		return nil
@@ -26,10 +30,6 @@ func (d *UTF16) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	}
 
 	return nil
-}
-
-func (d *UTF16) Type() detectorspb.DecoderType {
-	return detectorspb.DecoderType_UTF16
 }
 
 // utf16ToUTF8 converts a byte slice containing UTF-16 encoded data to a UTF-8 encoded byte slice.

@@ -1,4 +1,4 @@
-name: detector test aggregation
+name: Detectors Aggregation
 
 on:
   workflow_dispatch:
@@ -14,35 +14,16 @@ jobs:
       contents: "read"
       id-token: "write"
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - name: Install gotestsum
+        uses: jaxxstorm/action-install-gh-release@v1.12.0
         with:
-          go-version: "1.22"
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - id: "auth"
-        uses: "google-github-actions/auth@v2"
-        with:
-          workload_identity_provider: "projects/811013774421/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
-          service_account: "github-ci-external@trufflehog-testing.iam.gserviceaccount.com"
-      - name: Test integration
-        continue-on-error: true
-        run: make test-integration
-      - name: Set up gotestsum
+          repo: gotestyourself/gotestsum
+      - uses: rwx-research/setup-captain@v1
+      - name: Test Go
         run: |
-          go install gotest.tools/gotestsum@latest
-          mkdir -p tmp/test-results
-      - name: Test detectors
-        run: |
-          CGO_ENABLED=1 gotestsum --junitfile tmp/test-results/test.xml --raw-command -- go test -json -tags=detectors -timeout=15m $(go list ./... | grep pkg/detectors)
-      - name: Upload test results to BuildPulse for flaky test detection
-        if: ${{ !cancelled() }} # Run this step even when the tests fail. Skip if the workflow is cancelled.
-        uses: buildpulse/buildpulse-action@main
-        with:
-          account: 79229934
-          repository: 694446374
-          path: |
-            tmp/test-results/*.xml
-          key: ${{ secrets.BUILDPULSE_DETECTORS_ACCESS_KEY_ID }}
-          secret: ${{ secrets.BUILDPULSE_DETECTORS_SECRET_ACCESS_KEY }}
-          tags: detectors
+          export CGO_ENABLED=1
+          captain run detectors
+        env:
+          RWX_ACCESS_TOKEN: ${{ secrets.RWX_ACCESS_TOKEN }}

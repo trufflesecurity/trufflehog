@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ElevenLabs,
 			Raw:          []byte(match),
-			ExtraData:    map[string]string{"version": "1"},
+			ExtraData: map[string]string{
+				"version":        "1",
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/elevenlabs/",
+			},
 		}
 
 		if verify {

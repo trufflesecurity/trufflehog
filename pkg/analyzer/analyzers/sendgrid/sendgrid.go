@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go sendgrid
+
 package sendgrid
 
 import (
@@ -13,7 +15,95 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Sendgrid }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, fmt.Errorf("missing key in credInfo")
+	}
+	info, err := AnalyzePermissions(a.Cfg, key)
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	var keyType string
+	if slices.Contains(info.RawScopes, "user.email.read") {
+		keyType = "full access"
+	} else if slices.Contains(info.RawScopes, "billing.read") {
+		keyType = "billing access"
+	} else {
+		keyType = "restricted access"
+	}
+
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Sendgrid,
+		Metadata: map[string]any{
+			"key_type":     keyType,
+			"2fa_required": slices.Contains(info.RawScopes, "2fa_required"),
+		},
+		Bindings:           []analyzers.Binding{},
+		UnboundedResources: []analyzers.Resource{},
+	}
+
+	for _, scope := range info.Scopes {
+		resource := getCategoryResource(scope)
+
+		if len(scope.Permissions) == 0 {
+			result.UnboundedResources = append(result.UnboundedResources, *resource)
+			continue
+		}
+
+		for _, permission := range scope.Permissions {
+			result.Bindings = append(result.Bindings, analyzers.Binding{
+				Resource: *resource,
+				Permission: analyzers.Permission{
+					Value: permission,
+				},
+			})
+		}
+	}
+
+	return &result
+}
+
+func getCategoryResource(scope SendgridScope) *analyzers.Resource {
+	categoryResource := &analyzers.Resource{
+		Name:               scope.Category,
+		FullyQualifiedName: scope.Category,
+		Type:               "category",
+		Metadata:           nil,
+	}
+
+	if scope.SubCategory != "" {
+		return &analyzers.Resource{
+			Name:               scope.SubCategory,
+			FullyQualifiedName: fmt.Sprintf("%s/%s", scope.Category, scope.SubCategory),
+			Type:               "category",
+			Metadata:           nil,
+			Parent:             categoryResource,
+		}
+	}
+
+	return categoryResource
+}
 
 type ScopesJSON struct {
 	Scopes []string `json:"scopes"`
@@ -21,9 +111,10 @@ type ScopesJSON struct {
 
 type SecretInfo struct {
 	RawScopes []string
+	Scopes    []SendgridScope
 }
 
-func printPermissions(show_all bool) {
+func printPermissions(info *SecretInfo, show_all bool) {
 	fmt.Print("\n\n")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -33,7 +124,7 @@ func printPermissions(show_all bool) {
 		t.AppendHeader(table.Row{"Scope", "Sub-Scope", "Access"})
 	}
 	// Print the scopes
-	for _, s := range SCOPES {
+	for _, s := range info.Scopes {
 		writer := analyzers.GetWriterFromStatus(s.PermissionType)
 		if show_all {
 			t.AppendRow([]interface{}{writer(s.Category), writer(s.SubCategory), writer(s.PermissionType), writer(strings.Join(s.Permissions, "\n"))})
@@ -49,11 +140,11 @@ func printPermissions(show_all bool) {
 // It will return the most specific category possible.
 // For example, if the scope is "mail.send.read", it will return "Mail Send", not just "Mail"
 // since it's searching "mail.send.read" -> "mail.send" -> "mail"
-func getScopeIndex(scope string) int {
+func getScopeIndex(categories []SendgridScope, scope string) int {
 	splitScope := strings.Split(scope, ".")
 	for i := len(splitScope); i > 0; i-- {
 		searchScope := strings.Join(splitScope[:i], ".")
-		for i, s := range SCOPES {
+		for i, s := range categories {
 			for _, prefix := range s.Prefixes {
 				if strings.HasPrefix(searchScope, prefix) {
 					return i
@@ -64,24 +155,36 @@ func getScopeIndex(scope string) int {
 	return -1
 }
 
-func processPermissions(rawScopes []string) {
+func processPermissions(rawScopes []string) []SendgridScope {
+	categoryPermissions := make([]SendgridScope, len(SCOPES))
+
+	// copy all scope categories to the categoryPermissions slice
+	copy(categoryPermissions, SCOPES)
 	for _, scope := range rawScopes {
 		// Skip these scopes since they are not useful for this analysis
 		if scope == "2fa_required" || scope == "sender_verification_eligible" {
 			continue
 		}
-		ind := getScopeIndex(scope)
+
+		// must be part of generated permissions
+		if _, ok := StringToPermission[scope]; !ok {
+			continue
+		}
+		ind := getScopeIndex(categoryPermissions, scope)
 		if ind == -1 {
 			//color.Red("[!] Scope not found: %v", scope)
 			continue
 		}
-		s := &SCOPES[ind]
+		s := &categoryPermissions[ind]
 		s.AddPermission(scope)
 	}
+
 	// Run tests to determine the permission type
-	for i := range SCOPES {
-		SCOPES[i].RunTests()
+	for i := range categoryPermissions {
+		categoryPermissions[i].RunTests()
 	}
+
+	return categoryPermissions
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
@@ -105,7 +208,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		color.Yellow("[i] 2FA Required for this account")
 	}
 
-	printPermissions(cfg.ShowAll)
+	printPermissions(info, cfg.ShowAll)
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
@@ -133,7 +236,10 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// Now you can access the scopes
 	rawScopes := jsonScopes.Scopes
 
-	processPermissions(rawScopes)
+	categoryScope := processPermissions(rawScopes)
 
-	return &SecretInfo{RawScopes: rawScopes}, nil
+	return &SecretInfo{
+		RawScopes: rawScopes,
+		Scopes:    categoryScope,
+	}, nil
 }

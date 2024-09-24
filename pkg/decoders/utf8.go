@@ -10,6 +10,10 @@ import (
 
 type UTF8 struct{}
 
+func (d *UTF8) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType_PLAIN
+}
+
 func (d *UTF8) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	if chunk == nil || len(chunk.Data) == 0 {
 		return nil
@@ -23,10 +27,6 @@ func (d *UTF8) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	}
 
 	return decodableChunk
-}
-
-func (d *UTF8) Type() detectorspb.DecoderType {
-	return detectorspb.DecoderType_PLAIN
 }
 
 // extractSubstrings performs similarly to the strings binutil,

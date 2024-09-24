@@ -92,7 +92,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			} else {
 				s1.Verified = false
-
+			}
+			s1.AnalysisInfo = map[string]string{
+				"key": resMatch,
 			}
 		}
 

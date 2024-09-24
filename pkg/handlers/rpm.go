@@ -9,6 +9,7 @@ import (
 	"github.com/sassoftware/go-rpmutils"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
 // rpmHandler specializes archiveHandler to manage RPM package files.
@@ -23,6 +24,11 @@ func newRPMHandler() *rpmHandler {
 // handle RPM specific archive operations.
 func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
+
+	if feature.ForceSkipArchives.Load() {
+		close(archiveChan)
+		return archiveChan, nil
+	}
 
 	go func() {
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)

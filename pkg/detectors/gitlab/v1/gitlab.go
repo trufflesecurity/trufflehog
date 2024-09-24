@@ -25,10 +25,11 @@ var (
 	_ detectors.Detector           = (*Scanner)(nil)
 	_ detectors.EndpointCustomizer = (*Scanner)(nil)
 	_ detectors.Versioner          = (*Scanner)(nil)
+	_ detectors.CloudProvider      = (*Scanner)(nil)
 )
 
-func (Scanner) Version() int            { return 1 }
-func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
+func (Scanner) Version() int          { return 1 }
+func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -87,7 +88,7 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, error
 	if client == nil {
 		client = defaultClient
 	}
-	for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
+	for _, baseURL := range s.Endpoints() {
 		// test `read_user` scope
 		req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
 		if err != nil {
