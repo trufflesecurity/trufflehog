@@ -99,7 +99,7 @@ require (
 	github.com/xanzy/go-gitlab v0.109.0
 	github.com/xo/dburl v0.23.2
 	go.mongodb.org/mongo-driver v1.17.0
-	go.uber.org/automaxprocs v1.5.3
+	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.27.0
