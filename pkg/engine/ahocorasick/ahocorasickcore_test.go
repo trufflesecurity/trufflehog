@@ -29,6 +29,8 @@ func (testDetectorV1) Type() detectorspb.DetectorType {
 
 func (testDetectorV1) Version() int { return 1 }
 
+func (testDetectorV1) Description() string { return "" }
+
 type testDetectorV2 struct {
 }
 
@@ -45,6 +47,8 @@ func (testDetectorV2) Type() detectorspb.DetectorType {
 }
 
 func (testDetectorV2) Version() int { return 2 }
+
+func (testDetectorV2) Description() string { return "" }
 
 type testDetectorV3 struct {
 }
@@ -63,6 +67,8 @@ func (testDetectorV3) Type() detectorspb.DetectorType {
 
 func (testDetectorV3) Version() int { return 1 }
 
+func (testDetectorV3) Description() string { return "" }
+
 var _ detectors.Detector = (*testDetectorV4)(nil)
 var _ detectors.MultiPartCredentialProvider = (*testDetectorV4)(nil)
 var _ detectors.StartOffsetProvider = (*testDetectorV4)(nil)
@@ -78,6 +84,8 @@ func (testDetectorV4) Keywords() []string { return []string{"password"} }
 func (testDetectorV4) Type() detectorspb.DetectorType { return TestDetectorType }
 
 func (testDetectorV4) Version() int { return 1 }
+
+func (testDetectorV4) Description() string { return "" }
 
 func (testDetectorV4) MaxCredentialSpan() int64 { return 15 }
 
@@ -99,6 +107,8 @@ func (testDetectorV5) Type() detectorspb.DetectorType { return TestDetectorType 
 
 func (testDetectorV5) Version() int { return 1 }
 
+func (testDetectorV5) Description() string { return "" }
+
 func (testDetectorV5) MaxSecretSize() int64 { return 10 }
 
 func (testDetectorV5) StartOffset() int64 { return 3 }
@@ -118,6 +128,8 @@ func (testDetectorV6) Keywords() []string { return []string{"password"} }
 func (testDetectorV6) Type() detectorspb.DetectorType { return TestDetectorType }
 
 func (testDetectorV6) Version() int { return 1 }
+
+func (testDetectorV6) Description() string { return "" }
 
 func (testDetectorV6) StartOffset() int64 { return 1 }
 

@@ -83,3 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Coda
 }
+
+func (s Scanner) Description() string {
+	return "Coda is a platform for building collaborative documents and applications. Coda API keys can be used to access and manipulate data within Coda documents and applications."
+}

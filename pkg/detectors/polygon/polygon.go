@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Polygon
 }
+
+func (s Scanner) Description() string {
+	return "Polygon is a protocol and a framework for building and connecting Ethereum-compatible blockchain networks. Polygon API keys can be used to interact with its services and access blockchain data."
+}

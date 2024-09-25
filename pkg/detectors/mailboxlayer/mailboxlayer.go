@@ -31,7 +31,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"mailboxlayer"}
 }
 
-// FromData will find and optionally verify Mailboxplayer secrets in a given set of bytes.
+// FromData will find and optionally verify Mailboxlayer secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -82,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mailboxlayer
+}
+
+func (s Scanner) Description() string {
+	return "Mailboxlayer is an email validation and verification service. Mailboxlayer API keys can be used to validate and verify email addresses."
 }

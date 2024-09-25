@@ -155,6 +155,10 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
 }
 
+func (s Scanner) Description() string {
+	return "Private keys are used for securely connecting and authenticating to various systems and services. Exposure of private keys can lead to unauthorized access and data breaches."
+}
+
 type result struct {
 	CertificateURLs []string
 	GitHubUsername  string

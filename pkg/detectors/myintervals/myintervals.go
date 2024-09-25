@@ -75,3 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MyIntervals
 }
+
+func (s Scanner) Description() string {
+	return "MyIntervals is a project management tool that helps in tracking time, managing tasks, and organizing projects. MyIntervals API keys can be used to access and modify project data and user information."
+}

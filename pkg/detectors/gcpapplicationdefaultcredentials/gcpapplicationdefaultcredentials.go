@@ -170,3 +170,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GCPApplicationDefaultCredentials
 }
+
+func (s Scanner) Description() string {
+	return "GCP Application Default Credentials are used to authenticate and authorize API requests to Google Cloud services."
+}

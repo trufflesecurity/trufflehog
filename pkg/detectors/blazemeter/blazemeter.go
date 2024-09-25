@@ -73,3 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Blazemeter
 }
+
+func (s Scanner) Description() string {
+	return "Blazemeter is a continuous testing platform for DevOps. The keys can be used to access and manage performance tests and other resources."
+}

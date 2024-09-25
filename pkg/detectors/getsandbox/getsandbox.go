@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GetSandbox
 }
+
+func (s Scanner) Description() string {
+	return "GetSandbox is a service for creating and managing sandboxes. GetSandbox API keys can be used to access and control these sandboxes."
+}

@@ -83,3 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Billomat
 }
+
+func (s Scanner) Description() string {
+	return "Billomat is an online invoicing software. Billomat API keys can be used to access and manage invoices, clients, and other related data."
+}

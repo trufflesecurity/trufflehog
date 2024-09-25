@@ -111,3 +111,7 @@ func verifyResult(ctx context.Context, client *http.Client, token string) (bool,
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Signable
 }
+
+func (s Scanner) Description() string {
+	return "Signable is a service used for electronic signatures. Signable tokens can be used to authenticate and access Signable's API services."
+}

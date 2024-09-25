@@ -36,6 +36,11 @@ func (s Scanner) Keywords() []string {
 	return []string{"opsgenie"}
 }
 
+// Description returns a description for the result being detected
+func (s Scanner) Description() string {
+	return "Opsgenie is an alerting and incident management platform. Opsgenie API keys can be used to interact with the Opsgenie API to manage alerts and incidents."
+}
+
 // FromData will find and optionally verify Opsgenie secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)

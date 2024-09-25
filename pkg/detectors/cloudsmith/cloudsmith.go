@@ -84,3 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Cloudsmith
 }
+
+func (s Scanner) Description() string {
+	return "Cloudsmith is a cloud-native package management service. Cloudsmith API keys can be used to manage and distribute packages."
+}

@@ -66,3 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Graphhopper
 }
+
+func (s Scanner) Description() string {
+	return "Graphhopper provides a routing engine for route planning and navigation. The API keys can be used to access and utilize the Graphhopper routing services."
+}

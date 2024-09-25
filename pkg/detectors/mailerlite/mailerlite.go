@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mailerlite
 }
+
+func (s Scanner) Description() string {
+	return "MailerLite is an email marketing service that allows users to create and manage email campaigns. MailerLite API keys can be used to access and modify email campaign data."
+}

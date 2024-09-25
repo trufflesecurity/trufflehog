@@ -117,3 +117,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ElevenLabs
 }
+
+func (s Scanner) Description() string {
+	return "Elevenlabs is an AI-driven voice synthesis platform. Elevenlabs API keys can be used to access and manipulate voice synthesis features and services."
+}

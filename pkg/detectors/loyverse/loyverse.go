@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Loyverse
 }
+
+func (s Scanner) Description() string {
+	return "Loyverse is a point of sale (POS) system that allows businesses to manage sales, inventory, and customer relationships. Loyverse API keys can be used to access and modify this data."
+}

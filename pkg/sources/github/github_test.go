@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -566,8 +567,18 @@ func TestEnumerate(t *testing.T) {
 	s.cacheRepoInfo(repo)
 	s.filteredRepoCache.Set(repo.GetFullName(), repo.GetCloneURL())
 
+	var reportedRepos []string
+	reporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
+			url, _ := su.SourceUnitID()
+			reportedRepos = append(reportedRepos, url)
+			return nil
+		},
+	}
+
 	// Act
-	err := s.enumerate(context.Background())
+	err := s.Enumerate(context.Background(), reporter)
+	slices.Sort(reportedRepos)
 
 	// Assert
 	assert.Nil(t, err)
@@ -576,6 +587,8 @@ func TestEnumerate(t *testing.T) {
 	assert.True(t, s.filteredRepoCache.Exists("super-secret-user/super-secret-repo"))
 	assert.True(t, s.filteredRepoCache.Exists("cached-user/cached-repo"))
 	assert.True(t, s.filteredRepoCache.Exists("2801a2b0523099d0614a951579d99ba9"))
+	assert.Equal(t, 3, len(s.repos))
+	assert.Equal(t, s.repos, reportedRepos)
 	// Enumeration cached all repos.
 	assert.Equal(t, 3, len(s.repoInfoCache.cache))
 	_, ok := s.repoInfoCache.get("https://github.com/super-secret-user/super-secret-repo.git")
@@ -640,7 +653,7 @@ func BenchmarkEnumerate(b *testing.B) {
 		setupMocks(b)
 
 		b.StartTimer()
-		_ = s.enumerate(context.Background())
+		_ = s.Enumerate(context.Background(), noopReporter())
 	}
 }
 

@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Restpack
 }
+
+func (s Scanner) Description() string {
+	return "Restpack is a service that provides APIs for converting HTML to PDF, taking screenshots, and more. Restpack API keys can be used to access these services."
+}

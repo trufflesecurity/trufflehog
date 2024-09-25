@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Openuv
 }
+
+func (s Scanner) Description() string {
+	return "Openuv provides UV index data through its API. These API keys can be used to access UV index information."
+}

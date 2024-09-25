@@ -100,3 +100,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LiveAgent
 }
+
+func (s Scanner) Description() string {
+	return "LiveAgent is a help desk software that provides a customer service platform. The API key allows access to various functionalities of the LiveAgent service."
+}

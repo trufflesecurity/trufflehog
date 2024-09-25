@@ -138,3 +138,7 @@ type errorInfo struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GoogleOauth2
 }
+
+func (s Scanner) Description() string {
+	return "Google OAuth 2.0 tokens are used for authenticating and authorizing access to Google APIs and services."
+}

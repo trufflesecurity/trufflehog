@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Owlbot
 }
+
+func (s Scanner) Description() string {
+	return "Owlbot is an API service providing dictionary definitions, synonyms, and example sentences. Owlbot API keys can be used to access and retrieve this data."
+}

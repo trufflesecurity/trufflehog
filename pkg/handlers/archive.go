@@ -23,9 +23,8 @@ const (
 var (
 	// NOTE: This is a temporary workaround for |openArchive| incrementing depth twice per archive.
 	// See: https://github.com/trufflesecurity/trufflehog/issues/2942
-	maxDepth   = 5 * 2
-	maxSize    = 2 << 30 // 2 GB
-	maxTimeout = time.Duration(30) * time.Second
+	maxDepth = 5 * 2
+	maxSize  = 2 << 30 // 2 GB
 )
 
 // SetArchiveMaxSize sets the maximum size of the archive.
@@ -33,9 +32,6 @@ func SetArchiveMaxSize(size int) { maxSize = size }
 
 // SetArchiveMaxDepth sets the maximum depth of the archive.
 func SetArchiveMaxDepth(depth int) { maxDepth = depth }
-
-// SetArchiveMaxTimeout sets the maximum timeout for the archive handler.
-func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 
 // archiveHandler is a handler for common archive files that are supported by the archiver library.
 type archiveHandler struct{ *defaultHandler }
@@ -57,8 +53,6 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 	}
 
 	go func() {
-		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
-		defer cancel()
 		defer close(dataChan)
 
 		// Update the metrics for the file processing.
@@ -84,6 +78,9 @@ var ErrMaxDepthReached = errors.New("max archive depth reached")
 // it either decompresses or extracts the contents directly, sending data to the provided channel.
 // Returns an error if the archive cannot be processed due to issues like exceeding maximum depth or unsupported formats.
 func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader fileReader, archiveChan chan []byte) error {
+	ctx.Logger().V(4).Info("Starting archive processing", "depth", depth)
+	defer ctx.Logger().V(4).Info("Finished archive processing", "depth", depth)
+
 	if common.IsDone(ctx) {
 		return ctx.Err()
 	}
@@ -206,6 +203,7 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
 
+		lCtx.Logger().V(4).Info("Processed file successfully", "filename", file.Name(), "size", file.Size())
 		return h.openArchive(lCtx, depth, rdr, archiveChan)
 	}
 }

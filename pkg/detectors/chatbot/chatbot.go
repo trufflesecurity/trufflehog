@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Chatbot
 }
+
+func (s Scanner) Description() string {
+	return "Chatbot API keys are used to interact with the Chatbot service, allowing access to create, modify, and retrieve chatbot stories and other resources."
+}

@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Swiftype
 }
+
+func (s Scanner) Description() string {
+	return "Swiftype is a search technology that provides powerful search solutions for websites and applications. Swiftype keys can be used to access and manipulate search data."
+}

@@ -113,3 +113,7 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureBatch
 }
+
+func (s Scanner) Description() string {
+	return "Azure Batch is a cloud service that provides large-scale parallel and high-performance computing (HPC) applications efficiently in the cloud. Azure Batch account keys can be used to manage and control access to these resources."
+}

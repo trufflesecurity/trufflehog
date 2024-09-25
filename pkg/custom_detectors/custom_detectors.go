@@ -254,3 +254,12 @@ func permutateMatches(regexMatches map[string][][]string) []map[string][]string 
 func (c *CustomRegexWebhook) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CustomRegex
 }
+
+const defaultDescription = "This is a customer-defined detector with no description provided."
+
+func (c *CustomRegexWebhook) Description() string {
+	if c.GetDescription() == "" {
+		return defaultDescription
+	}
+	return c.GetDescription()
+}

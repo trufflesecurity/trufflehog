@@ -193,3 +193,7 @@ func verifyMatch(ctx context.Context, client *http.Client, apiKey, base64Private
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RobinhoodCrypto
 }
+
+func (s Scanner) Description() string {
+	return "Robinhood Crypto API keys can be used to access and trade cryptocurrencies on the Robinhood platform."
+}

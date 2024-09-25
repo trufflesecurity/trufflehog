@@ -108,3 +108,7 @@ func verifyAdzuna(ctx context.Context, client *http.Client, resMatch, resIdMatch
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Adzuna
 }
+
+func (s Scanner) Description() string {
+	return "Adzuna is a job search engine used to find job listings. Adzuna API keys can be used to access job listing data."
+}
