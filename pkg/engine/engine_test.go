@@ -1043,3 +1043,26 @@ func TestEngine_ShouldVerifyChunk(t *testing.T) {
 		}
 	}
 }
+
+func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
+	ctx := context.Background()
+	conf := Config{
+		Concurrency:   1,
+		Detectors:     DefaultDetectors(),
+		Verify:        false,
+		SourceManager: sources.NewManager(),
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
+
+	for _, det := range e.detectors {
+		if endpoints, ok := det.(interface{ Endpoints(...string) []string }); ok {
+			id := config.GetDetectorID(det)
+			if len(endpoints.Endpoints()) == 0 {
+				t.Fatalf("detector %q Endpoints() is empty", id.String())
+			}
+		}
+	}
+}
