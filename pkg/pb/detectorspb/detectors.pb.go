@@ -1100,6 +1100,7 @@ const (
 	DetectorType_RobinhoodCrypto                         DetectorType = 996
 	DetectorType_NVAPI                                   DetectorType = 997
 	DetectorType_PyPI                                    DetectorType = 998
+	DetectorType_Onfido                                  DetectorType = 999
 )
 
 // Enum value maps for DetectorType.
@@ -2100,6 +2101,7 @@ var (
 		996: "RobinhoodCrypto",
 		997: "NVAPI",
 		998: "PyPI",
+		999: "Onfido",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3097,6 +3099,7 @@ var (
 		"RobinhoodCrypto":                  996,
 		"NVAPI":                            997,
 		"PyPI":                             998,
+		"Onfido":                           999,
 	}
 )
 
