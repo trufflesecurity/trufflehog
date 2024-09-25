@@ -268,6 +268,20 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		return nil, err
 	}
 
+	// Abuse filters to initialize endpoint customizer detectors.
+	filters = append(filters, func(d detectors.Detector) bool {
+		customizer, ok := d.(detectors.EndpointCustomizer)
+		if !ok {
+			return true
+		}
+		customizer.UseFoundEndpoints(true)
+		customizer.UseCloudEndpoint(true)
+		if cloudProvider, ok := d.(detectors.CloudProvider); ok {
+			customizer.SetCloudEndpoint(cloudProvider.CloudEndpoint())
+		}
+		return true
+	})
+
 	if len(detectorsWithCustomVerifierEndpoints) > 0 {
 		filters = append(filters, func(d detectors.Detector) bool {
 			urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
