@@ -32,7 +32,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 
-	apiToken = regexp.MustCompile(detectors.PrefixRegex([]string{"railwayapp", "railway"}) +
+	apiToken = regexp.MustCompile(detectors.PrefixRegex([]string{"railway"}) +
 		`\b([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})\b`)
 )
 
@@ -47,7 +47,7 @@ func (s Scanner) getClient() *http.Client {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"railwayapp", "railway"}
+	return []string{"railway"}
 }
 
 func (s Scanner) Description() string {
