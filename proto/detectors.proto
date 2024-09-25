@@ -715,7 +715,7 @@ enum DetectorType {
   Goshippo = 703;
   Sigopt = 704;
   Sugester = 705;
-  Viewneo = 706; 
+  Viewneo = 706;
   BoostNote = 707;
   CaptainData = 708;
   Checkvist = 709;
@@ -1008,6 +1008,7 @@ enum DetectorType {
   RobinhoodCrypto = 996;
   NVAPI = 997;
   PyPI = 998;
+  RailwayApp = 999;
 }
 
 message Result {
