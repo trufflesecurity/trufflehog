@@ -1246,7 +1246,9 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return err
 	}
 	// Wait must be called after closing the pipe (defer is a stack, so first defer is executed last)
-	defer catCmd.Wait()
+	defer func() {
+		_ = catCmd.Wait()
+	}()
 	defer stdout.Close()
 
 	err = handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
