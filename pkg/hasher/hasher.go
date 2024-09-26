@@ -68,10 +68,10 @@ func (b *baseHasher) Hash(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	b.hash.Reset()
-	_, err := b.hash.Write(data)
-	if err != nil {
-		return nil, err
-	}
+	// nolint:errcheck
+	// The hash.Hash interface does not return errors on Write.
+	// (https://cs.opensource.google/go/go/+/refs/tags/go1.23.1:src/hash/hash.go;l=27-28)
+	_, _ = b.hash.Write(data)
 	return b.hash.Sum(nil), nil
 }
 
