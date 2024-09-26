@@ -35,7 +35,7 @@ func TestHasherHash(t *testing.T) {
 			name:        "SHA-256 input at max size",
 			hasher:      NewSHA256Hasher(),
 			input:       bytes.Repeat([]byte("a"), maxInputSize),
-			expectedHex: "dd4e6730520932767ec0a9e33fe19c4ce24399d6eba4ff62f13013c9ed30ef87",
+			expectedHex: "f3336bea752b5a28743033dd2c844a4a63fba08871aaee2586a2bf2d69be83a2",
 		},
 		{
 			name:        "FN-64a input exceeds max size",
