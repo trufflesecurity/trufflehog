@@ -806,7 +806,7 @@ import (
 )
 
 func DefaultDetectors() []detectors.Detector {
-	return []detectors.Detector{
+	detectorList := []detectors.Detector{
 		&heroku.Scanner{},
 		&pypi.Scanner{},
 		&linearapi.Scanner{},
@@ -1635,6 +1635,23 @@ func DefaultDetectors() []detectors.Detector {
 		nvapi.Scanner{},
 		railwayapp.Scanner{},
 	}
+
+	// Automatically initialize all detectors that implement
+	// EndpointCustomizer and/or CloudProvider interfaces.
+	for _, d := range detectorList {
+		customizer, ok := d.(detectors.EndpointCustomizer)
+		if !ok {
+			continue
+		}
+		// Default to always use the cloud endpoints (if available) and the found endpoints.
+		customizer.UseFoundEndpoints(true)
+		customizer.UseCloudEndpoint(true)
+		if cloudProvider, ok := d.(detectors.CloudProvider); ok {
+			customizer.SetCloudEndpoint(cloudProvider.CloudEndpoint())
+		}
+	}
+
+	return detectorList
 }
 
 func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]struct{} {
