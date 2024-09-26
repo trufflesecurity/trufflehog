@@ -1245,12 +1245,20 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	if err != nil {
 		return err
 	}
+	defer stdout.Close()
 
-	if err = handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives)); err != nil {
+	err = handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+
+	// Always call Wait() to ensure the process is properly cleaned up
+	waitErr := cmd.Wait()
+
+	// If there was an error in HandleFile, return that error
+	if err != nil {
 		return err
 	}
 
-	return cmd.Wait()
+	// If Wait() resulted in an error, return that error
+	return waitErr
 }
 
 func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, error) {
