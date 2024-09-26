@@ -267,21 +267,6 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Abuse filters to initialize endpoint customizer detectors.
-	filters = append(filters, func(d detectors.Detector) bool {
-		customizer, ok := d.(detectors.EndpointCustomizer)
-		if !ok {
-			return true
-		}
-		customizer.UseFoundEndpoints(true)
-		customizer.UseCloudEndpoint(true)
-		if cloudProvider, ok := d.(detectors.CloudProvider); ok {
-			customizer.SetCloudEndpoint(cloudProvider.CloudEndpoint())
-		}
-		return true
-	})
-
 	if len(detectorsWithCustomVerifierEndpoints) > 0 {
 		filters = append(filters, func(d detectors.Detector) bool {
 			urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
@@ -293,18 +278,13 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 				return false
 			}
 
-			if !cfg.CustomVerifiersOnly || len(urls) == 0 {
-				customizer.UseFoundEndpoints(true)
-				customizer.UseCloudEndpoint(true)
+			if cfg.CustomVerifiersOnly && len(urls) > 0 {
+				customizer.UseCloudEndpoint(false)
+				customizer.UseFoundEndpoints(false)
 			}
 
 			if err := customizer.SetConfiguredEndpoints(urls...); err != nil {
 				return false
-			}
-
-			cloudProvider, ok := d.(detectors.CloudProvider)
-			if ok {
-				customizer.SetCloudEndpoint(cloudProvider.CloudEndpoint())
 			}
 
 			return true
