@@ -152,11 +152,11 @@ func TestMutexHasherConcurrentHash(t *testing.T) {
 	}
 }
 
-// BenchmarkHasherWithMutex benchmarks hashing using a single SHA-256 Hasher instance
+var sampleData = []byte("The quick brown fox jumps over the lazy dog")
+
+// BenchmarkHasherWithMutex_SHA256 benchmarks hashing using a single SHA-256 Hasher instance
 // protected by a sync.Mutex across multiple goroutines.
 func BenchmarkHasherWithMutex_SHA256(b *testing.B) {
-	sampleData := []byte("The quick brown fox jumps over the lazy dog")
-
 	mutexHasher := NewMutexHasher(NewSHA256Hasher())
 
 	b.ReportAllocs()
@@ -170,11 +170,9 @@ func BenchmarkHasherWithMutex_SHA256(b *testing.B) {
 	})
 }
 
-// BenchmarkHasherPerGoroutine benchmarks hashing using separate SHA-256 Hasher instances
+// BenchmarkHasherPerGoroutine_SHA256 benchmarks hashing using separate SHA-256 Hasher instances
 // for each goroutine, eliminating the need for synchronization.
 func BenchmarkHasherPerGoroutine_SHA256(b *testing.B) {
-	sampleData := []byte("The quick brown fox jumps over the lazy dog")
-
 	b.ReportAllocs()
 	b.ResetTimer()
 
@@ -188,11 +186,9 @@ func BenchmarkHasherPerGoroutine_SHA256(b *testing.B) {
 	})
 }
 
-// BenchmarkHasherWithMutex benchmarks hashing using a single FNV-64a Hasher instance
+// BenchmarkHasherWithMutex_FNV benchmarks hashing using a single FNV-64a Hasher instance
 // protected by a sync.Mutex across multiple goroutines.
 func BenchmarkHasherWithMutex_FNV(b *testing.B) {
-	sampleData := []byte("The quick brown fox jumps over the lazy dog")
-
 	mutexHasher := NewMutexHasher(NewFNVHasher())
 
 	b.ReportAllocs()
@@ -206,16 +202,45 @@ func BenchmarkHasherWithMutex_FNV(b *testing.B) {
 	})
 }
 
-// BenchmarkHasherPerGoroutine benchmarks hashing using separate FNV-64a Hasher instances
+// BenchmarkHasherPerGoroutine_FNV benchmarks hashing using separate FNV-64a Hasher instances
 // for each goroutine, eliminating the need for synchronization.
 func BenchmarkHasherPerGoroutine_FNV(b *testing.B) {
-	sampleData := []byte("The quick brown fox jumps over the lazy dog")
-
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		hasher := NewFNVHasher()
+		for pb.Next() {
+			_, err := hasher.Hash(sampleData)
+			assert.NoError(b, err)
+		}
+	})
+}
+
+// BenchmarkHasherWithMutex_Blake2b benchmarks hashing using a single Blake2b Hasher instance
+// protected by a sync.Mutex across multiple goroutines.
+func BenchmarkHasherWithMutex_Blake2b(b *testing.B) {
+	mutexHasher := NewMutexHasher(NewBlaker2bHasher())
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, err := mutexHasher.Hash(sampleData)
+			assert.NoError(b, err)
+		}
+	})
+}
+
+// BenchmarkHasherPerGoroutine_Blake2b benchmarks hashing using separate Blake2b Hasher instances
+// for each goroutine, eliminating the need for synchronization.
+func BenchmarkHasherPerGoroutine_Blake2b(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		hasher := NewBlaker2bHasher()
 		for pb.Next() {
 			_, err := hasher.Hash(sampleData)
 			assert.NoError(b, err)
