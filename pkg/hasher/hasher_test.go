@@ -18,16 +18,22 @@ func TestHasherHash(t *testing.T) {
 		expectError error
 	}{
 		{
-			name:        "SHA-256 with 'Hello, World!'",
-			hasher:      NewSHA256Hasher(),
+			name:        "Blake2b with 'Hello, World!'",
+			hasher:      NewBlaker2bHasher(),
 			input:       []byte("Hello, World!"),
-			expectedHex: "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f",
+			expectedHex: "511bc81dde11180838c562c82bb35f3223f46061ebde4a955c27b3f489cf1e03",
 		},
 		{
-			name:        "SHA-256 input at max size",
-			hasher:      NewSHA256Hasher(),
+			name:        "Blake2b input at max size",
+			hasher:      NewBlaker2bHasher(),
 			input:       bytes.Repeat([]byte("a"), maxInputSize),
-			expectedHex: "f3336bea752b5a28743033dd2c844a4a63fba08871aaee2586a2bf2d69be83a2",
+			expectedHex: "605fd8458957df95394e9bf812f385264267c679e4899dc198ca67db4029d0ea",
+		},
+		{
+			name:        "Blake2b empty input",
+			hasher:      NewBlaker2bHasher(),
+			input:       []byte(""),
+			expectedHex: "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
 		},
 	}
 
@@ -74,7 +80,7 @@ func checkError(t *testing.T, err, expectError error, inputSize int) {
 func TestBaseHasherHashIdempotency(t *testing.T) {
 	t.Parallel()
 
-	hasher := NewSHA256Hasher()
+	hasher := NewBlaker2bHasher()
 	input := bytes.Repeat([]byte("a"), maxInputSize)
 
 	hash1, err1 := hasher.Hash(input)
@@ -88,28 +94,7 @@ func TestBaseHasherHashIdempotency(t *testing.T) {
 	}
 }
 
-const (
-	numGoroutines = 512
-	numIterations = 10_000
-)
-
 var sampleData = []byte("The quick brown fox jumps over the lazy dog")
-
-// BenchmarkHasherPerGoroutine_SHA256 benchmarks hashing using separate SHA-256 Hasher instances
-// for each goroutine, eliminating the need for synchronization.
-func BenchmarkHasherPerGoroutine_SHA256(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	b.RunParallel(func(pb *testing.PB) {
-		// Each goroutine maintains its own Hasher instance.
-		hasher := NewSHA256Hasher()
-		for pb.Next() {
-			_, err := hasher.Hash(sampleData)
-			assert.NoError(b, err)
-		}
-	})
-}
 
 // BenchmarkHasherPerGoroutine_Blake2b benchmarks hashing using separate Blake2b Hasher instances
 // for each goroutine, eliminating the need for synchronization.
