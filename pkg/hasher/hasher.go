@@ -38,7 +38,7 @@ func (e *InputTooLargeError) Error() string {
 const maxInputSize = 1 << 14 // 16KB
 
 // Hash computes the hash of the given data.
-// It returns an ErrEmptyData if the input is empty or if writing to the hash fails.
+// It returns an InputTooLargeError if the input data exceeds the maximum allowed size.
 // This method resets the underlying hash before each computation to ensure
 // that previous hashing operations do not affect the result.
 func (b *baseHasher) Hash(data []byte) ([]byte, error) {

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,12 +18,6 @@ func TestHasherHash(t *testing.T) {
 		expectError error
 	}{
 		{
-			name:        "FNV-64a with 'Hello, World!'",
-			hasher:      NewFNVHasher(),
-			input:       []byte("Hello, World!"),
-			expectedHex: "6ef05bd7cc857c54",
-		},
-		{
 			name:        "SHA-256 with 'Hello, World!'",
 			hasher:      NewSHA256Hasher(),
 			input:       []byte("Hello, World!"),
@@ -36,12 +28,6 @@ func TestHasherHash(t *testing.T) {
 			hasher:      NewSHA256Hasher(),
 			input:       bytes.Repeat([]byte("a"), maxInputSize),
 			expectedHex: "f3336bea752b5a28743033dd2c844a4a63fba08871aaee2586a2bf2d69be83a2",
-		},
-		{
-			name:        "FN-64a input exceeds max size",
-			hasher:      NewFNVHasher(),
-			input:       bytes.Repeat([]byte("a"), maxInputSize+1),
-			expectError: &InputTooLargeError{},
 		},
 	}
 
@@ -88,7 +74,7 @@ func checkError(t *testing.T, err, expectError error, inputSize int) {
 func TestBaseHasherHashIdempotency(t *testing.T) {
 	t.Parallel()
 
-	hasher := NewFNVHasher()
+	hasher := NewSHA256Hasher()
 	input := bytes.Repeat([]byte("a"), maxInputSize)
 
 	hash1, err1 := hasher.Hash(input)
@@ -107,68 +93,7 @@ const (
 	numIterations = 10_000
 )
 
-// TestMutexHasherConcurrentHash verifies that MutexHasher is thread-safe
-// and produces consistent hash results when used concurrently.
-func TestMutexHasherConcurrentHash(t *testing.T) {
-	t.Parallel()
-
-	mutexHasher := NewMutexHasher(NewSHA256Hasher())
-
-	input := []byte("Concurrent Hashing Test")
-
-	// Compute the expected hash once for comparison.
-	expectedHash, err := mutexHasher.Hash(input)
-	assert.NoError(t, err, "unexpected error computing expected hash")
-
-	// Channel to collect errors from goroutines.
-	// Buffered to prevent goroutines from blocking if the main thread is slow.
-	errs := make(chan error, numGoroutines*numIterations)
-
-	var wg sync.WaitGroup
-	wg.Add(numGoroutines)
-
-	// Launch multiple goroutines to perform hashing concurrently.
-	for i := range numGoroutines {
-		go func(goroutineID int) {
-			defer wg.Done()
-			for j := range numIterations {
-				hash, err := mutexHasher.Hash(input)
-				if err != nil {
-					errs <- fmt.Errorf("goroutine %d: hash error: %v", goroutineID, err)
-					continue
-				}
-				if !bytes.Equal(hash, expectedHash) {
-					errs <- fmt.Errorf("goroutine %d: hash mismatch on iteration %d", goroutineID, j)
-				}
-			}
-		}(i)
-	}
-
-	wg.Wait()
-	close(errs)
-
-	for err := range errs {
-		t.Error(err)
-	}
-}
-
 var sampleData = []byte("The quick brown fox jumps over the lazy dog")
-
-// BenchmarkHasherWithMutex_SHA256 benchmarks hashing using a single SHA-256 Hasher instance
-// protected by a sync.Mutex across multiple goroutines.
-func BenchmarkHasherWithMutex_SHA256(b *testing.B) {
-	mutexHasher := NewMutexHasher(NewSHA256Hasher())
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			_, err := mutexHasher.Hash(sampleData)
-			assert.NoError(b, err)
-		}
-	})
-}
 
 // BenchmarkHasherPerGoroutine_SHA256 benchmarks hashing using separate SHA-256 Hasher instances
 // for each goroutine, eliminating the need for synchronization.
@@ -181,53 +106,6 @@ func BenchmarkHasherPerGoroutine_SHA256(b *testing.B) {
 		hasher := NewSHA256Hasher()
 		for pb.Next() {
 			_, err := hasher.Hash(sampleData)
-			assert.NoError(b, err)
-		}
-	})
-}
-
-// BenchmarkHasherWithMutex_FNV benchmarks hashing using a single FNV-64a Hasher instance
-// protected by a sync.Mutex across multiple goroutines.
-func BenchmarkHasherWithMutex_FNV(b *testing.B) {
-	mutexHasher := NewMutexHasher(NewFNVHasher())
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			_, err := mutexHasher.Hash(sampleData)
-			assert.NoError(b, err)
-		}
-	})
-}
-
-// BenchmarkHasherPerGoroutine_FNV benchmarks hashing using separate FNV-64a Hasher instances
-// for each goroutine, eliminating the need for synchronization.
-func BenchmarkHasherPerGoroutine_FNV(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	b.RunParallel(func(pb *testing.PB) {
-		hasher := NewFNVHasher()
-		for pb.Next() {
-			_, err := hasher.Hash(sampleData)
-			assert.NoError(b, err)
-		}
-	})
-}
-
-// BenchmarkHasherWithMutex_Blake2b benchmarks hashing using a single Blake2b Hasher instance
-// protected by a sync.Mutex across multiple goroutines.
-func BenchmarkHasherWithMutex_Blake2b(b *testing.B) {
-	mutexHasher := NewMutexHasher(NewBlaker2bHasher())
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			_, err := mutexHasher.Hash(sampleData)
 			assert.NoError(b, err)
 		}
 	})
