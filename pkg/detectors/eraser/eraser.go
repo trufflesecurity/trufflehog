@@ -94,8 +94,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil, nil
-	case http.StatusNotFound:
-		// 404 API token not found
+	case http.StatusUnauthorized:
+		// 401 API token unauthorized
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
 	default:
