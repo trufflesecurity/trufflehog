@@ -19,19 +19,19 @@ func TestHasherHash(t *testing.T) {
 	}{
 		{
 			name:        "Blake2b with 'Hello, World!'",
-			hasher:      NewBlaker2bHasher(),
+			hasher:      NewBlake2B(),
 			input:       []byte("Hello, World!"),
 			expectedHex: "511bc81dde11180838c562c82bb35f3223f46061ebde4a955c27b3f489cf1e03",
 		},
 		{
 			name:        "Blake2b input at max size",
-			hasher:      NewBlaker2bHasher(),
+			hasher:      NewBlake2B(),
 			input:       bytes.Repeat([]byte("a"), maxInputSize),
 			expectedHex: "605fd8458957df95394e9bf812f385264267c679e4899dc198ca67db4029d0ea",
 		},
 		{
 			name:        "Blake2b empty input",
-			hasher:      NewBlaker2bHasher(),
+			hasher:      NewBlake2B(),
 			input:       []byte(""),
 			expectedHex: "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
 		},
@@ -77,10 +77,10 @@ func checkError(t *testing.T, err, expectError error, inputSize int) {
 	}
 }
 
-func TestBaseHasherHashIdempotency(t *testing.T) {
+func TestBlake2bHashIdempotency(t *testing.T) {
 	t.Parallel()
 
-	hasher := NewBlaker2bHasher()
+	hasher := NewBlake2B()
 	input := bytes.Repeat([]byte("a"), maxInputSize)
 
 	hash1, err1 := hasher.Hash(input)
@@ -103,7 +103,7 @@ func BenchmarkHasherPerGoroutine_Blake2b(b *testing.B) {
 	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
-		hasher := NewBlaker2bHasher()
+		hasher := NewBlake2B()
 		for pb.Next() {
 			_, err := hasher.Hash(sampleData)
 			assert.NoError(b, err)

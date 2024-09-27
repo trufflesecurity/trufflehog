@@ -2,13 +2,11 @@ package hasher
 
 import "golang.org/x/crypto/blake2b"
 
-// Blake2bHasher implements the Hasher interface using Blake2b algorithm.
-type Blake2bHasher struct{ baseHasher }
+// Blake2b implements the Hasher interface using Blake2b algorithm.
+type Blake2b struct{ baseHasher }
 
-// NewBlaker2bHasher creates a new Blake2bHasher.
-func NewBlaker2bHasher() *Blake2bHasher {
+// NewBlake2B creates a new Blake2b hasher.
+func NewBlake2B() *Blake2b {
 	h, _ := blake2b.New256(nil)
-	return &Blake2bHasher{
-		baseHasher: baseHasher{hash: h},
-	}
+	return &Blake2b{baseHasher: baseHasher{hash: h}}
 }
