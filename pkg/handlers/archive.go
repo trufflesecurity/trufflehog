@@ -56,9 +56,9 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 		var err error
 		defer close(dataChan)
 
-		// Sometimes the undelrying 7zip library panics when trying to open an archive.
-		// It is caused by an IOOR error when reading the header of the archive.
-		// https://github.com/bodgit/sevenzip/blob/74bff0da9b233317e4ea7dd8c184a315db71af2a/types.go#L846
+		// The underlying 7zip library may panic when attempting to open an archive.
+		// This is due to an Index Out Of Range (IOOR) error when reading the archive header.
+		// See: https://github.com/bodgit/sevenzip/blob/74bff0da9b233317e4ea7dd8c184a315db71af2a/types.go#L846
 		defer func() {
 			if r := recover(); r != nil {
 				// Return the panic as an error.
