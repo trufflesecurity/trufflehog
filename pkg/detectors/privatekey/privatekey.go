@@ -41,7 +41,7 @@ func (s Scanner) Keywords() []string {
 
 const maxPrivateKeySize = 4096
 
-// ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
+// MaxSecretSize returns the maximum size of a secret that this detector can find.
 func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
 
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
