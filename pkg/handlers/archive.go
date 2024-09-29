@@ -53,11 +53,26 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 	}
 
 	go func() {
+		var err error
 		defer close(dataChan)
+
+		// Sometimes the undelrying 7zip library panics when trying to open an archive.
+		// It is caused by an IOOR error when reading the header of the archive.
+		// https://github.com/bodgit/sevenzip/blob/74bff0da9b233317e4ea7dd8c184a315db71af2a/types.go#L846
+		defer func() {
+			if r := recover(); r != nil {
+				// Return the panic as an error.
+				if e, ok := r.(error); ok {
+					err = e
+				} else {
+					err = fmt.Errorf("panic occurred: %v", r)
+				}
+				ctx.Logger().Error(err, "Panic occurred when attempting to open archive")
+			}
+		}()
 
 		// Update the metrics for the file processing.
 		start := time.Now()
-		var err error
 		defer func() {
 			h.measureLatencyAndHandleErrors(start, err)
 			h.metrics.incFilesProcessed()
