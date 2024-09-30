@@ -131,21 +131,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}()
 
-			// Wait for all goroutines to finish or the context to be done.
-			// Use a separate goroutine to avoid blocking the main goroutine,
-			// which needs to check the context for a timeout.
-			done := make(chan struct{})
-			go func() {
-				wg.Wait()
-				close(done)
-			}()
-
-			select {
-			case <-done:
-				// All goroutines finished.
-			case <-ctx.Done():
-				// Handle timeout.
-				verificationErrors.Add(ctx.Err())
+			wg.Wait() // synchronization point - all goroutines finished but we don't know if it was because of a context cancellation
+			if err := ctx.Err(); err != nil {
+				verificationErrors.Add(err)
 			}
 
 			if len(extraData.data) > 0 {
