@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	regexp "github.com/wasilibs/go-re2"
 
@@ -28,12 +30,12 @@ var (
 	// TODO: Azure storage access keys and investigate other types of creds.
 
 	// Azure App Oauth
-	idPatFmt    = `(?i)(%s).{0,20}([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})`
-	clientIDPat = mustFmtPat("client_id", idPatFmt)
-	tenantIDPat = mustFmtPat("tenant_id", idPatFmt)
+	idPatFmt         = `(?i)(%s).{0,20}([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})`
+	clientIDPat      = mustFmtPat("client_id", idPatFmt)
+	tenantIDPat      = mustFmtPat("tenant_id", idPatFmt)
+	tenantIDInUrlPat = regexp.MustCompile(`https:\/\/login\.microsoftonline\.com\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\/oauth2\/v2\.0\/token`)
 
-	// TODO: support old patterns
-	secretPatFmt    = `(?i)(%s).{0,20}([a-z0-9_\.\-~]{34})`
+	secretPatFmt    = `(?i)(%s).{0,20}?([a-z0-9_\.\-~]{1,40})`
 	clientSecretPat = mustFmtPat("client_secret", secretPatFmt)
 )
 
@@ -50,13 +52,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	clientSecretMatches := clientSecretPat.FindAllStringSubmatch(dataStr, -1)
 	for _, clientSecret := range clientSecretMatches {
 		tenantIDMatches := tenantIDPat.FindAllStringSubmatch(dataStr, -1)
-		for _, tenantID := range tenantIDMatches {
+		tenantIDInUrlMatches := tenantIDInUrlPat.FindAllStringSubmatch(dataStr, -1)
+		tenantIDMatches = append(tenantIDMatches, tenantIDInUrlMatches...)
+		for _, tenantIDMatch := range tenantIDMatches {
+			var tenantID string
+			if len(tenantIDMatch) == 3 {
+				tenantID = tenantIDMatch[2]
+			} else {
+				tenantID = tenantIDMatch[1]
+			}
+			fmt.Println(tenantID)
 			clientIDMatches := clientIDPat.FindAllStringSubmatch(dataStr, -1)
 			for _, clientID := range clientIDMatches {
 				res := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Azure,
 					Raw:          []byte(clientSecret[2]),
-					RawV2:        []byte(clientID[2] + clientSecret[2] + tenantID[2]),
+					RawV2:        []byte(clientID[2] + clientSecret[2] + tenantID),
 					Redacted:     clientID[2],
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/azure/",
@@ -64,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					cred := auth.NewClientCredentialsConfig(clientID[2], clientSecret[2], tenantID[2])
+					cred := auth.NewClientCredentialsConfig(clientID[2], clientSecret[2], tenantID)
 					token, err := cred.ServicePrincipalToken()
 					if err != nil {
 						continue
