@@ -70,7 +70,7 @@ func NewCache[T any](cacheName string, opts ...Option[T]) (*Cache[T], error) {
 
 	lcache, err := lru.NewWithEvict[string, T](defaultSize, onEvicted)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Ristretto cache: %w", err)
+		return nil, fmt.Errorf("failed to create lrusized cache: %w", err)
 	}
 
 	sizedLRU.cache = lcache
