@@ -10,7 +10,7 @@ import (
 var _ collector = (*MetricsCollector)(nil)
 
 // MetricsCollector extends the BaseMetricsCollector with Sized LRU specific metrics.
-// It provides methods to record cache hits, misses, and evictions.
+// It provides methods to record cache evictions.
 type MetricsCollector struct {
 	// BaseMetricsCollector is embedded to provide the base metrics functionality.
 	cache.BaseMetricsCollector

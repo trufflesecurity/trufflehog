@@ -16,7 +16,7 @@ import (
 )
 
 // collector is an interface that extends cache.BaseMetricsCollector
-// and adds methods for recording cache hits, misses, and evictions.
+// and adds methods for recording cache evictions.
 type collector interface {
 	cache.BaseMetricsCollector
 
