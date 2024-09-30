@@ -3,10 +3,10 @@ package azure
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -69,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err != nil {
 						continue
 					}
-					err = token.Refresh()
+					err = token.RefreshWithContext(ctx)
 					if err == nil {
 						res.Verified = true
 					}
