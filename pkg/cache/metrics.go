@@ -5,6 +5,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 // BaseMetricsCollector defines the interface for recording cache metrics.
@@ -29,54 +31,53 @@ type MetricsCollector struct {
 	clears  *prometheus.CounterVec
 }
 
-var (
-	collectorOnce sync.Once // Ensures that the collector is initialized only once.
-	collector     *MetricsCollector
-)
-
-// InitializeMetrics initializes the singleton MetricsCollector.
-// It sets up Prometheus counters for cache operations (hits, misses, sets, deletes, clears).
-// Should be called once at the start of the application.
-func InitializeMetrics(namespace, subsystem string) {
+func init() {
+	// Initialize the singleton MetricsCollector.
+	// Set up Prometheus counters for cache operations (hits, misses, sets, deletes, clears).
 	collectorOnce.Do(func() {
 		collector = &MetricsCollector{
 			hits: promauto.NewCounterVec(prometheus.CounterOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
+				Namespace: common.MetricsNamespace,
+				Subsystem: common.MetricsSubsystem,
 				Name:      "hits_total",
 				Help:      "Total number of cache hits.",
 			}, []string{"cache_name"}),
 
 			misses: promauto.NewCounterVec(prometheus.CounterOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
+				Namespace: common.MetricsNamespace,
+				Subsystem: common.MetricsSubsystem,
 				Name:      "misses_total",
 				Help:      "Total number of cache misses.",
 			}, []string{"cache_name"}),
 
 			sets: promauto.NewCounterVec(prometheus.CounterOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
+				Namespace: common.MetricsNamespace,
+				Subsystem: common.MetricsSubsystem,
 				Name:      "sets_total",
 				Help:      "Total number of cache set operations.",
 			}, []string{"cache_name"}),
 
 			deletes: promauto.NewCounterVec(prometheus.CounterOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
+				Namespace: common.MetricsNamespace,
+				Subsystem: common.MetricsSubsystem,
 				Name:      "deletes_total",
 				Help:      "Total number of cache delete operations.",
 			}, []string{"cache_name"}),
 
 			clears: promauto.NewCounterVec(prometheus.CounterOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
+				Namespace: common.MetricsNamespace,
+				Subsystem: common.MetricsSubsystem,
 				Name:      "clears_total",
 				Help:      "Total number of cache clear operations.",
 			}, []string{"cache_name"}),
 		}
 	})
 }
+
+var (
+	collectorOnce sync.Once // Ensures that the collector is initialized only once.
+	collector     *MetricsCollector
+)
 
 // GetMetricsCollector returns the singleton MetricsCollector instance.
 // It panics if InitializeMetrics has not been called to ensure metrics are properly initialized.

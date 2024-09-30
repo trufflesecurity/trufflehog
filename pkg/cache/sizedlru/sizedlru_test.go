@@ -5,9 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type mockCollector struct{ mock.Mock }
@@ -33,9 +30,6 @@ func (m *mockCollector) RecordClear(cacheName string) { m.Called(cacheName) }
 // Otherwise, it sets up a cache without a custom metrics collector.
 func setupCache[T any](t *testing.T, withCollector bool) (*Cache[T], *mockCollector) {
 	t.Helper()
-
-	// Call InitializeMetrics first.
-	cache.InitializeMetrics(common.MetricsNamespace, common.MetricsSubsystem)
 
 	var collector *mockCollector
 	var c *Cache[T]

@@ -42,8 +42,8 @@ func WithMetricsCollector[T any](collector collector) Option[T] {
 	return func(lc *Cache[T]) { lc.metrics = collector }
 }
 
-// WithCapacity is a functional option to set the maximum capacity of the cache.
-// If the capacity is not set, the default value (512MB) is used.
+// WithCapacity is a functional option to set the maximum number of items the cache can hold.
+// If the capacity is not set, the default value (128_000) is used.
 func WithCapacity[T any](capacity int) Option[T] {
 	return func(lc *Cache[T]) { lc.capacity = capacity }
 }
@@ -52,7 +52,7 @@ func WithCapacity[T any](capacity int) Option[T] {
 // It takes a cache name and a variadic list of options.
 func NewCache[T any](cacheName string, opts ...Option[T]) (*Cache[T], error) {
 	// Default values for cache configuration.
-	const defaultSize = 1 << 29 // 512MB
+	const defaultSize = 128_000
 
 	sizedLRU := &Cache[T]{
 		metrics:   NewSizedLRUMetricsCollector(common.MetricsNamespace, common.MetricsSubsystem),
