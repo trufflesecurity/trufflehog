@@ -1,10 +1,10 @@
-// Package sizedlru provides a generic, size-limited, LRU (Least Recently Used) cache with optional
+// Package lru provides a generic, size-limited, LRU (Least Recently Used) cache with optional
 // metrics collection and reporting. It wraps the golang-lru/v2 caching library, adding support for custom
 // metrics tracking cache hits, misses, evictions, and other cache operations.
 //
 // This package supports configuring key aspects of cache behavior, including maximum cache size,
 // and custom metrics collection.
-package sizedlru
+package lru
 
 import (
 	"fmt"

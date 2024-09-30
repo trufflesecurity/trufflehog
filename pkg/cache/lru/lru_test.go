@@ -1,4 +1,4 @@
-package sizedlru
+package lru
 
 import (
 	"testing"
