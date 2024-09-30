@@ -131,7 +131,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}()
 
-			wg.Wait() // synchronization point - all goroutines finished but we don't know if it was because of a context cancellation
+			wg.Wait()
 			if err := ctx.Err(); err != nil {
 				verificationErrors.Add(err)
 			}
