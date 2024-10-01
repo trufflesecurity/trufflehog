@@ -19,10 +19,15 @@ type BaseMetricsCollector interface {
 	RecordClear(cacheName string)
 }
 
-// MetricsCollector encapsulates all Prometheus metrics with labels.
+// EvictionMetricsCollector defines the interface for recording cache-specific eviction metrics.
+type EvictionMetricsCollector interface {
+	RecordEviction(cacheName string)
+}
+
+// BaseCollector encapsulates all Prometheus metrics with labels.
 // It holds Prometheus counters for cache operations, which help track
 // the performance and usage of the cache.
-type MetricsCollector struct {
+type BaseCollector struct {
 	// Base metrics.
 	hits    *prometheus.CounterVec
 	misses  *prometheus.CounterVec
@@ -32,10 +37,10 @@ type MetricsCollector struct {
 }
 
 func init() {
-	// Initialize the singleton MetricsCollector.
+	// Initialize the singleton BaseCollector.
 	// Set up Prometheus counters for cache operations (hits, misses, sets, deletes, clears).
-	collectorOnce.Do(func() {
-		collector = &MetricsCollector{
+	baseCollectorOnce.Do(func() {
+		baseCollector = &BaseCollector{
 			hits: promauto.NewCounterVec(prometheus.CounterOpts{
 				Namespace: common.MetricsNamespace,
 				Subsystem: common.MetricsSubsystem,
@@ -72,37 +77,69 @@ func init() {
 			}, []string{"cache_name"}),
 		}
 	})
+
+	// Initialize the singleton EvictionMetrics.
+	// Set up Prometheus counters for cache evictions.
+	evictionCollectorOnce.Do(func() {
+		evictionCollector = &EvictionMetrics{
+			evictions: promauto.NewCounterVec(prometheus.CounterOpts{
+				Namespace: common.MetricsNamespace,
+				Subsystem: common.MetricsSubsystem,
+				Name:      "evictions_total",
+				Help:      "Total number of cache evictions.",
+			}, []string{"cache_name"}),
+		}
+	})
 }
 
 var (
-	collectorOnce sync.Once // Ensures that the collector is initialized only once.
-	collector     *MetricsCollector
+	baseCollectorOnce sync.Once // Ensures that the baseCollector is initialized only once.
+	baseCollector     *BaseCollector
+
+	evictionCollectorOnce sync.Once
+	evictionCollector     *EvictionMetrics
 )
 
-// GetMetricsCollector returns the singleton MetricsCollector instance.
-// It panics if InitializeMetrics has not been called to ensure metrics are properly initialized.
-// Must be called after InitializeMetrics to avoid runtime issues.
-// If you do it before, BAD THINGS WILL HAPPEN.
-func GetMetricsCollector() *MetricsCollector {
-	if collector == nil {
-		panic("MetricsCollector not initialized. Call InitializeMetrics first.")
+// GetBaseMetricsCollector returns the singleton BaseCollector instance.
+func GetBaseMetricsCollector() *BaseCollector {
+	if baseCollector == nil {
+		panic("BaseCollector not initialized. Call InitializeMetrics first.")
 	}
-	return collector
+	return baseCollector
+}
+
+// GetEvictionMetricsCollector returns the singleton EvictionMetrics instance.
+func GetEvictionMetricsCollector() *EvictionMetrics {
+	if evictionCollector == nil {
+		panic("EvictionMetrics not initialized. Call InitializeMetrics first.")
+	}
+	return evictionCollector
 }
 
 // Implement BaseMetricsCollector interface methods.
 
 // RecordHit increments the counter for cache hits, tracking how often cache lookups succeed.
-func (m *MetricsCollector) RecordHit(cacheName string) { m.hits.WithLabelValues(cacheName).Inc() }
+func (m *BaseCollector) RecordHit(cacheName string) { m.hits.WithLabelValues(cacheName).Inc() }
 
 // RecordMiss increments the counter for cache misses, tracking how often cache lookups fail.
-func (m *MetricsCollector) RecordMiss(cacheName string) { m.misses.WithLabelValues(cacheName).Inc() }
+func (m *BaseCollector) RecordMiss(cacheName string) { m.misses.WithLabelValues(cacheName).Inc() }
 
 // RecordSet increments the counter for cache set operations, tracking how often items are added/updated.
-func (m *MetricsCollector) RecordSet(cacheName string) { m.sets.WithLabelValues(cacheName).Inc() }
+func (m *BaseCollector) RecordSet(cacheName string) { m.sets.WithLabelValues(cacheName).Inc() }
 
 // RecordDelete increments the counter for cache delete operations, tracking how often items are removed.
-func (m *MetricsCollector) RecordDelete(cacheName string) { m.deletes.WithLabelValues(cacheName).Inc() }
+func (m *BaseCollector) RecordDelete(cacheName string) { m.deletes.WithLabelValues(cacheName).Inc() }
 
 // RecordClear increments the counter for cache clear operations, tracking how often the cache is completely cleared.
-func (m *MetricsCollector) RecordClear(cacheName string) { m.clears.WithLabelValues(cacheName).Inc() }
+func (m *BaseCollector) RecordClear(cacheName string) { m.clears.WithLabelValues(cacheName).Inc() }
+
+// EvictionMetrics implements EvictionMetricsCollector interface.
+type EvictionMetrics struct {
+	evictions *prometheus.CounterVec
+}
+
+// Implement EvictionMetricsCollector interface method.
+
+func (em *EvictionMetrics) RecordEviction(cacheName string) {
+	em.evictions.WithLabelValues(cacheName).Inc()
+}

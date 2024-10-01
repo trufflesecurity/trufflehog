@@ -62,3 +62,22 @@ func (c *WithMetrics[T]) Clear() {
 	c.wrapped.Clear()
 	c.metrics.RecordClear(c.cacheName)
 }
+
+// Count returns the number of entries in the cache. It also records a count metric
+// for the cache using the provided metrics collector and cache name.
+func (c *WithMetrics[T]) Count() int {
+	count := c.wrapped.Count()
+	return count
+}
+
+// Keys returns all keys in the cache. It also records a keys metric
+// for the cache using the provided metrics collector and cache name.
+func (c *WithMetrics[T]) Keys() []string { return c.wrapped.Keys() }
+
+// Values returns all values in the cache. It also records a values metric
+// for the cache using the provided metrics collector and cache name.
+func (c *WithMetrics[T]) Values() []T { return c.wrapped.Values() }
+
+// Contents returns all keys in the cache as a string. It also records a contents metric
+// for the cache using the provided metrics collector and cache name.
+func (c *WithMetrics[T]) Contents() string { return c.wrapped.Contents() }
