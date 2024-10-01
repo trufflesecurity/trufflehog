@@ -98,7 +98,7 @@ require (
 	github.com/wasilibs/go-re2 v1.7.0
 	github.com/xanzy/go-gitlab v0.109.0
 	github.com/xo/dburl v0.23.2
-	go.mongodb.org/mongo-driver v1.17.0
+	go.mongodb.org/mongo-driver v1.17.1
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
