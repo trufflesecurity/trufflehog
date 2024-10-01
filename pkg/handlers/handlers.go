@@ -285,12 +285,7 @@ func HandleFile(
 	}
 	defer rdr.Close()
 
-	size, err := rdr.Size()
-	if err != nil {
-		ctx.Logger().Error(err, "error getting file size")
-	}
-
-	ctx = logContext.WithValues(ctx, "mime", rdr.mime.String(), "size_bytes", size)
+	ctx = logContext.WithValues(ctx, "mime", rdr.mime.String())
 
 	mimeT := mimeType(rdr.mime.String())
 	config := newFileHandlingConfig(options...)
