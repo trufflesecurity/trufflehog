@@ -417,7 +417,7 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 		Endpoint:   apiEndpoint,
 		Credential: &sourcespb.GitHub_Unauthenticated{},
 	})
-	s.orgsCache = simple.New[string]()
+	s.orgsCache = simple.NewCache[string]()
 	s.orgsCache.Set("super-secret-org", "super-secret-org")
 	// s.enumerateUnauthenticated(context.Background(), apiEndpoint)
 	s.enumerateUnauthenticated(context.Background(), noopReporter())

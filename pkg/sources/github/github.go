@@ -232,14 +232,14 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.connector = connector
 
-	s.orgsCache = simple.New[string]()
+	s.orgsCache = simple.NewCache[string]()
 	for _, org := range s.conn.Organizations {
 		s.orgsCache.Set(org, org)
 	}
 	s.memberCache = make(map[string]struct{})
 
 	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
-		simple.New[string](),
+		simple.NewCache[string](),
 		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
 	)

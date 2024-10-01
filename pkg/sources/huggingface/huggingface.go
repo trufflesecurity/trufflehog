@@ -191,12 +191,12 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	s.orgsCache = simple.New[string]()
+	s.orgsCache = simple.NewCache[string]()
 	for _, org := range s.conn.Organizations {
 		s.orgsCache.Set(org, org)
 	}
 
-	s.usersCache = simple.New[string]()
+	s.usersCache = simple.NewCache[string]()
 	for _, user := range s.conn.Users {
 		s.usersCache.Set(user, user)
 	}
@@ -208,17 +208,17 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		return err
 	}
 
-	s.filteredModelsCache = s.newFilteredRepoCache(simple.New[string](),
+	s.filteredModelsCache = s.newFilteredRepoCache(simple.NewCache[string](),
 		append(s.conn.GetModels(), s.conn.GetIncludeModels()...),
 		s.conn.GetIgnoreModels(),
 	)
 
-	s.filteredSpacesCache = s.newFilteredRepoCache(simple.New[string](),
+	s.filteredSpacesCache = s.newFilteredRepoCache(simple.NewCache[string](),
 		append(s.conn.GetSpaces(), s.conn.GetIncludeSpaces()...),
 		s.conn.GetIgnoreSpaces(),
 	)
 
-	s.filteredDatasetsCache = s.newFilteredRepoCache(simple.New[string](),
+	s.filteredDatasetsCache = s.newFilteredRepoCache(simple.NewCache[string](),
 		append(s.conn.GetDatasets(), s.conn.GetIncludeDatasets()...),
 		s.conn.GetIgnoreDatasets(),
 	)

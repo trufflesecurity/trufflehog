@@ -61,7 +61,7 @@ func TestSource_Token(t *testing.T) {
 		repoInfoCache: newRepoInfoCache(),
 	}
 	s.Init(ctx, "github integration test source", 0, 0, false, conn, 1)
-	s.filteredRepoCache = s.newFilteredRepoCache(ctx, simple.New[string](), nil, nil)
+	s.filteredRepoCache = s.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
 
 	err = s.enumerateWithApp(ctx, s.connector.(*appConnector).InstallationClient(), noopReporter())
 	assert.NoError(t, err)

@@ -301,10 +301,10 @@ func (s *Source) setupCache(ctx context.Context) *persistableCache {
 			entries[i] = simple.CacheEntry[string]{Key: val, Value: val}
 		}
 
-		c = simple.NewWithData[string](entries)
+		c = simple.NewCacheWithData[string](entries)
 		ctx.Logger().V(3).Info("Loaded cache", "num_entries", len(entries))
 	} else {
-		c = simple.New[string]()
+		c = simple.NewCache[string]()
 	}
 
 	// TODO (ahrav): Make this configurable via conn.
