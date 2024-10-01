@@ -1072,3 +1072,54 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 		t.Fatal("no detectors found implementing Endpoints(), did EndpointSetter change?")
 	}
 }
+
+func TestEngineCachedVerifiedResults(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	tmpFile, err := os.CreateTemp("", "testfile")
+	assert.NoError(t, err)
+	tmpFile2, err := os.CreateTemp("", "testfile2")
+	assert.NoError(t, err)
+
+	defer tmpFile.Close()
+	defer tmpFile2.Close()
+	defer os.Remove(tmpFile.Name())
+	defer os.Remove(tmpFile2.Name())
+
+	_, err = tmpFile.WriteString(fmt.Sprintf("test data using keyword %s\n", fakeDetectorKeyword))
+	assert.NoError(t, err)
+	_, err = tmpFile2.WriteString(fmt.Sprintf("test data using keyword %s\n", fakeDetectorKeyword))
+	assert.NoError(t, err)
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	conf := Config{
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     []detectors.Detector{new(fakeDetectorV1)},
+		Verify:        true,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
+
+	e.Start(ctx)
+
+	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name(), tmpFile2.Name()}}
+	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	assert.NoError(t, e.Finish(ctx))
+	want := uint64(2)
+	assert.Equal(t, want, e.GetMetrics().VerifiedSecretsFound)
+	assert.Equal(t, 1, e.detectionCache.Count())
+}

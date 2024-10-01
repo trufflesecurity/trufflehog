@@ -35,6 +35,7 @@ require (
 	github.com/coinbase/waas-client-library-go v1.0.8
 	github.com/couchbase/gocb/v2 v2.9.2
 	github.com/crewjam/rfc5424 v0.1.0
+	github.com/dgraph-io/ristretto v1.0.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
 	github.com/envoyproxy/protoc-gen-validate v1.1.0

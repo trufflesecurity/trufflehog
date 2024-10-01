@@ -12,9 +12,10 @@ import (
 
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
-	lru "github.com/hashicorp/golang-lru/v2"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/lru"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -22,6 +23,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/hasher"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -88,6 +90,32 @@ func (p *PrinterDispatcher) Dispatch(ctx context.Context, result detectors.Resul
 	return p.printer.Print(ctx, &result)
 }
 
+// detectionResult represents the outcome of a secret detection process for a given candidate secret.
+// It stores information about the detection method, verification status, and additional metadata.
+type detectionResult struct {
+	// DetectorType is the type of Detector.
+	DetectorType detectorspb.DetectorType
+	// DetectorName is the name of the Detector. Used for custom detectors.
+	DetectorName string
+	// DecoderType is the type of Decoder.
+	DecoderType detectorspb.DecoderType
+	Verified    bool
+	// Redacted contains the redacted version of the raw secret identification data for display purposes.
+	// A secret ID should be used if available.
+	Redacted       string
+	ExtraData      map[string]string
+	StructuredData *detectorspb.StructuredData
+
+	// This field should only be populated if the verification process itself failed in a way that provides no
+	// information about the verification status of the candidate secret, such as if the verification request timed out.
+	verificationError error
+
+	// AnalysisInfo should be set with information required for credential
+	// analysis to run. The keys of the map are analyzer specific and
+	// should match what is expected in the corresponding analyzer.
+	AnalysisInfo map[string]string
+}
+
 // Config used to configure the engine.
 type Config struct {
 	// Number of concurrent scanner workers,
@@ -144,6 +172,22 @@ type Config struct {
 
 	// VerificationOverlapWorkerMultiplier is used to determine the number of verification overlap workers to spawn.
 	VerificationOverlapWorkerMultiplier int
+
+	// Detection caching options.
+
+	// EnableDetectionCache determines whether the engine will use caching for detection.
+	// If set to false, caching is disabled regardless of whether a DetectionCache is provided.
+	// By default, it is set to true.
+	EnableDetectionCache bool
+
+	// DetectionCache is used to store the results of the detection results.
+	// If EnableDetectionCache is true and DetectionCache is nil, a default cache implementation is used.
+	DetectionCache cache.Cache[*detectionResult]
+
+	// HasherFactory is used to create a new hasher for each worker.
+	// This is only required if caching is enabled.
+	// If not provided, a default hasher (blake2b) is used.
+	HasherFactory func() hasher.Hasher
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -197,7 +241,7 @@ type Engine struct {
 
 	// dedupeCache is used to deduplicate results by comparing the
 	// detector type, raw result, and source metadata
-	dedupeCache *lru.Cache[string, detectorspb.DecoderType]
+	dedupeCache cache.Cache[detectorspb.DecoderType]
 
 	// verify determines whether the scanner will attempt to verify candidate secrets.
 	verify bool
@@ -211,6 +255,25 @@ type Engine struct {
 	notificationWorkerMultiplier int
 	// verificationOverlapWorkerMultiplier is used to calculate the number of verification overlap workers.
 	verificationOverlapWorkerMultiplier int
+
+	// enableDetectionCache determines whether the engine will use caching for detection.
+	// By default, it is set to true.
+	enableDetectionCache bool
+
+	// detectionCache prevents re-verification of the same secret multiple times, which:
+	// 1. Reduces the risk of account lockouts
+	// 2. Minimizes requests to external services
+	// 3. Speeds up the overall scan process
+	detectionCache cache.Cache[*detectionResult]
+
+	// HasherFactory is used to create a new hasher for each worker.
+	// This is necessary because the hasher is not thread-safe.
+	// Having a separate hasher for each worker is generally more efficient than
+	// using a single hasher across all workers because it eliminates contention
+	// and the need for locking.
+	// While this approach uses more memory, the performance gain typically
+	// outweighs the increased memory usage in most scanning scenarios.
+	hasherFactory func() hasher.Hasher
 }
 
 // NewEngine creates a new Engine instance with the provided configuration.
@@ -232,12 +295,17 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		detectorWorkerMultiplier:            cfg.DetectorWorkerMultiplier,
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
 		verificationOverlapWorkerMultiplier: cfg.VerificationOverlapWorkerMultiplier,
+		enableDetectionCache:                cfg.EnableDetectionCache,
+		detectionCache:                      cfg.DetectionCache,
+		hasherFactory:                       cfg.HasherFactory,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
 	}
 
-	engine.setDefaults(ctx)
+	if err := engine.setDefaults(ctx); err != nil {
+		return nil, err
+	}
 
 	// Build include and exclude detector sets for filtering on engine initialization.
 	includeDetectorSet, excludeDetectorSet, err := buildDetectorSets(cfg)
@@ -318,7 +386,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 // setDefaults ensures that if specific engine properties aren't provided,
 // they're set to reasonable default values. It makes the engine robust to
 // incomplete configuration.
-func (e *Engine) setDefaults(ctx context.Context) {
+func (e *Engine) setDefaults(ctx context.Context) error {
 	if e.concurrency == 0 {
 		numCPU := runtime.NumCPU()
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
@@ -355,7 +423,31 @@ func (e *Engine) setDefaults(ctx context.Context) {
 	e.notifyUnverifiedResults = true
 	e.notifyUnknownResults = true
 
+	// Set enableCache to true by default if not explicitly set.
+	if !e.enableDetectionCache {
+		e.enableDetectionCache = true
+	}
+
+	if e.enableDetectionCache {
+		if e.detectionCache == nil {
+			const detectionCacheName = "detection_cache"
+			lcache, err := lru.NewCache[*detectionResult](
+				detectionCacheName,
+				lru.WithMetricsCollector[*detectionResult](cache.GetEvictionMetricsCollector()),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to create detection cache: %w", err)
+			}
+			e.detectionCache = cache.NewCacheWithMetrics[*detectionResult](lcache, cache.GetBaseMetricsCollector(), detectionCacheName)
+		}
+
+		if e.hasherFactory == nil {
+			e.hasherFactory = func() hasher.Hasher { return hasher.NewBlake2B() }
+		}
+	}
+
 	ctx.Logger().V(4).Info("default engine options set")
+	return nil
 }
 
 func buildDetectorSets(cfg *Config) (map[config.DetectorID]struct{}, map[config.DetectorID]struct{}, error) {
@@ -468,14 +560,20 @@ func filterDetectors(filterFunc func(detectors.Detector) bool, input []detectors
 	return out
 }
 
-// initialize prepares the engine's internal structures. The LRU cache optimizes
+// initialize prepares the engine's internal structures. The LRU detectionCache optimizes
 // deduplication efforts, allowing the engine to quickly check if a chunk has
 // been processed before, thereby saving computational overhead.
 func (e *Engine) initialize(ctx context.Context) error {
 	// TODO (ahrav): Determine the optimal cache size.
-	const cacheSize = 512 // number of entries in the LRU cache
+	const (
+		cacheName = "dedupe_cache"
+		cacheSize = 512 // number of entries in the LRU cache
+	)
 
-	cache, err := lru.New[string, detectorspb.DecoderType](cacheSize)
+	lcache, err := lru.NewCache[detectorspb.DecoderType](
+		cacheName,
+		lru.WithCapacity[detectorspb.DecoderType](cacheSize),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize LRU cache: %w", err)
 	}
@@ -502,7 +600,11 @@ func (e *Engine) initialize(ctx context.Context) error {
 		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
 	)
 	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer*resultsChanMultiplier)
-	e.dedupeCache = cache
+	e.dedupeCache = cache.NewCacheWithMetrics[detectorspb.DecoderType](
+		lcache,
+		cache.GetBaseMetricsCollector(),
+		cacheName,
+	)
 	ctx.Logger().V(4).Info("engine initialized")
 
 	// Configure the EntireChunkSpanCalculator if the engine is set to scan the entire chunk.
@@ -667,7 +769,7 @@ func (e *Engine) startDetectorWorkers(ctx context.Context) {
 			ctx := context.WithValue(ctx, "detector_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
 			defer e.wgDetectorWorkers.Done()
-			e.detectorWorker(ctx)
+			e.detectorWorker(ctx, e.hasherFactory())
 		}()
 	}
 }
@@ -682,7 +784,7 @@ func (e *Engine) startVerificationOverlapWorkers(ctx context.Context) {
 			ctx := context.WithValue(ctx, "verification_overlap_worker_id", common.RandomID(5))
 			defer common.Recover(ctx)
 			defer e.verificationOverlapWg.Done()
-			e.verificationOverlapWorker(ctx)
+			e.verificationOverlapWorker(ctx, e.hasherFactory())
 		}()
 	}
 }
@@ -760,12 +862,10 @@ type verificationOverlapChunk struct {
 }
 
 func (e *Engine) scannerWorker(ctx context.Context) {
-	var wgDetect sync.WaitGroup
 	var wgVerificationOverlap sync.WaitGroup
 
 	for chunk := range e.ChunksChan() {
 		startTime := time.Now()
-		sourceVerify := chunk.Verify
 		for _, decoder := range e.decoders {
 			decodeStart := time.Now()
 			decoded := decoder.FromChunk(chunk)
@@ -778,26 +878,12 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			}
 
 			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
-			if len(matchingDetectors) > 1 && !e.verificationOverlap {
-				wgVerificationOverlap.Add(1)
-				e.verificationOverlapChunksChan <- verificationOverlapChunk{
-					chunk:                       *decoded.Chunk,
-					detectors:                   matchingDetectors,
-					decoder:                     decoded.DecoderType,
-					verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
-				}
-				continue
-			}
-
-			for _, detector := range matchingDetectors {
-				decoded.Chunk.Verify = e.shouldVerifyChunk(sourceVerify, detector, e.detectorVerificationOverrides)
-				wgDetect.Add(1)
-				e.detectableChunksChan <- detectableChunk{
-					chunk:    *decoded.Chunk,
-					detector: detector,
-					decoder:  decoded.DecoderType,
-					wgDoneFn: wgDetect.Done,
-				}
+			wgVerificationOverlap.Add(1)
+			e.verificationOverlapChunksChan <- verificationOverlapChunk{
+				chunk:                       *decoded.Chunk,
+				detectors:                   matchingDetectors,
+				decoder:                     decoded.DecoderType,
+				verificationOverlapWgDoneFn: wgVerificationOverlap.Done,
 			}
 		}
 
@@ -821,7 +907,6 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 	}
 
 	wgVerificationOverlap.Wait()
-	wgDetect.Wait()
 	ctx.Logger().V(4).Info("finished scanning chunks")
 }
 
@@ -906,7 +991,7 @@ func likelyDuplicate(ctx context.Context, val chunkSecretKey, dupes map[chunkSec
 	return false
 }
 
-func (e *Engine) verificationOverlapWorker(ctx context.Context) {
+func (e *Engine) verificationOverlapWorker(ctx context.Context, hasher hasher.Hasher) {
 	var wgDetect sync.WaitGroup
 
 	// Reuse the same map and slice to avoid allocations.
@@ -938,12 +1023,14 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					detectorKeysWithResults[detector.Key] = detector
 				}
 
+				isTargetedScan := chunk.chunk.SecretID != 0
+
 				// If results filtration eliminates a rotated secret, then that rotation will never be reported. This
 				// problem can theoretically occur for any scan, but we've only actually seen it in practice during
 				// targeted scans. (The reason for this discrepancy is unclear.) The simplest fix is therefore to
 				// disable filtration for targeted scans, but if you're here because this problem surfaced for a
 				// non-targeted scan then we'll have to solve it correctly.
-				if chunk.chunk.SecretID == 0 {
+				if !isTargetedScan {
 					results = e.filterResults(ctx, detector, results)
 				}
 
@@ -953,6 +1040,53 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 						val = res.RawV2
 					} else {
 						val = res.Raw
+					}
+
+					// Only check the cache for non-targeted scans.
+					// Targeted scans should always be verified.
+					if e.enableDetectionCache && !isTargetedScan {
+						// Check the cache to see if we've already seen this secret.
+						keyBytes := make([]byte, len(res.Raw)+len(res.RawV2))
+						copy(keyBytes, res.Raw)
+						copy(keyBytes[len(res.Raw):], res.RawV2)
+						keyHash, err := hasher.Hash(keyBytes)
+						if err != nil {
+							ctx.Logger().Error(err, "failed to hash secret")
+							continue
+						}
+
+						cacheVal, exists := e.detectionCache.Get(string(keyHash))
+						if exists {
+							// Update the "res" object with the cached result.
+							res.Verified = cacheVal.Verified
+							res.DecoderType = cacheVal.DecoderType
+							res.DetectorType = cacheVal.DetectorType
+							res.ExtraData = cacheVal.ExtraData
+							res.Redacted = cacheVal.Redacted
+							res.StructuredData = cacheVal.StructuredData
+							res.AnalysisInfo = cacheVal.AnalysisInfo
+							// TODO: figure out how to set verification error.
+
+							// If the secret was found in the cache, we can skip verification.
+							// We ONLY skip the verification stage, we still need to process the result.
+							e.processResult(
+								ctx,
+								detectableChunk{
+									chunk:    chunk.chunk,
+									detector: detector,
+									decoder:  chunk.decoder,
+									wgDoneFn: wgDetect.Done,
+								},
+								res,
+								isFalsePositive,
+							)
+
+							// Remove the detector key from the list of detector keys with results.
+							// This is to ensure that the chunk is not reprocessed with verification enabled
+							// for this detector.
+							delete(detectorKeysWithResults, detector.Key)
+							continue
+						}
 					}
 
 					// Use levenstein distance to determine if the secret is likely the same.
@@ -1018,15 +1152,15 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 	wgDetect.Wait()
 }
 
-func (e *Engine) detectorWorker(ctx context.Context) {
+func (e *Engine) detectorWorker(ctx context.Context, hasher hasher.Hasher) {
 	for data := range e.detectableChunksChan {
 		start := time.Now()
-		e.detectChunk(ctx, data)
+		e.detectChunk(ctx, data, hasher)
 		chunksDetectedLatency.Observe(float64(time.Since(start).Milliseconds()))
 	}
 }
 
-func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
+func (e *Engine) detectChunk(ctx context.Context, data detectableChunk, hasher hasher.Hasher) {
 	var start time.Time
 	if e.printAvgDetectorTime {
 		start = time.Now()
@@ -1094,6 +1228,30 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		}
 
 		for _, res := range results {
+			if e.enableDetectionCache {
+				// Cache the result to avoid re-verifying the same secret.
+				hashKeyBytes := make([]byte, len(res.Raw)+len(res.RawV2))
+				copy(hashKeyBytes, res.Raw)
+				copy(hashKeyBytes[len(res.Raw):], res.RawV2)
+				hashKey, err := hasher.Hash(hashKeyBytes)
+				if err != nil {
+					ctx.Logger().Error(err, "failed to hash secret")
+				} else {
+					val := &detectionResult{
+						DetectorType:      res.DetectorType,
+						DetectorName:      res.DetectorName,
+						DecoderType:       res.DecoderType,
+						Verified:          res.Verified,
+						Redacted:          res.Redacted,
+						ExtraData:         res.ExtraData,
+						StructuredData:    res.StructuredData,
+						verificationError: res.VerificationError(),
+						AnalysisInfo:      res.AnalysisInfo,
+					}
+					e.detectionCache.Set(string(hashKey), val)
+				}
+			}
+
 			e.processResult(ctx, data, res, isFalsePositive)
 		}
 	}
@@ -1197,7 +1355,7 @@ func (e *Engine) notifierWorker(ctx context.Context) {
 			result.SourceType == sourcespb.SourceType_SOURCE_TYPE_POSTMAN) {
 			continue
 		}
-		e.dedupeCache.Add(key, result.DecoderType)
+		e.dedupeCache.Set(key, result.DecoderType)
 
 		if result.Verified {
 			atomic.AddUint64(&e.metrics.VerifiedSecretsFound, 1)
