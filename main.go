@@ -375,7 +375,7 @@ func run(state overseer.State) {
 		}()
 	}
 
-  // Set feature configurations from CLI flags
+  	// Set feature configurations from CLI flags
 	if *forceSkipBinaries {
 		feature.ForceSkipBinaries.Store(true)
 	}
