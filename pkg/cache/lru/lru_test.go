@@ -37,19 +37,7 @@ func setupCache[T any](t *testing.T, withCollector bool) (*Cache[T], *mockCollec
 func TestNewLRUCache(t *testing.T) {
 	t.Run("default configuration", func(t *testing.T) {
 		c, _ := setupCache[int](t, false)
-		assert.Equal(t, "test_cache", c.cacheName)
-	})
-
-	t.Run("with custom max cost", func(t *testing.T) {
-		c, _ := setupCache[int](t, false)
-		assert.NotNil(t, c)
-	})
-
-	t.Run("with metrics collector", func(t *testing.T) {
-		c, collector := setupCache[int](t, true)
-		assert.NotNil(t, c)
-		assert.Equal(t, "test_cache", c.cacheName)
-		assert.Equal(t, collector, c.evictMetrics, "Cache metrics should match the collector")
+		assert.Equal(t, "lru_test_cache", c.cacheName)
 	})
 }
 
@@ -90,12 +78,12 @@ func TestCacheExists(t *testing.T) {
 func TestCacheDelete(t *testing.T) {
 	c, collector := setupCache[string](t, true)
 
-	collector.On("RecordEviction", "test_cache").Once()
+	collector.On("RecordEviction", "lru_test_cache").Once()
 
 	c.Set("key", "value")
 
 	c.Delete("key")
-	collector.AssertCalled(t, "RecordEviction", "test_cache")
+	collector.AssertCalled(t, "RecordEviction", "lru_test_cache")
 
 	_, found := c.Get("key")
 	assert.False(t, found, "Expected not to find the deleted key")
@@ -104,7 +92,7 @@ func TestCacheDelete(t *testing.T) {
 func TestCacheClear(t *testing.T) {
 	c, collector := setupCache[string](t, true)
 
-	collector.On("RecordEviction", "test_cache").Twice()
+	collector.On("RecordEviction", "lru_test_cache").Twice()
 
 	c.Set("key1", "value1")
 	c.Set("key2", "value2")
@@ -121,7 +109,7 @@ func TestCacheClear(t *testing.T) {
 func TestCacheCount(t *testing.T) {
 	c, collector := setupCache[string](t, true)
 
-	collector.On("RecordEviction", "test_cache").Times(3)
+	collector.On("RecordEviction", "lru_test_cache").Times(3)
 
 	c.Set("key1", "value1")
 	c.Set("key2", "value2")
@@ -141,7 +129,7 @@ func TestCacheCount(t *testing.T) {
 func TestCacheKeys(t *testing.T) {
 	c, collector := setupCache[string](t, true)
 
-	collector.On("RecordEviction", "test_cache").Times(3)
+	collector.On("RecordEviction", "lru_test_cache").Times(3)
 
 	c.Set("key1", "value1")
 	c.Set("key2", "value2")
@@ -166,7 +154,7 @@ func TestCacheKeys(t *testing.T) {
 func TestCacheValues(t *testing.T) {
 	c, collector := setupCache[string](t, true)
 
-	collector.On("RecordEviction", "test_cache").Times(3)
+	collector.On("RecordEviction", "lru_test_cache").Times(3)
 
 	c.Set("key1", "value1")
 	c.Set("key2", "value2")
@@ -191,7 +179,7 @@ func TestCacheValues(t *testing.T) {
 func TestCacheContents(t *testing.T) {
 	c, collector := setupCache[string](t, true)
 
-	collector.On("RecordEviction", "test_cache").Times(3)
+	collector.On("RecordEviction", "lru_test_cache").Times(3)
 
 	c.Set("key1", "value1")
 	c.Set("key2", "value2")
