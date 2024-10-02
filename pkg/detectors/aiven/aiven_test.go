@@ -12,9 +12,7 @@ import (
 )
 
 var (
-	// key is long so keeping it separate in a variable for readability
-	validPattern = `ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef12`
-
+	validPattern   = `ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef123/+==ABCdef12`
 	invalidPattern = `ABCdef123`
 )
 

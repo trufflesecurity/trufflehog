@@ -2,12 +2,19 @@ package airbrakeprojectkey
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "qwmnerBv56zxpocvkjqr78afvYUx90Op/451298"
+	invalidPattern = "qwmnerBv56zxpocvkjqr78afvYU$90Op/4512987"
 )
 
 func TestAirBrakeProjectKey_Pattern(t *testing.T) {
@@ -21,27 +28,27 @@ func TestAirBrakeProjectKey_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "airbrake = 'qwmnerBv56zxpocvkjqr78afvYUx90Op/451298'",
+			input: fmt.Sprintf("airbrake = '%s'", validPattern),
 			want:  []string{"qwmnerBv56zxpocvkjqr78afvYUx90Op451298"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: "airbrake keyword is not close to the real key and secret = 'qwmnerBv56zxpocvkjqr78afvYUx90Op/451298'",
+			input: fmt.Sprintf("airbrake keyword is not close to the real key and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "valid pattern - only key",
-			input: "airbrake qwmnerBv56zxpocvkjqr78afvYUx90Op",
+			input: fmt.Sprintf("airbrake %s", strings.Split(validPattern, "/")[0]),
 			want:  nil,
 		},
 		{
 			name:  "valid pattern - only ID",
-			input: "airbrake = '451298'",
+			input: fmt.Sprintf("airbrake %s", strings.Split(validPattern, "/")[0]),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "airbrake = 'qwmnerBv56zxpocvkjqr78afvYU$90Op/4512987'",
+			input: fmt.Sprintf("airbrake = '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

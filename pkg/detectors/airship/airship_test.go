@@ -2,12 +2,18 @@ package airship
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "123abcdef456ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwx3455trdfrq95acr"
+	invalidPattern = "123#abcdef456gh$ijkl789mnopqr012stuvwX3455123abcdef456ghijkl789mnopqr012stuvwx3455trdfrq"
 )
 
 func TestAirship_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAirship_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "airship = '123abcdef456ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwx3455trdfrq95acr'",
-			want:  []string{"123abcdef456ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwx3455trdfrq95acr"},
+			input: fmt.Sprintf("airship = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: "airship keyword is not close to the real key and secret = '123abcdef456ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwx3455trdfrq95acr'",
+			input: fmt.Sprintf("airship keyword is not close to the real key and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "airship = '123#abcdef456gh$ijkl789mnopqr012stuvwX3455123abcdef456ghijkl789mnopqr012stuvwx3455trdfrq'",
+			input: fmt.Sprintf("airship = '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

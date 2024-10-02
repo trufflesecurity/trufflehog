@@ -2,6 +2,8 @@ package aha
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -10,9 +12,17 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
+var (
+	validPattern   = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff/example.aha.io"
+	invalidPattern = "00112233445566778899aabbCC$%eeff00112233445566778899aabbccddeeff/example.fake.io"
+)
+
 func TestAha_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
+	key := strings.Split(validPattern, "/")[0]
+	url := strings.Split(validPattern, "/")[1]
 
 	tests := []struct {
 		name  string
@@ -21,32 +31,32 @@ func TestAha_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "aha.io = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff/example.aha.io'",
-			want:  []string{"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"},
+			input: fmt.Sprintf("aha.io = '%s'", validPattern),
+			want:  []string{key},
 		},
 		{
 			name:  "valid pattern - detect URL far away from keyword",
-			input: "aha.io = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff\n URL is not close to the keyword but should be detected example.aha.io'",
-			want:  []string{"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"},
+			input: fmt.Sprintf("aha.io = '%s\n URL is not close to the keyword but should be detected %s'", key, url),
+			want:  []string{key},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: "aha.io keyword is not close to the real key and secret = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff/example.aha.io'",
+			input: fmt.Sprintf("aha.io keyword is not close to the real key and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "valid pattern - only key",
-			input: "aha.io 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-			want:  []string{"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"},
+			input: fmt.Sprintf("aha.io %s", key),
+			want:  []string{key},
 		},
 		{
 			name:  "valid pattern - only URL",
-			input: "aha.io example.aha.io",
+			input: fmt.Sprintf("aha.io %s", url),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "aha.io 00112233445566778899aabbCC$%eeff00112233445566778899aabbccddeeff/example.fake.io",
+			input: fmt.Sprintf("aha.io %s", invalidPattern),
 			want:  nil,
 		},
 	}

@@ -2,6 +2,7 @@ package adobeio
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -10,7 +11,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestAdobeio_Pattern(t *testing.T) {
+var (
+	validPattern   = "zxcv0987mnbv1234poiu6749gtnrfv54/WDcv0981Mn.B"
+	invalidPattern = "Rzxc#0987$%bv1234poiu6749gtnrfv54"
+)
+
+func TestAdobeIO_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -21,17 +27,17 @@ func TestAdobeio_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "adobe = 'zxcv0987mnbv1234poiu6749gtnrfv54/WDcv0981Mn.B'",
+			input: fmt.Sprintf("adobe = '%s'", validPattern),
 			want:  []string{"zxcv0987mnbv1234poiu6749gtnrfv54WDcv0981Mn.B"},
 		},
 		{
 			name:  "valid pattern - out of prefix range",
-			input: "adobe keyword is not close to the real id and secret = 'zxcv0987mnbv1234poiu6749gtnrfv54 / WDcv0981Mn.B'",
+			input: fmt.Sprintf("adobe keyword is not close to the real id and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "adobeRzxc#0987$%bv1234poiu6749gtnrfv54",
+			input: fmt.Sprintf("adobe%s", invalidPattern),
 			want:  nil,
 		},
 	}

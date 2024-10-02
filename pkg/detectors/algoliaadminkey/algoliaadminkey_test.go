@@ -2,12 +2,18 @@ package algoliaadminkey
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "AlgoliaAdminKey010TESTINGPlmiOPC/ADMIN01KEY"
+	invalidPattern = "AlgoliaAdminN$TKey010TESTINGPlmiOPC/NonAdmin01ID"
 )
 
 func TestAlgoliaAdminKey_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAlgoliaAdminKey_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "algolia: 'AlgoliaAdminKey010TESTINGPlmiOPC/ADMIN01KEY'",
+			input: fmt.Sprintf("algolia: '%s'", validPattern),
 			want:  []string{"AlgoliaAdminKey010TESTINGPlmiOPCADMIN01KEY"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: "algolia keyword is not close to the real key and secret = 'AlgoliaAdminKey010TESTINGPlmiOPC/ADMIN01KEY'",
+			input: fmt.Sprintf("algolia keyword is not close to the real key and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "algolia: 'AlgoliaAdminN$TKey010TESTINGPlmiOPC/NonAdmin01ID'",
+			input: fmt.Sprintf("algolia: '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

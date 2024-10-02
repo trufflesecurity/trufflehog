@@ -2,12 +2,19 @@ package agora
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "asdf0987mnbv1234qsxojb6ygb2wsx0o/beqr7215fr4g6bfjkmnvxrtygb2wsxap"
+	invalidPattern = "asdf0987mNbv1234qsxojb6ygb2w$x0o/beqr7215fr4g6bfjkmnVxrtygb2wsxap"
 )
 
 func TestAgora_Pattern(t *testing.T) {
@@ -21,27 +28,27 @@ func TestAgora_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "agora = 'asdf0987mnbv1234qsxojb6ygb2wsx0o/beqr7215fr4g6bfjkmnvxrtygb2wsxap'",
+			input: fmt.Sprintf("agora = '%s'", validPattern),
 			want:  []string{"asdf0987mnbv1234qsxojb6ygb2wsx0oasdf0987mnbv1234qsxojb6ygb2wsx0o"},
 		},
 		{
 			name:  "valid pattern - out of prefix range",
-			input: "agora keyword is not close to the real key and secret = 'asdf0987mnbv1234qsxojb6ygb2wsx0o/beqr7215fr4g6bfjkmnvxrtygb2wsxap'",
+			input: fmt.Sprintf("agora keyword is not close to the real key and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "valid pattern - only key",
-			input: "agora asdf0987mnbv1234qsxojb6ygb2wsx0o",
+			input: fmt.Sprintf("agora %s", strings.Split(validPattern, "/")[0]),
 			want:  []string{"asdf0987mnbv1234qsxojb6ygb2wsx0oasdf0987mnbv1234qsxojb6ygb2wsx0o"},
 		},
 		{
 			name:  "valid pattern - only secret",
-			input: "agora beqr7215fr4g6bfjkmnvxrtygb2wsxap",
+			input: fmt.Sprintf("agora %s", strings.Split(validPattern, "/")[1]),
 			want:  []string{"beqr7215fr4g6bfjkmnvxrtygb2wsxapbeqr7215fr4g6bfjkmnvxrtygb2wsxap"},
 		},
 		{
 			name:  "invalid pattern",
-			input: "agora asdf0987mNbv1234qsxojb6ygb2w$x0o/beqr7215fr4g6bfjkmnVxrtygb2wsxap",
+			input: fmt.Sprintf("agora %s", invalidPattern),
 			want:  nil,
 		},
 	}

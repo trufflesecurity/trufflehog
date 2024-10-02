@@ -2,12 +2,18 @@ package abuseipdb
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "123abcdef456ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwx3455"
+	invalidPattern = "123abcdef456Ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwX"
 )
 
 func TestAbuseipdb_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAbuseipdb_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "abuseipdb token = '123abcdef456ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwx3455'",
-			want:  []string{"123abcdef456ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwx3455"},
+			input: fmt.Sprintf("abuseipdb token = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - out of prefix range",
-			input: "abuseipdb token keyword is not close to the real token = '123abcdef456ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwx3455'",
+			input: fmt.Sprintf("abuseipdb token keyword is not close to the real token = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "abuseipdb = '123abcdef456Ghijkl789mnopqr012stuvwx3455123abcdef456ghijkl789mnopqr012stuvwX'",
+			input: fmt.Sprintf("abuseipdb = '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

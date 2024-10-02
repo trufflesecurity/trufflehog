@@ -2,12 +2,19 @@ package adzuna
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "asdf0987mnbv1234qsxojb6ygb2wsx0o/qsc0f098"
+	invalidPattern = "as#f0987mnbv1234^sxojb6ygb2wsx0o/qsc0f098"
 )
 
 func TestAdzuna_Pattern(t *testing.T) {
@@ -21,27 +28,27 @@ func TestAdzuna_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "adzuna = 'asdf0987mnbv1234qsxojb6ygb2wsx0o/qsc0f098'",
+			input: fmt.Sprintf("adzuna = '%s'", validPattern),
 			want:  []string{"asdf0987mnbv1234qsxojb6ygb2wsx0oqsc0f098"},
 		},
 		{
 			name:  "valid pattern - out of prefix range",
-			input: "adzuna keyword is not close to the real id and secret = 'asdf0987mnbv1234qsxojb6ygb2wsx0o/qsc0f098'",
+			input: fmt.Sprintf("adzuna keyword is not close to the real id and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "valid pattern - only key",
-			input: "adzuna asdf0987mnbv1234qsxojb6ygb2wsx0o",
+			input: fmt.Sprintf("adzuna %s", strings.Split(validPattern, "/")[0]),
 			want:  nil,
 		},
 		{
 			name:  "valid pattern - only id",
-			input: "adzuna qsc0f098",
+			input: fmt.Sprintf("adzuna %s", strings.Split(validPattern, "/")[1]),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "adzuna as#f0987mnbv1234^sxojb6ygb2wsx0o/qsc0f098",
+			input: fmt.Sprintf("adzuna %s", invalidPattern),
 			want:  nil,
 		},
 	}

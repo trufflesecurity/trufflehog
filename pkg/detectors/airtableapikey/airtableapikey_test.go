@@ -2,12 +2,19 @@ package airtableapikey
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern            = "app_pOcv67-Yuztyq / key_Yuztyq-pOcv67"
+	validPersonalKeyPattern = "app_pOcv67-Yuztyq / patWtrafrcg64DP0w.AA1AA2BB3CC4DD5EE6FF7GG8HH9II0JJ1KK2LL3MM4NN5OO6PP7QQ8aaaaaaaaaa"
+	invalidPattern          = "app_pOcv67%Yuztyq/key_Yuztyq*pOcv67"
 )
 
 func TestAirTableApiKey_Pattern(t *testing.T) {
@@ -21,17 +28,17 @@ func TestAirTableApiKey_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern - with key",
-			input: "airtable secrets: app_pOcv67-Yuztyq / key_Yuztyq-pOcv67",
+			input: fmt.Sprintf("airtable secrets: %s", validPattern),
 			want:  []string{"key_Yuztyq-pOcv67app_pOcv67-Yuztyq"},
 		},
 		{
 			name:  "valid pattern - with personal key",
-			input: "airtable secrets: app_pOcv67-Yuztyq / patWtrafrcg64DP0w.AA1AA2BB3CC4DD5EE6FF7GG8HH9II0JJ1KK2LL3MM4NN5OO6PP7QQ8aaaaaaaaaa",
+			input: fmt.Sprintf("airtable secrets: %s", validPersonalKeyPattern),
 			want:  []string{"patWtrafrcg64DP0w.AA1AA2BB3CC4DD5EE6FF7GG8HH9II0JJ1KK2LL3MM4NN5OO6PP7QQ8aaaaaaaaaaapp_pOcv67-Yuztyq"},
 		},
 		{
 			name:  "invalid pattern",
-			input: "airtable secrets: 'app_pOcv67%Yuztyq/key_Yuztyq*pOcv67'",
+			input: fmt.Sprintf("airtable secrets: '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

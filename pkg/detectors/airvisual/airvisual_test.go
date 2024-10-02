@@ -2,12 +2,18 @@ package airvisual
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "qscgyygcsq-wdvvok7slklklaasnd8afafxd"
+	invalidPattern = "wdvvok7slklklaasnd8afafxd"
 )
 
 func TestAirVisual_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAirVisual_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "airvisual = 'qscgyygcsq-wdvvok7slklklaasnd8afafxd'",
-			want:  []string{"qscgyygcsq-wdvvok7slklklaasnd8afafxd"},
+			input: fmt.Sprintf("airvisual = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: "airvisual keyword is not close to the real key and secret = 'qscgyygcsq-wdvvok7slklklaasnd8afafxd'",
+			input: fmt.Sprintf("airvisual keyword is not close to the real key and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "airvisual key: 'wdvvok7slklklaasnd8afafxd'",
+			input: fmt.Sprintf("airvisual key: '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

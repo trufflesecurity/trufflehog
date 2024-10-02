@@ -2,12 +2,18 @@ package abstract
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "qwerty12345iugt67s7a7sa0akhsxz82"
+	invalidPattern = "zxcvbr12345iugt67s7a7sa0akhsXz820"
 )
 
 func TestAbstract_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAbstract_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "abstract token = 'qwerty12345iugt67s7a7sa0akhsxz82'",
-			want:  []string{"qwerty12345iugt67s7a7sa0akhsxz82"},
+			input: fmt.Sprintf("abstract token = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - out of prefix range",
-			input: "abstract token keyword is not close to the real token = 'qwerty12345iugt67s7a7sa0akhsxz82'",
+			input: fmt.Sprintf("abstract token keyword is not close to the real token = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "abstract = 'zxcvbr12345iugt67s7a7sa0akhsXz820'",
+			input: fmt.Sprintf("abstract = '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

@@ -2,12 +2,18 @@ package accuweather
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "dqftwc490oPc%xae67sBSF741M56%sd091a"
+	invalidPattern = "dqftwc490oPc%xae67sBSF741M56=sd091a"
 )
 
 func TestAccuWeather_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAccuWeather_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "accuweather token = 'dqftwc490oPc%xae67sBSF741M56%sd091a'",
-			want:  []string{"dqftwc490oPc%xae67sBSF741M56%sd091a"},
+			input: fmt.Sprintf("accuweather token = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - out of prefix range",
-			input: "accuweather token keyword is not close to the real token = 'dqftwc490oPc%xae67sBSF741M56%sd091a'",
+			input: fmt.Sprintf("accuweather token keyword is not close to the real token = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "accuweather = 'dqftwc490oPc%xae67sBSF741M56=sd091a'",
+			input: fmt.Sprintf("accuweather = '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

@@ -2,12 +2,18 @@ package airbrakeuserkey
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "qsCGuilpkk2ngrsz75wtYqsCGuilpkk2ngrsz75w"
+	invalidPattern = "Qs%CGuil#pkk2ngrsz75wtYqsCGuilpkk2ngrsz75w"
 )
 
 func TestAirBrakeUserKey_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAirBrakeUserKey_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "airbrake = 'qsCGuilpkk2ngrsz75wtYqsCGuilpkk2ngrsz75w'",
-			want:  []string{"qsCGuilpkk2ngrsz75wtYqsCGuilpkk2ngrsz75w"},
+			input: fmt.Sprintf("airbrake = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: "airbrake keyword is not close to the real key and secret = 'qsCGuilpkk2ngrsz75wtYqsCGuilpkk2ngrsz75w'",
+			input: fmt.Sprintf("airbrake keyword is not close to the real key and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "airbrake = 'Qs%CGuil#pkk2ngrsz75wtYqsCGuilpkk2ngrsz75w'",
+			input: fmt.Sprintf("airbrake = '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

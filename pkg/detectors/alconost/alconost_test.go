@@ -2,12 +2,18 @@ package alconost
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "wdvnousa87acfxp9ioasrea4tbeasrfa"
+	invalidPattern = "wdvnousa87acfxp9ioasr$a4tBeasrfa"
 )
 
 func TestAlconost_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAlconost_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "alconost: 'wdvnousa87acfxp9ioasrea4tbeasrfa'",
-			want:  []string{"wdvnousa87acfxp9ioasrea4tbeasrfa"},
+			input: fmt.Sprintf("alconost: '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: "alconost keyword is not close to the real key and secret = 'wdvnousa87acfxp9ioasrea4tbeasrfa'",
+			input: fmt.Sprintf("alconost keyword is not close to the real key in the data = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "alconost: 'wdvnousa87acfxp9ioasr$a4tBeasrfa'",
+			input: fmt.Sprintf("alconost: '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

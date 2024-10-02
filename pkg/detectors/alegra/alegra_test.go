@@ -2,12 +2,19 @@ package alegra
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern            = "wdvn-usa87a-fxp9ioas/testUser.1005@example.com"
+	validSpecialCharPattern = "wdvn-usa87a-fxp9ioas / test-User.1005@example.com"
+	invalidPattern          = "wdvn-usa87a-fxp9ioas/testUser$1005@example.com"
 )
 
 func TestAlegra_Pattern(t *testing.T) {
@@ -21,22 +28,22 @@ func TestAlegra_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "alegra: 'wdvn-usa87a-fxp9ioas/testUser.1005@example.com'",
+			input: fmt.Sprintf("alegra: '%s'", validPattern),
 			want:  []string{"wdvn-usa87a-fxp9ioastestUser.1005@example.com"},
 		},
 		{
 			name:  "valid pattern - with special characters",
-			input: "alegra: 'wdvn-usa87a-fxp9ioas / test-User.1005@example.com'",
+			input: fmt.Sprintf("alegra: '%s'", validSpecialCharPattern),
 			want:  []string{"wdvn-usa87a-fxp9ioastest-User.1005@example.com"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: "alegra keyword is not close to the real key and secret = 'wdvn-usa87a-fxp9ioas/testUser.1005@example.com'",
+			input: fmt.Sprintf("alegra keyword is not close to the real key and id = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "alegra: 'wdvn-usa87a-fxp9ioas/testUser$1005@example.com'",
+			input: fmt.Sprintf("alegra: '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

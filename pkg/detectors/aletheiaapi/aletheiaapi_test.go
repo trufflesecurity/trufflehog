@@ -2,12 +2,18 @@ package aletheiaapi
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "TEST01KEYPATTERN2024ALETHEIAAPIN"
+	invalidPattern = "TEST01kEYPATTERN2024ALETHEIAAPIN"
 )
 
 func TestAleTheIaAPI_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAleTheIaAPI_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "aletheiaapi: 'TEST01KEYPATTERN2024ALETHEIAAPIN'",
-			want:  []string{"TEST01KEYPATTERN2024ALETHEIAAPIN"},
+			input: fmt.Sprintf("aletheiaapi: '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: "aletheiaapi keyword is not close to the real key and secret = 'TEST01KEYPATTERN2024ALETHEIAAPIN'",
+			input: fmt.Sprintf("aletheiaapi keyword is not close to the real key and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "aletheiaapi: 'TEST01kEYPATTERN2024ALETHEIAAPIN'",
+			input: fmt.Sprintf("aletheiaapi: '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

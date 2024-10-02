@@ -2,12 +2,18 @@ package abbysale
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "123abcDEF456ghiJKL789mnoPQR012stuVWX3456"
+	invalidPattern = "123abcDEF456ghiJKL789mnoPQR012stuVWX"
 )
 
 func TestAbbySale_Pattern(t *testing.T) {
@@ -21,17 +27,17 @@ func TestAbbySale_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "abbysale token = '123abcDEF456ghiJKL789mnoPQR012stuVWX3456'",
-			want:  []string{"123abcDEF456ghiJKL789mnoPQR012stuVWX3456"},
+			input: fmt.Sprintf("abbysale token = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "valid pattern - out of prefix range",
-			input: "abbysale token keyword is not close to the real token = '123abcDEF456ghiJKL789mnoPQR012stuVWX3456'",
+			input: fmt.Sprintf("abbysale token keyword is not close to the real token = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "abbysale = '123abcDEF456ghiJKL789mnoPQR012stuVWX'",
+			input: fmt.Sprintf("abbysale = '%s'", invalidPattern),
 			want:  nil,
 		},
 	}

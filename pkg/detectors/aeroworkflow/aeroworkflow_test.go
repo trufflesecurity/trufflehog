@@ -2,12 +2,19 @@ package aeroworkflow
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "qscVgy!WdvG;^#O:*?TG/806445634"
+	invalidPattern = "qscVg&!WdvG;^#O:*?TG/8064456A4"
 )
 
 func TestAeroWorkflow_Pattern(t *testing.T) {
@@ -21,27 +28,27 @@ func TestAeroWorkflow_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "aeroworkflow = 'qscVgy!WdvG;^#O:*?TG/806445634'",
+			input: fmt.Sprintf("aeroworkflow = '%s'", validPattern),
 			want:  []string{"qscVgy!WdvG;^#O:*?TG806445634"},
 		},
 		{
 			name:  "valid pattern - out of prefix range",
-			input: "aeroworkflow keyword is not close to the real id and secret = 'qscVgy!WdvG;^#O:*?TG/806445634'",
+			input: fmt.Sprintf("aeroworkflow keyword is not close to the real id and secret = '%s'", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "valid pattern - only key",
-			input: "aeroworkflow qscVgy!WdvG;^#O:*?TG",
+			input: fmt.Sprintf("aeroworkflow %s", strings.Split(validPattern, "/")[0]),
 			want:  nil,
 		},
 		{
 			name:  "valid pattern - only id",
-			input: "aeroworkflow 806445634",
+			input: fmt.Sprintf("aeroworkflow %s", strings.Split(validPattern, "/")[1]),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "aeroworkflow qscVg&!WdvG;^#O:*?TG/8064456A4",
+			input: fmt.Sprintf("aeroworkflow %s", invalidPattern),
 			want:  nil,
 		},
 	}

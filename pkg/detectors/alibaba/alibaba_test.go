@@ -2,6 +2,7 @@ package alibaba
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -10,7 +11,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestAlgoliaAdminKey_Pattern(t *testing.T) {
+var (
+	validPattern   = "abcDEF123ghiJKL456mnoPQR789std/LTAI123ABCdef456ghijkLMN"
+	invalidPattern = "abcDEF123ghiJKL456m$oPQR789/123ABCdef456ghijkLMN;"
+)
+
+func TestAliBaba_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -21,17 +27,17 @@ func TestAlgoliaAdminKey_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: "LTAI: 'abcDEF123ghiJKL456mnoPQR789std/LTAI123ABCdef456ghijkLMN'",
+			input: fmt.Sprintf("LTAI: '%s'", validPattern),
 			want:  []string{"abcDEF123ghiJKL456mnoPQR789stdLTAI123ABCdef456ghijkLMN"},
 		},
 		{
 			name:  "valid pattern - ignore special characters at end",
-			input: "LTAI: 'abcDEF123ghiJKL456mnoPQR789std/LTAI123ABCdef456ghijkLMN\"''",
+			input: fmt.Sprintf("LTAI: '%s\"''", validPattern),
 			want:  []string{"abcDEF123ghiJKL456mnoPQR789stdLTAI123ABCdef456ghijkLMN"},
 		},
 		{
 			name:  "invalid pattern",
-			input: "LTAI: 'abcDEF123ghiJKL456m$oPQR789/123ABCdef456ghijkLMN;'",
+			input: fmt.Sprintf("LTAI: '%s'", invalidPattern),
 			want:  nil,
 		},
 	}
