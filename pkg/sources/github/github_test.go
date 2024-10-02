@@ -23,7 +23,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -417,9 +417,9 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 		Endpoint:   apiEndpoint,
 		Credential: &sourcespb.GitHub_Unauthenticated{},
 	})
-	s.orgsCache = memory.New[string]()
+	s.orgsCache = simple.NewCache[string]()
 	s.orgsCache.Set("super-secret-org", "super-secret-org")
-	//s.enumerateUnauthenticated(context.Background(), apiEndpoint)
+	// s.enumerateUnauthenticated(context.Background(), apiEndpoint)
 	s.enumerateUnauthenticated(context.Background(), noopReporter())
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
