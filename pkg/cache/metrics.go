@@ -92,14 +92,10 @@ var (
 )
 
 // GetBaseMetricsCollector returns the singleton baseCollector instance.
-func GetBaseMetricsCollector() BaseMetricsCollector {
-	return baseMetricsInstance
-}
+func GetBaseMetricsCollector() BaseMetricsCollector { return baseMetricsInstance }
 
 // GetEvictionMetricsCollector returns the singleton evictionMetrics instance.
-func GetEvictionMetricsCollector() EvictionMetricsCollector {
-	return evictionMetricsInstance
-}
+func GetEvictionMetricsCollector() EvictionMetricsCollector { return evictionMetricsInstance }
 
 // Implement BaseMetricsCollector interface methods.
 
