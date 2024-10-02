@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -24,7 +24,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"alegra"}) + `\b([a-z0-9-]{20})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"alegra"}) + `\b([a-zA-Z0-9.-@]{25,30})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"alegra"}) + `\b([a-zA-Z0-9\.\-\@]{25,30})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
