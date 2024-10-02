@@ -32,7 +32,7 @@ func firstResponseFromSSH(ctx context.Context, parsedKey any, username, hostport
 		return "", err
 	}
 
-	// Verify the server fingerprint to ensure that there is no MITM replay attack.
+	// Verify the server fingerprint to ensure that there is no MITM replay attack
 	config := &ssh.ClientConfig{
 		User: username,
 		Auth: []ssh.AuthMethod{
@@ -75,24 +75,13 @@ func firstResponseFromSSH(ctx context.Context, parsedKey any, username, hostport
 	var output bytes.Buffer
 	session.Stderr = &output
 
-	if err = session.Shell(); err != nil {
+	err = session.Shell()
+	if err != nil {
 		return "", err
 	}
+	_ = session.Wait()
 
-	// Wait for the session to complete or context cancellation.
-	// If we don't check for context cancellation, the session will hang indefinitely.
-	done := make(chan error, 1)
-	go func() {
-		done <- session.Wait()
-	}()
-
-	select {
-	case <-ctx.Done():
-		session.Close()
-		return output.String(), ctx.Err()
-	case err := <-done:
-		return output.String(), err
-	}
+	return output.String(), err
 }
 
 func sshDialWithContext(ctx context.Context, network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
@@ -101,13 +90,6 @@ func sshDialWithContext(ctx context.Context, network, addr string, config *ssh.C
 	if err != nil {
 		return nil, fmt.Errorf("error dialing %s: %w", addr, err)
 	}
-
-	// Monitor the context and close the connection if canceled.
-	// This ensures that the connection is closed when the context is canceled, preventing leaks.
-	go func() {
-		<-ctx.Done()
-		conn.Close()
-	}()
 
 	ncc, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
 	if err != nil {
