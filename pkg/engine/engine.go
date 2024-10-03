@@ -1026,9 +1026,11 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context, hasher hasher.Ha
 
 						cacheVal, exists := e.detectionCache.Get(string(keyHash))
 						if exists {
-							// Update the cached result with the Raw and RawV2 values.
-							cacheVal.Raw = res.Raw
-							cacheVal.RawV2 = res.RawV2
+							cachedCopy := *cacheVal
+
+							// Update the copy's Raw and RawV2 fields with the current result's values.
+							cachedCopy.Raw = res.Raw
+							cachedCopy.RawV2 = res.RawV2
 
 							// If the secret was found in the cache, we can skip verification.
 							// We ONLY skip the verification stage, we still need to process the result.
@@ -1040,7 +1042,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context, hasher hasher.Ha
 									decoder:  chunk.decoder,
 									wgDoneFn: wgDetect.Done,
 								},
-								res,
+								cachedCopy,
 								isFalsePositive,
 							)
 
