@@ -27,7 +27,11 @@ var (
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"elasticcloud", "elastic-cloud", "apikey", "essu"}
+	return []string{"elasticcloud", "elastic-cloud", "essu"}
+}
+
+func (s Scanner) Description() string {
+	return "Elastic Cloud is a Elasticsearch cloud service. With a valid Elastic Cloud API key, you can access the API from its base URL at api.elastic-cloud.com"
 }
 
 // FromData will find and optionally verify Apifonica secrets in a given set of bytes.
