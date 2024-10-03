@@ -90,32 +90,6 @@ func (p *PrinterDispatcher) Dispatch(ctx context.Context, result detectors.Resul
 	return p.printer.Print(ctx, &result)
 }
 
-// detectionResult represents the outcome of a secret detection process for a given candidate secret.
-// It stores information about the detection method, verification status, and additional metadata.
-type detectionResult struct {
-	// DetectorType is the type of Detector.
-	DetectorType detectorspb.DetectorType
-	// DetectorName is the name of the Detector. Used for custom detectors.
-	DetectorName string
-	// DecoderType is the type of Decoder.
-	DecoderType detectorspb.DecoderType
-	Verified    bool
-	// Redacted contains the redacted version of the raw secret identification data for display purposes.
-	// A secret ID should be used if available.
-	Redacted       string
-	ExtraData      map[string]string
-	StructuredData *detectorspb.StructuredData
-
-	// This field should only be populated if the verification process itself failed in a way that provides no
-	// information about the verification status of the candidate secret, such as if the verification request timed out.
-	verificationError error
-
-	// AnalysisInfo should be set with information required for credential
-	// analysis to run. The keys of the map are analyzer specific and
-	// should match what is expected in the corresponding analyzer.
-	AnalysisInfo map[string]string
-}
-
 // Config used to configure the engine.
 type Config struct {
 	// Number of concurrent scanner workers,
@@ -182,7 +156,7 @@ type Config struct {
 
 	// DetectionCache is used to store the results of the detection results.
 	// If DisableDetectionCache is true and DetectionCache is nil, a default cache implementation is used.
-	DetectionCache cache.Cache[*detectionResult]
+	DetectionCache cache.Cache[*detectors.Result]
 
 	// HasherFactory is used to create a new hasher for each worker.
 	// This is only required if caching is enabled.
@@ -264,7 +238,7 @@ type Engine struct {
 	// 1. Reduces the risk of account lockouts
 	// 2. Minimizes requests to external services
 	// 3. Speeds up the overall scan process
-	detectionCache cache.Cache[*detectionResult]
+	detectionCache cache.Cache[*detectors.Result]
 
 	// HasherFactory is used to create a new hasher for each worker.
 	// This is necessary because the hasher is not thread-safe.
@@ -426,14 +400,14 @@ func (e *Engine) setDefaults(ctx context.Context) error {
 	if !e.disableDetectionCache {
 		if e.detectionCache == nil {
 			const detectionCacheName = "detection_cache"
-			lcache, err := lru.NewCache[*detectionResult](
+			lcache, err := lru.NewCache[*detectors.Result](
 				detectionCacheName,
-				lru.WithMetricsCollector[*detectionResult](cache.GetEvictionMetricsCollector()),
+				lru.WithMetricsCollector[*detectors.Result](cache.GetEvictionMetricsCollector()),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to create detection cache: %w", err)
 			}
-			e.detectionCache = cache.NewCacheWithMetrics[*detectionResult](lcache, cache.GetBaseMetricsCollector(), detectionCacheName)
+			e.detectionCache = cache.NewCacheWithMetrics[*detectors.Result](lcache, cache.GetBaseMetricsCollector(), detectionCacheName)
 		}
 
 		if e.hasherFactory == nil {
@@ -1052,15 +1026,9 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context, hasher hasher.Ha
 
 						cacheVal, exists := e.detectionCache.Get(string(keyHash))
 						if exists {
-							// Update the "res" object with the cached result.
-							res.Verified = cacheVal.Verified
-							res.DecoderType = cacheVal.DecoderType
-							res.DetectorType = cacheVal.DetectorType
-							res.ExtraData = cacheVal.ExtraData
-							res.Redacted = cacheVal.Redacted
-							res.StructuredData = cacheVal.StructuredData
-							res.AnalysisInfo = cacheVal.AnalysisInfo
-							// TODO: figure out how to set verification error.
+							// Update the cached result with the Raw and RawV2 values.
+							cacheVal.Raw = res.Raw
+							cacheVal.RawV2 = res.RawV2
 
 							// If the secret was found in the cache, we can skip verification.
 							// We ONLY skip the verification stage, we still need to process the result.
@@ -1232,18 +1200,13 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk, hasher h
 				if err != nil {
 					ctx.Logger().Error(err, "failed to hash secret")
 				} else {
-					val := &detectionResult{
-						DetectorType:      res.DetectorType,
-						DetectorName:      res.DetectorName,
-						DecoderType:       res.DecoderType,
-						Verified:          res.Verified,
-						Redacted:          res.Redacted,
-						ExtraData:         res.ExtraData,
-						StructuredData:    res.StructuredData,
-						verificationError: res.VerificationError(),
-						AnalysisInfo:      res.AnalysisInfo,
-					}
-					e.detectionCache.Set(string(hashKey), val)
+					// Create a shallow copy of the `res` struct to avoid modifying the original.
+					// We need to exclude the `Raw` and `RawV2` fields from the cached value because they
+					// are required later in the pipeline.
+					val := res
+					val.Raw = nil
+					val.RawV2 = nil
+					e.detectionCache.Set(string(hashKey), &val)
 				}
 			}
 
