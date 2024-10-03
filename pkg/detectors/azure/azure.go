@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	regexp "github.com/wasilibs/go-re2"
 
@@ -29,7 +27,7 @@ var (
 	clientIDPat = regexp.MustCompile(detectors.PrefixRegex([]string{"client_id", "clientid"}) + udidPatFmt)
 	tenantIDPat = regexp.MustCompile(detectors.PrefixRegex([]string{"microsoftonline", "tenant_id", "tenantid"}) + udidPatFmt)
 
-	// According the Microsoft documentation, the client secret can be 24, 32, 40, 44, 56, or 88 characters long.
+	// According to the Microsoft documentation, the client secret can be 24, 32, 40, 44, 56, or 88 characters long.
 	// https://learn.microsoft.com/en-us/purview/sit-defn-client-secret-api-key
 	clientSecretSubPatFmt = `(\b[a-zA-Z0-9_\.\-~]{%d}\b)`
 
@@ -45,7 +43,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"azure", "microsoftonline", "microsoft"}
+	return []string{"azure", "microsoftonline"}
 }
 
 func trimUniqueMatches(matches [][]string) (result map[string]struct{}) {
@@ -96,7 +94,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 					err = token.RefreshWithContext(ctx)
 					if err == nil {
-						res.Verified = true
+						s.Verified = true
 					}
 				}
 
