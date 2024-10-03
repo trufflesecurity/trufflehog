@@ -175,13 +175,13 @@ type Config struct {
 
 	// Detection caching options.
 
-	// EnableDetectionCache determines whether the engine will use caching for detection.
-	// If set to false, caching is disabled regardless of whether a DetectionCache is provided.
-	// By default, it is set to true.
-	EnableDetectionCache bool
+	// DisableDetectionCache determines whether the engine will use caching for detection.
+	// If set to true, caching is disabled regardless of whether a DetectionCache is provided.
+	// By default, it is set to false.
+	DisableDetectionCache bool
 
 	// DetectionCache is used to store the results of the detection results.
-	// If EnableDetectionCache is true and DetectionCache is nil, a default cache implementation is used.
+	// If DisableDetectionCache is true and DetectionCache is nil, a default cache implementation is used.
 	DetectionCache cache.Cache[*detectionResult]
 
 	// HasherFactory is used to create a new hasher for each worker.
@@ -256,9 +256,9 @@ type Engine struct {
 	// verificationOverlapWorkerMultiplier is used to calculate the number of verification overlap workers.
 	verificationOverlapWorkerMultiplier int
 
-	// enableDetectionCache determines whether the engine will use caching for detection.
-	// By default, it is set to true.
-	enableDetectionCache bool
+	// disableDetectionCache determines will not use caching for detection.
+	// By default, it is set to false.
+	disableDetectionCache bool
 
 	// detectionCache prevents re-verification of the same secret multiple times, which:
 	// 1. Reduces the risk of account lockouts
@@ -295,7 +295,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		detectorWorkerMultiplier:            cfg.DetectorWorkerMultiplier,
 		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
 		verificationOverlapWorkerMultiplier: cfg.VerificationOverlapWorkerMultiplier,
-		enableDetectionCache:                cfg.EnableDetectionCache,
+		disableDetectionCache:               cfg.DisableDetectionCache,
 		detectionCache:                      cfg.DetectionCache,
 		hasherFactory:                       cfg.HasherFactory,
 	}
@@ -423,12 +423,7 @@ func (e *Engine) setDefaults(ctx context.Context) error {
 	e.notifyUnverifiedResults = true
 	e.notifyUnknownResults = true
 
-	// Set enableCache to true by default if not explicitly set.
-	if !e.enableDetectionCache {
-		e.enableDetectionCache = true
-	}
-
-	if e.enableDetectionCache {
+	if !e.disableDetectionCache {
 		if e.detectionCache == nil {
 			const detectionCacheName = "detection_cache"
 			lcache, err := lru.NewCache[*detectionResult](
@@ -1044,7 +1039,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context, hasher hasher.Ha
 
 					// Only check the cache for non-targeted scans.
 					// Targeted scans should always be verified.
-					if e.enableDetectionCache && !isTargetedScan {
+					if !e.disableDetectionCache && !isTargetedScan {
 						// Check the cache to see if we've already seen this secret.
 						keyBytes := make([]byte, len(res.Raw)+len(res.RawV2))
 						copy(keyBytes, res.Raw)
@@ -1228,7 +1223,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk, hasher h
 		}
 
 		for _, res := range results {
-			if e.enableDetectionCache {
+			if !e.disableDetectionCache {
 				// Cache the result to avoid re-verifying the same secret.
 				hashKeyBytes := make([]byte, len(res.Raw)+len(res.RawV2))
 				copy(hashKeyBytes, res.Raw)
