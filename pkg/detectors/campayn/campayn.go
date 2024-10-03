@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Campayn
 }
+
+func (s Scanner) Description() string {
+	return "Campayn is an email marketing service that allows users to create, send, and track email campaigns. Campayn API keys can be used to manage email lists, send emails, and track campaign performance."
+}

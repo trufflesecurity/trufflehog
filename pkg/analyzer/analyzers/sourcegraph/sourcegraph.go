@@ -1,3 +1,4 @@
+//go:generate generate_permissions permissions.yaml permissions.go sourcegraph
 package sourcegraph
 
 // ToDo: Add suport for custom domain
@@ -11,7 +12,63 @@ import (
 	"github.com/fatih/color"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Sourcegraph }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, fmt.Errorf("missing key in credInfo")
+	}
+	info, err := AnalyzePermissions(a.Cfg, key)
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	permission := PermissionStrings[UserRead]
+	if info.IsSiteAdmin {
+		permission = PermissionStrings[SiteAdminFull]
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Sourcegraph,
+		Metadata:     nil,
+		Bindings: []analyzers.Binding{
+			{
+				Resource: analyzers.Resource{
+					Name:               info.User.Data.CurrentUser.Username,
+					FullyQualifiedName: "sourcegraph/" + info.User.Data.CurrentUser.Email,
+					Type:               "user",
+					Metadata: map[string]any{
+						"created_at": info.User.Data.CurrentUser.CreatedAt,
+						"email":      info.User.Data.CurrentUser.Email,
+					},
+					Parent: nil,
+				},
+				Permission: analyzers.Permission{
+					Value: permission,
+				},
+			},
+		},
+	}
+
+	return &result
+}
 
 type GraphQLError struct {
 	Message string   `json:"message"`

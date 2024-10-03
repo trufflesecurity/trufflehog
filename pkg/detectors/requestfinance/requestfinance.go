@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RequestFinance
 }
+
+func (s Scanner) Description() string {
+	return "Request Finance is a platform for managing and automating invoices and payments. Request Finance credentials can be used to access and manage these financial operations."
+}

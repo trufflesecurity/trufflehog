@@ -85,3 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Dareboost
 }
+
+func (s Scanner) Description() string {
+	return "Dareboost is a website performance monitoring tool. Dareboost API keys can be used to access and modify performance monitoring configurations."
+}

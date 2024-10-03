@@ -85,3 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SourcegraphCody
 }
+
+func (s Scanner) Description() string {
+	return "Sourcegraph Cody is a tool for integrating code intelligence into your development workflow. The detected key is used for accessing Sourcegraph Cody services."
+}

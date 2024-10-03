@@ -67,7 +67,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	//req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.pagar.me/1/balance", nil) send a post to this endpoint with the parameters api_key=token
 	data := `{"api_key":"` + token + `"}`
 	payload := strings.NewReader(data)
 
@@ -102,4 +101,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Pagarme
+}
+
+func (s Scanner) Description() string {
+	return "Pagarme is a payment service provider. Pagarme API keys can be used to access and manage payment transactions and other related services."
 }

@@ -25,7 +25,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = http.DefaultClient
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	keyPat        = regexp.MustCompile(`DefaultEndpointsProtocol=https;AccountName=(?P<account_name>[^;]+);AccountKey=(?P<account_key>[^;]+);EndpointSuffix=core\.windows\.net`)
 )
 
@@ -139,4 +139,8 @@ func verifyAzureStorageKey(ctx context.Context, client *http.Client, accountName
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureStorage
+}
+
+func (s Scanner) Description() string {
+	return "Azure Storage is a Microsoft-managed cloud service that provides storage that is highly available, secure, durable, scalable, and redundant. Azure Storage Account keys can be used to access and manage data within storage accounts."
 }

@@ -69,3 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Kickbox
 }
+
+func (s Scanner) Description() string {
+	return "Kickbox is an email verification service that allows users to verify email addresses in real-time. Kickbox API keys can be used to access and utilize the email verification services provided by Kickbox."
+}

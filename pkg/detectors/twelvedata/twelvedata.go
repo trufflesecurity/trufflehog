@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TwelveData
 }
+
+func (s Scanner) Description() string {
+	return "TwelveData provides financial data APIs for stock, forex, cryptocurrency, and more. TwelveData API keys can be used to access and retrieve this financial data."
+}

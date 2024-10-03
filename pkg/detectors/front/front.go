@@ -73,3 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Front
 }
+
+func (s Scanner) Description() string {
+	return "Front is a customer communication hub that allows teams to manage email, social media, SMS, and other channels in one place. Front API keys can be used to access and manage this communication data."
+}

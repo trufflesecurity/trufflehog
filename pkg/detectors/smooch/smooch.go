@@ -86,3 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Smooch
 }
+
+func (s Scanner) Description() string {
+	return "Smooch is a messaging platform that allows businesses to communicate with their customers across various messaging channels. Smooch API keys can be used to access and manage these communications."
+}

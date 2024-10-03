@@ -75,3 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Close
 }
+
+func (s Scanner) Description() string {
+	return "Close is a CRM software that helps businesses manage sales and customer relationships. Close API keys can be used to access and manipulate CRM data."
+}

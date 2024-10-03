@@ -1,6 +1,7 @@
 package decoders
 
 import (
+	"bytes"
 	"regexp"
 	"strconv"
 	"unicode/utf8"
@@ -24,27 +25,43 @@ var (
 	escapePat = regexp.MustCompile(`(?i:\\{1,2}u)([a-fA-F0-9]{4})`)
 )
 
+func (d *EscapedUnicode) Type() detectorspb.DecoderType {
+	return detectorspb.DecoderType_ESCAPED_UNICODE
+}
+
 func (d *EscapedUnicode) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	if chunk == nil || len(chunk.Data) == 0 {
 		return nil
 	}
 
-	matched := false
-	if codePointPat.Match(chunk.Data) {
+	var (
+		// Necessary to avoid data races.
+		chunkData = bytes.Clone(chunk.Data)
+		matched   = false
+	)
+	if codePointPat.Match(chunkData) {
 		matched = true
-		chunk.Data = decodeCodePoint(chunk.Data)
+		chunkData = decodeCodePoint(chunkData)
 	}
-	if escapePat.Match(chunk.Data) {
+	if escapePat.Match(chunkData) {
 		matched = true
-		chunk.Data = decodeEscaped(chunk.Data)
+		chunkData = decodeEscaped(chunkData)
 	}
 
 	if matched {
-		decodableChunk := &DecodableChunk{
-			DecoderType: detectorspb.DecoderType_ESCAPED_UNICODE,
-			Chunk:       chunk,
+		return &DecodableChunk{
+			DecoderType: d.Type(),
+			Chunk: &sources.Chunk{
+				Data:           chunkData,
+				SourceName:     chunk.SourceName,
+				SourceID:       chunk.SourceID,
+				JobID:          chunk.JobID,
+				SecretID:       chunk.SecretID,
+				SourceMetadata: chunk.SourceMetadata,
+				SourceType:     chunk.SourceType,
+				Verify:         chunk.Verify,
+			},
 		}
-		return decodableChunk
 	} else {
 		return nil
 	}

@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Pixabay
 }
+
+func (s Scanner) Description() string {
+	return "Pixabay is a website for sharing photos, illustrations, vector graphics, and film footage under a proprietary license. Pixabay API keys can be used to access and retrieve this media content programmatically."
+}

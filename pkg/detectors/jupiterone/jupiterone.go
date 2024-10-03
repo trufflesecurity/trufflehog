@@ -92,3 +92,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_JupiterOne
 }
+
+func (s Scanner) Description() string {
+	return "JupiterOne is a cloud security management platform. JupiterOne API keys can be used to access and manage security data."
+}

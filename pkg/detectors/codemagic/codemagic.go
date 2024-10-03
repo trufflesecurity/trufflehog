@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Codemagic
 }
+
+func (s Scanner) Description() string {
+	return "Codemagic is a CI/CD platform for mobile app projects. Codemagic API keys can be used to automate and manage the build and deployment process of mobile applications."
+}

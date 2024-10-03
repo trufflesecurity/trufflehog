@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Cloudmersive
 }
+
+func (s Scanner) Description() string {
+	return "Cloudmersive provides a suite of APIs for data validation, conversion, and security. Cloudmersive API keys can be used to access these services."
+}

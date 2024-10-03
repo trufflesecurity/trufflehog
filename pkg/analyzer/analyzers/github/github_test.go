@@ -89,82 +89,6 @@ func TestAnalyzer_Analyze(t *testing.T) {
                     }
                   },
                   "Permission": {
-                    "Value": "issues:write",
-                    "Parent": null
-                  }
-                },
-                {
-                  "Resource": {
-                    "Name": "private",
-                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
-                    "Type": "repository",
-                    "Metadata": null,
-                    "Parent": {
-                      "Name": "sirdetectsalot",
-                      "FullyQualifiedName": "github.com/sirdetectsalot",
-                      "Type": "user",
-                      "Metadata": null,
-                      "Parent": null
-                    }
-                  },
-                  "Permission": {
-                    "Value": "metadata:read",
-                    "Parent": null
-                  }
-                },
-                {
-                  "Resource": {
-                    "Name": "private",
-                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
-                    "Type": "repository",
-                    "Metadata": null,
-                    "Parent": {
-                      "Name": "sirdetectsalot",
-                      "FullyQualifiedName": "github.com/sirdetectsalot",
-                      "Type": "user",
-                      "Metadata": null,
-                      "Parent": null
-                    }
-                  },
-                  "Permission": {
-                    "Value": "actions:write",
-                    "Parent": null
-                  }
-                },
-                {
-                  "Resource": {
-                    "Name": "private",
-                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
-                    "Type": "repository",
-                    "Metadata": null,
-                    "Parent": {
-                      "Name": "sirdetectsalot",
-                      "FullyQualifiedName": "github.com/sirdetectsalot",
-                      "Type": "user",
-                      "Metadata": null,
-                      "Parent": null
-                    }
-                  },
-                  "Permission": {
-                    "Value": "contents:write",
-                    "Parent": null
-                  }
-                },
-                {
-                  "Resource": {
-                    "Name": "private",
-                    "FullyQualifiedName": "github.com/sirdetectsalot/private",
-                    "Type": "repository",
-                    "Metadata": null,
-                    "Parent": {
-                      "Name": "sirdetectsalot",
-                      "FullyQualifiedName": "github.com/sirdetectsalot",
-                      "Type": "user",
-                      "Metadata": null,
-                      "Parent": null
-                    }
-                  },
-                  "Permission": {
                     "Value": "deployments:read",
                     "Parent": null
                   }
@@ -192,82 +116,6 @@ func TestAnalyzer_Analyze(t *testing.T) {
                   "Resource": {
                     "Name": "private",
                     "FullyQualifiedName": "github.com/sirdetectsalot/private",
-                    "Type": "repository",
-                    "Metadata": null,
-                    "Parent": {
-                      "Name": "sirdetectsalot",
-                      "FullyQualifiedName": "github.com/sirdetectsalot",
-                      "Type": "user",
-                      "Metadata": null,
-                      "Parent": null
-                    }
-                  },
-                  "Permission": {
-                    "Value": "metadata:read",
-                    "Parent": null
-                  }
-                },
-                {
-                  "Resource": {
-                    "Name": "public",
-                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
-                    "Type": "repository",
-                    "Metadata": null,
-                    "Parent": {
-                      "Name": "sirdetectsalot",
-                      "FullyQualifiedName": "github.com/sirdetectsalot",
-                      "Type": "user",
-                      "Metadata": null,
-                      "Parent": null
-                    }
-                  },
-                  "Permission": {
-                    "Value": "actions:write",
-                    "Parent": null
-                  }
-                },
-                {
-                  "Resource": {
-                    "Name": "public",
-                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
-                    "Type": "repository",
-                    "Metadata": null,
-                    "Parent": {
-                      "Name": "sirdetectsalot",
-                      "FullyQualifiedName": "github.com/sirdetectsalot",
-                      "Type": "user",
-                      "Metadata": null,
-                      "Parent": null
-                    }
-                  },
-                  "Permission": {
-                    "Value": "contents:write",
-                    "Parent": null
-                  }
-                },
-                {
-                  "Resource": {
-                    "Name": "public",
-                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
-                    "Type": "repository",
-                    "Metadata": null,
-                    "Parent": {
-                      "Name": "sirdetectsalot",
-                      "FullyQualifiedName": "github.com/sirdetectsalot",
-                      "Type": "user",
-                      "Metadata": null,
-                      "Parent": null
-                    }
-                  },
-                  "Permission": {
-                    "Value": "issues:write",
-                    "Parent": null
-                  }
-                },
-                {
-                  "Resource": {
-                    "Name": "public",
-                    "FullyQualifiedName": "github.com/sirdetectsalot/public",
                     "Type": "repository",
                     "Metadata": null,
                     "Parent": {
@@ -381,7 +229,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
               ],
               "UnboundedResources": null,
               "Metadata": {
-                "expiration": "0001-01-01T00:00:00Z",
+                "expiration": "2025-08-05T00:00:00-07:00",
                 "type": "Fine-Grained GitHub Personal Access Token"
               }
             }`,

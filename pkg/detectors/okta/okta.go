@@ -9,7 +9,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -41,7 +40,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, domainMatch := range domainPat.FindAll(data, -1) {
 			domain := string(domainMatch)
 
-			s := detectors.Result{
+			result := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Okta,
 				Raw:          []byte(token),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", domain, token)),
@@ -64,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("Authorization", fmt.Sprintf("SSWS %s", token))
 
-				resp, err := common.SaneHttpClient().Do(req)
+				resp, err := detectors.DetectorHttpClientWithNoLocalAddresses.Do(req)
 				if err != nil {
 					continue
 				}
@@ -72,12 +71,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 					body, _ := io.ReadAll(resp.Body)
 					if strings.Contains(string(body), "activated") {
-						s.Verified = true
+						result.Verified = true
 					}
 				}
 			}
 
-			results = append(results, s)
+			results = append(results, result)
 		}
 	}
 
@@ -86,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Okta
+}
+
+func (s Scanner) Description() string {
+	return "Okta is an identity and access management service. Okta tokens can be used to authenticate and access various resources and APIs within an organization."
 }

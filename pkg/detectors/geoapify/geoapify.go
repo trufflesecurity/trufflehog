@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Geoapify
 }
+
+func (s Scanner) Description() string {
+	return "Geoapify provides APIs for geolocation services, including geocoding, routing, and places. Geoapify API keys can be used to access these services."
+}

@@ -1,4 +1,4 @@
-package memory
+package simple
 
 import (
 	"strings"
@@ -35,11 +35,11 @@ func WithPurgeInterval[T any](interval time.Duration) CacheOption[T] {
 	return func(c *Cache[T]) { c.purgeInterval = interval }
 }
 
-// New constructs a new in-memory cache instance with optional configurations.
+// NewCache constructs a new in-memory cache instance with optional configurations.
 // By default, it sets the expiration and purge intervals to 12 and 13 hours, respectively.
 // These defaults can be overridden using the functional options: WithExpirationInterval and WithPurgeInterval.
-func New[T any](opts ...CacheOption[T]) *Cache[T] {
-	return NewWithData[T](nil, opts...)
+func NewCache[T any](opts ...CacheOption[T]) *Cache[T] {
+	return NewCacheWithData[T](nil, opts...)
 }
 
 // CacheEntry represents a single entry in the cache, consisting of a key and its corresponding value.
@@ -50,9 +50,9 @@ type CacheEntry[T any] struct {
 	Value T
 }
 
-// NewWithData constructs a new in-memory cache with existing data.
+// NewCacheWithData constructs a new in-memory cache with existing data.
 // It also accepts CacheOption parameters to override default configuration values.
-func NewWithData[T any](data []CacheEntry[T], opts ...CacheOption[T]) *Cache[T] {
+func NewCacheWithData[T any](data []CacheEntry[T], opts ...CacheOption[T]) *Cache[T] {
 	instance := &Cache[T]{expiration: defaultExpirationInterval, purgeInterval: defaultPurgeInterval}
 	for _, opt := range opts {
 		opt(instance)

@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Statuspal
 }
+
+func (s Scanner) Description() string {
+	return "Statuspal is a status page service. Statuspal API keys can be used to manage status pages and subscriptions."
+}

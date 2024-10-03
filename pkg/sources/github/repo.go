@@ -14,6 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 type repoInfoCache struct {
@@ -76,8 +77,8 @@ func (s *Source) appListReposWrapper(ctx context.Context, _ string, opts repoLis
 	return nil, res, err
 }
 
-func (s *Source) getReposByApp(ctx context.Context) error {
-	return s.processRepos(ctx, "", s.appListReposWrapper, &appListOptions{
+func (s *Source) getReposByApp(ctx context.Context, reporter sources.UnitReporter) error {
+	return s.processRepos(ctx, "", reporter, s.appListReposWrapper, &appListOptions{
 		ListOptions: github.ListOptions{
 			PerPage: defaultPagination,
 		},
@@ -96,8 +97,8 @@ func (s *Source) userListReposWrapper(ctx context.Context, user string, opts rep
 	return s.connector.APIClient().Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
 }
 
-func (s *Source) getReposByUser(ctx context.Context, user string) error {
-	return s.processRepos(ctx, user, s.userListReposWrapper, &userListOptions{
+func (s *Source) getReposByUser(ctx context.Context, user string, reporter sources.UnitReporter) error {
+	return s.processRepos(ctx, user, reporter, s.userListReposWrapper, &userListOptions{
 		RepositoryListByUserOptions: github.RepositoryListByUserOptions{
 			ListOptions: github.ListOptions{
 				PerPage: defaultPagination,
@@ -119,8 +120,8 @@ func (s *Source) orgListReposWrapper(ctx context.Context, org string, opts repoL
 	return s.connector.APIClient().Repositories.ListByOrg(ctx, org, &opts.(*orgListOptions).RepositoryListByOrgOptions)
 }
 
-func (s *Source) getReposByOrg(ctx context.Context, org string) error {
-	return s.processRepos(ctx, org, s.orgListReposWrapper, &orgListOptions{
+func (s *Source) getReposByOrg(ctx context.Context, org string, reporter sources.UnitReporter) error {
+	return s.processRepos(ctx, org, reporter, s.orgListReposWrapper, &orgListOptions{
 		RepositoryListByOrgOptions: github.RepositoryListByOrgOptions{
 			ListOptions: github.ListOptions{
 				PerPage: defaultPagination,
@@ -145,11 +146,11 @@ const (
 	organization
 )
 
-func (s *Source) getReposByOrgOrUser(ctx context.Context, name string) (userType, error) {
+func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, reporter sources.UnitReporter) (userType, error) {
 	var err error
 
 	// List repositories for the organization |name|.
-	err = s.getReposByOrg(ctx, name)
+	err = s.getReposByOrg(ctx, name, reporter)
 	if err == nil {
 		return organization, nil
 	} else if !isGitHub404Error(err) {
@@ -157,9 +158,9 @@ func (s *Source) getReposByOrgOrUser(ctx context.Context, name string) (userType
 	}
 
 	// List repositories for the user |name|.
-	err = s.getReposByUser(ctx, name)
+	err = s.getReposByUser(ctx, name, reporter)
 	if err == nil {
-		if err := s.addUserGistsToCache(ctx, name); err != nil {
+		if err := s.addUserGistsToCache(ctx, name, reporter); err != nil {
 			ctx.Logger().Error(err, "Unable to add user to cache")
 		}
 		return user, nil
@@ -180,8 +181,8 @@ func isGitHub404Error(err error) bool {
 	return ghErr.Response.StatusCode == http.StatusNotFound
 }
 
-func (s *Source) processRepos(ctx context.Context, target string, listRepos repoLister, listOpts repoListOptions) error {
-	logger := s.log.WithValues("target", target)
+func (s *Source) processRepos(ctx context.Context, target string, reporter sources.UnitReporter, listRepos repoLister, listOpts repoListOptions) error {
+	logger := ctx.Logger().WithValues("target", target)
 	opts := listOpts.getListOptions()
 
 	var (
@@ -191,14 +192,14 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if s.handleRateLimit(err) {
+		if s.handleRateLimit(ctx, err) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
 
-		s.log.V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
+		ctx.Logger().V(2).Info("Listed repos", "page", opts.Page, "last_page", res.LastPage)
 		for _, r := range someRepos {
 			if r.GetFork() {
 				if !s.conn.IncludeForks {
@@ -215,8 +216,10 @@ func (s *Source) processRepos(ctx context.Context, target string, listRepos repo
 			repoName, repoURL := r.GetFullName(), r.GetCloneURL()
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
-
 			s.cacheRepoInfo(r)
+			if err := reporter.UnitOk(ctx, RepoUnit{Name: repoName, URL: repoURL}); err != nil {
+				return err
+			}
 			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)
 		}
 
@@ -279,60 +282,6 @@ func (s *Source) wikiIsReachable(ctx context.Context, repoURL string) bool {
 
 	// If the wiki is disabled, or is enabled but has no content, the request should be redirected.
 	return wikiURL == res.Request.URL.String()
-}
-
-// commitQuery represents the details required to fetch a commit.
-type commitQuery struct {
-	repo     string
-	owner    string
-	sha      string
-	filename string
-}
-
-// getDiffForFileInCommit retrieves the diff for a specified file in a commit.
-// If the file or its diff is not found, it returns an error.
-func (s *Source) getDiffForFileInCommit(ctx context.Context, query commitQuery) (string, error) {
-	var (
-		commit *github.RepositoryCommit
-		err    error
-	)
-	for {
-		commit, _, err = s.connector.APIClient().Repositories.GetCommit(ctx, query.owner, query.repo, query.sha, nil)
-		if s.handleRateLimit(err) {
-			continue
-		}
-		if err != nil {
-			return "", fmt.Errorf("error fetching commit %s: %w", query.sha, err)
-		}
-		break
-	}
-
-	if len(commit.Files) == 0 {
-		return "", fmt.Errorf("commit %s does not contain any files", query.sha)
-	}
-
-	res := new(strings.Builder)
-	// Only return the diff if the file is in the commit.
-	for _, file := range commit.Files {
-		if *file.Filename != query.filename {
-			continue
-		}
-
-		if file.Patch == nil {
-			return "", fmt.Errorf("commit %s file %s does not have a diff", query.sha, query.filename)
-		}
-
-		if _, err := res.WriteString(*file.Patch); err != nil {
-			return "", fmt.Errorf("buffer write error for commit %s file %s: %w", query.sha, query.filename, err)
-		}
-		res.WriteString("\n")
-	}
-
-	if res.Len() == 0 {
-		return "", fmt.Errorf("commit %s does not contain patch for file %s", query.sha, query.filename)
-	}
-
-	return res.String(), nil
 }
 
 func (s *Source) normalizeRepo(repo string) (string, error) {

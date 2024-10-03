@@ -97,3 +97,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ParallelDots
 }
+
+func (s Scanner) Description() string {
+	return "ParallelDots is an AI service offering various APIs for text analysis. API keys can be used to access these services."
+}

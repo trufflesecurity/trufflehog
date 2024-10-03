@@ -9,7 +9,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -26,7 +25,7 @@ var _ detectors.Versioner = (*Scanner)(nil)
 func (Scanner) Version() int { return 1 }
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
@@ -133,4 +132,8 @@ func verifyJiratoken(ctx context.Context, client *http.Client, email, domain, to
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_JiraToken
+}
+
+func (s Scanner) Description() string {
+	return "Jira is a proprietary issue tracking product developed by Atlassian that allows bug tracking and agile project management. Jira tokens can be used to authenticate and interact with Jira's API."
 }

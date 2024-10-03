@@ -77,3 +77,7 @@ func verifyToken(ctx context.Context, client *http.Client, token string) bool {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_VirusTotal
 }
+
+func (s Scanner) Description() string {
+	return "VirusTotal is an online service that analyzes files and URLs for viruses, worms, trojans, and other kinds of malicious content. VirusTotal API keys can be used to access and integrate this service into applications."
+}

@@ -75,3 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Alconost
 }
+
+func (s Scanner) Description() string {
+	return "Alconost is a translation and localization service. Alconost API keys can be used to access and modify translation data."
+}

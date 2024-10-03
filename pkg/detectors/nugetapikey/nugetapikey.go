@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_NuGetApiKey
 }
+
+func (s Scanner) Description() string {
+	return "NuGet is a package manager for .NET. NuGet API keys can be used to publish and manage packages in the NuGet repository."
+}

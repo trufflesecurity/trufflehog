@@ -12,7 +12,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -27,7 +26,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	urlPat    = regexp.MustCompile(`https://(.{1,50})\.(.{1,50})\.batch\.azure\.com`)
 	secretPat = regexp.MustCompile(`[A-Za-z0-9+/=]{88}`)
@@ -113,4 +112,8 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureBatch
+}
+
+func (s Scanner) Description() string {
+	return "Azure Batch is a cloud service that provides large-scale parallel and high-performance computing (HPC) applications efficiently in the cloud. Azure Batch account keys can be used to manage and control access to these resources."
 }

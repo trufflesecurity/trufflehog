@@ -3,9 +3,10 @@ package salesforce
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -25,7 +26,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	accessTokenPat = regexp.MustCompile(`\b00[a-zA-Z0-9]{13}![a-zA-Z0-9_.]{96}\b`)
 	instancePat    = regexp.MustCompile(`\bhttps://[0-9a-zA-Z-\.]{1,100}\.my\.salesforce\.com\b`)
@@ -110,4 +111,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Salesforce
+}
+
+func (s Scanner) Description() string {
+	return "Salesforce is a cloud-based software company that provides customer relationship management (CRM) service. Salesforce access tokens can be used to authenticate and interact with Salesforce APIs."
 }

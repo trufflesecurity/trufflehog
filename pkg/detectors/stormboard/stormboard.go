@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Stormboard
 }
+
+func (s Scanner) Description() string {
+	return "Stormboard is a digital workspace for brainstorming and collaboration. Stormboard API keys can be used to access and modify data within the workspace."
+}

@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RiteKit
 }
+
+func (s Scanner) Description() string {
+	return "RiteKit is a social media toolkit that provides various APIs for managing social media content and analytics. RiteKit API keys can be used to access and manage social media data."
+}

@@ -35,7 +35,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Dropbox,
 			Raw:          []byte(match[1]),
 		}
@@ -59,12 +59,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// 400 is bad (malformed)
 				// 403 bad scope
 				if res.StatusCode == http.StatusOK {
-					s.Verified = true
+					result.Verified = true
 				}
 			}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return
@@ -72,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Dropbox
+}
+
+func (s Scanner) Description() string {
+	return "Dropbox is a file hosting service that offers cloud storage, file synchronization, personal cloud, and client software. Dropbox API keys can be used to access and manage files and folders in a Dropbox account."
 }

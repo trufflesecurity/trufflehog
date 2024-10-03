@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go huggingface
+
 package huggingface
 
 import (
@@ -46,8 +48,9 @@ func bakeUnboundedResources(tokenJSON HFTokenJSON) []analyzers.Resource {
 	unboundedResources := make([]analyzers.Resource, len(tokenJSON.Orgs))
 	for idx, org := range tokenJSON.Orgs {
 		unboundedResources[idx] = analyzers.Resource{
-			Name: org.Name,
-			Type: "organization",
+			Name:               org.Name,
+			FullyQualifiedName: "huggingface.com/user/" + tokenJSON.Username + "/organization/" + org.Name,
+			Type:               "organization",
 			Metadata: map[string]interface{}{
 				"role":          org.Role,
 				"is_enterprise": org.IsEnterprise,
@@ -63,8 +66,9 @@ func bakeUnfineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analy
 	for idx, model := range allModels {
 		// Add Read Privs to All Models
 		modelResource := analyzers.Resource{
-			Name: model.Name,
-			Type: "model",
+			Name:               model.Name,
+			FullyQualifiedName: "huggingface.com/model/" + model.ID,
+			Type:               "model",
 			Metadata: map[string]interface{}{
 				"private": model.Private,
 			},
@@ -112,8 +116,9 @@ func bakefineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analyze
 
 		// Add Read Privs to All Models
 		modelResource := analyzers.Resource{
-			Name: model.Name,
-			Type: "model",
+			Name:               model.Name,
+			FullyQualifiedName: "huggingface.com/model/" + model.ID,
+			Type:               "model",
 			Metadata: map[string]interface{}{
 				"private": model.Private,
 			},
@@ -148,8 +153,9 @@ func bakeOrganizationBindings(tokenJSON HFTokenJSON) []analyzers.Binding {
 	for _, permission := range tokenJSON.Auth.AccessToken.FineGrained.Scoped {
 		if permission.Entity.Type == "org" {
 			orgResource = &analyzers.Resource{
-				Name: permission.Entity.Name,
-				Type: "organization",
+				Name:               permission.Entity.Name,
+				FullyQualifiedName: "hugggingface.com/organization/" + permission.Entity.ID,
+				Type:               "organization",
 			}
 			for _, perm := range permission.Permissions {
 				orgPermissions[perm] = struct{}{}
@@ -207,8 +213,9 @@ func bakeUserBindings(tokenJSON HFTokenJSON) []analyzers.Binding {
 	}
 
 	userResource := analyzers.Resource{
-		Name: tokenJSON.Username,
-		Type: "user",
+		Name:               tokenJSON.Name,
+		FullyQualifiedName: "huggingface.com/user/" + tokenJSON.Username,
+		Type:               "user",
 	}
 	for _, permission := range user_scopes_order {
 		for key, value := range user_scopes[permission] {
@@ -246,15 +253,13 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	result.Bindings = make([]analyzers.Binding, 0)
-	if info.Token.Auth.AccessToken.Type != FINEGRAINED {
-		result.Bindings = append(result.Bindings, bakeUnfineGrainedBindings(info.Models, info.Token)...)
-	}
-
-	result.Bindings = append(result.Bindings, bakefineGrainedBindings(info.Models, info.Token)...)
 
 	if info.Token.Auth.AccessToken.Type == FINEGRAINED {
+		result.Bindings = append(result.Bindings, bakefineGrainedBindings(info.Models, info.Token)...)
 		result.Bindings = append(result.Bindings, bakeOrganizationBindings(info.Token)...)
 		result.Bindings = append(result.Bindings, bakeUserBindings(info.Token)...)
+	} else {
+		result.Bindings = append(result.Bindings, bakeUnfineGrainedBindings(info.Models, info.Token)...)
 	}
 
 	return &result
@@ -550,12 +555,12 @@ func printOrgs(tokenJSON HFTokenJSON) {
 		enterprise := ""
 		role := ""
 		if org.IsEnterprise {
-			enterprise = color.New(color.FgGreen).Sprintf("True")
+			enterprise = color.New(color.FgGreen).Sprint("True")
 		} else {
 			enterprise = "False"
 		}
 		if org.Role == "admin" {
-			role = color.New(color.FgGreen).Sprintf("Admin")
+			role = color.New(color.FgGreen).Sprint("Admin")
 		} else {
 			role = org.Role
 		}
@@ -641,18 +646,18 @@ func printModelsTable(models []Model) {
 	for _, model := range models {
 		var name, read, write, private string
 		if model.Permissions.Read {
-			read = color.New(color.FgGreen).Sprintf("True")
+			read = color.New(color.FgGreen).Sprint("True")
 		} else {
 			read = "False"
 		}
 		if model.Permissions.Write {
-			write = color.New(color.FgGreen).Sprintf("True")
+			write = color.New(color.FgGreen).Sprint("True")
 		} else {
 			write = "False"
 		}
 		if model.Private {
-			private = color.New(color.FgGreen).Sprintf("True")
-			name = color.New(color.FgGreen).Sprintf(model.Name)
+			private = color.New(color.FgGreen).Sprint("True")
+			name = color.New(color.FgGreen).Sprint(model.Name)
 		} else {
 			private = "False"
 			name = model.Name

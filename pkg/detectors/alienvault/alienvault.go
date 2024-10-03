@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AlienVault
 }
+
+func (s Scanner) Description() string {
+	return "AlienVault is a threat intelligence platform providing real-time data on emerging threats. AlienVault API keys can be used to access threat data and other services."
+}

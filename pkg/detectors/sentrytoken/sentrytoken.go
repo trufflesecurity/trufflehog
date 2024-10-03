@@ -129,3 +129,7 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SentryToken
 }
+
+func (s Scanner) Description() string {
+	return "Sentry is an error tracking service that helps developers monitor and fix crashes in real time. Sentry tokens can be used to access and manage projects and organizations within Sentry."
+}

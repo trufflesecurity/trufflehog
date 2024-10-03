@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CalendlyApiKey
 }
+
+func (s Scanner) Description() string {
+	return "Calendly is an online scheduling tool that allows users to schedule meetings and appointments. Calendly API keys can be used to access and manage Calendly accounts and data."
+}

@@ -79,3 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Notion
 }
+
+func (s Scanner) Description() string {
+	return "Notion is a productivity tool that provides an all-in-one workspace for note-taking, project management, and collaboration. Notion API keys can be used to access and modify data within a user's Notion workspace."
+}

@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Metrilo
 }
+
+func (s Scanner) Description() string {
+	return "Metrilo is an analytics and CRM platform for e-commerce. Metrilo API keys can be used to access and manage e-commerce data."
+}
