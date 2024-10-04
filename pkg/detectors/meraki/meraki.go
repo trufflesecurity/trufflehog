@@ -3,10 +3,9 @@ package meraki
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"strings"
-
 	regexp "github.com/wasilibs/go-re2"
+	"io"
+	"net/http"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -50,14 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	// uniqueMatches will hold unique match values and ensure we only process unique matches found in the data string
-	var uniqueMatches = make(map[string]bool)
+	var uniqueMatches = make(map[string]struct{})
 
 	for _, match := range apiKey.FindAllStringSubmatch(dataStr, -1) {
-		if len(match) != 2 {
-			continue
-		}
-
-		uniqueMatches[strings.TrimSpace(match[1])] = true
+		uniqueMatches[match[1]] = struct{}{}
 	}
 
 	for match := range uniqueMatches {
@@ -102,7 +97,10 @@ func verifyMerakiApiKey(ctx context.Context, client *http.Client, match string) 
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
