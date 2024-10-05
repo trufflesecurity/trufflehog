@@ -127,7 +127,7 @@ Checksums are applied to all artifacts, and the resulting checksum file is signe
 
 You need the following tool to verify signature:
 
-- [Cosign](https://docs.sigstore.dev/cosign/installation/)
+- [Cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
 
 Verification steps are as follow:
 

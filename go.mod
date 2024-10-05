@@ -61,7 +61,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/jedib0t/go-pretty/v6 v6.5.9
+	github.com/jedib0t/go-pretty/v6 v6.6.0
 	github.com/jlaffaye/ftp v0.2.0
 	github.com/joho/godotenv v1.5.1
 	github.com/jpillora/overseer v1.1.6
@@ -86,7 +86,7 @@ require (
 	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 	github.com/shuheiktgw/go-travis v0.3.1
-	github.com/snowflakedb/gosnowflake v1.11.1
+	github.com/snowflakedb/gosnowflake v1.11.2
 	github.com/stretchr/testify v1.9.0
 	github.com/tailscale/depaware v0.0.0-20240804103531-585336c3e1b3
 	github.com/testcontainers/testcontainers-go v0.33.0
@@ -99,7 +99,7 @@ require (
 	github.com/wasilibs/go-re2 v1.7.0
 	github.com/xanzy/go-gitlab v0.109.0
 	github.com/xo/dburl v0.23.2
-	go.mongodb.org/mongo-driver v1.17.0
+	go.mongodb.org/mongo-driver v1.17.1
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
