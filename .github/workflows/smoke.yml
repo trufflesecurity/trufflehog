@@ -28,10 +28,10 @@ jobs:
           go-version: "1.23"
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Zombies
+      - name: Run trufflehog
         run: |
           set -e
-          go run . git --no-verification file://.
+          go run . git --no-verification file://. > /dev/null
       - name: Check for running git processes and zombies
         run: |
           if pgrep -x "git" > /dev/null
