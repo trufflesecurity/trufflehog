@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v63/github"
 	"golang.org/x/exp/rand"
@@ -725,15 +724,6 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 
 	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
 	s.setScanOptions(s.conn.Base, s.conn.Head)
-
-	// Repo size is not collected for wikis.
-	var logger logr.Logger
-	if !strings.HasSuffix(repoURL, ".wiki.git") && repoInfo.size > 0 {
-		logger = ctx.Logger().WithValues("repo_size_kb", repoInfo.size)
-	} else {
-		logger = ctx.Logger()
-	}
-	logger.V(2).Info("scanning repo")
 
 	start := time.Now()
 	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter); err != nil {
