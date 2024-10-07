@@ -579,6 +579,21 @@ func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsup
 		t.Fatalf("Failed to initialize git repository: %v, stderr: %s", err, initStderr.String())
 	}
 
+	cmds := [][]string{
+		{"git", "-C", tempDir, "config", "user.name", "Test User"},
+		{"git", "-C", tempDir, "config", "user.email", "test@example.com"},
+	}
+
+	for _, cmdArgs := range cmds {
+		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+		var cmdStderr bytes.Buffer
+		cmd.Stderr = &cmdStderr
+		err := cmd.Run()
+		if err != nil {
+			t.Fatalf("Failed to set git config: %v, stderr: %s", err, cmdStderr.String())
+		}
+	}
+
 	filePath := filepath.Join(tempDir, fileName)
 
 	// Create the file with appropriate content.
