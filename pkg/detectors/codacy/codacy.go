@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Codacy
 }
+
+func (s Scanner) Description() string {
+	return "Codacy is an automated code review tool that helps developers and teams improve code quality. Codacy API tokens can be used to access and manage code quality reports and settings."
+}

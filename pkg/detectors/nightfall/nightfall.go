@@ -74,3 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Nightfall
 }
+
+func (s Scanner) Description() string {
+	return "Nightfall is a data security platform providing sensitive data detection and protection. The detected key can be used to interact with Nightfall's API."
+}

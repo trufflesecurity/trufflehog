@@ -135,3 +135,7 @@ func getCexIOPassphrase(apiSecret string, apiKey string, nonce string, userId st
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CexIO
 }
+
+func (s Scanner) Description() string {
+	return "CexIO is a cryptocurrency exchange platform. CexIO API keys can be used to access and manage cryptocurrency accounts and transactions."
+}

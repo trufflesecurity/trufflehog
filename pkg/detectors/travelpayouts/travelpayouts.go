@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TravelPayouts
 }
+
+func (s Scanner) Description() string {
+	return "TravelPayouts is a travel affiliate network that provides access to various travel-related APIs. TravelPayouts keys can be used to interact with these APIs to retrieve travel data and earn commissions on bookings."
+}

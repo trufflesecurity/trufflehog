@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SimplyNoted
 }
+
+func (s Scanner) Description() string {
+	return "SimplyNoted is a service used for sending personalized handwritten notes. SimplyNoted API keys can be used to access and send these notes programmatically."
+}

@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MessageBird
 }
+
+func (s Scanner) Description() string {
+	return "MessageBird is a cloud communications platform. MessageBird API keys can be used to send and receive SMS, voice, and chat messages."
+}

@@ -135,3 +135,7 @@ func constructSignature(payload string, resSecretMatch string) string {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gemini
 }
+
+func (s Scanner) Description() string {
+	return "Gemini is a cryptocurrency exchange platform. API keys can be used to access and manage account details and perform transactions."
+}

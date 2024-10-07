@@ -111,3 +111,7 @@ func verifyAgora(ctx context.Context, client *http.Client, resMatch, resSecret s
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Agora
 }
+
+func (s Scanner) Description() string {
+	return "Agora is a real-time engagement platform providing APIs for voice, video, and messaging. Agora API keys can be used to access and manage these services."
+}

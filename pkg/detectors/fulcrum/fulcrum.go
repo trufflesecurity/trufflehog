@@ -29,7 +29,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"fulcrum"}
 }
 
-// FromData will find and optionally verify fullcrum secrets in a given set of bytes.
+// FromData will find and optionally verify fulcrum secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -70,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Fulcrum
+}
+
+func (s Scanner) Description() string {
+	return "Fulcrum is a data collection platform used to gather and analyze geospatial data. Fulcrum API tokens can be used to access and manage this data."
 }

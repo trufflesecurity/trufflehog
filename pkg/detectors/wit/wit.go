@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Wit
 }
+
+func (s Scanner) Description() string {
+	return "Wit.ai is a natural language processing service that provides an API for building conversational interfaces. Wit.ai API keys can be used to access and modify this data and compute."
+}

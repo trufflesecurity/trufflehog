@@ -229,6 +229,8 @@ func (m *CustomRegex) validate(all bool) error {
 
 	}
 
+	// no validation rules for Description
+
 	if len(errors) > 0 {
 		return CustomRegexMultiError(errors)
 	}

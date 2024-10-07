@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ApiScience
 }
+
+func (s Scanner) Description() string {
+	return "ApiScience is a tool for monitoring the performance of APIs. ApiScience keys can be used to access and manage API monitors."
+}

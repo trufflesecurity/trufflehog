@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go square
+
 package square
 
 import (
@@ -102,6 +104,9 @@ func getBindingsAndUnboundedResources(scopes []string) ([]analyzers.Binding, []a
 					Parent:             &parentResource,
 				}
 				for _, permission := range requiredPermissions {
+					if _, ok := StringToPermission[permission]; !ok { // skip unknown permissions
+						continue
+					}
 					if contains(scopes, permission) {
 						categoryBinding = append(categoryBinding, analyzers.Binding{
 							Resource: resource,

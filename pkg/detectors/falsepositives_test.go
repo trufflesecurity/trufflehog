@@ -29,6 +29,8 @@ func (d fakeDetector) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType(0)
 }
 
+func (f fakeDetector) Description() string { return "" }
+
 func (d customFalsePositiveChecker) IsFalsePositive(result Result) (bool, string) {
 	return IsKnownFalsePositive(string(result.Raw), []FalsePositive{"a specific magic string"}, false)
 }

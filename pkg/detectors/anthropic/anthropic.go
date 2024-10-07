@@ -124,3 +124,7 @@ func verifyToken(ctx context.Context, client *http.Client, apiKey string) (bool,
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Anthropic
 }
+
+func (s Scanner) Description() string {
+	return "Anthropic is an AI research company. The API keys can be used to access their AI models and services."
+}

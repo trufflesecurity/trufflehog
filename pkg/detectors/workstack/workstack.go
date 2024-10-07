@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Workstack
 }
+
+func (s Scanner) Description() string {
+	return "Workstack is a project management tool. Workstack API keys can be used to access and modify project data and manage tasks."
+}

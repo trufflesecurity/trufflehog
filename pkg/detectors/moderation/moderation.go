@@ -78,3 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Moderation
 }
+
+func (s Scanner) Description() string {
+	return "Moderation API keys are used to access the Moderation API, which provides services for analyzing and moderating content."
+}

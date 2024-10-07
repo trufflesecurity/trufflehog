@@ -19,9 +19,10 @@ type Scanner struct{ detectors.EndpointSetter }
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.CloudProvider = (*Scanner)(nil)
 
-func (Scanner) Version() int            { return 1 }
-func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
+func (Scanner) Version() int          { return 1 }
+func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
 
 var (
 	// Oauth token
@@ -112,7 +113,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) VerifyGithub(ctx context.Context, client *http.Client, token string) (bool, *UserRes, *HeaderInfo, error) {
 	// https://developer.github.com/v3/users/#get-the-authenticated-user
 	var requestErr error
-	for _, url := range s.Endpoints(s.DefaultEndpoint()) {
+	for _, url := range s.Endpoints() {
 		requestErr = nil
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/user", url), nil)
@@ -181,4 +182,8 @@ func SetHeaderInfo(headers *HeaderInfo, s1 *detectors.Result) {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Github
+}
+
+func (s Scanner) Description() string {
+	return "GitHub is a web-based platform used for version control and collaborative software development. GitHub tokens can be used to access and modify repositories and other resources."
 }

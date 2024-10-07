@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Loginradius
 }
+
+func (s Scanner) Description() string {
+	return "Loginradius is a customer identity and access management (CIAM) platform. The API keys can be used to manage user identities, authentication, and access control."
+}

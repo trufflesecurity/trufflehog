@@ -78,3 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Fullstory
 }
+
+func (s Scanner) Description() string {
+	return "Fullstory is a digital experience analytics platform. Fullstory keys can be used to access user session data and analytics."
+}

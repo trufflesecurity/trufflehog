@@ -69,3 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Paydirtapp
 }
+
+func (s Scanner) Description() string {
+	return "Paydirtapp is a time tracking and invoicing app. Paydirtapp API keys can be used to access and manage user data and billing information."
+}

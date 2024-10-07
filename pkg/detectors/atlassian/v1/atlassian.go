@@ -44,6 +44,11 @@ func (s Scanner) Keywords() []string {
 	return []string{"atlassian"}
 }
 
+// Description returns a description for the result being detected
+func (s Scanner) Description() string {
+	return "Atlassian provides tools for software development, project management, and content management. Atlassian API keys can be used to access and manage these tools and services."
+}
+
 // FromData will find and optionally verify Atlassian secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -88,8 +93,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	if err != nil {
 		return false, nil, nil
 	}
-        req.Header.Add("Accept", "application/json")
-        req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	res, err := client.Do(req)
 	if err != nil {
 		return false, nil, err

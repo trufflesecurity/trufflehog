@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mavenlink
 }
+
+func (s Scanner) Description() string {
+	return "Mavenlink is a project management software that provides tools to plan, manage, and analyze projects. Mavenlink API keys can be used to access and modify project data."
+}

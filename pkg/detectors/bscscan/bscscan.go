@@ -76,3 +76,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BscScan
 }
+
+func (s Scanner) Description() string {
+	return "BscScan is a block explorer and analytics platform for Binance Smart Chain. BscScan API keys can be used to access data from the Binance Smart Chain blockchain."
+}

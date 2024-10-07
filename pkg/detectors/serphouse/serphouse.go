@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Serphouse
 }
+
+func (s Scanner) Description() string {
+	return "Serphouse is a service that provides search engine result page data. Serphouse API keys can be used to access this data and perform various operations on it."
+}

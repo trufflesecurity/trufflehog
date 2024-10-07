@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CannyIo
 }
+
+func (s Scanner) Description() string {
+	return "Canny is a user feedback tool that helps you track and prioritize feature requests. Canny API keys can be used to access and manage feedback boards and other related data."
+}

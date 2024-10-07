@@ -78,6 +78,10 @@ func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Twitter
 }
 
+func (s Scanner) Description() string {
+	return "Twitter API keys can be used to interact with the Twitter API to post tweets, read timelines, and access other Twitter functionalities."
+}
+
 func (s Scanner) VerifyTwitterToken(ctx context.Context, client *http.Client, token string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.twitter.com/2/tweets/20", nil)
 	if err != nil {

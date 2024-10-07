@@ -106,3 +106,7 @@ func (s Scanner) verify(ctx context.Context, client *http.Client, key string) (b
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MaxMindLicense
 }
+
+func (s Scanner) Description() string {
+	return "MaxMind provides IP intelligence through its GeoIP databases and services. MaxMind license keys are used to access these services and databases."
+}

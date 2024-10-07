@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LokaliseToken
 }
+
+func (s Scanner) Description() string {
+	return "Lokalise is a translation management system that helps teams to manage and automate their localization process. Lokalise tokens can be used to access its API and modify project data."
+}

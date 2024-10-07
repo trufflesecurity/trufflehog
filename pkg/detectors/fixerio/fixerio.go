@@ -85,3 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FixerIO
 }
+
+func (s Scanner) Description() string {
+	return "Fixer.io is a foreign exchange rates and currency conversion API. Fixer.io API keys can be used to access and retrieve current and historical foreign exchange rates."
+}

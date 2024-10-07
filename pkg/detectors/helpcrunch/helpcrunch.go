@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_HelpCrunch
 }
+
+func (s Scanner) Description() string {
+	return "HelpCrunch is a customer communication platform offering live chat, email automation, and more. HelpCrunch API keys can be used to access and manage customer interactions and data."
+}

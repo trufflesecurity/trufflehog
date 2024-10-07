@@ -78,3 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MapBox
 }
+
+func (s Scanner) Description() string {
+	return "Mapbox provides location-based services and APIs. Mapbox access tokens can be used to interact with these services and modify data."
+}

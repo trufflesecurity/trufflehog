@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RocketReach
 }
+
+func (s Scanner) Description() string {
+	return "RocketReach is a tool used to find email addresses, phone numbers, and social media profiles for professionals. RocketReach API keys can be used to access and retrieve this contact information."
+}

@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Collect2
 }
+
+func (s Scanner) Description() string {
+	return "An API to Collect, Modify, Filter and Export Data using webhooks. API keys can create read update and delete data."
+}

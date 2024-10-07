@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GeoIpifi
 }
+
+func (s Scanner) Description() string {
+	return "GeoIpifi is a service that provides geolocation information. GeoIpifi API keys can be used to retrieve geolocation data based on IP addresses."
+}

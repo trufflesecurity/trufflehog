@@ -2,6 +2,7 @@ package iobuf
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -53,15 +54,34 @@ type BufferedReadSeeker struct {
 	sizeKnown bool  // Whether the total size of the reader is known
 }
 
+// asSeeker checks if a reader reliably supports seeking operations.
+// Some types, like os.File when used as a pipe, may implement io.Seeker
+// but do not actually support seeking.
+func asSeeker(r io.Reader) io.Seeker {
+	seeker, ok := r.(io.Seeker)
+	if !ok {
+		return nil
+	}
+
+	_, err := seeker.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil
+	}
+	return seeker
+}
+
 // NewBufferedReaderSeeker creates and initializes a BufferedReadSeeker.
 // It takes an io.Reader and checks if it supports seeking.
 // If the reader supports seeking, it is stored in the seeker field.
 func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 	const defaultThreshold = 1 << 24 // 16MB threshold for switching to file buffering
 
-	seeker, _ := r.(io.Seeker)
+	var (
+		buf    *buffer.Buffer
+		seeker io.Seeker
+	)
 
-	var buf *buffer.Buffer
+	seeker = asSeeker(r)
 	if seeker == nil {
 		buf = defaultBufferPool.Get()
 	}
@@ -98,6 +118,10 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 		n, err := br.tempFile.Read(out)
 		br.index += int64(n)
 		return n, err
+	}
+
+	if br.buf == nil {
+		br.buf = br.bufPool.Get()
 	}
 
 	var (
@@ -301,12 +325,13 @@ func (br *BufferedReadSeeker) createTempFile() error {
 }
 
 func (br *BufferedReadSeeker) flushBufferToDisk() error {
-	if _, err := br.buf.WriteTo(br.tempFile); err != nil {
+	n, err := br.buf.WriteTo(br.tempFile)
+	if err != nil {
 		return err
 	}
-	br.diskBufferSize = int64(br.buf.Len())
+	br.diskBufferSize += n
 
-	return nil
+	return err
 }
 
 // ReadAt reads len(out) bytes into out starting at offset off in the underlying input source.
@@ -321,7 +346,6 @@ func (br *BufferedReadSeeker) ReadAt(out []byte, offset int64) (int, error) {
 		return br.Read(out)
 	}
 
-	// For non-seekable readers, use our buffering logic.
 	currentIndex := br.index
 
 	if _, err := br.Seek(offset, io.SeekStart); err != nil {
@@ -354,4 +378,30 @@ func (br *BufferedReadSeeker) Close() error {
 		return os.Remove(br.tempFileName)
 	}
 	return nil
+}
+
+// Size returns the total size of the reader.
+func (br *BufferedReadSeeker) Size() (int64, error) {
+	if br.sizeKnown {
+		return br.totalSize, nil
+	}
+
+	currentPos, err := br.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get current position: %w", err)
+	}
+
+	endPos, err := br.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, fmt.Errorf("failed to seek to end: %w", err)
+	}
+
+	if _, err = br.Seek(currentPos, io.SeekStart); err != nil {
+		return 0, fmt.Errorf("failed to restore position: %w", err)
+	}
+
+	br.totalSize = endPos
+	br.sizeKnown = true
+
+	return br.totalSize, nil
 }

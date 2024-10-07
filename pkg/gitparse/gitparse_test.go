@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/process"
 	bufferwriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffer_writer"
 	bufferedfilewriter "github.com/trufflesecurity/trufflehog/v3/pkg/writers/buffered_file_writer"
 )
@@ -791,6 +792,8 @@ func (d1 *Diff) Equal(ctx context.Context, d2 *Diff) bool {
 func TestCommitParsing(t *testing.T) {
 	expected := expectedDiffs()
 
+	beforeProcesses := process.GetGitProcessList()
+
 	r := bytes.NewReader([]byte(commitLog))
 	diffChan := make(chan *Diff)
 	parser := NewParser()
@@ -808,6 +811,13 @@ func TestCommitParsing(t *testing.T) {
 			t.Errorf("Diff does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[i].Commit.Hash, diff, diff.Commit.Hash)
 		}
 		i++
+	}
+
+	afterProcesses := process.GetGitProcessList()
+	zombies := process.DetectGitZombies(beforeProcesses, afterProcesses)
+
+	if len(zombies) > 0 {
+		t.Errorf("Detected %d zombie git processes: %v", len(zombies), zombies)
 	}
 }
 

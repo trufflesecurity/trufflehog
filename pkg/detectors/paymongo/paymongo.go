@@ -73,3 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Paymongo
 }
+
+func (s Scanner) Description() string {
+	return "PayMongo is a payment processing platform in the Philippines. PayMongo API keys can be used to access and manage payment methods, transactions, and other related data."
+}

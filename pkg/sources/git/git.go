@@ -420,9 +420,12 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 		"clone",
 		cloneURL.String(),
 		params.clonePath,
-		"-c",
-		"remote.origin.fetch=+refs/*:refs/remotes/origin/*",
 		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
+	}
+	if !feature.SkipAdditionalRefs.Load() {
+		gitArgs = append(gitArgs,
+			"-c",
+			"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
 	}
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
@@ -651,9 +654,9 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 			commitHash := plumbing.NewHash(fullHash)
 			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.V(1).Info(
+				logger.Error(
+					err,
 					"error handling binary file",
-					"error", err,
 					"filename", fileName,
 					"commit", commitHash,
 					"file", diff.PathB,
@@ -874,7 +877,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				Verify:         s.verify,
 			}
 			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
+				logger.Error(err, "error handling binary file", "filename", fileName)
 			}
 			continue
 		}
@@ -969,17 +972,17 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 // If either commit cannot be resolved, it returns early.
 // If both are resolved, it finds and sets the merge base in scanOptions.
 func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
-	baseCommit, baseSet, err := resolveAndSetCommit(repo, &scanOptions.BaseHash)
+	baseCommit, err := resolveAndSetCommit(repo, &scanOptions.BaseHash)
 	if err != nil {
 		return err
 	}
 
-	headCommit, headSet, err := resolveAndSetCommit(repo, &scanOptions.HeadHash)
+	headCommit, err := resolveAndSetCommit(repo, &scanOptions.HeadHash)
 	if err != nil {
 		return err
 	}
 
-	if !(baseSet && headSet) {
+	if baseCommit == nil || headCommit == nil {
 		return nil
 	}
 
@@ -998,32 +1001,31 @@ func normalizeConfig(scanOptions *ScanOptions, repo *git.Repository) error {
 }
 
 // resolveAndSetCommit resolves a Git reference to a commit object and updates the reference if it was not a direct hash.
-// Returns the commit object, a boolean indicating if the commit was successfully set, and any error encountered.
-func resolveAndSetCommit(repo *git.Repository, ref *string) (*object.Commit, bool, error) {
+// Returns the commit object and any error encountered.
+func resolveAndSetCommit(repo *git.Repository, ref *string) (*object.Commit, error) {
 	if repo == nil || ref == nil {
-		return nil, false, fmt.Errorf("repo and ref must be non-nil")
+		return nil, fmt.Errorf("repo and ref must be non-nil")
 	}
 	if len(*ref) == 0 {
-		return nil, false, nil
+		return nil, nil
 	}
 
 	originalRef := *ref
 	resolvedRef, err := resolveHash(repo, originalRef)
 	if err != nil {
-		return nil, false, fmt.Errorf("unable to resolve ref: %w", err)
+		return nil, fmt.Errorf("unable to resolve ref: %w", err)
 	}
 
 	commit, err := repo.CommitObject(plumbing.NewHash(resolvedRef))
 	if err != nil {
-		return nil, false, fmt.Errorf("unable to resolve commit: %w", err)
+		return nil, fmt.Errorf("unable to resolve commit: %w", err)
 	}
 
-	wasSet := originalRef != resolvedRef
-	if wasSet {
+	if originalRef != resolvedRef {
 		*ref = resolvedRef
 	}
 
-	return commit, wasSet, nil
+	return commit, nil
 }
 
 func resolveHash(repo *git.Repository, ref string) (string, error) {
@@ -1239,47 +1241,44 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	}
 
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
-	stdout, err := s.executeCatFileCmd(cmd)
+	stdout, catCmd, err := s.executeCatFileCmd(cmd)
+	if err != nil {
+		return err
+	}
+	// Wait must be called after closing the pipe (defer is a stack, so first defer is executed last)
+	defer func() {
+		_ = catCmd.Wait()
+	}()
+	defer stdout.Close()
+
+	err = handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+
+	// Always call Wait() to ensure the process is properly cleaned up
+	waitErr := cmd.Wait()
+
+	// If there was an error in HandleFile, return that error
 	if err != nil {
 		return err
 	}
 
-	done := make(chan error, 1)
-	// Read from stdout to prevent the pipe buffer from filling up and causing the command to hang.
-	// This allows us to stream the file contents to the handler.
-	go func() {
-		defer close(done)
-		done <- handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
-	}()
-
-	// Close to signal that we are done writing to the pipe, which allows the reading goroutine to finish.
-	if closeErr := stdout.Close(); closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
-		ctx.Logger().Error(fmt.Errorf("error closing stdout: %w", closeErr), "closing stdout failed")
-	}
-
-	if waitErr := cmd.Wait(); waitErr != nil {
-		return fmt.Errorf("error waiting for git cat-file: %w", waitErr)
-	}
-
-	// Wait for the command to finish and the handler to complete.
-	// Capture any error from the file handling process.
-	return <-done
+	// If Wait() resulted in an error, return that error
+	return waitErr
 }
 
-func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, error) {
+func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, *exec.Cmd, error) {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
+		return nil, nil, fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
+		return nil, nil, fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	return stdout, nil
+	return stdout, cmd, nil
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {

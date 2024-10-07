@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GoodDay
 }
+
+func (s Scanner) Description() string {
+	return "GoodDay is a project management tool. GoodDay API tokens can be used to access and manage project data."
+}

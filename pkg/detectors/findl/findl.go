@@ -73,3 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Findl
 }
+
+func (s Scanner) Description() string {
+	return "Findl is a service used for searching and querying data. Findl API keys can be used to access and modify this data."
+}

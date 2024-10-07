@@ -131,3 +131,7 @@ type member struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ZulipChat
 }
+
+func (s Scanner) Description() string {
+	return "ZulipChat is a group chat application used for team communication. ZulipChat API keys can be used to access and manage various functionalities of the chat service."
+}

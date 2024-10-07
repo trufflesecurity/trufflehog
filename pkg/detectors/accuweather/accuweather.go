@@ -98,3 +98,7 @@ func verifyAccuweather(ctx context.Context, client *http.Client, resMatch string
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Accuweather
 }
+
+func (s Scanner) Description() string {
+	return "Accuweather is a weather forecasting service. Accuweather API keys can be used to access weather data and forecasts."
+}

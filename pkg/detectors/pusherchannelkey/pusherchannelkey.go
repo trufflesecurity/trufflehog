@@ -135,3 +135,7 @@ func hmacBytes(toSign, secret []byte) []byte {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PusherChannelKey
 }
+
+func (s Scanner) Description() string {
+	return "Pusher is a service for adding real-time functionality to web and mobile apps. Pusher Channel keys can be used to authenticate and send messages to channels."
+}

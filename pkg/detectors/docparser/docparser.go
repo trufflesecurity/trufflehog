@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Docparser
 }
+
+func (s Scanner) Description() string {
+	return "Docparser is a document processing service that extracts data from PDFs and scanned documents. Docparser API keys can be used to access and manipulate this data."
+}

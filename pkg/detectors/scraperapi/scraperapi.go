@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ScraperAPI
 }
+
+func (s Scanner) Description() string {
+	return "ScraperAPI is a service that allows users to scrape websites efficiently. ScraperAPI keys can be used to access and scrape data from various websites."
+}

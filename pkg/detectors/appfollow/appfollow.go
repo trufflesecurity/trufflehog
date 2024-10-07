@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Appfollow
 }
+
+func (s Scanner) Description() string {
+	return "Appfollow is a service used for app monitoring and analytics. Appfollow API tokens can be used to access and manage app data and analytics."
+}
