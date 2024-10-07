@@ -428,6 +428,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meaningcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mediastack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meistertask"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meraki"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mesibo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/messagebird"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
@@ -1634,6 +1635,7 @@ func DefaultDetectors() []detectors.Detector {
 		robinhoodcrypto.Scanner{},
 		nvapi.Scanner{},
 		railwayapp.Scanner{},
+		meraki.Scanner{},
 	}
 
 	// Automatically initialize all detectors that implement
