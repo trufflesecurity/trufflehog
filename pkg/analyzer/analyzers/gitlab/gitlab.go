@@ -54,13 +54,12 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	// Add token and it's permissions to bindings
 	tokenResource := analyzers.Resource{
 		Name:               info.AccessToken.Name,
-		FullyQualifiedName: fmt.Sprintf("github.com/token/%d", info.AccessToken.ID),
+		FullyQualifiedName: fmt.Sprintf("gitlab.com/token/%d", info.AccessToken.ID),
 		Type:               "access_token",
 		Metadata: map[string]any{
-			"last_used_at": info.AccessToken.LastUsedAt,
-			"created_at":   info.AccessToken.CreatedAt,
-			"revoked":      info.AccessToken.Revoked,
-			"expires_at":   info.AccessToken.ExpiresAt,
+			"created_at": info.AccessToken.CreatedAt,
+			"revoked":    info.AccessToken.Revoked,
+			"expires_at": info.AccessToken.ExpiresAt,
 		},
 	}
 
@@ -77,7 +76,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	for _, project := range info.Projects {
 		projectResource := analyzers.Resource{
 			Name:               project.NameWithNamespace,
-			FullyQualifiedName: fmt.Sprintf("github.com/project/%d", project.ID),
+			FullyQualifiedName: fmt.Sprintf("gitlab.com/project/%d", project.ID),
 			Type:               "project",
 		}
 
@@ -99,7 +98,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 // consider calling /api/v4/metadata to learn about gitlab instance version and whether neterrprises is enabled
 
-// we'll call /api/v4/personal_access_tokens and /api/v4/user and then filter down to scopes.
+// we'll call /api/v4/personal_access_tokens and then filter down to scopes.
 
 type AccessTokenJSON struct {
 	ID         int      `json:"id"`
