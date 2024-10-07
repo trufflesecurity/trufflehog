@@ -32,6 +32,7 @@ jobs:
         run: |
           set -e
           go run . git --no-verification file://. > /dev/null
+          # This case previously had a deadlock issue and left zombies after trufflehog exited #3379
           go run . git --no-verification https://github.com/git-test-fixtures/binary.git > /dev/null
       - name: Check for running git processes and zombies
         run: |
