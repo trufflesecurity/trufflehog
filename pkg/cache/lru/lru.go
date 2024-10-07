@@ -12,40 +12,30 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
-
-// collector is an interface that extends cache.BaseMetricsCollector
-// and adds methods for recording cache evictions.
-type collector interface {
-	cache.BaseMetricsCollector
-
-	RecordEviction(cacheName string)
-}
 
 // Cache is a generic LRU-sized cache that stores key-value pairs with a maximum size limit.
 // It wraps the lru.Cache library and adds support for custom metrics collection.
 type Cache[T any] struct {
 	cache *lru.Cache[string, T]
 
-	cacheName string
-	capacity  int
-	metrics   collector
+	cacheName    string
+	capacity     int
+	evictMetrics cache.EvictionMetricsCollector
 }
 
 // Option defines a functional option for configuring the Cache.
 type Option[T any] func(*Cache[T])
 
-// WithMetricsCollector is a functional option to set a custom metrics collector.
-// It sets the metrics field of the Cache.
-func WithMetricsCollector[T any](collector collector) Option[T] {
-	return func(lc *Cache[T]) { lc.metrics = collector }
-}
-
 // WithCapacity is a functional option to set the maximum number of items the cache can hold.
 // If the capacity is not set, the default value (128_000) is used.
 func WithCapacity[T any](capacity int) Option[T] {
 	return func(lc *Cache[T]) { lc.capacity = capacity }
+}
+
+// WithMetricsCollector is a functional option to set a custom metrics collector.
+func WithMetricsCollector[T any](collector cache.EvictionMetricsCollector) Option[T] {
+	return func(lc *Cache[T]) { lc.evictMetrics = collector }
 }
 
 // NewCache creates a new Cache with optional configuration parameters.
@@ -55,7 +45,6 @@ func NewCache[T any](cacheName string, opts ...Option[T]) (*Cache[T], error) {
 	const defaultSize = 128_000
 
 	sizedLRU := &Cache[T]{
-		metrics:   NewSizedLRUMetricsCollector(common.MetricsNamespace, common.MetricsSubsystem),
 		cacheName: cacheName,
 	}
 
@@ -63,9 +52,12 @@ func NewCache[T any](cacheName string, opts ...Option[T]) (*Cache[T], error) {
 		opt(sizedLRU)
 	}
 
-	// Provide a evict callback function to record evictions.
-	onEvicted := func(string, T) {
-		sizedLRU.metrics.RecordEviction(sizedLRU.cacheName)
+	var onEvicted func(string, T)
+	// Provide a evict callback function to record evictions if a custom metrics collector is provided.
+	if sizedLRU.evictMetrics != nil {
+		onEvicted = func(string, T) {
+			sizedLRU.evictMetrics.RecordEviction(sizedLRU.cacheName)
+		}
 	}
 
 	lcache, err := lru.NewWithEvict[string, T](defaultSize, onEvicted)
@@ -79,19 +71,14 @@ func NewCache[T any](cacheName string, opts ...Option[T]) (*Cache[T], error) {
 }
 
 // Set adds a key-value pair to the cache.
-func (lc *Cache[T]) Set(key string, val T) {
-	lc.cache.Add(key, val)
-	lc.metrics.RecordSet(lc.cacheName)
-}
+func (lc *Cache[T]) Set(key string, val T) { lc.cache.Add(key, val) }
 
 // Get retrieves a value from the cache by key.
 func (lc *Cache[T]) Get(key string) (T, bool) {
 	value, found := lc.cache.Get(key)
 	if found {
-		lc.metrics.RecordHit(lc.cacheName)
 		return value, true
 	}
-	lc.metrics.RecordMiss(lc.cacheName)
 	var zero T
 	return zero, false
 }
@@ -99,22 +86,37 @@ func (lc *Cache[T]) Get(key string) (T, bool) {
 // Exists checks if a key exists in the cache.
 func (lc *Cache[T]) Exists(key string) bool {
 	_, found := lc.cache.Get(key)
-	if found {
-		lc.metrics.RecordHit(lc.cacheName)
-	} else {
-		lc.metrics.RecordMiss(lc.cacheName)
-	}
 	return found
 }
 
 // Delete removes a key from the cache.
 func (lc *Cache[T]) Delete(key string) {
 	lc.cache.Remove(key)
-	lc.metrics.RecordDelete(lc.cacheName)
 }
 
 // Clear removes all keys from the cache.
 func (lc *Cache[T]) Clear() {
 	lc.cache.Purge()
-	lc.metrics.RecordClear(lc.cacheName)
+}
+
+// Count returns the number of key-value pairs in the cache.
+func (lc *Cache[T]) Count() int { return lc.cache.Len() }
+
+// Keys returns all keys in the cache.
+func (lc *Cache[T]) Keys() []string { return lc.cache.Keys() }
+
+// Values returns all values in the cache.
+func (lc *Cache[T]) Values() []T {
+	items := lc.cache.Keys()
+	res := make([]T, 0, len(items))
+	for _, k := range items {
+		v, _ := lc.cache.Get(k)
+		res = append(res, v)
+	}
+	return res
+}
+
+// Contents returns all keys in the cache encoded as a string.
+func (lc *Cache[T]) Contents() string {
+	return fmt.Sprintf("%v", lc.cache.Keys())
 }
