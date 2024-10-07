@@ -2,6 +2,7 @@ package meraki
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	regexp "github.com/wasilibs/go-re2"
 	"io"
@@ -14,6 +15,13 @@ import (
 
 type Scanner struct {
 	client *http.Client
+}
+
+// merakiOrganizations is the partial response from the /organizations api of cisco Meraki.
+// api docs: https://developer.cisco.com/meraki/api-v1/get-organizations/
+type merakiOrganizations struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -59,14 +67,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Meraki,
 			Raw:          []byte(match),
+			ExtraData:    make(map[string]string),
 		}
 
 		if verify {
 			client := s.getClient()
-			isVerified, verificationErr := verifyMerakiApiKey(ctx, client, match)
+			organizations, isVerified, verificationErr := verifyMerakiApiKey(ctx, client, match)
 			s1.Verified = isVerified
 			if verificationErr != nil {
 				s1.SetVerificationError(verificationErr)
+			}
+
+			// if organizations are not nil, which means token was verified.
+			if organizations != nil {
+				for _, org := range organizations {
+					// format: ExtraData{"organization_1": "Example", organization_2": "Example"}
+					s1.ExtraData[fmt.Sprintf("organization_%s", org.ID)] = org.Name
+				}
 			}
 		}
 
@@ -84,10 +101,10 @@ func (s Scanner) Type() detectorspb.DetectorType {
 verifyMerakiApiKey verifies if the passed matched api key for meraki is active or not.
 docs: https://developer.cisco.com/meraki/api-v1/authorization/#authorization
 */
-func verifyMerakiApiKey(ctx context.Context, client *http.Client, match string) (bool, error) {
+func verifyMerakiApiKey(ctx context.Context, client *http.Client, match string) ([]merakiOrganizations, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.meraki.com/api/v1/organizations", http.NoBody)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
 	// set the required auth header
@@ -95,7 +112,7 @@ func verifyMerakiApiKey(ctx context.Context, client *http.Client, match string) 
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
@@ -104,10 +121,16 @@ func verifyMerakiApiKey(ctx context.Context, client *http.Client, match string) 
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return true, nil
+		// in case token is verified, capture the organization id's and name which are accessible via token.
+		var organizations []merakiOrganizations
+		if err = json.NewDecoder(resp.Body).Decode(&organizations); err != nil {
+			return nil, false, err
+		}
+
+		return organizations, true, nil
 	case http.StatusUnauthorized:
-		return false, nil
+		return nil, false, nil
 	default:
-		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return nil, false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }
