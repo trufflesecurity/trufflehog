@@ -79,12 +79,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			// if organizations are not nil, which means token was verified.
-			if organizations != nil {
-				for _, org := range organizations {
-					// format: ExtraData{"organization_1": "Example", organization_2": "Example"}
-					s1.ExtraData[fmt.Sprintf("organization_%s", org.ID)] = org.Name
-				}
+			for _, org := range organizations {
+				// format: ExtraData{"organization_1": "Example", organization_2": "Example"}
+				s1.ExtraData[fmt.Sprintf("organization_%s", org.ID)] = org.Name
 			}
+
 		}
 
 		results = append(results, s1)
