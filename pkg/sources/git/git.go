@@ -1253,9 +1253,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	defer func() {
-		_ = cmd.Wait()
-	}()
+	defer func() { _ = cmd.Wait() }()
 
 	return handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
