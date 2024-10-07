@@ -585,7 +585,7 @@ func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsup
 	}
 
 	for _, cmdArgs := range cmds {
-		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...) //nolint:gosec
 		var cmdStderr bytes.Buffer
 		cmd.Stderr = &cmdStderr
 		err := cmd.Run()
