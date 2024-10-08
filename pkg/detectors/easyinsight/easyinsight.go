@@ -51,10 +51,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for keyMatch := range keyMatches {
 		for idMatch := range idMatches {
-			/*
-				as key and id regex are same, the strings captured by both regex will be same.
-				avoid processing when key is same as id. This will allow detector to process only different combinations
-			*/
+			//as key and id regex are same, the strings captured by both regex will be same.
+			//avoid processing when key is same as id. This will allow detector to process only different combinations
 			if keyMatch == idMatch {
 				continue
 			}
