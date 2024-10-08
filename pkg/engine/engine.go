@@ -773,7 +773,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
 
 			if decoded == nil {
-				ctx.Logger().V(4).Info("decoder not applicable for chunk", "decoder", decoder.Type().String(), "chunk", chunk)
+				ctx.Logger().V(5).Info("decoder not applicable for chunk", "decoder", decoder.Type().String(), "chunk", chunk)
 				continue
 			}
 
