@@ -2,7 +2,6 @@ package easyinsight
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
 	regexp "github.com/wasilibs/go-re2"
 	"io"
@@ -64,10 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				auth := fmt.Sprintf("%s:%s", idMatch, keyMatch)
-				sEnc := b64.StdEncoding.EncodeToString([]byte(auth))
-
-				verified, verificationErr := verifyEasyInsight(ctx, sEnc)
+				verified, verificationErr := verifyEasyInsight(ctx, idMatch, keyMatch)
 				s1.Verified = verified
 				if verificationErr != nil {
 					s1.SetVerificationError(verificationErr)
@@ -93,7 +89,7 @@ func (s Scanner) Description() string {
 	return "EasyInsight is a business intelligence tool that provides data visualization and reporting. EasyInsight API keys can be used to access and manage data within the platform."
 }
 
-func verifyEasyInsight(ctx context.Context, sEnc string) (bool, error) {
+func verifyEasyInsight(ctx context.Context, id, key string) (bool, error) {
 	// docs: https://www.easy-insight.com/api/users.html
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.easy-insight.com/app/api/users.json", nil)
 	if err != nil {
@@ -103,7 +99,8 @@ func verifyEasyInsight(ctx context.Context, sEnc string) (bool, error) {
 	// add required headers to the request
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
+	// set basic auth for the request
+	req.SetBasicAuth(id, key)
 
 	res, reqErr := client.Do(req)
 	if reqErr != nil {
