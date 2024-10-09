@@ -35,6 +35,14 @@ func runPatTest(t *testing.T, tests map[string]testCase, matchFunc func(data str
 func Test_FindTenantIdMatches(t *testing.T) {
 	cases := map[string]testCase{
 		// Tenant ID
+		"audience": {
+			Input: `az offazure hyperv site create --location "eastus" --service-principal-identity-details \
+	application-id="cbcfc473-97da-45dd-8a00-3612d1ddf35a" \
+	audience="https://bced5192-08c4-4470-9a94-666fea59efb07/aadapp" `,
+			Expected: map[string]struct{}{
+				"bced5192-08c4-4470-9a94-666fea59efb0": {},
+			},
+		},
 		"tenant": {
 			Input: `        "cas.authn.azure-active-directory.login-url=https://login.microsoftonline.com/common/",
         "cas.authn.azure-active-directory.tenant=8e439f30-da7a-482c-bd23-e45d0a732000"`,
@@ -99,6 +107,12 @@ tenant_id = "57aabdfc-6ce0-4828-94a2-9abe277892ec"`,
 				"7bb339cb-e94c-4a85-884c-48ebd9bb28c3": {},
 			},
 		},
+		"login.windows.net": {
+			Input: `az offazure hyperv site create --location "eastus" --service-principal-identity-details aad-authority="https://login.windows.net/7bb339cb-e94c-4a85-884c-48ebd9bb28c3" application-id="e9f013df-2a2a-4871-b766-e79867f30348" \'`,
+			Expected: map[string]struct{}{
+				"7bb339cb-e94c-4a85-884c-48ebd9bb28c3": {},
+			},
+		},
 		"sts.windows.net": {
 			Input: `{
   "aud": "00000003-0000-0000-c000-000000000000",
@@ -106,6 +120,20 @@ tenant_id = "57aabdfc-6ce0-4828-94a2-9abe277892ec"`,
   "iat": 1641799220,`,
 			Expected: map[string]struct{}{
 				"974fde14-c3a4-481b-9b03-cfce182c3a07": {},
+			},
+		},
+		"x-anchor-mailbox": {
+			// The tenantID can be encoded in this parameter.
+			// https://github.com/AzureAD/microsoft-authentication-library-for-python/blob/95a63a7fe97d91b99979e5bf78e03f6acf40a286/msal/application.py#L185-L186
+			// https://github.com/silverhack/monkey365/blob/b3f43c4a2d014fcc3aae0a4103c8f2610fbb4980/core/utils/Get-MonkeySecCompBackendUri.ps1#L70
+			Input: `      User-Agent:
+      - python-requests/2.31.0
+      X-AnchorMailbox:
+        - Oid:2b9b0cb5-d707-42e3-9504-d9b76ac7bec5@86843c34-863b-44d3-bb14-4f14e7c0564d
+      x-client-current-telemetry:
+        - 4|84,3|`,
+			Expected: map[string]struct{}{
+				"86843c34-863b-44d3-bb14-4f14e7c0564d": {},
 			},
 		},
 
@@ -143,6 +171,17 @@ tenant_id = "57aabdfc-6ce0-4828-94a2-9abe277892ec"`,
 | AADAppSecret      | Secret of the Azure app                                       | G1X2HsBw-co3dTIB45RE6vY.mSU~6u.7.8    |`,
 			Expected: map[string]struct{}{
 				"12fc345b-0c67-4cde-8902-dabf2cad34b5": {},
+			},
+		},
+		"newline": {
+			Input: `        {\n   \"mode\": \"Manual\"\n  },\n  \"bootstrapProfile\": {\n   \"artifactSource\":
+        \"Direct\"\n  }\n },\n \"identity\": {\n  \"type\": \"SystemAssigned\",\n
+        \ \"principalId\":\"00000000-0000-0000-0000-000000000001\",\n  \"tenantId\":
+        \"d0a69dfd-9b9e-4833-9c33-c7903dd2e012\"\n },\n \"sku\": {\n  \"name\": \"Base\",\n
+        \ \"tier\": \"Free\"\n }\n}"
+    headers:`,
+			Expected: map[string]struct{}{
+				"d0a69dfd-9b9e-4833-9c33-c7903dd2e012": {},
 			},
 		},
 

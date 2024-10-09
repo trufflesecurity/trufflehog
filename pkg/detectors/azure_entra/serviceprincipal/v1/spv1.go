@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -29,7 +30,8 @@ var (
 	// TODO: Azure storage access keys and investigate other types of creds.
 	// https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow#second-case-access-token-request-with-a-certificate
 	// https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow#third-case-access-token-request-with-a-federated-credential
-	//clientSecretPat = regexp.MustCompile(`(?i)(?:secret|password| -p[ =]).{0,40}?([a-z0-9~@_\-[\]:.?]{32,34})`)
+	//clientSecretPat = regexp.MustCompile(`(?i)(?:secret|password| -p[ =]).{0,80}?([\w~@[\]:.?*/+=-]{31,34}`)
+	// TODO: Tighten this regex and replace it with above.
 	secretPat = regexp.MustCompile(`(?i)(?:secret|password| -p[ =]).{0,80}[^A-Za-z0-9!#$%&()*+,\-./:;<=>?@[\\\]^_{|}~]([A-Za-z0-9!#$%&()*+,\-./:;<=>?@[\\\]^_{|}~]{31,34})[^A-Za-z0-9!#$%&()*+,\-./:;<=>?@[\\\]^_{|}~]`)
 )
 
@@ -61,6 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	if client == nil {
 		client = defaultClient
 	}
+	// The handling logic is identical for both versions.
 	processedResults := v2.ProcessData(ctx, clientSecrets, clientIds, tenantIds, verify, client)
 	for _, result := range processedResults {
 		results = append(results, result)
@@ -70,6 +73,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Azure
+}
+
+func (s Scanner) Description() string {
+	return serviceprincipal.Description
 }
 
 // region Helper methods.

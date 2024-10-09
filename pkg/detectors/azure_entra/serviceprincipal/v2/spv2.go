@@ -3,8 +3,7 @@ package v2
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"net/http"
 	"regexp"
 	"strings"
@@ -32,7 +31,6 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	SecretPat = regexp.MustCompile(`(?:[^a-zA-Z0-9_~.-]|\A)([a-zA-Z0-9_~.-]{3}\dQ~[a-zA-Z0-9_~.-]{31,34})(?:[^a-zA-Z0-9_~.-]|\z)`)
-	//clientSecretPat = regexp.MustCompile(`(?:[^a-zA-Z0-9_~.-]|\A)([a-zA-Z0-9_~.-]{3}\dQ~[a-zA-Z0-9_~.-]{31,34})(?:[^a-zA-Z0-9_~.-]|\z)|(?:secret|password| -p[ =]).{0,80}[^A-Za-z0-9!#$%&()*+,\-./:;<=>?@[\\\]^_{|}~]([A-Za-z0-9!#$%&()*+,\-./:;<=>?@[\\\]^_{|}~]{31,34})[^A-Za-z0-9!#$%&()*+,\-./:;<=>?@[\\\]^_{|}~]`)
 )
 
 func (s Scanner) Version() int {
@@ -69,6 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func ProcessData(ctx context.Context, clientSecrets, clientIds, tenantIds map[string]struct{}, verify bool, client *http.Client) (results []detectors.Result) {
+	logCtx := logContext.AddLogger(ctx)
 	invalidClientsForTenant := make(map[string]map[string]struct{})
 
 SecretLoop:
@@ -96,10 +95,13 @@ SecretLoop:
 				}
 
 				if verify {
-					if !isValidTenant(ctx, client, tenantId) {
+					if !azure_entra.TenantExists(logCtx, client, tenantId) {
 						// Tenant doesn't exist
 						delete(tenantIds, tenantId)
 						continue
+					} else {
+						// Ensure this isn't attempted as a clientId.
+						delete(clientIds, tenantId)
 					}
 
 					isVerified, extraData, verificationErr := serviceprincipal.VerifyCredentials(ctx, client, tenantId, clientId, clientSecret)
@@ -126,78 +128,6 @@ SecretLoop:
 						r = createResult(tenantId, clientId, clientSecret, isVerified, extraData, verificationErr)
 						break ClientLoop
 					}
-
-					// The result may be valid for another client/tenant.
-					//
-					//
-					//// https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow#request-an-access-token-with-a-client_secret
-					//cred := auth.NewClientCredentialsConfig(clientId, clientSecret, tenantId)
-					//token, err := cred.ServicePrincipalToken()
-					//if err != nil {
-					//	// This can only fail if a value is empty, which shouldn't be possible.
-					//	continue
-					//}
-					//
-					//err = token.Refresh()
-					//if err != nil {
-					//	var refreshError adal.TokenRefreshError
-					//	if ok := errors.As(err, &refreshError); ok {
-					//		resp := refreshError.Response()
-					//		defer func() {
-					//			// Ensure we drain the response body so this connection can be reused.
-					//			_, _ = io.Copy(io.Discard, resp.Body)
-					//			_ = resp.Body.Close()
-					//		}()
-					//
-					//		status := resp.StatusCode
-					//		errStr := refreshError.Error()
-					//		if status == 400 {
-					//			if strings.Contains(errStr, `"error_description":"AADSTS90002:`) {
-					//				// Tenant doesn't exist
-					//				delete(tenantIds, tenantId)
-					//				continue
-					//			} else if strings.Contains(errStr, `"error_description":"AADSTS700016:`) {
-					//				// Tenant is valid but the ClientID doesn't exist.
-					//				invalidTenantsForClientId[clientId] = append(invalidTenantsForClientId[clientId], tenantId)
-					//				continue
-					//			} else {
-					//				// Unexpected error.
-					//				r.SetVerificationError(refreshError, clientSecret)
-					//				break
-					//			}
-					//		} else if status == 401 {
-					//			// Tenant exists and the clientID is valid, but something is wrong.
-					//			if strings.Contains(errStr, `"error_description":"AADSTS7000215:`) {
-					//				// Secret is not valid.
-					//				setValidTenantIdForClientId(clientId, tenantId, tenantIds, invalidTenantsForClientId)
-					//				continue IdLoop
-					//			} else if strings.Contains(errStr, `"error_description":"AADSTS7000222:`) {
-					//				// The secret is expired.
-					//				setValidTenantIdForClientId(clientId, tenantId, tenantIds, invalidTenantsForClientId)
-					//				continue SecretLoop
-					//			} else {
-					//				// TODO: Investigate if it's possible to get a 401 with a valid id/secret.
-					//				r.SetVerificationError(refreshError, clientSecret)
-					//				break
-					//			}
-					//		} else {
-					//			// Unexpected status code.
-					//			r.SetVerificationError(refreshError, clientSecret)
-					//			break
-					//		}
-					//	} else {
-					//		// Unexpected error.
-					//		r.SetVerificationError(err, clientSecret)
-					//		break
-					//	}
-					//} else {
-					//	r.Verified = true
-					//	r.ExtraData = map[string]string{
-					//		"token": token.OAuthToken(),
-					//	}
-					//	setValidTenantIdForClientId(clientId, tenantId, tenantIds, invalidTenantsForClientId)
-					//	break
-					//}
 				}
 			}
 		}
@@ -243,30 +173,12 @@ func createResult(tenantId string, clientId string, clientSecret string, verifie
 	return r
 }
 
-func isValidTenant(ctx context.Context, client *http.Client, tenant string) bool {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://login.microsoftonline.com/%s/.well-known/openid-configuration", tenant), nil)
-	if err != nil {
-		return false
-	}
-	res, err := client.Do(req)
-	defer func() {
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
-	}()
-
-	if res.StatusCode == 200 {
-		return true
-	} else if res.StatusCode == 400 {
-		fmt.Printf("Invalid tenant: %s\n", tenant)
-		return false
-	} else {
-		fmt.Printf("[azure] Unexpected status code: %d for %s\n", res.StatusCode, tenant)
-		return false
-	}
-}
-
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Azure
+}
+
+func (s Scanner) Description() string {
+	return serviceprincipal.Description
 }
 
 // region Helper methods.

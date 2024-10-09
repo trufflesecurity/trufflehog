@@ -1,8 +1,10 @@
 package azure_entra
 
 import (
-	"context"
 	"fmt"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"golang.org/x/sync/singleflight"
 	"io"
 	"net/http"
 	"strings"
@@ -21,7 +23,11 @@ var (
 	// https://learn.microsoft.com/en-us/partner-center/account-settings/find-ids-and-domain-names#find-the-microsoft-azure-ad-tenant-id-and-primary-domain-name
 	// https://learn.microsoft.com/en-us/microsoft-365/admin/setup/domains-faq?view=o365-worldwide#why-do-i-have-an--onmicrosoft-com--domain
 	tenantIdPat = regexp.MustCompile(fmt.Sprintf(
-		`(?i)(?:login\.microsoftonline\.com/|sts\.windows\.net/|(?:t[ae]n[ae]nt(?:[ ._-]?id)?|\btid)(?:.|\s){0,45}?)(%s)`, uuidStr,
+		//language=regexp
+		`(?i)(?:(?:login\.microsoftonline\.com/|(?:login|sts)\.windows\.net/|(?:t[ae]n[ae]nt(?:[ ._-]?id)?|\btid)(?:.|\s){0,60}?)(%s)|https?://(%s)|X-AnchorMailbox(?:.|\s){0,60}?@(%s))`,
+		uuidStr,
+		uuidStr,
+		uuidStr,
 	))
 	tenantOnMicrosoftPat = regexp.MustCompile(`([\w-]+\.onmicrosoft\.com)`)
 
@@ -34,7 +40,14 @@ func FindTenantIdMatches(data string) map[string]struct{} {
 	uniqueMatches := make(map[string]struct{})
 
 	for _, match := range tenantIdPat.FindAllStringSubmatch(data, -1) {
-		m := strings.ToLower(match[1])
+		var m string
+		if match[1] != "" {
+			m = strings.ToLower(match[1])
+		} else if match[2] != "" {
+			m = strings.ToLower(match[2])
+		} else if match[3] != "" {
+			m = strings.ToLower(match[3])
+		}
 		if _, ok := detectors.UuidFalsePositives[detectors.FalsePositive(m)]; ok {
 			continue
 		}
@@ -59,8 +72,31 @@ func FindClientIdMatches(data string) map[string]struct{} {
 	return uniqueMatches
 }
 
+var (
+	tenantCache = simple.NewCache[bool]()
+	tenantGroup singleflight.Group
+)
+
 // TenantExists returns whether the tenant exists according to Microsoft's well-known OpenID endpoint.
 func TenantExists(ctx context.Context, client *http.Client, tenant string) bool {
+	// Use cached value where possible.
+	if tenantExists, isCached := tenantCache.Get(tenant); isCached {
+		return tenantExists
+	}
+
+	// https://www.codingexplorations.com/blog/understanding-singleflight-in-golang-a-solution-for-eliminating-redundant-work
+	tenantExists, _, _ := tenantGroup.Do(tenant, func() (interface{}, error) {
+		result := queryTenant(ctx, client, tenant)
+		tenantCache.Set(tenant, result)
+		return result, nil
+	})
+
+	return tenantExists.(bool)
+}
+
+func queryTenant(ctx context.Context, client *http.Client, tenant string) bool {
+	logger := ctx.Logger().WithName("azure").WithValues("tenant", tenant)
+
 	tenantUrl := fmt.Sprintf("https://login.microsoftonline.com/%s/.well-known/openid-configuration", tenant)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tenantUrl, nil)
 	if err != nil {
@@ -68,10 +104,24 @@ func TenantExists(ctx context.Context, client *http.Client, tenant string) bool 
 	}
 
 	res, err := client.Do(req)
+	if err != nil {
+		logger.Error(err, "Failed to check if tenant exists")
+		return false
+	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
 
-	return res.StatusCode == http.StatusOK
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true
+	case http.StatusBadRequest:
+		logger.V(4).Info("Tenant does not exist.")
+		return false
+	default:
+		bodyBytes, _ := io.ReadAll(res.Body)
+		logger.Error(nil, "WARNING: Unexpected response when checking if tenant exists", "status_code", res.StatusCode, "body", string(bodyBytes))
+		return false
+	}
 }

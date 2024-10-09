@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	Description               = "Azure is a cloud service offering a wide range of services including compute, analytics, storage, and networking. Azure credentials can be used to access and manage these services."
 	ErrSecretInvalid          = errors.New("invalid client secret provided")
 	ErrSecretExpired          = errors.New("the provided secret is expired")
 	ErrTenantNotFound         = errors.New("tenant not found")
@@ -35,7 +36,6 @@ type TokenErrResponse struct {
 func VerifyCredentials(ctx context.Context, client *http.Client, tenantId string, clientId string, clientSecret string) (bool, map[string]string, error) {
 	data := url.Values{}
 	data.Set("client_id", clientId)
-	//data.Set("scope", "https://management.core.windows.net/.default")
 	data.Set("scope", "https://graph.microsoft.com/.default")
 	data.Set("client_secret", clientSecret)
 	data.Set("grant_type", "client_credentials")
@@ -91,6 +91,7 @@ func VerifyCredentials(ctx context.Context, client *http.Client, tenantId string
 		case http.StatusBadRequest, http.StatusUnauthorized:
 			// Error codes can be looked up by removing the `AADSTS` prefix.
 			// https://login.microsoftonline.com/error?code=9002313
+			// TODO: Handle AADSTS900382 (https://github.com/Azure/azure-sdk-for-js/issues/30557)
 			d := errResp.Description
 			switch {
 			case strings.HasPrefix(d, "AADSTS700016:"):
