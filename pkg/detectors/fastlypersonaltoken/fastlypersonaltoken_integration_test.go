@@ -12,7 +12,6 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -42,7 +41,7 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf("You can find a fastlypersonaltoken secret %s within", secret)),
 				verify: true,
 			},
@@ -50,6 +49,12 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_FastlyPersonalToken,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"token_id":         "2GUTBVFzHG2zVOMGtEpi9q",
+						"user_id":          "2j1UhHmRhefRMNNrlxcyf5",
+						"token_expires_at": "never",
+						"token_scope":      "global:read",
+					},
 				},
 			},
 			wantErr: false,
@@ -66,6 +71,7 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_FastlyPersonalToken,
 					Verified:     false,
+					ExtraData:    map[string]string{},
 				},
 			},
 			wantErr: false,

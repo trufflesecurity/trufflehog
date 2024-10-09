@@ -35,32 +35,30 @@ type token struct {
 	TokenID   string `json:"id"`
 	UserID    string `json:"user_id"`
 	ExpiresAt string `json:"expires_at"`
+	Scope     string `json:"scope"`
 }
 
 // FromData will find and optionally verify FastlyPersonalToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueMatches = make(map[string]struct{})
 
-	for _, match := range matches {
-		resMatch := match[1]
+	for _, matches := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueMatches[matches[1]] = struct{}{}
+	}
 
+	for match := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FastlyPersonalToken,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(match),
 		}
 
 		if verify {
-			extraData, verified, verificationErr := verifyFastlyApiToken(ctx, resMatch)
+			extraData, verified, verificationErr := verifyFastlyApiToken(ctx, match)
 			s1.Verified = verified
-			if extraData != nil {
-				s1.ExtraData = extraData
-			}
-
-			if verificationErr != nil {
-				s1.SetVerificationError(verificationErr)
-			}
+			s1.ExtraData = extraData
+			s1.SetVerificationError(verificationErr)
 		}
 
 		results = append(results, s1)
@@ -108,8 +106,15 @@ func verifyFastlyApiToken(ctx context.Context, apiToken string) (map[string]stri
 			"token_id": self.TokenID,
 			// user id is the alphanumeric string uniquely identifying the user
 			"user_id": self.UserID,
-			// expires at is time-stamp (UTC) of when the token will expire.
+			// expires at is time-stamp (UTC) of when the token will expire
 			"token_expires_at": self.ExpiresAt,
+			// token scope is space-delimited list of authorization scope of the token
+			"token_scope": self.Scope,
+		}
+
+		// if expires at is empty which mean token is set to never expire, add 'Never' as the value
+		if extraData["token_expires_at"] == "" {
+			extraData["token_expires_at"] = "never"
 		}
 
 		return extraData, true, nil

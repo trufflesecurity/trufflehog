@@ -19,6 +19,8 @@ var (
 	const contentTypeToken string = "Content-Type"
 	const appJsonContentType = "application/json"`
 
+	validPatternToken = "TVAWji0p7uDI6OP9DyWvmV-vgoUoXIuf"
+
 	invalidPattern = `
 	// headers and header values
 	const fastlyKeyToken string = "Fastly-Key"
@@ -39,7 +41,7 @@ func TestFastlyPersonalToken_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{"TVAWji0p7uDI6OP9DyWvmV-vgoUoXIuf"},
+			want:  []string{validPatternToken},
 		},
 		{
 			name:  "invalid pattern",
