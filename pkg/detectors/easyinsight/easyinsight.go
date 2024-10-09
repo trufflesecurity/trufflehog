@@ -111,10 +111,15 @@ func verifyEasyInsight(ctx context.Context, id, key string) (bool, error) {
 		_ = res.Body.Close()
 	}()
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	switch res.StatusCode {
+	// id, key verified
+	case http.StatusOK:
 		return true, nil
+	// id, key unverified
+	case http.StatusUnauthorized:
+		return false, nil
+	// something invalid
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
-
-	// if status code is not handled, return unexpected code error
-	return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 }
