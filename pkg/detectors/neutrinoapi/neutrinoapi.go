@@ -97,3 +97,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_NeutrinoApi
 }
+
+func (s Scanner) Description() string {
+	return "Neutrino API provides a variety of services including data tools, security tools, and more. Neutrino API keys can be used to access these services."
+}

@@ -43,7 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 		for _, secMatch := range secMatches {
 
-			s := detectors.Result{
+			result := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SquareApp,
 				Raw:          []byte(match),
 				Redacted:     match,
@@ -68,20 +68,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				req.Header.Add("Authorization", fmt.Sprintf("Client %s", secMatch))
 				req.Header.Add("Content-Type", "application/json")
 
-				// unclear if this version needs to be set or matters, seems to work without, but docs want it
-				// req.Header.Add("Square-Version", "2020-08-12")
 				res, err := client.Do(req)
 				if err == nil {
 					res.Body.Close() // The request body is unused.
 
 					// 404 = Correct credentials. The fake access token should not be found.
 					if res.StatusCode == http.StatusNotFound {
-						s.Verified = true
+						result.Verified = true
 					}
 				}
 			}
 
-			results = append(results, s)
+			results = append(results, result)
 		}
 	}
 	return
@@ -89,4 +87,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SquareApp
+}
+
+func (s Scanner) Description() string {
+	return "Square is a financial services and mobile payment company. Square credentials can be used to access and manage payment processing and other financial services."
 }

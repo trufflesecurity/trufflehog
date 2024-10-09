@@ -107,3 +107,7 @@ func verifyPubNub(ctx context.Context, client *http.Client, resMatch, ressubMatc
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PubNubPublishKey
 }
+
+func (s Scanner) Description() string {
+	return "PubNub is a real-time communication platform that provides APIs for sending and receiving messages. Publish keys are used to send messages to channels, while subscribe keys are used to receive messages from channels."
+}

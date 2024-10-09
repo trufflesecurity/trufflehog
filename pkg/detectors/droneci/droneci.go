@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_DroneCI
 }
+
+func (s Scanner) Description() string {
+	return "DroneCI is a continuous integration service that automates the testing and deployment of applications. DroneCI tokens can be used to access and control CI/CD pipelines."
+}

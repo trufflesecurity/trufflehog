@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_IconFinder
 }
+
+func (s Scanner) Description() string {
+	return "IconFinder is a platform that provides a large collection of icons. IconFinder API keys can be used to access and retrieve icons from the platform."
+}

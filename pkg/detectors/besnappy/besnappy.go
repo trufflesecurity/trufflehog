@@ -73,3 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Besnappy
 }
+
+func (s Scanner) Description() string {
+	return "Besnappy is a customer service platform. The detected key can be used to access Besnappy's API, potentially exposing sensitive customer service data."
+}

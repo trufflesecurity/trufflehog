@@ -132,6 +132,10 @@ func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_HuggingFace
 }
 
+func (s Scanner) Description() string {
+	return "Hugging Face is a platform for natural language processing tasks and model hosting. Hugging Face API keys can be used to access various services and resources on the platform."
+}
+
 // https://huggingface.co/docs/hub/api#get-apiwhoami-v2
 type whoamiResponse struct {
 	Name          string         `json:"name"`

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archiver/v4"
@@ -249,6 +250,11 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 	}
 }
 
+var maxTimeout = time.Duration(60) * time.Second
+
+// SetArchiveMaxTimeout sets the maximum timeout for the archive handler.
+func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
+
 // HandleFile orchestrates the complete file handling process for a given file.
 // It determines the MIME type of the file, selects the appropriate handler based on this type, and processes the file.
 // This function initializes the handling process and delegates to the specific handler to manage file
@@ -277,7 +283,23 @@ func HandleFile(
 		}
 		return fmt.Errorf("error creating custom reader: %w", err)
 	}
-	defer rdr.Close()
+	defer func() {
+		// Ensure all data is read to prevent broken pipe.
+		_, copyErr := io.Copy(io.Discard, rdr)
+		if copyErr != nil {
+			err = fmt.Errorf("error discarding remaining data: %w", copyErr)
+		}
+		closeErr := rdr.Close()
+		if closeErr != nil {
+			if err != nil {
+				err = fmt.Errorf("%v; error closing reader: %w", err, closeErr)
+			} else {
+				err = fmt.Errorf("error closing reader: %w", closeErr)
+			}
+		}
+	}()
+
+	ctx = logContext.WithValues(ctx, "mime", rdr.mime.String())
 
 	mimeT := mimeType(rdr.mime.String())
 	config := newFileHandlingConfig(options...)
@@ -286,13 +308,16 @@ func HandleFile(
 		return nil
 	}
 
+	processingCtx, cancel := logContext.WithTimeout(ctx, maxTimeout)
+	defer cancel()
+
 	handler := selectHandler(mimeT, rdr.isGenericArchive)
-	archiveChan, err := handler.HandleFile(ctx, rdr) // Delegate to the specific handler to process the file.
+	archiveChan, err := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
 	if err != nil {
 		return fmt.Errorf("error handling file: %w", err)
 	}
 
-	return handleChunks(ctx, archiveChan, chunkSkel, reporter)
+	return handleChunks(processingCtx, archiveChan, chunkSkel, reporter)
 }
 
 // handleChunks reads data from the handlerChan and uses it to fill chunks according to a predefined skeleton (chunkSkel).

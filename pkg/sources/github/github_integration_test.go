@@ -9,12 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -58,14 +57,13 @@ func TestSource_Token(t *testing.T) {
 
 	s := Source{
 		conn:          src,
-		log:           logr.Discard(),
 		memberCache:   map[string]struct{}{},
 		repoInfoCache: newRepoInfoCache(),
 	}
 	s.Init(ctx, "github integration test source", 0, 0, false, conn, 1)
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New[string](), nil, nil)
+	s.filteredRepoCache = s.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
 
-	err = s.enumerateWithApp(ctx, s.connector.(*appConnector).InstallationClient())
+	err = s.enumerateWithApp(ctx, s.connector.(*appConnector).InstallationClient(), noopReporter())
 	assert.NoError(t, err)
 
 	_, _, err = s.cloneRepo(ctx, "https://github.com/truffle-test-integration-org/another-test-repo.git")
@@ -633,7 +631,7 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				assert.NoError(t, s.addUserGistsToCache(ctx, tt.user))
+				assert.NoError(t, s.addUserGistsToCache(ctx, tt.user, noopReporter()))
 				chunksCh <- &sources.Chunk{}
 			}()
 			var wantedRepo string
@@ -844,4 +842,39 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			assert.Equal(t, tt.wantChunks, i)
 		})
 	}
+}
+
+func TestChunkUnit(t *testing.T) {
+	ctx := context.Background()
+	conn, _ := anypb.New(&sourcespb.GitHub{
+		Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
+		Credential:   &sourcespb.GitHub_Unauthenticated{},
+	})
+	s := Source{}
+	if err := s.Init(ctx, "github integration test source", 0, 0, false, conn, 1); err != nil {
+		t.Errorf("Init() failed: %v", err)
+	}
+
+	unit := RepoUnit{Name: "driftwood", URL: "https://github.com/trufflesecurity/driftwood.git"}
+	reporter := &countChunkReporter{}
+	if err := s.ChunkUnit(ctx, unit, reporter); err != nil {
+		t.Errorf("ChunkUnit() failed: %v", err)
+	}
+	assert.GreaterOrEqual(t, reporter.chunkCount, 65)
+	assert.Equal(t, 0, reporter.errCount)
+}
+
+type countChunkReporter struct {
+	chunkCount int
+	errCount   int
+}
+
+func (m *countChunkReporter) ChunkOk(ctx context.Context, chunk sources.Chunk) error {
+	m.chunkCount++
+	return nil
+}
+
+func (m *countChunkReporter) ChunkErr(ctx context.Context, err error) error {
+	m.errCount++
+	return nil
 }

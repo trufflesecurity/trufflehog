@@ -178,3 +178,7 @@ type mfaRequiredResponse struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Dockerhub
 }
+
+func (s Scanner) Description() string {
+	return "Docker is a platform used to develop, ship, and run applications. Docker access tokens can be used to authenticate and interact with Docker services."
+}

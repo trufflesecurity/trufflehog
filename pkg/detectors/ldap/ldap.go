@@ -172,3 +172,7 @@ func verifyLDAP(username, password string, ldapURL *url.URL) error {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LDAP
 }
+
+func (s Scanner) Description() string {
+	return "LDAP (Lightweight Directory Access Protocol) is an open, vendor-neutral, industry standard application protocol for accessing and maintaining distributed directory information services over an Internet Protocol (IP) network."
+}

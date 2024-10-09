@@ -27,8 +27,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"agora"}) + `\b([a-z0-9]{32})\b`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"agora"}) + `\b([a-z0-9]{32})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"agora", "key", "token"}) + `\b([a-z0-9]{32})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"agora", "secret"}) + `\b([a-z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,21 +48,30 @@ func (s Scanner) getClient() *http.Client {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
+	for _, keyMatch := range keyMatches {
+		if len(keyMatch) != 2 {
 			continue
 		}
 
-		resMatch := strings.TrimSpace(match[1])
+		resMatch := strings.TrimSpace(keyMatch[1])
 
-		for _, secret := range secretMatches {
-			if len(secret) != 2 {
+		for _, secretMatch := range secretMatches {
+			if len(secretMatch) != 2 {
 				continue
 			}
-			resSecret := strings.TrimSpace(secret[1])
+
+			resSecret := strings.TrimSpace(secretMatch[1])
+
+			/*
+				as both agora key and secretMatch has same regex, the set of strings keyMatch for both probably me same.
+				we need to avoid the scenario where key is same as secretMatch. This will reduce the number of matches we process.
+			*/
+			if resMatch == resSecret {
+				continue
+			}
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Agora,
@@ -110,4 +119,8 @@ func verifyAgora(ctx context.Context, client *http.Client, resMatch, resSecret s
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Agora
+}
+
+func (s Scanner) Description() string {
+	return "Agora is a real-time engagement platform providing APIs for voice, video, and messaging. Agora API keys can be used to access and manage these services."
 }

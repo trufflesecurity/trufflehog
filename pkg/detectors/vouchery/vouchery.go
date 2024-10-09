@@ -84,3 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Vouchery
 }
+
+func (s Scanner) Description() string {
+	return "Vouchery is a service that provides API keys for accessing their promotional and loyalty campaign management platform. These keys can be used to manage and track various promotional activities."
+}

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"io"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -75,8 +76,10 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 	mimeExt := reader.mimeExt
 
 	if common.SkipFile(mimeExt) || common.IsBinary(mimeExt) {
-		ctx.Logger().V(5).Info("skipping file", "ext", mimeExt)
+		ctx.Logger().V(2).Info("skipping file: extension is ignored", "ext", mimeExt)
 		h.metrics.incFilesSkipped()
+		// Make sure we consume the reader to avoid potentially blocking indefinitely.
+		_, _ = io.Copy(io.Discard, reader)
 		return nil
 	}
 

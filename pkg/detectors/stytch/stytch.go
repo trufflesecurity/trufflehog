@@ -80,3 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Stytch
 }
+
+func (s Scanner) Description() string {
+	return "Stytch is a platform for passwordless authentication. Stytch API keys can be used to access and manage authentication services."
+}

@@ -98,3 +98,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Groq
 }
+
+func (s Scanner) Description() string {
+	return "Groq is a company that creates data processing hardware and software. Groq API keys can be used to access their services."
+}

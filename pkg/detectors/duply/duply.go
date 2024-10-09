@@ -86,3 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Duply
 }
+
+func (s Scanner) Description() string {
+	return "An API for generating images. API keys can fetch and create images."
+}

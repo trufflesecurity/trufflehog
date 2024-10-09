@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -83,7 +83,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			results = append(results, s1)
 		}
-
 	}
 
 	return results, nil
@@ -91,4 +90,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Thinkific
+}
+
+func (s Scanner) Description() string {
+	return "Thinkific is an online course platform that allows users to create, market, and sell online courses. Thinkific API keys can be used to access and manage course data and user information."
 }

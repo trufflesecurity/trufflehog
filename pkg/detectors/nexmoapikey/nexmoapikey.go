@@ -45,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, secretMatch := range secretPat {
-			if len(match) != 2 {
+			if len(secretMatch) != 2 {
 				continue
 			}
 			resSecret := strings.TrimSpace(secretMatch[1])
@@ -80,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_NexmoApiKey
+}
+
+func (s Scanner) Description() string {
+	return "Nexmo provides APIs for SMS, voice, phone verifications, and more. Nexmo API keys can be used to access and manage these services."
 }

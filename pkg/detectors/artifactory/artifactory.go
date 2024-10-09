@@ -15,11 +15,13 @@ import (
 type Scanner struct {
 	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
+	detectors.EndpointSetter
 }
 
 var (
 	// Ensure the Scanner satisfies the interface at compile time.
-	_ detectors.Detector = (*Scanner)(nil)
+	_ detectors.Detector           = (*Scanner)(nil)
+	_ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
@@ -52,6 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if len(URLmatch) != 2 {
 			continue
 		}
+
 		resURLMatch = strings.TrimSpace(URLmatch[1])
 	}
 
@@ -61,20 +64,24 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
-			Raw:          []byte(resMatch),
-			RawV2:        []byte(resMatch + resURLMatch),
+		client := s.getClient()
+
+		for _, URL := range s.Endpoints(resURLMatch) {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
+				Raw:          []byte(resMatch),
+				RawV2:        []byte(resMatch + URL),
+			}
+
+			if verify {
+				isVerified, verificationErr := verifyArtifactory(ctx, client, URL, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
+			}
+
+			results = append(results, s1)
 		}
 
-		if verify {
-			client := s.getClient()
-			isVerified, verificationErr := verifyArtifactory(ctx, client, resURLMatch, resMatch)
-			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr, resMatch)
-		}
-
-		results = append(results, s1)
 	}
 
 	return results, nil
@@ -106,4 +113,8 @@ func verifyArtifactory(ctx context.Context, client *http.Client, resURLMatch, re
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ArtifactoryAccessToken
+}
+
+func (s Scanner) Description() string {
+	return "Artifactory is a repository manager that supports all major package formats. Artifactory access tokens can be used to authenticate and perform operations on repositories."
 }

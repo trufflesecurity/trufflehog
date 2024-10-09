@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Newscatcher
 }
+
+func (s Scanner) Description() string {
+	return "Newscatcher is an API service used to search and retrieve news articles from various sources. Newscatcher API keys can be used to access and query this service."
+}

@@ -116,3 +116,7 @@ func getGengoSignature(timeStamp string, secret string) string {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gengo
 }
+
+func (s Scanner) Description() string {
+	return "Gengo is a platform for professional human translation services. Gengo API keys can be used to access and manage translation projects and resources."
+}

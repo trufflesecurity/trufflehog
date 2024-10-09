@@ -37,11 +37,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Stripe,
 			Raw:          []byte(match),
 		}
-		s.ExtraData = map[string]string{
+		result.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/stripe/",
 		}
 
@@ -63,13 +63,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res.Body.Close() // The request body is unused.
 
 				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-					s.Verified = true
+					result.Verified = true
 				}
 			}
-			s.AnalysisInfo = map[string]string{"key": match}
+			result.AnalysisInfo = map[string]string{"key": match}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return
@@ -77,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Stripe
+}
+
+func (s Scanner) Description() string {
+	return "Stripe is a payment processing platform. Stripe API keys can be used to interact with Stripe's services for processing payments, managing subscriptions, and more."
 }

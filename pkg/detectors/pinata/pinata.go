@@ -87,3 +87,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Pinata
 }
+
+func (s Scanner) Description() string {
+	return "Pinata is a service for managing files on IPFS. Pinata API keys can be used to pin and manage files on the IPFS network."
+}

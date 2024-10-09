@@ -69,3 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Disqus
 }
+
+func (s Scanner) Description() string {
+	return "Disqus is a networked community platform used for web comments and discussions. Disqus API keys can be used to access and manage comments and user data."
+}

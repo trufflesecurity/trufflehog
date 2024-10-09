@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Ayrshare
 }
+
+func (s Scanner) Description() string {
+	return "Ayrshare provides social media management services. Ayrshare API keys can be used to manage social media accounts and posts."
+}

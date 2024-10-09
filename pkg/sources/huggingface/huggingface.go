@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -191,34 +191,34 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	s.orgsCache = memory.New[string]()
+	s.orgsCache = simple.NewCache[string]()
 	for _, org := range s.conn.Organizations {
 		s.orgsCache.Set(org, org)
 	}
 
-	s.usersCache = memory.New[string]()
+	s.usersCache = simple.NewCache[string]()
 	for _, user := range s.conn.Users {
 		s.usersCache.Set(user, user)
 	}
 
-	//Verify ignore and include models, spaces, and datasets are valid
+	// Verify ignore and include models, spaces, and datasets are valid
 	// this ensures that calling --org <org> --ignore-model <org/model> contains the proper
 	// repo format of org/model. Otherwise, we would scan the entire org.
 	if err := s.validateIgnoreIncludeRepos(); err != nil {
 		return err
 	}
 
-	s.filteredModelsCache = s.newFilteredRepoCache(memory.New[string](),
+	s.filteredModelsCache = s.newFilteredRepoCache(simple.NewCache[string](),
 		append(s.conn.GetModels(), s.conn.GetIncludeModels()...),
 		s.conn.GetIgnoreModels(),
 	)
 
-	s.filteredSpacesCache = s.newFilteredRepoCache(memory.New[string](),
+	s.filteredSpacesCache = s.newFilteredRepoCache(simple.NewCache[string](),
 		append(s.conn.GetSpaces(), s.conn.GetIncludeSpaces()...),
 		s.conn.GetIgnoreSpaces(),
 	)
 
-	s.filteredDatasetsCache = s.newFilteredRepoCache(memory.New[string](),
+	s.filteredDatasetsCache = s.newFilteredRepoCache(simple.NewCache[string](),
 		append(s.conn.GetDatasets(), s.conn.GetIncludeDatasets()...),
 		s.conn.GetIgnoreDatasets(),
 	)

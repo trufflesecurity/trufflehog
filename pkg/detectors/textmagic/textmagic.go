@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, userMatch := range userMatches {
-			if len(match) != 2 {
+			if len(userMatch) != 2 {
 				continue
 			}
 			resUser := strings.TrimSpace(userMatch[1])
@@ -86,4 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Textmagic
+}
+
+func (s Scanner) Description() string {
+	return "Textmagic is a service for sending and receiving text messages. Textmagic API keys can be used to access and manage text messaging services."
 }

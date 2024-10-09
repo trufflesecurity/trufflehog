@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_WorldWeather
 }
+
+func (s Scanner) Description() string {
+	return "Worldweather provides weather data services through its API. The keys can be used to access various weather data endpoints."
+}

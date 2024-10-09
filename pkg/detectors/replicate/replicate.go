@@ -79,3 +79,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Replicate
 }
+
+func (s Scanner) Description() string {
+	return "Replicate is a platform for running machine learning models in the cloud. Replicate API keys can be used to manage and run these models."
+}

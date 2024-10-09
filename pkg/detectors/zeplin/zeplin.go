@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Zeplin
 }
+
+func (s Scanner) Description() string {
+	return "Zeplin is a collaboration app for UI designers and front-end developers. Zeplin API keys can be used to access and modify project data."
+}

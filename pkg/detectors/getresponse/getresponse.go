@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Getresponse
 }
+
+func (s Scanner) Description() string {
+	return "GetResponse is an email marketing service. GetResponse API keys can be used to access and manage email marketing campaigns, contacts, and other related data."
+}

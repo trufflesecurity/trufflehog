@@ -243,3 +243,7 @@ func verifyPostgres(params map[string]string) (bool, error) {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Postgres
 }
+
+func (s Scanner) Description() string {
+	return "Postgres connection string containing credentials"
+}

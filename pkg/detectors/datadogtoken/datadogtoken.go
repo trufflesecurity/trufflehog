@@ -21,8 +21,9 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.CloudProvider = (*Scanner)(nil)
 
-func (Scanner) DefaultEndpoint() string { return "https://api.datadoghq.com" }
+func (Scanner) CloudEndpoint() string { return "https://api.datadoghq.com" }
 
 var (
 	client = common.SaneHttpClient()
@@ -126,7 +127,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
+				for _, baseURL := range s.Endpoints() {
 					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v2/users", nil)
 					if err != nil {
 						continue
@@ -169,8 +170,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-
-				for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
+				for _, baseURL := range s.Endpoints() {
 					req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v1/validate", nil)
 					if err != nil {
 						continue
@@ -195,4 +195,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_DatadogToken
+}
+
+func (s Scanner) Description() string {
+	return "Datadog is a monitoring and security platform for cloud applications. Datadog API and Application keys can be used to access and manage data and configurations within Datadog."
 }

@@ -9,23 +9,25 @@ var (
 	KB, MB, GB, TB, PB = 1e3, 1e6, 1e9, 1e12, 1e15
 	ignoredExtensions  = map[string]struct{}{
 		// images
-		"apng": {},
-		"avif": {},
-		"bmp":  {},
-		"dia":  {}, // Open-source Visio clone
-		"gif":  {},
-		"icns": {}, // Apple icon image file
-		"ico":  {}, // Icon file
-		"jpg":  {},
-		"jpeg": {},
-		"png":  {},
-		"svg":  {},
-		"svgz": {}, // Compressed Scalable Vector Graphics file
-		"tga":  {},
-		"tif":  {},
-		"tiff": {},
-		"vsdx": {}, // Microsoft Visio drawing file
-		"vsix": {}, // Visual Studio extension file
+		"apng":  {},
+		"avif":  {},
+		"avifs": {},
+		"bmp":   {},
+		"dia":   {}, // Open-source Visio clone
+		"gif":   {},
+		"icns":  {}, // Apple icon image file
+		"ico":   {}, // Icon file
+		"jpg":   {},
+		"jpeg":  {},
+		"jxl":   {},
+		"png":   {},
+		"svg":   {},
+		"svgz":  {}, // Compressed Scalable Vector Graphics file
+		"tga":   {},
+		"tif":   {},
+		"tiff":  {},
+		"vsdx":  {}, // Microsoft Visio drawing file
+		"vsix":  {}, // Visual Studio extension file
 
 		// audio
 		"fev":  {}, // video game audio
@@ -69,6 +71,10 @@ var (
 		"ttf":   {}, // TrueType font
 		"woff":  {}, // Web Open Font Format
 		"woff2": {}, // Web Open Font Format 2
+
+		// misc
+		"glb":  {}, // 3d models (binary)
+		"gltf": {}, // 3d models (JSON/ASCII)
 	}
 
 	binaryExtensions = map[string]struct{}{

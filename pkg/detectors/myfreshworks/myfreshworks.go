@@ -110,3 +110,7 @@ func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resI
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Myfreshworks
 }
+
+func (s Scanner) Description() string {
+	return "Freshworks is a customer engagement platform offering various services like CRM, IT service management, and more. Freshworks API keys can be used to access and manage these services."
+}

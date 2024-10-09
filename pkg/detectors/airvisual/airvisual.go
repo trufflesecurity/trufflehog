@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AirVisual
 }
+
+func (s Scanner) Description() string {
+	return "AirVisual provides air quality information and monitoring. The API key allows access to various air quality data and services."
+}

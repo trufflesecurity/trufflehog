@@ -178,3 +178,7 @@ type mfaRequiredResponse struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Dockerhub
 }
+
+func (s Scanner) Description() string {
+	return "Dockerhub is a cloud-based repository in which Docker users and partners create, test, store and distribute container images. Dockerhub personal access tokens (PATs) can be used to access and manage these container images."
+}

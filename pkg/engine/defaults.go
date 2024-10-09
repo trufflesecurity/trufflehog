@@ -428,6 +428,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meaningcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mediastack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meistertask"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meraki"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mesibo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/messagebird"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
@@ -551,10 +552,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/purestake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pushbulletapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pusherchannelkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pypi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qualaroo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/qubole"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rabbitmq"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/railwayapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ramp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rapidapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rawg"
@@ -804,8 +807,9 @@ import (
 )
 
 func DefaultDetectors() []detectors.Detector {
-	return []detectors.Detector{
+	detectorList := []detectors.Detector{
 		&heroku.Scanner{},
+		&pypi.Scanner{},
 		&linearapi.Scanner{},
 		&alibaba.Scanner{},
 		aws.New(),
@@ -1630,7 +1634,26 @@ func DefaultDetectors() []detectors.Detector {
 		netsuite.Scanner{},
 		robinhoodcrypto.Scanner{},
 		nvapi.Scanner{},
+		railwayapp.Scanner{},
+		meraki.Scanner{},
 	}
+
+	// Automatically initialize all detectors that implement
+	// EndpointCustomizer and/or CloudProvider interfaces.
+	for _, d := range detectorList {
+		customizer, ok := d.(detectors.EndpointCustomizer)
+		if !ok {
+			continue
+		}
+		// Default to always use the cloud endpoints (if available) and the found endpoints.
+		customizer.UseFoundEndpoints(true)
+		customizer.UseCloudEndpoint(true)
+		if cloudProvider, ok := d.(detectors.CloudProvider); ok {
+			customizer.SetCloudEndpoint(cloudProvider.CloudEndpoint())
+		}
+	}
+
+	return detectorList
 }
 
 func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]struct{} {

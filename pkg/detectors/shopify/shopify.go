@@ -74,6 +74,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.ExtraData = map[string]string{
 								"access_scopes": strings.Join(handleArray, ","),
 							}
+							s1.AnalysisInfo = map[string]string{
+								"key":       key,
+								"store_url": domainRes,
+							}
 						}
 						res.Body.Close()
 					}
@@ -102,4 +106,8 @@ type shopifyTokenAccessScopes struct {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Shopify
+}
+
+func (s Scanner) Description() string {
+	return "An ecommerce platform, API keys can be used to access customer data"
 }

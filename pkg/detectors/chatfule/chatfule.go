@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Chatfule
 }
+
+func (s Scanner) Description() string {
+	return "Chatfuel is a platform for creating chatbots for Facebook Messenger and other platforms. Chatfuel API keys can be used to access and manage chatbot configurations and interactions."
+}

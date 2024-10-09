@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ExchangeRateAPI
 }
+
+func (s Scanner) Description() string {
+	return "An API key for determining the exchange rate of currencies"
+}

@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Beamer
 }
+
+func (s Scanner) Description() string {
+	return "Beamer is a user engagement platform that helps you communicate product updates and other important information to your users. Beamer API keys can be used to access and manage this information."
+}

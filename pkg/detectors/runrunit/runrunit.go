@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RunRunIt
 }
+
+func (s Scanner) Description() string {
+	return "RunRunIt is a project management tool. App-Key and User-Token can be used to access and modify project data."
+}

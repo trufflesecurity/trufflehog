@@ -1,6 +1,7 @@
 package decoders
 
 import (
+	"bytes"
 	"regexp"
 	"strconv"
 	"unicode/utf8"
@@ -33,22 +34,34 @@ func (d *EscapedUnicode) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 		return nil
 	}
 
-	matched := false
-	if codePointPat.Match(chunk.Data) {
+	var (
+		// Necessary to avoid data races.
+		chunkData = bytes.Clone(chunk.Data)
+		matched   = false
+	)
+	if codePointPat.Match(chunkData) {
 		matched = true
-		chunk.Data = decodeCodePoint(chunk.Data)
+		chunkData = decodeCodePoint(chunkData)
 	}
-	if escapePat.Match(chunk.Data) {
+	if escapePat.Match(chunkData) {
 		matched = true
-		chunk.Data = decodeEscaped(chunk.Data)
+		chunkData = decodeEscaped(chunkData)
 	}
 
 	if matched {
-		decodableChunk := &DecodableChunk{
+		return &DecodableChunk{
 			DecoderType: d.Type(),
-			Chunk:       chunk,
+			Chunk: &sources.Chunk{
+				Data:           chunkData,
+				SourceName:     chunk.SourceName,
+				SourceID:       chunk.SourceID,
+				JobID:          chunk.JobID,
+				SecretID:       chunk.SecretID,
+				SourceMetadata: chunk.SourceMetadata,
+				SourceType:     chunk.SourceType,
+				Verify:         chunk.Verify,
+			},
 		}
-		return decodableChunk
 	} else {
 		return nil
 	}

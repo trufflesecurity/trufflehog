@@ -78,3 +78,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Twitter
 }
+
+// Description returns a description for the result being detected
+func (s Scanner) Description() string {
+	return "Twitter API keys can be used to access and interact with Twitter's platform programmatically."
+}

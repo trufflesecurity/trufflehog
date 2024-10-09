@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Loadmill
 }
+
+func (s Scanner) Description() string {
+	return "Loadmill is a testing service for APIs and web applications. Loadmill API keys can be used to access and manage test scenarios and results."
+}

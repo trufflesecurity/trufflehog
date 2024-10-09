@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PositionStack
 }
+
+func (s Scanner) Description() string {
+	return "PositionStack is a geocoding API service providing forward and reverse geocoding. PositionStack API keys can be used to access geocoding services to convert addresses to coordinates and vice versa."
+}

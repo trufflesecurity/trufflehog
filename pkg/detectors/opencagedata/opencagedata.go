@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_OpenCageData
 }
+
+func (s Scanner) Description() string {
+	return "OpenCageData provides a geocoding API to convert coordinates to and from places. OpenCageData keys can be used to access the service's geocoding capabilities."
+}

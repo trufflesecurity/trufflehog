@@ -81,3 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Intercom
 }
+
+func (s Scanner) Description() string {
+	return "Intercom is a customer messaging platform that allows businesses to communicate with customers. Intercom tokens can be used to access and manage customer data and communication."
+}
