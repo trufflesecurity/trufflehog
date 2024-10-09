@@ -58,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			extraData, verified, verificationErr := verifyFastlyApiToken(ctx, match)
 			s1.Verified = verified
 			s1.ExtraData = extraData
-			s1.SetVerificationError(verificationErr)
+			s1.SetVerificationError(verificationErr, match)
 		}
 
 		results = append(results, s1)
