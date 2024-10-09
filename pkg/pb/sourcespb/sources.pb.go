@@ -1815,6 +1815,7 @@ type GitHub struct {
 	SkipBinaries               bool                `protobuf:"varint,17,opt,name=skip_binaries,json=skipBinaries,proto3" json:"skip_binaries,omitempty"`
 	SkipArchives               bool                `protobuf:"varint,18,opt,name=skip_archives,json=skipArchives,proto3" json:"skip_archives,omitempty"`
 	IncludeWikis               bool                `protobuf:"varint,19,opt,name=include_wikis,json=includeWikis,proto3" json:"include_wikis,omitempty"`
+	CommentsTimeframeDays      uint32              `protobuf:"varint,20,opt,name=comments_timeframe_days,json=commentsTimeframeDays,proto3" json:"comments_timeframe_days,omitempty"`
 }
 
 func (x *GitHub) Reset() {
@@ -1987,6 +1988,13 @@ func (x *GitHub) GetIncludeWikis() bool {
 		return x.IncludeWikis
 	}
 	return false
+}
+
+func (x *GitHub) GetCommentsTimeframeDays() uint32 {
+	if x != nil {
+		return x.CommentsTimeframeDays
+	}
+	return 0
 }
 
 type isGitHub_Credential interface {

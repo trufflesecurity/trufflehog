@@ -66,9 +66,10 @@ type Source struct {
 	resumeInfoSlice []string
 	connector       connector
 
-	includePRComments    bool
-	includeIssueComments bool
-	includeGistComments  bool
+	includePRComments     bool
+	includeIssueComments  bool
+	includeGistComments   bool
+	commentsTimeframeDays uint32
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
@@ -255,6 +256,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includeIssueComments = s.conn.IncludeIssueComments
 	s.includePRComments = s.conn.IncludePullRequestComments
 	s.includeGistComments = s.conn.IncludeGistComments
+	s.commentsTimeframeDays = s.conn.CommentsTimeframeDays
+	// TODO: Cleanup
+	aCtx.Logger().Info("Set commentsTimeframeDays",
+		"commentsTimeframeDays", s.commentsTimeframeDays,
+		"conn.CommentsTimeframeDays", s.conn.CommentsTimeframeDays,
+		"conn.GetCommentsTimeframeDays", s.conn.GetCommentsTimeframeDays(),
+	)
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -1104,7 +1112,18 @@ func isGistUrl(urlParts []string) bool {
 }
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter) error {
+	daysToFilter := int(s.commentsTimeframeDays)
+	cutoffTime := time.Now().AddDate(0, 0, -daysToFilter)
+
 	for _, comment := range comments {
+		createdAt := comment.GetCreatedAt()
+
+		// Skip comments that were not created within the specified timeframe
+		if !s.filterCommentByTimeframe(&createdAt, cutoffTime) {
+			ctx.Logger().V(2).Info("Done processing PR comments due to a configured cuttoff time of ", cutoffTime, " and an encounting a created at timestamp of ", createdAt)
+			break
+		}
+
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
@@ -1137,10 +1156,10 @@ func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo
 // Note: these can't be consts because the address is needed when using with the GitHub library.
 var (
 	// sortType defines the criteria for sorting comments.
-	// By default, comments are sorted by their creation date.
-	sortType = "created"
+	// By setting this to "updated" we can use this to reliably manage the comment timeframe filtering below
+	sortType = "updated"
 	// directionType defines the direction of sorting.
-	// "desc" means comments will be sorted in descending order, showing the latest comments first.
+	// "desc" means comments will be sorted in descending order, showing the latest comments first, which is critical for managing the comment timeframe filtering
 	directionType = "desc"
 	// allComments is a placeholder for specifying the comment ID to start listing from.
 	// A value of 0 means that all comments will be listed.
@@ -1277,7 +1296,18 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 }
 
 func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter) error {
+	daysToFilter := int(s.commentsTimeframeDays)
+	cutoffTime := time.Now().AddDate(0, 0, -daysToFilter)
+
 	for _, comment := range comments {
+		updatedAt := comment.GetUpdatedAt()
+
+		// Skip comments that were not last updated within the specified timeframe
+		if !s.filterCommentByTimeframe(&updatedAt, cutoffTime) {
+			ctx.Logger().V(2).Info("Done processing Issue comments due to a configured cuttoff time of ", cutoffTime, " and an encounting an updated at timestamp of ", updatedAt)
+			break
+		}
+
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
@@ -1404,13 +1434,24 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 }
 
 func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter) error {
+	daysToFilter := int(s.commentsTimeframeDays)
+	cutoffTime := time.Now().AddDate(0, 0, -daysToFilter)
+
 	for _, comment := range comments {
+		updatedAt := comment.GetUpdatedAt()
+
+		// Skip comments that were not last updated within the specified timeframe
+		if !s.filterCommentByTimeframe(&updatedAt, cutoffTime) {
+			ctx.Logger().V(2).Info("Done processing PR comments due to a configured cuttoff time of ", cutoffTime, " and an encounting an updated at timestamp of ", updatedAt)
+			break
+		}
+
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
-			SourceType: s.Type(),
 			JobID:      s.JobID(),
+			SourceType: s.Type(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
@@ -1432,6 +1473,16 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 		}
 	}
 	return nil
+}
+
+// Returns true if the comment should be included, false if it should be skipped
+func (s *Source) filterCommentByTimeframe(commentTimestamp *github.Timestamp, cutoffTime time.Time) bool {
+	if s.commentsTimeframeDays <= 0 {
+		return true
+	}
+
+	// Check if the comment timestamp is before the cutoff time
+	return commentTimestamp != nil && commentTimestamp.Before(cutoffTime)
 }
 
 func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, reporter sources.ChunkReporter) []error {
