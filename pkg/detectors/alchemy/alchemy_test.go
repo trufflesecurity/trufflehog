@@ -21,6 +21,17 @@ func TestAlchemy_Pattern(t *testing.T) {
 			input: "alchemy_token = '3aBcDFE5678901234567890_1a2b3c4d'",
 			want:  []string{"3aBcDFE5678901234567890_1a2b3c4d"},
 		},
+		{
+			name: "finds all matches",
+			input: `alchemy_token1 = '3aBcDFE5678901234567890_1a2b3c4d'
+alchemy_token2 = '3aDcDFE56789012245678a0_1a2b3c2d'`,
+			want: []string{"3aBcDFE5678901234567890_1a2b3c4d", "3aDcDFE56789012245678a0_1a2b3c2d"},
+		},
+		{
+			name:  "invald pattern",
+			input: "alchemy_token = '1a2b3c4d'",
+			want:  []string{},
+		},
 	}
 
 	for _, test := range tests {
