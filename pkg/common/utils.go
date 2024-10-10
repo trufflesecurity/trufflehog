@@ -81,3 +81,20 @@ func GetAccountNumFromAWSID(AWSID string) (string, error) {
 	accountNum := (z & mask) >> 7
 	return fmt.Sprintf("%012d", accountNum), nil
 }
+
+// SliceContainsString searches a slice to determine if it contains a specified string.
+func SliceContainsString(origTargetString string, stringSlice []string, ignoreCase bool) (bool, string) {
+	targetString := origTargetString
+	if ignoreCase {
+		targetString = strings.ToLower(origTargetString)
+	}
+	for _, stringFromSlice := range stringSlice {
+		if ignoreCase {
+			stringFromSlice = strings.ToLower(stringFromSlice)
+		}
+		if targetString == stringFromSlice {
+			return true, origTargetString
+		}
+	}
+	return false, ""
+}

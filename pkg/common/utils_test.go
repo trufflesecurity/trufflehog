@@ -133,3 +133,56 @@ func TestParseResponseForKeywords(t *testing.T) {
 		})
 	}
 }
+
+func TestSliceContainsString(t *testing.T) {
+	testCases := []struct {
+		name           string
+		slice          []string
+		target         string
+		expectedBool   bool
+		expectedString string
+		ignoreCase     bool
+	}{
+		{
+			name:           "matching case, target exists",
+			slice:          []string{"one", "two", "three"},
+			target:         "two",
+			expectedBool:   true,
+			expectedString: "two",
+			ignoreCase:     false,
+		},
+		{
+			name:           "non-matching case, target exists, ignore case",
+			slice:          []string{"one", "two", "three"},
+			target:         "Two",
+			expectedBool:   true,
+			expectedString: "Two",
+			ignoreCase:     true,
+		},
+		{
+			name:           "non-matching case, target in wrong case, case respected",
+			slice:          []string{"one", "two", "three"},
+			target:         "Two",
+			expectedBool:   false,
+			expectedString: "",
+			ignoreCase:     false,
+		},
+		{
+			name:           "target not in slice",
+			slice:          []string{"one", "two", "three"},
+			target:         "four",
+			expectedBool:   false,
+			expectedString: "",
+			ignoreCase:     false,
+		},
+	}
+	for _, testCase := range testCases {
+		resultBool, resultString := SliceContainsString(testCase.target, testCase.slice, testCase.ignoreCase)
+		if resultBool != testCase.expectedBool {
+			t.Errorf("%s: bool values do not match. Got: %t, expected: %t", testCase.name, resultBool, testCase.expectedBool)
+		}
+		if resultString != testCase.expectedString {
+			t.Errorf("%s: string values do not match. Got: %s, expected: %s", testCase.name, resultString, testCase.expectedString)
+		}
+	}
+}
