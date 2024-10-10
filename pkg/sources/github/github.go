@@ -257,12 +257,6 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includePRComments = s.conn.IncludePullRequestComments
 	s.includeGistComments = s.conn.IncludeGistComments
 	s.commentsTimeframeDays = s.conn.CommentsTimeframeDays
-	// TODO: Cleanup
-	aCtx.Logger().Info("Set commentsTimeframeDays",
-		"commentsTimeframeDays", s.commentsTimeframeDays,
-		"conn.CommentsTimeframeDays", s.conn.CommentsTimeframeDays,
-		"conn.GetCommentsTimeframeDays", s.conn.GetCommentsTimeframeDays(),
-	)
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -1009,10 +1003,17 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 		return err
 	}
 
+	var cutoffTime *time.Time
+	if s.commentsTimeframeDays > 0 {
+		daysToFilter := int(s.commentsTimeframeDays)
+		t := time.Now().AddDate(0, 0, -daysToFilter)
+		cutoffTime = &t
+	}
+
 	if s.includeGistComments && isGistUrl(urlParts) {
-		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter)
+		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter, cutoffTime)
 	} else if s.includeIssueComments || s.includePRComments {
-		return s.processRepoComments(ctx, repoInfo, reporter)
+		return s.processRepoComments(ctx, repoInfo, reporter, cutoffTime)
 	}
 	return nil
 }
@@ -1072,7 +1073,7 @@ func getRepoURLParts(repoURLString string) (string, []string, error) {
 
 const initialPage = 1 // page to start listing from
 
-func (s *Source) processGistComments(ctx context.Context, gistURL string, urlParts []string, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processGistComments(ctx context.Context, gistURL string, urlParts []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	ctx.Logger().V(2).Info("Scanning GitHub Gist comments")
 
 	// GitHub Gist URL.
@@ -1091,7 +1092,7 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 			return err
 		}
 
-		if err = s.chunkGistComments(ctx, gistURL, repoInfo, comments, reporter); err != nil {
+		if err = s.chunkGistComments(ctx, gistURL, repoInfo, comments, reporter, cutoffTime); err != nil {
 			return err
 		}
 
@@ -1111,17 +1112,12 @@ func isGistUrl(urlParts []string) bool {
 	return strings.EqualFold(urlParts[0], "gist.github.com") || (len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist"))
 }
 
-func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter) error {
-	daysToFilter := int(s.commentsTimeframeDays)
-	cutoffTime := time.Now().AddDate(0, 0, -daysToFilter)
-
+func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
-		createdAt := comment.GetCreatedAt()
-
-		// Skip comments that were not created within the specified timeframe
-		if !s.filterCommentByTimeframe(&createdAt, cutoffTime) {
-			ctx.Logger().V(2).Info("Done processing PR comments due to a configured cuttoff time of ", cutoffTime, " and an encounting a created at timestamp of ", createdAt)
-			break
+		// Skip the comment if it was created before the cutoff time
+		if cutoffTime != nil && comment.GetCreatedAt().Before(*cutoffTime) {
+			// ctx.Logger().V(2).Info("Skipping Gist Comment: " + comment.GetURL() + " due to cutoff time of " + cutoffTime.String())
+			continue
 		}
 
 		// Create chunk and send it to the channel.
@@ -1168,23 +1164,25 @@ var (
 	state = "all"
 )
 
-func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
+	// TODO: use cutoffTime
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
 		if err := s.processIssues(ctx, repoInfo, reporter); err != nil {
 			return err
 		}
-		if err := s.processIssueComments(ctx, repoInfo, reporter); err != nil {
+		if err := s.processIssueComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
 
+	// TODO: use cutoffTime
 	if s.includePRComments {
 		ctx.Logger().V(2).Info("Scanning pull requests")
 		if err := s.processPRs(ctx, repoInfo, reporter); err != nil {
 			return err
 		}
-		if err := s.processPRComments(ctx, repoInfo, reporter); err != nil {
+		if err := s.processPRComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
@@ -1229,7 +1227,6 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter 
 
 func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, reporter sources.ChunkReporter) error {
 	for _, issue := range issues {
-
 		// Skip pull requests since covered by processPRs.
 		if issue.IsPullRequest() {
 			continue
@@ -1264,7 +1261,7 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 	return nil
 }
 
-func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
 		Direction: &directionType,
@@ -1283,7 +1280,7 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 			return err
 		}
 
-		if err = s.chunkIssueComments(ctx, repoInfo, issueComments, reporter); err != nil {
+		if err = s.chunkIssueComments(ctx, repoInfo, issueComments, reporter, cutoffTime); err != nil {
 			return err
 		}
 
@@ -1295,17 +1292,12 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 	return nil
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter) error {
-	daysToFilter := int(s.commentsTimeframeDays)
-	cutoffTime := time.Now().AddDate(0, 0, -daysToFilter)
-
+func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
-		updatedAt := comment.GetUpdatedAt()
-
-		// Skip comments that were not last updated within the specified timeframe
-		if !s.filterCommentByTimeframe(&updatedAt, cutoffTime) {
-			ctx.Logger().V(2).Info("Done processing Issue comments due to a configured cuttoff time of ", cutoffTime, " and an encounting an updated at timestamp of ", updatedAt)
-			break
+		// Skip the comment if it was updated before the cutoff time
+		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
+			// ctx.Logger().V(2).Info("Skipping Issue Comment: " + comment.GetHTMLURL() + " due to cutoff time of " + cutoffTime.String())
+			continue
 		}
 
 		// Create chunk and send it to the channel.
@@ -1370,7 +1362,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sou
 	return nil
 }
 
-func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	prOpts := &github.PullRequestListCommentsOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1389,7 +1381,7 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, repor
 			return err
 		}
 
-		if err = s.chunkPullRequestComments(ctx, repoInfo, prComments, reporter); err != nil {
+		if err = s.chunkPullRequestComments(ctx, repoInfo, prComments, reporter, cutoffTime); err != nil {
 			return err
 		}
 
@@ -1433,17 +1425,12 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter) error {
-	daysToFilter := int(s.commentsTimeframeDays)
-	cutoffTime := time.Now().AddDate(0, 0, -daysToFilter)
-
+func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
-		updatedAt := comment.GetUpdatedAt()
-
-		// Skip comments that were not last updated within the specified timeframe
-		if !s.filterCommentByTimeframe(&updatedAt, cutoffTime) {
-			ctx.Logger().V(2).Info("Done processing PR comments due to a configured cuttoff time of ", cutoffTime, " and an encounting an updated at timestamp of ", updatedAt)
-			break
+		// Skip the comment if it was updated before the cutoff time
+		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
+			// ctx.Logger().V(2).Info("Skipping PR Comment: " + comment.GetHTMLURL() + " due to cutoff time of " + cutoffTime.String())
+			continue
 		}
 
 		// Create chunk and send it to the channel.
@@ -1473,16 +1460,6 @@ func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo
 		}
 	}
 	return nil
-}
-
-// Returns true if the comment should be included, false if it should be skipped
-func (s *Source) filterCommentByTimeframe(commentTimestamp *github.Timestamp, cutoffTime time.Time) bool {
-	if s.commentsTimeframeDays <= 0 {
-		return true
-	}
-
-	// Check if the comment timestamp is before the cutoff time
-	return commentTimestamp != nil && commentTimestamp.Before(cutoffTime)
 }
 
 func (s *Source) scanTargets(ctx context.Context, targets []sources.ChunkingTarget, reporter sources.ChunkReporter) []error {
