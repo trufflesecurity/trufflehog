@@ -83,18 +83,20 @@ func GetAccountNumFromAWSID(AWSID string) (string, error) {
 }
 
 // SliceContainsString searches a slice to determine if it contains a specified string.
-func SliceContainsString(origTargetString string, stringSlice []string, ignoreCase bool) (bool, string) {
+// Returns the index of the first match in the slice.
+func SliceContainsString(origTargetString string, stringSlice []string, ignoreCase bool) (bool, string, int) {
 	targetString := origTargetString
 	if ignoreCase {
 		targetString = strings.ToLower(origTargetString)
 	}
-	for _, stringFromSlice := range stringSlice {
+	for i, origStringFromSlice := range stringSlice {
+		stringFromSlice := origStringFromSlice
 		if ignoreCase {
-			stringFromSlice = strings.ToLower(stringFromSlice)
+			stringFromSlice = strings.ToLower(origStringFromSlice)
 		}
 		if targetString == stringFromSlice {
-			return true, origTargetString
+			return true, targetString, i
 		}
 	}
-	return false, ""
+	return false, "", 0
 }

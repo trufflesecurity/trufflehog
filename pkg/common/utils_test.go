@@ -141,6 +141,7 @@ func TestSliceContainsString(t *testing.T) {
 		target         string
 		expectedBool   bool
 		expectedString string
+		expectedIndex  int
 		ignoreCase     bool
 	}{
 		{
@@ -149,6 +150,7 @@ func TestSliceContainsString(t *testing.T) {
 			target:         "two",
 			expectedBool:   true,
 			expectedString: "two",
+			expectedIndex:  1,
 			ignoreCase:     false,
 		},
 		{
@@ -156,7 +158,8 @@ func TestSliceContainsString(t *testing.T) {
 			slice:          []string{"one", "two", "three"},
 			target:         "Two",
 			expectedBool:   true,
-			expectedString: "Two",
+			expectedString: "two",
+			expectedIndex:  1,
 			ignoreCase:     true,
 		},
 		{
@@ -165,6 +168,7 @@ func TestSliceContainsString(t *testing.T) {
 			target:         "Two",
 			expectedBool:   false,
 			expectedString: "",
+			expectedIndex:  0,
 			ignoreCase:     false,
 		},
 		{
@@ -173,16 +177,20 @@ func TestSliceContainsString(t *testing.T) {
 			target:         "four",
 			expectedBool:   false,
 			expectedString: "",
+			expectedIndex:  0,
 			ignoreCase:     false,
 		},
 	}
 	for _, testCase := range testCases {
-		resultBool, resultString := SliceContainsString(testCase.target, testCase.slice, testCase.ignoreCase)
+		resultBool, resultString, resultIndex := SliceContainsString(testCase.target, testCase.slice, testCase.ignoreCase)
 		if resultBool != testCase.expectedBool {
 			t.Errorf("%s: bool values do not match. Got: %t, expected: %t", testCase.name, resultBool, testCase.expectedBool)
 		}
 		if resultString != testCase.expectedString {
 			t.Errorf("%s: string values do not match. Got: %s, expected: %s", testCase.name, resultString, testCase.expectedString)
+		}
+		if resultIndex != testCase.expectedIndex {
+			t.Errorf("%s: index values do not match. Got: %d, expected: %d", testCase.name, resultIndex, testCase.expectedIndex)
 		}
 	}
 }
