@@ -1114,10 +1114,9 @@ func isGistUrl(urlParts []string) bool {
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
-		// Skip the comment if it was created before the cutoff time
+		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
 		if cutoffTime != nil && comment.GetCreatedAt().Before(*cutoffTime) {
-			// ctx.Logger().V(2).Info("Skipping Gist Comment: " + comment.GetURL() + " due to cutoff time of " + cutoffTime.String())
-			continue
+			break
 		}
 
 		// Create chunk and send it to the channel.
@@ -1165,7 +1164,6 @@ var (
 )
 
 func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
-	// TODO: use cutoffTime
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
 		if err := s.processIssues(ctx, repoInfo, reporter); err != nil {
@@ -1176,7 +1174,6 @@ func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, rep
 		}
 	}
 
-	// TODO: use cutoffTime
 	if s.includePRComments {
 		ctx.Logger().V(2).Info("Scanning pull requests")
 		if err := s.processPRs(ctx, repoInfo, reporter); err != nil {
@@ -1294,9 +1291,8 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 
 func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
-		// Skip the comment if it was updated before the cutoff time
+		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
 		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
-			// ctx.Logger().V(2).Info("Skipping Issue Comment: " + comment.GetHTMLURL() + " due to cutoff time of " + cutoffTime.String())
 			continue
 		}
 
@@ -1427,9 +1423,8 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 
 func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
-		// Skip the comment if it was updated before the cutoff time
+		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
 		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
-			// ctx.Logger().V(2).Info("Skipping PR Comment: " + comment.GetHTMLURL() + " due to cutoff time of " + cutoffTime.String())
 			continue
 		}
 
