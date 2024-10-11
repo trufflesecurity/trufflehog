@@ -1269,7 +1269,15 @@ func (s *Git) handleBinary(
 	catFileCtx, cancel := context.WithTimeoutCause(fileCtx, cmdTimeout, errors.New("git cat-file timeout"))
 	defer cancel()
 
-	cmd := exec.CommandContext(catFileCtx, "git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
+	cmd := exec.CommandContext(
+		catFileCtx,
+		"git",
+		"-C",
+		gitDir,
+		"cat-file",
+		"blob",
+		commitHash.String()+":"+path,
+	)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	cmd.WaitDelay = waitDelay // give the command a chance to finish before the timeout :)

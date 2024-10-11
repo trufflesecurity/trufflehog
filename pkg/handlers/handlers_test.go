@@ -3,6 +3,7 @@ package handlers
 import (
 	"archive/zip"
 	"bytes"
+	stdctx "context"
 	"fmt"
 	"io"
 	"net/http"
@@ -683,4 +684,90 @@ func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsup
 	}
 
 	return tempDir
+}
+
+// getGitCommitHash retrieves the current commit hash of the Git repository.
+func getGitCommitHash(t *testing.T, gitDir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "-C", gitDir, "rev-parse", "HEAD")
+	hashBytes, err := cmd.Output()
+	assert.NoError(t, err, "Failed to get commit hash")
+	commitHash := strings.TrimSpace(string(hashBytes))
+	return commitHash
+}
+
+type mockReporter struct{ reportedChunks int }
+
+func (m *mockReporter) ChunkOk(logContext.Context, sources.Chunk) error {
+	m.reportedChunks++
+	return nil
+}
+
+func (m *mockReporter) ChunkErr(logContext.Context, error) error { return nil }
+
+func TestHandleChunksWithError(t *testing.T) {
+	tests := []struct {
+		name                   string
+		input                  []DataOrErr
+		expectedErr            error
+		expectedReportedChunks int
+	}{
+		{
+			name:  "Non-Critical Error",
+			input: []DataOrErr{{Err: ErrNonCriticalProcessing}},
+		},
+		{
+			name:        "Critical Error",
+			input:       []DataOrErr{{Err: ErrCriticalProcessing}},
+			expectedErr: ErrCriticalProcessing,
+		},
+		{
+			name: "No Error",
+			input: []DataOrErr{
+				{Data: []byte("test data")},
+				{Data: []byte("more data")},
+			},
+			expectedReportedChunks: 2,
+		},
+		{
+			name:        "Context Canceled",
+			input:       []DataOrErr{{Err: stdctx.Canceled}},
+			expectedErr: stdctx.Canceled,
+		},
+		{
+			name:        "Context Deadline Exceeded",
+			input:       []DataOrErr{{Err: stdctx.DeadlineExceeded}},
+			expectedErr: stdctx.DeadlineExceeded,
+		},
+		{
+			name:  "EOF Error",
+			input: []DataOrErr{{Err: io.EOF}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			chunkSkel := &sources.Chunk{}
+			reporter := new(mockReporter)
+
+			dataErrChan := make(chan DataOrErr, len(tc.input))
+			for _, de := range tc.input {
+				dataErrChan <- de
+			}
+			close(dataErrChan)
+
+			err := handleChunksWithError(ctx, dataErrChan, chunkSkel, reporter)
+
+			if tc.expectedErr != nil {
+				assert.ErrorIs(t, err, tc.expectedErr, "handleChunksWithError should return the expected error")
+			} else {
+				assert.NoError(t, err, "handleChunksWithError should not return an error for non-critical errors")
+			}
+
+			assert.Equal(t, tc.expectedReportedChunks, reporter.reportedChunks, "should have reported the expected number of chunks")
+		})
+	}
 }
