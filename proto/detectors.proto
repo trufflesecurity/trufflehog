@@ -1010,6 +1010,7 @@ enum DetectorType {
   PyPI = 998;
   RailwayApp = 999;
   Meraki = 1000;
+  SaladCloudApiKey = 1001;
 }
 
 message Result {
