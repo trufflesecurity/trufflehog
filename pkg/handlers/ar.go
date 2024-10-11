@@ -31,8 +31,6 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan [
 	}
 
 	go func() {
-		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
-		defer cancel()
 		defer close(archiveChan)
 
 		// Update the metrics for the file processing.

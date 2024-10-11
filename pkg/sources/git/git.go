@@ -1226,7 +1226,14 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+func (s *Git) handleBinary(
+	ctx context.Context,
+	gitDir string,
+	reporter sources.ChunkReporter,
+	chunkSkel *sources.Chunk,
+	commitHash plumbing.Hash,
+	path string,
+) (err error) {
 	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
 	fileCtx.Logger().V(5).Info("handling binary file")
 
@@ -1240,9 +1247,19 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
+	const (
+		cmdTimeout = 60 * time.Second
+		waitDelay  = 5 * time.Second
+	)
+	// Create a timeout context for the 'git cat-file' command to ensure it does not run indefinitely.
+	// This prevents potential resource exhaustion by terminating the command if it exceeds the specified duration.
+	catFileCtx, cancel := context.WithTimeoutCause(fileCtx, cmdTimeout, errors.New("git cat-file timeout"))
+	defer cancel()
+
+	cmd := exec.CommandContext(catFileCtx, "git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+	cmd.WaitDelay = waitDelay // give the command a chance to finish before the timeout
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -1253,9 +1270,17 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	defer func() { _ = cmd.Wait() }()
+	var waitErr error
+	defer func() {
+		waitErr = cmd.Wait()
+		if err != nil && waitErr != nil {
+			err = fmt.Errorf("handle error: %v; wait error: %v", err, waitErr)
+			return
+		}
+		err = waitErr
+	}()
 
-	return handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	return handlers.HandleFile(catFileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {

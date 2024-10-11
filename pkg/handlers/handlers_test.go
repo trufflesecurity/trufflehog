@@ -3,6 +3,7 @@ package handlers
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -517,13 +518,10 @@ func TestHandleGitCatFile(t *testing.T) {
 			}
 			defer os.RemoveAll(gitDir)
 
-			cmd := exec.Command("git", "-C", gitDir, "rev-parse", "HEAD")
-			hashBytes, err := cmd.Output()
-			assert.NoError(t, err, "Failed to get commit hash")
-			commitHash := strings.TrimSpace(string(hashBytes))
+			commitHash := getGitCommitHash(t, gitDir)
 
 			// Create a pipe to simulate the git cat-file stdout.
-			cmd = exec.Command("git", "-C", gitDir, "cat-file", "blob", fmt.Sprintf("%s:%s", commitHash, tt.fileName))
+			cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", fmt.Sprintf("%s:%s", commitHash, tt.fileName))
 
 			var stderr bytes.Buffer
 			cmd.Stderr = &stderr
@@ -683,4 +681,145 @@ func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsup
 	}
 
 	return tempDir
+}
+
+// errorOnceReader is a custom io.Reader that simulates a read error only once.
+// On the first read, it returns an error. Subsequent reads return the remaining data normally.
+// This is used to simulate an error during mime type detection in newFileReader.
+type errorOnceReader struct {
+	data    []byte
+	err     error
+	failed  bool
+	readPos int
+}
+
+func (er *errorOnceReader) Read(p []byte) (int, error) {
+	if !er.failed {
+		er.failed = true
+		return 0, er.err
+	}
+
+	if er.readPos >= len(er.data) {
+		return 0, io.EOF
+	}
+
+	n := copy(p, er.data[er.readPos:])
+	er.readPos += n
+	return n, nil
+}
+
+// BytesRead returns the total number of bytes read from the reader.
+// It's a helper method to check if the reader has been fully drained.
+func (er *errorOnceReader) BytesRead() int { return er.readPos }
+
+func newErrorOnceReader(data []byte, err error) *errorOnceReader {
+	return &errorOnceReader{data: data, err: err}
+}
+
+// TestHandleFileDrainsReaderOnNewFileReaderFailure tests that HandleFile drains the reader correctly
+// when newFileReader fails.
+func TestHandleFileDrainsReaderOnNewFileReaderFailure(t *testing.T) {
+	dataSize := 100 * 1024 // 100 KB
+	data := bytes.Repeat([]byte("A"), dataSize)
+
+	simulatedError := errors.New("simulated read error")
+	customReader := newErrorOnceReader(data, simulatedError)
+
+	chunkSkel := &sources.Chunk{}
+	chunkCh := make(chan *sources.Chunk)
+	reporter := sources.ChanReporter{Ch: chunkCh}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := HandleFile(ctx, customReader, chunkSkel, reporter)
+
+	assert.Error(t, err, "HandleFile should return an error when newFileReader fails")
+	// All the data should be read from the reader.
+	assert.Equal(t, dataSize, customReader.BytesRead(), "HandleFile should drain the reader on failure")
+}
+
+// errorInjectingReader is a custom io.Reader that injects an error after reading a certain number of bytes.
+// It also tracks the total bytes read.
+type errorInjectingReader struct {
+	reader        io.Reader
+	injectAfter   int64 // Number of bytes after which to inject the error
+	injected      bool
+	bytesRead     int64
+	errorToInject error
+}
+
+func (eir *errorInjectingReader) Read(p []byte) (int, error) {
+	if eir.injectAfter > 0 && eir.bytesRead >= eir.injectAfter && !eir.injected {
+		eir.injected = true
+		return 0, eir.errorToInject
+	}
+
+	n, err := eir.reader.Read(p)
+	eir.bytesRead += int64(n)
+	return n, err
+}
+
+// TestHandleGitCatFileWithPipeError tests that when an error is injected during the HandleFile processing,
+// the reader is fully drained and the git cat-file command completes without error.
+func TestHandleGitCatFileWithPipeError(t *testing.T) {
+	fileName := "largefile_with_error.bin"
+	fileSize := 100 * 1024               // 100 KB
+	injectErrorAfter := int64(50 * 1024) // Inject error after 50 KB
+	simulatedError := errors.New("simulated error during newFileReader")
+
+	gitDir := setupTempGitRepo(t, fileName, fileSize)
+	defer os.RemoveAll(gitDir)
+
+	commitHash := getGitCommitHash(t, gitDir)
+
+	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", fmt.Sprintf("%s:%s", commitHash, fileName))
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	stdout, err := cmd.StdoutPipe()
+	assert.NoError(t, err, "Failed to create stdout pipe")
+
+	err = cmd.Start()
+	assert.NoError(t, err, "Failed to start git cat-file command")
+
+	// Wrap the stdout with errorInjectingReader to simulate an error after reading injectErrorAfter bytes.
+	wrappedReader := &errorInjectingReader{
+		reader:        stdout,
+		injectAfter:   injectErrorAfter,
+		injected:      false,
+		bytesRead:     0,
+		errorToInject: simulatedError,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	chunkCh := make(chan *sources.Chunk, 1000)
+
+	go func() {
+		defer close(chunkCh)
+		err = HandleFile(ctx, wrappedReader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(false))
+		assert.NoError(t, err, "HandleFile should not return an error")
+	}()
+
+	for range chunkCh {
+	}
+
+	err = cmd.Wait()
+	assert.NoError(t, err, "git cat-file command should complete without error")
+
+	// Now, verify that the reader was fully drained.
+	assert.Equal(t, wrappedReader.bytesRead, int64(fileSize), "HandleFile should have drained the reader completely")
+}
+
+// getGitCommitHash retrieves the current commit hash of the Git repository.
+func getGitCommitHash(t *testing.T, gitDir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "-C", gitDir, "rev-parse", "HEAD")
+	hashBytes, err := cmd.Output()
+	assert.NoError(t, err, "Failed to get commit hash")
+	commitHash := strings.TrimSpace(string(hashBytes))
+	return commitHash
 }

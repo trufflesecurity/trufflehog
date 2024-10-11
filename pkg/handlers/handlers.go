@@ -83,16 +83,32 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 func newFileReader(r io.Reader) (fileReader, error) {
 	var fReader fileReader
 
-	fReader.BufferedReadSeeker = iobuf.NewBufferedReaderSeeker(r)
+	// To detect the MIME type of the input data, we need a reader that supports seeking.
+	// This allows us to read the data multiple times if necessary without losing the original position.
+	// We use a BufferedReaderSeeker to wrap the original reader, enabling this functionality.
+	// If an error occurs during MIME type detection, it is important we close the BufferedReaderSeeker
+	// to release any resources it holds and prevent potential memory leaks.
+	bufferedReader := iobuf.NewBufferedReaderSeeker(r)
+	fReader.BufferedReadSeeker = bufferedReader
 
-	mime, err := mimetype.DetectReader(fReader)
+	var err error
+	defer func() {
+		if err != nil {
+			if closeErr := bufferedReader.Close(); closeErr != nil {
+				err = fmt.Errorf("%w; error closing reader: %w", err, closeErr)
+			}
+		}
+	}()
+
+	var mime *mimetype.MIME
+	mime, err = mimetype.DetectReader(fReader)
 	if err != nil {
 		return fReader, fmt.Errorf("unable to detect MIME type: %w", err)
 	}
 	fReader.mime = mime
 
 	// Reset the reader to the beginning because DetectReader consumes the reader.
-	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+	if _, err = fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
@@ -102,7 +118,8 @@ func newFileReader(r io.Reader) (fileReader, error) {
 		return fReader, nil
 	}
 
-	format, _, err := archiver.Identify("", fReader)
+	var format archiver.Format
+	format, _, err = archiver.Identify("", fReader)
 	switch {
 	case err == nil:
 		fReader.isGenericArchive = true
@@ -117,7 +134,7 @@ func newFileReader(r io.Reader) (fileReader, error) {
 
 	// Reset the reader to the beginning again to allow the handler to read from the start.
 	// This is necessary because Identify consumes the reader.
-	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+	if _, err = fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after archive identification: %w", err)
 	}
 
@@ -270,29 +287,45 @@ func HandleFile(
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 	options ...func(*fileHandlingConfig),
-) error {
+) (err error) {
 	if reader == nil {
-		return fmt.Errorf("reader is nil")
+		return errors.New("reader is nil")
 	}
 
-	rdr, err := newFileReader(reader)
+	// Ensure that all data from the reader is consumed to prevent broken pipe errors.
+	// This is important even if the newFileReader function fails during MIME type detection,
+	// which can happen if the reader is not fully consumed. By discarding the remaining data,
+	// we avoid potential broken pipe issues. If the reader has already been fully consumed,
+	// this operation will have no effect.
+	//
+	// Attempt to read and discard any remaining data from the reader.
+	// If an error occurs while discarding data,
+	// it will be combined with any existing error.
+	defer func() {
+		n, copyErr := io.Copy(io.Discard, reader)
+		ctx.Logger().V(3).Info("discarded reader data", "bytes", n)
+		if copyErr != nil {
+			if err != nil {
+				err = fmt.Errorf("%w; error discarding reader data: %w", err, copyErr)
+			} else {
+				err = fmt.Errorf("error discarding reader data: %w", copyErr)
+			}
+		}
+	}()
+
+	var rdr fileReader
+	rdr, err = newFileReader(reader)
 	if err != nil {
 		if errors.Is(err, ErrEmptyReader) {
 			ctx.Logger().V(5).Info("empty reader, skipping file")
 			return nil
 		}
-		return fmt.Errorf("error creating custom reader: %w", err)
+		return fmt.Errorf("unable to HandleFile, error creating file reader: %w", err)
 	}
 	defer func() {
-		// Ensure all data is read to prevent broken pipe.
-		_, copyErr := io.Copy(io.Discard, rdr)
-		if copyErr != nil {
-			err = fmt.Errorf("error discarding remaining data: %w", copyErr)
-		}
-		closeErr := rdr.Close()
-		if closeErr != nil {
+		if closeErr := rdr.Close(); closeErr != nil {
 			if err != nil {
-				err = fmt.Errorf("%v; error closing reader: %w", err, closeErr)
+				err = fmt.Errorf("%w; error closing reader: %w", err, closeErr)
 			} else {
 				err = fmt.Errorf("error closing reader: %w", closeErr)
 			}
@@ -312,7 +345,8 @@ func HandleFile(
 	defer cancel()
 
 	handler := selectHandler(mimeT, rdr.isGenericArchive)
-	archiveChan, err := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
+	var archiveChan chan []byte
+	archiveChan, err = handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
 	if err != nil {
 		return fmt.Errorf("error handling file: %w", err)
 	}
