@@ -31,6 +31,10 @@ func (s Scanner) Keywords() []string {
 	return []string{"salad_cloud_"}
 }
 
+func (s Scanner) Description() string {
+	return "Salad-API-Key detector"
+}
+
 // FromData will find and optionally verify SaladCloud API Key secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
