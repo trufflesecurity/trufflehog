@@ -32,7 +32,7 @@ func (s Scanner) Keywords() []string {
 }
 
 func (s Scanner) Description() string {
-	return "Salad-API-Key detector"
+	return "SaladCloud is a cloud service provider offering GPUs and NPUs for high-performance computing. SaladCloud API keys can be used to access and modify compute and data resources in your account."
 }
 
 // FromData will find and optionally verify SaladCloud API Key secrets in a given set of bytes.
