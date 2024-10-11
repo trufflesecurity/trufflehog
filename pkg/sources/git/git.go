@@ -1259,7 +1259,7 @@ func (s *Git) handleBinary(
 	cmd := exec.CommandContext(catFileCtx, "git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	cmd.WaitDelay = waitDelay // give the command a chance to finish before the timeout
+	cmd.WaitDelay = waitDelay // give the command a chance to finish before the timeout :)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
