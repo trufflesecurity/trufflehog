@@ -1301,26 +1301,12 @@ func (s *Git) handleBinary(
 			"HandleFile did not consume all stdout data; excess discarded",
 			"bytes_discarded", n)
 
-		err = combineErrors(err, fmt.Errorf("error discarding excess stdout data: %w", copyErr))
-
 		// Wait for the command to finish and handle any errors.
 		waitErr := cmd.Wait()
-		err = combineErrors(err, fmt.Errorf("command execution error: %w", waitErr))
+		err = errors.Join(err, copyErr, waitErr)
 	}()
 
 	return handlers.HandleFile(catFileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
-}
-
-// combineErrors combines two errors into one, preserving both error messages if they exist.
-func combineErrors(err1, err2 error) error {
-	switch {
-	case err1 != nil && err2 != nil:
-		return fmt.Errorf("%w; %w", err1, err2)
-	case err1 != nil:
-		return err1
-	default:
-		return err2
-	}
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
