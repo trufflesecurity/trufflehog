@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"sync"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -103,25 +102,18 @@ func sshDialWithContext(ctx context.Context, network, addr string, config *ssh.C
 		return nil, fmt.Errorf("error dialing %s: %w", addr, err)
 	}
 
-	var once sync.Once
-	closeConn := func() {
-		once.Do(func() {
-			conn.Close()
-		})
+	ncc, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("error creating SSH connection to %s: %w", addr, err)
 	}
 
 	// Monitor the context and close the connection if canceled.
 	// This ensures that the connection is closed when the context is canceled, preventing leaks.
 	go func() {
 		<-ctx.Done()
-		closeConn()
+		conn.Close()
 	}()
-
-	ncc, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
-	if err != nil {
-		closeConn()
-		return nil, fmt.Errorf("error creating SSH connection to %s: %w", addr, err)
-	}
 
 	client := ssh.NewClient(ncc, chans, reqs)
 	return client, nil
