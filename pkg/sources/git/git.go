@@ -1251,6 +1251,19 @@ func (s *Git) handleBinary(
 		cmdTimeout = 60 * time.Second
 		waitDelay  = 5 * time.Second
 	)
+	// NOTE: This kludge ensures the context timeout for the 'git cat-file' command
+	// matches the timeout for the HandleFile operation.
+	// By setting both timeouts to the same value, we can be more confident
+	// that both operations will run for the same duration.
+	// The command execution includes a small Wait delay before terminating the process,
+	// giving HandleFile time to respect the context
+	// and return before the process is forcibly killed.
+	// This approach helps prevent premature termination and allows for more complete processing.
+
+	// TODO: Develop a more robust mechanism to ensure consistent timeout behavior between the command execution
+	// and the HandleFile operation. This should prevent premature termination and allow for complete processing.
+	handlers.SetArchiveMaxTimeout(cmdTimeout)
+
 	// Create a timeout context for the 'git cat-file' command to ensure it does not run indefinitely.
 	// This prevents potential resource exhaustion by terminating the command if it exceeds the specified duration.
 	catFileCtx, cancel := context.WithTimeoutCause(fileCtx, cmdTimeout, errors.New("git cat-file timeout"))
