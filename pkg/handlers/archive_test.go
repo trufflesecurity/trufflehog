@@ -91,7 +91,7 @@ func TestArchiveHandler(t *testing.T) {
 			}
 			defer newReader.Close()
 
-			dataOrErrChan := handler.HandleFile(logContext.Background(), *newReader)
+			dataOrErrChan := handler.HandleFile(logContext.Background(), newReader)
 			if testCase.expectErr {
 				assert.NoError(t, err)
 				return
@@ -125,6 +125,6 @@ func TestOpenInvalidArchive(t *testing.T) {
 
 	dataOrErrChan := make(chan DataOrErr)
 
-	err = handler.openArchive(ctx, 0, *rdr, dataOrErrChan)
+	err = handler.openArchive(ctx, 0, rdr, dataOrErrChan)
 	assert.Error(t, err)
 }

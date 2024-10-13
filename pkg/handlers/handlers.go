@@ -90,7 +90,7 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
 // The caller is responsible for closing the reader when it is no longer needed.
-func newFileReader(r io.Reader) (*fileReader, error) {
+func newFileReader(r io.Reader) (fileReader, error) {
 	var fReader fileReader
 
 	// To detect the MIME type of the input data, we need a reader that supports seeking.
@@ -98,21 +98,32 @@ func newFileReader(r io.Reader) (*fileReader, error) {
 	// We use a BufferedReaderSeeker to wrap the original reader, enabling this functionality.
 	fReader.BufferedReadSeeker = iobuf.NewBufferedReadSeeker(r)
 
+	// If an error occurs during MIME type detection, it is important we close the BufferedReaderSeeker
+	// to release any resources it holds and prevent potential memory leaks.
+	var err error
+	defer func() {
+		if err != nil {
+			if closeErr := fReader.Close(); closeErr != nil {
+				err = fmt.Errorf("%w; error closing reader: %w", err, closeErr)
+			}
+		}
+	}()
+
 	mime, err := mimetype.DetectReader(fReader)
 	if err != nil {
-		return nil, fmt.Errorf("unable to detect MIME type: %w", err)
+		return fReader, fmt.Errorf("unable to detect MIME type: %w", err)
 	}
 	fReader.mime = mime
 
 	// Reset the reader to the beginning because DetectReader consumes the reader.
 	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("error resetting reader after MIME detection: %w", err)
+		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
 	// If a MIME type is known to not be an archive type, we might as well return here rather than
 	// paying the I/O penalty of an archiver.Identify() call that won't identify anything.
 	if _, ok := skipArchiverMimeTypes[mimeType(mime.String())]; ok {
-		return nil, nil
+		return fReader, nil
 	}
 
 	format, _, err := archiver.Identify("", fReader)
@@ -125,16 +136,16 @@ func newFileReader(r io.Reader) (*fileReader, error) {
 		// Not an archive handled by archiver.
 		// Continue with the default reader.
 	default:
-		return nil, fmt.Errorf("error identifying archive: %w", err)
+		return fReader, fmt.Errorf("error identifying archive: %w", err)
 	}
 
 	// Reset the reader to the beginning again to allow the handler to read from the start.
 	// This is necessary because Identify consumes the reader.
 	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("error resetting reader after archive identification: %w", err)
+		return fReader, fmt.Errorf("error resetting reader after archive identification: %w", err)
 	}
 
-	return &fReader, nil
+	return fReader, nil
 }
 
 // DataOrErr represents a result that can either contain data or an error.
@@ -341,7 +352,7 @@ func HandleFile(
 	defer cancel()
 
 	handler := selectHandler(mimeT, rdr.isGenericArchive)
-	dataOrErrChan := handler.HandleFile(processingCtx, *rdr) // Delegate to the specific handler to process the file.
+	dataOrErrChan := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
 
 	return handleChunksWithError(processingCtx, dataOrErrChan, chunkSkel, reporter)
 }

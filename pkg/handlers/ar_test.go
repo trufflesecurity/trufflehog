@@ -23,7 +23,7 @@ func TestHandleARFile(t *testing.T) {
 	defer rdr.Close()
 
 	handler := newARHandler()
-	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), *rdr)
+	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 
 	wantChunkCount := 102

@@ -140,7 +140,7 @@ func (h *archiveHandler) openArchive(
 		}
 		defer rdr.Close()
 
-		return h.openArchive(ctx, depth+1, *rdr, dataOrErrChan)
+		return h.openArchive(ctx, depth+1, rdr, dataOrErrChan)
 	case archiver.Extractor:
 		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, nil, h.extractorHandler(dataOrErrChan))
 		if err != nil {
@@ -228,6 +228,6 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		h.metrics.observeFileSize(fileSize)
 
 		lCtx.Logger().V(4).Info("Processed file successfully", "filename", file.Name(), "size", file.Size())
-		return h.openArchive(lCtx, depth, *rdr, dataOrErrChan)
+		return h.openArchive(lCtx, depth, rdr, dataOrErrChan)
 	}
 }
