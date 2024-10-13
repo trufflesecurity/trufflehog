@@ -99,7 +99,7 @@ func newFileReader(r io.Reader) (fileReader, error) {
 	fReader.BufferedReadSeeker = iobuf.NewBufferedReadSeeker(r)
 
 	// If an error occurs during MIME type detection, it is important we close the BufferedReaderSeeker
-	// to release any resources it holds and prevent potential memory leaks.
+	// to release any resources it holds (checked out buffers or temp file).
 	var err error
 	defer func() {
 		if err != nil {
