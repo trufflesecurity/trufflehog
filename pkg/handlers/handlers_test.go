@@ -686,16 +686,6 @@ func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsup
 	return tempDir
 }
 
-// getGitCommitHash retrieves the current commit hash of the Git repository.
-func getGitCommitHash(t *testing.T, gitDir string) string {
-	t.Helper()
-	cmd := exec.Command("git", "-C", gitDir, "rev-parse", "HEAD")
-	hashBytes, err := cmd.Output()
-	assert.NoError(t, err, "Failed to get commit hash")
-	commitHash := strings.TrimSpace(string(hashBytes))
-	return commitHash
-}
-
 type mockReporter struct{ reportedChunks int }
 
 func (m *mockReporter) ChunkOk(logContext.Context, sources.Chunk) error {
