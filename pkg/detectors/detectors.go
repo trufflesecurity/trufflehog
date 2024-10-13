@@ -91,7 +91,8 @@ type Result struct {
 	DetectorName string
 	// DecoderType is the type of Decoder.
 	DecoderType detectorspb.DecoderType
-	Verified    bool
+	// Verified indicates whether the secret was verified.
+	Verified bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -168,6 +169,8 @@ type ResultWithMetadata struct {
 	Result
 	// Data from the sources.Chunk which this result was emitted for
 	Data []byte
+	// DetectorDescription is the description of the Detector.
+	DetectorDescription string
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
