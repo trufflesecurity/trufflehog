@@ -20,7 +20,16 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`sl\.u\.[0-9a-zA-Z_-]{256,}`)
+	// Dropbox API keys typically start with 'sl.u.' followed by a long string of alphanumeric characters.
+	// Based on testing, observed key lengths were around 1309 characters.
+	// However, to account for potential variations in key length, the regex pattern is set to match
+	// keys that are at least 256 characters long after the 'sl.u.' prefix.
+	//
+	// As per Dropbox API documentation:
+	// Access tokens provided by Dropbox should be treated as opaque.
+	// Applications must support variable token size with tokens capable of exceeding 1KB.
+	// For more information on Dropbox API authentication, see: https://www.dropbox.com/developers/documentation/http/documentation
+	keyPat = regexp.MustCompile(`sl\.u\.[0-9a-zA-Z_-]{256,}`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
