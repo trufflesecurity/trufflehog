@@ -3,7 +3,6 @@ package agora
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -13,7 +12,15 @@ import (
 )
 
 var (
-	validPattern   = "asdf0987mnbv1234qsxojb6ygb2wsx0o/beqr7215fr4g6bfjkmnvxrtygb2wsxap"
+	validKeyPattern    = "asdf0987mnbv1234qsxojb6ygb2wsx0o"
+	validSecretPattern = "beqr7215fr4g6bfjkmnvxrtygb2wsxap"
+	complexPattern     = `agora credentials
+							these are some example credentails for login.
+							use these to login.
+							key: asdf0987mnbv1234qsxojb6ygb2wsx0o
+							secret: beqr7215fr4g6bfjkmnvxrtygb2wsxap
+							loginUrl: https://www.agora.com/example_login
+						`
 	invalidPattern = "asdf0987mNbv1234qsxojb6ygb2w$x0o/beqr7215fr4g6bfjkmnVxrtygb2wsxap"
 )
 
@@ -28,23 +35,28 @@ func TestAgora_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("agora = '%s'", validPattern),
-			want:  []string{"asdf0987mnbv1234qsxojb6ygb2wsx0oasdf0987mnbv1234qsxojb6ygb2wsx0o"},
+			input: fmt.Sprintf("agora key='%s' - secret='%s'", validKeyPattern, validSecretPattern),
+			want:  []string{validKeyPattern + validSecretPattern},
+		},
+		{
+			name:  "valid complex pattern",
+			input: fmt.Sprintf("agora data='%s'", complexPattern),
+			want:  []string{validKeyPattern + validSecretPattern},
 		},
 		{
 			name:  "valid pattern - out of prefix range",
-			input: fmt.Sprintf("agora keyword is not close to the real key and secret = '%s'", validPattern),
+			input: fmt.Sprintf("agora keyword is not close to the real key or secret = '%s|%s'", validKeyPattern, validSecretPattern),
 			want:  nil,
 		},
 		{
 			name:  "valid pattern - only key",
-			input: fmt.Sprintf("agora %s", strings.Split(validPattern, "/")[0]),
-			want:  []string{"asdf0987mnbv1234qsxojb6ygb2wsx0oasdf0987mnbv1234qsxojb6ygb2wsx0o"},
+			input: fmt.Sprintf("agora key%s", validKeyPattern),
+			want:  nil,
 		},
 		{
 			name:  "valid pattern - only secret",
-			input: fmt.Sprintf("agora %s", strings.Split(validPattern, "/")[1]),
-			want:  []string{"beqr7215fr4g6bfjkmnvxrtygb2wsxapbeqr7215fr4g6bfjkmnvxrtygb2wsxap"},
+			input: fmt.Sprintf("agora secret%s", validSecretPattern),
+			want:  nil,
 		},
 		{
 			name:  "invalid pattern",

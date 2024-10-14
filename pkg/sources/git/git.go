@@ -19,7 +19,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v66/github"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
@@ -1241,44 +1241,21 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 	}
 
 	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
-	stdout, catCmd, err := s.executeCatFileCmd(cmd)
-	if err != nil {
-		return err
-	}
-	// Wait must be called after closing the pipe (defer is a stack, so first defer is executed last)
-	defer func() {
-		_ = catCmd.Wait()
-	}()
-	defer stdout.Close()
-
-	err = handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
-
-	// Always call Wait() to ensure the process is properly cleaned up
-	waitErr := cmd.Wait()
-
-	// If there was an error in HandleFile, return that error
-	if err != nil {
-		return err
-	}
-
-	// If Wait() resulted in an error, return that error
-	return waitErr
-}
-
-func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, *exec.Cmd, error) {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, nil, fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
+		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, nil, fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
+		return fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	return stdout, cmd, nil
+	defer func() { _ = cmd.Wait() }()
+
+	return handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
