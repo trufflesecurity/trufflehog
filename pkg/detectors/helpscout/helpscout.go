@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Helpscout
 }
+
+func (s Scanner) Description() string {
+	return "Helpscout is a customer service software that provides a help desk for managing customer communications. Helpscout API keys can be used to access and manage customer interactions and data."
+}

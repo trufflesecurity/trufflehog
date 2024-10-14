@@ -41,7 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		token := match[1]
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PivotalTracker,
 			Raw:          []byte(token),
 		}
@@ -60,12 +60,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res.Body.Close() // The request body is unused.
 
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s.Verified = true
+					result.Verified = true
 				}
 			}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return results, nil
@@ -73,4 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PivotalTracker
+}
+
+func (s Scanner) Description() string {
+	return "PivotalTracker is a project management tool. PivotalTracker tokens can be used to access and manage projects and data within PivotalTracker."
 }

@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Codequiry
 }
+
+func (s Scanner) Description() string {
+	return "Codequiry is a plagiarism detection service. Codequiry API keys can be used to access and utilize their plagiarism detection features."
+}

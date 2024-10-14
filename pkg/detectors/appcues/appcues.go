@@ -93,3 +93,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Appcues
 }
+
+func (s Scanner) Description() string {
+	return "Appcues is a user engagement platform that helps create personalized user experiences. The detected credentials can be used to access and manage user engagement flows and data."
+}

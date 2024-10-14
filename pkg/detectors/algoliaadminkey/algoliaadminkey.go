@@ -81,3 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AlgoliaAdminKey
 }
+
+func (s Scanner) Description() string {
+	return "Algolia is a search-as-a-service platform. Algolia Admin Keys can be used to manage indices and API keys, and perform administrative tasks."
+}

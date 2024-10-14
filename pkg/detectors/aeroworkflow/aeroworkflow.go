@@ -113,3 +113,7 @@ func verifyAeroworkflow(ctx context.Context, client *http.Client, resMatch, resI
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Aeroworkflow
 }
+
+func (s Scanner) Description() string {
+	return "Aeroworkflow is a service for managing workflows. Aeroworkflow API keys and Account IDs can be used to access and manage workflows."
+}

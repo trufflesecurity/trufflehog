@@ -83,3 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FinancialModelingPrep
 }
+
+func (s Scanner) Description() string {
+	return "FinancialModelingPrep provides financial data APIs. The API keys can be used to access financial data and related services."
+}

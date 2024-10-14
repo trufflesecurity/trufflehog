@@ -125,3 +125,7 @@ type organization struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SnykKey
 }
+
+func (s Scanner) Description() string {
+	return "Snyk is a developer security platform that helps developers find and fix vulnerabilities in their code. Snyk API keys can be used to access and manage Snyk services."
+}

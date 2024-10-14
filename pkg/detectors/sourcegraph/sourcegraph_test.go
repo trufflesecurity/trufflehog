@@ -227,6 +227,7 @@ func TestSourcegraph_FromChunk(t *testing.T) {
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
+				got[i].AnalysisInfo = nil
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "VerificationError", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {

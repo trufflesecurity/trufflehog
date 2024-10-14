@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_APITemplate
 }
+
+func (s Scanner) Description() string {
+	return "APITemplate is a service used to generate documents and images from templates. APITemplate API keys can be used to access and generate these documents and images."
+}

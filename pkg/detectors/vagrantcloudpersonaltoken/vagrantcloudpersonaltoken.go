@@ -84,3 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_VagrantCloudPersonalToken
 }
+
+func (s Scanner) Description() string {
+	return "Vagrant Cloud is a service for managing and distributing development environments. Personal tokens can be used to authenticate and interact with the Vagrant Cloud API."
+}

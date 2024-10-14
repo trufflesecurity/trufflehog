@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Enigma
 }
+
+func (s Scanner) Description() string {
+	return "Enigma is a data intelligence company that provides comprehensive data about businesses. Enigma API keys can be used to access and interact with this data."
+}

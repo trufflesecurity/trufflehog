@@ -77,3 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ElasticEmail
 }
+
+func (s Scanner) Description() string {
+	return "ElasticEmail is an email marketing service. ElasticEmail API keys can be used to send emails, manage contacts, and access other features of the service."
+}

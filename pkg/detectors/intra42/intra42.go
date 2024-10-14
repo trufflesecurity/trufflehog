@@ -116,3 +116,7 @@ func verifyIntra42(ctx context.Context, client *http.Client, resMatch string, re
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Intra42
 }
+
+func (s Scanner) Description() string {
+	return "Intra42 is an API service used to interact with the 42 school's internal systems. Intra42 API keys can be used to access and modify data within these systems."
+}

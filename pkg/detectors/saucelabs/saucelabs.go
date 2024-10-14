@@ -68,7 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
-				// req.SetBasicAuth(idMatch, keyMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
@@ -87,4 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SauceLabs
+}
+
+func (s Scanner) Description() string {
+	return "A service for cross browser testing, API keys can create and access tests from potentially sensitive internal websites"
 }

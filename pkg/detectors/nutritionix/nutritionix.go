@@ -85,3 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Nutritionix
 }
+
+func (s Scanner) Description() string {
+	return "Nutritionix provides a food tracking API. The API keys can be used to access and log nutritional data."
+}

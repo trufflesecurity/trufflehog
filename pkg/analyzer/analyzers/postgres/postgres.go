@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go postgres
+
 package postgres
 
 import (
@@ -14,7 +16,167 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Postgres }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	uri, ok := credInfo["connection_string"]
+	if !ok {
+		return nil, errors.New("connection string not found in credInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, uri)
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Postgres,
+		Metadata:     nil,
+		Bindings:     []analyzers.Binding{},
+	}
+
+	// set user related bindings in result
+	userResource, userBindings := bakeUserBindings(info)
+	result.Bindings = append(result.Bindings, userBindings...)
+
+	// add user's database priviliges to bindings
+	dbNameToResourceMap, dbBindings := bakeDatabaseBindings(userResource, info)
+	result.Bindings = append(result.Bindings, dbBindings...)
+
+	// add user's table priviliges to bindings
+	tableBindings := bakeTableBindings(dbNameToResourceMap, info)
+	result.Bindings = append(result.Bindings, tableBindings...)
+
+	return &result
+}
+
+func bakeUserBindings(info *SecretInfo) (analyzers.Resource, []analyzers.Binding) {
+	userResource := analyzers.Resource{
+		Name:               info.User,
+		FullyQualifiedName: info.Host + "/" + info.User,
+		Type:               "user",
+		Metadata: map[string]any{
+			"role": info.Role,
+		},
+	}
+
+	var bindings []analyzers.Binding
+
+	for rolePriv, exists := range info.RolePrivs {
+		if exists {
+			bindings = append(bindings, analyzers.Binding{
+				Resource: userResource,
+				Permission: analyzers.Permission{
+					Value: rolePriv,
+				},
+			})
+		}
+	}
+
+	return userResource, bindings
+}
+
+func bakeDatabaseBindings(userResource analyzers.Resource, info *SecretInfo) (map[string]*analyzers.Resource, []analyzers.Binding) {
+	dbNameToResourceMap := map[string]*analyzers.Resource{}
+	dbBindings := []analyzers.Binding{}
+
+	for _, db := range info.DBs {
+		dbResource := analyzers.Resource{
+			Name:               db.DatabaseName,
+			FullyQualifiedName: info.Host + "/" + db.DatabaseName,
+			Type:               "database",
+			Metadata: map[string]any{
+				"owner": db.Owner,
+			},
+			Parent: &userResource,
+		}
+
+		// populate map to reference later for tables
+		dbNameToResourceMap[db.DatabaseName] = &dbResource
+
+		dbPriviliges := map[string]bool{
+			"connect": db.Connect,
+			"create":  db.Create,
+			"temp":    db.CreateTemp,
+		}
+
+		for priv, exists := range dbPriviliges {
+			if exists {
+				dbBindings = append(dbBindings, analyzers.Binding{
+					Resource: dbResource,
+					Permission: analyzers.Permission{
+						Value: priv,
+					},
+				})
+			}
+		}
+	}
+
+	return dbNameToResourceMap, dbBindings
+}
+
+func bakeTableBindings(dbNameToResourceMap map[string]*analyzers.Resource, info *SecretInfo) []analyzers.Binding {
+	var tableBindings []analyzers.Binding
+
+	for dbName, tableMap := range info.TablePrivs {
+		dbResource, ok := dbNameToResourceMap[dbName]
+		if !ok {
+			continue
+		}
+
+		for tableName, tableData := range tableMap {
+			tableResource := analyzers.Resource{
+				Name:               tableName,
+				FullyQualifiedName: info.Host + "/" + dbResource.Name + "/" + tableName,
+				Type:               "table",
+				Metadata: map[string]any{
+					"size": tableData.Size,
+					"rows": tableData.Rows,
+				},
+				Parent: dbResource,
+			}
+
+			tablePrivsMap := map[string]bool{
+				"select":     tableData.Privs.Select,
+				"insert":     tableData.Privs.Insert,
+				"update":     tableData.Privs.Update,
+				"delete":     tableData.Privs.Delete,
+				"truncate":   tableData.Privs.Truncate,
+				"references": tableData.Privs.References,
+				"trigger":    tableData.Privs.Trigger,
+			}
+
+			for priv, exists := range tablePrivsMap {
+				if exists {
+					tableBindings = append(tableBindings, analyzers.Binding{
+						Resource: tableResource,
+						Permission: analyzers.Permission{
+							Value: priv,
+						},
+					})
+				}
+			}
+		}
+	}
+
+	return tableBindings
+}
 
 type DBPrivs struct {
 	Connect    bool
@@ -62,6 +224,7 @@ const (
 var connStrPartPattern = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
 
 type SecretInfo struct {
+	Host       string
 	User       string
 	Role       string
 	RolePrivs  map[string]bool
@@ -132,6 +295,7 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, 
 	}
 
 	return &SecretInfo{
+		Host:       params[pg_host],
 		User:       currentUser,
 		Role:       role,
 		RolePrivs:  privs,

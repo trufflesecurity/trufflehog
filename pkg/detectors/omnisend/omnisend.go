@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Omnisend
 }
+
+func (s Scanner) Description() string {
+	return "Omnisend is a marketing automation platform focused on e-commerce. Omnisend API keys can be used to access and manage marketing campaigns, contacts, and other resources within the Omnisend platform."
+}

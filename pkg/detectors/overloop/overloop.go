@@ -83,3 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Overloop
 }
+
+func (s Scanner) Description() string {
+	return "Overloop is a service that provides API keys for accessing its platform. These keys can be used to interact with the Overloop API to manage and retrieve user data."
+}

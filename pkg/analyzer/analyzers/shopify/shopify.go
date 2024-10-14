@@ -1,8 +1,11 @@
+//go:generate generate_permissions permissions.yaml permissions.go shopify
+
 package shopify
 
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,7 +15,99 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+var (
+	// order the categories
+	categoryOrder = []string{"Analytics", "Applications", "Assigned fulfillment orders", "Browsing behavior", "Custom pixels", "Customers", "Discounts", "Discovery", "Draft orders", "Files", "Fulfillment services", "Gift cards", "Inventory", "Legal policies", "Locations", "Marketing events", "Merchant-managed fulfillment orders", "Metaobject definitions", "Metaobject entries", "Online Store navigation", "Online Store pages", "Order editing", "Orders", "Packing slip management", "Payment customizations", "Payment terms", "Pixels", "Price rules", "Product feeds", "Product listings", "Products", "Publications", "Purchase options", "Reports", "Resource feedback", "Returns", "Sales channels", "Script tags", "Shipping", "Shop locales", "Shopify Markets", "Shopify Payments accounts", "Shopify Payments bank accounts", "Shopify Payments disputes", "Shopify Payments payouts", "Store content", "Store credit account transactions", "Store credit accounts", "Themes", "Third-party fulfillment orders", "Translations", "all_cart_transforms", "all_checkout_completion_target_customizations", "cart_transforms", "cash_tracking", "companies", "custom_fulfillment_services", "customer_data_erasure", "customer_merge", "delivery_customizations", "delivery_option_generators", "discounts_allocator_functions", "fulfillment_constraint_rules", "gates", "order_submission_rules", "privacy_settings", "shopify_payments_provider_accounts_sensitive", "validations"}
+)
+
+func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Shopify }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+
+	storeUrl, ok := credInfo["store_url"]
+	if !ok {
+		return nil, errors.New("store_url not found in credentialInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key, storeUrl)
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Shopify,
+		Metadata: map[string]any{
+			"status_code": info.StatusCode,
+		},
+	}
+
+	resource := &analyzers.Resource{
+		Name:               info.ShopInfo.Shop.Name,
+		FullyQualifiedName: info.ShopInfo.Shop.Domain + "/" + info.ShopInfo.Shop.Email,
+		Type:               "shop",
+		Metadata: map[string]any{
+			"created_at": info.ShopInfo.Shop.CreatedAt,
+		},
+		Parent: nil,
+	}
+	result.Bindings = make([]analyzers.Binding, 0)
+
+	for _, category := range categoryOrder {
+		if val, ok := info.Scopes[category]; ok {
+			cateogryResource := &analyzers.Resource{
+				Name:               category,
+				FullyQualifiedName: resource.FullyQualifiedName + "/" + category, // shop.domain/shop.email/category
+				Type:               "category",
+				Parent:             resource,
+			}
+
+			if sliceContains(val.Scopes, "Read") && sliceContains(val.Scopes, "Write") {
+				result.Bindings = append(result.Bindings, analyzers.Binding{
+					Resource: *cateogryResource,
+					Permission: analyzers.Permission{
+						Value: PermissionStrings[FullAccess],
+					},
+				})
+				continue
+			}
+
+			for _, scope := range val.Scopes {
+				lowerScope := strings.ToLower(scope)
+				if _, ok := StringToPermission[lowerScope]; !ok { // skip unknown scopes/permission
+					continue
+				}
+				result.Bindings = append(result.Bindings, analyzers.Binding{
+					Resource: *cateogryResource,
+					Permission: analyzers.Permission{
+						Value: lowerScope,
+					},
+				})
+			}
+		}
+	}
+
+	return &result
+}
 
 //go:embed scopes.json
 var scopesConfig []byte
@@ -90,6 +185,7 @@ func determineScopes(data ScopeDataJSON, input string) map[string]OutputScopes {
 
 type ShopInfoJSON struct {
 	Shop struct {
+		Domain    string `json:"domain"`
 		Name      string `json:"name"`
 		Email     string `json:"email"`
 		CreatedAt string `json:"created_at"`
@@ -223,9 +319,6 @@ func printAccessScopes(accessScopes map[string]OutputScopes) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Scope", "Description", "Access"})
-
-	// order the categories
-	categoryOrder := []string{"Analytics", "Applications", "Assigned fulfillment orders", "Browsing behavior", "Custom pixels", "Customers", "Discounts", "Discovery", "Draft orders", "Files", "Fulfillment services", "Gift cards", "Inventory", "Legal policies", "Locations", "Marketing events", "Merchant-managed fulfillment orders", "Metaobject definitions", "Metaobject entries", "Online Store navigation", "Online Store pages", "Order editing", "Orders", "Packing slip management", "Payment customizations", "Payment terms", "Pixels", "Price rules", "Product feeds", "Product listings", "Products", "Publications", "Purchase options", "Reports", "Resource feedback", "Returns", "Sales channels", "Script tags", "Shipping", "Shop locales", "Shopify Markets", "Shopify Payments accounts", "Shopify Payments bank accounts", "Shopify Payments disputes", "Shopify Payments payouts", "Store content", "Store credit account transactions", "Store credit accounts", "Themes", "Third-party fulfillment orders", "Translations", "all_cart_transforms", "all_checkout_completion_target_customizations", "cart_transforms", "cash_tracking", "companies", "custom_fulfillment_services", "customer_data_erasure", "customer_merge", "delivery_customizations", "delivery_option_generators", "discounts_allocator_functions", "fulfillment_constraint_rules", "gates", "order_submission_rules", "privacy_settings", "shopify_payments_provider_accounts_sensitive", "validations"}
 
 	for _, category := range categoryOrder {
 		if val, ok := accessScopes[category]; ok {

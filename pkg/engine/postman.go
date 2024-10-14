@@ -26,17 +26,17 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 		CollectionPaths:     c.CollectionPaths,
 		EnvironmentPaths:    c.EnvironmentPaths,
 	}
+
+	// Check if postman data is going to be accessed via an api call using a token, or
+	// if it has been already exported and exists locally
 	if len(c.Token) > 0 {
 		connection.Credential = &sourcespb.Postman_Token{
 			Token: c.Token,
 		}
-	} else {
+	} else if len(c.WorkspacePaths) > 0 || len(c.CollectionPaths) > 0 || len(c.EnvironmentPaths) > 0 {
 		connection.Credential = &sourcespb.Postman_Unauthenticated{}
-	}
-
-	if len(c.Workspaces) == 0 && len(c.Collections) == 0 && len(c.Environments) == 0 && len(c.Token) == 0 && len(c.WorkspacePaths) == 0 && len(c.CollectionPaths) == 0 && len(c.EnvironmentPaths) == 0 {
-		ctx.Logger().Error(errors.New("no postman workspaces, collections, environments or API token provided"), "failed to scan postman")
-		return nil
+	} else {
+		return errors.New("no path to locally exported data or API token provided")
 	}
 
 	// Turn AhoCorasick keywordsToDetectors into a map of keywords

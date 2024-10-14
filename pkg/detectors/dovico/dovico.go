@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Dovico
 }
+
+func (s Scanner) Description() string {
+	return "Dovico is a time tracking and project management service. Dovico keys can be used to access and manage time tracking and project data."
+}

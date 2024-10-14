@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ScrutinizerCi
 }
+
+func (s Scanner) Description() string {
+	return "Scrutinizer CI is a continuous integration service. The access token allows access to user repositories data."
+}

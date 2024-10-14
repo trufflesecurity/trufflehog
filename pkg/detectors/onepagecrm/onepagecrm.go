@@ -80,3 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_OnepageCRM
 }
+
+func (s Scanner) Description() string {
+	return "OnepageCRM is a simple CRM system designed for small businesses. The API keys can be used to access and manage contacts, deals, and other CRM data."
+}

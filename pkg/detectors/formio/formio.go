@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FormIO
 }
+
+func (s Scanner) Description() string {
+	return "FormIO is a platform for building form-based applications. FormIO JWT tokens can be used to authenticate and interact with FormIO services."
+}

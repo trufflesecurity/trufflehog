@@ -31,7 +31,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"aha"}
+	return []string{"aha.io"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -107,4 +107,8 @@ func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch s
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Aha
+}
+
+func (s Scanner) Description() string {
+	return "Aha is a product management software suite. Aha API keys can be used to access and modify product data and workflows."
 }

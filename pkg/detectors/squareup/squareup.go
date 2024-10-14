@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Squareup
 }
+
+func (s Scanner) Description() string {
+	return "Squareup is a financial services and mobile payment company. The detected key can be used to interact with Squareup's APIs for processing payments and accessing customer data."
+}

@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TravisCI
 }
+
+func (s Scanner) Description() string {
+	return "Travis CI is a continuous integration service used to build and test software projects hosted on GitHub and Bitbucket. Travis CI tokens can be used to interact with the Travis CI API."
+}

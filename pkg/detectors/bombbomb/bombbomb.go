@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BombBomb
 }
+
+func (s Scanner) Description() string {
+	return "BombBomb is a video messaging platform that allows users to create and send video emails. BombBomb API keys can be used to access and manage video email campaigns and contacts."
+}

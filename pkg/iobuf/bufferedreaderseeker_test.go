@@ -2,6 +2,7 @@ package iobuf
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -349,4 +350,131 @@ func TestBufferedReaderSeekerReadAt(t *testing.T) {
 			assert.Equal(t, tt.expectedOut, out[:n])
 		})
 	}
+}
+
+// TestBufferedReadSeekerSize tests the Size method of BufferedReadSeeker.
+func TestBufferedReadSeekerSize(t *testing.T) {
+	tests := []struct {
+		name           string
+		reader         io.Reader
+		setup          func(*BufferedReadSeeker)
+		expectedSize   int64
+		expectError    bool
+		verifyPosition func(*BufferedReadSeeker, int64)
+	}{
+		{
+			name:         "size of seekable reader",
+			reader:       strings.NewReader("Hello, World!"),
+			expectedSize: 13,
+		},
+		{
+			name:         "size of non-seekable reader",
+			reader:       bytes.NewBufferString("Hello, World!"),
+			expectedSize: 13,
+		},
+		{
+			name:         "size of empty seekable reader",
+			reader:       strings.NewReader(""),
+			expectedSize: 0,
+		},
+		{
+			name:         "size of empty non-seekable reader",
+			reader:       bytes.NewBufferString(""),
+			expectedSize: 0,
+		},
+		{
+			name:   "size of non-seekable reader after partial read",
+			reader: bytes.NewBufferString("Partial read data"),
+			setup: func(brs *BufferedReadSeeker) {
+				// Read first 7 bytes ("Partial").
+				buf := make([]byte, 7)
+				_, _ = brs.Read(buf)
+			},
+			expectedSize: 17, // "Partial read data" is 16 bytes
+			expectError:  false,
+			verifyPosition: func(brs *BufferedReadSeeker, expectedSize int64) {
+				// After Size is called, the read position should remain at 7
+				currentPos, err := brs.Seek(0, io.SeekCurrent)
+				assert.NoError(t, err)
+				assert.Equal(t, int64(7), currentPos)
+			},
+		},
+		{
+			name:         "repeated Size calls",
+			reader:       strings.NewReader("Repeated Size Calls Test"),
+			expectedSize: 24,
+			expectError:  false,
+			setup: func(brs *BufferedReadSeeker) {
+				// Call Size multiple times.
+				size1, err1 := brs.Size()
+				assert.NoError(t, err1)
+				assert.Equal(t, int64(24), size1)
+
+				size2, err2 := brs.Size()
+				assert.NoError(t, err2)
+				assert.Equal(t, int64(24), size2)
+			},
+		},
+		{
+			name: "size with error during reading",
+			reader: &errorReader{
+				data:       "Data before error",
+				errorAfter: 5, // Return error after reading 5 bytes
+			},
+			expectedSize: 0,
+			expectError:  true,
+		},
+		{
+			name:         "size with limited reader simulating EOF",
+			reader:       io.LimitReader(strings.NewReader("Limited data"), 7),
+			expectedSize: 7,
+			expectError:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			brs := NewBufferedReaderSeeker(tt.reader)
+
+			if tt.setup != nil {
+				tt.setup(brs)
+			}
+
+			size, err := brs.Size()
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedSize, size)
+			}
+
+			if tt.verifyPosition != nil {
+				tt.verifyPosition(brs, tt.expectedSize)
+			}
+		})
+	}
+}
+
+// errorReader is an io.Reader that returns an error after reading a specified number of bytes.
+// It's used to simulate non-EOF errors during read operations.
+type errorReader struct {
+	data       string
+	errorAfter int // Number of bytes to read before returning an error
+	readBytes  int
+}
+
+func (er *errorReader) Read(p []byte) (int, error) {
+	if er.readBytes >= er.errorAfter {
+		return 0, errors.New("simulated read error")
+	}
+	remaining := er.errorAfter - er.readBytes
+	toRead := len(p)
+	if toRead > remaining {
+		toRead = remaining
+	}
+	copy(p, er.data[er.readBytes:er.readBytes+toRead])
+	er.readBytes += toRead
+	return toRead, nil
 }

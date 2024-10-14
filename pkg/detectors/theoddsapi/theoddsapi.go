@@ -69,3 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TheOddsApi
 }
+
+func (s Scanner) Description() string {
+	return "TheOddsApi provides sports data and odds. TheOddsApi keys can be used to access this data."
+}

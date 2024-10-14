@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Ubidots
 }
+
+func (s Scanner) Description() string {
+	return "Ubidots is an IoT platform that provides tools to manage and analyze IoT devices. Ubidots tokens can be used to access and manipulate data from IoT devices."
+}

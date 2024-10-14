@@ -34,7 +34,6 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify ShodanKey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-	// log.Println(dataStr)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -101,4 +100,8 @@ func verifyToken(ctx context.Context, client *http.Client, token string) bool {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ShodanKey
+}
+
+func (s Scanner) Description() string {
+	return "Shodan is a search engine for Internet-connected devices. Shodan API keys can be used to query the Shodan database for information on these devices."
 }

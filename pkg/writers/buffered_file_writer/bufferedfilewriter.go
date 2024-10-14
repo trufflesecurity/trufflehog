@@ -118,17 +118,6 @@ func New(opts ...Option) *BufferedFileWriter {
 	return w
 }
 
-// NewFromReader creates a new instance of BufferedFileWriter and writes the content from the provided reader to the writer.
-func NewFromReader(r io.Reader, opts ...Option) (*BufferedFileWriter, error) {
-	opts = append(opts, WithBufferSize(Large))
-	writer := New(opts...)
-	if _, err := io.Copy(writer, r); err != nil && !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("error writing to buffered file writer: %w", err)
-	}
-
-	return writer, nil
-}
-
 // Len returns the number of bytes written to the buffer or file.
 func (w *BufferedFileWriter) Len() int { return int(w.size) }
 
@@ -291,14 +280,7 @@ func (w *BufferedFileWriter) CloseForWriting() error {
 // If the content is stored in memory, it returns a custom reader that handles returning the buffer to the pool.
 // The caller should call Close() on the returned io.Reader when done to ensure resources are properly released.
 // This method can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) { return w.ReadSeekCloser() }
-
-// ReadSeekCloser returns an io.ReadSeekCloser to read the written content.
-// If the content is stored in a file, it opens the file and returns a file reader.
-// If the content is stored in memory, it returns a custom reader that allows seeking and handles returning
-// the buffer to the pool.
-// This method can only be used when the BufferedFileWriter is in read-only mode.
-func (w *BufferedFileWriter) ReadSeekCloser() (io.ReadSeekCloser, error) {
+func (w *BufferedFileWriter) ReadCloser() (io.ReadCloser, error) {
 	if w.state != readOnly {
 		return nil, fmt.Errorf("BufferedFileWriter must be in read-only mode to read")
 	}

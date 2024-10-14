@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go stripe
+
 package stripe
 
 import (
@@ -69,6 +71,9 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			result.UnboundedResources = append(result.UnboundedResources, *parentResource)
 		} else {
 			for _, permission := range permissionCategory.Permissions {
+				if _, ok := StringToPermission[*permission.Value]; !ok { // skip unknown scopes/permission
+					continue
+				}
 				result.Bindings = append(result.Bindings, analyzers.Binding{
 					Resource: *parentResource,
 					Permission: analyzers.Permission{
@@ -99,14 +104,14 @@ const (
 //go:embed restricted.yaml
 var restrictedConfig []byte
 
-type Permission struct {
+type PermissionStruct struct {
 	Name  string
 	Value *string
 }
 
 type PermissionsCategory struct {
 	Name        string
-	Permissions []Permission
+	Permissions []PermissionStruct
 }
 
 type HttpStatusTest struct {
@@ -318,7 +323,7 @@ func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCate
 	output := make([]PermissionsCategory, 0)
 
 	for category, scopes := range config.Categories {
-		permissions := make([]Permission, 0)
+		permissions := make([]PermissionStruct, 0)
 		for name, scope := range scopes {
 			value := ""
 			testCount := 0
@@ -340,7 +345,7 @@ func getRestrictedPermissions(cfg *config.Config, key string) ([]PermissionsCate
 				}
 			}
 			if testCount > 0 {
-				permissions = append(permissions, Permission{Name: name, Value: &value})
+				permissions = append(permissions, PermissionStruct{Name: name, Value: &value})
 			}
 		}
 		output = append(output, PermissionsCategory{Name: category, Permissions: permissions})

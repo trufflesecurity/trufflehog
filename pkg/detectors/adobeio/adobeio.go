@@ -83,3 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AdobeIO
 }
+
+func (s Scanner) Description() string {
+	return "AdobeIO provides APIs for integrating with Adobe services. These credentials can be used to access Adobe services and data."
+}

@@ -88,3 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_EightxEight
 }
+
+func (s Scanner) Description() string {
+	return "8x8 is a provider of cloud-based communication services including voice, video, chat, and contact center solutions."
+}

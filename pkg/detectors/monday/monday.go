@@ -73,3 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Monday
 }
+
+func (s Scanner) Description() string {
+	return "Monday.com is a work operating system that powers teams to run projects and workflows with confidence. Monday API keys can be used to access and modify data and workflows on the platform."
+}

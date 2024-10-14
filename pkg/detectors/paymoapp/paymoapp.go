@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Paymoapp
 }
+
+func (s Scanner) Description() string {
+	return "Paymoapp is a project management and collaboration tool. Paymoapp API keys can be used to access and modify project data and user information."
+}

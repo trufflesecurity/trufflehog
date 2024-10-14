@@ -2,9 +2,10 @@ package zipcodebase
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -70,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Zipcodebase
+}
+
+func (s Scanner) Description() string {
+	return "Zipcodebase is a service that provides access to a database of postal codes. The API keys can be used to query this database for information related to postal codes."
 }

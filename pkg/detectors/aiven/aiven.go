@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Aiven
 }
+
+func (s Scanner) Description() string {
+	return "Aiven is a managed cloud service that provides various open-source data infrastructure services. Aiven API keys can be used to access and manage these services."
+}

@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -296,15 +296,15 @@ func (s *Source) setupCache(ctx context.Context) *persistableCache {
 	var c cache.Cache[string]
 	if s.Progress.EncodedResumeInfo != "" {
 		keys := strings.Split(s.Progress.EncodedResumeInfo, ",")
-		entries := make([]memory.CacheEntry[string], len(keys))
+		entries := make([]simple.CacheEntry[string], len(keys))
 		for i, val := range keys {
-			entries[i] = memory.CacheEntry[string]{Key: val, Value: val}
+			entries[i] = simple.CacheEntry[string]{Key: val, Value: val}
 		}
 
-		c = memory.NewWithData[string](entries)
+		c = simple.NewCacheWithData[string](entries)
 		ctx.Logger().V(3).Info("Loaded cache", "num_entries", len(entries))
 	} else {
-		c = memory.New[string]()
+		c = simple.NewCache[string]()
 	}
 
 	// TODO (ahrav): Make this configurable via conn.

@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Salesblink
 }
+
+func (s Scanner) Description() string {
+	return "Salesblink is a sales outreach tool that helps automate email, LinkedIn, and cold call outreach. Salesblink API keys can be used to access and manage sales outreach campaigns and data."
+}

@@ -97,3 +97,7 @@ type userResponse struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TelegramBotToken
 }
+
+func (s Scanner) Description() string {
+	return "Telegram Bot API tokens are used to authenticate requests to the Telegram Bot API. They can be used to control and interact with Telegram bots."
+}

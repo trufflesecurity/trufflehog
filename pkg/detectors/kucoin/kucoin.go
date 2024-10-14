@@ -128,3 +128,7 @@ func getKucoinSignature(apiSecret string, timestamp string, method string, endpo
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_KuCoin
 }
+
+func (s Scanner) Description() string {
+	return "KuCoin is a cryptocurrency exchange that provides various digital asset trading services. KuCoin API keys can be used to access and manage trading accounts, execute trades, and retrieve market data."
+}

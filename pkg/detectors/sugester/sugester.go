@@ -11,7 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, domainmatch := range domainMatches {
-			if len(match) != 2 {
+			if len(domainmatch) != 2 {
 				continue
 			}
 			resDomainMatch := strings.TrimSpace(domainmatch[1])
@@ -72,7 +72,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			results = append(results, s1)
 		}
-
 	}
 
 	return results, nil
@@ -80,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Sugester
+}
+
+func (s Scanner) Description() string {
+	return "Sugester is a customer support software that offers various tools for managing customer interactions. Sugester API keys can be used to access and manage data within the Sugester platform."
 }

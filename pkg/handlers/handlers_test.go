@@ -1,9 +1,14 @@
 package handlers
 
 import (
+	"archive/zip"
+	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -416,4 +421,266 @@ func TestHandleLargeHTTPJson(t *testing.T) {
 		count++
 	}
 	assert.Equal(t, wantCount, count)
+}
+
+func TestHandlePipe(t *testing.T) {
+	r, w := io.Pipe()
+
+	go func() {
+		defer w.Close()
+		file, err := os.Open("testdata/test.tar")
+		assert.NoError(t, err)
+		defer file.Close()
+		_, err = io.Copy(w, file)
+		assert.NoError(t, err)
+	}()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(logContext.Background(), r, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 1
+	count := 0
+	for range chunkCh {
+		count++
+	}
+	assert.Equal(t, wantCount, count)
+}
+
+func TestHandleZipCommandStdoutPipe(t *testing.T) {
+	cmd := exec.Command("zip", "-j", "-", "testdata/nested-dirs.zip")
+	stdout, err := cmd.StdoutPipe()
+	assert.NoError(t, err)
+
+	err = cmd.Start()
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	chunkCh := make(chan *sources.Chunk, 1)
+	go func() {
+		defer close(chunkCh)
+		err := HandleFile(ctx, stdout, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		assert.NoError(t, err)
+	}()
+
+	wantCount := 8
+	count := 0
+	for range chunkCh {
+		count++
+	}
+
+	// cmd.Wait() should be called after all the reading from the pipe is done.
+	// https://cs.opensource.google/go/go/+/refs/tags/go1.23.2:src/os/exec/exec.go;l=1051-1053
+	err = cmd.Wait()
+	assert.NoError(t, err)
+
+	assert.Equal(t, wantCount, count)
+}
+
+func TestHandleGitCatFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		fileName       string
+		fileSize       int
+		supportedType  bool
+		expectedChunks int
+	}{
+		{
+			name:           "LargeBlob",
+			fileName:       "largefile.bin",
+			fileSize:       50 * 1024 * 1024, // 50 MB
+			supportedType:  true,
+			expectedChunks: 5120,
+		},
+		{
+			name:           "UnsupportedType",
+			fileName:       "unsupported.so",
+			fileSize:       1024 * 1024, // 1 MB
+			supportedType:  false,
+			expectedChunks: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up a temporary git repository with the specified file.
+			var gitDir string
+			if tt.supportedType {
+				gitDir = setupTempGitRepo(t, tt.fileName, tt.fileSize)
+			} else {
+				gitDir = setupTempGitRepoWithUnsupportedFile(t, tt.fileName, tt.fileSize)
+			}
+			defer os.RemoveAll(gitDir)
+
+			cmd := exec.Command("git", "-C", gitDir, "rev-parse", "HEAD")
+			hashBytes, err := cmd.Output()
+			assert.NoError(t, err, "Failed to get commit hash")
+			commitHash := strings.TrimSpace(string(hashBytes))
+
+			// Create a pipe to simulate the git cat-file stdout.
+			cmd = exec.Command("git", "-C", gitDir, "cat-file", "blob", fmt.Sprintf("%s:%s", commitHash, tt.fileName))
+
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
+
+			stdout, err := cmd.StdoutPipe()
+			assert.NoError(t, err, "Failed to create stdout pipe")
+
+			err = cmd.Start()
+			assert.NoError(t, err, "Failed to start git cat-file command")
+
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+
+			chunkCh := make(chan *sources.Chunk, 1000)
+
+			go func() {
+				defer close(chunkCh)
+				err := HandleFile(ctx, stdout, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(false))
+				assert.NoError(t, err, "HandleFile should not return an error")
+			}()
+
+			count := 0
+			for range chunkCh {
+				count++
+			}
+
+			// cmd.Wait() should be called after all the reading from the pipe is done.
+			// https://cs.opensource.google/go/go/+/refs/tags/go1.23.2:src/os/exec/exec.go;l=1051-1053
+			err = cmd.Wait()
+			assert.NoError(t, err, "git cat-file command should complete without error")
+
+			assert.Equal(t, tt.expectedChunks, count, "Number of chunks should match the expected value")
+		})
+	}
+}
+
+func setupTempGitRepoWithUnsupportedFile(t *testing.T, fileName string, fileSize int) string {
+	t.Helper()
+	return setupTempGitRepoCommon(t, fileName, fileSize, true)
+}
+
+func setupTempGitRepo(t *testing.T, archiveName string, fileSize int) string {
+	t.Helper()
+	return setupTempGitRepoCommon(t, archiveName, fileSize, false)
+}
+
+func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsupported bool) string {
+	t.Helper()
+
+	tempDir := t.TempDir()
+
+	cmd := exec.Command("git", "init", tempDir)
+	var initStderr bytes.Buffer
+	cmd.Stderr = &initStderr
+	err := cmd.Run()
+	if err != nil {
+		t.Fatalf("Failed to initialize git repository: %v, stderr: %s", err, initStderr.String())
+	}
+
+	cmds := [][]string{
+		{"git", "-C", tempDir, "config", "user.name", "Test User"},
+		{"git", "-C", tempDir, "config", "user.email", "test@example.com"},
+	}
+
+	for _, cmdArgs := range cmds {
+		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...) //nolint:gosec
+		var cmdStderr bytes.Buffer
+		cmd.Stderr = &cmdStderr
+		err := cmd.Run()
+		if err != nil {
+			t.Fatalf("Failed to set git config: %v, stderr: %s", err, cmdStderr.String())
+		}
+	}
+
+	filePath := filepath.Join(tempDir, fileName)
+
+	// Create the file with appropriate content.
+	f, err := os.Create(filePath)
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer f.Close()
+
+	if isUnsupported {
+		// Write ELF header for unsupported file.
+		// https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.eheader.html
+		elfHeader := []byte{
+			0x7f, 'E', 'L', 'F', // ELF magic number
+			2,                   // 64-bit format
+			1,                   // Little endian
+			1,                   // Current version of ELF
+			0,                   // Target OS ABI
+			0,                   // ABI Version
+			0, 0, 0, 0, 0, 0, 0, // 7 bytes of padding
+			3, 0, // Relocatable file
+			0x3e, 0, // AMD x86-64 architecture
+			1, 0, 0, 0, // ELF version
+			0, 0, 0, 0, 0, 0, 0, 0, // Entry point
+			0, 0, 0, 0, 0, 0, 0, 0, // Program header offset
+			0, 0, 0, 0, 0, 0, 0, 0, // Section header offset
+		}
+		_, err = f.Write(elfHeader)
+		if err != nil {
+			t.Fatalf("Failed to write ELF header: %v", err)
+		}
+	} else {
+		// Write ZIP content for supported file.
+		zipWriter := zip.NewWriter(f)
+		header := &zip.FileHeader{
+			Name:   "largefile.txt",
+			Method: zip.Store, // No compression
+		}
+		zipFileWriter, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			t.Fatalf("Failed to create file in ZIP archive: %v", err)
+		}
+
+		dataChunk := bytes.Repeat([]byte("A"), 1024) // 1KB chunk
+		totalWritten := 0
+		for totalWritten < fileSize {
+			remaining := fileSize - totalWritten
+			if remaining < len(dataChunk) {
+				_, err = zipFileWriter.Write(dataChunk[:remaining])
+				if err != nil {
+					t.Fatalf("Failed to write to inner file in ZIP archive: %v", err)
+				}
+				totalWritten += remaining
+			} else {
+				_, err = zipFileWriter.Write(dataChunk)
+				if err != nil {
+					t.Fatalf("Failed to write to inner file in ZIP archive: %v", err)
+				}
+				totalWritten += len(dataChunk)
+			}
+		}
+
+		if err := zipWriter.Close(); err != nil {
+			t.Fatalf("Failed to close ZIP writer: %v", err)
+		}
+	}
+
+	// Add and commit the file to Git.
+	cmd = exec.Command("git", "-C", tempDir, "add", fileName)
+	var addStderr bytes.Buffer
+	cmd.Stderr = &addStderr
+	err = cmd.Run()
+	if err != nil {
+		t.Fatalf("Failed to add file to git: %v, stderr: %s", err, addStderr.String())
+	}
+
+	cmd = exec.Command("git", "-C", tempDir, "commit", "-m", "Add file")
+	var commitStderr bytes.Buffer
+	cmd.Stderr = &commitStderr
+	err = cmd.Run()
+	if err != nil {
+		t.Fatalf("Failed to commit file to git: %v, stderr: %s", err, commitStderr.String())
+	}
+
+	return tempDir
 }
