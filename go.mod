@@ -11,7 +11,7 @@ replace github.com/coinbase/waas-client-library-go => github.com/trufflesecurity
 
 // github.com/mholt/archiver/v4 is pinned to a specific commit hash. That commit depends on STARRY-S/zip 0.1.0
 // specifically - future tags won't build. So we have to pin STARRY-S/zip@v0.1.0
-replace github.com/STARRY-S/zip => github.com/STARRY-S/zip v0.1.0
+replace github.com/STARRY-S/zip => github.com/STARRY-S/zip v0.2.1
 
 require (
 	cloud.google.com/go/secretmanager v1.14.1
