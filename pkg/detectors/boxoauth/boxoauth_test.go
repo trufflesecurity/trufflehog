@@ -1,30 +1,49 @@
 //go:build detectors
 // +build detectors
 
-package box
+package boxoauth
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestBox_Pattern(t *testing.T) {
+var (
+	clientId            = gofakeit.Password(true, true, true, false, false, 32)
+	clientSecret        = gofakeit.Password(true, true, true, false, false, 32)
+	invalidClientSecret = gofakeit.Password(true, true, true, true, false, 32)
+)
+
+func TestBoxOauth_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "typical pattern",
-			input: "box_access_token = 'Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ'",
-			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
+			name:  "valid pattern",
+			input: fmt.Sprintf("box id = '%s' box secret = '%s'", clientId, clientSecret),
+			want:  []string{clientId + clientSecret},
+		},
+		{
+			name:  "invalid pattern",
+			input: fmt.Sprintf("box id = '%s' box secret = '%s'", clientId, invalidClientSecret),
+			want:  nil,
+		},
+		{
+			name:  "invalid pattern",
+			input: fmt.Sprintf("box = '%s|%s'", clientId, invalidClientSecret),
+			want:  nil,
 		},
 	}
 
