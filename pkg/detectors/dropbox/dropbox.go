@@ -20,10 +20,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	// Note: Dropbox API keys are currently ~1309 characters long.
-	// Go limits the repetition count in a regex to 1000.
-	// https://pkg.go.dev/regexp/syntax#hdr-Syntax
-	keyPat = regexp.MustCompile(`sl\.u\.[0-9a-zA-Z_-]{1000,}`)
+	keyPat        = regexp.MustCompile(`sl\.u\.[0-9a-zA-Z_-]{256,}`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
