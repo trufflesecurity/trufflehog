@@ -468,14 +468,16 @@ func TestHandleZipCommandStdoutPipe(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	err = cmd.Wait()
-	assert.NoError(t, err)
-
 	wantCount := 8
 	count := 0
 	for range chunkCh {
 		count++
 	}
+
+	// cmd.Wait() should be called after all the reading from the pipe is done.
+	// https://cs.opensource.google/go/go/+/refs/tags/go1.23.2:src/os/exec/exec.go;l=1051-1053
+	err = cmd.Wait()
+	assert.NoError(t, err)
 
 	assert.Equal(t, wantCount, count)
 }
@@ -543,13 +545,15 @@ func TestHandleGitCatFile(t *testing.T) {
 				assert.NoError(t, err, "HandleFile should not return an error")
 			}()
 
-			err = cmd.Wait()
-			assert.NoError(t, err, "git cat-file command should complete without error")
-
 			count := 0
 			for range chunkCh {
 				count++
 			}
+
+			// cmd.Wait() should be called after all the reading from the pipe is done.
+			// https://cs.opensource.google/go/go/+/refs/tags/go1.23.2:src/os/exec/exec.go;l=1051-1053
+			err = cmd.Wait()
+			assert.NoError(t, err, "git cat-file command should complete without error")
 
 			assert.Equal(t, tt.expectedChunks, count, "Number of chunks should match the expected value")
 		})
