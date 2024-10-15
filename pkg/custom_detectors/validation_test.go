@@ -232,3 +232,58 @@ func TestCustomDetectorsVerifyRegexVarsValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestCustomDetectorsHandleJSONResponse(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    []byte
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "success - convert JSON object to string",
+			body: []byte(`{"id":"123","name":"test"}`),
+			// adjust the expected 'want' string with correct indentation (2 spaces per level)
+			want: `{
+  "id": "123",
+  "name": "test"
+}`,
+			wantErr: false,
+		},
+		{
+			name: "success - convert JSON array to string",
+			body: []byte(`[{"id":"123","name":"test"},{"id":"456","name":"example"}]`),
+			// adjust the expected 'want' string with correct indentation (2 spaces per level)
+			want: `[
+  {
+    "id": "123",
+    "name": "test"
+  },
+  {
+    "id": "456",
+    "name": "example"
+  }
+]`,
+			wantErr: false,
+		},
+		{
+			name:    "fail - convert JSON to string",
+			body:    []byte(`{id:"123","name":"test"}`),
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := handleJSONResponse(tt.body)
+			if err != nil && !tt.wantErr {
+				t.Errorf("handleJSONResponse() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if got != "" && got != tt.want {
+				t.Errorf("handleJSONResponse() got = %v, want %v", got, tt.want)
+			}
+
+		})
+	}
+}
