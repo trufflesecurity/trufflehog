@@ -23,12 +23,12 @@ func TestHandleRPMFile(t *testing.T) {
 	defer rdr.Close()
 
 	handler := newRPMHandler()
-	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), rdr)
+	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 
 	wantChunkCount := 179
 	count := 0
-	for range archiveChan {
+	for range dataOrErrChan {
 		count++
 	}
 

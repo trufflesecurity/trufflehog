@@ -22,63 +22,66 @@ func newRPMHandler() *rpmHandler {
 
 // HandleFile processes RPM formatted files. Further implementation is required to appropriately
 // handle RPM specific archive operations.
-func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
-	archiveChan := make(chan []byte, defaultBufferSize)
+func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
+	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 
 	if feature.ForceSkipArchives.Load() {
-		close(archiveChan)
-		return archiveChan, nil
+		close(dataOrErrChan)
+		return dataOrErrChan
 	}
 
 	go func() {
-		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
-		defer cancel()
-		defer close(archiveChan)
+		defer close(dataOrErrChan)
 
 		// Update the metrics for the file processing.
 		start := time.Now()
 		var err error
 		defer func() {
-			h.measureLatencyAndHandleErrors(start, err)
+			h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 			h.metrics.incFilesProcessed()
 		}()
 
 		// Defer a panic recovery to handle any panics that occur during the RPM processing.
 		defer func() {
 			if r := recover(); r != nil {
-				// Return the panic as an error.
+				var panicErr error
 				if e, ok := r.(error); ok {
-					err = e
+					panicErr = e
 				} else {
-					err = fmt.Errorf("panic occurred: %v", r)
+					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(err, "Panic occurred when reading rpm archive")
+				dataOrErrChan <- DataOrErr{
+					Data: nil,
+					Err:  fmt.Errorf("%w: panic error: %w", ErrCriticalProcessing, panicErr),
+				}
 			}
 		}()
 
 		var rpm *rpmutils.Rpm
 		rpm, err = rpmutils.ReadRpm(input)
 		if err != nil {
-			ctx.Logger().Error(err, "error reading RPM")
 			return
 		}
 
 		var reader rpmutils.PayloadReader
 		reader, err = rpm.PayloadReaderExtended()
 		if err != nil {
-			ctx.Logger().Error(err, "error getting RPM payload reader")
 			return
 		}
 
-		if err = h.processRPMFiles(ctx, reader, archiveChan); err != nil {
+		if err = h.processRPMFiles(ctx, reader, dataOrErrChan); err != nil {
 			ctx.Logger().Error(err, "error processing RPM files")
 		}
 	}()
 
-	return archiveChan, nil
+	return dataOrErrChan
 }
 
-func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.PayloadReader, archiveChan chan []byte) error {
+func (h *rpmHandler) processRPMFiles(
+	ctx logContext.Context,
+	reader rpmutils.PayloadReader,
+	dataOrErrChan chan DataOrErr,
+) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -101,8 +104,11 @@ func (h *rpmHandler) processRPMFiles(ctx logContext.Context, reader rpmutils.Pay
 				return fmt.Errorf("error creating mime-type reader: %w", err)
 			}
 
-			if err := h.handleNonArchiveContent(fileCtx, rdr, archiveChan); err != nil {
-				fileCtx.Logger().Error(err, "error handling archive content in RPM")
+			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
+				dataOrErrChan <- DataOrErr{
+					Data: nil,
+					Err:  fmt.Errorf("%w: error processing RPM archive: %w", ErrNonCriticalProcessing, err),
+				}
 				h.metrics.incErrors()
 			}
 
