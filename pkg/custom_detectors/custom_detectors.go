@@ -131,6 +131,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		DetectorType: detectorspb.DetectorType_CustomRegex,
 		DetectorName: c.GetName(),
 		Raw:          []byte(raw),
+		ExtraData:    map[string]string{},
 	}
 
 	if !verify {
