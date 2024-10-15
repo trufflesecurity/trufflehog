@@ -27,6 +27,8 @@ func TestDropbox_FromChunk(t *testing.T) {
 
 	secret := testSecrets.MustGetField("DROPBOX")
 	secretInactive := testSecrets.MustGetField("DROPBOX_INACTIVE")
+	secretAccess := testSecrets.MustGetField("DROPBOX_ACCESS_TOKEN")
+	secretAcsessInactive := testSecrets.MustGetField("DROPBOX_ACCESS_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -42,7 +44,7 @@ func TestDropbox_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found, verified API explorer token",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
@@ -59,7 +61,7 @@ func TestDropbox_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found, unverified",
+			name: "found, unverified API explorer token",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
@@ -71,6 +73,40 @@ func TestDropbox_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Dropbox,
 					Verified:     false,
 					Raw:          []byte(secretInactive),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, verified access token",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a dropbox secret %s within", secretAccess)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Dropbox,
+					Verified:     true,
+					Raw:          []byte(secretAccess),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, unverified access token",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a dropbox secret %s within", secretAcsessInactive)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Dropbox,
+					Verified:     false,
+					Raw:          []byte(secretAcsessInactive),
 				},
 			},
 			wantErr: false,
