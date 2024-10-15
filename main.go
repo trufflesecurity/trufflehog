@@ -7,6 +7,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strconv"
@@ -314,12 +315,13 @@ func main() {
 
 // Function to check if the commit is valid
 func isValidCommit(commit string) bool {
-    for _, char := range commit {
-        if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')) {
-            return false
-        }
-    }
-    return true
+	cmd := exec.Command("git", "cat-file", "-t", commit)
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+
+	return strings.TrimSpace(string(output)) == "commit"
 }
 
 func run(state overseer.State) {
