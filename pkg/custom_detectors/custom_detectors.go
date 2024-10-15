@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -182,28 +181,13 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			// mark the result as verified
 			result.Verified = true
 
-			// read the Content-Type header and response body
-			respContentType := resp.Header.Get("Content-Type")
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
-				return fmt.Errorf("failed to read response body: %v", err)
+				continue
 			}
 
-			var responseStr string
-
-			// determine the response content type and process accordingly
-			switch respContentType {
-			case "application/json":
-				responseStr, err = handleJSONResponse(body)
-				if err != nil {
-					return err
-				}
-			case "text/plain":
-				responseStr = string(body)
-			default:
-				// TODO: handle other content types (HTML, XML, etc.)
-				responseStr = string(body)
-			}
+			// TODO: handle different content-type responses seperatly when implement custom detector configurations
+			responseStr := string(body)
 
 			// store the processed response in ExtraData
 			result.ExtraData["response"] = responseStr
@@ -296,21 +280,4 @@ func (c *CustomRegexWebhook) Description() string {
 		return defaultDescription
 	}
 	return c.GetDescription()
-}
-
-// helper function to handle JSON response
-func handleJSONResponse(body []byte) (string, error) {
-	var respBody interface{}
-	err := json.Unmarshal(body, &respBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to unmarshal JSON: %v", err)
-	}
-
-	// convert JSON map to a formatted string
-	jsonString, err := json.MarshalIndent(respBody, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal JSON: %v", err)
-	}
-
-	return strings.TrimSpace(string(jsonString)), nil
 }
