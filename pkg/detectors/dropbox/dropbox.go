@@ -29,12 +29,12 @@ var (
 	// Access tokens provided by Dropbox should be treated as opaque.
 	// Applications must support variable token size with tokens capable of exceeding 1KB.
 	// For more information on Dropbox API authentication, see: https://www.dropbox.com/developers/documentation/http/documentation
-	keyPat = regexp.MustCompile(`sl\.u\.[0-9a-zA-Z_-]{256,}`)
+	keyPat = regexp.MustCompile(`sl\.[uB]\.[0-9a-zA-Z_-]{256,}`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s Scanner) Keywords() []string { return []string{"sl.u."} }
+func (s Scanner) Keywords() []string { return []string{"sl.u.", "sl.B."} }
 
 // FromData will find and optionally verify Dropbox secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
