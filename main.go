@@ -313,7 +313,7 @@ func main() {
 }
 
 func isValidCommit(commit string) bool {
-	if len(commit) != 40 {
+	if len(commit) < 4 {
 		return false
 	}
 	for _, char := range commit {
