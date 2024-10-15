@@ -29,7 +29,7 @@ var (
 	// Access tokens provided by Dropbox should be treated as opaque.
 	// Applications must support variable token size with tokens capable of exceeding 1KB.
 	// For more information on Dropbox API authentication, see: https://www.dropbox.com/developers/documentation/http/documentation
-	keyPat = regexp.MustCompile(`sl\.[uB]\.[0-9a-zA-Z_-]{256,}`)
+	keyPat = regexp.MustCompile(`sl\.[uB]\.[0-9a-zA-Z_-]{130,}`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
