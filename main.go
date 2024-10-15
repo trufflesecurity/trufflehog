@@ -312,6 +312,18 @@ func main() {
 	}
 }
 
+func isValidCommit(commit string) bool {
+	if len(commit) != 40 {
+		return false
+	}
+	for _, char := range commit {
+		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
 func run(state overseer.State) {
 
 	ctx, cancel := context.WithCancelCause(context.Background())
@@ -352,6 +364,9 @@ func run(state overseer.State) {
 	// When setting a base commit, chunks must be scanned in order.
 	if *gitScanSinceCommit != "" {
 		*concurrency = 1
+		if !isValidCommit(*gitScanSinceCommit) {
+			logger.Info("Warning: The provided commit hash appears to be invalid.")
+		}
 	}
 
 	if *profile {
