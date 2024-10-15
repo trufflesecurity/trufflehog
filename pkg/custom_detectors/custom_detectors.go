@@ -200,7 +200,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			case "text/plain":
 				responseStr = string(body)
 			default:
-				// handle other content types (HTML, XML, etc.)
+				// TODO: handle other content types (HTML, XML, etc.)
 				responseStr = string(body)
 			}
 
