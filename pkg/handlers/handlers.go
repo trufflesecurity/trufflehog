@@ -287,7 +287,7 @@ func HandleFile(
 		// Ensure all data is read to prevent broken pipe.
 		if closeErr := rdr.Close(); closeErr != nil {
 			if err != nil {
-				err = fmt.Errorf("%w; error closing reader: %w", err, closeErr)
+				err = errors.Join(err, closeErr)
 			} else {
 				err = fmt.Errorf("error closing reader: %w", closeErr)
 			}
