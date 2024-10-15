@@ -312,16 +312,14 @@ func main() {
 	}
 }
 
+// Function to check if the commit is valid
 func isValidCommit(commit string) bool {
-	if len(commit) < 4 {
-		return false
-	}
-	for _, char := range commit {
-		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')) {
-			return false
-		}
-	}
-	return true
+    for _, char := range commit {
+        if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')) {
+            return false
+        }
+    }
+    return true
 }
 
 func run(state overseer.State) {
