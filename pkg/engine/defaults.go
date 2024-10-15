@@ -90,6 +90,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bombbomb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boostnote"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/borgbase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/box"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boxoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintreepayments"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
@@ -1633,11 +1635,13 @@ func DefaultDetectors() []detectors.Detector {
 		atlassianv1.Scanner{},
 		atlassianv2.Scanner{},
 		netsuite.Scanner{},
+		box.Scanner{},
 		robinhoodcrypto.Scanner{},
 		nvapi.Scanner{},
 		railwayapp.Scanner{},
 		meraki.Scanner{},
 		saladcloudapikey.Scanner{},
+		boxoauth.Scanner{},
 	}
 
 	// Automatically initialize all detectors that implement

@@ -1492,8 +1492,10 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},
 		},
-		Verify: s.verify}
-	return handlers.HandleFile(ctx, readCloser, &chunkSkel, reporter)
+		Verify: s.verify,
+	}
+	fileCtx := context.WithValues(ctx, "path", meta.GetFile())
+	return handlers.HandleFile(fileCtx, readCloser, &chunkSkel, reporter)
 }
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {

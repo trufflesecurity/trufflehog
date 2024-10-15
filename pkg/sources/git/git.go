@@ -657,9 +657,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				logger.Error(
 					err,
 					"error handling binary file",
-					"filename", fileName,
 					"commit", commitHash,
-					"file", diff.PathB,
+					"path", fileName,
 				)
 			}
 			continue
@@ -677,9 +676,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			if err != nil {
 				ctx.Logger().Error(
 					err, "error creating reader for commits",
-					"filename", fileName,
 					"commit", fullHash,
-					"file", diff.PathB,
+					"path", fileName,
 				)
 				return nil
 			}
@@ -687,11 +685,10 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 			data := make([]byte, d.Len())
 			if _, err := io.ReadFull(reader, data); err != nil {
-				ctx.Logger().Error(
+				logger.Error(
 					err, "error reading diff content for commit",
-					"filename", fileName,
 					"commit", fullHash,
-					"file", diff.PathB,
+					"path", fileName,
 				)
 				return nil
 			}
@@ -829,7 +826,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	)
 	for diff := range diffChan {
 		fullHash := diff.Commit.Hash
-		logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
+		logger := ctx.Logger().WithValues("commit", fullHash, "path", diff.PathB)
 		logger.V(2).Info("scanning staged changes from git")
 
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
@@ -877,7 +874,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				Verify:         s.verify,
 			}
 			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.Error(err, "error handling binary file", "filename", fileName)
+				logger.Error(err, "error handling binary file")
 			}
 			continue
 		}
@@ -887,24 +884,14 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 			reader, err := d.ReadCloser()
 			if err != nil {
-				ctx.Logger().Error(
-					err, "error creating reader for staged",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
+				logger.Error(err, "error creating reader for staged")
 				return nil
 			}
 			defer reader.Close()
 
 			data := make([]byte, d.Len())
 			if _, err := reader.Read(data); err != nil {
-				ctx.Logger().Error(
-					err, "error reading diff content for staged",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
+				logger.Error(err, "error reading diff content for staged")
 				return nil
 			}
 			chunk := sources.Chunk{
@@ -1255,7 +1242,7 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 
 	defer func() { _ = cmd.Wait() }()
 
-	return handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	return handlers.HandleFile(fileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
