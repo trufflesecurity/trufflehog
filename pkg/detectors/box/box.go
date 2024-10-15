@@ -113,21 +113,15 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func bakeExtraDataFromUser(u user) map[string]string {
 	return map[string]string{
-		"user_id":           u.ID,
-		"user_full_name":    u.Name,
-		"username":          u.Login,
-		"user_space_amount": fmt.Sprintf("%d", u.SpaceAmount),
-		"user_space_used":   fmt.Sprintf("%d", u.SpaceUsed),
-		"user_status":       u.Status,
+		"user_id":     u.ID,
+		"username":    u.Login,
+		"user_status": u.Status,
 	}
 }
 
 // struct to represent a Box user.
 type user struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Login       string `json:"login"`
-	SpaceAmount int64  `json:"space_amount"`
-	SpaceUsed   int64  `json:"space_used"`
-	Status      string `json:"status"`
+	ID     string `json:"id"`
+	Login  string `json:"login"`
+	Status string `json:"status"`
 }
