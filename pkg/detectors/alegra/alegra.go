@@ -60,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.alegra.com/api/v1/users", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.alegra.com/api/v1/users/self", nil)
 				if err != nil {
 					continue
 				}
