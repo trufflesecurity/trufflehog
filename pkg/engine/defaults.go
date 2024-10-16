@@ -483,7 +483,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onedesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onelogin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepagecrm"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onesignal"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onfleet"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
@@ -588,7 +587,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rocketreach"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rockset"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roninapp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rootly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/route4me"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rubygems"
@@ -1644,8 +1642,6 @@ func DefaultDetectors() []detectors.Detector {
 		meraki.Scanner{},
 		saladcloudapikey.Scanner{},
 		boxoauth.Scanner{},
-		rootly.Scanner{},
-		onepassword.Scanner{},
 	}
 
 	// Automatically initialize all detectors that implement
