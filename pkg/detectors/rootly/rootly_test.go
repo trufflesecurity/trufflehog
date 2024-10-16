@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	validPattern   = "rootly_a3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9"
+	validPattern   = "rootly_7f1e8738d7d6b540bc62e1bc65c6e2c109dc44642f9e5d583be7e5d04f8bd282"
 	invalidPattern = "rootly_A$3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d"
 )
 
