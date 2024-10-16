@@ -285,14 +285,9 @@ func HandleFile(
 	}
 	defer func() {
 		// Ensure all data is read to prevent broken pipe.
-		_, copyErr := io.Copy(io.Discard, rdr)
-		if copyErr != nil {
-			err = fmt.Errorf("error discarding remaining data: %w", copyErr)
-		}
-		closeErr := rdr.Close()
-		if closeErr != nil {
+		if closeErr := rdr.Close(); closeErr != nil {
 			if err != nil {
-				err = fmt.Errorf("%v; error closing reader: %w", err, closeErr)
+				err = errors.Join(err, closeErr)
 			} else {
 				err = fmt.Errorf("error closing reader: %w", closeErr)
 			}
