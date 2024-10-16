@@ -2,39 +2,43 @@ package rootly
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+)
+
+var (
+	validPattern   = "rootly_a3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9"
+	invalidPattern = "rootly_A$3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d"
 )
 
 func TestRootly_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "typical pattern",
-			input: "rootly_token = 'rootly_a3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9'",
-			want:  []string{"rootly_a3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9"},
+			name:  "valid pattern",
+			input: fmt.Sprintf("rootly: '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
-			name: "finds all matches",
-			input: `rootly_token1 = 'rootly_a3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9'
-rootly_token2 = 'rootly_b4c0f9d2e3e5f6c7d8e9a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0'`,
-			want: []string{
-				"rootly_a3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9",
-				"rootly_b4c0f9d2e3e5f6c7d8e9a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
-			},
+			name:  "valid pattern - key out of prefix range",
+			input: fmt.Sprintf("rootly keyword is not close to the real key in the data\n = '%s'", validPattern),
+			want:  []string{validPattern},
 		},
 		{
 			name:  "invalid pattern",
-			input: "rootly_token = 'rootly_1a2b3c4d'",
-			want:  []string{},
+			input: fmt.Sprintf("rootly: '%s'", invalidPattern),
+			want:  nil,
 		},
 	}
 
