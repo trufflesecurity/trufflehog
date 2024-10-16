@@ -326,9 +326,10 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				return nil
 			}
 
+			const defaultTimeout = 30 * time.Second
 			// files break with spaces, must replace with +
 			// objKey := strings.ReplaceAll(*obj.Key, " ", "+")
-			ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+			ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 			defer cancel()
 			res, err := client.GetObjectWithContext(ctx, &s3.GetObjectInput{
 				Bucket: &bucket,
