@@ -2,18 +2,12 @@ package rootly
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"
-	invalidPattern = "rootly_A$3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d"
 )
 
 func TestRootly_Pattern(t *testing.T) {
@@ -27,17 +21,17 @@ func TestRootly_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("rootly: '%s'", validPattern),
-			want:  []string{validPattern},
+			input: "rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("rootly keyword is not close to the real key in the data\n = '%s'", validPattern),
-			want:  []string{validPattern},
+			input: "rootly keyword is not close to the real key in the data ='rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282'",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("rootly: '%s'", invalidPattern),
+			input: "rootly_A$3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
 			want:  nil,
 		},
 	}
