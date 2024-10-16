@@ -2,9 +2,10 @@ package apify
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -47,7 +48,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.apify.com/v2/acts?token="+resMatch+"&my=true&offset=10&limit=99&desc=true", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.apify.com/v2/users/me", nil)
+			req.Header.Set("Authorization", "Bearer "+resMatch)
 			if err != nil {
 				continue
 			}
