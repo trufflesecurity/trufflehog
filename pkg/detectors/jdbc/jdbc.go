@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -60,6 +61,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Jdbc secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logCtx := logContext.AddLogger(ctx)
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -81,11 +83,11 @@ matchLoop:
 		}
 
 		if verify {
-			result.Verified = false
-			j, err := newJDBC(jdbcConn)
+			j, err := newJDBC(logCtx, jdbcConn)
 			if err != nil {
 				continue
 			}
+
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 			pingRes := j.ping(ctx)
@@ -204,7 +206,7 @@ func tryRedactRegex(conn string) (string, bool) {
 	return newConn, true
 }
 
-var supportedSubprotocols = map[string]func(string) (jdbc, error){
+var supportedSubprotocols = map[string]func(logContext.Context, string) (jdbc, error){
 	"mysql":      parseMySQL,
 	"postgresql": parsePostgres,
 	"sqlserver":  parseSqlServer,
@@ -219,22 +221,24 @@ type jdbc interface {
 	ping(context.Context) pingResult
 }
 
-func newJDBC(conn string) (jdbc, error) {
+func newJDBC(ctx logContext.Context, conn string) (jdbc, error) {
 	// expected format: "jdbc:{subprotocol}:{subname}"
 	if !strings.HasPrefix(strings.ToLower(conn), "jdbc:") {
 		return nil, errors.New("expected jdbc prefix")
 	}
 	conn = conn[len("jdbc:"):]
+
 	subprotocol, subname, found := strings.Cut(conn, ":")
 	if !found {
 		return nil, errors.New("expected a colon separated subprotocol and subname")
 	}
+
 	// get the subprotocol parser
 	parser, ok := supportedSubprotocols[strings.ToLower(subprotocol)]
 	if !ok {
 		return nil, errors.New("unsupported subprotocol")
 	}
-	return parser(subname)
+	return parser(ctx, subname)
 }
 
 func ping(ctx context.Context, driverName string, isDeterminate func(error) bool, candidateConns ...string) pingResult {
