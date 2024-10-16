@@ -314,8 +314,8 @@ func (s *Source) scanDirs(ctx context.Context, reporter sources.ChunkReporter) e
 			continue
 		}
 		if err := s.scanDir(ctx, gitDir, reporter); err != nil {
-			ctx.Logger().Error(err, "error scanning repository", "repo", gitDir, "error", err)
-			return err // Return the error instead of continuing
+			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
+			continue
 		}
 	}
 	return nil
@@ -327,16 +327,10 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		// TODO: Figure out why we skip directories ending in "git".
 		return nil
 	}
-
-	// Check if the directory exists
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		return fmt.Errorf("directory does not exist: %s", gitDir)
-	}
-
 	// try paths instead of url
 	repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
 	if err != nil {
-		return fmt.Errorf("error opening repo from path: %w", err)
+		return reporter.ChunkErr(ctx, err)
 	}
 
 	err = func() error {
@@ -347,7 +341,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		return s.git.ScanRepo(ctx, repo, gitDir, s.scanOptions, reporter)
 	}()
 	if err != nil {
-		return err
+		return reporter.ChunkErr(ctx, err)
 	}
 	return nil
 }
