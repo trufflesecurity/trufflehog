@@ -13,7 +13,7 @@ builds:
     - arm64
     hooks:
       post:
-        - bash -c 'if [ "{{ .Env.GGOOS  }}" != "darwin" ]; then upx -q "{{ .Path }}"; fi'
+        - bash -c 'if [ "{{ .Env.GGOOS  }}" != "darwin" ]; then upx -q "{{ .Path }}" || true; fi'
 dockers:
   - image_templates: ["trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64"]
     dockerfile: Dockerfile.goreleaser
