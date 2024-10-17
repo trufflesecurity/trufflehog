@@ -57,25 +57,89 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resIdMatch+"-dsn.algolia.net/1/keys", nil)
-				if err != nil {
+				// Verify if the key is a valid Algolia Admin Key.
+				isVerified, verificationErr := verifyAlgoliaKey(ctx, resIdMatch, resMatch)
+
+				// Verify if the key has sensitive permissions, even if it's not an Admin Key.
+				if !isVerified && verificationErr == nil {
+					isVerified, verificationErr = verifyAlgoliaKeyACL(ctx, resIdMatch, resMatch)
+				}
+
+				// Ignore the key if it's valid but doesn't have sensitive permissions.
+				if !isVerified && verificationErr == nil {
 					continue
 				}
-				req.Header.Add("X-Algolia-Application-Id", resIdMatch)
-				req.Header.Add("X-Algolia-API-Key", resMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+
+				s1.SetVerificationError(verificationErr, resMatch)
+				s1.Verified = isVerified
 			}
 
 			results = append(results, s1)
 		}
 	}
 	return results, nil
+}
+
+func verifyAlgoliaKey(ctx context.Context, appId, apiKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+appId+"-dsn.algolia.net/1/keys", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("X-Algolia-Application-Id", appId)
+	req.Header.Add("X-Algolia-API-Key", apiKey)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == 403 {
+		return false, nil
+	} else if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	return true, nil
+}
+
+func verifyAlgoliaKeyACL(ctx context.Context, appId, apiKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+appId+".algolia.net/1/keys/"+apiKey, nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("X-Algolia-Application-Id", appId)
+	req.Header.Add("X-Algolia-API-Key", apiKey)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == 403 {
+		return false, nil
+	} else if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	var jsonResponse struct {
+		ACL []string `json:"acl"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
+		return false, err
+	}
+
+	for _, acl := range jsonResponse.ACL {
+		if acl != "search" && acl != "listIndexes" && acl != "settings" {
+			return true, nil // Other permissions are sensitive.
+		}
+	}
+
+	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
