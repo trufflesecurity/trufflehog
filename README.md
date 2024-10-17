@@ -16,6 +16,27 @@
 
 ---
 
+# Table of Contents
+1. [Now Scanning](#now-scanning)
+2. [TruffleHog Enterprise](#trufflehog-enterprise)
+3. [Join Our Community](#join-our-community)
+4. [Demo](#demo)
+5. [Installation](#installation)
+6. [Verifying the Artifacts](#verifying-the-artifacts)
+7. [Quick Start](#quick-start)
+8. [FAQ](#faq)
+9. [What's New in v3](#whats-new-in-v3)
+10. [Usage](#usage)
+11. [TruffleHog GitHub Action](#trufflehog-github-action)
+12. [TruffleHog GitLab CI](#trufflehog-gitlab-ci)
+13. [Pre-commit Hook](#pre-commit-hook)
+14. [Regex Detector (alpha)](#regex-detector-alpha)
+15. [Analyze](#analyze)
+16. [Contributors](#contributors)
+17. [Contributing](#contributing)
+18. [Use as a Library](#use-as-a-library)
+19. [License Change](#license-change)
+
 # :mag_right: _Now Scanning_
 
 <div align="center">
