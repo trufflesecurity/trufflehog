@@ -1,4 +1,4 @@
-package detectioncaching
+package verificationcaching
 
 import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"

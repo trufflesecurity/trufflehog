@@ -14,7 +14,7 @@ import (
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectioncaching"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcaching"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -154,11 +154,13 @@ type Config struct {
 // customization through various options and configurations.
 type Engine struct {
 	// CLI flags.
-	concurrency          int
-	decoders             []decoders.Decoder
-	detectors            []detectors.Detector
-	detectionCache       cache.Cache[*detectors.Result]
-	getDetectionCacheKey func(result *detectors.Result) string
+	concurrency int
+	decoders    []decoders.Decoder
+	detectors   []detectors.Detector
+	// verificationCache must be thread-safe
+	verificationCache cache.Cache[*detectors.Result]
+	// getVerificationCacheKey must be thread-safe
+	getVerificationCacheKey func(result *detectors.Result) string
 	// Any detectors configured to override sources' verification flags
 	detectorVerificationOverrides map[config.DetectorID]bool
 
@@ -223,8 +225,8 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		concurrency:                         cfg.Concurrency,
 		decoders:                            cfg.Decoders,
 		detectors:                           cfg.Detectors,
-		detectionCache:                      nil,
-		getDetectionCacheKey:                func(result *detectors.Result) string { panic("cache should be unused") },
+		verificationCache:                   nil,
+		getVerificationCacheKey:             func(result *detectors.Result) string { panic("cache should be unused") },
 		dispatcher:                          cfg.Dispatcher,
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,
@@ -1058,10 +1060,10 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
 			ctx.Logger().Error(nil, "a detector ignored the context timeout")
 		})
-		results, err := detectioncaching.FromDataCached(
+		results, err := verificationcaching.FromDataCached(
 			ctx,
-			e.detectionCache,
-			e.getDetectionCacheKey,
+			e.verificationCache,
+			e.getVerificationCacheKey,
 			data.detector.Detector,
 			data.chunk.Verify,
 			data.chunk.SecretID != 0,
