@@ -1,8 +1,11 @@
+//go:generate generate_permissions permissions.yaml permissions.go gitlab
+
 package gitlab
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,18 +29,79 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_GitLab }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("not implemented")
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_GitLab,
+		Metadata: map[string]any{
+			"version":    info.Metadata.Version,
+			"enterprise": info.Metadata.Enterprise,
+		},
+		Bindings: []analyzers.Binding{},
+	}
+
+	// Add token and it's permissions to bindings
+	tokenResource := analyzers.Resource{
+		Name:               info.AccessToken.Name,
+		FullyQualifiedName: fmt.Sprintf("gitlab.com/token/%d", info.AccessToken.ID),
+		Type:               "access_token",
+		Metadata: map[string]any{
+			"created_at": info.AccessToken.CreatedAt,
+			"revoked":    info.AccessToken.Revoked,
+			"expires_at": info.AccessToken.ExpiresAt,
+		},
+	}
+
+	for _, scope := range info.AccessToken.Scopes {
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource: tokenResource,
+			Permission: analyzers.Permission{
+				Value: scope,
+			},
+		})
+	}
+
+	// append project and it's permissions to bindings
+	for _, project := range info.Projects {
+		projectResource := analyzers.Resource{
+			Name:               project.NameWithNamespace,
+			FullyQualifiedName: fmt.Sprintf("gitlab.com/project/%d", project.ID),
+			Type:               "project",
+		}
+
+		accessLevel, ok := access_level_map[project.Permissions.ProjectAccess.AccessLevel]
+		if !ok {
+			continue
+		}
+
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource: projectResource,
+			Permission: analyzers.Permission{
+				Value: accessLevel,
+			},
+		})
+	}
+
+	return &result
 }
 
 // consider calling /api/v4/metadata to learn about gitlab instance version and whether neterrprises is enabled
 
-// we'll call /api/v4/personal_access_tokens and /api/v4/user and then filter down to scopes.
+// we'll call /api/v4/personal_access_tokens and then filter down to scopes.
 
 type AccessTokenJSON struct {
+	ID         int      `json:"id"`
 	Name       string   `json:"name"`
 	Revoked    bool     `json:"revoked"`
 	CreatedAt  string   `json:"created_at"`
@@ -47,6 +111,7 @@ type AccessTokenJSON struct {
 }
 
 type ProjectsJSON struct {
+	ID                int    `json:"id"`
 	NameWithNamespace string `json:"name_with_namespace"`
 	Permissions       struct {
 		ProjectAccess struct {
