@@ -24,8 +24,8 @@ var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	domain = regexp.MustCompile(`\b([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azurewebsites\.net))\b`)
-	keyPat = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
+	domain = regexp.MustCompile(`\b([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azuredatabricks\.net))\b`)
+	keyPat = regexp.MustCompile(`\b(dapi[0-9a-f]{32}(-\d)?)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
