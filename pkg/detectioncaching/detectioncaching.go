@@ -9,7 +9,7 @@ import (
 
 func FromDataCached(
 	ctx context.Context,
-	cache cache.Cache[*detectors.Result],
+	verificationCache cache.Cache[*detectors.Result],
 	detector detectors.Detector,
 	verify bool,
 	forceCacheMiss bool,
@@ -29,7 +29,7 @@ func FromDataCached(
 		isEverythingCached := false
 		var fromCache []detectors.Result
 		for _, r := range withoutVerification {
-			if cacheHit, ok := cache.Get(cacheKey(r)); ok {
+			if cacheHit, ok := verificationCache.Get(cacheKey(r)); ok {
 				fromCache = append(fromCache, *cacheHit)
 				fromCache[len(fromCache)-1].Raw = r.Raw
 				fromCache[len(fromCache)-1].RawV2 = r.RawV2
@@ -56,7 +56,7 @@ func FromDataCached(
 		copyForCaching.RawV2 = nil
 		// Decoder type will be set later, so clear it out now to minimize the chance of accidentally cloning it
 		copyForCaching.DecoderType = detectorspb.DecoderType_UNKNOWN
-		cache.Set(cacheKey(r), &copyForCaching)
+		verificationCache.Set(cacheKey(r), &copyForCaching)
 	}
 
 	return withVerification, nil
