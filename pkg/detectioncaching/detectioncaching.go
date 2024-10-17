@@ -10,6 +10,7 @@ import (
 func FromDataCached(
 	ctx context.Context,
 	verificationCache cache.Cache[*detectors.Result],
+	getCacheKey func(result *detectors.Result) string,
 	detector detectors.Detector,
 	verify bool,
 	forceCacheMiss bool,
@@ -29,7 +30,7 @@ func FromDataCached(
 		isEverythingCached := false
 		var fromCache []detectors.Result
 		for _, r := range withoutVerification {
-			if cacheHit, ok := verificationCache.Get(cacheKey(r)); ok {
+			if cacheHit, ok := verificationCache.Get(getCacheKey(&r)); ok {
 				fromCache = append(fromCache, *cacheHit)
 				fromCache[len(fromCache)-1].Raw = r.Raw
 				fromCache[len(fromCache)-1].RawV2 = r.RawV2
@@ -56,12 +57,8 @@ func FromDataCached(
 		copyForCaching.RawV2 = nil
 		// Decoder type will be set later, so clear it out now to minimize the chance of accidentally cloning it
 		copyForCaching.DecoderType = detectorspb.DecoderType_UNKNOWN
-		verificationCache.Set(cacheKey(r), &copyForCaching)
+		verificationCache.Set(getCacheKey(&r), &copyForCaching)
 	}
 
 	return withVerification, nil
-}
-
-func cacheKey(result detectors.Result) string {
-	return string(result.Raw) + string(result.RawV2)
 }

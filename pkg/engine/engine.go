@@ -1060,6 +1060,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results, err := detectioncaching.FromDataCached(
 			ctx,
 			e.detectionCache,
+			func(r *detectors.Result) string { return string(r.Raw) + string(r.RawV2) },
 			data.detector.Detector,
 			data.chunk.Verify,
 			data.chunk.SecretID != 0,
