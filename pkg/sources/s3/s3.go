@@ -131,6 +131,7 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	cfg := aws.NewConfig()
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
+	cfg.LogLevel = aws.LogLevel(aws.LogDebugWithRequestErrors)
 	cfg.Region = aws.String(region)
 
 	switch cred := s.conn.GetCredential().(type) {
@@ -326,9 +327,10 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				return nil
 			}
 
+			const defaultTimeout = 30 * time.Second
 			// files break with spaces, must replace with +
 			// objKey := strings.ReplaceAll(*obj.Key, " ", "+")
-			ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+			ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 			defer cancel()
 			res, err := client.GetObjectWithContext(ctx, &s3.GetObjectInput{
 				Bucket: &bucket,
