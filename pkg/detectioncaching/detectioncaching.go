@@ -23,22 +23,34 @@ func FromDataCached(
 		return withoutVerification, nil
 	}
 
-	if !forceCacheMiss {
-		everythingCached := false
-		var cachedResults []detectors.Result
-		for _, r := range withoutVerification {
-			if cacheHit, ok := cache.Get(cacheKey(r)); ok {
-				cachedResults = append(cachedResults, *cacheHit)
-			} else {
-				everythingCached = false
-				break
-			}
-		}
+	if forceCacheMiss {
+		return verifyAndCache(ctx, cache, detector, data)
+	}
 
-		if everythingCached {
-			return cachedResults, nil
+	everythingCached := false
+	var cachedResults []detectors.Result
+	for _, r := range withoutVerification {
+		if cacheHit, ok := cache.Get(cacheKey(r)); ok {
+			cachedResults = append(cachedResults, *cacheHit)
+		} else {
+			everythingCached = false
+			break
 		}
 	}
+
+	if everythingCached {
+		return cachedResults, nil
+	}
+
+	return verifyAndCache(ctx, cache, detector, data)
+}
+
+func verifyAndCache(
+	ctx context.Context,
+	cache cache.Cache[*detectors.Result],
+	detector detectors.Detector,
+	data []byte,
+) ([]detectors.Result, error) {
 
 	results, err := detector.FromData(ctx, true, data)
 	if err != nil {
