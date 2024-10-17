@@ -15,6 +15,7 @@ func FromDataCached(
 	forceCacheMiss bool,
 	data []byte,
 ) ([]detectors.Result, error) {
+
 	withoutVerification, err := detector.FromData(ctx, false, data)
 	if err != nil {
 		return nil, err
@@ -24,44 +25,31 @@ func FromDataCached(
 		return withoutVerification, nil
 	}
 
-	if forceCacheMiss {
-		return verifyAndCache(ctx, cache, detector, data)
-	}
+	if !forceCacheMiss {
+		isEverythingCached := false
+		var fromCache []detectors.Result
+		for _, r := range withoutVerification {
+			if cacheHit, ok := cache.Get(cacheKey(r)); ok {
+				fromCache = append(fromCache, *cacheHit)
+				fromCache[len(fromCache)-1].Raw = r.Raw
+				fromCache[len(fromCache)-1].RawV2 = r.RawV2
+			} else {
+				isEverythingCached = false
+				break
+			}
+		}
 
-	everythingCached := false
-	var cachedResults []detectors.Result
-	for _, r := range withoutVerification {
-		if cacheHit, ok := cache.Get(cacheKey(r)); ok {
-			returnedCopy := *cacheHit
-			returnedCopy.Raw = r.Raw
-			returnedCopy.RawV2 = r.RawV2
-			cachedResults = append(cachedResults, returnedCopy)
-		} else {
-			everythingCached = false
-			break
+		if isEverythingCached {
+			return fromCache, nil
 		}
 	}
 
-	if everythingCached {
-		return cachedResults, nil
-	}
-
-	return verifyAndCache(ctx, cache, detector, data)
-}
-
-func verifyAndCache(
-	ctx context.Context,
-	cache cache.Cache[*detectors.Result],
-	detector detectors.Detector,
-	data []byte,
-) ([]detectors.Result, error) {
-
-	results, err := detector.FromData(ctx, true, data)
+	withVerification, err := detector.FromData(ctx, true, data)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, r := range results {
+	for _, r := range withVerification {
 		copyForCaching := r
 		// Do not persist raw secret values in a long-lived cache
 		copyForCaching.Raw = nil
@@ -71,7 +59,7 @@ func verifyAndCache(
 		cache.Set(cacheKey(r), &copyForCaching)
 	}
 
-	return results, nil
+	return withVerification, nil
 }
 
 func cacheKey(result detectors.Result) string {
