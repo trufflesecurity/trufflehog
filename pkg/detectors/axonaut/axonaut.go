@@ -48,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			// Reference : https://axonaut.com/api/v2/doc
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://axonaut.com/api/v2/me", nil)
 			if err != nil {
 				continue
