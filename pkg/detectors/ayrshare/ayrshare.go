@@ -3,9 +3,10 @@ package ayrshare
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -48,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.ayrshare.com/api/analytics/links", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.ayrshare.com/api/user", nil)
 			if err != nil {
 				continue
 			}
