@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -50,7 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.autoklose.com/api/campaigns/?api_token=%s", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.autoklose.com/api/me/?api_token=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
