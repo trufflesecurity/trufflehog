@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -129,6 +130,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		DetectorType: detectorspb.DetectorType_CustomRegex,
 		DetectorName: c.GetName(),
 		Raw:          []byte(raw),
+		ExtraData:    map[string]string{},
 	}
 
 	if !verify {
@@ -166,14 +168,30 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			}
 			req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
 		}
-		res, err := httpClient.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			continue
 		}
-		// TODO: Read response body.
-		res.Body.Close()
-		if res.StatusCode == http.StatusOK {
+		defer func() {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}()
+
+		if resp.StatusCode == http.StatusOK {
+			// mark the result as verified
 			result.Verified = true
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				continue
+			}
+
+			// TODO: handle different content-type responses seperatly when implement custom detector configurations
+			responseStr := string(body)
+
+			// store the processed response in ExtraData
+			result.ExtraData["response"] = responseStr
+
 			break
 		}
 	}
