@@ -4,8 +4,8 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -13,7 +13,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -66,17 +68,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
-				// req.SetBasicAuth(idMatch, keyMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(keyMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -90,4 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SauceLabs
+}
+
+func (s Scanner) Description() string {
+	return "A service for cross browser testing, API keys can create and access tests from potentially sensitive internal websites"
 }

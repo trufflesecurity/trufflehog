@@ -3,7 +3,7 @@ package planetscaledb
 import (
 	"context"
 	"database/sql"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 
 	"github.com/go-sql-driver/mysql"
@@ -12,7 +12,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -77,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PlanetScaleDb
+}
+
+func (s Scanner) Description() string {
+	return "PlanetScaleDB is a serverless database platform built on Vitess. Credentials found here can be used to connect to the database and perform operations."
 }

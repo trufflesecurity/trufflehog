@@ -4,9 +4,9 @@ import (
 	"context"
 	"io"
 	"net/http"
-	// "log"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -64,10 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if strings.Contains(body, "success") {
 					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
@@ -80,4 +76,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Allsports
+}
+
+func (s Scanner) Description() string {
+	return "Allsports API keys can be used to access and interact with the Allsports API, allowing retrieval of sports data and other related operations."
 }

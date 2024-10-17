@@ -63,7 +63,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 	s.verify = verify
 	s.jobPool = &errgroup.Group{}
 	s.jobPool.SetLimit(concurrency)
-	s.client = common.RetryableHttpClientTimeout(3)
+	s.client = common.RetryableHTTPClientTimeout(3)
 
 	var conn sourcespb.CircleCI
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {

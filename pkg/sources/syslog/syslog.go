@@ -303,6 +303,10 @@ func (s *Source) acceptUDPConnections(ctx context.Context, netListener net.Packe
 		if common.IsDone(ctx) {
 			return nil
 		}
+		err := netListener.SetDeadline(time.Now().Add(time.Second))
+		if err != nil {
+			ctx.Logger().V(2).Info("could not update connection deadline", "error", err)
+		}
 		input := make([]byte, 65535)
 		_, remote, err := netListener.ReadFrom(input)
 		if err != nil {

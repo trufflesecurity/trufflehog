@@ -3,20 +3,19 @@ package jdbc
 import (
 	"context"
 	"errors"
-	mssql "github.com/denisenkom/go-mssqldb"
+	"fmt"
 	"strings"
+
+	mssql "github.com/microsoft/go-mssqldb"
 )
 
 type sqlServerJDBC struct {
-	conn   string
-	params map[string]string
+	connStr string
 }
 
 func (s *sqlServerJDBC) ping(ctx context.Context) pingResult {
 	return ping(ctx, "mssql", isSqlServerErrorDeterminate,
-		joinKeyValues(s.params, ";"),
-		s.conn,
-		"sqlserver://"+s.conn)
+		s.connStr)
 }
 
 func isSqlServerErrorDeterminate(err error) bool {
@@ -38,22 +37,35 @@ func parseSqlServer(subname string) (jdbc, error) {
 		return nil, errors.New("expected connection to start with //")
 	}
 	conn := strings.TrimPrefix(subname, "//")
-	params := map[string]string{
-		"user id":  "sa",
-		"database": "master",
-	}
-	for _, param := range strings.Split(conn, ";") {
+
+	port := "1433"
+	var password, host string
+
+	for i, param := range strings.Split(conn, ";") {
 		key, value, found := strings.Cut(param, "=")
-		if !found {
+		if !found && i == 0 {
+			//  String connectionUrl = "jdbc:sqlserver://<server>:<port>;encrypt=true;databaseName=AdventureWorks;user=<user>;password=<password>";
+			if split := strings.Split(param, ":"); len(split) > 1 {
+				host = split[0]
+				port = split[1]
+			} else {
+				host = param
+			}
 			continue
 		}
-		params[key] = value
-		if key != "password" && strings.Contains(strings.ToLower(key), "password") {
-			params["password"] = value
+
+		switch strings.ToLower(key) {
+		case "password":
+			password = value
+		case "spring.datasource.password":
+			password = value
+		case "server":
+			host = value
+		case "port":
+			port = value
 		}
 	}
 	return &sqlServerJDBC{
-		conn:   strings.TrimPrefix(subname, "//"),
-		params: params,
+		connStr: fmt.Sprintf("sqlserver://sa:%s@%s:%s?database=master&connection+timeout=5", password, host, port),
 	}, nil
 }

@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -15,7 +15,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -59,11 +61,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-
 				payload := url.Values{}
 				payload.Add("username", resEmailMatch)
 
-				req, err := http.NewRequest("GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
 				if err != nil {
 					continue
 				}
@@ -82,11 +83,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
 							s1.Verified = true
-						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}
@@ -107,4 +103,8 @@ type Response struct {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GoCanvas
+}
+
+func (s Scanner) Description() string {
+	return "GoCanvas is a platform for automating business processes using mobile forms. GoCanvas API keys can be used to access and modify data within the GoCanvas platform."
 }

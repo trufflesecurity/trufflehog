@@ -1,0 +1,16 @@
+permissions:
+- project
+- project:admin
+- repository
+- repository:write
+- repository:admin
+- repository:delete
+- pullrequest
+- pullrequest:write
+- webhook
+- account
+- pipeline
+- pipeline:write
+- pipeline:variable
+- runner
+- runner:write

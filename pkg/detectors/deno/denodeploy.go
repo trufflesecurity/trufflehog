@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -73,7 +74,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else {
 						var user userResponse
 						if err := json.Unmarshal(body, &user); err != nil {
-							fmt.Printf("Unmarshal error: %v\n", err)
 							s1.SetVerificationError(err, token)
 						} else {
 							s1.ExtraData = map[string]string{
@@ -92,11 +92,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-		if !s1.Verified && detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
-			continue
-		}
-
 		results = append(results, s1)
 	}
 
@@ -105,4 +100,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_DenoDeploy
+}
+
+func (s Scanner) Description() string {
+	return "DenoDeploy is a cloud service for deploying JavaScript and TypeScript applications. DenoDeploy tokens can be used to access and manage these deployments."
 }

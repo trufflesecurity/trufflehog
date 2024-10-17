@@ -61,6 +61,9 @@ func GetAccountNumFromAWSID(AWSID string) (string, error) {
 	if len(AWSID) < 4 {
 		return "", fmt.Errorf("AWSID is too short")
 	}
+	if AWSID[4] == 'I' || AWSID[4] == 'J' {
+		return "", fmt.Errorf("Can't get account number from AKIAJ/ASIAJ or AKIAI/ASIAI keys")
+	}
 	trimmedAWSID := AWSID[4:]
 	decodedBytes, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(trimmedAWSID))
 	if err != nil {
@@ -77,4 +80,23 @@ func GetAccountNumFromAWSID(AWSID string) (string, error) {
 	const mask uint64 = 0x7fffffffff80
 	accountNum := (z & mask) >> 7
 	return fmt.Sprintf("%012d", accountNum), nil
+}
+
+// SliceContainsString searches a slice to determine if it contains a specified string.
+// Returns the index of the first match in the slice.
+func SliceContainsString(origTargetString string, stringSlice []string, ignoreCase bool) (bool, string, int) {
+	targetString := origTargetString
+	if ignoreCase {
+		targetString = strings.ToLower(origTargetString)
+	}
+	for i, origStringFromSlice := range stringSlice {
+		stringFromSlice := origStringFromSlice
+		if ignoreCase {
+			stringFromSlice = strings.ToLower(origStringFromSlice)
+		}
+		if targetString == stringFromSlice {
+			return true, targetString, i
+		}
+	}
+	return false, "", 0
 }

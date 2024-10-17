@@ -3,8 +3,8 @@ package bitfinex
 import (
 	"context"
 	"flag"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
@@ -14,7 +14,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -77,10 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					if strings.HasPrefix(err.Error(), "POST https://") { // eg POST https://api-pub.bitfinex.com/v2/auth/r/orders/hist: 500 apikey: digest invalid (10100)
 						isValid = false
-					} else {
-						if detectors.IsKnownFalsePositive(apiKeyRes, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 
@@ -92,7 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		// By appending resutls in the outer loop we can reduce false positives if there are multiple
+		// By appending results in the outer loop we can reduce false positives if there are multiple
 		// combinations of secrets and IDs found.
 		if len(apiSecretMatches) > 0 {
 			results = append(results, s1)
@@ -104,4 +102,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Bitfinex
+}
+
+func (s Scanner) Description() string {
+	return "Bitfinex is a cryptocurrency exchange offering various trading options. Bitfinex API keys can be used to access and manage trading accounts."
 }

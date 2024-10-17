@@ -3,9 +3,9 @@ package userstack
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -64,10 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = true
 					} else {
 						s1.Verified = false
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -81,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_UserStack
+}
+
+func (s Scanner) Description() string {
+	return "UserStack is a service that provides detailed information about the technology stack used by a website. UserStack API keys can be used to access this information."
 }

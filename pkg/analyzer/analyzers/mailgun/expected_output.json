@@ -1,0 +1,25 @@
+{
+   "AnalyzerType": 8,
+   "Bindings": [
+    {
+     "Resource": {
+      "Name": "sandbox19e49763d44e498e850589ea7d54bd82.mailgun.org",
+      "FullyQualifiedName": "mailgun/6478cb31d026c112819856cd/sandbox19e49763d44e498e850589ea7d54bd82.mailgun.org",
+      "Type": "domain",
+      "Metadata": {
+       "created_at": "Thu, 01 Jun 2023 16:45:37 GMT",
+       "is_disabled": false,
+       "state": "active",
+       "type": "sandbox"
+      },
+      "Parent": null
+     },
+     "Permission": {
+      "Value": "full_access",
+      "Parent": null
+     }
+    }
+   ],
+   "UnboundedResources": null,
+   "Metadata": null
+  }

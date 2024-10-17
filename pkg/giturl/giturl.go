@@ -120,7 +120,7 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 func GenerateLink(repo, commit, file string, line int64) string {
 	// Some paths contain '%' which breaks |url.Parse| if not encoded.
 	// https://developer.mozilla.org/en-US/docs/Glossary/Percent-encoding
-	file = strings.Replace(file, "%", "%25", -1)
+	file = strings.ReplaceAll(file, "%", "%25")
 
 	switch determineProvider(repo) {
 	case providerBitbucket:
@@ -140,7 +140,7 @@ func GenerateLink(repo, commit, file string, line int64) string {
 	default:
 		var baseLink string
 
-		//Gist links are formatted differently
+		// Gist links are formatted differently
 		if strings.HasPrefix(repo, "https://gist.github.com") {
 			baseLink = repo[:len(repo)-4] + "/"
 			if commit != "" {

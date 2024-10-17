@@ -1,4 +1,4 @@
-PROTOS_IMAGE ?= trufflesecurity/protos:1.21-0
+PROTOS_IMAGE ?= trufflesecurity/protos:1.22
 
 .PHONY: check
 .PHONY: lint
@@ -40,7 +40,7 @@ test-detectors:
 	CGO_ENABLED=0 go test -tags=detectors -timeout=5m $(shell go list ./... | grep pkg/detectors)
 
 test-community:
-	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors | grep -v pkg/sources)
+	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/ | grep -v pkg/detectors | grep -v pkg/sources | grep -v pkg/analyzer/analyzers)
 
 bench:
 	CGO_ENABLED=0 go test $(shell go list ./pkg/secrets/... | grep -v /vendor/) -benchmem -run=xxx -bench .
@@ -59,10 +59,10 @@ protos-windows:
 
 release-protos-image:
 	docker buildx build --push --platform=linux/amd64,linux/arm64 \
-	-t trufflesecurity/protos:1.21-0 -f hack/Dockerfile.protos .
+	-t ${PROTOS_IMAGE} -f hack/Dockerfile.protos .
 
 snifftest:
 	./hack/snifftest/snifftest.sh
 
 test-release:
-	goreleaser release --rm-dist --skip-publish --snapshot
+	goreleaser release --clean --skip-publish --snapshot

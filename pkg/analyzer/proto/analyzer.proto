@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package analyzer;
+
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb";
+
+enum AnalyzerType {
+  Invalid = 0;
+  Airbrake = 1;
+  Asana = 2;
+  Bitbucket = 3;
+  GitHub = 4;
+  GitLab = 5;
+  HuggingFace = 6;
+  Mailchimp = 7;
+  Mailgun = 8;
+  MySQL = 9;
+  OpenAI = 10;
+  Opsgenie = 11;
+  Postgres = 12;
+  Postman = 13;
+  Sendgrid = 14;
+  Shopify = 15;
+  Slack = 16;
+  Sourcegraph = 17;
+  Square = 18;
+  Stripe = 19;
+  Twilio = 20;
+}

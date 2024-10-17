@@ -23,6 +23,7 @@ func TestLaunchDarkly_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
+	sdkSecret := testSecrets.MustGetField("LAUNCHDARKLY_SDK_TOKEN")
 	secret := testSecrets.MustGetField("LAUNCHDARKLY_TOKEN")
 	inactiveSecret := testSecrets.MustGetField("LAUNCHDARKLY_INACTIVE")
 
@@ -99,30 +100,26 @@ func TestLaunchDarkly_FromChunk(t *testing.T) {
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
-		// TODO: enable this test and add the sdk token
-		/*
-			{
-				name: "found, valid sdk token",
-				s:    Scanner{},
-				args: args{
-					ctx:    context.Background(),
-					data:   []byte(fmt.Sprintf("You can find a launchdarkly sdk secret %s within", sdkSecret)),
-					verify: true,
-				},
-				want: []detectors.Result{
-					{
-						DetectorType: detectorspb.DetectorType_LaunchDarkly,
-						Verified:     true,
-					},
-				},
-				wantErr: false,
+		{
+			name: "found, valid sdk token",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a launchdarkly sdk secret %s within", sdkSecret)),
+				verify: true,
 			},
-		*/
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_LaunchDarkly,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LaunchDarkly.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -132,6 +129,14 @@ func TestLaunchDarkly_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+
+				// Do we expect to be comparing the ExtraData?
+				got[i].ExtraData = nil
+
+				// If we expect a verification error, copy over the one we got so the later comparison can work
+				if tt.wantVerificationErr && len(tt.want) > i {
+					tt.want[i].SetVerificationError(got[i].VerificationError())
+				}
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("LaunchDarkly.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

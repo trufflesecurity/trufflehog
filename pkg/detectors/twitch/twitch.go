@@ -3,9 +3,9 @@ package twitch
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -15,6 +15,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -68,10 +69,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
 			results = append(results, s1)
 		}
 	}
@@ -117,4 +114,8 @@ func verifyTwitch(ctx context.Context, client *http.Client, resMatch string, res
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Twitch
+}
+
+func (s Scanner) Description() string {
+	return "Twitch is a live streaming service. Twitch API keys can be used to access and modify data on the Twitch platform."
 }

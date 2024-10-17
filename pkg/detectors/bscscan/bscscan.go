@@ -2,9 +2,9 @@ package bscscan
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -55,22 +55,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
-                                bodyBytes, err := io.ReadAll(res.Body)
-                                if err != nil {
-                                        continue
-                                }
-                                body := string(bodyBytes)
+				bodyBytes, err := io.ReadAll(res.Body)
+				if err != nil {
+					continue
+				}
+				body := string(bodyBytes)
 
-                                if !strings.Contains(body, "NOTOK") {
-                                        s1.Verified = true
-                                } else {
-                                        // This function will check false positives for common test words, but also it will make sur>
-                                        if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-                                                continue
-                                        }
-                                }
-                        }
-                }
+				if !strings.Contains(body, "NOTOK") {
+					s1.Verified = true
+				}
+			}
+		}
 
 		results = append(results, s1)
 	}
@@ -80,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BscScan
+}
+
+func (s Scanner) Description() string {
+	return "BscScan is a block explorer and analytics platform for Binance Smart Chain. BscScan API keys can be used to access data from the Binance Smart Chain blockchain."
 }

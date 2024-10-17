@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/lib/pq"
@@ -23,8 +24,7 @@ func (s *postgresJDBC) ping(ctx context.Context) pingResult {
 	return ping(ctx, "postgres", isPostgresErrorDeterminate,
 		buildPostgresConnectionString(s.params, true),
 		buildPostgresConnectionString(s.params, false),
-		s.conn,
-		"postgres://"+s.conn)
+	)
 }
 
 func isPostgresErrorDeterminate(err error) bool {
@@ -59,36 +59,50 @@ func joinKeyValues(m map[string]string, sep string) string {
 
 func parsePostgres(subname string) (jdbc, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
-	hostAndDB, paramString, _ := strings.Cut(subname, "?")
-	if !strings.HasPrefix(hostAndDB, "//") {
+
+	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected host to start with //")
 	}
-	userPassAndHostAndDB := strings.TrimPrefix(hostAndDB, "//")
-	userPass, hostAndDB, found := strings.Cut(userPassAndHostAndDB, "@")
-	var user, pass string
-	if found {
-		user, pass, _ = strings.Cut(userPass, ":")
-	} else {
-		hostAndDB = userPass
+
+	u, err := url.Parse(subname)
+	if err != nil {
+		return nil, err
 	}
-	host, database, found := strings.Cut(hostAndDB, "/")
-	if !found {
-		return nil, errors.New("expected host and database to be separated by /")
+
+	dbName := strings.TrimPrefix(u.Path, "/")
+	if dbName == "" {
+		dbName = "postgres"
 	}
 
 	params := map[string]string{
-		"host":   host,
-		"dbname": database,
+		"host":            u.Host,
+		"dbname":          dbName,
+		"connect_timeout": "5",
 	}
-	if len(user) > 0 {
-		params["user"] = user
+
+	if u.User != nil {
+		params["user"] = u.User.Username()
+		pass, set := u.User.Password()
+		if set {
+			params["password"] = pass
+		}
 	}
-	if len(pass) > 0 {
-		params["password"] = pass
+
+	if v := u.Query()["sslmode"]; len(v) > 0 {
+		switch v[0] {
+		// https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
+		case "disable", "allow", "prefer",
+			"require", "verify-ca", "verify-full":
+			params["sslmode"] = v[0]
+		}
 	}
-	for _, param := range strings.Split(paramString, "&") {
-		key, val, _ := strings.Cut(param, "=")
-		params[key] = val
+
+	if v := u.Query().Get("user"); v != "" {
+		params["user"] = v
+	}
+
+	if v := u.Query().Get("password"); v != "" {
+		params["password"] = v
 	}
 
 	return &postgresJDBC{subname[2:], params}, nil
@@ -107,11 +121,14 @@ func buildPostgresConnectionString(params map[string]string, includeDbName bool)
 				continue
 			}
 		}
-		if key == "dbname" && !includeDbName {
-			continue
-		}
 		data[key] = val
 	}
 
-	return joinKeyValues(data, " ")
+	if !includeDbName {
+		data["dbname"] = "postgres"
+	}
+
+	connStr := joinKeyValues(data, " ")
+
+	return connStr
 }

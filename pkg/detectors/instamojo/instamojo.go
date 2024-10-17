@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,6 +15,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -23,9 +25,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	//KeyPat is client_id
+	// KeyPat is client_id
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{40})\b`)
-	//Secretpat is Client_secret
+	// Secretpat is Client_secret
 	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"instamojo"}) + `\b([0-9a-zA-Z]{128})\b`)
 )
 
@@ -90,10 +92,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
-
 			results = append(results, s1)
 		}
 	}
@@ -103,4 +101,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Instamojo
+}
+
+func (s Scanner) Description() string {
+	return "An Ecommerce service, API keys can be used to create and access customer data"
 }

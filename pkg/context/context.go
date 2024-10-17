@@ -169,7 +169,7 @@ func AddLogger(parent context.Context) Context {
 	return WithLogger(parent, defaultLogger)
 }
 
-// SetupDefaultLogger sets the package-level global default logger that will be
+// SetDefaultLogger sets the package-level global default logger that will be
 // used for Background and TODO contexts. On startup, the default logger will
 // be configured to output logs to stderr. Use logr.Discard() to disable all
 // logs from Contexts.

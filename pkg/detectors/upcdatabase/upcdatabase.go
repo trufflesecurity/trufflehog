@@ -3,9 +3,9 @@ package upcdatabase
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -66,11 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						} else {
 							s1.Verified = false
 						}
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -84,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_UPCDatabase
+}
+
+func (s Scanner) Description() string {
+	return "UPCDatabase is a service that provides access to a database of product information via API. The API key can be used to query product details."
 }

@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -67,11 +67,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					} else {
 						s1.Verified = false
 					}
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
@@ -84,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Autoklose
+}
+
+func (s Scanner) Description() string {
+	return "Autoklose is a sales automation tool that allows users to streamline their email outreach and follow-up processes. Autoklose API tokens can be used to access and manage campaigns, contacts, and other related data."
 }

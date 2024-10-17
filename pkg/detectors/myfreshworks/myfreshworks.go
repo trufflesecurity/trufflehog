@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -16,6 +16,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -64,10 +65,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
 			results = append(results, s1)
 		}
 
@@ -112,4 +109,8 @@ func verifyMyfreshworks(ctx context.Context, client *http.Client, resMatch, resI
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Myfreshworks
+}
+
+func (s Scanner) Description() string {
+	return "Freshworks is a customer engagement platform offering various services like CRM, IT service management, and more. Freshworks API keys can be used to access and manage these services."
 }

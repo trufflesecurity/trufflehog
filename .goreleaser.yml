@@ -1,3 +1,4 @@
+version: 2
 builds:
   - binary: trufflehog
     ldflags:
@@ -87,7 +88,7 @@ docker_manifests:
     - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64
     - ghcr.io/trufflesecurity/{{ .ProjectName }}:{{ .Version }}-arm64v8
 brews:
-  - tap:
+  - repository:
       owner: trufflesecurity
       name: homebrew-trufflehog
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"

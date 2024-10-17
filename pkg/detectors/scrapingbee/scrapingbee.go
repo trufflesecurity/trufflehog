@@ -2,8 +2,8 @@ package scrapingbee
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -56,11 +56,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
@@ -73,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ScrapingBee
+}
+
+func (s Scanner) Description() string {
+	return "ScrapingBee is a web scraping service that handles headless browsers and proxies for you. ScrapingBee API keys can be used to access and control web scraping tasks."
 }

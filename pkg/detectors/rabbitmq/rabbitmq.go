@@ -3,8 +3,9 @@ package rabbitmq
 import (
 	"context"
 	"net/url"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -18,7 +19,7 @@ type Scanner struct{}
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\b(?:amqp:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\b(?:amqps?):\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -59,9 +60,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			_, err := amqp.Dial(urlMatch)
+			conn, err := amqp.Dial(urlMatch)
 			if err == nil {
 				s.Verified = true
+			}
+			if conn != nil {
+				conn.Close()
 			}
 		}
 
@@ -72,10 +76,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
-
 		results = append(results, s)
 	}
 
@@ -84,4 +84,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RabbitMQ
+}
+
+func (s Scanner) Description() string {
+	return "RabbitMQ is an open-source message broker software that originally implemented the Advanced Message Queuing Protocol (AMQP). RabbitMQ credentials can be used to access and manage message queues."
 }

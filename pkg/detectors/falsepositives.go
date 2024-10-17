@@ -2,15 +2,27 @@ package detectors
 
 import (
 	_ "embed"
+	"fmt"
 	"math"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	ahocorasick "github.com/BobuSumisu/aho-corasick"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "www"}
+var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "*****"}
 
 type FalsePositive string
+
+type CustomFalsePositiveChecker interface {
+	// IsFalsePositive returns two values:
+	// 1. Whether the result is a false positive.
+	// 2. If #1 is `true`, the reason why.
+	IsFalsePositive(result Result) (bool, string)
+}
 
 //go:embed "badlist.txt"
 var badList []byte
@@ -21,49 +33,57 @@ var wordList []byte
 //go:embed "programmingbooks.txt"
 var programmingBookWords []byte
 
-type Wordlists struct {
-	wordList             map[string]struct{}
-	badList              map[string]struct{}
-	programmingBookWords map[string]struct{}
+var filter *ahocorasick.Trie
+
+func init() {
+	builder := ahocorasick.NewTrieBuilder()
+
+	wordList := bytesToCleanWordList(wordList)
+	builder.AddStrings(wordList)
+
+	badList := bytesToCleanWordList(badList)
+	builder.AddStrings(badList)
+
+	programmingBookWords := bytesToCleanWordList(programmingBookWords)
+	builder.AddStrings(programmingBookWords)
+
+	filter = builder.Build()
 }
 
-var FalsePositiveWordlists = Wordlists{
-	wordList:             bytesToCleanWordList(wordList),
-	badList:              bytesToCleanWordList(badList),
-	programmingBookWords: bytesToCleanWordList(programmingBookWords),
+func GetFalsePositiveCheck(detector Detector) func(Result) (bool, string) {
+	checker, ok := detector.(CustomFalsePositiveChecker)
+	if ok {
+		return checker.IsFalsePositive
+	}
+
+	return func(res Result) (bool, string) {
+		return IsKnownFalsePositive(string(res.Raw), DefaultFalsePositives, true)
+	}
 }
 
-// IsKnownFalsePositives will not return a valid secret finding if any of the disqualifying conditions are met
-// Currently that includes: No number, english word in key, or matches common example pattens.
+// IsKnownFalsePositive returns whether a finding is (likely) a known false positive, and the reason for the detection.
+//
+// Currently, this includes: english word in key or matches common example patterns.
 // Only the secret key material should be passed into this function
-func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) bool {
+func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) (bool, string) {
 	if !utf8.ValidString(match) {
-		return true
+		return true, "invalid utf8"
 	}
 	lower := strings.ToLower(match)
 	for _, fp := range falsePositives {
-		if strings.Contains(lower, string(fp)) {
-			return true
+		fps := string(fp)
+		if strings.Contains(lower, fps) {
+			return true, "matches term: " + fps
 		}
 	}
 
 	if wordCheck {
-		// check against common substring badlist
-		if _, ok := FalsePositiveWordlists.badList[lower]; ok {
-			return true
-		}
-
-		// check for dictionary word substrings
-		if _, ok := FalsePositiveWordlists.wordList[lower]; ok {
-			return true
-		}
-
-		// check for programming book token substrings
-		if _, ok := FalsePositiveWordlists.programmingBookWords[lower]; ok {
-			return true
+		if m := filter.MatchFirstString(lower); m != nil {
+			return true, "matches wordlist: " + m.MatchString()
 		}
 	}
-	return false
+
+	return false, ""
 }
 
 func HasDigit(key string) bool {
@@ -76,14 +96,19 @@ func HasDigit(key string) bool {
 	return false
 }
 
-func bytesToCleanWordList(data []byte) map[string]struct{} {
+func bytesToCleanWordList(data []byte) []string {
 	words := make(map[string]struct{})
 	for _, word := range strings.Split(string(data), "\n") {
 		if strings.TrimSpace(word) != "" {
 			words[strings.TrimSpace(strings.ToLower(word))] = struct{}{}
 		}
 	}
-	return words
+
+	wordList := make([]string, 0, len(words))
+	for word := range words {
+		wordList = append(wordList, word)
+	}
+	return wordList
 }
 
 func StringShannonEntropy(input string) float64 {
@@ -104,20 +129,49 @@ func StringShannonEntropy(input string) float64 {
 }
 
 // FilterResultsWithEntropy filters out determinately unverified results that have a shannon entropy below the given value.
-func FilterResultsWithEntropy(results []Result, entropy float64) []Result {
+func FilterResultsWithEntropy(ctx context.Context, results []Result, entropy float64, shouldLog bool) []Result {
 	var filteredResults []Result
 	for _, result := range results {
-		if !result.Verified && result.VerificationError() == nil {
-			if result.RawV2 != nil {
-				if StringShannonEntropy(string(result.RawV2)) >= entropy {
-					filteredResults = append(filteredResults, result)
-				}
-			} else {
+		if !result.Verified {
+			if result.Raw != nil {
 				if StringShannonEntropy(string(result.Raw)) >= entropy {
 					filteredResults = append(filteredResults, result)
+				} else {
+					if shouldLog {
+						ctx.Logger().Info("Filtered out result with low entropy", "result", result)
+					}
 				}
+			} else {
+				filteredResults = append(filteredResults, result)
 			}
+		} else {
+			filteredResults = append(filteredResults, result)
 		}
 	}
+	return filteredResults
+}
+
+// FilterKnownFalsePositives filters out known false positives from the results.
+func FilterKnownFalsePositives(ctx context.Context, detector Detector, results []Result) []Result {
+	var filteredResults []Result
+
+	isFalsePositive := GetFalsePositiveCheck(detector)
+
+	for _, result := range results {
+		if len(result.Raw) == 0 {
+			ctx.Logger().Error(fmt.Errorf("empty raw"), "invalid result; skipping")
+			continue
+		}
+
+		if result.Verified {
+			filteredResults = append(filteredResults, result)
+			continue
+		}
+
+		if isFp, _ := isFalsePositive(result); !isFp {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
 	return filteredResults
 }

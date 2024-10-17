@@ -17,7 +17,15 @@ type (
 )
 
 // Chunk contains data to be decoded and scanned along with context on where it came from.
+//
+// **Important:** The order of the fields in this struct is specifically designed to optimize
+// struct alignment and minimize memory usage. Do not change the field order without carefully considering
+// the potential impact on memory consumption.
+// Ex: https://go.dev/play/p/Azf4a7O-DhC
 type Chunk struct {
+	// Data is the data to decode and scan.
+	Data []byte
+
 	// SourceName is the name of the Source that produced the chunk.
 	SourceName string
 	// SourceID is the ID of the source that the Chunk originated from.
@@ -27,13 +35,12 @@ type Chunk struct {
 	// SecretID is the ID of the secret, if it exists.
 	// Only secrets that are being reverified will have a SecretID.
 	SecretID int64
-	// SourceType is the type of Source that produced the chunk.
-	SourceType sourcespb.SourceType
+
 	// SourceMetadata holds the context of where the Chunk was found.
 	SourceMetadata *source_metadatapb.MetaData
+	// SourceType is the type of Source that produced the chunk.
+	SourceType sourcespb.SourceType
 
-	// Data is the data to decode and scan.
-	Data []byte
 	// Verify specifies whether any secrets in the Chunk should be verified.
 	Verify bool
 }
@@ -123,11 +130,28 @@ type ChunkReporter interface {
 	ChunkErr(ctx context.Context, err error) error
 }
 
+type SourceUnitKind string
+
 // SourceUnit is an object that represents a Source's unit of work. This is
 // used as the output of enumeration, progress reporting, and job distribution.
 type SourceUnit interface {
-	// SourceUnitID uniquely identifies a source unit.
-	SourceUnitID() string
+	// SourceUnitID uniquely identifies a source unit. It does not need to
+	// be human readable or two-way, however, it should be canonical and
+	// stable across runs.
+	SourceUnitID() (string, SourceUnitKind)
+
+	// Display is the human readable representation of the SourceUnit.
+	Display() string
+}
+
+// DockerConfig defines the optional configuration for a Docker source.
+type DockerConfig struct {
+	// Images is the list of images to scan.
+	Images []string
+	// BearerToken is the token to use to authenticate with the source.
+	BearerToken string
+	// UseDockerKeychain determines whether to use the Docker keychain.
+	UseDockerKeychain bool
 }
 
 // GCSConfig defines the optional configuration for a GCS source.
@@ -210,6 +234,24 @@ type GithubConfig struct {
 	IncludeGistComments bool
 	// SkipBinaries allows skipping binary files from the scan.
 	SkipBinaries bool
+	// IncludeWikis indicates whether to include repository wikis in the scan.
+	IncludeWikis bool
+	// CommentsTimeframeDays indicates how many days of comments to include in the scan.
+	CommentsTimeframeDays uint32
+}
+
+// GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.
+type GitHubExperimentalConfig struct {
+	// Repository is the repository to scan.
+	Repository string
+	// Token is the token to use to authenticate with the source.
+	Token string
+	// ObjectDiscovery indicates whether to discover all commit objects (CFOR) in the repository.
+	ObjectDiscovery bool
+	// CollisionThreshold is the number of short-sha collisions tolerated during hidden data enumeration. Default is 1.
+	CollisionThreshold int
+	// DeleteCachedData indicates whether to delete cached data.
+	DeleteCachedData bool
 }
 
 // GitlabConfig defines the optional configuration for a gitlab source.
@@ -230,8 +272,10 @@ type GitlabConfig struct {
 type FilesystemConfig struct {
 	// Paths is the list of files and directories to scan.
 	Paths []string
-	// Filter is the filter to use to scan the source.
-	Filter *common.Filter
+	// IncludePathsFile is the path to a file containing a list of regexps to include in the scan.
+	IncludePathsFile string
+	// ExcludePathsFile is the path to a file containing a list of regexps to exclude from the scan.
+	ExcludePathsFile string
 }
 
 // S3Config defines the optional configuration for an S3 source.
@@ -247,6 +291,8 @@ type S3Config struct {
 	SessionToken string
 	// Buckets is the list of buckets to scan.
 	Buckets []string
+	// IgnoreBuckets is the list buckets to ignore.
+	IgnoreBuckets []string
 	// Roles is the list of Roles to use.
 	Roles []string
 	// MaxObjectSize is the maximum object size to scan.
@@ -267,6 +313,49 @@ type SyslogConfig struct {
 	KeyPath string
 	// Concurrency is the number of concurrent workers to use to scan the source.
 	Concurrency int
+}
+
+// PostmanConfig defines the optional configuration for a Postman source.
+type PostmanConfig struct {
+	// Workspace UUID(s) or file path(s) to Postman workspace (.zip)
+	Workspaces []string
+	// Collection ID(s) or file path(s) to Postman collection (.json)
+	Collections []string
+	// Environment ID(s) or file path(s) to Postman environment (.json)
+	Environments []string
+	// Token is the token to use to authenticate with the API.
+	Token string
+	// IncludeCollections is a list of Collections to include in the scan.
+	IncludeCollections []string
+	// IncludeEnvironment is a list of Environments to include in the scan.
+	IncludeEnvironments []string
+	// ExcludeCollections is a list of Collections to exclude in the scan.
+	ExcludeCollections []string
+	// ExcludeEnvironment is a list of Environments to exclude in the scan.
+	ExcludeEnvironments []string
+	// Concurrency is the number of concurrent workers to use to scan the source.
+	Concurrency int
+	// CollectionPaths is the list of paths to Postman collections.
+	CollectionPaths []string
+	// WorkspacePaths is the list of paths to Postman workspaces.
+	WorkspacePaths []string
+	// EnvironmentPaths is the list of paths to Postman environments.
+	EnvironmentPaths []string
+	// Filter is the filter to use to scan the source.
+	Filter *common.Filter
+}
+
+type ElasticsearchConfig struct {
+	Nodes          []string
+	Username       string
+	Password       string
+	CloudID        string
+	APIKey         string
+	ServiceToken   string
+	IndexPattern   string
+	QueryJSON      string
+	SinceTimestamp string
+	BestEffortScan bool
 }
 
 // Progress is used to update job completion progress across sources.

@@ -11,11 +11,20 @@ var _ SourceUnit = CommonSourceUnit{}
 // CommonSourceUnit is a common implementation of SourceUnit that Sources can
 // use instead of implementing their own types.
 type CommonSourceUnit struct {
-	ID string `json:"source_unit_id"`
+	Kind SourceUnitKind `json:"kind,omitempty"`
+	ID   string         `json:"id"`
 }
 
 // SourceUnitID implements the SourceUnit interface.
-func (c CommonSourceUnit) SourceUnitID() string {
+func (c CommonSourceUnit) SourceUnitID() (string, SourceUnitKind) {
+	kind := SourceUnitKind("unit")
+	if c.Kind != "" {
+		kind = c.Kind
+	}
+	return c.ID, kind
+}
+
+func (c CommonSourceUnit) Display() string {
 	return c.ID
 }
 

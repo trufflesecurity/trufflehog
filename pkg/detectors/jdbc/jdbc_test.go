@@ -5,9 +5,10 @@ package jdbc
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -66,22 +67,6 @@ func TestJdbc_FromChunk(t *testing.T) {
 				verify: false,
 			},
 			want:    nil,
-			wantErr: false,
-		},
-		{
-			name: "sqlite unverified",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("jdbc:sqlite::memory:"),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JDBC,
-					Verified:     false,
-					Redacted:     "jdbc:sqlite::memory:",
-				},
-			},
 			wantErr: false,
 		},
 		{
@@ -149,6 +134,7 @@ func TestJdbc_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].AnalysisInfo = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Jdbc.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

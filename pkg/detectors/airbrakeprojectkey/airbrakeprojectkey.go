@@ -2,8 +2,8 @@ package airbrakeprojectkey
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -11,7 +11,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -76,12 +78,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			if !s1.Verified {
-				if detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
-					continue
-				}
-			}
-
 			results = append(results, s1)
 
 		}
@@ -93,4 +89,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AirbrakeProjectKey
+}
+
+func (s Scanner) Description() string {
+	return "Airbrake is an error and performance monitoring service for web applications. Airbrake project keys can be used to report and track errors in applications."
 }

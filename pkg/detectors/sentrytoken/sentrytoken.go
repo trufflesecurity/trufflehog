@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -70,9 +70,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-			continue
-		}
 		results = append(results, s1)
 	}
 
@@ -131,4 +128,8 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SentryToken
+}
+
+func (s Scanner) Description() string {
+	return "Sentry is an error tracking service that helps developers monitor and fix crashes in real time. Sentry tokens can be used to access and manage projects and organizations within Sentry."
 }

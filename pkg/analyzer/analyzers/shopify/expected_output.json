@@ -1,0 +1,177 @@
+{
+   "AnalyzerType": 15,
+   "Bindings": [
+    {
+     "Resource": {
+      "Name": "Analytics",
+      "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com/Analytics",
+      "Type": "category",
+      "Metadata": null,
+      "Parent": {
+       "Name": "My Store",
+       "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com",
+       "Type": "shop",
+       "Metadata": {
+        "created_at": "2024-08-16T17:16:17+05:00"
+       },
+       "Parent": null
+      }
+     },
+     "Permission": {
+      "Value": "read",
+      "Parent": null
+     }
+    },
+    {
+     "Resource": {
+      "Name": "Applications",
+      "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com/Applications",
+      "Type": "category",
+      "Metadata": null,
+      "Parent": {
+       "Name": "My Store",
+       "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com",
+       "Type": "shop",
+       "Metadata": {
+        "created_at": "2024-08-16T17:16:17+05:00"
+       },
+       "Parent": null
+      }
+     },
+     "Permission": {
+      "Value": "read",
+      "Parent": null
+     }
+    },
+    {
+     "Resource": {
+      "Name": "Assigned fulfillment orders",
+      "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com/Assigned fulfillment orders",
+      "Type": "category",
+      "Metadata": null,
+      "Parent": {
+       "Name": "My Store",
+       "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com",
+       "Type": "shop",
+       "Metadata": {
+        "created_at": "2024-08-16T17:16:17+05:00"
+       },
+       "Parent": null
+      }
+     },
+     "Permission": {
+      "Value": "full_access",
+      "Parent": null
+     }
+    },
+    {
+     "Resource": {
+      "Name": "Customers",
+      "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com/Customers",
+      "Type": "category",
+      "Metadata": null,
+      "Parent": {
+       "Name": "My Store",
+       "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com",
+       "Type": "shop",
+       "Metadata": {
+        "created_at": "2024-08-16T17:16:17+05:00"
+       },
+       "Parent": null
+      }
+     },
+     "Permission": {
+      "Value": "full_access",
+      "Parent": null
+     }
+    },
+    {
+     "Resource": {
+      "Name": "Discovery",
+      "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com/Discovery",
+      "Type": "category",
+      "Metadata": null,
+      "Parent": {
+       "Name": "My Store",
+       "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com",
+       "Type": "shop",
+       "Metadata": {
+        "created_at": "2024-08-16T17:16:17+05:00"
+       },
+       "Parent": null
+      }
+     },
+     "Permission": {
+      "Value": "full_access",
+      "Parent": null
+     }
+    },
+    {
+     "Resource": {
+      "Name": "Merchant-managed fulfillment orders",
+      "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com/Merchant-managed fulfillment orders",
+      "Type": "category",
+      "Metadata": null,
+      "Parent": {
+       "Name": "My Store",
+       "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com",
+       "Type": "shop",
+       "Metadata": {
+        "created_at": "2024-08-16T17:16:17+05:00"
+       },
+       "Parent": null
+      }
+     },
+     "Permission": {
+      "Value": "full_access",
+      "Parent": null
+     }
+    },
+    {
+     "Resource": {
+      "Name": "Reports",
+      "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com/Reports",
+      "Type": "category",
+      "Metadata": null,
+      "Parent": {
+       "Name": "My Store",
+       "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com",
+       "Type": "shop",
+       "Metadata": {
+        "created_at": "2024-08-16T17:16:17+05:00"
+       },
+       "Parent": null
+      }
+     },
+     "Permission": {
+      "Value": "full_access",
+      "Parent": null
+     }
+    },
+    {
+     "Resource": {
+      "Name": "cart_transforms",
+      "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com/cart_transforms",
+      "Type": "category",
+      "Metadata": null,
+      "Parent": {
+       "Name": "My Store",
+       "FullyQualifiedName": "727f01-d6.myshopify.com/detectors@trufflesec.com",
+       "Type": "shop",
+       "Metadata": {
+        "created_at": "2024-08-16T17:16:17+05:00"
+       },
+       "Parent": null
+      }
+     },
+     "Permission": {
+      "Value": "full_access",
+      "Parent": null
+     }
+    }
+   ],
+   "UnboundedResources": null,
+   "Metadata": {
+    "status_code": 200
+   }
+  }

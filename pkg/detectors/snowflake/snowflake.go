@@ -4,25 +4,27 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 	"unicode"
 
 	_ "github.com/snowflakedb/gosnowflake"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z]{7})\b`)
+	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z-_]{1,255}(.privatelink)?)\b`)
 	usernameExclusionPat = `!@#$%^&*{}:<>,.;?()/\+=\s\n`
 )
 
@@ -69,7 +71,10 @@ func meetsSnowflakePasswordRequirements(password string) (string, bool) {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	accountMatches := accountIdentifierPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueAccountMatches := make(map[string]struct{})
+	for _, match := range accountIdentifierPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueAccountMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
 	usernameRegexState := common.UsernameRegexCheck(usernameExclusionPat)
 	usernameMatches := usernameRegexState.Matches(data)
@@ -77,14 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	passwordRegexState := common.PasswordRegexCheck(" ") // No explicit character exclusions by Snowflake for passwords
 	passwordMatches := passwordRegexState.Matches(data)
 
-	for _, accountMatch := range accountMatches {
-		if len(accountMatch) != 2 {
-			continue
-		}
-		resAccountMatch := strings.TrimSpace(accountMatch[1])
-
+	for resAccountMatch := range uniqueAccountMatches {
 		for _, resUsernameMatch := range usernameMatches {
-
 			for _, resPasswordMatch := range passwordMatches {
 				_, metPasswordRequirements := meetsSnowflakePasswordRequirements(resPasswordMatch)
 
@@ -117,7 +116,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						ctx = context.Background()
 					}
 
-					// Disable pool + retries to prevent flooding the server with failed login attemps.
+					// Disable pool + retries to prevent flooding the server with failed login attempts.
 					db.SetConnMaxLifetime(time.Second)
 					db.SetMaxOpenConns(1)
 
@@ -153,11 +152,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				}
 
-				// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-				if !s1.Verified && detectors.IsKnownFalsePositive(resPasswordMatch, detectors.DefaultFalsePositives, true) {
-					continue
-				}
-
 				results = append(results, s1)
 
 			}
@@ -168,4 +162,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Snowflake
+}
+
+func (s Scanner) Description() string {
+	return "Snowflake is a cloud data platform that provides data warehousing, data lakes, data sharing, and data exchange capabilities. Snowflake credentials can be used to access and manipulate data stored in Snowflake."
 }

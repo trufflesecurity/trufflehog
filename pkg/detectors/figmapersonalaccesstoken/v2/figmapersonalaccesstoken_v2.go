@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -33,6 +34,11 @@ func (s Scanner) Keywords() []string {
 	return []string{"figma"}
 }
 
+// Description returns a description for the result being detected.
+func (s Scanner) Description() string {
+	return "Figma is a collaborative interface design tool. Figma Personal Access Tokens can be used to access and manipulate design files and other resources on behalf of a user."
+}
+
 // FromData will find and optionally verify FigmaPersonalAccessToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -48,6 +54,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 			Raw:          []byte(resMatch),
+			ExtraData: map[string]string{
+				"version": fmt.Sprintf("%d", s.Version()),
+			},
 		}
 
 		if verify {
@@ -75,9 +84,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-			continue
-		}
 		results = append(results, s1)
 	}
 

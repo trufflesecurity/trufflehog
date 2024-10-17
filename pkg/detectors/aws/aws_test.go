@@ -12,12 +12,77 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+const canaryAccessKeyID = "AKIASP2TPHJSQH3FJRUX"
+
 var unverifiedSecretClient = common.ConstantResponseHttpClient(403, `{"Error": {"Code": "InvalidClientTokenId"} }`)
+
+// Our AWS detector interacts with AWS in an (expectedly) uncommon way that triggers some odd AWS behavior. (This odd
+// behavior doesn't affect "normal" AWS use, so it's not really "broken" - it's just something that we have to work
+// around.) The AWS detector code has a long comment explaining this in more detail, but the basic issue is that AWS STS
+// is stateful, so the behavior of these tests can vary depending on which of them you run, and in which order. This
+// particular test (TestAWS_FromChunk_InvalidValidReuseIDSequence) duplicates some logic in the "big" test table in the
+// other test in this file, but extracting it in this way as well makes it fail more consistently when it's supposed to
+// fail, which is why it's extracted.
+func TestAWS_FromChunk_InvalidValidReuseIDSequence(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+	secret := testSecrets.MustGetField("AWS")
+	id := testSecrets.MustGetField("AWS_ID")
+	inactiveSecret := testSecrets.MustGetField("AWS_INACTIVE")
+
+	d := scanner{}
+
+	ignoreOpts := []cmp.Option{cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError")}
+
+	got, err := d.FromData(ctx, true, []byte(fmt.Sprintf("aws %s %s", id, inactiveSecret)))
+	if assert.NoError(t, err) {
+		want := []detectors.Result{
+			{
+				DetectorType: detectorspb.DetectorType_AWS,
+				Verified:     false,
+				Redacted:     "AKIAZAVB57H55F3T4BKH",
+				ExtraData: map[string]string{
+					"resource_type": "Access key",
+					"account":       "619888638459",
+				},
+			},
+		}
+		if diff := cmp.Diff(got, want, ignoreOpts...); diff != "" {
+			t.Errorf("AWS.FromData() (valid ID, invalid secret) diff: (-got +want)\n%s", diff)
+		}
+	}
+
+	got, err = d.FromData(ctx, true, []byte(fmt.Sprintf("aws %s %s", id, secret)))
+	if assert.NoError(t, err) {
+		want := []detectors.Result{
+			{
+				DetectorType: detectorspb.DetectorType_AWS,
+				Verified:     true,
+				Redacted:     "AKIAZAVB57H55F3T4BKH",
+				ExtraData: map[string]string{
+					"resource_type":  "Access key",
+					"account":        "619888638459",
+					"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
+					"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
+					"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
+				},
+			},
+		}
+		if diff := cmp.Diff(got, want, ignoreOpts...); diff != "" {
+			t.Errorf("AWS.FromData() (valid secret after invalid secret using same ID) diff: (-got +want)\n%s", diff)
+		}
+	}
+}
 
 func TestAWS_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -59,13 +124,13 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type":  "Access key",
+						"account":        "619888638459",
+						"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
-						"account":        "171436882533",
-						"arn":            "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"user_id":        "AIDASP2TPHJSUFRSTTZX4",
+						"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
 					},
 				},
 			},
@@ -83,10 +148,10 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
+						"account":       "619888638459",
 					},
 				},
 			},
@@ -115,22 +180,22 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJXYZ",
+					Redacted:     "AKIAZAVB57H55F3T4XYZ",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
+						"account":       "619888638459",
 					},
 				},
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type":  "Access key",
+						"account":        "619888638459",
+						"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
-						"account":        "171436882533",
-						"arn":            "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"user_id":        "AIDASP2TPHJSUFRSTTZX4",
+						"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
 					},
 				},
 			},
@@ -159,26 +224,32 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type":  "Access key",
+						"account":        "619888638459",
+						"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
-						"account":        "171436882533",
-						"arn":            "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"user_id":        "AIDASP2TPHJSUFRSTTZX4",
+						"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
 					},
 				},
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
 					Redacted:     inactiveID,
+					ExtraData: map[string]string{
+						"account":       "619888638459",
+						"resource_type": "Access key",
+					},
 				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "found, unverified, with leading +",
-			s:    scanner{verificationClient: unverifiedSecretClient},
+			s: scanner{
+				verificationClient: unverifiedSecretClient,
+			},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s but not valid", "+HaNv9cTwheDKGJaws/+BMF2GgybQgBWdhcOOdfF", id)), // the secret would satisfy the regex but not pass validation
@@ -188,10 +259,10 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
+						"account":       "619888638459",
 					},
 				},
 			},
@@ -201,7 +272,7 @@ func TestAWS_FromChunk(t *testing.T) {
 			name: "skipped",
 			s: scanner{
 				skipIDs: map[string]struct{}{
-					"AKIASP2TPHJSQH3FJRUX": {},
+					"AKIAZAVB57H55F3T4BKH": {},
 				},
 			},
 			args: args{
@@ -213,7 +284,9 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, would be verified if not for http timeout",
-			s:    scanner{verificationClient: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			s: scanner{
+				verificationClient: common.SaneHttpClientTimeOut(1 * time.Microsecond),
+			},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
@@ -223,10 +296,10 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
+						"account":       "619888638459",
 					},
 				},
 			},
@@ -235,7 +308,9 @@ func TestAWS_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, unverified due to unexpected http response status",
-			s:    scanner{verificationClient: common.ConstantResponseHttpClient(500, "internal server error")},
+			s: scanner{
+				verificationClient: common.ConstantResponseHttpClient(500, "internal server error"),
+			},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
@@ -245,10 +320,10 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
-						"account":       "171436882533",
+						"account":       "619888638459",
 					},
 				},
 			},
@@ -256,26 +331,52 @@ func TestAWS_FromChunk(t *testing.T) {
 			wantVerificationError: true,
 		},
 		{
-			name: "found, unverified due to unexpected 403 response reason",
-			s:    scanner{verificationClient: common.ConstantResponseHttpClient(403, `{"Error": {"Code": "SignatureDoesNotMatch"} }`)},
+			name: "found, unverified due to invalid aws_secret with valid canary access_key_id",
+			s:    scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", inactiveSecret, canaryAccessKeyID)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     false,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     canaryAccessKeyID,
 					ExtraData: map[string]string{
 						"resource_type": "Access key",
 						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
 					},
 				},
 			},
 			wantErr:               false,
-			wantVerificationError: true,
+			wantVerificationError: false,
+		},
+		{
+			name: "found, valid canary token with no verification",
+			s:    scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a aws secret %s within aws %s", secret, canaryAccessKeyID)),
+				verify: false,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AWS,
+					Verified:     false,
+					Redacted:     canaryAccessKeyID,
+					ExtraData: map[string]string{
+						"resource_type": "Access key",
+						"account":       "171436882533",
+						"is_canary":     "true",
+						"message":       "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries",
+					},
+				},
+			},
+			wantErr:               false,
+			wantVerificationError: false,
 		},
 		{
 			name: "verified secret checked directly after unverified secret with same key id",
@@ -289,13 +390,13 @@ func TestAWS_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AWS,
 					Verified:     true,
-					Redacted:     "AKIASP2TPHJSQH3FJRUX",
+					Redacted:     "AKIAZAVB57H55F3T4BKH",
 					ExtraData: map[string]string{
 						"resource_type":  "Access key",
+						"account":        "619888638459",
+						"arn":            "arn:aws:iam::619888638459:user/trufflehog-aws-detector-tester",
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/aws/",
-						"account":        "171436882533",
-						"arn":            "arn:aws:iam::171436882533:user/canarytokens.com@@4dxkh0pdeop3bzu9zx5wob793",
-						"user_id":        "AIDASP2TPHJSUFRSTTZX4",
+						"user_id":        "AIDAZAVB57H5V3Q4ACRGM",
 					},
 				},
 			},
@@ -318,8 +419,13 @@ func TestAWS_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError %v, verification error = %v", tt.wantVerificationError, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			ignoreOpts := []cmp.Option{
+				cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "verificationError"),
+				cmpopts.SortSlices(func(x, y detectors.Result) bool {
+					return x.Redacted < y.Redacted
+				}),
+			}
+			if diff := cmp.Diff(got, tt.want, ignoreOpts...); diff != "" {
 				t.Errorf("AWS.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

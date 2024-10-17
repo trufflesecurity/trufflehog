@@ -15,8 +15,7 @@ ${ts.map(kv
 ${uname
 $value
 $x:expr
-+3=err
-a;								
++3=err						
 a][appendix_a
 abbreviated
 abcabcabc
@@ -1242,7 +1241,6 @@ getusermedia
 getval
 gg@allin.com
 ghastly
-github
 gitignore
 giving
 glance

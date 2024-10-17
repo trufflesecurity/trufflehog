@@ -23,7 +23,7 @@ func TestSignalwire_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("SGINALWIRE_ID")
+	id := testSecrets.MustGetField("SIGNALWIRE_ID")
 	secret := testSecrets.MustGetField("SIGNALWIRE_TOKEN")
 	url := testSecrets.MustGetField("SIGNALWIRE_URL")
 	inactiveSecret := testSecrets.MustGetField("SIGNALWIRE_INACTIVE")

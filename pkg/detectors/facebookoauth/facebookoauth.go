@@ -3,8 +3,8 @@ package facebookoauth
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -12,7 +12,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -69,10 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					} else {
-						if detectors.IsKnownFalsePositive(apiIdRes, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -86,4 +84,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FacebookOAuth
+}
+
+func (s Scanner) Description() string {
+	return "Facebook OAuth tokens are used to authenticate users and provide access to Facebook's API services."
 }

@@ -8,6 +8,14 @@ import (
 )
 
 var (
+	gitlabGroupsEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: common.MetricsNamespace,
+		Subsystem: common.MetricsSubsystem,
+		Name:      "gitlab_groups_enumerated",
+		Help:      "Total number of GitLab groups enumerated.",
+	},
+		[]string{"source_name"})
+
 	gitlabReposEnumerated = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
 		Subsystem: common.MetricsSubsystem,

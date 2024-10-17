@@ -3,9 +3,9 @@ package braintreepayments
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -14,6 +14,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client     *http.Client
 	useTestURL bool
 }
@@ -69,11 +70,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := verifyBraintree(ctx, client, url, resIdMatch, resMatch)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resMatch)
-			}
-
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s1)
@@ -132,4 +128,8 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BraintreePayments
+}
+
+func (s Scanner) Description() string {
+	return "Braintree is a full-stack payment platform that makes it easy to accept payments in your mobile app or website. Braintree API keys can be used to access and manage payment transactions, customer data, and other payment-related operations."
 }

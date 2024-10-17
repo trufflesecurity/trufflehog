@@ -1,0 +1,76 @@
+{
+    "AnalyzerType": 13,
+    "Bindings": [
+     {
+      "Resource": {
+       "Name": "rendy",
+       "FullyQualifiedName": "rendyplayground@gmail.com",
+       "Type": "user",
+       "Metadata": {
+        "email": "rendyplayground@gmail.com",
+        "role": "user",
+        "team_domain": "",
+        "team_name": "",
+        "username": "rendyplayground"
+       },
+       "Parent": null
+      },
+      "Permission": {
+       "Value": "usage_data:view",
+       "Parent": null
+      }
+     },
+     {
+      "Resource": {
+       "Name": "rendy",
+       "FullyQualifiedName": "rendyplayground@gmail.com",
+       "Type": "user",
+       "Metadata": {
+        "email": "rendyplayground@gmail.com",
+        "role": "user",
+        "team_domain": "",
+        "team_name": "",
+        "username": "rendyplayground"
+       },
+       "Parent": null
+      },
+      "Permission": {
+       "Value": "team_workspaces:create",
+       "Parent": null
+      }
+     },
+     {
+      "Resource": {
+       "Name": "rendy",
+       "FullyQualifiedName": "rendyplayground@gmail.com",
+       "Type": "user",
+       "Metadata": {
+        "email": "rendyplayground@gmail.com",
+        "role": "user",
+        "team_domain": "",
+        "team_name": "",
+        "username": "rendyplayground"
+       },
+       "Parent": null
+      },
+      "Permission": {
+       "Value": "team_workspaces:view",
+       "Parent": null
+      }
+     }
+    ],
+    "UnboundedResources": [
+     {
+      "Name": "My Workspace",
+      "FullyQualifiedName": "4d06fc0c-6402-4a26-857d-80787b10eabf",
+      "Type": "workspace",
+      "Metadata": {
+       "id": "4d06fc0c-6402-4a26-857d-80787b10eabf",
+       "type": "personal",
+       "visibility": "personal"
+      },
+      "Parent": null
+     }
+    ],
+    "Metadata": null
+   }

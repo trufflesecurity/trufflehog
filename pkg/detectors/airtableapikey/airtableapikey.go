@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -13,7 +13,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -49,7 +51,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	if len(keyMatches) == 0 {
 		keyMatches = personalKeyMatches
-
 	}
 
 	for _, keyMatch := range keyMatches {
@@ -92,10 +93,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								s1.Verified = true
 							}
 						}
-					} else {
-						if detectors.IsKnownFalsePositive(keyRes, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -109,4 +106,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AirtableApiKey
+}
+
+func (s Scanner) Description() string {
+	return "Airtable is a cloud collaboration service that offers database-like features. Airtable API keys can be used to access and modify data within Airtable bases."
 }

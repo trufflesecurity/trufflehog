@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -57,10 +58,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
@@ -73,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_DigitalOceanToken
+}
+
+func (s Scanner) Description() string {
+	return "DigitalOcean is a cloud infrastructure provider offering cloud services to help deploy, manage, and scale applications. DigitalOcean tokens can be used to access and manage these services."
 }

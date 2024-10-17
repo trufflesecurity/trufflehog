@@ -1,0 +1,4 @@
+permissions:
+  - read
+  - write
+  - full_access

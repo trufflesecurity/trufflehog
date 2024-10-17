@@ -3,8 +3,8 @@ package plaidkey
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -12,7 +12,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -69,11 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
 							s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", env)}
-						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}
@@ -91,4 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PlaidKey
+}
+
+func (s Scanner) Description() string {
+	return "Plaid is a financial services company that provides a way to connect applications to users' bank accounts. Plaid API keys can be used to access and manage financial data."
 }

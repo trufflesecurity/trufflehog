@@ -2,8 +2,8 @@ package virustotal
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -48,9 +48,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			s1.Verified = verifyToken(ctx, client, resMatch)
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
 		}
 		results = append(results, s1)
 	}
@@ -79,4 +76,8 @@ func verifyToken(ctx context.Context, client *http.Client, token string) bool {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_VirusTotal
+}
+
+func (s Scanner) Description() string {
+	return "VirusTotal is an online service that analyzes files and URLs for viruses, worms, trojans, and other kinds of malicious content. VirusTotal API keys can be used to access and integrate this service into applications."
 }

@@ -2,9 +2,9 @@ package infura
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -64,11 +64,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				body := string(bodyBytes)
 				if strings.Contains(body, `"result"`) {
 					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
@@ -81,4 +76,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Infura
+}
+
+func (s Scanner) Description() string {
+	return "Infura provides the infrastructure for decentralized applications to connect to the Ethereum blockchain. Infura keys can be used to interact with the Ethereum network."
 }

@@ -114,10 +114,6 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ui.activePage -= 1
 				return ui, nil
 			}
-		case tea.MouseMsg:
-			switch msg.Type {
-			case tea.MouseLeft:
-			}
 		}
 	case common.ErrorMsg:
 		return ui, nil
@@ -132,11 +128,14 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case wizard_intro.ViewHelpDocs:
 				ui.args = []string{"--help"}
 
-				return ui, tea.Batch(nil, tea.Quit)
+				return ui, tea.Quit
 			case wizard_intro.EnterpriseInquire:
 				ui.activePage = contactEnterprisePage
 			case wizard_intro.ScanSourceWithWizard:
 				ui.activePage = sourceSelectPage
+			case wizard_intro.AnalyzeSecret:
+				ui.args = []string{"analyze"}
+				return ui, tea.Quit
 			}
 		case source_select.SourceItem:
 			ui.activePage = sourceConfigurePage

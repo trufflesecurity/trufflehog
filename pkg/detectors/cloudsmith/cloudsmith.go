@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -70,11 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if r.Authenticated {
 						s1.Verified = true
 					}
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
@@ -87,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Cloudsmith
+}
+
+func (s Scanner) Description() string {
+	return "Cloudsmith is a cloud-native package management service. Cloudsmith API keys can be used to manage and distribute packages."
 }

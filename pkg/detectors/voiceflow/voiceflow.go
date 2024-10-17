@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -25,7 +25,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Reference: https://developer.voiceflow.com/reference/project#dialog-manager-api-keys
 	//
-	//TODO: This includes Workspace and Legacy Workspace API keys; I haven't validated whether these actually work.
+	// TODO: This includes Workspace and Legacy Workspace API keys; I haven't validated whether these actually work.
 	// https://github.com/voiceflow/general-runtime/blob/master/tests/runtime/lib/DataAPI/utils.unit.ts
 	keyPat = regexp.MustCompile(`\b(VF\.(?:(?:DM|WS)\.)?[a-fA-F0-9]{24}\.[a-zA-Z0-9]{16})\b`)
 )
@@ -97,4 +97,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Voiceflow
+}
+
+func (s Scanner) Description() string {
+	return "Voiceflow is an AI service designed to transact with customers. API keys may be used to access customer data."
 }

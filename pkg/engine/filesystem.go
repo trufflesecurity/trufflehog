@@ -15,7 +15,9 @@ import (
 // ScanFileSystem scans a given file system.
 func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig) error {
 	connection := &sourcespb.Filesystem{
-		Paths: c.Paths,
+		Paths:            c.Paths,
+		IncludePathsFile: c.IncludePathsFile,
+		ExcludePathsFile: c.ExcludePathsFile,
 	}
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
@@ -28,7 +30,6 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, filesystem.SourceType)
 
 	fileSystemSource := &filesystem.Source{}
-	fileSystemSource.WithFilter(c.Filter)
 	if err := fileSystemSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}

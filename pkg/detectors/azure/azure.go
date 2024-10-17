@@ -3,16 +3,18 @@ package azure
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -51,15 +53,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, tenantID := range tenantIDMatches {
 			clientIDMatches := clientIDPat.FindAllStringSubmatch(dataStr, -1)
 			for _, clientID := range clientIDMatches {
-				s := detectors.Result{
+				res := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Azure,
 					Raw:          []byte(clientSecret[2]),
 					RawV2:        []byte(clientID[2] + clientSecret[2] + tenantID[2]),
 					Redacted:     clientID[2],
-				}
-				// Set the RotationGuideURL in the ExtraData
-				s.ExtraData = map[string]string{
-					"rotation_guide": "https://howtorotate.com/docs/tutorials/azure/",
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/azure/",
+					},
 				}
 
 				if verify {
@@ -68,22 +69,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err != nil {
 						continue
 					}
-					err = token.Refresh()
+					err = token.RefreshWithContext(ctx)
 					if err == nil {
-						s.Verified = true
+						res.Verified = true
 					}
 				}
 
-				if !s.Verified {
-					if detectors.IsKnownFalsePositive(s.Redacted, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-					if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
-
-				results = append(results, s)
+				results = append(results, res)
 			}
 		}
 	}
@@ -93,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Azure
+}
+
+func (s Scanner) Description() string {
+	return "Azure is a cloud service offering a wide range of services including compute, analytics, storage, and networking. Azure credentials can be used to access and manage these services."
 }

@@ -1,0 +1,11 @@
+permissions:
+- models:read
+- model_capabilities:write
+- assistants:read
+- assistants:write
+- threads:read
+- threads:write
+- fine_tuning:read
+- fine_tuning:write
+- files:read
+- files:write

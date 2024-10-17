@@ -2,7 +2,7 @@ package cleantemp
 
 import (
 	"fmt"
-	"io/fs"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -69,41 +69,50 @@ func CleanTempArtifacts(ctx logContext.Context) error {
 	}
 
 	tempDir := os.TempDir()
-	err = filepath.WalkDir(tempDir, func(path string, d fs.DirEntry, err error) error {
+	dir, err := os.Open(tempDir)
+	if err != nil {
+		return fmt.Errorf("error opening temp dir: %w", err)
+	}
+	defer dir.Close()
+
+	for {
+		entries, err := dir.ReadDir(1) // read only one entry
 		if err != nil {
-			return fmt.Errorf("error walking temp dir: %w", err)
+			if err == io.EOF {
+				break
+			}
+			continue
 		}
-		if trufflehogRE.MatchString(d.Name()) {
+		entry := entries[0]
+
+		if trufflehogRE.MatchString(entry.Name()) {
+
 			// Mark these artifacts initially as ones that should be deleted.
 			shouldDelete := true
 			// Check if the name matches any live PIDs.
 			// Potential race condition here if a PID is started and creates tmp data after the initial check.
 			for _, pidval := range pids {
-				if strings.Contains(d.Name(), fmt.Sprintf("-%s-", pidval)) {
+				if strings.Contains(entry.Name(), fmt.Sprintf("-%s-", pidval)) {
 					shouldDelete = false
 					break
 				}
 			}
 
 			if shouldDelete {
-				var err error
-				if d.IsDir() {
+				path := filepath.Join(tempDir, entry.Name())
+				isDir := entry.IsDir()
+				if isDir {
 					err = os.RemoveAll(path)
 				} else {
 					err = os.Remove(path)
 				}
 				if err != nil {
-					return fmt.Errorf("error deleting temp artifact: %s", path)
+					return fmt.Errorf("error deleting temp artifact (dir: %v) %s: %w", isDir, path, err)
 				}
 
 				ctx.Logger().V(4).Info("Deleted orphaned temp artifact", "artifact", path)
 			}
 		}
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("error walking temp dir: %w", err)
 	}
 
 	return nil

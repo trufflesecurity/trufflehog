@@ -3,9 +3,9 @@ package languagelayer
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -66,11 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						} else {
 							s1.Verified = false
 						}
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -84,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LanguageLayer
+}
+
+func (s Scanner) Description() string {
+	return "LanguageLayer is an API service for language detection. The access key can be used to authenticate and use the API."
 }

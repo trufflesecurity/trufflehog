@@ -52,6 +52,7 @@ func TestSlack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Slack,
 					Verified:     true,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
 				},
 			},
 			wantErr: false,
@@ -67,9 +68,28 @@ func TestSlack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Slack,
 					Verified:     false,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "account_inactive",
+			s:    Scanner{client: common.ConstantResponseHttpClient(200, `{"ok": false, "error": "account_inactive"}`)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
+				verify: true,
+			},
+			wantResults: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Slack,
+					Verified:     false,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, would be verified if not for timeout",
@@ -83,6 +103,7 @@ func TestSlack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Slack,
 					Verified:     false,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
 				},
 			},
 			wantErr:             false,
@@ -100,6 +121,7 @@ func TestSlack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Slack,
 					Verified:     false,
+					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
 				},
 			},
 			wantErr:             false,
@@ -119,6 +141,7 @@ func TestSlack_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].AnalysisInfo = nil
 
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())

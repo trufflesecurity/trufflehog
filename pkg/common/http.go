@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
 var caCerts = []string{
@@ -88,8 +89,15 @@ type CustomTransport struct {
 	T http.RoundTripper
 }
 
+func userAgent() string {
+	if len(feature.UserAgentSuffix.Load()) > 0 {
+		return "TruffleHog " + feature.UserAgentSuffix.Load()
+	}
+	return "TruffleHog"
+}
+
 func (t *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Add("User-Agent", "TruffleHog")
+	req.Header.Add("User-Agent", userAgent())
 	return t.T.RoundTrip(req)
 }
 
@@ -115,6 +123,39 @@ func ConstantResponseHttpClient(statusCode int, body string) *http.Client {
 	}
 }
 
+// ClientOption configures how we set up the client.
+type ClientOption func(*retryablehttp.Client)
+
+// WithCheckRetry allows setting a custom CheckRetry policy.
+func WithCheckRetry(cr retryablehttp.CheckRetry) ClientOption {
+	return func(c *retryablehttp.Client) { c.CheckRetry = cr }
+}
+
+// WithBackoff allows setting a custom backoff policy.
+func WithBackoff(b retryablehttp.Backoff) ClientOption {
+	return func(c *retryablehttp.Client) { c.Backoff = b }
+}
+
+// WithTimeout allows setting a custom timeout.
+func WithTimeout(timeout time.Duration) ClientOption {
+	return func(c *retryablehttp.Client) { c.HTTPClient.Timeout = timeout }
+}
+
+// WithMaxRetries allows setting a custom maximum number of retries.
+func WithMaxRetries(retries int) ClientOption {
+	return func(c *retryablehttp.Client) { c.RetryMax = retries }
+}
+
+// WithRetryWaitMin allows setting a custom minimum retry wait.
+func WithRetryWaitMin(wait time.Duration) ClientOption {
+	return func(c *retryablehttp.Client) { c.RetryWaitMin = wait }
+}
+
+// WithRetryWaitMax allows setting a custom maximum retry wait.
+func WithRetryWaitMax(wait time.Duration) ClientOption {
+	return func(c *retryablehttp.Client) { c.RetryWaitMax = wait }
+}
+
 func PinnedRetryableHttpClient() *http.Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.Logger = nil
@@ -136,21 +177,28 @@ func PinnedRetryableHttpClient() *http.Client {
 	return httpClient.StandardClient()
 }
 
-func RetryableHttpClient() *http.Client {
+func RetryableHTTPClient(opts ...ClientOption) *http.Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.RetryMax = 3
 	httpClient.Logger = nil
-	httpClient.HTTPClient.Timeout = 3 * time.Second
 	httpClient.HTTPClient.Transport = NewCustomTransport(nil)
+
+	for _, opt := range opts {
+		opt(httpClient)
+	}
 	return httpClient.StandardClient()
 }
 
-func RetryableHttpClientTimeout(timeOutSeconds int64) *http.Client {
+func RetryableHTTPClientTimeout(timeOutSeconds int64, opts ...ClientOption) *http.Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.RetryMax = 3
 	httpClient.Logger = nil
 	httpClient.HTTPClient.Timeout = time.Duration(timeOutSeconds) * time.Second
 	httpClient.HTTPClient.Transport = NewCustomTransport(nil)
+
+	for _, opt := range opts {
+		opt(httpClient)
+	}
 	return httpClient.StandardClient()
 }
 

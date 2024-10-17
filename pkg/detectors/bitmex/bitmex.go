@@ -5,9 +5,9 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +17,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -82,15 +84,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
-
-						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -112,4 +105,8 @@ func getBitmexSignature(timeStamp string, secret string, action string, path str
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Bitmex
+}
+
+func (s Scanner) Description() string {
+	return "Bitmex is a cryptocurrency exchange and derivative trading platform. Bitmex API keys can be used to access and trade on the platform programmatically."
 }

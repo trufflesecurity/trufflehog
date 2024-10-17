@@ -3,22 +3,22 @@ package jdbc
 import (
 	"context"
 	"errors"
-	"github.com/go-sql-driver/mysql"
+	"fmt"
+	"net/url"
 	"strings"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 type mysqlJDBC struct {
 	conn     string
 	userPass string
 	host     string
-	database string
 	params   string
 }
 
 func (s *mysqlJDBC) ping(ctx context.Context) pingResult {
 	return ping(ctx, "mysql", isMySQLErrorDeterminate,
-		s.conn,
-		buildMySQLConnectionString(s.host, s.database, s.userPass, s.params),
 		buildMySQLConnectionString(s.host, "", s.userPass, s.params))
 }
 
@@ -51,25 +51,51 @@ func isMySQLErrorDeterminate(err error) bool {
 
 func parseMySQL(subname string) (jdbc, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
-	hostAndDB, params, _ := strings.Cut(subname, "?")
-	if !strings.HasPrefix(hostAndDB, "//") {
+	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected host to start with //")
 	}
-	userPassAndHostAndDB := strings.TrimPrefix(hostAndDB, "//")
-	userPass, hostAndDB, found := strings.Cut(userPassAndHostAndDB, "@")
-	if !found {
-		hostAndDB = userPass
-		userPass = ""
+
+	// need for hostnames that have tcp(host:port) format required by this database driver
+	cfg, err := mysql.ParseDSN(strings.TrimPrefix(subname, "//"))
+	if err == nil {
+		return &mysqlJDBC{
+			conn:     subname[2:],
+			userPass: cfg.User + ":" + cfg.Passwd,
+			host:     fmt.Sprintf("tcp(%s)", cfg.Addr),
+			params:   "timeout=5s",
+		}, nil
 	}
-	host, database, found := strings.Cut(hostAndDB, "/")
-	if !found {
-		return nil, errors.New("expected host and database to be separated by /")
+
+	// for standard URI format, which is all i've seen for JDBC
+	u, err := url.Parse(subname)
+	if err != nil {
+		return nil, err
 	}
+
+	user := "root"
+	pass := ""
+	if u.User != nil {
+		user = u.User.Username()
+		pass, _ = u.User.Password()
+	}
+
+	if v := u.Query().Get("user"); v != "" {
+		user = v
+	}
+	if v := u.Query().Get("password"); v != "" {
+		pass = v
+	}
+
+	userAndPass := user
+	if pass != "" {
+		userAndPass = userAndPass + ":" + pass
+	}
+
 	return &mysqlJDBC{
 		conn:     subname[2:],
-		userPass: userPass,
-		host:     host,
-		database: database,
-		params:   params,
+		userPass: userAndPass,
+		host:     fmt.Sprintf("tcp(%s)", u.Host),
+		params:   "timeout=5s",
 	}, nil
+
 }

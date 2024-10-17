@@ -2,15 +2,15 @@
 package cache
 
 // Cache is used to store key/value pairs.
-type Cache interface {
+type Cache[T any] interface {
 	// Set stores the given key/value pair.
-	Set(string, string)
+	Set(key string, val T)
 	// Get returns the value for the given key and a boolean indicating if the key was found.
-	Get(string) (string, bool)
+	Get(key string) (T, bool)
 	// Exists returns true if the given key exists in the cache.
-	Exists(string) bool
+	Exists(key string) bool
 	// Delete the given key from the cache.
-	Delete(string)
+	Delete(key string)
 	// Clear all key/value pairs from the cache.
 	Clear()
 	// Count the number of key/value pairs in the cache.
@@ -18,7 +18,7 @@ type Cache interface {
 	// Keys returns all keys in the cache.
 	Keys() []string
 	// Values returns all values in the cache.
-	Values() []string
+	Values() []T
 	// Contents returns all keys in the cache encoded as a string.
 	Contents() string
 }

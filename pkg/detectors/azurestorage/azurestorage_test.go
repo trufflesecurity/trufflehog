@@ -6,7 +6,7 @@ package azurestorage
 import (
 	"context"
 	"fmt"
-	"regexp"
+	regexp "github.com/wasilibs/go-re2"
 	"strings"
 	"testing"
 	"time"

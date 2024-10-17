@@ -3,9 +3,9 @@ package currencycloud
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -13,7 +13,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -77,10 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							s1.Verified = true
 							s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.currencycloud.com", env)}
 							break
-						} else {
-							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}
@@ -95,4 +93,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CurrencyCloud
+}
+
+func (s Scanner) Description() string {
+	return "Currencycloud provides a global payments platform that allows businesses to make payments and manage currency risk. Currencycloud API keys can be used to access and manage these financial services."
 }

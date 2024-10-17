@@ -2,9 +2,9 @@ package sonarcloud
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -67,11 +67,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if validResponse {
 						s1.Verified = true
 					}
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 
@@ -85,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SonarCloud
+}
+
+func (s Scanner) Description() string {
+	return "SonarCloud is a cloud-based code quality and security service. SonarCloud tokens can be used to access project analysis and quality reports."
 }

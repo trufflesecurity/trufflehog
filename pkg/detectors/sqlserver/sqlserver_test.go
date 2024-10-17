@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/microsoft/go-mssqldb/msdsn"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -45,7 +45,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
-					Redacted:     "sqlserver://sa:********@localhost?database=Demo&disableRetry=false",
+					Redacted:     "sqlserver://sa:********@localhost?database=Demo&dial+timeout=15&disableretry=false",
 					Verified:     true,
 				},
 			},
@@ -67,7 +67,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
-					Redacted:     "sqlserver://sa:********@localhost?disableRetry=false",
+					Redacted:     "sqlserver://sa:********@localhost?dial+timeout=15&disableretry=false",
 					Verified:     false,
 				},
 			},
@@ -105,7 +105,7 @@ func TestSQLServer_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SQLServer,
-					Redacted:     "sqlserver://username:********@server_name?database=testdb&disableRetry=false",
+					Redacted:     "sqlserver://username:********@server_name?database=testdb&dial+timeout=15&disableretry=false&encrypt=true",
 					Verified:     true,
 				},
 			},
@@ -164,9 +164,15 @@ func TestSQLServer_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2")
-			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+			ignoreOpts := []cmp.Option{
+				cmpopts.IgnoreFields(detectors.Result{}, "RawV2"),
+				cmpopts.IgnoreUnexported(detectors.Result{}),
+			}
+			if diff := cmp.Diff(tt.want, got, ignoreOpts...); diff != "" {
 				t.Errorf("SQLServer.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				for _, g := range got {
+					t.Error(g.Redacted)
+				}
 			}
 		})
 	}

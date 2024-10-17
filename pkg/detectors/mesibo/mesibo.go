@@ -2,9 +2,9 @@ package mesibo
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -13,6 +13,7 @@ import (
 )
 
 type Scanner struct{}
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
@@ -62,12 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if !strings.Contains(body, "AUTHFAIL") {
 					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
-
 			}
 		}
 
@@ -79,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mesibo
+}
+
+func (s Scanner) Description() string {
+	return "Mesibo is a real-time communication platform that allows developers to add messaging, voice, and video calls to their apps. Mesibo tokens can be used to access and interact with the Mesibo API."
 }

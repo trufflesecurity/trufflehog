@@ -4,21 +4,23 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat       = regexp.MustCompile(detectors.PrefixRegex([]string{"planviewleankit", "planview"}) + `\b([0-9a-f]{128})\b`)
@@ -56,7 +58,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequest("GET", fmt.Sprintf("https://%s.leankit.com/io/account", resSubdomainMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s.leankit.com/io/account", resSubdomainMatch), nil)
 				if err != nil {
 					continue
 				}
@@ -66,11 +68,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -84,4 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PlanviewLeanKit
+}
+
+func (s Scanner) Description() string {
+	return "Planview LeanKit is a visual project delivery tool that enables teams to apply Lean management principles to their work. The detected credential can be used to access and manage LeanKit accounts."
 }

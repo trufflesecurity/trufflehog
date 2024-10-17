@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -49,6 +50,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FigmaPersonalAccessToken,
 			Raw:          []byte(resMatch),
+			ExtraData: map[string]string{
+				"version": fmt.Sprintf("%d", s.Version()),
+			},
 		}
 
 		if verify {
@@ -76,9 +80,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-			continue
-		}
 		results = append(results, s1)
 	}
 
@@ -87,4 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FigmaPersonalAccessToken
+}
+
+func (s Scanner) Description() string {
+	return "Figma is a web-based design tool. Personal Access Tokens can be used to access and modify design files and other resources."
 }

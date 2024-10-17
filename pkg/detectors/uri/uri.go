@@ -4,11 +4,11 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -20,11 +20,13 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	keyPat = regexp.MustCompile(`\b(?:https?:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
 
-	defaultClient = common.SaneHttpClient()
+	// TODO: make local addr opt-out
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -95,14 +97,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s1.Verified && !s.allowKnownTestSites && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
-
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, error) {
@@ -116,7 +118,7 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 	u.User = nil
 	nonCredentialedURL := u.String()
 
-	req, err := http.NewRequest("GET", credentialedURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", credentialedURL, nil)
 	if err != nil {
 		return false, err
 	}
@@ -134,7 +136,7 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 
 	time.Sleep(time.Millisecond * 10)
 
-	req, err = http.NewRequest("GET", nonCredentialedURL, nil)
+	req, err = http.NewRequestWithContext(ctx, "GET", nonCredentialedURL, nil)
 	if err != nil {
 		return false, err
 	}
@@ -157,4 +159,8 @@ func verifyURL(ctx context.Context, client *http.Client, u *url.URL) (bool, erro
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_URI
+}
+
+func (s Scanner) Description() string {
+	return "This detector identifies URLs with embedded credentials, which can be used to access web resources without explicit user interaction."
 }

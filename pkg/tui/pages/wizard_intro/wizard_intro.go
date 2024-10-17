@@ -14,6 +14,7 @@ import (
 const (
 	ScanSourceWithWizard Item = iota
 	// ScanSourceWithConfig
+	AnalyzeSecret
 	ViewHelpDocs
 	ViewOSSProject
 	EnterpriseInquire
@@ -24,6 +25,8 @@ func (w Item) String() string {
 	switch w {
 	case ScanSourceWithWizard:
 		return "Scan a source using wizard"
+	case AnalyzeSecret:
+		return "Analyze a secret's permissions"
 	//case ScanSourceWithConfig:
 	//	return "Scan a source with a config file"
 	case ViewHelpDocs:
@@ -47,6 +50,7 @@ func New(cmn common.Common) *WizardIntro {
 	sel := selector.New(cmn,
 		[]selector.IdentifiableItem{
 			ScanSourceWithWizard,
+			AnalyzeSecret,
 			// ScanSourceWithConfig,
 			ViewHelpDocs,
 			ViewOSSProject,

@@ -234,9 +234,18 @@ func (m *Artifactory) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Artifactory_BasicAuth:
+		if v == nil {
+			err := ArtifactoryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -268,9 +277,28 @@ func (m *Artifactory) validate(all bool) error {
 		}
 
 	case *Artifactory_AccessToken:
+		if v == nil {
+			err := ArtifactoryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for AccessToken
-
 	case *Artifactory_Unauthenticated:
+		if v == nil {
+			err := ArtifactoryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -301,6 +329,8 @@ func (m *Artifactory) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -402,12 +432,30 @@ func (m *AzureStorage) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *AzureStorage_ConnectionString:
+		if v == nil {
+			err := AzureStorageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for ConnectionString
-
 	case *AzureStorage_BasicAuth:
+		if v == nil {
+			err := AzureStorageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -439,9 +487,28 @@ func (m *AzureStorage) validate(all bool) error {
 		}
 
 	case *AzureStorage_ClientCertificate:
+		if v == nil {
+			err := AzureStorageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for ClientCertificate
-
 	case *AzureStorage_Unauthenticated:
+		if v == nil {
+			err := AzureStorageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -472,6 +539,8 @@ func (m *AzureStorage) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -589,12 +658,30 @@ func (m *Bitbucket) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Bitbucket_Token:
+		if v == nil {
+			err := BitbucketValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *Bitbucket_Oauth:
+		if v == nil {
+			err := BitbucketValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -626,6 +713,16 @@ func (m *Bitbucket) validate(all bool) error {
 		}
 
 	case *Bitbucket_BasicAuth:
+		if v == nil {
+			err := BitbucketValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -656,6 +753,8 @@ func (m *Bitbucket) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -769,11 +868,21 @@ func (m *CircleCI) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *CircleCI_Token:
+		if v == nil {
+			err := CircleCIValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -887,11 +996,21 @@ func (m *TravisCI) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *TravisCI_Token:
+		if v == nil {
+			err := TravisCIValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1013,9 +1132,18 @@ func (m *Confluence) validate(all bool) error {
 
 	// no validation rules for SkipHistory
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Confluence_Unauthenticated:
+		if v == nil {
+			err := ConfluenceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -1047,6 +1175,16 @@ func (m *Confluence) validate(all bool) error {
 		}
 
 	case *Confluence_BasicAuth:
+		if v == nil {
+			err := ConfluenceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -1078,8 +1216,19 @@ func (m *Confluence) validate(all bool) error {
 		}
 
 	case *Confluence_Token:
+		if v == nil {
+			err := ConfluenceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1180,9 +1329,18 @@ func (m *Docker) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Docker_Unauthenticated:
+		if v == nil {
+			err := DockerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -1214,6 +1372,16 @@ func (m *Docker) validate(all bool) error {
 		}
 
 	case *Docker_BasicAuth:
+		if v == nil {
+			err := DockerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -1245,11 +1413,31 @@ func (m *Docker) validate(all bool) error {
 		}
 
 	case *Docker_BearerToken:
+		if v == nil {
+			err := DockerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for BearerToken
-
 	case *Docker_DockerKeychain:
+		if v == nil {
+			err := DockerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for DockerKeychain
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1350,9 +1538,18 @@ func (m *ECR) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *ECR_AccessKey:
+		if v == nil {
+			err := ECRValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAccessKey()).(type) {
@@ -1383,6 +1580,8 @@ func (m *ECR) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1483,6 +1682,10 @@ func (m *Filesystem) validate(all bool) error {
 	}
 
 	var errors []error
+
+	// no validation rules for IncludePathsFile
+
+	// no validation rules for ExcludePathsFile
 
 	if len(errors) > 0 {
 		return FilesystemMultiError(errors)
@@ -1586,15 +1789,42 @@ func (m *GCS) validate(all bool) error {
 
 	// no validation rules for MaxObjectSize
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *GCS_JsonServiceAccount:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for JsonServiceAccount
-
 	case *GCS_ApiKey:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for ApiKey
-
 	case *GCS_Unauthenticated:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -1626,6 +1856,16 @@ func (m *GCS) validate(all bool) error {
 		}
 
 	case *GCS_Adc:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAdc()).(type) {
@@ -1657,9 +1897,28 @@ func (m *GCS) validate(all bool) error {
 		}
 
 	case *GCS_ServiceAccountFile:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for ServiceAccountFile
-
 	case *GCS_Oauth:
+		if v == nil {
+			err := GCSValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -1690,6 +1949,8 @@ func (m *GCS) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1810,9 +2071,18 @@ func (m *Git) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Git_BasicAuth:
+		if v == nil {
+			err := GitValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -1844,6 +2114,16 @@ func (m *Git) validate(all bool) error {
 		}
 
 	case *Git_Unauthenticated:
+		if v == nil {
+			err := GitValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -1875,6 +2155,16 @@ func (m *Git) validate(all bool) error {
 		}
 
 	case *Git_SshAuth:
+		if v == nil {
+			err := GitValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSshAuth()).(type) {
@@ -1905,6 +2195,8 @@ func (m *Git) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2021,12 +2313,30 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *GitLab_Token:
+		if v == nil {
+			err := GitLabValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *GitLab_Oauth:
+		if v == nil {
+			err := GitLabValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -2058,6 +2368,16 @@ func (m *GitLab) validate(all bool) error {
 		}
 
 	case *GitLab_BasicAuth:
+		if v == nil {
+			err := GitLabValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -2088,6 +2408,8 @@ func (m *GitLab) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2218,9 +2540,22 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
+	// no validation rules for IncludeWikis
 
+	// no validation rules for CommentsTimeframeDays
+
+	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
+		if v == nil {
+			err := GitHubValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGithubApp()).(type) {
@@ -2252,9 +2587,28 @@ func (m *GitHub) validate(all bool) error {
 		}
 
 	case *GitHub_Token:
+		if v == nil {
+			err := GitHubValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *GitHub_Unauthenticated:
+		if v == nil {
+			err := GitHubValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -2286,6 +2640,16 @@ func (m *GitHub) validate(all bool) error {
 		}
 
 	case *GitHub_BasicAuth:
+		if v == nil {
+			err := GitHubValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -2316,6 +2680,8 @@ func (m *GitHub) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2395,6 +2761,133 @@ var _ interface {
 	ErrorName() string
 } = GitHubValidationError{}
 
+// Validate checks the field values on GitHubExperimental with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GitHubExperimental) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GitHubExperimental with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GitHubExperimentalMultiError, or nil if none found.
+func (m *GitHubExperimental) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GitHubExperimental) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Repository
+
+	// no validation rules for ObjectDiscovery
+
+	// no validation rules for CollisionThreshold
+
+	// no validation rules for DeleteCachedData
+
+	switch v := m.Credential.(type) {
+	case *GitHubExperimental_Token:
+		if v == nil {
+			err := GitHubExperimentalValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Token
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return GitHubExperimentalMultiError(errors)
+	}
+
+	return nil
+}
+
+// GitHubExperimentalMultiError is an error wrapping multiple validation errors
+// returned by GitHubExperimental.ValidateAll() if the designated constraints
+// aren't met.
+type GitHubExperimentalMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GitHubExperimentalMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GitHubExperimentalMultiError) AllErrors() []error { return m }
+
+// GitHubExperimentalValidationError is the validation error returned by
+// GitHubExperimental.Validate if the designated constraints aren't met.
+type GitHubExperimentalValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GitHubExperimentalValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GitHubExperimentalValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GitHubExperimentalValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GitHubExperimentalValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GitHubExperimentalValidationError) ErrorName() string {
+	return "GitHubExperimentalValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GitHubExperimentalValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGitHubExperimental.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GitHubExperimentalValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GitHubExperimentalValidationError{}
+
 // Validate checks the field values on GoogleDrive with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -2417,11 +2910,21 @@ func (m *GoogleDrive) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *GoogleDrive_RefreshToken:
+		if v == nil {
+			err := GoogleDriveValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for RefreshToken
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2501,6 +3004,185 @@ var _ interface {
 	ErrorName() string
 } = GoogleDriveValidationError{}
 
+// Validate checks the field values on Huggingface with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Huggingface) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Huggingface with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in HuggingfaceMultiError, or
+// nil if none found.
+func (m *Huggingface) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Huggingface) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if _, err := url.Parse(m.GetEndpoint()); err != nil {
+		err = HuggingfaceValidationError{
+			field:  "Endpoint",
+			reason: "value must be a valid URI",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for SkipAllModels
+
+	// no validation rules for SkipAllSpaces
+
+	// no validation rules for SkipAllDatasets
+
+	// no validation rules for IncludeDiscussions
+
+	// no validation rules for IncludePrs
+
+	switch v := m.Credential.(type) {
+	case *Huggingface_Token:
+		if v == nil {
+			err := HuggingfaceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Token
+	case *Huggingface_Unauthenticated:
+		if v == nil {
+			err := HuggingfaceValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetUnauthenticated()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, HuggingfaceValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, HuggingfaceValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return HuggingfaceValidationError{
+					field:  "Unauthenticated",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return HuggingfaceMultiError(errors)
+	}
+
+	return nil
+}
+
+// HuggingfaceMultiError is an error wrapping multiple validation errors
+// returned by Huggingface.ValidateAll() if the designated constraints aren't met.
+type HuggingfaceMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m HuggingfaceMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m HuggingfaceMultiError) AllErrors() []error { return m }
+
+// HuggingfaceValidationError is the validation error returned by
+// Huggingface.Validate if the designated constraints aren't met.
+type HuggingfaceValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e HuggingfaceValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e HuggingfaceValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e HuggingfaceValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e HuggingfaceValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e HuggingfaceValidationError) ErrorName() string { return "HuggingfaceValidationError" }
+
+// Error satisfies the builtin error interface
+func (e HuggingfaceValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sHuggingface.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = HuggingfaceValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = HuggingfaceValidationError{}
+
 // Validate checks the field values on JIRA with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
 // encountered is returned, or nil if there are no violations.
@@ -2536,9 +3218,18 @@ func (m *JIRA) validate(all bool) error {
 
 	// no validation rules for InsecureSkipVerifyTls
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *JIRA_BasicAuth:
+		if v == nil {
+			err := JIRAValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -2570,6 +3261,16 @@ func (m *JIRA) validate(all bool) error {
 		}
 
 	case *JIRA_Unauthenticated:
+		if v == nil {
+			err := JIRAValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -2601,6 +3302,16 @@ func (m *JIRA) validate(all bool) error {
 		}
 
 	case *JIRA_Oauth:
+		if v == nil {
+			err := JIRAValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -2632,8 +3343,19 @@ func (m *JIRA) validate(all bool) error {
 		}
 
 	case *JIRA_Token:
+		if v == nil {
+			err := JIRAValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2735,9 +3457,18 @@ func (m *NPMUnauthenticatedPackage) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *NPMUnauthenticatedPackage_Unauthenticated:
+		if v == nil {
+			err := NPMUnauthenticatedPackageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -2768,6 +3499,8 @@ func (m *NPMUnauthenticatedPackage) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -2872,9 +3605,18 @@ func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *PyPIUnauthenticatedPackage_Unauthenticated:
+		if v == nil {
+			err := PyPIUnauthenticatedPackageValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -2905,6 +3647,8 @@ func (m *PyPIUnauthenticatedPackage) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3010,9 +3754,18 @@ func (m *S3) validate(all bool) error {
 
 	// no validation rules for MaxObjectSize
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *S3_AccessKey:
+		if v == nil {
+			err := S3ValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAccessKey()).(type) {
@@ -3044,6 +3797,16 @@ func (m *S3) validate(all bool) error {
 		}
 
 	case *S3_Unauthenticated:
+		if v == nil {
+			err := S3ValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -3075,6 +3838,16 @@ func (m *S3) validate(all bool) error {
 		}
 
 	case *S3_CloudEnvironment:
+		if v == nil {
+			err := S3ValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetCloudEnvironment()).(type) {
@@ -3106,6 +3879,16 @@ func (m *S3) validate(all bool) error {
 		}
 
 	case *S3_SessionToken:
+		if v == nil {
+			err := S3ValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSessionToken()).(type) {
@@ -3136,6 +3919,8 @@ func (m *S3) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3248,12 +4033,30 @@ func (m *Slack) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Slack_Token:
+		if v == nil {
+			err := SlackValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *Slack_Tokens:
+		if v == nil {
+			err := SlackValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTokens()).(type) {
@@ -3284,6 +4087,8 @@ func (m *Slack) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3483,11 +4288,21 @@ func (m *Buildkite) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Buildkite_Token:
+		if v == nil {
+			err := BuildkiteValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3604,9 +4419,18 @@ func (m *Gerrit) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Gerrit_BasicAuth:
+		if v == nil {
+			err := GerritValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -3638,6 +4462,16 @@ func (m *Gerrit) validate(all bool) error {
 		}
 
 	case *Gerrit_Unauthenticated:
+		if v == nil {
+			err := GerritValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
@@ -3668,6 +4502,8 @@ func (m *Gerrit) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3782,9 +4618,18 @@ func (m *Jenkins) validate(all bool) error {
 
 	// no validation rules for InsecureSkipVerifyTls
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Jenkins_BasicAuth:
+		if v == nil {
+			err := JenkinsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBasicAuth()).(type) {
@@ -3816,6 +4661,16 @@ func (m *Jenkins) validate(all bool) error {
 		}
 
 	case *Jenkins_Header:
+		if v == nil {
+			err := JenkinsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetHeader()).(type) {
@@ -3846,6 +4701,49 @@ func (m *Jenkins) validate(all bool) error {
 			}
 		}
 
+	case *Jenkins_Unauthenticated:
+		if v == nil {
+			err := JenkinsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetUnauthenticated()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, JenkinsValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, JenkinsValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return JenkinsValidationError{
+					field:  "Unauthenticated",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3958,12 +4856,30 @@ func (m *Teams) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Teams_Token:
+		if v == nil {
+			err := TeamsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *Teams_Authenticated:
+		if v == nil {
+			err := TeamsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAuthenticated()).(type) {
@@ -3995,6 +4911,16 @@ func (m *Teams) validate(all bool) error {
 		}
 
 	case *Teams_Oauth:
+		if v == nil {
+			err := TeamsValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -4025,6 +4951,8 @@ func (m *Teams) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -4212,29 +5140,26 @@ var _ interface {
 	ErrorName() string
 } = SyslogValidationError{}
 
-// Validate checks the field values on PublicEventMonitoring with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the first error encountered is returned, or nil if there are no violations.
-func (m *PublicEventMonitoring) Validate() error {
+// Validate checks the field values on Forager with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Forager) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on PublicEventMonitoring with the rules
-// defined in the proto definition for this message. If any rules are
-// violated, the result is a list of violation errors wrapped in
-// PublicEventMonitoringMultiError, or nil if none found.
-func (m *PublicEventMonitoring) ValidateAll() error {
+// ValidateAll checks the field values on Forager with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in ForagerMultiError, or nil if none found.
+func (m *Forager) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *PublicEventMonitoring) validate(all bool) error {
+func (m *Forager) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
 
 	var errors []error
-
-	// no validation rules for Domain
 
 	// no validation rules for MaxDepth
 
@@ -4242,7 +5167,7 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 		switch v := interface{}(m.GetSince()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, PublicEventMonitoringValidationError{
+				errors = append(errors, ForagerValidationError{
 					field:  "Since",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -4250,7 +5175,7 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, PublicEventMonitoringValidationError{
+				errors = append(errors, ForagerValidationError{
 					field:  "Since",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -4259,7 +5184,7 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetSince()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return PublicEventMonitoringValidationError{
+			return ForagerValidationError{
 				field:  "Since",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -4267,15 +5192,24 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 		}
 	}
 
-	switch m.Credential.(type) {
-
-	case *PublicEventMonitoring_Unauthenticated:
+	switch v := m.Credential.(type) {
+	case *Forager_Unauthenticated:
+		if v == nil {
+			err := ForagerValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetUnauthenticated()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, PublicEventMonitoringValidationError{
+					errors = append(errors, ForagerValidationError{
 						field:  "Unauthenticated",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -4283,7 +5217,7 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, PublicEventMonitoringValidationError{
+					errors = append(errors, ForagerValidationError{
 						field:  "Unauthenticated",
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -4292,7 +5226,7 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return PublicEventMonitoringValidationError{
+				return ForagerValidationError{
 					field:  "Unauthenticated",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -4300,22 +5234,23 @@ func (m *PublicEventMonitoring) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
-		return PublicEventMonitoringMultiError(errors)
+		return ForagerMultiError(errors)
 	}
 
 	return nil
 }
 
-// PublicEventMonitoringMultiError is an error wrapping multiple validation
-// errors returned by PublicEventMonitoring.ValidateAll() if the designated
-// constraints aren't met.
-type PublicEventMonitoringMultiError []error
+// ForagerMultiError is an error wrapping multiple validation errors returned
+// by Forager.ValidateAll() if the designated constraints aren't met.
+type ForagerMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m PublicEventMonitoringMultiError) Error() string {
+func (m ForagerMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -4324,11 +5259,11 @@ func (m PublicEventMonitoringMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m PublicEventMonitoringMultiError) AllErrors() []error { return m }
+func (m ForagerMultiError) AllErrors() []error { return m }
 
-// PublicEventMonitoringValidationError is the validation error returned by
-// PublicEventMonitoring.Validate if the designated constraints aren't met.
-type PublicEventMonitoringValidationError struct {
+// ForagerValidationError is the validation error returned by Forager.Validate
+// if the designated constraints aren't met.
+type ForagerValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -4336,24 +5271,22 @@ type PublicEventMonitoringValidationError struct {
 }
 
 // Field function returns field value.
-func (e PublicEventMonitoringValidationError) Field() string { return e.field }
+func (e ForagerValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e PublicEventMonitoringValidationError) Reason() string { return e.reason }
+func (e ForagerValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e PublicEventMonitoringValidationError) Cause() error { return e.cause }
+func (e ForagerValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e PublicEventMonitoringValidationError) Key() bool { return e.key }
+func (e ForagerValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e PublicEventMonitoringValidationError) ErrorName() string {
-	return "PublicEventMonitoringValidationError"
-}
+func (e ForagerValidationError) ErrorName() string { return "ForagerValidationError" }
 
 // Error satisfies the builtin error interface
-func (e PublicEventMonitoringValidationError) Error() string {
+func (e ForagerValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -4365,14 +5298,14 @@ func (e PublicEventMonitoringValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sPublicEventMonitoring.%s: %s%s",
+		"invalid %sForager.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = PublicEventMonitoringValidationError{}
+var _ error = ForagerValidationError{}
 
 var _ interface {
 	Field() string
@@ -4380,7 +5313,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = PublicEventMonitoringValidationError{}
+} = ForagerValidationError{}
 
 // Validate checks the field values on SlackRealtime with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
@@ -4404,9 +5337,18 @@ func (m *SlackRealtime) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *SlackRealtime_Tokens:
+		if v == nil {
+			err := SlackRealtimeValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTokens()).(type) {
@@ -4437,6 +5379,8 @@ func (m *SlackRealtime) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -4541,9 +5485,18 @@ func (m *Sharepoint) validate(all bool) error {
 
 	// no validation rules for SiteUrl
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *Sharepoint_Oauth:
+		if v == nil {
+			err := SharepointValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -4574,6 +5527,8 @@ func (m *Sharepoint) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -4693,12 +5648,30 @@ func (m *AzureRepos) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
-	switch m.Credential.(type) {
-
+	switch v := m.Credential.(type) {
 	case *AzureRepos_Token:
+		if v == nil {
+			err := AzureReposValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 		// no validation rules for Token
-
 	case *AzureRepos_Oauth:
+		if v == nil {
+			err := AzureReposValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetOauth()).(type) {
@@ -4729,6 +5702,8 @@ func (m *AzureRepos) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -4807,3 +5782,608 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = AzureReposValidationError{}
+
+// Validate checks the field values on Postman with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Postman) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Postman with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in PostmanMultiError, or nil if none found.
+func (m *Postman) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Postman) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.Credential.(type) {
+	case *Postman_Unauthenticated:
+		if v == nil {
+			err := PostmanValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetUnauthenticated()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, PostmanValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, PostmanValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PostmanValidationError{
+					field:  "Unauthenticated",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *Postman_Token:
+		if v == nil {
+			err := PostmanValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Token
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return PostmanMultiError(errors)
+	}
+
+	return nil
+}
+
+// PostmanMultiError is an error wrapping multiple validation errors returned
+// by Postman.ValidateAll() if the designated constraints aren't met.
+type PostmanMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m PostmanMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m PostmanMultiError) AllErrors() []error { return m }
+
+// PostmanValidationError is the validation error returned by Postman.Validate
+// if the designated constraints aren't met.
+type PostmanValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e PostmanValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e PostmanValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e PostmanValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e PostmanValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e PostmanValidationError) ErrorName() string { return "PostmanValidationError" }
+
+// Error satisfies the builtin error interface
+func (e PostmanValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sPostman.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = PostmanValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = PostmanValidationError{}
+
+// Validate checks the field values on Webhook with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Webhook) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Webhook with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in WebhookMultiError, or nil if none found.
+func (m *Webhook) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Webhook) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if err := m._validateHostname(m.GetListenAddress()); err != nil {
+		err = WebhookValidationError{
+			field:  "ListenAddress",
+			reason: "value must be a valid hostname",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	switch v := m.Credential.(type) {
+	case *Webhook_Header:
+		if v == nil {
+			err := WebhookValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetHeader()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, WebhookValidationError{
+						field:  "Header",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, WebhookValidationError{
+						field:  "Header",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetHeader()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return WebhookValidationError{
+					field:  "Header",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return WebhookMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *Webhook) _validateHostname(host string) error {
+	s := strings.ToLower(strings.TrimSuffix(host, "."))
+
+	if len(host) > 253 {
+		return errors.New("hostname cannot exceed 253 characters")
+	}
+
+	for _, part := range strings.Split(s, ".") {
+		if l := len(part); l == 0 || l > 63 {
+			return errors.New("hostname part must be non-empty and cannot exceed 63 characters")
+		}
+
+		if part[0] == '-' {
+			return errors.New("hostname parts cannot begin with hyphens")
+		}
+
+		if part[len(part)-1] == '-' {
+			return errors.New("hostname parts cannot end with hyphens")
+		}
+
+		for _, r := range part {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+				return fmt.Errorf("hostname parts can only contain alphanumeric characters or hyphens, got %q", string(r))
+			}
+		}
+	}
+
+	return nil
+}
+
+// WebhookMultiError is an error wrapping multiple validation errors returned
+// by Webhook.ValidateAll() if the designated constraints aren't met.
+type WebhookMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m WebhookMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m WebhookMultiError) AllErrors() []error { return m }
+
+// WebhookValidationError is the validation error returned by Webhook.Validate
+// if the designated constraints aren't met.
+type WebhookValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e WebhookValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e WebhookValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e WebhookValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e WebhookValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e WebhookValidationError) ErrorName() string { return "WebhookValidationError" }
+
+// Error satisfies the builtin error interface
+func (e WebhookValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sWebhook.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = WebhookValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = WebhookValidationError{}
+
+// Validate checks the field values on Elasticsearch with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Elasticsearch) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Elasticsearch with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ElasticsearchMultiError, or
+// nil if none found.
+func (m *Elasticsearch) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Elasticsearch) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Username
+
+	// no validation rules for Password
+
+	// no validation rules for CloudId
+
+	// no validation rules for ApiKey
+
+	// no validation rules for ServiceToken
+
+	// no validation rules for IndexPattern
+
+	// no validation rules for QueryJson
+
+	// no validation rules for SinceTimestamp
+
+	// no validation rules for BestEffortScan
+
+	if len(errors) > 0 {
+		return ElasticsearchMultiError(errors)
+	}
+
+	return nil
+}
+
+// ElasticsearchMultiError is an error wrapping multiple validation errors
+// returned by Elasticsearch.ValidateAll() if the designated constraints
+// aren't met.
+type ElasticsearchMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ElasticsearchMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ElasticsearchMultiError) AllErrors() []error { return m }
+
+// ElasticsearchValidationError is the validation error returned by
+// Elasticsearch.Validate if the designated constraints aren't met.
+type ElasticsearchValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ElasticsearchValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ElasticsearchValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ElasticsearchValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ElasticsearchValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ElasticsearchValidationError) ErrorName() string { return "ElasticsearchValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ElasticsearchValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sElasticsearch.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ElasticsearchValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ElasticsearchValidationError{}
+
+// Validate checks the field values on Sentry with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Sentry) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Sentry with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in SentryMultiError, or nil if none found.
+func (m *Sentry) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Sentry) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Endpoint
+
+	// no validation rules for InsecureSkipVerifyTls
+
+	// no validation rules for Projects
+
+	switch v := m.Credential.(type) {
+	case *Sentry_AuthToken:
+		if v == nil {
+			err := SentryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for AuthToken
+	case *Sentry_DsnKey:
+		if v == nil {
+			err := SentryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for DsnKey
+	case *Sentry_ApiKey:
+		if v == nil {
+			err := SentryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ApiKey
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return SentryMultiError(errors)
+	}
+
+	return nil
+}
+
+// SentryMultiError is an error wrapping multiple validation errors returned by
+// Sentry.ValidateAll() if the designated constraints aren't met.
+type SentryMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SentryMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SentryMultiError) AllErrors() []error { return m }
+
+// SentryValidationError is the validation error returned by Sentry.Validate if
+// the designated constraints aren't met.
+type SentryValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SentryValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SentryValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SentryValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SentryValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SentryValidationError) ErrorName() string { return "SentryValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SentryValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSentry.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SentryValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SentryValidationError{}

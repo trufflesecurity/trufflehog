@@ -8,5 +8,4 @@ Explain the purpose of the PR.
 
 ### Checklist:
 * [ ] Tests passing (`make test-community`)?
-* [ ] Lint passing (`make lint` this requires [golangci-lint](https://golangci-lint.run/usage/install/#local-installation))?
-
+* [ ] Lint passing (`make lint` this requires [golangci-lint](https://golangci-lint.run/welcome/install/#local-installation))?

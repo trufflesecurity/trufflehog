@@ -81,7 +81,7 @@ func TestJobProgressHook(t *testing.T) {
 	startChunk := time.Now().Add(40 * time.Second)
 	endChunk := time.Now().Add(50 * time.Second)
 	reportErr := fmt.Errorf("reporting error")
-	reportUnit := CommonSourceUnit{"reporting unit"}
+	reportUnit := CommonSourceUnit{ID: "reporting unit"}
 	reportChunk := &Chunk{Data: []byte("reporting chunk")}
 
 	hook.EXPECT().Start(gomock.Any(), startTime)

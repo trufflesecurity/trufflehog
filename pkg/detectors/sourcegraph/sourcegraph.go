@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(sgp_[a-f0-9]{40})\b`)
+	keyPat = regexp.MustCompile(`\b(sgp_(?:[a-fA-F0-9]{16}|local)_[a-fA-F0-9]{40}|sgp_[a-fA-F0-9]{40}|[a-fA-F0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -46,6 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Sourcegraph,
 			Raw:          []byte(resMatch),
+		}
+		s1.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/sourcegraph/",
 		}
 
 		if verify {
@@ -77,11 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			} else {
 				s1.SetVerificationError(err, resMatch)
 			}
-		}
-
-		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-			continue
+			s1.AnalysisInfo = map[string]string{"key": resMatch}
 		}
 
 		results = append(results, s1)
@@ -92,4 +92,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Sourcegraph
+}
+
+func (s Scanner) Description() string {
+	return "Sourcegraph is a code search and navigation engine. Sourcegraph tokens can be used to access and interact with Sourcegraph APIs."
 }
