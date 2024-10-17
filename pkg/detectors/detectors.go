@@ -90,8 +90,9 @@ type Result struct {
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
 	// DecoderType is the type of Decoder.
-	DecoderType detectorspb.DecoderType
-	Verified    bool
+	DecoderType           detectorspb.DecoderType
+	Verified              bool
+	VerificationFromCache bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.

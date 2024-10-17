@@ -53,6 +53,7 @@ func FromDataCached(
 				fromCache = append(fromCache, *cacheHit)
 				fromCache[len(fromCache)-1].Raw = r.Raw
 				fromCache[len(fromCache)-1].RawV2 = r.RawV2
+				fromCache[len(fromCache)-1].VerificationFromCache = true
 			} else {
 				isEverythingCached = false
 				break
