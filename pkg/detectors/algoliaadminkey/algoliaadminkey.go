@@ -44,7 +44,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 		resMatch := strings.TrimSpace(match[1])
-
 		for _, idMatch := range idMatches {
 			if len(idMatch) != 2 {
 				continue
