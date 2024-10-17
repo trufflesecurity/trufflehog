@@ -154,10 +154,11 @@ type Config struct {
 // customization through various options and configurations.
 type Engine struct {
 	// CLI flags.
-	concurrency    int
-	decoders       []decoders.Decoder
-	detectors      []detectors.Detector
-	detectionCache cache.Cache[*detectors.Result]
+	concurrency          int
+	decoders             []decoders.Decoder
+	detectors            []detectors.Detector
+	detectionCache       cache.Cache[*detectors.Result]
+	getDetectionCacheKey func(result *detectors.Result) string
 	// Any detectors configured to override sources' verification flags
 	detectorVerificationOverrides map[config.DetectorID]bool
 
@@ -223,6 +224,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		decoders:                            cfg.Decoders,
 		detectors:                           cfg.Detectors,
 		detectionCache:                      nil,
+		getDetectionCacheKey:                func(result *detectors.Result) string { panic("cache should be unused") },
 		dispatcher:                          cfg.Dispatcher,
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,
@@ -1059,7 +1061,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		results, err := detectioncaching.FromDataCached(
 			ctx,
 			e.detectionCache,
-			func(r *detectors.Result) string { panic("cache should be ignored") },
+			e.getDetectionCacheKey,
 			data.detector.Detector,
 			data.chunk.Verify,
 			data.chunk.SecretID != 0,
