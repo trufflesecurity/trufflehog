@@ -4,6 +4,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func FromDataCached(
@@ -31,7 +32,10 @@ func FromDataCached(
 	var cachedResults []detectors.Result
 	for _, r := range withoutVerification {
 		if cacheHit, ok := cache.Get(cacheKey(r)); ok {
-			cachedResults = append(cachedResults, *cacheHit)
+			returnedCopy := *cacheHit
+			returnedCopy.Raw = r.Raw
+			returnedCopy.RawV2 = r.RawV2
+			cachedResults = append(cachedResults, returnedCopy)
 		} else {
 			everythingCached = false
 			break
@@ -58,7 +62,13 @@ func verifyAndCache(
 	}
 
 	for _, r := range results {
-		cache.Set(cacheKey(r), &r)
+		copyForCaching := r
+		// Do not persist raw secret values in a long-lived cache
+		copyForCaching.Raw = nil
+		copyForCaching.RawV2 = nil
+		// Decoder type will be set later, so clear it out now to minimize the chance of accidentally cloning it
+		copyForCaching.DecoderType = detectorspb.DecoderType_UNKNOWN
+		cache.Set(cacheKey(r), &copyForCaching)
 	}
 
 	return results, nil
