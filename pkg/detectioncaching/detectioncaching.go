@@ -10,25 +10,25 @@ import (
 // FromDataCached executes detection on chunk data in a way that uses a provided verification cache to deduplicate
 // verification requests when possible.
 //
-// If the provided cache is nil, all caching logic is skipped, and this function returns the result of the provided
-// detector's FromData method.
+// If the provided cache is nil, this function simply returns the result of the provided detector's FromData method.
 //
-// Otherwise, if forceCacheMiss is true, the provided detector's FromData method is called, and the results are used to
-// update the cache before being returned.
+// If verify is false, this function returns the result of the provided detector's FromData method. In this case, the
+// cache is only updated if forceCacheUpdate is true.
 //
-// Otherwise, if verify is false, all caching logic is skipped, and this function returns the result of the provided
-// detector's FromData method.
+// If verify is true, and forceCacheUpdate is false, this function first executes the provided detector's FromData
+// method with verification disabled. Then, the cache is queried for each result. If they are all present in the cache,
+// the cached values are returned. Otherwise, the provided detector's FromData method is invoked (again) with
+// verification enabled, and the results are used to update the cache before being returned.
 //
-// Otherwise, detection proceeds in two stages. First, detection is executed without verification. Then, the cache is
-// queried for each returned result. If all results are cache hits, then their cached values are returned. Otherwise,
-// detection is executed again with verification, and the results are used to update the cache before being returned.
+// If verify is true, and forceCacheUpdate is also true, the provided detector's FromData method is invoked, and the
+// results are used to update the cache before being returned.
 func FromDataCached(
 	ctx context.Context,
 	verificationCache cache.Cache[*detectors.Result],
 	getCacheKey func(result *detectors.Result) string,
 	detector detectors.Detector,
 	verify bool,
-	forceCacheMiss bool,
+	forceCacheUpdate bool,
 	data []byte,
 ) ([]detectors.Result, error) {
 
@@ -36,7 +36,7 @@ func FromDataCached(
 		return detector.FromData(ctx, verify, data)
 	}
 
-	if !forceCacheMiss {
+	if !forceCacheUpdate {
 		withoutVerification, err := detector.FromData(ctx, false, data)
 		if err != nil {
 			return nil, err
