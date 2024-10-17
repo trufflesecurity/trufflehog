@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bombbomb"}) + `\b([a-zA-Z0-9-._]{704})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bombbomb"}) + `\b(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -53,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", resMatch)
+			req.Header.Add("Authorization", "Bearer "+resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
