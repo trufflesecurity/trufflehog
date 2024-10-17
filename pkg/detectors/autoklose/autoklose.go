@@ -59,16 +59,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
+				defer res.Body.Close()
 				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
 					continue
 				}
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				if res.StatusCode == 200 {
 					if json.Valid(bodyBytes) {
+						s1.Verified = true
 						var responseBody map[string]interface{}
 						if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
-							s1.Verified = true
 							if email, ok := responseBody["email"].(string); ok {
 								s1.ExtraData = map[string]string{
 									"email": email,
@@ -76,6 +76,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							}
 						}
 					} else {
+						// If it's not valid JSON, it's likely HTML (expired token)
 						s1.Verified = false
 					}
 				}
