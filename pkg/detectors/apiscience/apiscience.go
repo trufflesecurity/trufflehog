@@ -3,9 +3,10 @@ package apiscience
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apiscience"}) + `\b([a-bA-Z0-9\S]{22})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apiscience"}) + `\b([a-bA-Z0-9\S]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.apiscience.com/v1/monitors", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://client.apimetrics.io/api/2/calls/", nil)
 			if err != nil {
 				continue
 			}
