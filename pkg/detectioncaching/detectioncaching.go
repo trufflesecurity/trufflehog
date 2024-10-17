@@ -7,6 +7,21 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+// FromDataCached executes detection on chunk data in a way that uses a provided verification cache to deduplicate
+// verification requests when possible.
+//
+// If the provided cache is nil, all caching logic is skipped, and this function returns the result of the provided
+// detector's FromData method.
+//
+// Otherwise, if forceCacheMiss is true, the provided detector's FromData method is called, and the results are used to
+// update the cache before being returned.
+//
+// Otherwise, if verify is false, all caching logic is skipped, and this function returns the result of the provided
+// detector's FromData method.
+//
+// Otherwise, detection proceeds in two stages. First, detection is executed without verification. Then, the cache is
+// queried for each returned result. If all results are cache hits, then their cached values are returned. Otherwise,
+// detection is executed again with verification, and the results are used to update the cache before being returned.
 func FromDataCached(
 	ctx context.Context,
 	verificationCache cache.Cache[*detectors.Result],
@@ -16,6 +31,10 @@ func FromDataCached(
 	forceCacheMiss bool,
 	data []byte,
 ) ([]detectors.Result, error) {
+
+	if verificationCache == nil {
+		return detector.FromData(ctx, verify, data)
+	}
 
 	if !forceCacheMiss {
 		withoutVerification, err := detector.FromData(ctx, false, data)
