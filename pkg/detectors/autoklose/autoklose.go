@@ -56,7 +56,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("Accept", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
@@ -64,21 +64,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
+				if res.StatusCode == 401 {
+					s1.Verified = false
+				}
+
 				if res.StatusCode == 200 {
-					if json.Valid(bodyBytes) {
-						s1.Verified = true
-						var responseBody map[string]interface{}
-						if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
-							if email, ok := responseBody["email"].(string); ok {
-								s1.ExtraData = map[string]string{
-									"email": email,
-								}
+					s1.Verified = true
+				}
+
+				if json.Valid(bodyBytes) {
+					var responseBody map[string]interface{}
+					if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
+						if email, ok := responseBody["email"].(string); ok {
+							s1.ExtraData = map[string]string{
+								"email": email,
 							}
 						}
-					} else {
-						// If it's not valid JSON, it's likely HTML (expired token)
-						s1.Verified = false
 					}
+				} else {
+					s1.Verified = false
 				}
 			}
 		}
