@@ -17,16 +17,16 @@ func FromDataCached(
 	data []byte,
 ) ([]detectors.Result, error) {
 
-	withoutVerification, err := detector.FromData(ctx, false, data)
-	if err != nil {
-		return nil, err
-	}
-
-	if !verify {
-		return withoutVerification, nil
-	}
-
 	if !forceCacheMiss {
+		withoutVerification, err := detector.FromData(ctx, false, data)
+		if err != nil {
+			return nil, err
+		}
+
+		if !verify {
+			return withoutVerification, nil
+		}
+
 		isEverythingCached := false
 		var fromCache []detectors.Result
 		for _, r := range withoutVerification {
@@ -45,7 +45,7 @@ func FromDataCached(
 		}
 	}
 
-	withVerification, err := detector.FromData(ctx, true, data)
+	withVerification, err := detector.FromData(ctx, verify, data)
 	if err != nil {
 		return nil, err
 	}
