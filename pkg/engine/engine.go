@@ -13,6 +13,9 @@ import (
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectioncaching"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -152,9 +155,10 @@ type Config struct {
 // customization through various options and configurations.
 type Engine struct {
 	// CLI flags.
-	concurrency int
-	decoders    []decoders.Decoder
-	detectors   []detectors.Detector
+	concurrency    int
+	decoders       []decoders.Decoder
+	detectors      []detectors.Detector
+	detectionCache cache.Cache[*detectors.Result]
 	// Any detectors configured to override sources' verification flags
 	detectorVerificationOverrides map[config.DetectorID]bool
 
@@ -219,6 +223,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		concurrency:                         cfg.Concurrency,
 		decoders:                            cfg.Decoders,
 		detectors:                           cfg.Detectors,
+		detectionCache:                      simple.NewCache[*detectors.Result](),
 		dispatcher:                          cfg.Dispatcher,
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,
@@ -1052,7 +1057,13 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
 			ctx.Logger().Error(nil, "a detector ignored the context timeout")
 		})
-		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
+		results, err := detectioncaching.FromDataCached(
+			ctx,
+			e.detectionCache,
+			data.detector.Detector,
+			data.chunk.Verify,
+			data.chunk.SecretID != 0,
+			matchBytes)
 		t.Stop()
 		cancel()
 		if err != nil {
