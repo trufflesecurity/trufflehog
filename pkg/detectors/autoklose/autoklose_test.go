@@ -50,6 +50,9 @@ func TestAutoklose_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Autoklose,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"email": "mladen.stevanovic@vanillasoft.com",
+					},
 				},
 			},
 			wantErr: false,

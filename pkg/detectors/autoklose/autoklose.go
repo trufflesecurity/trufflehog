@@ -51,10 +51,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			// API Documentation: https://api.aklab.xyz/#auth-info-fd71acd1-2e41-4991-8789-3edfd258479a
 			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.autoklose.com/api/me/?api_token=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
+			req.Header.Add("Content-Type", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
 				bodyBytes, err := io.ReadAll(res.Body)
@@ -64,7 +66,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					if json.Valid(bodyBytes) {
-						s1.Verified = true
+						var responseBody map[string]interface{}
+						if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
+							s1.Verified = true
+							if email, ok := responseBody["email"].(string); ok {
+								s1.ExtraData = map[string]string{
+									"email": email,
+								}
+							}
+						}
 					} else {
 						s1.Verified = false
 					}
