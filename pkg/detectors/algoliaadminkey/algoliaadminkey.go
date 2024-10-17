@@ -22,14 +22,14 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"algolia"}) + `\b([a-zA-Z0-9]{32})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"algolia"}) + `\b([A-Z0-9]{10})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"algolia", "docsearch", "appId"}) + `\b([a-zA-Z0-9]{32})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"algolia", "docsearch", "apiKey"}) + `\b([A-Z0-9]{10})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"algolia"}
+	return []string{"algolia", "docsearch"}
 }
 
 // FromData will find and optionally verify AlgoliaAdminKey secrets in a given set of bytes.
