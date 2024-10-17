@@ -37,23 +37,19 @@ func FromDataCached(
 	}
 
 	if !forceCacheUpdate {
-		withoutVerification, err := detector.FromData(ctx, false, data)
+		withoutRemoteVerification, err := detector.FromData(ctx, false, data)
 		if err != nil {
 			return nil, err
 		}
 
 		if !verify {
-			return withoutVerification, nil
+			return withoutRemoteVerification, nil
 		}
 
 		isEverythingCached := false
-		var fromCache []detectors.Result
-		for _, r := range withoutVerification {
+		for _, r := range withoutRemoteVerification {
 			if cacheHit, ok := verificationCache.Get(getCacheKey(&r)); ok {
-				fromCache = append(fromCache, *cacheHit)
-				fromCache[len(fromCache)-1].Raw = r.Raw
-				fromCache[len(fromCache)-1].RawV2 = r.RawV2
-				fromCache[len(fromCache)-1].VerificationFromCache = true
+				r.CopyVerificationInfo(cacheHit)
 			} else {
 				isEverythingCached = false
 				break
@@ -61,16 +57,16 @@ func FromDataCached(
 		}
 
 		if isEverythingCached {
-			return fromCache, nil
+			return withoutRemoteVerification, nil
 		}
 	}
 
-	withVerification, err := detector.FromData(ctx, verify, data)
+	withRemoteVerification, err := detector.FromData(ctx, verify, data)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, r := range withVerification {
+	for _, r := range withRemoteVerification {
 		copyForCaching := r
 		// Do not persist raw secret values in a long-lived cache
 		copyForCaching.Raw = nil
@@ -80,5 +76,5 @@ func FromDataCached(
 		verificationCache.Set(getCacheKey(&r), &copyForCaching)
 	}
 
-	return withVerification, nil
+	return withRemoteVerification, nil
 }
