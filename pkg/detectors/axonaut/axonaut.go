@@ -2,9 +2,10 @@ package axonaut
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -47,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://axonaut.com/api/v2/companies?type=all&sort=id", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://axonaut.com/api/v2/me", nil)
 			if err != nil {
 				continue
 			}
