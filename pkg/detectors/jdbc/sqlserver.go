@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
+
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	mssql "github.com/microsoft/go-mssqldb"
 )
@@ -20,19 +23,19 @@ func (s *sqlServerJDBC) ping(ctx context.Context) pingResult {
 
 func isSqlServerErrorDeterminate(err error) bool {
 	// Error numbers from https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16
-	if mssqlError, isMssqlError := err.(mssql.Error); isMssqlError {
-		switch mssqlError.Number {
+	var sqlErr mssql.Error
+	if errors.As(err, &sqlErr) {
+		switch sqlErr.Number {
 		case 18456:
 			// Login failed
 			// This is a determinate failure iff we tried to use a real user
-			return mssqlError.Message != "login error: Login failed for user ''."
+			return sqlErr.Message != "login error: Login failed for user ''."
 		}
 	}
-
 	return false
 }
 
-func parseSqlServer(subname string) (jdbc, error) {
+func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected connection to start with //")
 	}
@@ -65,7 +68,15 @@ func parseSqlServer(subname string) (jdbc, error) {
 			port = value
 		}
 	}
-	return &sqlServerJDBC{
-		connStr: fmt.Sprintf("sqlserver://sa:%s@%s:%s?database=master&connection+timeout=5", password, host, port),
-	}, nil
+
+	urlStr := fmt.Sprintf("sqlserver://sa:%s@%s:%s?database=master&connection+timeout=5", password, host, port)
+	jdbcUrl, err := url.Parse(urlStr)
+	if err != nil {
+		ctx.Logger().WithName("jdbc").
+			V(3).
+			Info("Skipping invalid SQL Server URL", "url", urlStr, "err", err)
+		return nil, err
+	}
+
+	return &sqlServerJDBC{connStr: jdbcUrl.String()}, nil
 }
