@@ -65,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					isVerified, verificationErr = verifyAlgoliaKeyACL(ctx, resIdMatch, resMatch)
 				}
 
-				// Ignore the key if it's valid but doesn't have sensitive scopes.
+				// Ignore the key if it's valid but doesn't have sensitive permissions.
 				if !isVerified && verificationErr == nil {
 					continue
 				}
@@ -135,7 +135,7 @@ func verifyAlgoliaKeyACL(ctx context.Context, appId, apiKey string) (bool, error
 
 	for _, acl := range jsonResponse.ACL {
 		if acl != "search" && acl != "listIndexes" && acl != "settings" {
-			return true, nil // Other scopes are sensitive.
+			return true, nil // Other permissions are sensitive.
 		}
 	}
 
