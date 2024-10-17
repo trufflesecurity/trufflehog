@@ -11,6 +11,7 @@ func FromDataCached(
 	cache cache.Cache[*detectors.Result],
 	detector detectors.Detector,
 	verify bool,
+	forceCacheMiss bool,
 	data []byte,
 ) ([]detectors.Result, error) {
 	withoutVerification, err := detector.FromData(ctx, false, data)
@@ -22,19 +23,21 @@ func FromDataCached(
 		return withoutVerification, nil
 	}
 
-	everythingCached := false
-	var cachedResults []detectors.Result
-	for _, r := range withoutVerification {
-		if cacheHit, ok := cache.Get(cacheKey(r)); ok {
-			cachedResults = append(cachedResults, *cacheHit)
-		} else {
-			everythingCached = false
-			break
+	if !forceCacheMiss {
+		everythingCached := false
+		var cachedResults []detectors.Result
+		for _, r := range withoutVerification {
+			if cacheHit, ok := cache.Get(cacheKey(r)); ok {
+				cachedResults = append(cachedResults, *cacheHit)
+			} else {
+				everythingCached = false
+				break
+			}
 		}
-	}
 
-	if everythingCached {
-		return cachedResults, nil
+		if everythingCached {
+			return cachedResults, nil
+		}
 	}
 
 	results, err := detector.FromData(ctx, true, data)
