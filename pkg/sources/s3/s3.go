@@ -326,14 +326,20 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				return nil
 			}
 
-			// files break with spaces, must replace with +
-			// objKey := strings.ReplaceAll(*obj.Key, " ", "+")
-			ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-			defer cancel()
-			res, err := client.GetObjectWithContext(ctx, &s3.GetObjectInput{
-				Bucket: &bucket,
-				Key:    obj.Key,
-			})
+			// Use an anonymous function to retrieve the S3 object with a dedicated timeout context.
+			// This ensures that the timeout is isolated and does not affect any downstream operations. (e.g. HandleFile)
+			getObject := func() (*s3.GetObjectOutput, error) {
+				const getObjectTimeout = 5 * time.Second
+				objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
+				defer cancel()
+
+				return client.GetObjectWithContext(objCtx, &s3.GetObjectInput{
+					Bucket: &bucket,
+					Key:    obj.Key,
+				})
+			}
+
+			res, err := getObject()
 			if err != nil {
 				if !strings.Contains(err.Error(), "AccessDenied") {
 					s.log.Error(err, "could not get S3 object", "object", *obj.Key)
