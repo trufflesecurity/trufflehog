@@ -1035,7 +1035,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 	ctx = context.WithValue(ctx, "detector", data.detector.Key.Loggable())
 
-	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
+	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
 	var matchCount int
 	// To reduce the overhead of regex calls in the detector,
