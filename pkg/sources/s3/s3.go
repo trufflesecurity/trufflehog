@@ -282,18 +282,17 @@ func (s *Source) pageChunker(
 	pageNumber int,
 	objectCount *uint64,
 ) {
-	for _, o := range page.Contents {
-		if o == nil {
+	for _, obj := range page.Contents {
+		if obj == nil {
 			continue
 		}
-		obj := *o
 
 		ctx = context.WithValues(
 			ctx,
-			"key", obj.Key,
+			"key", *obj.Key,
 			"bucket", bucket,
 			"page", pageNumber,
-			"size", obj.Size,
+			"size", *obj.Size,
 		)
 
 		if common.IsDone(ctx) {
@@ -302,7 +301,7 @@ func (s *Source) pageChunker(
 
 		// Skip GLACIER and GLACIER_IR objects.
 		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
-			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", obj.StorageClass)
+			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass)
 			continue
 		}
 
