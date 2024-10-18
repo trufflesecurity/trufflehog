@@ -272,38 +272,55 @@ func (s *Source) getRegionalClientForBucket(ctx context.Context, defaultRegionCl
 }
 
 // pageChunker emits chunks onto the given channel from a page
-func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan *sources.Chunk, bucket string, page *s3.ListObjectsV2Output, errorCount *sync.Map, pageNumber int, objectCount *uint64) {
-	for _, obj := range page.Contents {
-		obj := obj
+func (s *Source) pageChunker(
+	ctx context.Context,
+	client *s3.S3,
+	chunksChan chan *sources.Chunk,
+	bucket string,
+	page *s3.ListObjectsV2Output,
+	errorCount *sync.Map,
+	pageNumber int,
+	objectCount *uint64,
+) {
+	for _, o := range page.Contents {
+		if o == nil {
+			continue
+		}
+		obj := *o
+
+		ctx = context.WithValues(
+			ctx,
+			"key", obj.Key,
+			"bucket", bucket,
+			"page", pageNumber,
+			"size", obj.Size,
+		)
+
 		if common.IsDone(ctx) {
 			return
 		}
 
-		if obj == nil {
-			continue
-		}
-
-		// skip GLACIER and GLACIER_IR objects
+		// Skip GLACIER and GLACIER_IR objects.
 		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
-			s.log.V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass, "object", *obj.Key)
+			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", obj.StorageClass)
 			continue
 		}
 
-		// ignore large files
+		// Ignore large files.
 		if *obj.Size > s.maxObjectSize {
-			s.log.V(5).Info("Skipping %d byte file (over maxObjectSize limit)", "object", *obj.Key)
+			ctx.Logger().V(5).Info("Skipping %d byte file (over maxObjectSize limit)")
 			continue
 		}
 
-		// file empty file
+		// File empty file.
 		if *obj.Size == 0 {
-			s.log.V(5).Info("Skipping 0 byte file", "object", *obj.Key)
+			ctx.Logger().V(5).Info("Skipping empty file")
 			continue
 		}
 
-		// skip incompatible extensions
+		// Skip incompatible extensions.
 		if common.SkipFile(*obj.Key) {
-			s.log.V(5).Info("Skipping file with incompatible extension", "object", *obj.Key)
+			ctx.Logger().V(5).Info("Skipping file with incompatible extension")
 			continue
 		}
 
@@ -311,7 +328,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			defer common.RecoverWithExit(ctx)
 
 			if strings.HasSuffix(*obj.Key, "/") {
-				s.log.V(5).Info("Skipping directory", "object", *obj.Key)
+				ctx.Logger().V(5).Info("Skipping directory")
 				return nil
 			}
 
@@ -323,7 +340,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 				nErr = 0
 			}
 			if nErr.(int) > 3 {
-				s.log.V(2).Info("Skipped due to excessive errors", "object", *obj.Key)
+				ctx.Logger().V(2).Info("Skipped due to excessive errors")
 				return nil
 			}
 
@@ -343,7 +360,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			res, err := getObject()
 			if err != nil {
 				if !strings.Contains(err.Error(), "AccessDenied") {
-					s.log.Error(err, "could not get S3 object", "object", *obj.Key)
+					ctx.Logger().Error(err, "could not get S3 object")
 				}
 
 				nErr, ok := errorCount.Load(prefix)
@@ -351,14 +368,14 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 					nErr = 0
 				}
 				if nErr.(int) > 3 {
-					s.log.V(3).Info("Skipped due to excessive errors", "object", *obj.Key)
+					ctx.Logger().V(3).Info("Skipped due to excessive errors")
 					return nil
 				}
 				nErr = nErr.(int) + 1
 				errorCount.Store(prefix, nErr)
 				// too many consecutive errors on this page
 				if nErr.(int) > 3 {
-					s.log.V(2).Info("Too many consecutive errors, excluding prefix", "prefix", prefix)
+					ctx.Logger().V(2).Info("Too many consecutive errors, excluding prefix", "prefix", prefix)
 				}
 				return nil
 			}
@@ -394,7 +411,7 @@ func (s *Source) pageChunker(ctx context.Context, client *s3.S3, chunksChan chan
 			}
 
 			atomic.AddUint64(objectCount, 1)
-			s.log.V(5).Info("S3 object scanned.", "object_count", objectCount, "page_number", pageNumber)
+			ctx.Logger().V(5).Info("S3 object scanned.", "object_count", objectCount)
 			nErr, ok = errorCount.Load(prefix)
 			if !ok {
 				nErr = 0
