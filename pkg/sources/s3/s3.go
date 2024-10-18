@@ -362,6 +362,13 @@ func (s *Source) pageChunker(
 				if !strings.Contains(err.Error(), "AccessDenied") {
 					ctx.Logger().Error(err, "could not get S3 object")
 				}
+				// According to the documentation for GetObjectWithContext,
+				// the response can be non-nil even if there was an error.
+				// It's uncertain if the body will be nil in such cases,
+				// but we'll close it if it's not.
+				if res != nil && res.Body != nil {
+					res.Body.Close()
+				}
 
 				nErr, ok := errorCount.Load(prefix)
 				if !ok {
