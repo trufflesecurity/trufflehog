@@ -1,11 +1,12 @@
-package apiscience
+package apimetrics
 
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,16 +22,16 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apiscience"}) + `\b([a-bA-Z0-9\S]{22})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apimetrics"}) + `\b([a-bA-Z0-9\S]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"apiscience"}
+	return []string{"apimetrics"}
 }
 
-// FromData will find and optionally verify ApiScience secrets in a given set of bytes.
+// FromData will find and optionally verify ApiMetrics secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -43,12 +44,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_ApiScience,
+			DetectorType: detectorspb.DetectorType_ApiMetrics,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.apiscience.com/v1/monitors", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://client.apimetrics.io/api/2/calls/", nil)
 			if err != nil {
 				continue
 			}
@@ -69,9 +70,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_ApiScience
+	return detectorspb.DetectorType_ApiMetrics
 }
 
 func (s Scanner) Description() string {
-	return "ApiScience is a tool for monitoring the performance of APIs. ApiScience keys can be used to access and manage API monitors."
+	return "ApiMetrics is a tool for monitoring the performance of APIs. ApiMetrics keys can be used to access and manage API monitors."
 }
