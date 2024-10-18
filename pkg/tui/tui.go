@@ -47,12 +47,20 @@ type TUI struct {
 }
 
 // New returns a new TUI model.
-func New(c common.Common) *TUI {
+func New(c common.Common, args []string) *TUI {
 	ui := &TUI{
 		common:     c,
 		pages:      make([]common.Component, 5),
 		activePage: wizardIntroPage,
 		state:      startState,
+	}
+	switch {
+	case len(args) == 0:
+		return ui
+	case len(args) == 1 && args[0] == "analyze":
+		// Set to analyze start page.
+	case len(args) >= 2 && args[0] == "analyze":
+		// Set analyze sub-page.
 	}
 	return ui
 }
@@ -177,7 +185,7 @@ func (ui *TUI) View() string {
 	)
 }
 
-func Run() []string {
+func Run(args []string) []string {
 	c := common.Common{
 		Copy:   nil,
 		Styles: styles.DefaultStyles(),
@@ -186,7 +194,7 @@ func Run() []string {
 		Height: 0,
 		Zone:   zone.New(),
 	}
-	m := New(c)
+	m := New(c, args)
 	p := tea.NewProgram(m)
 	// TODO: Print normal help message.
 	if _, err := p.Run(); err != nil {

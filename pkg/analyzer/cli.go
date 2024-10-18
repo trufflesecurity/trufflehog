@@ -27,13 +27,17 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/stripe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/twilio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/tui"
 )
 
 var (
 	// TODO: Add list of supported key types.
 	analyzeKeyType *string
 )
+
+type SecretInfo struct {
+	Parts map[string]string
+	Cfg   *config.Config
+}
 
 func Command(app *kingpin.Application) *kingpin.CmdClause {
 	cli := app.Command("analyze", "Analyze API keys for fine-grained permissions information.")
@@ -52,12 +56,7 @@ func Command(app *kingpin.Application) *kingpin.CmdClause {
 	return cli
 }
 
-func Run(cmd string) {
-	keyType, secretInfo, err := tui.Run(*analyzeKeyType)
-	if err != nil {
-		// TODO: Log error.
-		return
-	}
+func Run(cmd string, keyType string, secretInfo SecretInfo) {
 	if secretInfo.Cfg == nil {
 		secretInfo.Cfg = &config.Config{}
 	}
