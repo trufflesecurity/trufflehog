@@ -2,7 +2,9 @@ package ayrshare
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -56,10 +58,29 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			res, err := client.Do(req)
 			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
+				defer func() {
+					_, _ = io.Copy(io.Discard, res.Body)
+					_ = res.Body.Close()
+				}()
+
+				if res.StatusCode == http.StatusOK {
 					s1.Verified = true
+					bodyBytes, err := io.ReadAll(res.Body)
+					if err != nil {
+						continue
+					}
+
+					var responseBody map[string]interface{}
+					if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
+						if email, ok := responseBody["email"].(string); ok {
+							s1.ExtraData = map[string]string{
+								"email": email,
+							}
+						}
+					}
 				}
+			} else {
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 
