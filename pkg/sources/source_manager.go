@@ -364,7 +364,7 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 			// TODO: Catch panics and add to report.
 			defer close(chunkReporter.chunkCh)
 			id, kind := unit.SourceUnitID()
-			ctx := context.WithValues(ctx, "unit", id, "unit_kind", kind)
+			ctx := context.WithValues(ctx, "unit_kind", kind, "unit", id)
 			ctx.Logger().V(3).Info("chunking unit")
 			if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
 				report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
