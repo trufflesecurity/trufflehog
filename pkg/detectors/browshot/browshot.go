@@ -2,9 +2,10 @@ package browshot
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -20,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"browshot"}) + `\b([a-zA-Z-0-9]{28})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"browshot"}) + `\b([a-zA-Z-0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,7 +48,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.browshot.com/api/v1/instance/list?key="+resMatch, nil)
+			// Reference : https://browshot.com/api/documentation#account_info
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.browshot.com/api/v1/account/info?key="+resMatch, nil)
 			if err != nil {
 				continue
 			}
