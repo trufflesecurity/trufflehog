@@ -83,7 +83,7 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 func newFileReader(r io.Reader) (fileReader, error) {
 	var fReader fileReader
 
-	fReader.BufferedReadSeeker = iobuf.NewBufferedReaderSeeker(r)
+	fReader.BufferedReadSeeker = iobuf.NewBufferedReadSeeker(r)
 
 	mime, err := mimetype.DetectReader(fReader)
 	if err != nil {

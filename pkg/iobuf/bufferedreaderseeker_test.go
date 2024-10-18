@@ -121,7 +121,7 @@ func TestBufferedReaderSeekerRead(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 
 			for i, readSize := range tt.reads {
 				buf := make([]byte, readSize)
@@ -241,7 +241,7 @@ func TestBufferedReaderSeekerSeek(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 			pos, err := brs.Seek(tt.offset, tt.whence)
 			if tt.expectedErr {
 				assert.Error(t, err)
@@ -336,7 +336,7 @@ func TestBufferedReaderSeekerReadAt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 
 			out := make([]byte, tt.length)
 			n, err := brs.ReadAt(out, tt.offset)
@@ -436,7 +436,7 @@ func TestBufferedReadSeekerSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			brs := NewBufferedReaderSeeker(tt.reader)
+			brs := NewBufferedReadSeeker(tt.reader)
 
 			if tt.setup != nil {
 				tt.setup(brs)
