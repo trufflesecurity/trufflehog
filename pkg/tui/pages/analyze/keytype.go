@@ -1,4 +1,4 @@
-package tui
+package analyze
 
 import (
 	"github.com/charmbracelet/bubbles/key"

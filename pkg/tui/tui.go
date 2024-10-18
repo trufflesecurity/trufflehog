@@ -11,6 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/keymap"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/analyze"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/contact_enterprise"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_select"
@@ -27,6 +28,7 @@ const (
 	sourceConfigurePage
 	viewOSSProjectPage
 	contactEnterprisePage
+	analyzePage
 )
 
 type sessionState int
@@ -50,7 +52,7 @@ type TUI struct {
 func New(c common.Common, args []string) *TUI {
 	ui := &TUI{
 		common:     c,
-		pages:      make([]common.Component, 5),
+		pages:      make([]common.Component, 6),
 		activePage: wizardIntroPage,
 		state:      startState,
 	}
@@ -59,7 +61,13 @@ func New(c common.Common, args []string) *TUI {
 		return ui
 	case len(args) == 1 && args[0] == "analyze":
 		// Set to analyze start page.
-	case len(args) >= 2 && args[0] == "analyze":
+		return &TUI{
+			common:     c,
+			pages:      make([]common.Component, 6),
+			activePage: analyzePage,
+			state:      startState,
+		}
+		// case len(args) >= 2 && args[0] == "analyze":
 		// Set analyze sub-page.
 	}
 	return ui
@@ -82,6 +90,7 @@ func (ui *TUI) Init() tea.Cmd {
 	ui.pages[sourceConfigurePage] = source_configure.New(ui.common)
 	ui.pages[viewOSSProjectPage] = view_oss.New(ui.common)
 	ui.pages[contactEnterprisePage] = contact_enterprise.New(ui.common)
+	ui.pages[analyzePage] = analyze.New(ui.common, ui.args)
 	ui.SetSize(ui.common.Width, ui.common.Height)
 	cmds := make([]tea.Cmd, 0)
 	cmds = append(cmds,
