@@ -113,7 +113,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/campayn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cannyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/capsulecrm"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata/v2"
 	captainDataV2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata/v2"
 	captainDataV3 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata/v3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/carboninterface"
@@ -1415,7 +1414,6 @@ func DefaultDetectors() []detectors.Detector {
 		checklyhq.Scanner{},
 		teamworkspaces.Scanner{},
 		cloudelements.Scanner{},
-		captaindata.Scanner{},
 		uploadcare.Scanner{},
 		moderation.Scanner{},
 		myintervals.Scanner{},
