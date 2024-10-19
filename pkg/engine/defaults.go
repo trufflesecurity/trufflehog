@@ -113,7 +113,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/campayn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cannyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/capsulecrm"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata/v2"
+	captainDataV2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata/v2"
+	captainDataV3 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata/v3"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/carboninterface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cashboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/caspio"
@@ -1642,6 +1644,8 @@ func DefaultDetectors() []detectors.Detector {
 		meraki.Scanner{},
 		saladcloudapikey.Scanner{},
 		boxoauth.Scanner{},
+		captainDataV2.Scanner{},
+		captainDataV3.Scanner{},
 	}
 
 	// Automatically initialize all detectors that implement
