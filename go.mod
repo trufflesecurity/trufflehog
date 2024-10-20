@@ -15,7 +15,7 @@ replace github.com/STARRY-S/zip => github.com/STARRY-S/zip v0.1.0
 
 require (
 	cloud.google.com/go/secretmanager v1.14.1
-	cloud.google.com/go/storage v1.44.0
+	cloud.google.com/go/storage v1.45.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.13
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2
 	github.com/BobuSumisu/aho-corasick v1.0.3
@@ -40,8 +40,8 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.1.0
 	github.com/fatih/color v1.17.0
 	github.com/felixge/fgprof v0.9.5
-	github.com/gabriel-vasile/mimetype v1.4.5
-	github.com/getsentry/sentry-go v0.29.0
+	github.com/gabriel-vasile/mimetype v1.4.6
+	github.com/getsentry/sentry-go v0.29.1
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-ldap/ldap/v3 v3.4.8
@@ -78,7 +78,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.20.4
+	github.com/prometheus/client_golang v1.20.5
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/sassoftware/go-rpmutils v0.4.0
 	github.com/schollz/progressbar/v3 v3.16.1
@@ -96,11 +96,11 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.33.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.7.0
-	github.com/xanzy/go-gitlab v0.111.0
+	github.com/xanzy/go-gitlab v0.112.0
 	github.com/xo/dburl v0.23.2
 	go.mongodb.org/mongo-driver v1.17.1
 	go.uber.org/automaxprocs v1.6.0
-	go.uber.org/mock v0.4.0
+	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.28.0
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
@@ -108,7 +108,7 @@ require (
 	golang.org/x/oauth2 v0.23.0
 	golang.org/x/sync v0.8.0
 	golang.org/x/text v0.19.0
-	google.golang.org/api v0.200.0
+	google.golang.org/api v0.201.0
 	google.golang.org/protobuf v1.35.1
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v2 v2.4.0
@@ -120,7 +120,7 @@ require (
 
 require (
 	cel.dev/expr v0.16.1 // indirect
-	cloud.google.com/go v0.115.1 // indirect
+	cloud.google.com/go v0.116.0 // indirect
 	cloud.google.com/go/auth v0.9.8 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
 	cloud.google.com/go/compute/metadata v0.5.2 // indirect

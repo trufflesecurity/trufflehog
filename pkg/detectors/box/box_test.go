@@ -1,4 +1,7 @@
-package slackwebhook
+//go:build detectors
+// +build detectors
+
+package box
 
 import (
 	"context"
@@ -10,29 +13,18 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "https://hooks.slack.com/services/TAGGINGEXAMPLE/BASE/91nziTEEzAAcaNZiz1mPPoXyS"
-	invalidPattern = "https://hooks.slack.com/apps/LAGGINGEXAMPLE/BASE/91nziTEEzAAcaNZiz1mPPoXyS"
-)
-
-func TestSlackWebHook_Pattern(t *testing.T) {
+func TestBox_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{validPattern},
-		},
-		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name:  "typical pattern",
+			input: "box_access_token = 'Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ'",
+			want:  []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
 		},
 	}
 

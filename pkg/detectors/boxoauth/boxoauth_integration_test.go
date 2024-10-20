@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package autoklose
+package boxoauth
 
 import (
 	"context"
@@ -10,21 +10,23 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestAutoklose_FromChunk(t *testing.T) {
+func TestBoxOauth_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AUTOKLOSE")
-	inactiveSecret := testSecrets.MustGetField("AUTOKLOSE_INACTIVE")
+
+	id := testSecrets.MustGetField("BOXOAUTH_ID")
+	secret := testSecrets.MustGetField("BOXOAUTH_SECRET")
+	invalidSecret := testSecrets.MustGetField("BOXOAUTH_INVALID_SECRET")
 
 	type args struct {
 		ctx    context.Context
@@ -43,16 +45,15 @@ func TestAutoklose_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a autoklose secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a box id %s with secret %s", id, secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Autoklose,
+					DetectorType: detectorspb.DetectorType_BoxOauth,
 					Verified:     true,
-					ExtraData: map[string]string{
-						"email": "mladen.stevanovic@vanillasoft.com",
-					},
+					Raw:          []byte(id),
+					RawV2:        []byte(id + secret),
 				},
 			},
 			wantErr: false,
@@ -62,13 +63,15 @@ func TestAutoklose_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a autoklose secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a box id %s with secret %s", id, invalidSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Autoklose,
+					DetectorType: detectorspb.DetectorType_BoxOauth,
 					Verified:     false,
+					Raw:          []byte(id),
+					RawV2:        []byte(id + invalidSecret),
 				},
 			},
 			wantErr: false,
@@ -90,17 +93,20 @@ func TestAutoklose_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Autoklose.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("BoxOauth.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no rawV2 secret present: \n %+v", got[i])
+				}
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Autoklose.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("BoxOauth.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

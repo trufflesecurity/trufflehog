@@ -1,21 +1,27 @@
-package slackwebhook
+//go:build detectors
+// +build detectors
+
+package boxoauth
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
 var (
-	validPattern   = "https://hooks.slack.com/services/TAGGINGEXAMPLE/BASE/91nziTEEzAAcaNZiz1mPPoXyS"
-	invalidPattern = "https://hooks.slack.com/apps/LAGGINGEXAMPLE/BASE/91nziTEEzAAcaNZiz1mPPoXyS"
+	clientId            = gofakeit.Password(true, true, true, false, false, 32)
+	clientSecret        = gofakeit.Password(true, true, true, false, false, 32)
+	invalidClientSecret = gofakeit.Password(true, true, true, true, false, 32)
 )
 
-func TestSlackWebHook_Pattern(t *testing.T) {
+func TestBoxOauth_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -26,12 +32,17 @@ func TestSlackWebHook_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{validPattern},
+			input: fmt.Sprintf("box id = '%s' box secret = '%s'", clientId, clientSecret),
+			want:  []string{clientId + clientSecret},
 		},
 		{
 			name:  "invalid pattern",
-			input: invalidPattern,
+			input: fmt.Sprintf("box id = '%s' box secret = '%s'", clientId, invalidClientSecret),
+			want:  nil,
+		},
+		{
+			name:  "invalid pattern",
+			input: fmt.Sprintf("box = '%s|%s'", clientId, invalidClientSecret),
 			want:  nil,
 		},
 	}
