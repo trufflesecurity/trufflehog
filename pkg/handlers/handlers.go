@@ -380,7 +380,7 @@ func handleChunksWithError(
 				return nil
 			}
 			if dataOrErr.Err != nil {
-				if isCriticalError(dataOrErr.Err) {
+				if isFatal(dataOrErr.Err) {
 					return dataOrErr.Err
 				}
 				ctx.Logger().Error(dataOrErr.Err, "non-critical error processing chunk")
@@ -399,12 +399,12 @@ func handleChunksWithError(
 	}
 }
 
-// isCriticalError determines whether the given error is a critical error that should
-// terminate processing, or a non-critical error that can be logged and ignored.
-// Critical errors include context cancellation, deadline exceeded, and the
-// ErrProcessingFatal error. Non-critical errors include the ErrProcessingWarning
-// error. All other errors are treated as non-critical.
-func isCriticalError(err error) bool {
+// isFatal determines whether the given error is a fatal error that should
+// terminate processing the current file, or a non-critical error that can be logged and ignored.
+// "Fatal" errors include context cancellation, deadline exceeded, and the
+// ErrProcessingFatal error. Non-fatal errors include the ErrProcessingWarning
+// error as well as any other error that is not one of the fatal errors.
+func isFatal(err error) bool {
 	switch {
 	case errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded) ||
