@@ -42,11 +42,13 @@ type fileReader struct {
 var (
 	ErrEmptyReader = errors.New("reader is empty")
 
-	// ErrCriticalProcessing indicates a critical error that should halt processing.
-	ErrCriticalProcessing = errors.New("critical processing error")
+	// ErrProcessingFatal indicates a severe error that requires stopping the file processing.
 
-	// ErrNonCriticalProcessing indicates a non-critical error that can be logged and processing can continue.
-	ErrNonCriticalProcessing = errors.New("non-critical processing error")
+	ErrProcessingFatal = errors.New("fatal error processing file")
+
+	// ErrProcessingWarning indicates a recoverable error that can be logged,
+	// allowing processing to continue.
+	ErrProcessingWarning = errors.New("error processing file")
 )
 
 // mimeTypeReader wraps an io.Reader with MIME type information.
@@ -90,9 +92,7 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
 // The caller is responsible for closing the reader when it is no longer needed.
-func newFileReader(r io.Reader) (fileReader, error) {
-	var fReader fileReader
-
+func newFileReader(r io.Reader) (fReader fileReader, err error) {
 	// To detect the MIME type of the input data, we need a reader that supports seeking.
 	// This allows us to read the data multiple times if necessary without losing the original position.
 	// We use a BufferedReaderSeeker to wrap the original reader, enabling this functionality.
@@ -100,7 +100,6 @@ func newFileReader(r io.Reader) (fileReader, error) {
 
 	// If an error occurs during MIME type detection, it is important we close the BufferedReaderSeeker
 	// to release any resources it holds (checked out buffers or temp file).
-	var err error
 	defer func() {
 		if err != nil {
 			if closeErr := fReader.Close(); closeErr != nil {
@@ -109,14 +108,15 @@ func newFileReader(r io.Reader) (fileReader, error) {
 		}
 	}()
 
-	mime, err := mimetype.DetectReader(fReader)
+	var mime *mimetype.MIME
+	mime, err = mimetype.DetectReader(fReader)
 	if err != nil {
 		return fReader, fmt.Errorf("unable to detect MIME type: %w", err)
 	}
 	fReader.mime = mime
 
 	// Reset the reader to the beginning because DetectReader consumes the reader.
-	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+	if _, err = fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
@@ -126,7 +126,8 @@ func newFileReader(r io.Reader) (fileReader, error) {
 		return fReader, nil
 	}
 
-	format, _, err := archiver.Identify("", fReader)
+	var format archiver.Format
+	format, _, err = archiver.Identify("", fReader)
 	switch {
 	case err == nil:
 		fReader.isGenericArchive = true
@@ -141,7 +142,7 @@ func newFileReader(r io.Reader) (fileReader, error) {
 
 	// Reset the reader to the beginning again to allow the handler to read from the start.
 	// This is necessary because Identify consumes the reader.
-	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+	if _, err = fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after archive identification: %w", err)
 	}
 
@@ -305,7 +306,7 @@ func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 // - If the reader is nil
 // - If there's an error creating the file reader
 // - If there's an error closing the reader
-// - If a critical error occurs during chunk processing (context cancellation, deadline exceeded, or ErrCriticalProcessing)
+// - If a critical error occurs during chunk processing (context cancellation, deadline exceeded, or ErrProcessingFatal)
 // - If there's an error reporting a chunk
 //
 // Non-critical errors during chunk processing are logged
@@ -371,22 +372,22 @@ func handleChunksWithError(
 ) error {
 	for {
 		select {
-		case de, ok := <-dataErrChan:
+		case dataOrErr, ok := <-dataErrChan:
 			if !ok {
 				// Channel closed, processing complete.
 				ctx.Logger().V(5).Info("dataErrChan closed, all chunks processed")
 				return nil
 			}
-			if de.Err != nil {
-				if isCriticalError(de.Err) {
-					return de.Err
+			if dataOrErr.Err != nil {
+				if isCriticalError(dataOrErr.Err) {
+					return dataOrErr.Err
 				}
-				ctx.Logger().Error(de.Err, "non-critical error processing chunk")
+				ctx.Logger().Error(dataOrErr.Err, "non-critical error processing chunk")
 				continue
 			}
-			if len(de.Data) > 0 {
+			if len(dataOrErr.Data) > 0 {
 				chunk := *chunkSkel
-				chunk.Data = de.Data
+				chunk.Data = dataOrErr.Data
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					return fmt.Errorf("error reporting chunk: %w", err)
 				}
@@ -400,15 +401,15 @@ func handleChunksWithError(
 // isCriticalError determines whether the given error is a critical error that should
 // terminate processing, or a non-critical error that can be logged and ignored.
 // Critical errors include context cancellation, deadline exceeded, and the
-// ErrCriticalProcessing error. Non-critical errors include the ErrNonCriticalProcessing
+// ErrProcessingFatal error. Non-critical errors include the ErrProcessingWarning
 // error. All other errors are treated as non-critical.
 func isCriticalError(err error) bool {
 	switch {
 	case errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded) ||
-		errors.Is(err, ErrCriticalProcessing):
+		errors.Is(err, ErrProcessingFatal):
 		return true
-	case errors.Is(err, ErrNonCriticalProcessing):
+	case errors.Is(err, ErrProcessingWarning):
 		return false
 	default:
 		return false

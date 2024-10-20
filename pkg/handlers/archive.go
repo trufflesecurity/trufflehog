@@ -53,7 +53,6 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 	}
 
 	go func() {
-		var err error
 		defer close(dataOrErrChan)
 
 		// The underlying 7zip library may panic when attempting to open an archive.
@@ -67,24 +66,21 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 				} else {
 					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(panicErr, "Panic occurred when attempting to open archive")
 				dataOrErrChan <- DataOrErr{
-					Data: nil,
-					Err:  fmt.Errorf("%w: panic error: %w", ErrCriticalProcessing, panicErr),
+					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
 				}
 			}
 		}()
 
-		// Update the metrics for the file processing.
 		start := time.Now()
-		defer func() {
-			h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
-			h.metrics.incFilesProcessed()
-		}()
 
-		if err = h.openArchive(ctx, 0, input, dataOrErrChan); err != nil {
-			ctx.Logger().Error(err, "error unarchiving chunk.")
+		err := h.openArchive(ctx, 0, input, dataOrErrChan)
+		if err == nil {
+			h.metrics.incFilesProcessed()
 		}
+
+		// Update the metrics for the file processing and handle any errors.
+		h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 	}()
 
 	return dataOrErrChan

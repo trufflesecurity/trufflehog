@@ -799,12 +799,12 @@ func TestHandleChunksWithError(t *testing.T) {
 	}{
 		{
 			name:  "Non-Critical Error",
-			input: []DataOrErr{{Err: ErrNonCriticalProcessing}},
+			input: []DataOrErr{{Err: ErrProcessingWarning}},
 		},
 		{
 			name:        "Critical Error",
-			input:       []DataOrErr{{Err: ErrCriticalProcessing}},
-			expectedErr: ErrCriticalProcessing,
+			input:       []DataOrErr{{Err: ErrProcessingFatal}},
+			expectedErr: ErrProcessingFatal,
 		},
 		{
 			name: "No Error",

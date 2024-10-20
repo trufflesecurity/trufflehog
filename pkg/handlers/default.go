@@ -38,17 +38,15 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 	go func() {
 		defer close(dataOrErrChan)
 
-		// Update the metrics for the file processing.
 		start := time.Now()
-		var err error
-		defer func() {
-			h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
-			h.metrics.incFilesProcessed()
-		}()
 
-		if err = h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(input), dataOrErrChan); err != nil {
-			ctx.Logger().Error(err, "error handling non-archive content.")
+		err := h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(input), dataOrErrChan)
+		if err == nil {
+			h.metrics.incFilesProcessed()
 		}
+
+		// Update the metrics for the file processing and handle errors.
+		h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 	}()
 
 	return dataOrErrChan
@@ -66,17 +64,21 @@ func (h *defaultHandler) measureLatencyAndHandleErrors(
 		h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		return
 	}
+	dataOrErr := DataOrErr{}
 
 	h.metrics.incErrors()
 	if errors.Is(err, context.DeadlineExceeded) {
 		h.metrics.incFileProcessingTimeouts()
-		de := DataOrErr{
-			Data: nil,
-			Err:  fmt.Errorf("%w: error processing chunk: %w", ErrCriticalProcessing, err),
-		}
-		if err := common.CancellableWrite(ctx, dataErrChan, de); err != nil {
+		dataOrErr.Err = fmt.Errorf("%w: error processing chunk: %v", ErrProcessingFatal, err)
+		if err := common.CancellableWrite(ctx, dataErrChan, dataOrErr); err != nil {
 			ctx.Logger().Error(err, "error writing to data channel")
 		}
+		return
+	}
+
+	dataOrErr.Err = err
+	if err := common.CancellableWrite(ctx, dataErrChan, dataOrErr); err != nil {
+		ctx.Logger().Error(err, "error writing to data channel")
 	}
 }
 
@@ -102,20 +104,18 @@ func (h *defaultHandler) handleNonArchiveContent(
 
 	chunkReader := sources.NewChunkReader()
 	for data := range chunkReader(ctx, reader) {
+		dataOrErr := DataOrErr{}
 		if err := data.Error(); err != nil {
 			h.metrics.incErrors()
-			de := DataOrErr{
-				Data: nil,
-				Err:  fmt.Errorf("%w: error reading chunk: %w", ErrNonCriticalProcessing, err),
-			}
-			if writeErr := common.CancellableWrite(ctx, dataOrErrChan, de); writeErr != nil {
-				return writeErr
+			dataOrErr.Err = fmt.Errorf("%w: error reading chunk: %v", ErrProcessingWarning, err)
+			if writeErr := common.CancellableWrite(ctx, dataOrErrChan, dataOrErr); writeErr != nil {
+				return fmt.Errorf("%w: error writing to data channel: %v", ErrProcessingFatal, writeErr)
 			}
 			continue
 		}
 
-		de := DataOrErr{Data: data.Bytes(), Err: nil}
-		if err := common.CancellableWrite(ctx, dataOrErrChan, de); err != nil {
+		dataOrErr.Data = data.Bytes()
+		if err := common.CancellableWrite(ctx, dataOrErrChan, dataOrErr); err != nil {
 			return err
 		}
 		h.metrics.incBytesProcessed(len(data.Bytes()))

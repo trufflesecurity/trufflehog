@@ -33,13 +33,7 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 	go func() {
 		defer close(dataOrErrChan)
 
-		// Update the metrics for the file processing.
 		start := time.Now()
-		var err error
-		defer func() {
-			h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
-			h.metrics.incFilesProcessed()
-		}()
 
 		// Defer a panic recovery to handle any panics that occur during the RPM processing.
 		defer func() {
@@ -51,27 +45,34 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
 				dataOrErrChan <- DataOrErr{
-					Data: nil,
-					Err:  fmt.Errorf("%w: panic error: %w", ErrCriticalProcessing, panicErr),
+					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
 				}
 			}
 		}()
 
-		var rpm *rpmutils.Rpm
-		rpm, err = rpmutils.ReadRpm(input)
+		rpm, err := rpmutils.ReadRpm(input)
 		if err != nil {
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: reading rpm error: %v", ErrProcessingFatal, err),
+			}
 			return
 		}
 
-		var reader rpmutils.PayloadReader
-		reader, err = rpm.PayloadReaderExtended()
+		reader, err := rpm.PayloadReaderExtended()
 		if err != nil {
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: uncompressing rpm error: %v", ErrProcessingFatal, err),
+			}
 			return
 		}
 
-		if err = h.processRPMFiles(ctx, reader, dataOrErrChan); err != nil {
-			ctx.Logger().Error(err, "error processing RPM files")
+		err = h.processRPMFiles(ctx, reader, dataOrErrChan)
+		if err == nil {
+			h.metrics.incFilesProcessed()
 		}
+
+		// Update the metrics for the file processing and handle any errors.
+		h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 	}()
 
 	return dataOrErrChan
@@ -106,8 +107,7 @@ func (h *rpmHandler) processRPMFiles(
 
 			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
 				dataOrErrChan <- DataOrErr{
-					Data: nil,
-					Err:  fmt.Errorf("%w: error processing RPM archive: %w", ErrNonCriticalProcessing, err),
+					Err: fmt.Errorf("%w: error processing RPM archive: %v", ErrProcessingWarning, err),
 				}
 				h.metrics.incErrors()
 			}

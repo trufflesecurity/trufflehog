@@ -33,13 +33,7 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) chan Da
 	go func() {
 		defer close(dataOrErrChan)
 
-		// Update the metrics for the file processing.
 		start := time.Now()
-		var err error
-		defer func() {
-			h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
-			h.metrics.incFilesProcessed()
-		}()
 
 		// Defer a panic recovery to handle any panics that occur during the AR processing.
 		defer func() {
@@ -51,21 +45,26 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) chan Da
 					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
 				dataOrErrChan <- DataOrErr{
-					Data: nil,
-					Err:  fmt.Errorf("%w: panic error: %w", ErrCriticalProcessing, panicErr),
+					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
 				}
 			}
 		}()
 
-		var arReader *deb.Ar
-		arReader, err = deb.LoadAr(input)
+		arReader, err := deb.LoadAr(input)
 		if err != nil {
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: loading AR error: %v", ErrProcessingFatal, err),
+			}
 			return
 		}
 
-		if err = h.processARFiles(ctx, arReader, dataOrErrChan); err != nil {
-			ctx.Logger().Error(err, "error processing AR files")
+		err = h.processARFiles(ctx, arReader, dataOrErrChan)
+		if err == nil {
+			h.metrics.incFilesProcessed()
 		}
+
+		// Update the metrics for the file processing and handle any errors.
+		h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 	}()
 
 	return dataOrErrChan
@@ -91,15 +90,19 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, dataO
 
 			rdr, err := newMimeTypeReader(arEntry.Data)
 			if err != nil {
-				return fmt.Errorf("error creating mime-type reader: %w", err)
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error creating AR mime-type reader: %v", ErrProcessingWarning, err),
+				}
+				h.metrics.incErrors()
+				continue
 			}
 
 			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
 				dataOrErrChan <- DataOrErr{
-					Data: nil,
-					Err:  fmt.Errorf("%w: error handling archive content in AR: %w", ErrNonCriticalProcessing, err),
+					Err: fmt.Errorf("%w: error handling archive content in AR: %v", ErrProcessingWarning, err),
 				}
 				h.metrics.incErrors()
+				continue
 			}
 
 			h.metrics.incFilesProcessed()
