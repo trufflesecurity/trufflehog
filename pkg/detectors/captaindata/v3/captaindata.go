@@ -2,8 +2,9 @@ package captaindata
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -13,15 +14,14 @@ import (
 )
 
 type Scanner struct {
-	detectors.DefaultMultiPartCredentialProvider
+	client *http.Client
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"captaindata"}) + `\b([0-9a-f]{64})\b`)
 	projIdPat = regexp.MustCompile(detectors.PrefixRegex([]string{"captaindata"}) + `\b([0-9a-f]{8}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{12})\b`)
@@ -37,48 +37,68 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	projIdMatches := projIdPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueMatches := make(map[string]struct{})
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueMatches[match[1]] = struct{}{}
+	}
 
-	for _, projIdMatch := range projIdMatches {
-		if len(projIdMatch) != 2 {
-			continue
-		}
-		resProjIdMatch := strings.TrimSpace(projIdMatch[1])
+	uniqueProjIdMatches := make(map[string]struct{})
+	for _, match := range projIdPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueProjIdMatches[match[1]] = struct{}{}
+	}
 
-		for _, match := range matches {
-			if len(match) != 2 {
-				continue
-			}
-			resMatch := strings.TrimSpace(match[1])
-
+	for projId := range uniqueProjIdMatches {
+		for apiKey := range uniqueMatches {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_CaptainData,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resProjIdMatch + resMatch),
+				Raw:          []byte(apiKey),
+				RawV2:        []byte(projId + apiKey),
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.captaindata.co/v3/project", nil)
-				if err != nil {
-					continue
+				client := s.client
+				if client == nil {
+					client = defaultClient
 				}
-				req.Header.Set("Authorization", "x-api-key "+resMatch)
-				req.Header.Set("x-project-id", resProjIdMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+
+				isVerified, extraData, verificationErr := verifyMatch(ctx, client, projId, apiKey)
+				s1.Verified = isVerified
+				s1.ExtraData = extraData
+				s1.SetVerificationError(verificationErr, apiKey)
 			}
 
 			results = append(results, s1)
 		}
 	}
 
-	return results, nil
+	return
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, projId, apiKey string) (bool, map[string]string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.captaindata.co/v3/workspace", nil)
+	if err != nil {
+		return false, nil, nil
+	}
+	req.Header.Set("Authorization", "x-api-key "+apiKey)
+	req.Header.Set("x-project-id", projId)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil, nil
+	case http.StatusUnauthorized:
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
