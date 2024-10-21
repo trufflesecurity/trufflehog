@@ -6,22 +6,30 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
 var DetectorHttpClientWithNoLocalAddresses *http.Client
 var DetectorHttpClientWithLocalAddresses *http.Client
 
 const DefaultResponseTimeout = 5 * time.Second
-const DefaultUserAgent = "TruffleHog"
+
+func userAgent() string {
+	if len(feature.UserAgentSuffix.Load()) > 0 {
+		return "TruffleHog " + feature.UserAgentSuffix.Load()
+	}
+	return "TruffleHog"
+}
 
 func init() {
 	DetectorHttpClientWithLocalAddresses = NewDetectorHttpClient(
-		WithTransport(NewDetectorTransport(DefaultUserAgent, nil)),
+		WithTransport(NewDetectorTransport(nil)),
 		WithTimeout(DefaultResponseTimeout),
 		WithNoFollowRedirects(),
 	)
 	DetectorHttpClientWithNoLocalAddresses = NewDetectorHttpClient(
-		WithTransport(NewDetectorTransport(DefaultUserAgent, nil)),
+		WithTransport(NewDetectorTransport(nil)),
 		WithTimeout(DefaultResponseTimeout),
 		WithNoFollowRedirects(),
 		WithNoLocalIP(),
@@ -41,12 +49,11 @@ func WithNoFollowRedirects() ClientOption {
 }
 
 type detectorTransport struct {
-	T         http.RoundTripper
-	userAgent string
+	T http.RoundTripper
 }
 
 func (t *detectorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Add("User-Agent", t.userAgent)
+	req.Header.Add("User-Agent", userAgent())
 	return t.T.RoundTrip(req)
 }
 
@@ -55,7 +62,7 @@ var defaultDialer = &net.Dialer{
 	KeepAlive: 5 * time.Second,
 }
 
-func NewDetectorTransport(userAgent string, T http.RoundTripper) http.RoundTripper {
+func NewDetectorTransport(T http.RoundTripper) http.RoundTripper {
 	if T == nil {
 		T = &http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,
@@ -67,7 +74,7 @@ func NewDetectorTransport(userAgent string, T http.RoundTripper) http.RoundTripp
 			ExpectContinueTimeout: 1 * time.Second,
 		}
 	}
-	return &detectorTransport{T: T, userAgent: userAgent}
+	return &detectorTransport{T: T}
 }
 
 func isLocalIP(ip net.IP) bool {
@@ -143,7 +150,7 @@ func WithTimeout(timeout time.Duration) ClientOption {
 
 func NewDetectorHttpClient(opts ...ClientOption) *http.Client {
 	httpClient := &http.Client{
-		Transport: NewDetectorTransport(DefaultUserAgent, nil),
+		Transport: NewDetectorTransport(nil),
 		Timeout:   DefaultResponseTimeout,
 	}
 

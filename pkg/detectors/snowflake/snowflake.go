@@ -24,7 +24,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z]{7})\b`)
+	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z-_]{1,255}(.privatelink)?)\b`)
 	usernameExclusionPat = `!@#$%^&*{}:<>,.;?()/\+=\s\n`
 )
 
@@ -71,7 +71,10 @@ func meetsSnowflakePasswordRequirements(password string) (string, bool) {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	accountMatches := accountIdentifierPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueAccountMatches := make(map[string]struct{})
+	for _, match := range accountIdentifierPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueAccountMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
 	usernameRegexState := common.UsernameRegexCheck(usernameExclusionPat)
 	usernameMatches := usernameRegexState.Matches(data)
@@ -79,14 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	passwordRegexState := common.PasswordRegexCheck(" ") // No explicit character exclusions by Snowflake for passwords
 	passwordMatches := passwordRegexState.Matches(data)
 
-	for _, accountMatch := range accountMatches {
-		if len(accountMatch) != 2 {
-			continue
-		}
-		resAccountMatch := strings.TrimSpace(accountMatch[1])
-
+	for resAccountMatch := range uniqueAccountMatches {
 		for _, resUsernameMatch := range usernameMatches {
-
 			for _, resPasswordMatch := range passwordMatches {
 				_, metPasswordRequirements := meetsSnowflakePasswordRequirements(resPasswordMatch)
 
@@ -165,4 +162,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Snowflake
+}
+
+func (s Scanner) Description() string {
+	return "Snowflake is a cloud data platform that provides data warehousing, data lakes, data sharing, and data exchange capabilities. Snowflake credentials can be used to access and manipulate data stored in Snowflake."
 }

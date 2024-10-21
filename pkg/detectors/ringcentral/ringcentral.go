@@ -83,3 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RingCentral
 }
+
+func (s Scanner) Description() string {
+	return "RingCentral is a cloud-based communication system that offers messaging, video conferencing, and phone services. RingCentral API keys can be used to access and manage these services."
+}

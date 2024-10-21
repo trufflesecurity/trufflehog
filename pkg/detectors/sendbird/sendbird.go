@@ -115,3 +115,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Sendbird
 }
+
+func (s Scanner) Description() string {
+	return "Sendbird is a communication platform providing chat, voice, and video services. Sendbird API tokens can be used to access and manage communication services."
+}

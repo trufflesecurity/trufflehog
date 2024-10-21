@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -51,7 +51,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	if len(keyMatches) == 0 {
 		keyMatches = personalKeyMatches
-
 	}
 
 	for _, keyMatch := range keyMatches {
@@ -107,4 +106,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AirtableApiKey
+}
+
+func (s Scanner) Description() string {
+	return "Airtable is a cloud collaboration service that offers database-like features. Airtable API keys can be used to access and modify data within Airtable bases."
 }

@@ -1,7 +1,9 @@
+//go:generate generate_permissions permissions.yaml permissions.go mailchimp
 package mailchimp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -26,11 +28,66 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Mailchimp }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("not implemented")
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType:       analyzerpb.AnalyzerType_Mailchimp,
+		Bindings:           make([]analyzers.Binding, 0, len(StringToPermission)),
+		UnboundedResources: make([]analyzers.Resource, 0, len(info.Domains.Domains)),
+	}
+
+	accountResource := analyzers.Resource{
+		Name:               info.Metadata.AccountName,
+		FullyQualifiedName: "mailchimp.com/account/" + info.Metadata.AccountID,
+		Type:               "account",
+		Metadata: map[string]any{
+			"email":             info.Metadata.Email,
+			"role":              info.Metadata.Role,
+			"member_since":      info.Metadata.MemberSince,
+			"pricing_plan":      info.Metadata.PricingPlan,
+			"account_timezone":  info.Metadata.AccountTimezone,
+			"last_login":        info.Metadata.LastLogin,
+			"total_subscribers": info.Metadata.TotalSubscribers,
+		},
+	}
+
+	for perm := range StringToPermission {
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource: accountResource,
+			Permission: analyzers.Permission{
+				Value: perm,
+			},
+		})
+	}
+
+	for _, domain := range info.Domains.Domains {
+		result.UnboundedResources = append(result.UnboundedResources, analyzers.Resource{
+			Name:               domain.Domain,
+			FullyQualifiedName: "mailchimp.com/domain/" + domain.Domain,
+			Type:               "domain",
+			Metadata: map[string]any{
+				"verified":      domain.Verified,
+				"authenticated": domain.Authenticated,
+			},
+			Parent: &accountResource,
+		})
+	}
+
+	return &result
 }
 
 type MetadataJSON struct {

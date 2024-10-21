@@ -24,6 +24,8 @@ type Detector interface {
 	Keywords() []string
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
+	// Description returns a description for the result being detected
+	Description() string
 }
 
 // CustomResultsCleaner is an optional interface that a detector can implement to customize how its generated results
@@ -72,8 +74,14 @@ type MultiPartCredentialProvider interface {
 // EndpointCustomizer is an optional interface that a detector can implement to
 // support verifying against user-supplied endpoints.
 type EndpointCustomizer interface {
-	SetEndpoints(...string) error
-	DefaultEndpoint() string
+	SetConfiguredEndpoints(...string) error
+	SetCloudEndpoint(string)
+	UseCloudEndpoint(bool)
+	UseFoundEndpoints(bool)
+}
+
+type CloudProvider interface {
+	CloudEndpoint() string
 }
 
 type Result struct {

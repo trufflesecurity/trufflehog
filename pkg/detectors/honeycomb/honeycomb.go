@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Honeycomb
 }
+
+func (s Scanner) Description() string {
+	return "Honeycomb is a tool for introspecting and interrogating production systems to help users understand how their systems work in real-time. Honeycomb API keys can be used to authenticate and interact with the Honeycomb API."
+}

@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Parsers
 }
+
+func (s Scanner) Description() string {
+	return "Parsers is a service used for parsing SQL queries. Parsers API keys can be used to access and modify this data."
+}

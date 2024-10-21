@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TatumIO
 }
+
+func (s Scanner) Description() string {
+	return "Tatum is a blockchain infrastructure platform. Tatum API keys can be used to access and interact with blockchain services provided by Tatum."
+}

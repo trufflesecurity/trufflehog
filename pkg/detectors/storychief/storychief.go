@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Storychief
 }
+
+func (s Scanner) Description() string {
+	return "Storychief is a content marketing platform that helps in creating, distributing, and measuring content. Storychief API keys can be used to access and manage content and integrations within the platform."
+}

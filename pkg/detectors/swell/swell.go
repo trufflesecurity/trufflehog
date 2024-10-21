@@ -80,3 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Swell
 }
+
+func (s Scanner) Description() string {
+	return "Swell is an eCommerce platform that allows businesses to create and manage online stores. Swell API keys can be used to access and modify store data."
+}

@@ -109,6 +109,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				} else {
 					s1.SetVerificationError(err, token)
 				}
+				s1.AnalysisInfo = map[string]string{
+					"key": token,
+				}
 			}
 
 			results = append(results, s1)
@@ -120,4 +123,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Slack
+}
+
+func (s Scanner) Description() string {
+	return "Slack tokens can be used to authenticate API requests to the Slack platform, allowing access to various workspace resources and functionalities."
 }

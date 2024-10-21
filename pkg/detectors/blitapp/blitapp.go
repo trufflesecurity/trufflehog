@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BlitApp
 }
+
+func (s Scanner) Description() string {
+	return "BlitApp is a service used for managing applications. BlitApp API keys can be used to access and modify application data."
+}

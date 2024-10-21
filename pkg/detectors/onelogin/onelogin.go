@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 
-			s := detectors.Result{
+			result := detectors.Result{
 				DetectorType: detectorspb.DetectorType_OneLogin,
 				Raw:          []byte(clientID[1]),
 				RawV2:        []byte(fmt.Sprintf("%s:%s", clientID[1], clientSecret[1])),
@@ -70,13 +70,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						res.Body.Close() // The request body is unused.
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s.Verified = true
+							result.Verified = true
 						}
 					}
 				}
 			}
 
-			results = append(results, s)
+			results = append(results, result)
 		}
 	}
 
@@ -85,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_OneLogin
+}
+
+func (s Scanner) Description() string {
+	return "OneLogin is an identity and access management provider. OneLogin OAuth client IDs and secrets can be used to authenticate and authorize API requests."
 }

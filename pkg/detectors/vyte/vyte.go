@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Vyte
 }
+
+func (s Scanner) Description() string {
+	return "Vyte is a scheduling platform that allows users to create and manage events. Vyte API keys can be used to access and manage these events."
+}

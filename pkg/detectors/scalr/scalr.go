@@ -84,3 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Scalr
 }
+
+func (s Scanner) Description() string {
+	return "Scalr is a cloud management platform that allows users to manage and automate cloud infrastructure. Scalr keys can be used to access and manage cloud resources within the Scalr platform."
+}

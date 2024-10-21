@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Stormglass
 }
+
+func (s Scanner) Description() string {
+	return "Stormglass is a weather data provider. Stormglass API keys can be used to access weather data services."
+}

@@ -1,0 +1,18 @@
+permissions:
+  - bypass_rls
+  - connect
+  - create
+  - create_db
+  - create_role
+  - delete
+  - inheritance_of_privs
+  - insert
+  - login
+  - references
+  - replication
+  - select
+  - superuser
+  - temp
+  - trigger
+  - truncate
+  - update

@@ -46,11 +46,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(secMatch[1])
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Square,
 			Raw:          []byte(resMatch),
 		}
-		s.ExtraData = map[string]string{
+		result.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/square/",
 		}
 
@@ -77,13 +77,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// 200 means good key and has `merchants` scope - default allowed by square
 				// 401 is bad key
 				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-					s.Verified = true
+					result.Verified = true
 				}
 			}
-			s.AnalysisInfo = map[string]string{"key": resMatch}
+			result.AnalysisInfo = map[string]string{"key": resMatch}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return
@@ -91,4 +91,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Square
+}
+
+func (s Scanner) Description() string {
+	return "Square is a financial services and mobile payment company. Square API keys can be used to access and manage payments, transactions, and other financial data."
 }

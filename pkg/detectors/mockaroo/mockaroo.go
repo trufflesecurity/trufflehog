@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -62,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if err == nil && len(t.Types) > 0 {
 						s1.Verified = true
 					}
-				} 
+				}
 			}
 		}
 
@@ -74,6 +75,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mockaroo
+}
+
+func (s Scanner) Description() string {
+	return "Mockaroo is a tool for generating realistic data for testing and development. Mockaroo API keys can be used to access and generate this data."
 }
 
 type typeRes struct {

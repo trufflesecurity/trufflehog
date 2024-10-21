@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CoinApi
 }
+
+func (s Scanner) Description() string {
+	return "CoinApi provides a RESTful API to access cryptocurrency market data. CoinApi keys can be used to fetch real-time and historical cryptocurrency data."
+}

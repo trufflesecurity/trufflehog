@@ -20,6 +20,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
@@ -110,4 +111,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SlackWebhook
+}
+
+func (s Scanner) Description() string {
+	return "Slack webhooks are used to send messages from external sources into Slack channels. If compromised, they can be used to send unauthorized messages."
+}
+
+func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
+	// ignore "https:" as a false positive for slack webhook detector
+	if strings.Contains(string(result.Raw), "https:") {
+		return false, ""
+	}
+
+	// back to the default false positive checks
+	return detectors.IsKnownFalsePositive(string(result.Raw), detectors.DefaultFalsePositives, true)
+
 }

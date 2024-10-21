@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for token := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_OpenAI,
-			Redacted:     token[:3] + "..." + token[47:],
+			Redacted:     token[:3] + "..." + token[min(len(token)-1, 47):],
 			Raw:          []byte(token),
 		}
 
@@ -119,6 +119,10 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_OpenAI
+}
+
+func (s Scanner) Description() string {
+	return "OpenAI provides various AI models and services. The API keys can be used to access and interact with these models and services."
 }
 
 type response struct {

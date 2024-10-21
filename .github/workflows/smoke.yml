@@ -10,11 +10,44 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.23"
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Smoke
         run: |
           set -e
-          go run . git https://github.com/dustin-decker/secretsandstuff.git
-          go run . github --repo https://github.com/dustin-decker/secretsandstuff.git
+          go run . git https://github.com/dustin-decker/secretsandstuff.git > /dev/null
+          go run . github --repo https://github.com/dustin-decker/secretsandstuff.git > /dev/null
+  zombies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run trufflehog
+        run: |
+          set -e
+          go run . git --no-verification file://. > /dev/null
+          # This case previously had a deadlock issue and left zombies after trufflehog exited #3379
+          go run . git --no-verification https://github.com/git-test-fixtures/binary.git > /dev/null
+      - name: Check for running git processes and zombies
+        run: |
+          if pgrep -x "git" > /dev/null
+          then
+            echo "Git processes are still running"
+            exit 1
+          else
+            echo "No git processes found"
+          fi
+
+          if ps -A -ostat,ppid | grep -e '[zZ]' > /dev/null
+          then
+            echo "Zombie processes found"
+            exit 1
+          else
+            echo "No zombie processes found"
+          fi

@@ -9,6 +9,7 @@ import (
 	"pault.ag/go/debian/deb"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
 // arHandler handles AR archive formats.
@@ -23,6 +24,11 @@ func newARHandler() *arHandler {
 // manage data from AR files according to specific requirements.
 func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
+
+	if feature.ForceSkipArchives.Load() {
+		close(archiveChan)
+		return archiveChan, nil
+	}
 
 	go func() {
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)

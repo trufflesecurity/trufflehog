@@ -103,3 +103,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TrufflehogEnterprise
 }
+
+func (s Scanner) Description() string {
+	return "TruffleHog Enterprise is a tool for detecting and verifying secrets in your codebase. The keys and secrets detected can be used to access TruffleHog Enterprise services."
+}

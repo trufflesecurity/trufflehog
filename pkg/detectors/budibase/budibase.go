@@ -90,3 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Budibase
 }
+
+func (s Scanner) Description() string {
+	return "Budibase is a low-code platform for creating internal tools. Budibase API keys can be used to access and modify applications and data within the platform."
+}

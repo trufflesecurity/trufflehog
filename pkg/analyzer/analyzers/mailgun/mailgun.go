@@ -1,7 +1,9 @@
+//go:generate generate_permissions permissions.yaml permissions.go mailgun
 package mailgun
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -24,14 +26,50 @@ type Analyzer struct {
 func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Mailgun }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("not implemented")
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *DomainsJSON) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzerpb.AnalyzerType_Mailgun,
+		Bindings:     make([]analyzers.Binding, len(info.Items)),
+	}
+
+	for idx, domain := range info.Items {
+		result.Bindings[idx] = analyzers.Binding{
+			Resource: analyzers.Resource{
+				Name:               domain.URL,
+				FullyQualifiedName: "mailgun/" + domain.ID + "/" + domain.URL,
+				Type:               "domain",
+				Metadata: map[string]any{
+					"created_at":  domain.CreatedAt,
+					"type":        domain.Type,
+					"state":       domain.State,
+					"is_disabled": domain.IsDisabled,
+				},
+			},
+			Permission: analyzers.Permission{
+				Value: PermissionStrings[FullAccess],
+			},
+		}
+	}
+	return &result
 }
 
 type Domain struct {
+	ID         string `json:"id"`
 	URL        string `json:"name"`
 	IsDisabled bool   `json:"is_disabled"`
 	Type       string `json:"type"`

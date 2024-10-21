@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Shutterstock
 }
+
+func (s Scanner) Description() string {
+	return "Shutterstock is a global provider of stock photography, footage, music, and editing tools. Shutterstock API keys can be used to access and modify this content."
+}

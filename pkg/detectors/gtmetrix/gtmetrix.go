@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GTMetrix
 }
+
+func (s Scanner) Description() string {
+	return "GTMetrix provides website performance analytics and monitoring. GTMetrix API keys can be used to access and manage these analytics."
+}

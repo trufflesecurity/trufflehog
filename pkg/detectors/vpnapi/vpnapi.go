@@ -69,3 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Vpnapi
 }
+
+func (s Scanner) Description() string {
+	return "Vpnapi provides information about IP addresses, including geolocation and VPN detection. Vpnapi keys can be used to access this information."
+}

@@ -29,7 +29,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"imagga"}
 }
 
-// FromData will find and optionally verify Imagga secrets in a given set of bytes.ddd
+// FromData will find and optionally verify Imagga secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -70,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Imagga
+}
+
+func (s Scanner) Description() string {
+	return "Imagga is a cloud-based image recognition and categorization service. Imagga API keys can be used to access and utilize these image processing services."
 }

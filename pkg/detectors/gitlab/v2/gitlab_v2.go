@@ -23,8 +23,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
-func (Scanner) Version() int            { return 2 }
-func (Scanner) DefaultEndpoint() string { return "https://gitlab.com" }
+func (Scanner) Version() int          { return 2 }
+func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -77,7 +77,7 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, error
 	if client == nil {
 		client = defaultClient
 	}
-	for _, baseURL := range s.Endpoints(s.DefaultEndpoint()) {
+	for _, baseURL := range s.Endpoints() {
 		// test `read_user` scope
 		req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/api/v4/user", nil)
 		if err != nil {
@@ -112,4 +112,8 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, error
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gitlab
+}
+
+func (s Scanner) Description() string {
+	return "GitLab is a web-based DevOps lifecycle tool that provides a Git repository manager providing wiki, issue-tracking, and CI/CD pipeline features. GitLab Personal Access Tokens (PATs) can be used to authenticate and access GitLab resources."
 }

@@ -84,3 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureFunctionKey
 }
+
+func (s Scanner) Description() string {
+	return "Azure Functions is a serverless compute service that lets you run event-triggered code without having to explicitly provision or manage infrastructure. Azure Function Keys can be used to access and manage these functions."
+}

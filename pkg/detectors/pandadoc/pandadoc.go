@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Pandadoc
 }
+
+func (s Scanner) Description() string {
+	return "Pandadoc is a document automation software that helps create, manage, and sign digital documents. Pandadoc API keys can be used to access and manage documents through the Pandadoc API."
+}

@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Cicero
 }
+
+func (s Scanner) Description() string {
+	return "Cicero is a service provided by Azavea that offers various geospatial and civic data APIs. Cicero keys can be used to access and interact with these APIs."
+}

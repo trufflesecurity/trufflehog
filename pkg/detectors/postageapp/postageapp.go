@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PostageApp
 }
+
+func (s Scanner) Description() string {
+	return "PostageApp is a service for sending emails via their API. The API keys can be used to send emails and access account information."
+}
