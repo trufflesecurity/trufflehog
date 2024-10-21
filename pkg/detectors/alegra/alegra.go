@@ -24,7 +24,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"alegra"}) + `\b([a-z0-9-]{20})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"alegra"}) + `\b([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-z]+)\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"alegra"}) + common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,11 +47,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		tokenPatMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
-
-			userPatMatch := strings.TrimSpace(idMatch[1])
+			userPatMatch := strings.TrimSpace(idMatch[0][strings.LastIndex(idMatch[0], " ")+1:])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Alegra,
