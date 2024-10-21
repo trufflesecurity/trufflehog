@@ -36,7 +36,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apilayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apimatic"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apiscience"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apimetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apitemplate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appcues"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appfollow"
@@ -1368,7 +1368,6 @@ func DefaultDetectors() []detectors.Detector {
 		livestorm.Scanner{},
 		// manifest.Scanner{},
 		formbucket.Scanner{},
-		apiscience.Scanner{},
 		dronahq.Scanner{},
 		webscraper.Scanner{},
 		versioneye.Scanner{},
@@ -1642,6 +1641,7 @@ func DefaultDetectors() []detectors.Detector {
 		meraki.Scanner{},
 		saladcloudapikey.Scanner{},
 		boxoauth.Scanner{},
+		apimetrics.Scanner{},
 	}
 
 	// Automatically initialize all detectors that implement
