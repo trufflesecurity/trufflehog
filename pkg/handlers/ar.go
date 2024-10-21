@@ -22,56 +22,55 @@ func newARHandler() *arHandler {
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.
-func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
-	archiveChan := make(chan []byte, defaultBufferSize)
+func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
+	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 
 	if feature.ForceSkipArchives.Load() {
-		close(archiveChan)
-		return archiveChan, nil
+		close(dataOrErrChan)
+		return dataOrErrChan
 	}
 
 	go func() {
-		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
-		defer cancel()
-		defer close(archiveChan)
+		defer close(dataOrErrChan)
 
-		// Update the metrics for the file processing.
 		start := time.Now()
-		var err error
-		defer func() {
-			h.measureLatencyAndHandleErrors(start, err)
-			h.metrics.incFilesProcessed()
-		}()
 
 		// Defer a panic recovery to handle any panics that occur during the AR processing.
 		defer func() {
 			if r := recover(); r != nil {
-				// Return the panic as an error.
+				var panicErr error
 				if e, ok := r.(error); ok {
-					err = e
+					panicErr = e
 				} else {
-					err = fmt.Errorf("panic occurred: %v", r)
+					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(err, "Panic occurred when reading ar archive")
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
+				}
 			}
 		}()
 
-		var arReader *deb.Ar
-		arReader, err = deb.LoadAr(input)
+		arReader, err := deb.LoadAr(input)
 		if err != nil {
-			ctx.Logger().Error(err, "error reading AR")
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: loading AR error: %v", ErrProcessingFatal, err),
+			}
 			return
 		}
 
-		if err = h.processARFiles(ctx, arReader, archiveChan); err != nil {
-			ctx.Logger().Error(err, "error processing AR files")
+		err = h.processARFiles(ctx, arReader, dataOrErrChan)
+		if err == nil {
+			h.metrics.incFilesProcessed()
 		}
+
+		// Update the metrics for the file processing and handle any errors.
+		h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 	}()
 
-	return archiveChan, nil
+	return dataOrErrChan
 }
 
-func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archiveChan chan []byte) error {
+func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, dataOrErrChan chan DataOrErr) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -91,12 +90,19 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 
 			rdr, err := newMimeTypeReader(arEntry.Data)
 			if err != nil {
-				return fmt.Errorf("error creating mime-type reader: %w", err)
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error creating AR mime-type reader: %v", ErrProcessingWarning, err),
+				}
+				h.metrics.incErrors()
+				continue
 			}
 
-			if err := h.handleNonArchiveContent(fileCtx, rdr, archiveChan); err != nil {
-				fileCtx.Logger().Error(err, "error handling archive content in AR")
+			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error handling archive content in AR: %v", ErrProcessingWarning, err),
+				}
 				h.metrics.incErrors()
+				continue
 			}
 
 			h.metrics.incFilesProcessed()

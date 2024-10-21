@@ -70,10 +70,10 @@ func asSeeker(r io.Reader) io.Seeker {
 	return seeker
 }
 
-// NewBufferedReaderSeeker creates and initializes a BufferedReadSeeker.
+// NewBufferedReadSeeker creates and initializes a BufferedReadSeeker.
 // It takes an io.Reader and checks if it supports seeking.
 // If the reader supports seeking, it is stored in the seeker field.
-func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
+func NewBufferedReadSeeker(r io.Reader) *BufferedReadSeeker {
 	const defaultThreshold = 1 << 24 // 16MB threshold for switching to file buffering
 
 	var (
@@ -82,9 +82,6 @@ func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 	)
 
 	seeker = asSeeker(r)
-	if seeker == nil {
-		buf = defaultBufferPool.Get()
-	}
 
 	return &BufferedReadSeeker{
 		reader:    r,
@@ -266,6 +263,10 @@ func (br *BufferedReadSeeker) readToEnd() error {
 }
 
 func (br *BufferedReadSeeker) writeData(data []byte) error {
+	if br.buf == nil {
+		br.buf = br.bufPool.Get()
+	}
+
 	_, err := br.buf.Write(data)
 	if err != nil {
 		return err
