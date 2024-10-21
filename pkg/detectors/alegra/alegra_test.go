@@ -14,7 +14,7 @@ import (
 var (
 	validPattern            = "wdvn-usa87a-fxp9ioas/testUser.1005@example.com"
 	validSpecialCharPattern = "wdvn-usa87a-fxp9ioas / test-User.1005@example.com"
-	invalidPattern          = "wdvn-usa87a-fxp9ioas/testUser$1005@example.com"
+	invalidPattern          = "wdvn-usa87a-fxp9ioas/user@example"
 )
 
 func TestAlegra_Pattern(t *testing.T) {
