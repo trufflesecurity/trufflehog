@@ -20,7 +20,7 @@ type Scanner struct {
 	detectors.EndpointSetter
 }
 
-type gitlabMessage struct {
+type GitLabMessage struct {
 	Message string `json:"message"`
 }
 
@@ -39,7 +39,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9\-=_]{20,22})\b`)
 
-	blockedUserMessage = "403 Forbidden - Your account has been blocked"
+	BlockedUserMessage = "403 Forbidden - Your account has been blocked"
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -74,12 +74,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, isUserBlocked, verificationErr := s.verifyGitlab(ctx, resMatch)
+			isVerified, extraData, verificationErr := s.verifyGitlab(ctx, resMatch)
 			s1.Verified = isVerified
-			// if user account is blocked, add this information in the extra data
-			if isUserBlocked {
-				s1.ExtraData["User Account Blocked"] = "Yes"
-			}
+			s1.ExtraData = extraData
 
 			s1.SetVerificationError(verificationErr, resMatch)
 		}
@@ -90,7 +87,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, bool, error) {
+func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, map[string]string, error) {
 	// there are 4 read 'scopes' for a gitlab token: api, read_user, read_repo, and read_registry
 	// they all grant access to different parts of the API. I couldn't find an endpoint that every
 	// one of these scopes has access to, so we just check an example endpoint for each scope. If any
@@ -110,13 +107,13 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, bool,
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 		res, err := client.Do(req)
 		if err != nil {
-			return false, false, err
+			return false, nil, err
 		}
 
 		defer res.Body.Close()
 		body, err := io.ReadAll(res.Body)
 		if err != nil {
-			return false, false, err
+			return false, nil, err
 		}
 
 		// 200 means good key and has `read_user` scope
@@ -124,28 +121,30 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, bool,
 		// 401 is bad key
 		switch res.StatusCode {
 		case http.StatusOK:
-			return json.Valid(body), false, nil
+			return json.Valid(body), nil, nil
 		case http.StatusForbidden:
 			// check if the user account is blocked or not
-			var apiResp gitlabMessage
+			var apiResp GitLabMessage
 			if err := json.Unmarshal(body, &apiResp); err == nil {
-				if apiResp.Message == blockedUserMessage {
-					return true, true, nil
+				if apiResp.Message == BlockedUserMessage {
+					return true, map[string]string{
+						"blocked": "True",
+					}, nil
 				}
 			}
 
 			// Good key but not the right scope
-			return true, false, nil
+			return true, nil, nil
 		case http.StatusUnauthorized:
 			// Nothing to do; zero values are the ones we want
-			return false, false, nil
+			return false, nil, nil
 		default:
-			return false, false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+			return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 		}
 
 	}
 
-	return false, false, nil
+	return false, nil, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
