@@ -255,7 +255,7 @@ func (c *CustomRegexWebhook) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CustomRegex
 }
 
-const defaultDescription = "This is a customer-defined detector with no description provided."
+const defaultDescription = "This is a user-defined detector with no description provided."
 
 func (c *CustomRegexWebhook) Description() string {
 	if c.GetDescription() == "" {

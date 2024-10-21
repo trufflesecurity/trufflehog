@@ -283,7 +283,16 @@ func HandleFile(
 		}
 		return fmt.Errorf("error creating custom reader: %w", err)
 	}
-	defer rdr.Close()
+	defer func() {
+		// Ensure all data is read to prevent broken pipe.
+		if closeErr := rdr.Close(); closeErr != nil {
+			if err != nil {
+				err = errors.Join(err, closeErr)
+			} else {
+				err = fmt.Errorf("error closing reader: %w", closeErr)
+			}
+		}
+	}()
 
 	ctx = logContext.WithValues(ctx, "mime", rdr.mime.String())
 

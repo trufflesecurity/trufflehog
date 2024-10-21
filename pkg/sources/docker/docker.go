@@ -345,7 +345,7 @@ type chunkProcessingInfo struct {
 func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chunksChan chan *sources.Chunk) error {
 	const filesizeLimitBytes int64 = 50 * 1024 * 1024 // 50MB
 	if info.size > filesizeLimitBytes {
-		ctx.Logger().V(4).Info("skipping large file", "file", info.name, "size", info.size)
+		ctx.Logger().V(2).Info("skipping file: size exceeds max allowed", "file", info.name, "size", info.size, "limit", filesizeLimitBytes)
 		return nil
 	}
 

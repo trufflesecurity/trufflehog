@@ -9,21 +9,7 @@ import (
 
 type mockCollector struct{ mock.Mock }
 
-func (m *mockCollector) RecordHits(cacheName string, hits uint64) { m.Called(cacheName, hits) }
-
-func (m *mockCollector) RecordMisses(cacheName string, misses uint64) { m.Called(cacheName, misses) }
-
 func (m *mockCollector) RecordEviction(cacheName string) { m.Called(cacheName) }
-
-func (m *mockCollector) RecordSet(cacheName string) { m.Called(cacheName) }
-
-func (m *mockCollector) RecordHit(cacheName string) { m.Called(cacheName) }
-
-func (m *mockCollector) RecordMiss(cacheName string) { m.Called(cacheName) }
-
-func (m *mockCollector) RecordDelete(cacheName string) { m.Called(cacheName) }
-
-func (m *mockCollector) RecordClear(cacheName string) { m.Called(cacheName) }
 
 // setupCache initializes the metrics and cache.
 // If withCollector is true, it sets up a cache with a custom metrics collector.
@@ -52,7 +38,6 @@ func TestNewLRUCache(t *testing.T) {
 	t.Run("default configuration", func(t *testing.T) {
 		c, _ := setupCache[int](t, false)
 		assert.Equal(t, "test_cache", c.cacheName)
-		assert.NotNil(t, c.metrics, "Cache metrics should not be nil")
 	})
 
 	t.Run("with custom max cost", func(t *testing.T) {
@@ -64,97 +49,168 @@ func TestNewLRUCache(t *testing.T) {
 		c, collector := setupCache[int](t, true)
 		assert.NotNil(t, c)
 		assert.Equal(t, "test_cache", c.cacheName)
-		assert.Equal(t, collector, c.metrics, "Cache metrics should match the collector")
+		assert.Equal(t, collector, c.evictMetrics, "Cache metrics should match the collector")
 	})
 }
 
 func TestCacheSet(t *testing.T) {
-	c, collector := setupCache[string](t, true)
+	c, _ := setupCache[string](t, true)
 
-	collector.On("RecordSet", "test_cache").Once()
 	c.Set("key", "value")
-
-	collector.AssertCalled(t, "RecordSet", "test_cache")
+	value, found := c.Get("key")
+	assert.True(t, found, "Expected to find the key")
+	assert.Equal(t, "value", value, "Expected value to match")
 }
 
 func TestCacheGet(t *testing.T) {
-	c, collector := setupCache[string](t, true)
-
-	collector.On("RecordSet", "test_cache").Once()
-	collector.On("RecordHit", "test_cache").Once()
-	collector.On("RecordMiss", "test_cache").Once()
+	c, _ := setupCache[string](t, true)
 
 	c.Set("key", "value")
-	collector.AssertCalled(t, "RecordSet", "test_cache")
 
 	value, found := c.Get("key")
 	assert.True(t, found, "Expected to find the key")
 	assert.Equal(t, "value", value, "Expected value to match")
-	collector.AssertCalled(t, "RecordHit", "test_cache")
 
 	_, found = c.Get("non_existent")
 	assert.False(t, found, "Expected not to find the key")
-	collector.AssertCalled(t, "RecordMiss", "test_cache")
 }
 
 func TestCacheExists(t *testing.T) {
-	c, collector := setupCache[string](t, true)
-
-	collector.On("RecordSet", "test_cache").Once()
-	collector.On("RecordHit", "test_cache").Twice()
-	collector.On("RecordMiss", "test_cache").Once()
+	c, _ := setupCache[string](t, true)
 
 	c.Set("key", "value")
-	collector.AssertCalled(t, "RecordSet", "test_cache")
 
 	exists := c.Exists("key")
 	assert.True(t, exists, "Expected the key to exist")
-	collector.AssertCalled(t, "RecordHit", "test_cache")
 
 	exists = c.Exists("non_existent")
 	assert.False(t, exists, "Expected the key not to exist")
-	collector.AssertCalled(t, "RecordMiss", "test_cache")
 }
 
 func TestCacheDelete(t *testing.T) {
 	c, collector := setupCache[string](t, true)
 
-	collector.On("RecordSet", "test_cache").Once()
-	collector.On("RecordDelete", "test_cache").Once()
-	collector.On("RecordMiss", "test_cache").Once()
 	collector.On("RecordEviction", "test_cache").Once()
 
 	c.Set("key", "value")
-	collector.AssertCalled(t, "RecordSet", "test_cache")
 
 	c.Delete("key")
-	collector.AssertCalled(t, "RecordDelete", "test_cache")
 	collector.AssertCalled(t, "RecordEviction", "test_cache")
 
 	_, found := c.Get("key")
 	assert.False(t, found, "Expected not to find the deleted key")
-	collector.AssertCalled(t, "RecordMiss", "test_cache")
 }
 
 func TestCacheClear(t *testing.T) {
 	c, collector := setupCache[string](t, true)
 
-	collector.On("RecordSet", "test_cache").Twice()
-	collector.On("RecordClear", "test_cache").Once()
-	collector.On("RecordMiss", "test_cache").Twice()
 	collector.On("RecordEviction", "test_cache").Twice()
 
 	c.Set("key1", "value1")
 	c.Set("key2", "value2")
-	collector.AssertNumberOfCalls(t, "RecordSet", 2)
 
 	c.Clear()
-	collector.AssertCalled(t, "RecordClear", "test_cache")
 	collector.AssertNumberOfCalls(t, "RecordEviction", 2)
 
 	_, found1 := c.Get("key1")
 	_, found2 := c.Get("key2")
 	assert.False(t, found1, "Expected not to find key1 after clear")
 	assert.False(t, found2, "Expected not to find key2 after clear")
-	collector.AssertNumberOfCalls(t, "RecordMiss", 2)
+}
+
+func TestCacheCount(t *testing.T) {
+	c, collector := setupCache[string](t, true)
+
+	collector.On("RecordEviction", "test_cache").Times(3)
+
+	c.Set("key1", "value1")
+	c.Set("key2", "value2")
+	c.Set("key3", "value3")
+
+	assert.Equal(t, 3, c.Count(), "Expected count to be 3")
+
+	c.Delete("key2")
+	assert.Equal(t, 2, c.Count(), "Expected count to be 2 after deletion")
+	collector.AssertNumberOfCalls(t, "RecordEviction", 1)
+
+	c.Clear()
+	assert.Equal(t, 0, c.Count(), "Expected count to be 0 after clear")
+	collector.AssertNumberOfCalls(t, "RecordEviction", 3)
+}
+
+func TestCacheKeys(t *testing.T) {
+	c, collector := setupCache[string](t, true)
+
+	collector.On("RecordEviction", "test_cache").Times(3)
+
+	c.Set("key1", "value1")
+	c.Set("key2", "value2")
+	c.Set("key3", "value3")
+
+	keys := c.Keys()
+	assert.Len(t, keys, 3, "Expected 3 keys")
+	assert.ElementsMatch(t, []string{"key1", "key2", "key3"}, keys, "Keys do not match expected values")
+
+	c.Delete("key2")
+	keys = c.Keys()
+	assert.Len(t, keys, 2, "Expected 2 keys after deletion")
+	assert.ElementsMatch(t, []string{"key1", "key3"}, keys, "Keys do not match expected values after deletion")
+	collector.AssertNumberOfCalls(t, "RecordEviction", 1)
+
+	c.Clear()
+	keys = c.Keys()
+	assert.Len(t, keys, 0, "Expected no keys after clear")
+	collector.AssertNumberOfCalls(t, "RecordEviction", 3)
+}
+
+func TestCacheValues(t *testing.T) {
+	c, collector := setupCache[string](t, true)
+
+	collector.On("RecordEviction", "test_cache").Times(3)
+
+	c.Set("key1", "value1")
+	c.Set("key2", "value2")
+	c.Set("key3", "value3")
+
+	values := c.Values()
+	assert.Len(t, values, 3, "Expected 3 values")
+	assert.ElementsMatch(t, []string{"value1", "value2", "value3"}, values, "Values do not match expected values")
+
+	c.Delete("key2")
+	values = c.Values()
+	assert.Len(t, values, 2, "Expected 2 values after deletion")
+	assert.ElementsMatch(t, []string{"value1", "value3"}, values, "Values do not match expected values after deletion")
+	collector.AssertNumberOfCalls(t, "RecordEviction", 1)
+
+	c.Clear()
+	values = c.Values()
+	assert.Len(t, values, 0, "Expected no values after clear")
+	collector.AssertNumberOfCalls(t, "RecordEviction", 3)
+}
+
+func TestCacheContents(t *testing.T) {
+	c, collector := setupCache[string](t, true)
+
+	collector.On("RecordEviction", "test_cache").Times(3)
+
+	c.Set("key1", "value1")
+	c.Set("key2", "value2")
+	c.Set("key3", "value3")
+
+	contents := c.Contents()
+	assert.Contains(t, contents, "key1", "Contents should contain key1")
+	assert.Contains(t, contents, "key2", "Contents should contain key2")
+	assert.Contains(t, contents, "key3", "Contents should contain key3")
+
+	c.Delete("key2")
+	contents = c.Contents()
+	assert.Contains(t, contents, "key1", "Contents should contain key1")
+	assert.NotContains(t, contents, "key2", "Contents should not contain key2")
+	assert.Contains(t, contents, "key3", "Contents should contain key3")
+	collector.AssertNumberOfCalls(t, "RecordEviction", 1)
+
+	c.Clear()
+	contents = c.Contents()
+	assert.Equal(t, "[]", contents, "Contents should be empty after clear")
+	collector.AssertNumberOfCalls(t, "RecordEviction", 3)
 }

@@ -90,6 +90,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bombbomb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boostnote"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/borgbase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/box"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boxoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintreepayments"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
@@ -429,6 +431,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meaningcloud"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mediastack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meistertask"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/meraki"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mesibo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/messagebird"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/metaapi"
@@ -589,6 +592,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rubygems"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/runrunit"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/saladcloudapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesblink"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salescookie"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesflare"
@@ -1632,9 +1636,13 @@ func DefaultDetectors() []detectors.Detector {
 		atlassianv1.Scanner{},
 		atlassianv2.Scanner{},
 		netsuite.Scanner{},
+		box.Scanner{},
 		robinhoodcrypto.Scanner{},
 		nvapi.Scanner{},
 		railwayapp.Scanner{},
+		meraki.Scanner{},
+		saladcloudapikey.Scanner{},
+		boxoauth.Scanner{},
 		elasticcloud.Scanner{},
 	}
 

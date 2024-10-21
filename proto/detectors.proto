@@ -1009,7 +1009,11 @@ enum DetectorType {
   NVAPI = 997;
   PyPI = 998;
   RailwayApp = 999;
-  ElasticCloud = 1000;
+  Meraki = 1000;
+  SaladCloudApiKey = 1001;
+  Box = 1002;
+  BoxOauth = 1003;
+  ElasticCloud = 1004;
 }
 
 message Result {

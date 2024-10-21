@@ -236,6 +236,8 @@ type GithubConfig struct {
 	SkipBinaries bool
 	// IncludeWikis indicates whether to include repository wikis in the scan.
 	IncludeWikis bool
+	// CommentsTimeframeDays indicates how many days of comments to include in the scan.
+	CommentsTimeframeDays uint32
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.

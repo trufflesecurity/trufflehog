@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v66/github"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -97,8 +97,9 @@ func TestAddReposByOrg(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		Repositories: nil,
-		IgnoreRepos:  []string{"secret/super-*-repo2"},
+		Repositories:          nil,
+		IgnoreRepos:           []string{"secret/super-*-repo2"},
+		CommentsTimeframeDays: 10,
 	})
 	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
 	assert.Nil(t, err)
