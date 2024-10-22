@@ -2,8 +2,7 @@ package bulksms
 
 import (
 	"context"
-	b64 "encoding/base64"
-	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -60,25 +59,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				data := fmt.Sprintf("%s:%s", resIdMatch, resMatch)
-				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
+				// data := fmt.Sprintf("%s:%s", resIdMatch, resMatch)
+				// sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.bulksms.com/v1/messages", nil)
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
+				req.SetBasicAuth(resIdMatch, resMatch)
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
+					defer func() {
+						_, _ = io.Copy(io.Discard, res.Body)
+						_ = res.Body.Close()
+					}()
+
+					if res.StatusCode == http.StatusOK {
 						s1.Verified = true
 					}
+				} else {
+					s1.SetVerificationError(err, resMatch)
 				}
 			}
 
 			results = append(results, s1)
 		}
-
 	}
 
 	return results, nil
