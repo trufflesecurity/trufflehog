@@ -6,8 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
@@ -184,6 +186,88 @@ func Test_normalizeGitlabEndpoint(t *testing.T) {
 			output, err := normalizeGitlabEndpoint(tc.inputEndpoint)
 			assert.Equal(t, tc.outputEndpoint, output)
 			assert.Equal(t, tc.wantErr, err != nil)
+		})
+	}
+}
+
+func createTestSource(src *sourcespb.GitLab) (*Source, *anypb.Any) {
+	s := &Source{}
+	conn, err := anypb.New(src)
+	if err != nil {
+		panic(err)
+	}
+	return s, conn
+}
+
+func Test_globImplementation(t *testing.T) {
+	tests := []struct {
+		name          string
+		repos         []string
+		ignoreRepos   []string
+		expectedRepos []string
+	}{
+		{
+			name: "include all repos",
+			repos: []string{
+				"https://gitlab.com/lHumaNl/grafconflux.git",
+				"https://gitlab.com/castdoc/doc.git",
+			},
+			ignoreRepos: []string{},
+			expectedRepos: []string{
+				"https://gitlab.com/lHumaNl/grafconflux.git",
+				"https://gitlab.com/castdoc/doc.git",
+			},
+		},
+		{
+			name: "exclude castdoc repos",
+			repos: []string{
+				"https://gitlab.com/lHumaNl/grafconflux.git",
+				"https://gitlab.com/castdoc/doc.git",
+			},
+			ignoreRepos: []string{
+				"*/castdoc/*",
+			},
+			expectedRepos: []string{
+				"https://gitlab.com/lHumaNl/grafconflux.git",
+			},
+		},
+		{
+			name: "exclude lHumaNl repos",
+			repos: []string{
+				"https://gitlab.com/lHumaNl/grafconflux.git",
+				"https://gitlab.com/castdoc/doc.git",
+			},
+			ignoreRepos: []string{
+				"*/lHumaNl/*",
+			},
+			expectedRepos: []string{
+				"https://gitlab.com/castdoc/doc.git",
+			},
+		},
+		{
+			name: "ignore all repos",
+			repos: []string{
+				"https://gitlab.com/lHumaNl/grafconflux.git",
+				"https://gitlab.com/castdoc/doc.git",
+			},
+			ignoreRepos: []string{
+				"*",
+			},
+			expectedRepos: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src, conn := createTestSource(&sourcespb.GitLab{
+				Repositories: tt.repos,
+				IgnoreRepos:  tt.ignoreRepos,
+			})
+
+			if err := src.Init(context.Background(), "test - gitlab", 0, 1337, false, conn, 1); err != nil {
+				assert.NotNil(t, err)
+			}
+			assert.Equal(t, tt.expectedRepos, src.repos)
 		})
 	}
 }

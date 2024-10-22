@@ -10,6 +10,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -81,6 +83,44 @@ func (s *Source) JobID() sources.JobID {
 	return s.jobID
 }
 
+// filteredRepoCache is a wrapper around cache.Cache that filters out repos
+// based on include and exclude globs.
+type filteredRepoCache struct {
+	cache.Cache[string]
+	include, exclude []glob.Glob
+}
+
+func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string], include, exclude []string) *filteredRepoCache {
+	includeGlobs := make([]glob.Glob, 0, len(include))
+	excludeGlobs := make([]glob.Glob, 0, len(exclude))
+	for _, ig := range include {
+		g, err := glob.Compile(ig)
+		if err != nil {
+			ctx.Logger().V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			continue
+		}
+		includeGlobs = append(includeGlobs, g)
+	}
+	for _, eg := range exclude {
+		g, err := glob.Compile(eg)
+		if err != nil {
+			ctx.Logger().V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			continue
+		}
+		excludeGlobs = append(excludeGlobs, g)
+	}
+	return &filteredRepoCache{Cache: c, include: includeGlobs, exclude: excludeGlobs}
+}
+
+func (c *filteredRepoCache) ignoreRepo(s string) bool {
+	for _, g := range c.exclude {
+		if g.Match(s) {
+			return true
+		}
+	}
+	return false
+}
+
 // Init returns an initialized Gitlab source.
 func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
@@ -100,7 +140,12 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 
-	s.repos = conn.Repositories
+	filteredRepoCache := s.newFilteredRepoCache(ctx,
+		simple.NewCache[string](),
+		conn.GetRepositories(),
+		conn.GetIgnoreRepos())
+
+	s.repos = initializeRepos(filteredRepoCache, conn.GetRepositories())
 	s.ignoreRepos = conn.IgnoreRepos
 	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
 
@@ -156,6 +201,16 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.git = git.NewGit(cfg)
 
 	return nil
+}
+
+func initializeRepos(cache *filteredRepoCache, repos []string) []string {
+	returnRepos := make([]string, 0)
+	for _, repo := range repos {
+		if !cache.ignoreRepo(repo) {
+			returnRepos = append(returnRepos, repo)
+		}
+	}
+	return returnRepos
 }
 
 // Chunks emits chunks of bytes over a channel.
