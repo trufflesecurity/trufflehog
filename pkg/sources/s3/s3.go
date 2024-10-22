@@ -343,20 +343,14 @@ func (s *Source) pageChunker(
 				return nil
 			}
 
-			// Use an anonymous function to retrieve the S3 object with a dedicated timeout context.
-			// This ensures that the timeout is isolated and does not affect any downstream operations. (e.g. HandleFile)
-			getObject := func() (*s3.GetObjectOutput, error) {
-				const getObjectTimeout = 30 * time.Second
-				objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
-				defer cancel()
+			const getObjectTimeout = 30 * time.Second
+			objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
+			defer cancel()
 
-				return client.GetObjectWithContext(objCtx, &s3.GetObjectInput{
-					Bucket: &bucket,
-					Key:    obj.Key,
-				})
-			}
-
-			res, err := getObject()
+			res, err := client.GetObjectWithContext(objCtx, &s3.GetObjectInput{
+				Bucket: &bucket,
+				Key:    obj.Key,
+			})
 			if err != nil {
 				if !strings.Contains(err.Error(), "AccessDenied") {
 					ctx.Logger().Error(err, "could not get S3 object")
