@@ -11,7 +11,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -19,8 +18,8 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (a *Analyzer) Type() analyzerpb.AnalyzerType {
-	return analyzerpb.AnalyzerType_Twilio
+func (a *Analyzer) Type() analyzers.AnalyzerType {
+	return analyzers.AnalyzerTypeTwilio
 }
 
 func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string) (*analyzers.AnalyzerResult, error) {
@@ -118,7 +117,7 @@ func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string
 	}
 
 	return &analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_Twilio,
+		AnalyzerType: analyzers.AnalyzerTypeTwilio,
 		Bindings:     bindings,
 	}, nil
 }
