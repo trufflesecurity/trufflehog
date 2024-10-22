@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Paperform
 }
+
+func (s Scanner) Description() string {
+	return "An API for building and creating forms. API keys could be used to read proprietary or not public form data"
+}

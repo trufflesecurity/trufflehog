@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TerraformCloudPersonalToken
 }
+
+func (s Scanner) Description() string {
+	return "Terraform Cloud is a service that provides infrastructure automation. Terraform Cloud personal tokens can be used to access and manage infrastructure as code."
+}

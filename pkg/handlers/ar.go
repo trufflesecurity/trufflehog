@@ -9,6 +9,7 @@ import (
 	"pault.ag/go/debian/deb"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
 // arHandler handles AR archive formats.
@@ -23,6 +24,11 @@ func newARHandler() *arHandler {
 // manage data from AR files according to specific requirements.
 func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
 	archiveChan := make(chan []byte, defaultBufferSize)
+
+	if feature.ForceSkipArchives.Load() {
+		close(archiveChan)
+		return archiveChan, nil
+	}
 
 	go func() {
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
@@ -83,7 +89,12 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 			fileSize := arEntry.Size
 			fileCtx := logContext.WithValues(ctx, "filename", arEntry.Name, "size", fileSize)
 
-			if err := h.handleNonArchiveContent(fileCtx, arEntry.Data, archiveChan); err != nil {
+			rdr, err := newMimeTypeReader(arEntry.Data)
+			if err != nil {
+				return fmt.Errorf("error creating mime-type reader: %w", err)
+			}
+
+			if err := h.handleNonArchiveContent(fileCtx, rdr, archiveChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in AR")
 				h.metrics.incErrors()
 			}

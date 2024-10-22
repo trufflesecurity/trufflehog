@@ -18,14 +18,15 @@ type Scanner struct {
 }
 
 // Ensure the Scanner satisfies the interfaces at compile time.
-var _ detectors.Detector = (*v1.Scanner)(nil)
-var _ detectors.Versioner = (*v1.Scanner)(nil)
-var _ detectors.EndpointCustomizer = (*v1.Scanner)(nil)
+var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (s Scanner) Version() int {
 	return 2
 }
-func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
+func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
 
 var (
 	// Oauth token
@@ -66,6 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 				"version":        fmt.Sprintf("%d", s.Version()),
 			},
+			AnalysisInfo: map[string]string{"key": token},
 		}
 
 		if verify {
@@ -91,4 +93,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Github
+}
+
+func (s Scanner) Description() string {
+	return "GitHub is a platform for version control and collaboration. Personal access tokens (PATs) can be used to access and modify repositories and other resources."
 }

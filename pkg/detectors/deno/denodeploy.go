@@ -101,3 +101,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_DenoDeploy
 }
+
+func (s Scanner) Description() string {
+	return "DenoDeploy is a cloud service for deploying JavaScript and TypeScript applications. DenoDeploy tokens can be used to access and manage these deployments."
+}

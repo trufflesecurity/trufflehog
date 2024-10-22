@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Imagekit
 }
+
+func (s Scanner) Description() string {
+	return "Imagekit is a real-time image optimization and transformation service. Imagekit keys can be used to access and manipulate images on the platform."
+}

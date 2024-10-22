@@ -49,6 +49,7 @@ func WithSkipIDs(skipIDs []string) func(*scanner) {
 
 // Ensure the scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*scanner)(nil)
+var _ detectors.CustomResultsCleaner = (*scanner)(nil)
 
 var (
 	defaultVerificationClient = common.SaneHttpClient()
@@ -85,8 +86,10 @@ func GetHMAC(key []byte, data []byte) []byte {
 	return hasher.Sum(nil)
 }
 
+// Reference: https://nitter.poast.org/TalBeerySec/status/1816449053841838223#m
 func checkSessionToken(sessionToken string, secret string) bool {
-	if !strings.Contains(sessionToken, "YXdz") || strings.Contains(sessionToken, secret) {
+	if !(strings.Contains(sessionToken, "YXdz") || strings.Contains(sessionToken, "Jb3JpZ2luX2Vj")) ||
+		strings.Contains(sessionToken, secret) {
 		// Handle error if the sessionToken is not a valid base64 string
 		return false
 	}
@@ -167,7 +170,11 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 	}
-	return awsCustomCleanResults(results), nil
+	return results, nil
+}
+
+func (s scanner) ShouldCleanResultsIrrespectiveOfConfiguration() bool {
+	return true
 }
 
 func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, resSessionMatch string, retryOn403 bool) (bool, map[string]string, error) {
@@ -283,7 +290,7 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 	}
 }
 
-func awsCustomCleanResults(results []detectors.Result) []detectors.Result {
+func (s scanner) CleanResults(results []detectors.Result) []detectors.Result {
 	if len(results) == 0 {
 		return results
 	}
@@ -334,4 +341,8 @@ type identityRes struct {
 
 func (s scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AWSSessionKey
+}
+
+func (s scanner) Description() string {
+	return "AWS is a cloud service used offering over 200 API's to transact data and compute. AWS API keys can be used to access and modify this data and compute."
 }

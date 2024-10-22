@@ -76,3 +76,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Zerobounce
 }
+
+func (s Scanner) Description() string {
+	return "Zerobounce is an email validation and verification service. Zerobounce API keys can be used to access and utilize this service."
+}

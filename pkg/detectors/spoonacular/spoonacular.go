@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Spoonacular
 }
+
+func (s Scanner) Description() string {
+	return "Spoonacular provides a food and recipe API. Spoonacular API keys can be used to access and manage food and recipe data."
+}

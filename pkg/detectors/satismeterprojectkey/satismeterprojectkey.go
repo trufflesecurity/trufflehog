@@ -98,3 +98,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SatismeterProjectkey
 }
+
+func (s Scanner) Description() string {
+	return "Satismeter is a customer feedback platform. Satismeter project keys can be used to access project-specific data and manage feedback settings."
+}

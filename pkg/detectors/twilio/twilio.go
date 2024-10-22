@@ -90,6 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
+						s1.AnalysisInfo = map[string]string{"key": key, "sid": sid}
 						var serviceResponse serviceResponse
 						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have at least one service
 							service := serviceResponse.Services[0]
@@ -113,9 +114,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 	}
 
-	return detectors.CleanResults(results), nil
+	return results, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Twilio
+}
+
+func (s Scanner) Description() string {
+	return "Twilio is a cloud communications platform that allows software developers to programmatically make and receive phone calls, send and receive text messages, and perform other communication functions using its web service APIs."
 }

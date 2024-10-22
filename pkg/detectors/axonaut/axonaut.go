@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Axonaut
 }
+
+func (s Scanner) Description() string {
+	return "Axonaut is a service that provides business management solutions including CRM, invoicing, and accounting. Axonaut API keys can be used to access and manage business data through their API."
+}

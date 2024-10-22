@@ -3,9 +3,10 @@ package square
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -43,13 +44,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if len(secMatch) != 2 {
 			continue
 		}
-		res := strings.TrimSpace(secMatch[1])
+		resMatch := strings.TrimSpace(secMatch[1])
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Square,
-			Raw:          []byte(res),
+			Raw:          []byte(resMatch),
 		}
-		s.ExtraData = map[string]string{
+		result.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/square/",
 		}
 
@@ -65,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", res))
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 			req.Header.Add("Content-Type", "application/json")
 			// unclear if this version needs to be set or matters, seems to work without, but docs want it
 			// req.Header.Add("Square-Version", "2020-08-12")
@@ -76,12 +77,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				// 200 means good key and has `merchants` scope - default allowed by square
 				// 401 is bad key
 				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-					s.Verified = true
+					result.Verified = true
 				}
 			}
+			result.AnalysisInfo = map[string]string{"key": resMatch}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return
@@ -89,4 +91,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Square
+}
+
+func (s Scanner) Description() string {
+	return "Square is a financial services and mobile payment company. Square API keys can be used to access and manage payments, transactions, and other financial data."
 }

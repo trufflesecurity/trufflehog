@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Pepipost
 }
+
+func (s Scanner) Description() string {
+	return "Pepipost is an email delivery service. The API keys can be used to send and track emails through Pepipost's infrastructure."
+}

@@ -49,6 +49,8 @@ enum SourceType {
   SOURCE_TYPE_WEBHOOK = 34;
   SOURCE_TYPE_ELASTICSEARCH = 35;
   SOURCE_TYPE_HUGGINGFACE = 36;
+  SOURCE_TYPE_GITHUB_EXPERIMENTAL = 37;
+  SOURCE_TYPE_SENTRY = 38;
 }
 
 message LocalSource {
@@ -241,6 +243,17 @@ message GitHub {
   bool skip_binaries = 17;
   bool skip_archives = 18;
   bool include_wikis = 19;
+  uint32 comments_timeframe_days = 20;
+}
+
+message GitHubExperimental {
+  string repository = 1;
+  oneof credential {
+    string token = 2;
+  }
+  bool object_discovery = 3;
+  int64 collision_threshold = 4;
+  bool delete_cached_data = 5;
 }
 
 message GoogleDrive {
@@ -415,13 +428,13 @@ message Postman {
     credentials.Unauthenticated unauthenticated = 1;
     string token = 2;
   }
-  repeated string workspaces = 3; 
+  repeated string workspaces = 3;
   repeated string collections = 4;
   repeated string environments = 5;
   repeated string exclude_collections = 6;
-  repeated string exclude_environments = 7; 
+  repeated string exclude_environments = 7;
   repeated string include_collections = 8;
-  repeated string include_environments = 9; 
+  repeated string include_environments = 9;
   repeated string detector_keywords = 10;
   repeated string workspace_paths = 11;
   repeated string collection_paths = 12;
@@ -446,4 +459,15 @@ message Elasticsearch {
   string query_json = 8;
   string since_timestamp = 9;
   bool best_effort_scan = 10;
+}
+
+message Sentry {
+  string endpoint = 1;
+  oneof credential {
+    string auth_token = 2;
+    string dsn_key = 3;
+    string api_key = 4;
+  }
+  bool insecure_skip_verify_tls = 5;
+  string projects = 6;
 }

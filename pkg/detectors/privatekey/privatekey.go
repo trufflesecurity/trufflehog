@@ -109,7 +109,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				user, err := verifyGitHubUser(parsedKey)
+				user, err := verifyGitHubUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
 				}
@@ -122,7 +122,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				user, err := verifyGitLabUser(parsedKey)
+				user, err := verifyGitLabUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
 				}
@@ -153,6 +153,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
+}
+
+func (s Scanner) Description() string {
+	return "Private keys are used for securely connecting and authenticating to various systems and services. Exposure of private keys can lead to unauthorized access and data breaches."
 }
 
 type result struct {

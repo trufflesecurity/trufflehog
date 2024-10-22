@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	regexp "github.com/wasilibs/go-re2"
@@ -21,9 +20,10 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPats = map[string]*regexp.Regexp{
 		"Slack Service Web Hook":   regexp.MustCompile(`(https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{23,25})`),
@@ -111,4 +111,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SlackWebhook
+}
+
+func (s Scanner) Description() string {
+	return "Slack webhooks are used to send messages from external sources into Slack channels. If compromised, they can be used to send unauthorized messages."
+}
+
+func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
+	// ignore "https:" as a false positive for slack webhook detector
+	if strings.Contains(string(result.Raw), "https:") {
+		return false, ""
+	}
+
+	// back to the default false positive checks
+	return detectors.IsKnownFalsePositive(string(result.Raw), detectors.DefaultFalsePositives, true)
+
 }

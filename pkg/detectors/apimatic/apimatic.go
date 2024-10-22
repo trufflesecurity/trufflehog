@@ -85,3 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_APIMatic
 }
+
+func (s Scanner) Description() string {
+	return "APIMatic provides tools for generating SDKs, API documentation, and code snippets. APIMatic credentials can be used to access and manage these tools and services."
+}

@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strings"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -29,8 +29,9 @@ var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 var (
 	defaultTimeout = 2 * time.Second
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(mongodb(\+srv)?://[\S]{3,50}:([\S]{3,88})@[-.%\w\/:]+)\b`)
+	connStrPat = regexp.MustCompile(`\b(mongodb(?:\+srv)?://(?P<username>\S{3,50}):(?P<password>\S{3,88})@(?P<host>[-.%\w]+(?::\d{1,5})?(?:,[-.%\w]+(?::\d{1,5})?)*)(?:/(?P<authdb>[\w-]+)?(?P<options>\?\w+=[\w@/.$-]+(?:&(?:amp;)?\w+=[\w@/.$-]+)*)?)?)(?:\b|$)`)
 	// TODO: Add support for sharded cluster, replica set and Atlas Deployment.
+	placeholderPasswordPat = regexp.MustCompile(`^[xX]+|\*+$`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -43,11 +44,17 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := connStrPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+		// Filter out common placeholder passwords.
+		password := match[3]
+		if password == "" || placeholderPasswordPat.MatchString(password) {
+			continue
+		}
 
+		// If the query string contains `&amp;` the options will not be parsed.
+		resMatch := strings.Replace(strings.TrimSpace(match[1]), "&amp;", "&", -1)
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_MongoDB,
 			Raw:          []byte(resMatch),
@@ -61,10 +68,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if timeout == 0 {
 				timeout = defaultTimeout
 			}
-			err := verifyUri(resMatch, timeout)
-			s1.Verified = err == nil
-			if !isErrDeterminate(err) {
-				s1.SetVerificationError(err, resMatch)
+			isVerified, verificationErr := verifyUri(ctx, resMatch, timeout)
+			s1.Verified = isVerified
+			if !isErrDeterminate(verificationErr) {
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 		}
 		results = append(results, s1)
@@ -77,24 +84,19 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
 }
 
-func isErrDeterminate(err error) bool {
-	switch e := err.(type) {
-	case topology.ConnectionError:
-		switch e.Unwrap().(type) {
-		case *auth.Error:
-			return true
-		default:
-			return false
-		}
-	default:
-		return false
-	}
+func (s Scanner) Description() string {
+	return "MongoDB is a NoSQL database that uses a document-oriented data model. MongoDB credentials can be used to access and manipulate the database."
 }
 
-func verifyUri(uri string, timeout time.Duration) error {
+func isErrDeterminate(err error) bool {
+	var authErr *auth.Error
+	return errors.As(err, &authErr)
+}
+
+func verifyUri(ctx context.Context, uri string, timeout time.Duration) (bool, error) {
 	parsed, err := url.Parse(uri)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	params := url.Values{}
@@ -114,16 +116,23 @@ func verifyUri(uri string, timeout time.Duration) error {
 	parsed.Path = "/"
 	uri = parsed.String()
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().SetTimeout(timeout).ApplyURI(uri))
+
+	clientOptions := options.Client().SetTimeout(timeout).ApplyURI(uri)
+	if err = clientOptions.Validate(); err != nil {
+		return false, err
+	}
+
+	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer func() {
 		_ = client.Disconnect(ctx)
 	}()
-	return client.Ping(ctx, readpref.Primary())
+	err = client.Ping(ctx, readpref.Primary())
+	return err == nil, err
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

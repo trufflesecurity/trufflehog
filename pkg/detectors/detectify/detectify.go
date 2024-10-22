@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Detectify
 }
+
+func (s Scanner) Description() string {
+	return "Detectify is a web application security scanner that helps identify vulnerabilities in web applications. Detectify API keys can be used to access and manage security scans and findings."
+}

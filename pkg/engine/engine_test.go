@@ -52,6 +52,8 @@ func (f fakeDetectorV1) Keywords() []string             { return []string{fakeDe
 func (f fakeDetectorV1) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
 func (f fakeDetectorV1) Version() int                   { return 1 }
 
+func (f fakeDetectorV1) Description() string { return "" }
+
 func (f fakeDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Result, error) {
 	return []detectors.Result{
 		{
@@ -65,6 +67,8 @@ func (f fakeDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.
 func (f fakeDetectorV2) Keywords() []string             { return []string{fakeDetectorKeyword} }
 func (f fakeDetectorV2) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
 func (f fakeDetectorV2) Version() int                   { return 2 }
+
+func (f fakeDetectorV2) Description() string { return "" }
 
 func TestFragmentLineOffset(t *testing.T) {
 	tests := []struct {
@@ -417,12 +421,13 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	sourceManager := sources.NewManager(opts...)
 
 	c := Config{
-		Concurrency:   1,
-		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     conf.Detectors,
-		Verify:        false,
-		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+		Concurrency:      1,
+		Decoders:         decoders.DefaultDecoders(),
+		Detectors:        conf.Detectors,
+		IncludeDetectors: "904", // isolate this test to only the custom detectors provided
+		Verify:           false,
+		SourceManager:    sourceManager,
+		Dispatcher:       NewPrinterDispatcher(new(discardPrinter)),
 	}
 
 	e, err := NewEngine(ctx, &c)
@@ -469,6 +474,8 @@ func (testDetectorV1) Keywords() []string { return []string{"sample"} }
 
 func (testDetectorV1) Type() detectorspb.DetectorType { return TestDetectorType }
 
+func (testDetectorV1) Description() string { return "" }
+
 var _ detectors.Detector = (*testDetectorV2)(nil)
 
 type testDetectorV2 struct{}
@@ -484,6 +491,8 @@ func (testDetectorV2) FromData(_ aCtx.Context, _ bool, _ []byte) ([]detectors.Re
 func (testDetectorV2) Keywords() []string { return []string{"ample"} }
 
 func (testDetectorV2) Type() detectorspb.DetectorType { return TestDetectorType2 }
+
+func (testDetectorV2) Description() string { return "" }
 
 func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	ctx := context.Background()
@@ -840,6 +849,77 @@ func TestLikelyDuplicate(t *testing.T) {
 	}
 }
 
+type customCleaner struct {
+	ignoreConfig bool
+}
+
+var _ detectors.CustomResultsCleaner = (*customCleaner)(nil)
+var _ detectors.Detector = (*customCleaner)(nil)
+
+func (c customCleaner) FromData(aCtx.Context, bool, []byte) ([]detectors.Result, error) {
+	return []detectors.Result{}, nil
+}
+
+func (c customCleaner) Keywords() []string             { return []string{} }
+func (c customCleaner) Type() detectorspb.DetectorType { return detectorspb.DetectorType(-1) }
+
+func (customCleaner) Description() string { return "" }
+
+func (c customCleaner) CleanResults([]detectors.Result) []detectors.Result {
+	return []detectors.Result{}
+}
+func (c customCleaner) ShouldCleanResultsIrrespectiveOfConfiguration() bool { return c.ignoreConfig }
+
+func TestFilterResults_CustomCleaner(t *testing.T) {
+	testCases := []struct {
+		name               string
+		cleaningConfigured bool
+		ignoreConfig       bool
+		resultsToClean     []detectors.Result
+		wantResults        []detectors.Result
+	}{
+		{
+			name:               "respect config to clean",
+			cleaningConfigured: true,
+			ignoreConfig:       false,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{},
+		},
+		{
+			name:               "respect config to not clean",
+			cleaningConfigured: false,
+			ignoreConfig:       false,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{{}},
+		},
+		{
+			name:               "clean irrespective of config",
+			cleaningConfigured: false,
+			ignoreConfig:       true,
+			resultsToClean:     []detectors.Result{{}},
+			wantResults:        []detectors.Result{},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			match := ahocorasick.DetectorMatch{
+				Detector: customCleaner{
+					ignoreConfig: tt.ignoreConfig,
+				},
+			}
+			engine := Engine{
+				filterUnverified:     tt.cleaningConfigured,
+				retainFalsePositives: true,
+			}
+
+			cleaned := engine.filterResults(context.Background(), &match, tt.resultsToClean)
+
+			assert.ElementsMatch(t, tt.wantResults, cleaned)
+		})
+	}
+}
+
 func BenchmarkPopulateMatchingDetectors(b *testing.B) {
 	allDetectors := DefaultDetectors()
 	ac := ahocorasick.NewAhoCorasickCore(allDetectors)
@@ -961,5 +1041,34 @@ func TestEngine_ShouldVerifyChunk(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
+	ctx := context.Background()
+	conf := Config{
+		Concurrency:   1,
+		Detectors:     DefaultDetectors(),
+		Verify:        false,
+		SourceManager: sources.NewManager(),
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
+
+	var count int
+	for _, det := range e.detectors {
+		if endpoints, ok := det.(interface{ Endpoints(...string) []string }); ok {
+			id := config.GetDetectorID(det)
+			if len(endpoints.Endpoints()) == 0 {
+				t.Fatalf("detector %q Endpoints() is empty", id.String())
+			}
+			count++
+		}
+	}
+
+	if count == 0 {
+		t.Fatal("no detectors found implementing Endpoints(), did EndpointSetter change?")
 	}
 }

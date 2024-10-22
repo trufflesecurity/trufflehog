@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Pipedrive
 }
+
+func (s Scanner) Description() string {
+	return "Pipedrive is a sales-focused customer relationship management (CRM) tool. Pipedrive API tokens can be used to access and manipulate CRM data."
+}

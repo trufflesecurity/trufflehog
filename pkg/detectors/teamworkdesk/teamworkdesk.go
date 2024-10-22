@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TeamworkDesk
 }
+
+func (s Scanner) Description() string {
+	return "TeamworkDesk is a helpdesk software that allows teams to manage customer communications. TeamworkDesk tokens can be used to access and manage customer support tickets and other related data."
+}

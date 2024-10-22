@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_OOPSpam
 }
+
+func (s Scanner) Description() string {
+	return "OOPSpam is a spam detection service. OOPSpam API keys can be used to verify and detect spam content."
+}

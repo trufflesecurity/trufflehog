@@ -112,3 +112,7 @@ func verifyMatch(ctx context.Context, client *http.Client, key, secret string) (
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_EndorLabs
 }
+
+func (s Scanner) Description() string {
+	return "Endorlabs provides API keys that can be used to authenticate and interact with its services. These keys should be kept confidential to prevent unauthorized access."
+}

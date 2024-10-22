@@ -46,6 +46,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Eraser,
 			Raw:          []byte(match),
+			ExtraData: map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/eraser/",
+			},
 		}
 
 		if verify {
@@ -91,8 +94,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil, nil
-	case http.StatusNotFound:
-		// 404 API token not found
+	case http.StatusUnauthorized:
+		// 401 API token unauthorized
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
 	default:
@@ -105,4 +108,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Eraser
+}
+
+func (s Scanner) Description() string {
+	return "Eraser is a tool used for generating diagrams from DSL. Eraser API tokens can be used to authenticate and interact with the Eraser API."
 }

@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Livestorm
 }
+
+func (s Scanner) Description() string {
+	return "Livestorm is a video communication platform for webinars, meetings, and virtual events. Livestorm API keys can be used to interact with Livestorm services programmatically."
+}

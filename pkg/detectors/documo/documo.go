@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Documo
 }
+
+func (s Scanner) Description() string {
+	return "A service for creating and modifying documents. API keys can create read update and delete documents."
+}

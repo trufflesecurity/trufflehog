@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_IPGeolocation
 }
+
+func (s Scanner) Description() string {
+	return "IPGeolocation provides geolocation information about IP addresses. The API key can be used to access and retrieve this data."
+}

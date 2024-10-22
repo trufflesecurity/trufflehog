@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_IbmCloudUserKey
 }
+
+func (s Scanner) Description() string {
+	return "IBM Cloud is a suite of cloud computing services from IBM that offers both platform as a service (PaaS) and infrastructure as a service (IaaS). IBM Cloud API keys can be used to access and manage IBM Cloud services and resources."
+}

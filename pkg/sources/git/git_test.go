@@ -15,6 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/process"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
@@ -235,6 +236,8 @@ func TestSource_Chunks_Integration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Source{}
 
+			beforeProcesses := process.GetGitProcessList()
+
 			conn, err := anypb.New(tt.init.connection)
 			if err != nil {
 				t.Fatal(err)
@@ -279,6 +282,12 @@ func TestSource_Chunks_Integration(t *testing.T) {
 					t.Errorf("Expected data with key %q not found", key)
 				}
 
+			}
+
+			afterProcesses := process.GetGitProcessList()
+			zombies := process.DetectGitZombies(beforeProcesses, afterProcesses)
+			if len(zombies) > 0 {
+				t.Errorf("Git zombies detected: %v", zombies)
 			}
 		})
 	}

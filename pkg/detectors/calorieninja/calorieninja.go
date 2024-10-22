@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CalorieNinja
 }
+
+func (s Scanner) Description() string {
+	return "CalorieNinja is a service that provides nutritional information for various foods. CalorieNinja API keys can be used to access this nutritional data."
+}

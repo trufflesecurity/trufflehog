@@ -73,3 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MediaStack
 }
+
+func (s Scanner) Description() string {
+	return "MediaStack is a service that provides real-time news data. MediaStack API keys can be used to access this data."
+}

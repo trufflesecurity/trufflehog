@@ -127,7 +127,7 @@ Checksums are applied to all artifacts, and the resulting checksum file is signe
 
 You need the following tool to verify signature:
 
-- [Cosign](https://docs.sigstore.dev/cosign/installation/)
+- [Cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
 
 Verification steps are as follow:
 
@@ -299,6 +299,42 @@ To scan a cluster on Elastic Cloud, you’ll need a Cloud ID and API key.
 trufflehog elasticsearch \
   --cloud-id 'search-prod:dXMtY2Vx...YjM1ODNlOWFiZGRlNjI0NA==' \
   --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
+```
+
+## 15. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
+
+The following command will enumerate deleted and hidden commits on a GitHub repository and then scan them for secrets. This is an alpha release feature.
+
+```bash
+trufflehog github-experimental --repo https://github.com/<USER>/<REPO>.git --object-discovery
+```
+
+In addition to the normal TruffleHog output, the `--object-discovery` flag creates two files in a new `$HOME/.trufflehog` directory: `valid_hidden.txt` and `invalid.txt`. These are used to track state during commit enumeration, as well as to provide users with a complete list of all hidden and deleted commits (`valid_hidden.txt`). If you'd like to automatically remove these files after scanning, please add the flag `--delete-cached-data`.
+
+**Note**: Enumerating all valid commits on a repository using this method takes between 20 minutes and a few hours, depending on the size of your repository. We added a progress bar to keep you updated on how long the enumeration will take. The actual secret scanning runs extremely fast.
+
+For more information on Cross Fork Object References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github).
+
+## 16. Scan Hugging Face
+
+### Scan a Hugging Face Model, Dataset or Space
+
+```bash
+trufflehog huggingface --model <model_id> --space <space_id> --dataset <dataset_id>
+```
+
+### Scan all Models, Datasets and Spaces belonging to a Hugging Face Organization or User
+
+```bash
+trufflehog huggingface --org <orgname> --user <username>
+```
+
+(Optionally) When scanning an organization or user, you can skip an entire class of resources with `--skip-models`, `--skip-datasets`, `--skip-spaces` OR a particular resource with `--ignore-models <model_id>`, `--ignore-datasets <dataset_id>`, `--ignore-spaces <space_id>`.
+
+### Scan Discussion and PR Comments
+
+```bash
+trufflehog huggingface --model <model_id> --include-discussions --include-prs
 ```
 
 # :question: FAQ
@@ -680,6 +716,14 @@ with HTTPServer(('', 8000), Verifier) as server:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+```
+
+## :mag: Analyze
+
+TruffleHog supports running a deeper analysis of a credential to view its permissions and the resources it has access to.
+
+```bash
+trufflehog analyze
 ```
 
 # :heart: Contributors
