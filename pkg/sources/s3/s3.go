@@ -342,7 +342,8 @@ func (s *Source) pageChunker(
 				ctx.Logger().V(2).Info("Skipped due to excessive errors")
 				return nil
 			}
-
+			// Make sure we use a separate context for the GetObjectWithContext call.
+			// This ensures that the timeout is isolated and does not affect any downstream operations. (e.g. HandleFile)
 			const getObjectTimeout = 30 * time.Second
 			objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
 			defer cancel()
