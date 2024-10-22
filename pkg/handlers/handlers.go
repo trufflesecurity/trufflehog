@@ -281,7 +281,7 @@ func HandleFile(
 			ctx.Logger().V(5).Info("empty reader, skipping file")
 			return nil
 		}
-		return fmt.Errorf("error creating custom reader: %w", err)
+		return fmt.Errorf("failed to create file reader to handle file: %w", err)
 	}
 	defer func() {
 		// Ensure all data is read to prevent broken pipe.
