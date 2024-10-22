@@ -188,6 +188,10 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 
 			// TODO: handle different content-type responses seperatly when implement custom detector configurations
 			responseStr := string(body)
+			// truncate to 200 characters if response length exceeds 200
+			if len(responseStr) > 200 {
+				responseStr = responseStr[:200]
+			}
 
 			// store the processed response in ExtraData
 			result.ExtraData["response"] = responseStr
