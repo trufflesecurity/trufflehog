@@ -38,7 +38,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
 	github.com/envoyproxy/protoc-gen-validate v1.1.0
-	github.com/fatih/color v1.17.0
+	github.com/fatih/color v1.18.0
 	github.com/felixge/fgprof v0.9.5
 	github.com/gabriel-vasile/mimetype v1.4.6
 	github.com/getsentry/sentry-go v0.29.1
