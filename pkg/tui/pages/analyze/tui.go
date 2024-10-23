@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
 type Analyze struct {
@@ -89,34 +90,35 @@ func (ui *Analyze) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (ui *Analyze) View() string {
-	// if ui.model == nil {
-	// 	return "Loading..."
-	// }
-
-	ui.model = NewKeyTypePage(&ui.Common)
-	if len(ui.args) > 0 {
-		ui.model = NewFormPage(&ui.Common, ui.args[0])
+	if ui.model == nil {
+		return "Loading..."
 	}
 
 	return ui.model.View()
 }
 
-// func (ui *Analyze) SetSize(msg tea.WindowSizeMsg) {
-// 	h, v := styles.AppStyle.GetFrameSize()
-// 	h, v = msg.Width-h, msg.Height-v
-// 	// ui.common.SetSize(h, v)
-// 	if ui.model != nil {
-// 		return
-// 	}
+func (ui *Analyze) SetSize(width, height int) {
+	h, v := styles.AppStyle.GetFrameSize()
+	h, v = width-h, height-v
+	ui.Common.SetSize(h, v)
 
-// 	// Set the model only after we have size information.
-// 	// TODO: Responsive pages.
-// 	// if ui.keyType == "" {
-// 	// 	ui.model = NewKeyTypePage(ui.common)
-// 	// } else {
-// 	// 	ui.model = NewFormPage(ui.common, ui.keyType)
-// 	// }
-// }
+	if ui.model != nil {
+		return
+	}
+
+	// Set the model only after we have size information.
+	// TODO: Responsive pages.
+	ui.model = NewKeyTypePage(&ui.Common)
+	if len(ui.args) > 0 {
+		ui.model = NewFormPage(&ui.Common, ui.args[0])
+	}
+
+	// if ui.keyType == "" {
+	// 	ui.model = NewKeyTypePage(&ui.Common)
+	// } else {
+	// 	ui.model = NewFormPage(&ui.Common, ui.keyType)
+	// }
+}
 
 type SetKeyTypeMsg string
 

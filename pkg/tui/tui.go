@@ -99,6 +99,7 @@ func (ui *TUI) Init() tea.Cmd {
 		ui.pages[sourceConfigurePage].Init(),
 		ui.pages[viewOSSProjectPage].Init(),
 		ui.pages[contactEnterprisePage].Init(),
+		ui.pages[analyzePage].Init(),
 	)
 	ui.state = loadedState
 	ui.SetSize(ui.common.Width, ui.common.Height)
@@ -144,15 +145,13 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ui.activePage = viewOSSProjectPage
 			case wizard_intro.ViewHelpDocs:
 				ui.args = []string{"--help"}
-
 				return ui, tea.Quit
 			case wizard_intro.EnterpriseInquire:
 				ui.activePage = contactEnterprisePage
 			case wizard_intro.ScanSourceWithWizard:
 				ui.activePage = sourceSelectPage
 			case wizard_intro.AnalyzeSecret:
-				ui.args = []string{"analyze"}
-				return ui, tea.Quit
+				ui.activePage = analyzePage
 			}
 		case source_select.SourceItem:
 			ui.activePage = sourceConfigurePage
