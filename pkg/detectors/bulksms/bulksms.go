@@ -29,7 +29,6 @@ var (
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"bulksms"}
 }
@@ -38,34 +37,44 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
+	verifiedKeys := make(map[string]bool)
+	verifiedIDs := make(map[string]bool)
+
+	for _, idMatch := range idMatches {
+		if len(idMatch) != 2 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
-		for _, idmatch := range idMatches {
-			if len(match) != 2 {
+		resIDMatch := strings.TrimSpace(idMatch[1])
+
+		if verifiedIDs[resIDMatch] {
+			continue
+		}
+
+		for _, keyMatch := range keyMatches {
+			if len(keyMatch) != 2 {
 				continue
 			}
-			resIdMatch := strings.TrimSpace(idmatch[1])
+			resKeyMatch := strings.TrimSpace(keyMatch[1])
+
+			if verifiedKeys[resKeyMatch] {
+				continue
+			}
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Bulksms,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				Raw:          []byte(resKeyMatch),
+				RawV2:        []byte(resKeyMatch + resIDMatch),
 			}
 
 			if verify {
-				// data := fmt.Sprintf("%s:%s", resIdMatch, resMatch)
-				// sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.bulksms.com/v1/messages", nil)
 				if err != nil {
 					continue
 				}
-				req.SetBasicAuth(resIdMatch, resMatch)
+				req.SetBasicAuth(resIDMatch, resKeyMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer func() {
@@ -75,13 +84,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					if res.StatusCode == http.StatusOK {
 						s1.Verified = true
+						// Mark both ID and key as verified
+						verifiedIDs[resIDMatch] = true
+						verifiedKeys[resKeyMatch] = true
+						results = append(results, s1)
+						break
 					}
 				} else {
-					s1.SetVerificationError(err, resMatch)
+					s1.SetVerificationError(err, resKeyMatch)
 				}
 			}
-
 			results = append(results, s1)
+
 		}
 	}
 
