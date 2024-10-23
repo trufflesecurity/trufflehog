@@ -11,7 +11,7 @@ import (
 )
 
 type Analyze struct {
-	common.Common
+	common     *common.Common
 	viewed     bool
 	model      tea.Model
 	keyType    string
@@ -27,7 +27,7 @@ type SecretInfo struct {
 var AbortError error = errors.New("command aborted")
 
 func New(c common.Common, args []string) *Analyze {
-	return &Analyze{Common: c, viewed: false, args: args}
+	return &Analyze{common: &c, viewed: false, args: args}
 }
 
 func (ui *Analyze) Init() tea.Cmd {
@@ -100,7 +100,7 @@ func (ui *Analyze) View() string {
 func (ui *Analyze) SetSize(width, height int) {
 	h, v := styles.AppStyle.GetFrameSize()
 	h, v = width-h, height-v
-	ui.Common.SetSize(h, v)
+	ui.common.SetSize(h, v)
 
 	if ui.model != nil {
 		return
@@ -108,9 +108,9 @@ func (ui *Analyze) SetSize(width, height int) {
 
 	// Set the model only after we have size information.
 	// TODO: Responsive pages.
-	ui.model = NewKeyTypePage(&ui.Common)
+	ui.model = NewKeyTypePage(ui.common)
 	if len(ui.args) > 0 {
-		ui.model = NewFormPage(&ui.Common, ui.args[0])
+		ui.model = NewFormPage(ui.common, ui.args[0])
 	}
 
 	// if ui.keyType == "" {

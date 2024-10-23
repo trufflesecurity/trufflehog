@@ -54,6 +54,9 @@ func NewKeyTypePage(c *common.Common) KeyTypePage {
 }
 
 func (ui KeyTypePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if msg, ok := msg.(tea.WindowSizeMsg); ok {
+		ui.SetSize(msg.Width, msg.Height)
+	}
 	if !ui.list.SettingFilter() {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
@@ -70,6 +73,13 @@ func (ui KeyTypePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	ui.list, cmd = ui.list.Update(msg)
 	return ui, cmd
+}
+
+func (ui *KeyTypePage) SetSize(width, height int) {
+	h, v := styles.AppStyle.GetFrameSize()
+	h, v = width-h, height-v
+	ui.Common.SetSize(h, v)
+	*ui = NewKeyTypePage(ui.Common)
 }
 
 func (ui KeyTypePage) View() string {
