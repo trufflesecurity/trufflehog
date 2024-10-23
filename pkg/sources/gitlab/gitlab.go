@@ -40,13 +40,14 @@ type Source struct {
 	jobID    sources.JobID
 	verify   bool
 
-	authMethod  string
-	user        string
-	password    string
-	token       string
-	url         string
-	repos       []string
-	ignoreRepos []string
+	authMethod        string
+	user              string
+	password          string
+	token             string
+	url               string
+	repos             []string
+	ignoreRepos       []string
+	filteredRepoCache *filteredRepoCache
 
 	useCustomContentWriter bool
 	git                    *git.Git
@@ -121,6 +122,19 @@ func (c *filteredRepoCache) ignoreRepo(s string) bool {
 	return false
 }
 
+func (c *filteredRepoCache) includeRepo(s string) bool {
+	if len(c.include) == 0 {
+		return true
+	}
+
+	for _, g := range c.include {
+		if g.Match(s) {
+			return true
+		}
+	}
+	return false
+}
+
 // Init returns an initialized Gitlab source.
 func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.name = name
@@ -140,13 +154,13 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 
-	filteredRepoCache := s.newFilteredRepoCache(ctx,
+	s.filteredRepoCache = s.newFilteredRepoCache(ctx,
 		simple.NewCache[string](),
-		conn.GetRepositories(),
+		append(conn.GetRepositories(), conn.GetIncludeRepos()...),
 		conn.GetIgnoreRepos())
 
-	s.repos = initializeRepos(filteredRepoCache, conn.GetRepositories())
-	s.ignoreRepos = conn.IgnoreRepos
+	s.repos = conn.GetRepositories()
+	s.ignoreRepos = conn.GetIgnoreRepos()
 	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
 
 	switch cred := conn.GetCredential().(type) {
@@ -203,16 +217,6 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	return nil
 }
 
-func initializeRepos(cache *filteredRepoCache, repos []string) []string {
-	returnRepos := make([]string, 0)
-	for _, repo := range repos {
-		if !cache.ignoreRepo(repo) {
-			returnRepos = append(returnRepos, repo)
-		}
-	}
-	return returnRepos
-}
-
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, targets ...sources.ChunkingTarget) error {
 	// Start client.
@@ -243,9 +247,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	// Get all repos if not specified.
 	if len(repos) == 0 {
 		ctx.Logger().Info("no repositories configured, enumerating")
-		ignoreRepo := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
-			ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", pattern)
-		})
+		ignoreRepo := buildIgnorer(s.filteredRepoCache)
 		reporter := sources.VisitorReporter{
 			VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
 				id, _ := unit.SourceUnitID()
@@ -367,9 +369,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 		return errs
 	}
 
-	ignoreProject := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
-		errs = append(errs, fmt.Errorf("could not compile ignore repo pattern %q: %w", pattern, err))
-	})
+	ignoreProject := buildIgnorer(s.filteredRepoCache)
 
 	// Query GitLab for the list of configured repos.
 	var repos []string
@@ -697,23 +697,10 @@ func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
 }
 
-func buildIgnorer(patterns []string, onCompileErr func(err error, pattern string)) func(repo string) bool {
-	var globs []glob.Glob
-
-	for _, pattern := range patterns {
-		g, err := glob.Compile(pattern)
-		if err != nil {
-			onCompileErr(err, pattern)
-			continue
-		}
-		globs = append(globs, g)
-	}
-
+func buildIgnorer(filteredRepoCache *filteredRepoCache) func(repo string) bool {
 	f := func(repo string) bool {
-		for _, g := range globs {
-			if g.Match(repo) {
-				return true
-			}
+		if !filteredRepoCache.includeRepo(repo) || filteredRepoCache.ignoreRepo(repo) {
+			return true
 		}
 		return false
 	}
@@ -816,11 +803,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	}
 
 	// Otherwise, enumerate all repos.
-	ignoreRepo := buildIgnorer(s.ignoreRepos, func(err error, pattern string) {
-		ctx.Logger().Error(err, "could not compile ignore repo glob", "glob", pattern)
-		// TODO: Handle error returned from UnitErr.
-		_ = reporter.UnitErr(ctx, fmt.Errorf("could not compile ignore repo glob: %w", err))
-	})
+	ignoreRepo := buildIgnorer(s.filteredRepoCache)
 	return s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter)
 }
 
