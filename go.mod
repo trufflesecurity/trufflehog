@@ -14,7 +14,7 @@ replace github.com/coinbase/waas-client-library-go => github.com/trufflesecurity
 replace github.com/STARRY-S/zip => github.com/STARRY-S/zip v0.1.0
 
 require (
-	cloud.google.com/go/secretmanager v1.14.1
+	cloud.google.com/go/secretmanager v1.14.2
 	cloud.google.com/go/storage v1.45.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.13
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2
@@ -108,7 +108,7 @@ require (
 	golang.org/x/oauth2 v0.23.0
 	golang.org/x/sync v0.8.0
 	golang.org/x/text v0.19.0
-	google.golang.org/api v0.202.0
+	google.golang.org/api v0.203.0
 	google.golang.org/protobuf v1.35.1
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v2 v2.4.0
@@ -121,7 +121,7 @@ require (
 require (
 	cel.dev/expr v0.16.1 // indirect
 	cloud.google.com/go v0.116.0 // indirect
-	cloud.google.com/go/auth v0.9.8 // indirect
+	cloud.google.com/go/auth v0.9.9 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
 	cloud.google.com/go/compute/metadata v0.5.2 // indirect
 	cloud.google.com/go/iam v1.2.1 // indirect
