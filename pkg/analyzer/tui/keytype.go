@@ -34,8 +34,8 @@ func (ui KeyTypePage) Init() tea.Cmd {
 }
 
 func NewKeyTypePage(c *common.Common) KeyTypePage {
-	items := make([]list.Item, len(analyzers.AvailableAnalyzers))
-	for i, analyzerType := range analyzers.AvailableAnalyzers {
+	items := make([]list.Item, len(analyzers.AvailableAnalyzers()))
+	for i, analyzerType := range analyzers.AvailableAnalyzers() {
 		items[i] = KeyTypeItem(analyzerType)
 	}
 	delegate := list.NewDefaultDelegate()

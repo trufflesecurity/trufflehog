@@ -40,11 +40,11 @@ func Command(app *kingpin.Application) *kingpin.CmdClause {
 
 	keyTypeHelp := fmt.Sprintf(
 		"Type of key to analyze. Omit to interactively choose. Available key types: %s",
-		strings.Join(analyzers.AvailableAnalyzers, ", "),
+		strings.Join(analyzers.AvailableAnalyzers(), ", "),
 	)
 	// Lowercase the available analyzers.
-	availableAnalyzers := make([]string, len(analyzers.AvailableAnalyzers))
-	for i, a := range analyzers.AvailableAnalyzers {
+	availableAnalyzers := make([]string, len(analyzers.AvailableAnalyzers()))
+	for i, a := range analyzers.AvailableAnalyzers() {
 		availableAnalyzers[i] = strings.ToLower(a)
 	}
 	analyzeKeyType = cli.Arg("key-type", keyTypeHelp).Enum(availableAnalyzers...)

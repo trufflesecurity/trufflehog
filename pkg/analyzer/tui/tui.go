@@ -32,7 +32,7 @@ func Run(keyType string) (string, *SecretInfo, error) {
 	// If a keyType is provided, make sure it's in the list of AvailableAnalyzers.
 	if keyType != "" {
 		var found bool
-		for _, a := range analyzers.AvailableAnalyzers {
+		for _, a := range analyzers.AvailableAnalyzers() {
 			if strings.EqualFold(a, keyType) {
 				keyType = a
 				found = true
