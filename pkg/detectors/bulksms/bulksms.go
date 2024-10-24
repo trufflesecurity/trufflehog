@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -37,36 +36,23 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueIds = make(map[string]struct{})
+	var uniqueKeys = make(map[string]struct{})
 
-	verifiedKeys := make(map[string]bool)
-	verifiedIDs := make(map[string]bool)
+	for _, match := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueIds[match[1]] = struct{}{}
+	}
 
-	for _, idMatch := range idMatches {
-		if len(idMatch) != 2 {
-			continue
-		}
-		resIDMatch := strings.TrimSpace(idMatch[1])
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[match[1]] = struct{}{}
+	}
 
-		if verifiedIDs[resIDMatch] {
-			continue
-		}
-
-		for _, keyMatch := range keyMatches {
-			if len(keyMatch) != 2 {
-				continue
-			}
-			resKeyMatch := strings.TrimSpace(keyMatch[1])
-
-			if verifiedKeys[resKeyMatch] {
-				continue
-			}
-
+	for id := range uniqueIds {
+		for key := range uniqueKeys {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Bulksms,
-				Raw:          []byte(resKeyMatch),
-				RawV2:        []byte(resKeyMatch + resIDMatch),
+				Raw:          []byte(key),
+				RawV2:        []byte(key + id),
 			}
 
 			if verify {
@@ -74,7 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.SetBasicAuth(resIDMatch, resKeyMatch)
+				req.SetBasicAuth(id, key)
 				res, err := client.Do(req)
 				if err == nil {
 					defer func() {
@@ -84,18 +70,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					if res.StatusCode == http.StatusOK {
 						s1.Verified = true
-						// Mark both ID and key as verified
-						verifiedIDs[resIDMatch] = true
-						verifiedKeys[resKeyMatch] = true
 						results = append(results, s1)
+						// move to next id, by skipping remaining key's
 						break
 					}
 				} else {
-					s1.SetVerificationError(err, resKeyMatch)
+					s1.SetVerificationError(err, key)
 				}
 			}
-			results = append(results, s1)
 
+			results = append(results, s1)
 		}
 	}
 
