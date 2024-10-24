@@ -262,20 +262,6 @@ func TestSource_Validate(t *testing.T) {
 			wantErrCount: 1,
 		},
 		{
-			name: "could not compile ignore glob(s)",
-			connection: &sourcespb.GitLab{
-				Credential: &sourcespb.GitLab_Token{
-					Token: token,
-				},
-				IgnoreRepos: []string{
-					"tes1188/*-gitlab",
-					"[",    // glob doesn't compile
-					"[a-]", // glob doesn't compile
-				},
-			},
-			wantErrCount: 2,
-		},
-		{
 			name: "repositories do not exist or are not accessible",
 			connection: &sourcespb.GitLab{
 				Credential: &sourcespb.GitLab_Token{
@@ -441,6 +427,88 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			}
 			wg.Wait()
 			assert.Equal(t, tt.wantChunks, i)
+		})
+	}
+}
+
+func TestSource_InclusionGlobbing(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	token := secret.MustGetField("GITLAB_TOKEN")
+
+	tests := []struct {
+		name             string
+		connection       *sourcespb.GitLab
+		wantReposScanned int
+	}{
+		{
+			name: "Get all Repos",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IncludeRepos: []string{"*"},
+				IgnoreRepos:  nil,
+			},
+			wantReposScanned: 6,
+		},
+		{
+			name: "Ignore testy repo, include all others",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IncludeRepos: []string{"*"},
+				IgnoreRepos:  []string{"*testy*"},
+			},
+			wantReposScanned: 5,
+		},
+		{
+			name: "Ignore all repos",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IncludeRepos: nil,
+				IgnoreRepos:  []string{"*"},
+			},
+			wantReposScanned: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			src := &Source{}
+			conn, err := anypb.New(tt.connection)
+			assert.NoError(t, err)
+
+			err = src.Init(ctx, tt.name, 0, 0, false, conn, 1)
+			assert.NoError(t, err)
+
+			// Query GitLab for the list of configured repos.
+			var repos []string
+			visitor := sources.VisitorReporter{
+				VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
+					id, _ := unit.SourceUnitID()
+					repos = append(repos, id)
+					return nil
+				},
+			}
+			apiClient, err := src.newClient()
+			assert.NoError(t, err)
+
+			ignoreRepo := buildIgnorer(src.filteredRepoCache)
+			err = src.getAllProjectRepos(ctx, apiClient, ignoreRepo, visitor)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wantReposScanned, len(repos))
 		})
 	}
 }

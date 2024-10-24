@@ -266,6 +266,10 @@ type GitlabConfig struct {
 	Filter *common.Filter
 	// SkipBinaries allows skipping binary files from the scan.
 	SkipBinaries bool
+	// IncludeRepos is a list of repositories to include in the scan.
+	IncludeRepos []string
+	// ExcludeRepos is a list of repositories to exclude from the scan.
+	ExcludeRepos []string
 }
 
 // FilesystemConfig defines the optional configuration for a filesystem source.

@@ -43,6 +43,14 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 		connection.Repositories = c.Repos
 	}
 
+	if len(c.IncludeRepos) > 0 {
+		connection.IncludeRepos = c.IncludeRepos
+	}
+
+	if len(c.ExcludeRepos) > 0 {
+		connection.IgnoreRepos = c.ExcludeRepos
+	}
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
