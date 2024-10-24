@@ -83,14 +83,15 @@ func WithSentry(opts sentry.ClientOptions, tags map[string]string) logConfig {
 }
 
 type sinkConfig struct {
-	encoder       zapcore.Encoder
-	sink          zapcore.WriteSyncer
-	level         levelSetter
-	redactionList []string
+	encoder  zapcore.Encoder
+	sink     zapcore.WriteSyncer
+	level    levelSetter
+	redactor *dynamicRedactor
 }
 
 // WithJSONSink adds a JSON encoded output to the logger.
 func WithJSONSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
+	opts = append(opts, WithGlobalRedaction())
 	return newCoreConfig(
 		zapcore.NewJSONEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
@@ -101,6 +102,7 @@ func WithJSONSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
 
 // WithConsoleSink adds a console-style output to the logger.
 func WithConsoleSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
+	opts = append(opts, WithGlobalRedaction())
 	return newCoreConfig(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
@@ -177,10 +179,10 @@ func WithLeveler(leveler levelSetter) func(*sinkConfig) {
 	}
 }
 
-// WithRedaction adds values to be redacted from logs.
-func WithRedaction(targets ...string) func(*sinkConfig) {
+// WithGlobalRedaction adds values to be redacted from logs.
+func WithGlobalRedaction() func(*sinkConfig) {
 	return func(conf *sinkConfig) {
-		conf.redactionList = append(conf.redactionList, targets...)
+		conf.redactor = &globalRedactor
 	}
 }
 
@@ -223,5 +225,9 @@ func newCoreConfig(
 		conf.level,
 	)
 
-	return logConfig{core: NewRedactionCore(core, conf.redactionList)}
+	if conf.redactor == nil {
+		return logConfig{core: core}
+	}
+
+	return logConfig{core: NewRedactionCore(core, conf.redactor)}
 }
