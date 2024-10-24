@@ -26,6 +26,10 @@ func RedactGlobally(sensitiveValue string) {
 }
 
 func (r *dynamicRedactor) configureForRedaction(sensitiveValue string) {
+	if sensitiveValue == "" {
+		return
+	}
+
 	r.denyMu.Lock()
 	defer r.denyMu.Unlock()
 

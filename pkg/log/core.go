@@ -26,6 +26,10 @@ func (c *redactionCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapc
 	return ce
 }
 
+func (c *redactionCore) With(fields []zapcore.Field) zapcore.Core {
+	return NewRedactionCore(c.Core.With(fields), c.redactor)
+}
+
 // Write overrides the embedded zapcore.Core Write() method to redact the
 // message and fields before passing them to be written.
 func (c *redactionCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
