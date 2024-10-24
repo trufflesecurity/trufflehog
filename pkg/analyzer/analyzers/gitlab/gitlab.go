@@ -51,21 +51,24 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Bindings: []analyzers.Binding{},
 	}
 
-	// Add token and it's permissions to bindings
-	tokenResource := analyzers.Resource{
-		Name:               info.AccessToken.Name,
-		FullyQualifiedName: fmt.Sprintf("gitlab.com/token/%d", info.AccessToken.ID),
-		Type:               "access_token",
+	// Add user and it's permissions to bindings
+	userFullyQualifiedName := fmt.Sprintf("gitlab.com/user/%d", info.AccessToken.UserID)
+	userResource := analyzers.Resource{
+		Name:               userFullyQualifiedName,
+		FullyQualifiedName: userFullyQualifiedName,
+		Type:               "user",
 		Metadata: map[string]any{
-			"created_at": info.AccessToken.CreatedAt,
-			"revoked":    info.AccessToken.Revoked,
-			"expires_at": info.AccessToken.ExpiresAt,
+			"token_name":       info.AccessToken.Name,
+			"token_id":         info.AccessToken.ID,
+			"token_created_at": info.AccessToken.CreatedAt,
+			"token_revoked":    info.AccessToken.Revoked,
+			"token_expires_at": info.AccessToken.ExpiresAt,
 		},
 	}
 
 	for _, scope := range info.AccessToken.Scopes {
 		result.Bindings = append(result.Bindings, analyzers.Binding{
-			Resource: tokenResource,
+			Resource: userResource,
 			Permission: analyzers.Permission{
 				Value: scope,
 			},
@@ -108,6 +111,7 @@ type AccessTokenJSON struct {
 	Scopes     []string `json:"scopes"`
 	LastUsedAt string   `json:"last_used_at"`
 	ExpiresAt  string   `json:"expires_at"`
+	UserID     int      `json:"user_id"`
 }
 
 type ProjectsJSON struct {
@@ -314,6 +318,7 @@ func printTokenInfo(token AccessTokenJSON) {
 	color.Green("Token Name: %s\n", token.Name)
 	color.Green("Created At: %s\n", token.CreatedAt)
 	color.Green("Last Used At: %s\n", token.LastUsedAt)
+	color.Green("User ID: %d\n", token.UserID)
 	color.Green("Expires At: %s  (%v remaining)\n\n", token.ExpiresAt, getRemainingTime(token.ExpiresAt))
 	if token.Revoked {
 		color.Red("Token Revoked: %v\n", token.Revoked)
