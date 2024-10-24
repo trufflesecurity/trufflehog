@@ -14,7 +14,10 @@ type dynamicRedactor struct {
 	replacerMu sync.RWMutex
 }
 
-var globalRedactor dynamicRedactor
+var globalRedactor = dynamicRedactor{
+	denySet:  make(map[string]struct{}),
+	replacer: strings.NewReplacer(),
+}
 
 // RedactGlobally configures the global log redactor to redact the provided value during log emission. The value will be
 // redacted in log messages and values that are strings, but not in log keys or values of other types.
@@ -30,9 +33,6 @@ func (r *dynamicRedactor) configureForRedaction(sensitiveValue string) {
 		return
 	}
 
-	if r.denySet == nil {
-		r.denySet = make(map[string]struct{})
-	}
 	r.denySet[sensitiveValue] = struct{}{}
 	r.denySlice = append(r.denySlice, sensitiveValue, "*****")
 
