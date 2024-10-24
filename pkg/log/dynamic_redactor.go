@@ -3,6 +3,7 @@ package log
 import (
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 type dynamicRedactor struct {
@@ -10,13 +11,11 @@ type dynamicRedactor struct {
 	denySlice []string
 	denyMu    sync.Mutex
 
-	replacer   *strings.Replacer
-	replacerMu sync.RWMutex
+	replacer atomic.Pointer[strings.Replacer]
 }
 
 var globalRedactor = &dynamicRedactor{
-	denySet:  make(map[string]struct{}),
-	replacer: strings.NewReplacer(),
+	denySet: make(map[string]struct{}),
 }
 
 // RedactGlobally configures the global log redactor to redact the provided value during log emission. The value will be
@@ -40,14 +39,9 @@ func (r *dynamicRedactor) configureForRedaction(sensitiveValue string) {
 	r.denySet[sensitiveValue] = struct{}{}
 	r.denySlice = append(r.denySlice, sensitiveValue, "*****")
 
-	r.replacerMu.Lock()
-	defer r.replacerMu.Unlock()
-	r.replacer = strings.NewReplacer(r.denySlice...)
+	r.replacer.Store(strings.NewReplacer(r.denySlice...))
 }
 
 func (r *dynamicRedactor) redact(s string) string {
-	r.replacerMu.RLock()
-	defer r.replacerMu.RUnlock()
-
-	return r.replacer.Replace(s)
+	return r.replacer.Load().Replace(s)
 }
