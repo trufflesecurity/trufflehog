@@ -250,7 +250,10 @@ func TestGlobalRedaction_Console(t *testing.T) {
 	RedactGlobally("foo")
 	RedactGlobally("bar")
 
-	logger.Info("this foo is bar", "foo", "bar")
+	logger.Info("this foo is bar",
+		"foo", "bar",
+		"array", []string{"foo", "bar", "baz"},
+		"object", map[string]string{"foo": "bar"})
 	require.NoError(t, flush())
 
 	gotParts := strings.Split(buf.String(), "\t")[1:] // The first item is the timestamp
@@ -258,7 +261,7 @@ func TestGlobalRedaction_Console(t *testing.T) {
 		"info-0",
 		"console-redaction-test",
 		"this ***** is *****",
-		"{\"foo\": \"*****\"}\n",
+		"{\"foo\": \"*****\", \"array\": [\"foo\", \"bar\", \"baz\"], \"object\": {\"foo\":\"bar\"}}\n",
 	}
 	assert.Equal(t, wantParts, gotParts)
 }
@@ -277,8 +280,10 @@ func TestGlobalRedaction_JSON(t *testing.T) {
 	)
 	RedactGlobally("foo")
 	RedactGlobally("bar")
-
-	logger.Info("this foo is bar", "foo", "bar")
+	logger.Info("this foo is bar",
+		"foo", "bar",
+		"array", []string{"foo", "bar", "baz"},
+		"object", map[string]string{"foo": "bar"})
 	require.NoError(t, flush())
 
 	var parsedJSON map[string]any
@@ -291,6 +296,8 @@ func TestGlobalRedaction_JSON(t *testing.T) {
 			"logger": "json-redaction-test",
 			"msg":    "this ***** is *****",
 			"foo":    "*****",
+			"array":  []any{"foo", "bar", "baz"},
+			"object": map[string]interface{}{"foo": "bar"},
 		},
 		parsedJSON,
 	)
