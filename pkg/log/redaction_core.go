@@ -30,8 +30,9 @@ func (c *redactionCore) With(fields []zapcore.Field) zapcore.Core {
 	return NewRedactionCore(c.Core.With(fields), c.redactor)
 }
 
-// Write overrides the embedded zapcore.Core Write() method to redact the
-// message and fields before passing them to be written.
+// Write overrides the embedded zapcore.Core Write() method to redact the message and fields before passing them to be
+// written. Only message and string values are redacted; keys and non-string values (e.g. those inside of arrays and
+// structured objects) are not redacted.
 func (c *redactionCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	ent.Message = c.redactor.redact(ent.Message)
 	for i := range fields {
