@@ -737,6 +737,8 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		return err
 	}
 
+	ctx.Logger().Info("enumerating using token", "token", s.token)
+
 	// Get repos within target.
 	repos, errs := normalizeRepos(s.repos)
 	for _, repoErr := range errs {

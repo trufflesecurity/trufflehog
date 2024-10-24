@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/TheZeroSlave/zapsentry"
@@ -91,7 +92,6 @@ type sinkConfig struct {
 
 // WithJSONSink adds a JSON encoded output to the logger.
 func WithJSONSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
-	opts = append(opts, WithGlobalRedaction())
 	return newCoreConfig(
 		zapcore.NewJSONEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
@@ -102,7 +102,6 @@ func WithJSONSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
 
 // WithConsoleSink adds a console-style output to the logger.
 func WithConsoleSink(sink io.Writer, opts ...func(*sinkConfig)) logConfig {
-	opts = append(opts, WithGlobalRedaction())
 	return newCoreConfig(
 		zapcore.NewConsoleEncoder(defaultEncoderConfig()),
 		zapcore.Lock(zapcore.AddSync(sink)),
@@ -181,6 +180,8 @@ func WithLeveler(leveler levelSetter) func(*sinkConfig) {
 
 // WithGlobalRedaction adds values to be redacted from logs.
 func WithGlobalRedaction() func(*sinkConfig) {
+	// If someone is going to use this capability, we need to initialize the global redaction replacer.
+	globalRedactor.replacer.CompareAndSwap(nil, strings.NewReplacer())
 	return func(conf *sinkConfig) {
 		conf.redactor = globalRedactor
 	}

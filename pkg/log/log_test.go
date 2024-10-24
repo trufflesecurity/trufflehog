@@ -17,8 +17,8 @@ import (
 func TestNew(t *testing.T) {
 	var jsonBuffer, consoleBuffer bytes.Buffer
 	logger, flush := New("service-name",
-		WithJSONSink(&jsonBuffer),
-		WithConsoleSink(&consoleBuffer),
+		WithJSONSink(&jsonBuffer, WithGlobalRedaction()),
+		WithConsoleSink(&consoleBuffer, WithGlobalRedaction()),
 	)
 	logger.Info("yay")
 	assert.Nil(t, flush())
@@ -238,8 +238,7 @@ func TestFindLevel(t *testing.T) {
 func TestGlobalRedaction_Console(t *testing.T) {
 	oldState := globalRedactor
 	globalRedactor = &dynamicRedactor{
-		denySet:  make(map[string]struct{}),
-		replacer: strings.NewReplacer(),
+		denySet: make(map[string]struct{}),
 	}
 	defer func() { globalRedactor = oldState }()
 
@@ -250,7 +249,7 @@ func TestGlobalRedaction_Console(t *testing.T) {
 	RedactGlobally("foo")
 	RedactGlobally("bar")
 
-	logger.Info("this foo is bar",
+	logger.Info("this foo is :bar",
 		"foo", "bar",
 		"array", []string{"foo", "bar", "baz"},
 		"object", map[string]string{"foo": "bar"})
@@ -260,7 +259,7 @@ func TestGlobalRedaction_Console(t *testing.T) {
 	wantParts := []string{
 		"info-0",
 		"console-redaction-test",
-		"this ***** is *****",
+		"this ***** is :*****",
 		"{\"foo\": \"*****\", \"array\": [\"foo\", \"bar\", \"baz\"], \"object\": {\"foo\":\"bar\"}}\n",
 	}
 	assert.Equal(t, wantParts, gotParts)
@@ -269,8 +268,7 @@ func TestGlobalRedaction_Console(t *testing.T) {
 func TestGlobalRedaction_JSON(t *testing.T) {
 	oldState := globalRedactor
 	globalRedactor = &dynamicRedactor{
-		denySet:  make(map[string]struct{}),
-		replacer: strings.NewReplacer(),
+		denySet: make(map[string]struct{}),
 	}
 	defer func() { globalRedactor = oldState }()
 
@@ -280,7 +278,7 @@ func TestGlobalRedaction_JSON(t *testing.T) {
 	)
 	RedactGlobally("foo")
 	RedactGlobally("bar")
-	logger.Info("this foo is bar",
+	logger.Info("this foo is :bar",
 		"foo", "bar",
 		"array", []string{"foo", "bar", "baz"},
 		"object", map[string]string{"foo": "bar"})
@@ -294,7 +292,7 @@ func TestGlobalRedaction_JSON(t *testing.T) {
 		map[string]any{
 			"level":  "info-0",
 			"logger": "json-redaction-test",
-			"msg":    "this ***** is *****",
+			"msg":    "this ***** is :*****",
 			"foo":    "*****",
 			"array":  []any{"foo", "bar", "baz"},
 			"object": map[string]interface{}{"foo": "bar"},
