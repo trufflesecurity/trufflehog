@@ -10,6 +10,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -232,4 +233,30 @@ func TestFindLevel(t *testing.T) {
 		SetLevelForControl(lvl, i8)
 		assert.Equal(t, i8, findLevel(logger))
 	}
+}
+
+func TestGlobalRedaction_JSON(t *testing.T) {
+	var jsonBuffer bytes.Buffer
+	logger, flush := New("json-redaction-test",
+		WithJSONSink(&jsonBuffer, WithGlobalRedaction()),
+	)
+	RedactGlobally("foo")
+	RedactGlobally("bar")
+
+	logger.Info("this foo is bar", "foo", "bar")
+	require.NoError(t, flush())
+
+	var parsedJSON map[string]any
+	require.NoError(t, json.Unmarshal(jsonBuffer.Bytes(), &parsedJSON))
+	assert.NotEmpty(t, parsedJSON["ts"])
+	delete(parsedJSON, "ts")
+	assert.Equal(t,
+		map[string]any{
+			"level":  "info-0",
+			"logger": "json-redaction-test",
+			"msg":    "this ***** is *****",
+			"foo":    "*****",
+		},
+		parsedJSON,
+	)
 }

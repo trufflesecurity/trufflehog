@@ -16,20 +16,23 @@ type dynamicRedactor struct {
 
 var globalRedactor dynamicRedactor
 
-func RedactGlobally(s string) {
-	globalRedactor.ConfigureForRedaction(s)
+func RedactGlobally(sensitiveValue string) {
+	globalRedactor.ConfigureForRedaction(sensitiveValue)
 }
 
-func (r *dynamicRedactor) ConfigureForRedaction(s string) {
+func (r *dynamicRedactor) ConfigureForRedaction(sensitiveValue string) {
 	r.denyMu.Lock()
 	defer r.denyMu.Unlock()
 
-	if _, ok := r.denySet[s]; ok {
+	if _, ok := r.denySet[sensitiveValue]; ok {
 		return
 	}
 
-	r.denySet[s] = struct{}{}
-	r.denySlice = append(r.denySlice, s, "*****")
+	if r.denySet == nil {
+		r.denySet = make(map[string]struct{})
+	}
+	r.denySet[sensitiveValue] = struct{}{}
+	r.denySlice = append(r.denySlice, sensitiveValue, "*****")
 
 	r.replacerMu.Lock()
 	defer r.replacerMu.Unlock()
@@ -38,7 +41,7 @@ func (r *dynamicRedactor) ConfigureForRedaction(s string) {
 
 func (r *dynamicRedactor) Redact(s string) string {
 	r.replacerMu.RLock()
-	defer r.replacerMu.Unlock()
+	defer r.replacerMu.RUnlock()
 
 	return r.replacer.Replace(s)
 }
