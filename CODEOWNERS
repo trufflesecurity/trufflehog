@@ -3,7 +3,8 @@
 
 # teams
 pkg/sources/ @trufflesecurity/backend
-pkg/detectors/ @trufflesecurity/detection
+pkg/detectors/ @trufflesecurity/oss
+pkg/analyzer/ @trufflesecurity/oss
 
 # critical detectors
 pkg/detectors/aws/ @trufflesecurity/backend
