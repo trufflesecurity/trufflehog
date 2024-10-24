@@ -83,9 +83,10 @@ func WithSentry(opts sentry.ClientOptions, tags map[string]string) logConfig {
 }
 
 type sinkConfig struct {
-	encoder zapcore.Encoder
-	sink    zapcore.WriteSyncer
-	level   levelSetter
+	encoder       zapcore.Encoder
+	sink          zapcore.WriteSyncer
+	level         levelSetter
+	redactionList []string
 }
 
 // WithJSONSink adds a JSON encoded output to the logger.
@@ -176,6 +177,13 @@ func WithLeveler(leveler levelSetter) func(*sinkConfig) {
 	}
 }
 
+// WithRedaction adds values to be redacted from logs.
+func WithRedaction(targets ...string) func(*sinkConfig) {
+	return func(conf *sinkConfig) {
+		conf.redactionList = append(conf.redactionList, targets...)
+	}
+}
+
 // firstErrorFunc is a helper function that returns a function that executes
 // all provided args and returns the first error, if any.
 func firstErrorFunc(fs ...func() error) func() error {
@@ -209,11 +217,11 @@ func newCoreConfig(
 	for _, f := range opts {
 		f(&conf)
 	}
-	return logConfig{
-		core: zapcore.NewCore(
-			conf.encoder,
-			conf.sink,
-			conf.level,
-		),
-	}
+	core := zapcore.NewCore(
+		conf.encoder,
+		conf.sink,
+		conf.level,
+	)
+
+	return logConfig{core: NewRedactionCore(core, conf.redactionList)}
 }
