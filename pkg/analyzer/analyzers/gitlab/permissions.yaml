@@ -1,0 +1,15 @@
+permissions:
+  - api
+  - read_user
+  - read_api
+  - read_repository
+  - write_repository
+  - read_registry
+  - write_registry
+  - sudo
+  - admin_mode
+  - create_runner
+  - manage_runner
+  - ai_features
+  - k8s_proxy
+  - read_service_ping
