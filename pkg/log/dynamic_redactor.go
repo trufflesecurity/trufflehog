@@ -16,11 +16,13 @@ type dynamicRedactor struct {
 
 var globalRedactor dynamicRedactor
 
+// RedactGlobally configures the global log redactor to redact the provided value during log emission. The value will be
+// redacted in log messages and values that are strings, but not in log keys or values of other types.
 func RedactGlobally(sensitiveValue string) {
-	globalRedactor.ConfigureForRedaction(sensitiveValue)
+	globalRedactor.configureForRedaction(sensitiveValue)
 }
 
-func (r *dynamicRedactor) ConfigureForRedaction(sensitiveValue string) {
+func (r *dynamicRedactor) configureForRedaction(sensitiveValue string) {
 	r.denyMu.Lock()
 	defer r.denyMu.Unlock()
 
@@ -39,7 +41,7 @@ func (r *dynamicRedactor) ConfigureForRedaction(sensitiveValue string) {
 	r.replacer = strings.NewReplacer(r.denySlice...)
 }
 
-func (r *dynamicRedactor) Redact(s string) string {
+func (r *dynamicRedactor) redact(s string) string {
 	r.replacerMu.RLock()
 	defer r.replacerMu.RUnlock()
 
