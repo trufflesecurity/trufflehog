@@ -131,7 +131,6 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	cfg := aws.NewConfig()
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
-	cfg.LogLevel = aws.LogLevel(aws.LogDebugWithRequestErrors)
 	cfg.Region = aws.String(region)
 
 	switch cred := s.conn.GetCredential().(type) {
