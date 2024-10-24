@@ -182,7 +182,7 @@ func WithLeveler(leveler levelSetter) func(*sinkConfig) {
 // WithGlobalRedaction adds values to be redacted from logs.
 func WithGlobalRedaction() func(*sinkConfig) {
 	return func(conf *sinkConfig) {
-		conf.redactor = &globalRedactor
+		conf.redactor = globalRedactor
 	}
 }
 

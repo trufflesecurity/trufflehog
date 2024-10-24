@@ -14,7 +14,7 @@ type dynamicRedactor struct {
 	replacerMu sync.RWMutex
 }
 
-var globalRedactor = dynamicRedactor{
+var globalRedactor = &dynamicRedactor{
 	denySet:  make(map[string]struct{}),
 	replacer: strings.NewReplacer(),
 }

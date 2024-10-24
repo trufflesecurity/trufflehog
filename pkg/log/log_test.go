@@ -236,6 +236,13 @@ func TestFindLevel(t *testing.T) {
 }
 
 func TestGlobalRedaction_Console(t *testing.T) {
+	oldState := globalRedactor
+	globalRedactor = &dynamicRedactor{
+		denySet:  make(map[string]struct{}),
+		replacer: strings.NewReplacer(),
+	}
+	defer func() { globalRedactor = oldState }()
+
 	var buf bytes.Buffer
 	logger, flush := New("console-redaction-test",
 		WithConsoleSink(&buf, WithGlobalRedaction()),
@@ -257,6 +264,13 @@ func TestGlobalRedaction_Console(t *testing.T) {
 }
 
 func TestGlobalRedaction_JSON(t *testing.T) {
+	oldState := globalRedactor
+	globalRedactor = &dynamicRedactor{
+		denySet:  make(map[string]struct{}),
+		replacer: strings.NewReplacer(),
+	}
+	defer func() { globalRedactor = oldState }()
+
 	var jsonBuffer bytes.Buffer
 	logger, flush := New("json-redaction-test",
 		WithJSONSink(&jsonBuffer, WithGlobalRedaction()),
