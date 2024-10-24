@@ -235,6 +235,27 @@ func TestFindLevel(t *testing.T) {
 	}
 }
 
+func TestGlobalRedaction_Console(t *testing.T) {
+	var buf bytes.Buffer
+	logger, flush := New("console-redaction-test",
+		WithConsoleSink(&buf, WithGlobalRedaction()),
+	)
+	RedactGlobally("foo")
+	RedactGlobally("bar")
+
+	logger.Info("this foo is bar", "foo", "bar")
+	require.NoError(t, flush())
+
+	gotParts := strings.Split(buf.String(), "\t")[1:] // The first item is the timestamp
+	wantParts := []string{
+		"info-0",
+		"console-redaction-test",
+		"this ***** is *****",
+		"{\"foo\": \"*****\"}\n",
+	}
+	assert.Equal(t, wantParts, gotParts)
+}
+
 func TestGlobalRedaction_JSON(t *testing.T) {
 	var jsonBuffer bytes.Buffer
 	logger, flush := New("json-redaction-test",
