@@ -709,6 +709,8 @@ github.com/sassoftware/go-rpmutils v0.4.0 h1:ojND82NYBxgwrV+mX1CWsd5QJvvEZTKddtC
 github.com/sassoftware/go-rpmutils v0.4.0/go.mod h1:3goNWi7PGAT3/dlql2lv3+MSN5jNYPjT5mVcQcIsYzI=
 github.com/schollz/progressbar/v3 v3.16.1 h1:RnF1neWZFzLCoGx8yp1yF7SDl4AzNDI5y4I0aUJRrZQ=
 github.com/schollz/progressbar/v3 v3.16.1/go.mod h1:I2ILR76gz5VXqYMIY/LdLecvMHDPVcQm3W/MSKi1TME=
+github.com/schollz/progressbar/v3 v3.17.0 h1:Fv+vG6O6jnJwdjCelvfyYO7sF2jaUGQVmdH4CxcZdsQ=
+github.com/schollz/progressbar/v3 v3.17.0/go.mod h1:5H4fLgifX+KeQCsEJnZTOepgZLe1jFF1lpPXb68IJTA=
 github.com/sendgrid/rest v2.6.9+incompatible h1:1EyIcsNdn9KIisLW50MKwmSRSK+ekueiEMJ7NEoxJo0=
 github.com/sendgrid/rest v2.6.9+incompatible/go.mod h1:kXX7q3jZtJXK5c5qK83bSGMdV6tsOE70KbHoqJls4lE=
 github.com/sendgrid/sendgrid-go v3.16.0+incompatible h1:i8eE6IMkiCy7vusSdacHHSBUpXyTcTXy/Rl9N9aZ/Qw=
