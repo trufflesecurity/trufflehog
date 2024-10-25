@@ -262,6 +262,38 @@ func TestSource_Validate(t *testing.T) {
 			wantErrCount: 1,
 		},
 		{
+			name: "could not compile ignore glob(s)",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IgnoreRepos: []string{
+					"tes1188/*-gitlab",
+					"[",    // glob doesn't compile
+					"[a-]", // glob doesn't compile
+				},
+			},
+			wantErrCount: 2,
+		},
+
+		{
+			name: "could not compile include glob(s)",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IncludeRepos: []string{
+					"tes1188/*-gitlab",
+					"[",    // glob doesn't compile
+					"[a-]", // glob doesn't compile
+				},
+				IgnoreRepos: []string{
+					"[",
+				},
+			},
+			wantErrCount: 3,
+		},
+		{
 			name: "repositories do not exist or are not accessible",
 			connection: &sourcespb.GitLab{
 				Credential: &sourcespb.GitLab_Token{
@@ -446,6 +478,7 @@ func TestSource_InclusionGlobbing(t *testing.T) {
 		name             string
 		connection       *sourcespb.GitLab
 		wantReposScanned int
+		wantErrCount     int
 	}{
 		{
 			name: "Get all Repos",
@@ -457,6 +490,7 @@ func TestSource_InclusionGlobbing(t *testing.T) {
 				IgnoreRepos:  nil,
 			},
 			wantReposScanned: 6,
+			wantErrCount:     0,
 		},
 		{
 			name: "Ignore testy repo, include all others",
@@ -468,6 +502,7 @@ func TestSource_InclusionGlobbing(t *testing.T) {
 				IgnoreRepos:  []string{"*testy*"},
 			},
 			wantReposScanned: 5,
+			wantErrCount:     0,
 		},
 		{
 			name: "Ignore all repos",
@@ -479,6 +514,25 @@ func TestSource_InclusionGlobbing(t *testing.T) {
 				IgnoreRepos:  []string{"*"},
 			},
 			wantReposScanned: 0,
+			wantErrCount:     0,
+		},
+		{
+			name: "Ignore all repos, but glob doesn't compile",
+			connection: &sourcespb.GitLab{
+				Credential: &sourcespb.GitLab_Token{
+					Token: token,
+				},
+				IncludeRepos: []string{
+					"[",    // glob doesn't compile
+					"[a-]", // glob doesn't compile
+				},
+				IgnoreRepos: []string{
+					"*", // ignore all repos
+					"[", // glob doesn't compile
+				},
+			},
+			wantReposScanned: 0,
+			wantErrCount:     3,
 		},
 	}
 
@@ -504,11 +558,16 @@ func TestSource_InclusionGlobbing(t *testing.T) {
 			apiClient, err := src.newClient()
 			assert.NoError(t, err)
 
-			ignoreRepo := buildIgnorer(src.filteredRepoCache)
+			var errs []error
+			ignoreRepo := buildIgnorer(ctx, src.includeRepos, src.ignoreRepos, func(err error, pattern string) {
+				errs = append(errs, err)
+			})
 			err = src.getAllProjectRepos(ctx, apiClient, ignoreRepo, visitor)
 			assert.NoError(t, err)
 
+			assert.Equal(t, tt.wantErrCount, len(errs))
 			assert.Equal(t, tt.wantReposScanned, len(repos))
+
 		})
 	}
 }

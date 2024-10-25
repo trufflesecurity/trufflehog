@@ -10,8 +10,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -40,14 +38,14 @@ type Source struct {
 	jobID    sources.JobID
 	verify   bool
 
-	authMethod        string
-	user              string
-	password          string
-	token             string
-	url               string
-	repos             []string
-	ignoreRepos       []string
-	filteredRepoCache *filteredRepoCache
+	authMethod   string
+	user         string
+	password     string
+	token        string
+	url          string
+	repos        []string
+	ignoreRepos  []string
+	includeRepos []string
 
 	useCustomContentWriter bool
 	git                    *git.Git
@@ -84,20 +82,19 @@ func (s *Source) JobID() sources.JobID {
 	return s.jobID
 }
 
-// filteredRepoCache is a wrapper around cache.Cache that filters out repos
+// globRepoFilter is a wrapper around cache.Cache that filters out repos
 // based on include and exclude globs.
-type filteredRepoCache struct {
-	cache.Cache[string]
+type globRepoFilter struct {
 	include, exclude []glob.Glob
 }
 
-func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string], include, exclude []string) *filteredRepoCache {
+func newGlobRepoFilter(ctx context.Context, include, exclude []string, onCompileErr func(err error, pattern string)) *globRepoFilter {
 	includeGlobs := make([]glob.Glob, 0, len(include))
 	excludeGlobs := make([]glob.Glob, 0, len(exclude))
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			ctx.Logger().V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			onCompileErr(err, ig)
 			continue
 		}
 		includeGlobs = append(includeGlobs, g)
@@ -105,15 +102,15 @@ func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string]
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			ctx.Logger().V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			onCompileErr(err, eg)
 			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
 	}
-	return &filteredRepoCache{Cache: c, include: includeGlobs, exclude: excludeGlobs}
+	return &globRepoFilter{include: includeGlobs, exclude: excludeGlobs}
 }
 
-func (c *filteredRepoCache) ignoreRepo(s string) bool {
+func (c *globRepoFilter) ignoreRepo(s string) bool {
 	for _, g := range c.exclude {
 		if g.Match(s) {
 			return true
@@ -122,7 +119,7 @@ func (c *filteredRepoCache) ignoreRepo(s string) bool {
 	return false
 }
 
-func (c *filteredRepoCache) includeRepo(s string) bool {
+func (c *globRepoFilter) includeRepo(s string) bool {
 	if len(c.include) == 0 {
 		return true
 	}
@@ -154,14 +151,12 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 
-	s.filteredRepoCache = s.newFilteredRepoCache(ctx,
-		simple.NewCache[string](),
-		append(conn.GetRepositories(), conn.GetIncludeRepos()...),
-		conn.GetIgnoreRepos())
-
 	s.repos = conn.GetRepositories()
 	s.ignoreRepos = conn.GetIgnoreRepos()
+	s.includeRepos = conn.GetIncludeRepos()
+
 	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
+	ctx.Logger().V(3).Info("setting include repos patterns", "patterns", s.includeRepos)
 
 	switch cred := conn.GetCredential().(type) {
 	case *sourcespb.GitLab_Token:
@@ -247,7 +242,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	// Get all repos if not specified.
 	if len(repos) == 0 {
 		ctx.Logger().Info("no repositories configured, enumerating")
-		ignoreRepo := buildIgnorer(s.filteredRepoCache)
+		ignoreRepo := buildIgnorer(ctx, s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+			ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
+		})
 		reporter := sources.VisitorReporter{
 			VisitUnit: func(ctx context.Context, unit sources.SourceUnit) error {
 				id, _ := unit.SourceUnitID()
@@ -369,7 +366,9 @@ func (s *Source) Validate(ctx context.Context) []error {
 		return errs
 	}
 
-	ignoreProject := buildIgnorer(s.filteredRepoCache)
+	ignoreProject := buildIgnorer(ctx, s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+		errs = append(errs, fmt.Errorf("could not compile include/exclude repo pattern %q: %w", pattern, err))
+	})
 
 	// Query GitLab for the list of configured repos.
 	var repos []string
@@ -697,9 +696,13 @@ func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
 }
 
-func buildIgnorer(filteredRepoCache *filteredRepoCache) func(repo string) bool {
+func buildIgnorer(ctx context.Context, include, exclude []string, onCompile func(err error, pattern string)) func(repo string) bool {
+
+	// compile and load globRepoFilter
+	globRepoFilter := newGlobRepoFilter(ctx, include, exclude, onCompile)
+
 	f := func(repo string) bool {
-		if !filteredRepoCache.includeRepo(repo) || filteredRepoCache.ignoreRepo(repo) {
+		if !globRepoFilter.includeRepo(repo) || globRepoFilter.ignoreRepo(repo) {
 			return true
 		}
 		return false
@@ -803,7 +806,11 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	}
 
 	// Otherwise, enumerate all repos.
-	ignoreRepo := buildIgnorer(s.filteredRepoCache)
+	ignoreRepo := buildIgnorer(ctx, s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+		ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
+		// TODO: Handle error returned from UnitErr.
+		_ = reporter.UnitErr(ctx, fmt.Errorf("could not compile include/exclude repo glob: %w", err))
+	})
 	return s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter)
 }
 
