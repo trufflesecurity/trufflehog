@@ -29,10 +29,7 @@ Limit log levels to _**info**_ (indicate normal or expected operation) and _**er
 4. — extremely verbose logs or logs containing sensitive information
 5. — ultimate verbosity
 ```
-
 Example: `Logger().V(2).Info("skipping file: extension is ignored", "ext", mimeExt)`
-
-
 
 **Either log an error or return it**. Doing one or the other will help defer logging for when there is more context for it and prevent duplicate “bubbling up” logs.
 
