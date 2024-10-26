@@ -78,7 +78,7 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 			return positionMap[sortedSubstrings[i]] < positionMap[sortedSubstrings[j]]
 		})
 
-		// Process in order.
+		// Process in sequential order.
 		for _, encoded := range sortedSubstrings {
 			if decoded, ok := decodedSubstrings[encoded]; ok {
 				pos := positionMap[encoded]
@@ -112,8 +112,11 @@ func getSubstringsOfCharacterSet(data []byte, threshold int, charsetMapping [128
 		return nil
 	}
 
-	// Start with a reasonable capacity.
-	substrings := make([]string, 0, 16)
+	// initialSubstringsCapacity is set to 16 as a practical optimization,
+	// balancing memory usage with the typical number of base64-encoded
+	// strings found in common input data. (this could be tuned further)
+	const initialSubstringsCapacity = 16
+	substrings := make([]string, 0, initialSubstringsCapacity)
 
 	count := 0
 	start := 0
