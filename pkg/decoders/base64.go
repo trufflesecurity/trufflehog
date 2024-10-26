@@ -3,6 +3,7 @@ package decoders
 import (
 	"bytes"
 	"encoding/base64"
+	"sort"
 	"unicode"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -49,20 +50,44 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	}
 
 	if len(decodedSubstrings) > 0 {
-		var result bytes.Buffer
-		result.Grow(len(chunk.Data))
+		// Build a position map and sort encoded strings by their position in the original data.
+		// This ensures we process the data in a single forward pass, handling each encoded string
+		// in order of appearance. By sorting first, we guarantee sequential processing and avoid
+		// potential backward scans through already processed data.
+		positionMap := make(map[string]int, len(encodedSubstrings))
+		remaining := chunk.Data
+		pos := 0
 
-		start := 0
 		for _, encoded := range encodedSubstrings {
-			if decoded, ok := decodedSubstrings[encoded]; ok {
-				end := bytes.Index(chunk.Data[start:], []byte(encoded))
-				if end != -1 {
-					result.Write(chunk.Data[start : start+end])
-					result.Write(decoded)
-					start += end + len(encoded)
-				}
+			if idx := bytes.Index(remaining, []byte(encoded)); idx != -1 {
+				positionMap[encoded] = pos + idx
+				pos += idx
+				remaining = remaining[idx+len(encoded):]
 			}
 		}
+
+		var result bytes.Buffer
+		result.Grow(len(chunk.Data))
+		start := 0
+		// Sort encodedSubstrings by their positions for sequential processing.
+		sortedSubstrings := make([]string, 0, len(positionMap))
+		for encoded := range positionMap {
+			sortedSubstrings = append(sortedSubstrings, encoded)
+		}
+		sort.Slice(sortedSubstrings, func(i, j int) bool {
+			return positionMap[sortedSubstrings[i]] < positionMap[sortedSubstrings[j]]
+		})
+
+		// Process in order.
+		for _, encoded := range sortedSubstrings {
+			if decoded, ok := decodedSubstrings[encoded]; ok {
+				pos := positionMap[encoded]
+				result.Write(chunk.Data[start:pos])
+				result.Write(decoded)
+				start = pos + len(encoded)
+			}
+		}
+
 		result.Write(chunk.Data[start:])
 		chunk.Data = result.Bytes()
 		return decodableChunk
@@ -80,46 +105,35 @@ func isASCII(b []byte) bool {
 	return true
 }
 
+// getSubstringsOfCharacterSet extracts base64-encoded substrings
+// from byte data that meet the threshold.
 func getSubstringsOfCharacterSet(data []byte, threshold int, charsetMapping [128]bool, endChars string) []string {
 	if len(data) == 0 {
 		return nil
 	}
 
+	// Start with a reasonable capacity.
+	substrings := make([]string, 0, 16)
+
 	count := 0
-	substringsCount := 0
-
-	// Determine the number of substrings that will be returned.
-	// Pre-allocate the slice to avoid reallocations.
-	for _, char := range data {
-		if char < 128 && charsetMapping[char] {
-			count++
-		} else {
-			if count > threshold {
-				substringsCount++
-			}
-			count = 0
-		}
-	}
-	if count > threshold {
-		substringsCount++
-	}
-
-	count = 0
 	start := 0
-	substrings := make([]string, 0, substringsCount)
 
-	for i, char := range data {
-		if char < 128 && charsetMapping[char] {
+	for i := range data {
+		char := data[i]
+		isValid := char < 128 && charsetMapping[char]
+
+		if isValid {
 			if count == 0 {
 				start = i
 			}
 			count++
-		} else {
-			if count > threshold {
-				substrings = appendB64Substring(data, start, count, substrings, endChars)
-			}
-			count = 0
+			continue
 		}
+
+		if count > threshold {
+			substrings = appendB64Substring(data, start, count, substrings, endChars)
+		}
+		count = 0
 	}
 
 	if count > threshold {
@@ -129,12 +143,38 @@ func getSubstringsOfCharacterSet(data []byte, threshold int, charsetMapping [128
 	return substrings
 }
 
+// appendB64Substring processes and appends a base64 substring to the result slice.
+// It handles both standard and URL-safe base64 encodings, preserving padding characters
+// and special characters like underscores.
 func appendB64Substring(data []byte, start, count int, substrings []string, endChars string) []string {
-	substring := bytes.TrimLeft(data[start:start+count], endChars)
-	if idx := bytes.IndexByte(bytes.TrimRight(substring, endChars), '='); idx != -1 {
-		substrings = append(substrings, string(substring[idx+1:]))
-	} else {
-		substrings = append(substrings, string(substring))
+	left := start
+	right := start + count - 1
+
+	// Trim left end chars except underscore.
+	for left < right && bytes.IndexByte([]byte(endChars), data[left]) != -1 && data[left] != '_' {
+		left++
 	}
+
+	// Trim right end chars except underscore and equals.
+	for right > left && bytes.IndexByte([]byte(endChars), data[right]) != -1 {
+		if data[right] == '=' || data[right] == '_' {
+			break
+		}
+		right--
+	}
+
+	// Find equals sign in the middle if present.
+	for i := left; i < right; i++ {
+		if data[i] == '=' {
+			left = i + 1
+			break
+		}
+	}
+
+	// Only append if we have valid data after trimming.
+	if right >= left {
+		substrings = append(substrings, string(data[left:right+1]))
+	}
+
 	return substrings
 }

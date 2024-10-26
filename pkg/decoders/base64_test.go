@@ -171,7 +171,7 @@ func BenchmarkFromChunkMedium(b *testing.B) {
 
 func BenchmarkFromChunkLarge(b *testing.B) {
 	d := Base64{}
-	data := detectors.MustGetBenchmarkData()["big"]
+	data := detectors.MustGetBenchmarkData()["large"]
 
 	for n := 0; n < b.N; n++ {
 		d.FromChunk(&sources.Chunk{Data: data})
