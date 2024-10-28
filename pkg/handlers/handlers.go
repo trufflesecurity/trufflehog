@@ -318,7 +318,7 @@ func HandleFile(
 	if mimeT == "application/jar" || mimeT == "application/zip" {
 		ext := getFileExtension(chunkSkel)
 		if ext == ".apk" {
-			fmt.Println("APK file detected by extension")
+			ctx.Logger().V(3).Info("APK file detected by extension", "extension", ext)
 			mimeT = apkMime
 			ctx = logContext.WithValues(ctx, "mime", mimeT)
 		}
