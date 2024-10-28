@@ -88,7 +88,7 @@ type globRepoFilter struct {
 	include, exclude []glob.Glob
 }
 
-func newGlobRepoFilter(ctx context.Context, include, exclude []string, onCompileErr func(err error, pattern string)) *globRepoFilter {
+func newGlobRepoFilter(include, exclude []string, onCompileErr func(err error, pattern string)) *globRepoFilter {
 	includeGlobs := make([]glob.Glob, 0, len(include))
 	excludeGlobs := make([]glob.Glob, 0, len(exclude))
 	for _, ig := range include {
@@ -242,7 +242,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	// Get all repos if not specified.
 	if len(repos) == 0 {
 		ctx.Logger().Info("no repositories configured, enumerating")
-		ignoreRepo := buildIgnorer(ctx, s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+		ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
 			ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
 		})
 		reporter := sources.VisitorReporter{
@@ -366,7 +366,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 		return errs
 	}
 
-	ignoreProject := buildIgnorer(ctx, s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+	ignoreProject := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
 		errs = append(errs, fmt.Errorf("could not compile include/exclude repo pattern %q: %w", pattern, err))
 	})
 
@@ -696,10 +696,10 @@ func (s *Source) WithScanOptions(scanOptions *git.ScanOptions) {
 	s.scanOptions = scanOptions
 }
 
-func buildIgnorer(ctx context.Context, include, exclude []string, onCompile func(err error, pattern string)) func(repo string) bool {
+func buildIgnorer(include, exclude []string, onCompile func(err error, pattern string)) func(repo string) bool {
 
 	// compile and load globRepoFilter
-	globRepoFilter := newGlobRepoFilter(ctx, include, exclude, onCompile)
+	globRepoFilter := newGlobRepoFilter(include, exclude, onCompile)
 
 	f := func(repo string) bool {
 		if !globRepoFilter.includeRepo(repo) || globRepoFilter.ignoreRepo(repo) {
@@ -806,7 +806,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	}
 
 	// Otherwise, enumerate all repos.
-	ignoreRepo := buildIgnorer(ctx, s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
+	ignoreRepo := buildIgnorer(s.includeRepos, s.ignoreRepos, func(err error, pattern string) {
 		ctx.Logger().Error(err, "could not compile include/exclude repo glob", "glob", pattern)
 		// TODO: Handle error returned from UnitErr.
 		_ = reporter.UnitErr(ctx, fmt.Errorf("could not compile include/exclude repo glob: %w", err))
