@@ -266,6 +266,10 @@ func (br *BufferedReadSeeker) readToEnd() error {
 }
 
 func (br *BufferedReadSeeker) writeData(data []byte) error {
+	if br.buf == nil {
+		br.buf = br.bufPool.Get()
+	}
+
 	_, err := br.buf.Write(data)
 	if err != nil {
 		return err

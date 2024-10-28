@@ -44,16 +44,16 @@ func newArchiveHandler() *archiveHandler {
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
-	dataChan := make(chan []byte, defaultBufferSize)
+func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
+	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 
 	if feature.ForceSkipArchives.Load() {
-		close(dataChan)
-		return dataChan, nil
+		close(dataOrErrChan)
+		return dataOrErrChan
 	}
 
 	go func() {
-		defer close(dataChan)
+		defer close(dataOrErrChan)
 
 		// The underlying 7zip library may panic when attempting to open an archive.
 		// This is due to an Index Out Of Range (IOOR) error when reading the archive header.
@@ -71,7 +71,7 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 		}()
 
 		start := time.Now()
-		err := h.openArchive(ctx, 0, input, dataChan)
+		err := h.openArchive(ctx, 0, input, dataOrErrChan)
 		if err == nil {
 			h.metrics.incFilesProcessed()
 		}
@@ -80,7 +80,7 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 		h.measureLatencyAndHandleErrors(start, err)
 	}()
 
-	return dataChan, nil
+	return dataOrErrChan
 }
 
 var ErrMaxDepthReached = errors.New("max archive depth reached")
@@ -89,7 +89,12 @@ var ErrMaxDepthReached = errors.New("max archive depth reached")
 // It takes a reader from which it attempts to identify and process the archive format. Depending on the archive type,
 // it either decompresses or extracts the contents directly, sending data to the provided channel.
 // Returns an error if the archive cannot be processed due to issues like exceeding maximum depth or unsupported formats.
-func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader fileReader, archiveChan chan []byte) error {
+func (h *archiveHandler) openArchive(
+	ctx logContext.Context,
+	depth int,
+	reader fileReader,
+	dataOrErrChan chan DataOrErr,
+) error {
 	ctx.Logger().V(4).Info("Starting archive processing", "depth", depth)
 	defer ctx.Logger().V(4).Info("Finished archive processing", "depth", depth)
 
@@ -104,7 +109,7 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 
 	if reader.format == nil {
 		if depth > 0 {
-			return h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(reader), archiveChan)
+			return h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(reader), dataOrErrChan)
 		}
 		return fmt.Errorf("unknown archive format")
 	}
@@ -132,9 +137,9 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 		}
 		defer rdr.Close()
 
-		return h.openArchive(ctx, depth+1, rdr, archiveChan)
+		return h.openArchive(ctx, depth+1, rdr, dataOrErrChan)
 	case archiver.Extractor:
-		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, nil, h.extractorHandler(archiveChan))
+		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, nil, h.extractorHandler(dataOrErrChan))
 		if err != nil {
 			return fmt.Errorf("error extracting archive with format: %s: %w", reader.format.Name(), err)
 		}
@@ -148,7 +153,7 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 // It logs the extraction, checks for cancellation, and decides whether to skip the file based on its name or type,
 // particularly for binary files if configured to skip. If the file is not skipped, it recursively calls openArchive
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
-func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.Context, archiver.File) error {
+func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, file archiver.File) error {
 		lCtx := logContext.WithValues(
 			logContext.AddLogger(ctx),
@@ -220,6 +225,6 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 		h.metrics.observeFileSize(fileSize)
 
 		lCtx.Logger().V(4).Info("Processed file successfully", "filename", file.Name(), "size", file.Size())
-		return h.openArchive(lCtx, depth, rdr, archiveChan)
+		return h.openArchive(lCtx, depth, rdr, dataOrErrChan)
 	}
 }

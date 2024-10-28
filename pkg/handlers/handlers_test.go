@@ -3,6 +3,7 @@ package handlers
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,13 +12,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	diskbufferreader "github.com/trufflesecurity/disk-buffer-reader"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -61,7 +62,7 @@ func TestHandleHTTPJson(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -85,7 +86,7 @@ func TestHandleHTTPJsonZip(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -115,7 +116,7 @@ func BenchmarkHandleHTTPJsonZip(b *testing.B) {
 			b.StartTimer()
 			go func() {
 				defer close(chunkCh)
-				err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+				err := HandleFile(context.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 				assert.NoError(b, err)
 			}()
 
@@ -158,7 +159,7 @@ func TestSkipArchive(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
+		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(true))
 		assert.NoError(t, err)
 	}()
 
@@ -177,7 +178,7 @@ func TestHandleNestedArchives(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -196,7 +197,7 @@ func TestHandleCompressedZip(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -215,7 +216,7 @@ func TestHandleNestedCompressedArchive(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -234,7 +235,7 @@ func TestExtractTarContent(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -339,7 +340,7 @@ func TestExtractTarContentWithEmptyFile(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -359,7 +360,7 @@ func TestHandleTar(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), file, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -411,7 +412,7 @@ func TestHandleLargeHTTPJson(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), resp.Body, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -438,7 +439,7 @@ func TestHandlePipe(t *testing.T) {
 	chunkCh := make(chan *sources.Chunk, 1)
 	go func() {
 		defer close(chunkCh)
-		err := HandleFile(logContext.Background(), r, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
+		err := HandleFile(context.Background(), r, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh})
 		assert.NoError(t, err)
 	}()
 
@@ -683,4 +684,100 @@ func setupTempGitRepoCommon(t *testing.T, fileName string, fileSize int, isUnsup
 	}
 
 	return tempDir
+}
+
+func TestHandleFileNewFileReaderFailure(t *testing.T) {
+	customReader := iotest.ErrReader(errors.New("simulated newFileReader error"))
+
+	chunkSkel := &sources.Chunk{}
+	chunkCh := make(chan *sources.Chunk)
+	reporter := sources.ChanReporter{Ch: chunkCh}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := HandleFile(ctx, customReader, chunkSkel, reporter)
+
+	assert.Error(t, err, "HandleFile should return an error when newFileReader fails")
+}
+
+// errorInjectingReader is a custom io.Reader that injects an error after reading a certain number of bytes.
+type errorInjectingReader struct {
+	reader        io.Reader
+	injectAfter   int64 // Number of bytes after which to inject the error
+	injected      bool
+	bytesRead     int64
+	errorToInject error
+}
+
+func (eir *errorInjectingReader) Read(p []byte) (int, error) {
+	if eir.injectAfter > 0 && eir.bytesRead >= eir.injectAfter && !eir.injected {
+		eir.injected = true
+		return 0, eir.errorToInject
+	}
+
+	n, err := eir.reader.Read(p)
+	eir.bytesRead += int64(n)
+	return n, err
+}
+
+// TestHandleGitCatFileWithPipeError tests that when an error is injected during the HandleFile processing,
+// the error is reported and the git cat-file command completes successfully.
+func TestHandleGitCatFileWithPipeError(t *testing.T) {
+	fileName := "largefile_with_error.bin"
+	fileSize := 100 * 1024               // 100 KB
+	injectErrorAfter := int64(50 * 1024) // Inject error after 50 KB
+	simulatedError := errors.New("simulated error during newFileReader")
+
+	gitDir := setupTempGitRepo(t, fileName, fileSize)
+	defer os.RemoveAll(gitDir)
+
+	commitHash := getGitCommitHash(t, gitDir)
+
+	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", fmt.Sprintf("%s:%s", commitHash, fileName))
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	stdout, err := cmd.StdoutPipe()
+	assert.NoError(t, err, "Failed to create stdout pipe")
+
+	err = cmd.Start()
+	assert.NoError(t, err, "Failed to start git cat-file command")
+
+	// Wrap the stdout with errorInjectingReader to simulate an error after reading injectErrorAfter bytes.
+	wrappedReader := &errorInjectingReader{
+		reader:        stdout,
+		injectAfter:   injectErrorAfter,
+		injected:      false,
+		bytesRead:     0,
+		errorToInject: simulatedError,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	chunkCh := make(chan *sources.Chunk, 1000)
+
+	go func() {
+		defer close(chunkCh)
+		err = HandleFile(ctx, wrappedReader, &sources.Chunk{}, sources.ChanReporter{Ch: chunkCh}, WithSkipArchives(false))
+		assert.NoError(t, err, "HandleFile should not return an error")
+	}()
+
+	for range chunkCh {
+	}
+
+	err = cmd.Wait()
+	assert.NoError(t, err, "git cat-file command should complete without error")
+}
+
+// getGitCommitHash retrieves the current commit hash of the Git repository.
+func getGitCommitHash(t *testing.T, gitDir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "-C", gitDir, "rev-parse", "HEAD")
+	hashBytes, err := cmd.Output()
+	assert.NoError(t, err, "Failed to get commit hash")
+	commitHash := strings.TrimSpace(string(hashBytes))
+	return commitHash
 }

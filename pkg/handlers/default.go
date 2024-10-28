@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -30,15 +31,15 @@ func newDefaultHandler(handlerType handlerType) *defaultHandler {
 // utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
 // it processes it accordingly; otherwise, it handles the input as non-archive content.
 // The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
-func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
+func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
 	// Shared channel for both archive and non-archive content.
-	dataChan := make(chan []byte, defaultBufferSize)
+	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 
 	go func() {
-		defer close(dataChan)
+		defer close(dataOrErrChan)
 
 		start := time.Now()
-		err := h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(input), dataChan)
+		err := h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(input), dataOrErrChan)
 		if err == nil {
 			h.metrics.incFilesProcessed()
 		}
@@ -47,7 +48,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 		h.measureLatencyAndHandleErrors(start, err)
 	}()
 
-	return dataChan, nil
+	return dataOrErrChan
 }
 
 // measureLatencyAndHandleErrors measures the latency of the file processing and updates the metrics accordingly.
@@ -69,7 +70,11 @@ func (h *defaultHandler) measureLatencyAndHandleErrors(start time.Time, err erro
 // on the type, particularly for binary files. It manages reading file chunks and writing them to the archive channel,
 // effectively collecting the final bytes for further processing. This function is a key component in ensuring that all
 // file content, regardless of being an archive or not, is handled appropriately.
-func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader mimeTypeReader, archiveChan chan []byte) error {
+func (h *defaultHandler) handleNonArchiveContent(
+	ctx logContext.Context,
+	reader mimeTypeReader,
+	dataOrErrChan chan DataOrErr,
+) error {
 	mimeExt := reader.mimeExt
 
 	if common.SkipFile(mimeExt) || common.IsBinary(mimeExt) {
@@ -82,13 +87,18 @@ func (h *defaultHandler) handleNonArchiveContent(ctx logContext.Context, reader 
 
 	chunkReader := sources.NewChunkReader()
 	for data := range chunkReader(ctx, reader) {
+		dataOrErr := DataOrErr{}
 		if err := data.Error(); err != nil {
-			ctx.Logger().Error(err, "error reading chunk")
 			h.metrics.incErrors()
+			dataOrErr.Err = fmt.Errorf("%w: error reading chunk", err)
+			if writeErr := common.CancellableWrite(ctx, dataOrErrChan, dataOrErr); writeErr != nil {
+				return fmt.Errorf("%w: error writing to data channel", writeErr)
+			}
 			continue
 		}
 
-		if err := common.CancellableWrite(ctx, archiveChan, data.Bytes()); err != nil {
+		dataOrErr.Data = data.Bytes()
+		if err := common.CancellableWrite(ctx, dataOrErrChan, dataOrErr); err != nil {
 			return err
 		}
 		h.metrics.incBytesProcessed(len(data.Bytes()))

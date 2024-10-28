@@ -80,19 +80,32 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 }
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
-func newFileReader(r io.Reader) (fileReader, error) {
-	var fReader fileReader
-
+// The caller is responsible for closing the reader when it is no longer needed.
+func newFileReader(r io.Reader) (fReader fileReader, err error) {
+	// To detect the MIME type of the input data, we need a reader that supports seeking.
+	// This allows us to read the data multiple times if necessary without losing the original position.
+	// We use a BufferedReaderSeeker to wrap the original reader, enabling this functionality.
 	fReader.BufferedReadSeeker = iobuf.NewBufferedReaderSeeker(r)
 
-	mime, err := mimetype.DetectReader(fReader)
+	// If an error occurs during MIME type detection, it is important we close the BufferedReaderSeeker
+	// to release any resources it holds (checked out buffers or temp file).
+	defer func() {
+		if err != nil {
+			if closeErr := fReader.Close(); closeErr != nil {
+				err = fmt.Errorf("%w; error closing reader: %w", err, closeErr)
+			}
+		}
+	}()
+
+	var mime *mimetype.MIME
+	mime, err = mimetype.DetectReader(fReader)
 	if err != nil {
 		return fReader, fmt.Errorf("unable to detect MIME type: %w", err)
 	}
 	fReader.mime = mime
 
 	// Reset the reader to the beginning because DetectReader consumes the reader.
-	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+	if _, err = fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
 	}
 
@@ -102,7 +115,8 @@ func newFileReader(r io.Reader) (fileReader, error) {
 		return fReader, nil
 	}
 
-	format, _, err := archiver.Identify("", fReader)
+	var format archiver.Format
+	format, _, err = archiver.Identify("", fReader)
 	switch {
 	case err == nil:
 		fReader.isGenericArchive = true
@@ -117,18 +131,29 @@ func newFileReader(r io.Reader) (fileReader, error) {
 
 	// Reset the reader to the beginning again to allow the handler to read from the start.
 	// This is necessary because Identify consumes the reader.
-	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+	if _, err = fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after archive identification: %w", err)
 	}
 
 	return fReader, nil
 }
 
+// DataOrErr represents a result that can either contain data or an error.
+// The Data field holds the byte slice of data, and the Err field holds any error that occurred.
+// This structure is used to handle asynchronous file processing where each chunk of data
+// or potential error needs to be communicated back to the caller. It allows for
+// efficient streaming of file contents while also providing a way to propagate errors
+// that may occur during the file handling process.
+type DataOrErr struct {
+	Data []byte
+	Err  error
+}
+
 // FileHandler represents a handler for files.
 // It has a single method, HandleFile, which takes a context and a fileReader as input,
 // and returns a channel of byte slices and an error.
 type FileHandler interface {
-	HandleFile(ctx logContext.Context, reader fileReader) (chan []byte, error)
+	HandleFile(ctx logContext.Context, reader fileReader) chan DataOrErr
 }
 
 // fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
@@ -256,14 +281,25 @@ var maxTimeout = time.Duration(60) * time.Second
 func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 
 // HandleFile orchestrates the complete file handling process for a given file.
-// It determines the MIME type of the file, selects the appropriate handler based on this type, and processes the file.
-// This function initializes the handling process and delegates to the specific handler to manage file
-// extraction or processing. Errors at any stage result in an error return value.
-// Successful handling passes the file content through a channel to be chunked and reported.
-// The function will close the reader when it has consumed all the data.
+// It determines the MIME type of the file,
+// selects the appropriate handler based on this type, and processes the file.
+// This function initializes the handling process and delegates to the specific
+// handler to manage file extraction or processing.
 //
-// If the skipArchives option is set to true and the detected MIME type is a known archive type,
-// the function will skip processing the file and return nil.
+// The function will return nil (success) in the following cases:
+// - If the reader is empty (ErrEmptyReader)
+// - If skipArchives option is true and the file is detected as an archive
+// - If all chunks are processed successfully without critical errors
+//
+// The function will return an error in the following cases:
+// - If the reader is nil
+// - If there's an error creating the file reader
+// - If there's an error closing the reader
+// - If a critical error occurs during chunk processing (context cancellation, deadline exceeded, or ErrProcessingFatal)
+// - If there's an error reporting a chunk
+//
+// Non-critical errors during chunk processing are logged
+// but do not cause the function to return an error.
 func HandleFile(
 	ctx logContext.Context,
 	reader io.Reader,
@@ -272,7 +308,7 @@ func HandleFile(
 	options ...func(*fileHandlingConfig),
 ) error {
 	if reader == nil {
-		return fmt.Errorf("reader is nil")
+		return errors.New("reader is nil")
 	}
 
 	rdr, err := newFileReader(reader)
@@ -281,7 +317,7 @@ func HandleFile(
 			ctx.Logger().V(5).Info("empty reader, skipping file")
 			return nil
 		}
-		return fmt.Errorf("failed to create file reader to handle file: %w", err)
+		return fmt.Errorf("unable to HandleFile, error creating file reader: %w", err)
 	}
 	defer func() {
 		// Ensure all data is read to prevent broken pipe.
@@ -307,39 +343,41 @@ func HandleFile(
 	defer cancel()
 
 	handler := selectHandler(mimeT, rdr.isGenericArchive)
-	archiveChan, err := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
-	if err != nil {
-		return fmt.Errorf("error handling file: %w", err)
-	}
+	dataOrErrChan := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
 
-	return handleChunks(processingCtx, archiveChan, chunkSkel, reporter)
+	return handleChunksWithError(processingCtx, dataOrErrChan, chunkSkel, reporter)
 }
 
-// handleChunks reads data from the handlerChan and uses it to fill chunks according to a predefined skeleton (chunkSkel).
-// Each filled chunk is reported using the provided reporter. This function manages the lifecycle of the channel,
-// handling the termination condition when the channel closes and ensuring the cancellation of the operation if the context
-// is done. It returns true if all chunks are processed successfully, otherwise returns false on errors or cancellation.
-func handleChunks(
+// handleChunksWithError processes data and errors received from the dataErrChan channel.
+// For each DataOrErr received:
+// - If it contains data, the function creates a chunk based on chunkSkel and reports it through the reporter.
+// - If it contains an error, the function logs the error.
+// The function also listens for context cancellation to gracefully terminate processing if the context is done.
+// It returns nil upon successful processing of all data, or the first encountered error.
+func handleChunksWithError(
 	ctx logContext.Context,
-	handlerChan chan []byte,
+	dataErrChan chan DataOrErr,
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 ) error {
-	if handlerChan == nil {
-		return fmt.Errorf("handler channel is nil")
-	}
-
 	for {
 		select {
-		case data, open := <-handlerChan:
-			if !open {
-				ctx.Logger().V(5).Info("handler channel closed, all chunks processed")
+		case dataOrErr, ok := <-dataErrChan:
+			if !ok {
+				// Channel closed, processing complete.
+				ctx.Logger().V(5).Info("dataErrChan closed, all chunks processed")
 				return nil
 			}
-			chunk := *chunkSkel
-			chunk.Data = data
-			if err := reporter.ChunkOk(ctx, chunk); err != nil {
-				return fmt.Errorf("error reporting chunk: %w", err)
+			if dataOrErr.Err != nil {
+				ctx.Logger().Error(dataOrErr.Err, "error processing chunk")
+				continue
+			}
+			if len(dataOrErr.Data) > 0 {
+				chunk := *chunkSkel
+				chunk.Data = dataOrErr.Data
+				if err := reporter.ChunkOk(ctx, chunk); err != nil {
+					return fmt.Errorf("error reporting chunk: %w", err)
+				}
 			}
 		case <-ctx.Done():
 			return ctx.Err()

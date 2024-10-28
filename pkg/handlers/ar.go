@@ -22,16 +22,16 @@ func newARHandler() *arHandler {
 
 // HandleFile processes AR formatted files. This function needs to be implemented to extract or
 // manage data from AR files according to specific requirements.
-func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
-	archiveChan := make(chan []byte, defaultBufferSize)
+func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
+	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 
 	if feature.ForceSkipArchives.Load() {
-		close(archiveChan)
-		return archiveChan, nil
+		close(dataOrErrChan)
+		return dataOrErrChan
 	}
 
 	go func() {
-		defer close(archiveChan)
+		defer close(dataOrErrChan)
 
 		// Defer a panic recovery to handle any panics that occur during the AR processing.
 		defer func() {
@@ -53,7 +53,7 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan [
 			return
 		}
 
-		err = h.processARFiles(ctx, arReader, archiveChan)
+		err = h.processARFiles(ctx, arReader, dataOrErrChan)
 		if err == nil {
 			h.metrics.incFilesProcessed()
 		}
@@ -62,10 +62,10 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) (chan [
 		h.measureLatencyAndHandleErrors(start, err)
 	}()
 
-	return archiveChan, nil
+	return dataOrErrChan
 }
 
-func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archiveChan chan []byte) error {
+func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, dataOrErrChan chan DataOrErr) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -88,7 +88,7 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, archi
 				return fmt.Errorf("error creating mime-type reader: %w", err)
 			}
 
-			if err := h.handleNonArchiveContent(fileCtx, rdr, archiveChan); err != nil {
+			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
 				fileCtx.Logger().Error(err, "error handling archive content in AR")
 				h.metrics.incErrors()
 			}
