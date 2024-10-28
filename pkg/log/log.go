@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/TheZeroSlave/zapsentry"
@@ -180,8 +179,6 @@ func WithLeveler(leveler levelSetter) func(*sinkConfig) {
 
 // WithGlobalRedaction adds values to be redacted from logs.
 func WithGlobalRedaction() func(*sinkConfig) {
-	// If someone is going to use this capability, we need to initialize the global redaction replacer.
-	globalRedactor.replacer.CompareAndSwap(nil, strings.NewReplacer())
 	return func(conf *sinkConfig) {
 		conf.redactor = globalRedactor
 	}

@@ -14,8 +14,11 @@ type dynamicRedactor struct {
 	replacer atomic.Pointer[strings.Replacer]
 }
 
-var globalRedactor = &dynamicRedactor{
-	denySet: make(map[string]struct{}),
+var globalRedactor *dynamicRedactor
+
+func init() {
+	globalRedactor = &dynamicRedactor{denySet: make(map[string]struct{})}
+	globalRedactor.replacer.CompareAndSwap(nil, strings.NewReplacer())
 }
 
 // RedactGlobally configures the global log redactor to redact the provided value during log emission. The value will be
