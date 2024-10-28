@@ -43,7 +43,6 @@ var (
 	ErrEmptyReader = errors.New("reader is empty")
 
 	// ErrProcessingFatal indicates a severe error that requires stopping the file processing.
-
 	ErrProcessingFatal = errors.New("fatal error processing file")
 
 	// ErrProcessingWarning indicates a recoverable error that can be logged,
