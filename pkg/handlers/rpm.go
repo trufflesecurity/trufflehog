@@ -65,7 +65,7 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 		}
 
 		// Update the metrics for the file processing and handle any errors.
-		h.measureLatencyAndHandleErrors(start, err)
+		h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 	}()
 
 	return dataOrErrChan

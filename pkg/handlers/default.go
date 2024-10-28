@@ -45,7 +45,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 		}
 
 		// Update the metrics for the file processing and handle errors.
-		h.measureLatencyAndHandleErrors(start, err)
+		h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 	}()
 
 	return dataOrErrChan
@@ -53,15 +53,31 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 
 // measureLatencyAndHandleErrors measures the latency of the file processing and updates the metrics accordingly.
 // It also records errors and timeouts in the metrics.
-func (h *defaultHandler) measureLatencyAndHandleErrors(start time.Time, err error) {
+func (h *defaultHandler) measureLatencyAndHandleErrors(
+	ctx logContext.Context,
+	start time.Time,
+	err error,
+	dataErrChan chan DataOrErr,
+) {
 	if err == nil {
 		h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
 		return
 	}
+	dataOrErr := DataOrErr{}
 
 	h.metrics.incErrors()
 	if errors.Is(err, context.DeadlineExceeded) {
 		h.metrics.incFileProcessingTimeouts()
+		dataOrErr.Err = fmt.Errorf("%w: error processing chunk", err)
+		if err := common.CancellableWrite(ctx, dataErrChan, dataOrErr); err != nil {
+			ctx.Logger().Error(err, "error writing to data channel")
+		}
+		return
+	}
+
+	dataOrErr.Err = err
+	if err := common.CancellableWrite(ctx, dataErrChan, dataOrErr); err != nil {
+		ctx.Logger().Error(err, "error writing to data channel")
 	}
 }
 

@@ -77,7 +77,7 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 		}
 
 		// Update the metrics for the file processing and handle any errors.
-		h.measureLatencyAndHandleErrors(start, err)
+		h.measureLatencyAndHandleErrors(ctx, start, err, dataOrErrChan)
 	}()
 
 	return dataOrErrChan
