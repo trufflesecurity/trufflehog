@@ -76,7 +76,7 @@ func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 			}
 		}()
 
-		if err = h.ProcessAPK(ctx, input, apkChan); err != nil {
+		if err = h.processAPK(ctx, input, apkChan); err != nil {
 			ctx.Logger().Error(err, "error handling apk.")
 		}
 	}()
@@ -84,7 +84,7 @@ func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 }
 
 // processAPK processes the apk file and sends the extracted data to the provided channel.
-func (h *apkHandler) ProcessAPK(ctx logContext.Context, input fileReader, apkChan chan []byte) error {
+func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkChan chan []byte) error {
 
 	// Create a ZIP reader from the input fileReader
 	zipReader, err := createZipReader(input)
