@@ -300,3 +300,57 @@ func TestGlobalRedaction_JSON(t *testing.T) {
 		parsedJSON,
 	)
 }
+
+func BenchmarkLoggerRedact(b *testing.B) {
+	msg := "this is a message with 'foo' in it"
+	logKvps := []any{"key", "value", "foo", "bar", "bar", "baz", "longval", "84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa"}
+	redactor := &dynamicRedactor{denySet: make(map[string]struct{})}
+	redactor.replacer.CompareAndSwap(nil, strings.NewReplacer())
+
+	b.Run("no redaction", func(b *testing.B) {
+		logger, flush := New("redaction-benchmark", WithJSONSink(
+			io.Discard,
+			func(conf *sinkConfig) { conf.redactor = redactor },
+		))
+		for i := 0; i < b.N; i++ {
+			logger.Info(msg, logKvps...)
+		}
+		require.NoError(b, flush())
+	})
+	b.Run("1 redaction", func(b *testing.B) {
+		logger, flush := New("redaction-benchmark", WithJSONSink(
+			io.Discard,
+			func(conf *sinkConfig) { conf.redactor = redactor },
+		))
+		redactor.configureForRedaction("84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa")
+		for i := 0; i < b.N; i++ {
+			logger.Info(msg, logKvps...)
+		}
+		require.NoError(b, flush())
+	})
+	b.Run("2 redactions", func(b *testing.B) {
+		logger, flush := New("redaction-benchmark", WithJSONSink(
+			io.Discard,
+			func(conf *sinkConfig) { conf.redactor = redactor },
+		))
+		redactor.configureForRedaction("84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa")
+		redactor.configureForRedaction("foo")
+		for i := 0; i < b.N; i++ {
+			logger.Info(msg, logKvps...)
+		}
+		require.NoError(b, flush())
+	})
+	b.Run("3 redactions", func(b *testing.B) {
+		logger, flush := New("redaction-benchmark", WithJSONSink(
+			io.Discard,
+			func(conf *sinkConfig) { conf.redactor = redactor },
+		))
+		redactor.configureForRedaction("84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa")
+		redactor.configureForRedaction("foo")
+		redactor.configureForRedaction("bar")
+		for i := 0; i < b.N; i++ {
+			logger.Info(msg, logKvps...)
+		}
+		require.NoError(b, flush())
+	})
+}
