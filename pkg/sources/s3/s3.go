@@ -131,7 +131,6 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	cfg := aws.NewConfig()
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
-	cfg.LogLevel = aws.LogLevel(aws.LogDebugWithRequestErrors)
 	cfg.Region = aws.String(region)
 
 	switch cred := s.conn.GetCredential().(type) {
@@ -342,21 +341,16 @@ func (s *Source) pageChunker(
 				ctx.Logger().V(2).Info("Skipped due to excessive errors")
 				return nil
 			}
-
-			// Use an anonymous function to retrieve the S3 object with a dedicated timeout context.
+			// Make sure we use a separate context for the GetObjectWithContext call.
 			// This ensures that the timeout is isolated and does not affect any downstream operations. (e.g. HandleFile)
-			getObject := func() (*s3.GetObjectOutput, error) {
-				const getObjectTimeout = 30 * time.Second
-				objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
-				defer cancel()
+			const getObjectTimeout = 30 * time.Second
+			objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
+			defer cancel()
 
-				return client.GetObjectWithContext(objCtx, &s3.GetObjectInput{
-					Bucket: &bucket,
-					Key:    obj.Key,
-				})
-			}
-
-			res, err := getObject()
+			res, err := client.GetObjectWithContext(objCtx, &s3.GetObjectInput{
+				Bucket: &bucket,
+				Key:    obj.Key,
+			})
 			if err != nil {
 				if !strings.Contains(err.Error(), "AccessDenied") {
 					ctx.Logger().Error(err, "could not get S3 object")
