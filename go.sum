@@ -768,6 +768,8 @@ github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsT
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/tailscale/depaware v0.0.0-20240804103531-585336c3e1b3 h1:1wRadBXZ4ddC71FYpzDTS3weuj0IOgmeptZtgTDGU7g=
 github.com/tailscale/depaware v0.0.0-20240804103531-585336c3e1b3/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
+github.com/tailscale/depaware v0.0.0-20241028160002-3d7f3b30ed0e h1:Hb50wYyy5VblH5zpKkoy49TrJy3pxVWOaRSOEdzTWKA=
+github.com/tailscale/depaware v0.0.0-20241028160002-3d7f3b30ed0e/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
 github.com/testcontainers/testcontainers-go v0.33.0 h1:zJS9PfXYT5O0ZFXM2xxXfk4J5UMw/kRiISng037Gxdw=
 github.com/testcontainers/testcontainers-go v0.33.0/go.mod h1:W80YpTa8D5C3Yy16icheD01UTDu+LmXIA2Keo+jWtT8=
 github.com/testcontainers/testcontainers-go v0.34.0 h1:5fbgF0vIN5u+nD3IWabQwRybuB4GY8G2HHgCkbMzMHo=
