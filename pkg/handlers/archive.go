@@ -127,7 +127,11 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 				ctx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
-			return fmt.Errorf("error creating custom reader: %w", err)
+			return fmt.Errorf(
+				"error creating reader for decompressor with format: %s %w",
+				reader.format.Name(),
+				err,
+			)
 		}
 		defer rdr.Close()
 
@@ -211,7 +215,7 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 				lCtx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
-			return fmt.Errorf("error creating custom reader: %w", err)
+			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
 		}
 		defer rdr.Close()
 
