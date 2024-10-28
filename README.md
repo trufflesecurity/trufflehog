@@ -36,23 +36,23 @@ We take the revenue from the enterprise product to fund more awesome open source
 
 </div>
 
-# What is TruffleHog 🐽:
+# What is TruffleHog 🐽
 
 TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** engine. In this context secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
 
-### Discovery 🔍:
+## Discovery 🔍
 
 TruffleHog can look for secrets in many places including Git, chats, wikis, logs, API testing platforms, object stores, filesystems and more
 
-### Classification 📁:
+## Classification 📁
 
 TruffleHog classifies over 800 secret types, mapping them back to the specific identity they belong to. Is it an AWS secret? Stripe secret? Cloudflare secret? Postgress password? SSL Private key? Sometimes its hard to tell looking at it, TruffleHog classifies everything it finds.
 
-### Validation ✅:
+## Validation ✅
 
 For every secret TruffleHog can classify, it can also log in to confirm if that secret is live or not. This step is critical to know if there’s an active present danger or not.
 
-### Analysis 🔬:
+## Analysis 🔬
 
 For the 20 some of the most commonly leaked out credential types, instead of sending one request to check if the secret can log in, TruffleHog can send many requests to learn everything there is to know about the secret. Who created it? What resources can it access? What permissions does it have on those resources?
 
