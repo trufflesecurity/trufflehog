@@ -20,10 +20,6 @@ type Scanner struct {
 	detectors.EndpointSetter
 }
 
-type GitLabMessage struct {
-	Message string `json:"message"`
-}
-
 // Ensure the Scanner satisfies the interfaces at compile time.
 var (
 	_ detectors.Detector           = (*Scanner)(nil)
@@ -111,7 +107,8 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, map[s
 		}
 
 		defer res.Body.Close()
-		body, err := io.ReadAll(res.Body)
+
+		bodyBytes, err := io.ReadAll(res.Body)
 		if err != nil {
 			return false, nil, err
 		}
@@ -121,16 +118,14 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, map[s
 		// 401 is bad key
 		switch res.StatusCode {
 		case http.StatusOK:
-			return json.Valid(body), nil, nil
+			return json.Valid(bodyBytes), nil, nil
 		case http.StatusForbidden:
 			// check if the user account is blocked or not
-			var apiResp GitLabMessage
-			if err := json.Unmarshal(body, &apiResp); err == nil {
-				if apiResp.Message == BlockedUserMessage {
-					return true, map[string]string{
-						"blocked": "True",
-					}, nil
-				}
+			stringBody := string(bodyBytes)
+			if strings.Contains(stringBody, BlockedUserMessage) {
+				return true, map[string]string{
+					"blocked": "True",
+				}, nil
 			}
 
 			// Good key but not the right scope

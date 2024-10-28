@@ -2,7 +2,6 @@ package gitlab
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -95,7 +94,8 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, map[s
 			return false, nil, err
 		}
 		defer res.Body.Close()
-		body, err := io.ReadAll(res.Body)
+
+		bodyBytes, err := io.ReadAll(res.Body)
 		if err != nil {
 			return false, nil, err
 		}
@@ -108,13 +108,11 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, map[s
 			return true, nil, nil
 		case http.StatusForbidden:
 			// check if the user account is blocked or not
-			var apiResp v1.GitLabMessage
-			if err := json.Unmarshal(body, &apiResp); err == nil {
-				if apiResp.Message == v1.BlockedUserMessage {
-					return true, map[string]string{
-						"blocked": "True",
-					}, nil
-				}
+			stringBody := string(bodyBytes)
+			if strings.Contains(stringBody, v1.BlockedUserMessage) {
+				return true, map[string]string{
+					"blocked": "True",
+				}, nil
 			}
 
 			// Good key but not the right scope
