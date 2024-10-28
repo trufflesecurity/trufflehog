@@ -53,7 +53,6 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 	}
 
 	go func() {
-		var err error
 		defer close(dataChan)
 
 		// The underlying 7zip library may panic when attempting to open an archive.
@@ -61,26 +60,24 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 		// See: https://github.com/bodgit/sevenzip/blob/74bff0da9b233317e4ea7dd8c184a315db71af2a/types.go#L846
 		defer func() {
 			if r := recover(); r != nil {
-				// Return the panic as an error.
+				var panicErr error
 				if e, ok := r.(error); ok {
-					err = e
+					panicErr = e
 				} else {
-					err = fmt.Errorf("panic occurred: %v", r)
+					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(err, "Panic occurred when attempting to open archive")
+				ctx.Logger().Error(panicErr, "Panic occurred when attempting to open archive")
 			}
 		}()
 
-		// Update the metrics for the file processing.
 		start := time.Now()
-		defer func() {
-			h.measureLatencyAndHandleErrors(start, err)
+		err := h.openArchive(ctx, 0, input, dataChan)
+		if err == nil {
 			h.metrics.incFilesProcessed()
-		}()
-
-		if err = h.openArchive(ctx, 0, input, dataChan); err != nil {
-			ctx.Logger().Error(err, "error unarchiving chunk.")
 		}
+
+		// Update the metrics for the file processing and handle any errors.
+		h.measureLatencyAndHandleErrors(start, err)
 	}()
 
 	return dataChan, nil

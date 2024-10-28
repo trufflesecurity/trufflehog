@@ -31,48 +31,41 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 	}
 
 	go func() {
-		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
-		defer cancel()
 		defer close(archiveChan)
-
-		// Update the metrics for the file processing.
-		start := time.Now()
-		var err error
-		defer func() {
-			h.measureLatencyAndHandleErrors(start, err)
-			h.metrics.incFilesProcessed()
-		}()
 
 		// Defer a panic recovery to handle any panics that occur during the RPM processing.
 		defer func() {
 			if r := recover(); r != nil {
-				// Return the panic as an error.
+				var panicErr error
 				if e, ok := r.(error); ok {
-					err = e
+					panicErr = e
 				} else {
-					err = fmt.Errorf("panic occurred: %v", r)
+					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(err, "Panic occurred when reading rpm archive")
+				ctx.Logger().Error(panicErr, "Panic occurred when attempting to open rpm archive")
 			}
 		}()
 
-		var rpm *rpmutils.Rpm
-		rpm, err = rpmutils.ReadRpm(input)
+		start := time.Now()
+		rpm, err := rpmutils.ReadRpm(input)
 		if err != nil {
-			ctx.Logger().Error(err, "error reading RPM")
+			ctx.Logger().Error(err, "Error reading rpm file")
 			return
 		}
 
-		var reader rpmutils.PayloadReader
-		reader, err = rpm.PayloadReaderExtended()
+		reader, err := rpm.PayloadReaderExtended()
 		if err != nil {
-			ctx.Logger().Error(err, "error getting RPM payload reader")
+			ctx.Logger().Error(err, "Error reading rpm file")
 			return
 		}
 
-		if err = h.processRPMFiles(ctx, reader, archiveChan); err != nil {
-			ctx.Logger().Error(err, "error processing RPM files")
+		err = h.processRPMFiles(ctx, reader, archiveChan)
+		if err == nil {
+			h.metrics.incFilesProcessed()
 		}
+
+		// Update the metrics for the file processing and handle any errors.
+		h.measureLatencyAndHandleErrors(start, err)
 	}()
 
 	return archiveChan, nil
