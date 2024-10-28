@@ -42,14 +42,18 @@ func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) chan Da
 				} else {
 					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(panicErr, "Panic occurred when attempting to open ar archive")
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
+				}
 			}
 		}()
 
 		start := time.Now()
 		arReader, err := deb.LoadAr(input)
 		if err != nil {
-			ctx.Logger().Error(err, "Error loading AR file")
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: loading AR error: %v", ErrProcessingFatal, err),
+			}
 			return
 		}
 
@@ -85,12 +89,19 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, dataO
 
 			rdr, err := newMimeTypeReader(arEntry.Data)
 			if err != nil {
-				return fmt.Errorf("error creating mime-type reader: %w", err)
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error creating AR mime-type reader: %v", ErrProcessingWarning, err),
+				}
+				h.metrics.incErrors()
+				continue
 			}
 
 			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
-				fileCtx.Logger().Error(err, "error handling archive content in AR")
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error handling archive content in AR: %v", ErrProcessingWarning, err),
+				}
 				h.metrics.incErrors()
+				continue
 			}
 
 			h.metrics.incFilesProcessed()

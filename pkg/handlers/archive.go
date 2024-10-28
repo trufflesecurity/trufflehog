@@ -66,7 +66,9 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 				} else {
 					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(panicErr, "Panic occurred when attempting to open archive")
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
+				}
 			}
 		}()
 

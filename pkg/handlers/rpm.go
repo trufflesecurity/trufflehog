@@ -42,20 +42,26 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 				} else {
 					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(panicErr, "Panic occurred when attempting to open rpm archive")
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
+				}
 			}
 		}()
 
 		start := time.Now()
 		rpm, err := rpmutils.ReadRpm(input)
 		if err != nil {
-			ctx.Logger().Error(err, "Error reading rpm file")
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: reading rpm error: %v", ErrProcessingFatal, err),
+			}
 			return
 		}
 
 		reader, err := rpm.PayloadReaderExtended()
 		if err != nil {
-			ctx.Logger().Error(err, "Error reading rpm file")
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: uncompressing rpm error: %v", ErrProcessingFatal, err),
+			}
 			return
 		}
 
@@ -99,7 +105,9 @@ func (h *rpmHandler) processRPMFiles(
 			}
 
 			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
-				fileCtx.Logger().Error(err, "error handling archive content in RPM")
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error processing RPM archive: %v", ErrProcessingWarning, err),
+				}
 				h.metrics.incErrors()
 			}
 
