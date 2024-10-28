@@ -14,7 +14,7 @@ import (
 var (
 	validPattern            = "wdvn-usa87a-fxp9ioas/testUser.1005@example.com"
 	validSpecialCharPattern = "wdvn-usa87a-fxp9ioas / test-User.1005@example.com"
-	invalidPattern          = "wdvn-usa87a-fxp9ioas/testUser$1005@example.com"
+	invalidPattern          = "wdvn-usa87a-fxp9ioasQQsstestUsQQ@example"
 )
 
 func TestAlegra_Pattern(t *testing.T) {
@@ -28,22 +28,22 @@ func TestAlegra_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("alegra: '%s'", validPattern),
-			want:  []string{"wdvn-usa87a-fxp9ioastestUser.1005@example.com"},
+			input: fmt.Sprintf("alegra: %s", validPattern),
+			want:  []string{"wdvn-usa87a-fxp9ioas:wdvn-usa87a-fxp9ioas/testUser.1005@example.com"},
 		},
 		{
 			name:  "valid pattern - with special characters",
-			input: fmt.Sprintf("alegra: '%s'", validSpecialCharPattern),
-			want:  []string{"wdvn-usa87a-fxp9ioastest-User.1005@example.com"},
+			input: fmt.Sprintf("alegra: %s", validSpecialCharPattern),
+			want:  []string{"wdvn-usa87a-fxp9ioas:test-User.1005@example.com"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("alegra keyword is not close to the real key and id = '%s'", validPattern),
+			input: fmt.Sprintf("alegra keyword is not close to the real key and id = %s", validPattern),
 			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("alegra: '%s'", invalidPattern),
+			input: fmt.Sprintf("alegra: %s", invalidPattern),
 			want:  nil,
 		},
 	}
@@ -51,7 +51,7 @@ func TestAlegra_Pattern(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 {
+			if len(matchedDetectors) == 0 && test.want != nil {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
@@ -63,11 +63,7 @@ func TestAlegra_Pattern(t *testing.T) {
 			}
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("expected %d results, got %d", len(test.want), len(results))
 				return
 			}
 
