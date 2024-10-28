@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -38,7 +39,17 @@ type fileReader struct {
 	*iobuf.BufferedReadSeeker
 }
 
-var ErrEmptyReader = errors.New("reader is empty")
+var (
+	ErrEmptyReader = errors.New("reader is empty")
+
+	// ErrProcessingFatal indicates a severe error that requires stopping the file processing.
+
+	ErrProcessingFatal = errors.New("fatal error processing file")
+
+	// ErrProcessingWarning indicates a recoverable error that can be logged,
+	// allowing processing to continue.
+	ErrProcessingWarning = errors.New("error processing file")
+)
 
 // mimeTypeReader wraps an io.Reader with MIME type information.
 // This type is used to pass content through the processing pipeline
@@ -351,7 +362,7 @@ func HandleFile(
 // handleChunksWithError processes data and errors received from the dataErrChan channel.
 // For each DataOrErr received:
 // - If it contains data, the function creates a chunk based on chunkSkel and reports it through the reporter.
-// - If it contains an error, the function logs the error.
+// - If it contains an error, the function returns the error immediately.
 // The function also listens for context cancellation to gracefully terminate processing if the context is done.
 // It returns nil upon successful processing of all data, or the first encountered error.
 func handleChunksWithError(
@@ -369,7 +380,10 @@ func handleChunksWithError(
 				return nil
 			}
 			if dataOrErr.Err != nil {
-				ctx.Logger().Error(dataOrErr.Err, "error processing chunk")
+				if isFatal(dataOrErr.Err) {
+					return dataOrErr.Err
+				}
+				ctx.Logger().Error(dataOrErr.Err, "non-critical error processing chunk")
 				continue
 			}
 			if len(dataOrErr.Data) > 0 {
@@ -382,5 +396,23 @@ func handleChunksWithError(
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+}
+
+// isFatal determines whether the given error is a fatal error that should
+// terminate processing the current file, or a non-critical error that can be logged and ignored.
+// "Fatal" errors include context cancellation, deadline exceeded, and the
+// ErrProcessingFatal error. Non-fatal errors include the ErrProcessingWarning
+// error as well as any other error that is not one of the fatal errors.
+func isFatal(err error) bool {
+	switch {
+	case errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, ErrProcessingFatal):
+		return true
+	case errors.Is(err, ErrProcessingWarning):
+		return false
+	default:
+		return false
 	}
 }
