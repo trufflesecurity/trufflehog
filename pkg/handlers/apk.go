@@ -107,7 +107,7 @@ func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkCha
 	for _, file := range zipReader.File {
 		if hasSuffix(file.Name, targetFileTypes) {
 			if err := h.processFile(ctx, file, resTable, apkChan); err != nil {
-				ctx.Logger().Error(err, fmt.Sprintf("failed to process file: %s", file.Name))
+				ctx.Logger().V(2).Info(fmt.Sprintf("failed to process file: %s", file.Name), "error", err)
 			}
 		}
 	}
