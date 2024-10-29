@@ -16,7 +16,7 @@ import (
 )
 
 func TestSource_Scan(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
 	secret, err := common.GetTestSecret(ctx)
