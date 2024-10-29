@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -117,6 +118,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		}
 		s.client = NewClient(conn.GetToken())
 		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3)
+		log.RedactGlobally(conn.GetToken())
 	case *sourcespb.Postman_Unauthenticated:
 		s.client = nil
 		// No client needed if reading from local
