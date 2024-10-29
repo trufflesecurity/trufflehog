@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -108,9 +109,11 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	case *sourcespb.GitLab_Token:
 		s.authMethod = "TOKEN"
 		s.token = cred.Token
+		log.RedactGlobally(s.token)
 	case *sourcespb.GitLab_Oauth:
 		s.authMethod = "OAUTH"
 		s.token = cred.Oauth.RefreshToken
+		log.RedactGlobally(s.token)
 		// TODO: is it okay if there is no client id and secret? Might be an issue when marshalling config to proto
 	case *sourcespb.GitLab_BasicAuth:
 		s.authMethod = "BASIC_AUTH"
@@ -118,6 +121,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		s.password = cred.BasicAuth.Password
 		// We may need the password as a token if the user is using an access_token with basic auth.
 		s.token = cred.BasicAuth.Password
+		log.RedactGlobally(cred.BasicAuth.Password)
 	default:
 		return fmt.Errorf("invalid configuration given for source %q (%s)", name, s.Type().String())
 	}
