@@ -19,6 +19,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+          cache-dependency-path: hack/snifftest/go.sum
       - uses: actions/checkout@v4
       - name: Run Snifftest
         run: make snifftest
