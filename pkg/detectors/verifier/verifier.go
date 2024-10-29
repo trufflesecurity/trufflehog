@@ -3,9 +3,10 @@ package verifier
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -24,7 +25,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"verifier"}) + `\b([a-z0-9]{96})\b`)
-	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"verifier"}) + `\b([a-zA-Z-0-9-]{5,16}\@[a-zA-Z-0-9]{4,16}\.[a-zA-Z-0-9]{3,6})\b`)
+	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"verifier"}) + common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -38,7 +39,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
+
+	uniqueEmailMatches := make(map[string]struct{})
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
 	for _, match := range matches {
 		if len(match) != 2 {
@@ -46,19 +51,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
-
-			userPatMatch := strings.TrimSpace(idMatch[1])
-
+		for emailMatch := range uniqueEmailMatches {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Verifier,
 				Raw:          []byte(resMatch),
 			}
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://verifier.meetchopra.com/verify/%s?token=%s", userPatMatch, resMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://verifier.meetchopra.com/verify/%s?token=%s", emailMatch, resMatch), nil)
 				if err != nil {
 					continue
 				}
