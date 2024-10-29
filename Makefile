@@ -61,8 +61,5 @@ release-protos-image:
 	docker buildx build --push --platform=linux/amd64,linux/arm64 \
 	-t ${PROTOS_IMAGE} -f hack/Dockerfile.protos .
 
-snifftest:
-	./hack/snifftest/snifftest.sh
-
 test-release:
 	goreleaser release --clean --skip-publish --snapshot
