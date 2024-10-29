@@ -87,7 +87,7 @@ require (
 	github.com/shuheiktgw/go-travis v0.3.1
 	github.com/snowflakedb/gosnowflake v1.11.2
 	github.com/stretchr/testify v1.9.0
-	github.com/tailscale/depaware v0.0.0-20240804103531-585336c3e1b3
+	github.com/tailscale/depaware v0.0.0-20241028160002-3d7f3b30ed0e
 	github.com/testcontainers/testcontainers-go v0.34.0
 	github.com/testcontainers/testcontainers-go/modules/elasticsearch v0.34.0
 	github.com/testcontainers/testcontainers-go/modules/mongodb v0.34.0
