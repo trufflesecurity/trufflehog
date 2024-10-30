@@ -83,5 +83,30 @@ func TestOpenInvalidAPK(t *testing.T) {
 	archiveChan := make(chan []byte)
 
 	err = handler.processAPK(ctx, rdr, archiveChan)
-	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "zip: not a valid zip file")
+}
+
+func TestOpenValidZipInvalidAPK(t *testing.T) {
+	// Grabbed from archive_test.go
+	validZipURL := "https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip"
+
+	resp, err := http.Get(validZipURL)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	defer resp.Body.Close()
+
+	handler := newAPKHandler()
+
+	newReader, err := newFileReader(resp.Body)
+	if err != nil {
+		t.Errorf("error creating reusable reader: %s", err)
+	}
+	assert.NoError(t, err)
+	defer newReader.Close()
+
+	archiveChan := make(chan []byte)
+	ctx := logContext.AddLogger(context.Background())
+
+	err = handler.processAPK(ctx, newReader, archiveChan)
+	assert.Contains(t, err.Error(), "resources.arsc file not found")
 }

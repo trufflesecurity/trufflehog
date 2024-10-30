@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -28,14 +27,15 @@ import (
 // ToDo: Provide file location information to secret output.
 
 var (
-	targetFileTypes = []string{".xml", ".dex", ".json"}
-	// Note: Only targeting xml, dex, and json files for now. This might need to be expanded.
-	// If expanding, ensure the processFile function is updated to handle the new file types.
 	targetInstructionTypes = []string{"const-string", "iput-object"}
 	// Note: We're only looking at `const-string` and `iput-objects` for now. This might need to be expanded.
-	// If expanding, ensure the formatInstruction function is updated to handle the relevant instructions.
+	// If expanding, update precompiled REGEX below + update the formatInstruction function.
 	// - const-string: loads a string into a register (value)
 	// - iput-object: stores a string into a field (key)
+	reFieldPrefix = regexp.MustCompile(`iput-object obj=\d+ field=com/[a-zA-Z0-9/_]+:`)
+	reTypeSuffix  = regexp.MustCompile(`Ljava/lang/String; src=\d+`)
+	reConstString = regexp.MustCompile(`const-string dst=\d+`)
+	// Precompiling regexes for performance
 )
 
 // apkHandler handles apk archive formats.
@@ -103,12 +103,10 @@ func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkCha
 		ctx.Logger().Error(err, "failed to process resources.arsc")
 	}
 
-	// Process all xml, json and dex files for secrets
+	// Process all files for secrets
 	for _, file := range zipReader.File {
-		if hasSuffix(file.Name, targetFileTypes) {
-			if err := h.processFile(ctx, file, resTable, apkChan); err != nil {
-				ctx.Logger().V(2).Info(fmt.Sprintf("failed to process file: %s", file.Name), "error", err)
-			}
+		if err := h.processFile(ctx, file, resTable, apkChan); err != nil {
+			ctx.Logger().V(2).Info(fmt.Sprintf("failed to process file: %s", file.Name), "error", err)
 		}
 	}
 	return nil
@@ -119,58 +117,58 @@ func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparse
 	if resTable == nil {
 		return errors.New("ResourceTable is nil")
 	}
-	resourcesStrings, err := extractStringsFromResTable(resTable)
+	rscStrRdr, err := extractStringsFromResTable(resTable)
 	if err != nil {
 		return fmt.Errorf("failed to parse strings from resources.arsc: %w", err)
 	}
-	h.handleAPKFileContent(ctx, resourcesStrings, "resources.arsc", apkChan)
+	h.handleAPKFileContent(ctx, rscStrRdr, "resources.arsc", apkChan)
 	return nil
 }
 
 // processFile processes the file and sends the extracted data to the provided channel.
 func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTable *apkparser.ResourceTable, apkChan chan []byte) error {
-	data, err := readFile(file)
+	// check if the file is empty
+	if file.UncompressedSize64 == 0 {
+		return nil
+	}
+
+	// Read the file data
+	rdr, err := readFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", file.Name, err)
 	}
-	if len(data) == 0 {
-		return nil
-	}
+	defer rdr.Close()
 
 	// Decode the file based on its extension
 	switch {
 	case strings.HasSuffix(file.Name, ".xml"):
-		xmlData, err := decodeXML(data, resTable)
+		xmlRdr, err := decodeXML(rdr, resTable)
 		if err != nil {
 			return fmt.Errorf("failed to decode xml file %s: %w", file.Name, err)
 		}
-		h.handleAPKFileContent(ctx, xmlData, file.Name, apkChan)
+		return h.handleAPKFileContent(ctx, xmlRdr, file.Name, apkChan)
 	case strings.HasSuffix(file.Name, ".dex"):
-		dexStrings, err := decodeDexStrings(data)
+		dexRdr, err := processDexFile(ctx, rdr)
 		if err != nil {
 			return fmt.Errorf("failed to decode dex file %s: %w", file.Name, err)
 		}
-		h.handleAPKFileContent(ctx, dexStrings, file.Name, apkChan)
-	case strings.HasSuffix(file.Name, ".json"):
-		h.handleAPKFileContent(ctx, string(data), file.Name, apkChan)
+		return h.handleAPKFileContent(ctx, dexRdr, file.Name, apkChan)
+	default:
+		return h.handleAPKFileContent(ctx, rdr, file.Name, apkChan)
 	}
-	return nil
 }
 
 // handleAPKFileContent sends the extracted data to the provided channel via the handleNonArchiveContent function.
-// Reviewers Note: If there's a better way to handle this, please let me know.
-func (h *apkHandler) handleAPKFileContent(ctx logContext.Context, data string, fileName string, apkChan chan []byte) {
-	r := mimeTypeReader{mimeExt: "", Reader: bytes.NewReader([]byte(data))}
-
+func (h *apkHandler) handleAPKFileContent(ctx logContext.Context, rdr io.Reader, fileName string, apkChan chan []byte) error {
+	mimeReader, err := newMimeTypeReader(rdr)
+	if err != nil {
+		return fmt.Errorf("failed to create mimeTypeReader for file %s: %w", fileName, err)
+	}
 	ctx = logContext.WithValues(
 		ctx,
 		"filename", fileName,
-		"size", len(data),
 	)
-
-	if err := h.handleNonArchiveContent(ctx, r, apkChan); err != nil {
-		ctx.Logger().Error(err, "error handling apk file")
-	}
+	return h.handleNonArchiveContent(ctx, mimeReader, apkChan)
 }
 
 // createZipReader creates a new ZIP reader from the input fileReader.
@@ -196,43 +194,30 @@ func createZipReader(input fileReader) (*zip.Reader, error) {
 func parseResTable(zipReader *zip.Reader) (*apkparser.ResourceTable, error) {
 	for _, file := range zipReader.File {
 		if file.Name == "resources.arsc" {
-			data, err := readFile(file)
+			rdr, err := readFile(file)
 			if err != nil {
 				return nil, err
 			}
-			resTable, err := apkparser.ParseResourceTable(bytes.NewReader(data))
+			defer rdr.Close()
+
+			resTable, err := apkparser.ParseResourceTable(rdr)
 			if err != nil {
 				return nil, err
 			}
 			return resTable, nil
 		}
 	}
-	return nil, errors.New("resources.arsc file not found")
+	return nil, errors.New("resources.arsc file not found in the APK archive")
 }
 
-// readFile reads the file from the zip archive and returns the data as a byte slice.
-func readFile(file *zip.File) ([]byte, error) {
+// readFile reads the file from the zip archive and returns the data as an io.ReadCloser
+// Note: responsibility of calling function to close the reader
+func readFile(file *zip.File) (io.ReadCloser, error) {
 	rc, err := file.Open()
 	if err != nil {
 		return nil, err
 	}
-	var buf bytes.Buffer
-	_, copyErr := io.Copy(&buf, rc)
-	rc.Close() // Close immediately after reading
-	if copyErr != nil {
-		return nil, copyErr
-	}
-	return buf.Bytes(), nil
-}
-
-// hasSuffix checks if the name has any of the provided suffixes.
-func hasSuffix(name string, suffixes []string) bool {
-	for _, suffix := range suffixes {
-		if strings.HasSuffix(name, suffix) {
-			return true
-		}
-	}
-	return false
+	return rc, nil
 }
 
 // hasSubstring checks if the string contains any of the provided substrings.
@@ -249,8 +234,8 @@ func hasSubstring(s string, substrings []string) bool {
 // Note: This is a hacky way to get the strings from the resources table
 // APK strings are typically (always?) stored in the 0x7f000000-0x7fffffff range
 // https://chromium.googlesource.com/chromium/src/+/master/build/android/docs/life_of_a_resource.md
-func extractStringsFromResTable(resTable *apkparser.ResourceTable) (string, error) {
-	var resourceStrings string
+func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, error) {
+	var resourceStrings bytes.Buffer
 	inStrings := false
 	for i := 0x7f000000; i <= 0x7fffffff; i++ {
 		entry, _ := resTable.GetResourceEntry(uint32(i))
@@ -261,57 +246,74 @@ func extractStringsFromResTable(resTable *apkparser.ResourceTable) (string, erro
 			inStrings = true
 			val, err := entry.GetValue().String()
 			if err != nil {
-				return "", err
+				return nil, err
 			}
-			resourceStrings += fmt.Sprintf("%s: %s\n", entry.Key, val)
+			// Write directly to the buffer
+			_, err = resourceStrings.WriteString(fmt.Sprintf("%s: %s\n", entry.Key, val))
+			if err != nil {
+				return nil, err
+			}
 		}
 		// Exit the loop if we've finished processing the strings
 		if inStrings && entry.ResourceType != "string" {
 			break
 		}
 	}
-	return resourceStrings, nil
+	return &resourceStrings, nil
 }
 
-// decodeDexStrings decodes the dex file and returns the string representation of the instructions
-func decodeDexStrings(data []byte) (string, error) {
-	// Read in dex file
-	f := bytes.NewReader(data)
-	r, err := dextk.Read(f)
+// processDexFile decodes the dex file and returns the relevant instructions
+func processDexFile(ctx logContext.Context, rdr io.ReadCloser) (io.Reader, error) {
+	// dextk.Read() requires an io.ReaderAt interface,
+	// so we first convert the reader to a byte slice
+	data, err := io.ReadAll(rdr)
 	if err != nil {
-		log.Panicln(err)
+		return nil, err
+	}
+	bytesRdr := bytes.NewReader(data)
+
+	// Read the dex file
+	dexReader, err := dextk.Read(bytesRdr)
+	if err != nil {
+		return nil, err
 	}
 
-	// Get strings from the dex file
-	var dexOutput strings.Builder
-	ci := r.ClassIter()
+	// Get relevant instruction data from the dex file
+	var dexOutput bytes.Buffer
+	ci := dexReader.ClassIter()
 	for ci.HasNext() {
 		node, err := ci.Next()
 		if err != nil {
 			break
 		}
-
-		for _, method := range node.DirectMethods {
-			out, err := processDexMethod(r, method)
-			if err != nil {
-				return "", err
-			}
-			dexOutput.WriteString(out)
-		}
-
-		for _, method := range node.VirtualMethods {
-			out, err := processDexMethod(r, method)
-			if err != nil {
-				return "", err
-			}
-			dexOutput.WriteString(out)
-		}
+		processDexClass(ctx, dexReader, node, &dexOutput)
 	}
-	return dexOutput.String(), nil
+	return &dexOutput, nil
 }
 
-// processDexMethod processes a dex method and returns the string representation of the instruction
-func processDexMethod(r *dextk.Reader, m dextk.MethodNode) (string, error) {
+// processDexClass processes a single class node's methods
+func processDexClass(ctx logContext.Context, dexReader *dextk.Reader, node dextk.ClassNode, dexOutput *bytes.Buffer) {
+	// Process Direct Methods
+	processDexMethod(ctx, dexReader, node.DirectMethods, dexOutput)
+	// Process Virtual Methods
+	processDexMethod(ctx, dexReader, node.VirtualMethods, dexOutput)
+}
+
+// processDexMethod iterates over a slice of methods, processes each method,
+// handles errors, and writes the output to dexOutput.
+func processDexMethod(ctx logContext.Context, dexReader *dextk.Reader, methods []dextk.MethodNode, dexOutput *bytes.Buffer) {
+	for _, method := range methods {
+		out, err := parseDexInstructions(dexReader, method)
+		if err != nil {
+			ctx.Logger().V(2).Info("failed to process dex method", "error", err)
+			continue // Continue processing other methods even if one fails
+		}
+		dexOutput.WriteString(out)
+	}
+}
+
+// parseDexInstructions processes a dex method and returns the string representation of the instruction
+func parseDexInstructions(r *dextk.Reader, m dextk.MethodNode) (string, error) {
 	if m.CodeOff == 0 {
 		return "", nil
 	}
@@ -334,30 +336,29 @@ func processDexMethod(r *dextk.Reader, m dextk.MethodNode) (string, error) {
 // Note: This is critical for ensuring secret + keyword are in close proximity.
 // If we expand the instructions we're looking at, this function will need to be updated.
 func formatInstruction(line string) string {
-	reFieldPrefix := regexp.MustCompile(`iput-object obj=\d+ field=com/[a-zA-Z0-9/_]+:`)
-	reTypeSuffix := regexp.MustCompile(`Ljava/lang/String; src=\d+`)
-	reConstString := regexp.MustCompile(`const-string dst=\d+`)
-
 	line = reFieldPrefix.ReplaceAllString(line, "")
 	line = reTypeSuffix.ReplaceAllString(line, "")
 	line = reConstString.ReplaceAllString(line, "")
 	return line
 }
 
-func decodeXML(xmlData []byte, resTable *apkparser.ResourceTable) (string, error) {
+func decodeXML(rdr io.ReadCloser, resTable *apkparser.ResourceTable) (io.Reader, error) {
 	// Create a buffer to store the formatted XML data
 	var buf bytes.Buffer
 	enc := xml.NewEncoder(&buf)
 
 	// Parse the XML data using the apkparser library + resource table
-	rdr := bytes.NewReader(xmlData)
 	err := apkparser.ParseXml(rdr, enc, resTable)
 	if err != nil {
 		// If the error is due to plaintext XML, return the plaintext XML stringified
 		if err.Error() == "xml is in plaintext, binary form expected" {
-			return string(xmlData), nil
+			xmlData, readErr := io.ReadAll(rdr)
+			if readErr != nil {
+				return nil, readErr
+			}
+			return bytes.NewReader(xmlData), nil
 		}
-		return "", err
+		return nil, err
 	}
-	return buf.String(), nil
+	return &buf, nil
 }
