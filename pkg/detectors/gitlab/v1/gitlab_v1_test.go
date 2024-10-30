@@ -187,6 +187,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf(" wantVerificationError = %v, verification error = %v,", tt.wantVerificationErr, got[i].VerificationError())
 				}
+				got[i].AnalysisInfo = nil
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {

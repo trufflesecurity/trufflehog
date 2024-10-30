@@ -27,10 +27,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/updater"
@@ -72,10 +72,10 @@ var (
 	jobReportFile        = cli.Flag("output-report", "Write a scan report to the provided path.").Hidden().OpenFile(os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 
 	// Add feature flags
-	forceSkipBinaries = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
-	forceSkipArchives = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
+	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
+	forceSkipArchives  = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
 	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
-	userAgentSuffix = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -124,6 +124,8 @@ var (
 	gitlabScanToken        = gitlabScan.Flag("token", "GitLab token. Can be provided with environment variable GITLAB_TOKEN.").Envar("GITLAB_TOKEN").Required().String()
 	gitlabScanIncludePaths = gitlabScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitlabScanExcludePaths = gitlabScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	gitlabScanIncludeRepos = gitlabScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	gitlabScanExcludeRepos = gitlabScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 
 	filesystemScan  = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemPaths = filesystemScan.Arg("path", "Path to file or directory to scan.").Strings()
@@ -285,7 +287,7 @@ func main() {
 	if *jsonOut {
 		logFormat = log.WithJSONSink
 	}
-	logger, sync := log.New("trufflehog", logFormat(os.Stderr))
+	logger, sync := log.New("trufflehog", logFormat(os.Stderr, log.WithGlobalRedaction()))
 	// make it the default logger for contexts
 	context.SetDefaultLogger(logger)
 
@@ -375,7 +377,7 @@ func run(state overseer.State) {
 		}()
 	}
 
-  	// Set feature configurations from CLI flags
+	// Set feature configurations from CLI flags
 	if *forceSkipBinaries {
 		feature.ForceSkipBinaries.Store(true)
 	}
@@ -383,7 +385,7 @@ func run(state overseer.State) {
 	if *forceSkipArchives {
 		feature.ForceSkipArchives.Store(true)
 	}
-	
+
 	if *skipAdditionalRefs {
 		feature.SkipAdditionalRefs.Store(true)
 	}
@@ -674,10 +676,12 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 
 		cfg := sources.GitlabConfig{
-			Endpoint: *gitlabScanEndpoint,
-			Token:    *gitlabScanToken,
-			Repos:    *gitlabScanRepos,
-			Filter:   filter,
+			Endpoint:     *gitlabScanEndpoint,
+			Token:        *gitlabScanToken,
+			Repos:        *gitlabScanRepos,
+			IncludeRepos: *gitlabScanIncludeRepos,
+			ExcludeRepos: *gitlabScanExcludeRepos,
+			Filter:       filter,
 		}
 		if err := eng.ScanGitLab(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)

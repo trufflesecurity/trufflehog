@@ -9,6 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
@@ -71,6 +72,7 @@ func (s *Source) Init(
 
 	if conn.Password != "" {
 		esConfig.Password = conn.Password
+		log.RedactGlobally(conn.Password)
 	}
 
 	if conn.CloudId != "" {
@@ -79,10 +81,12 @@ func (s *Source) Init(
 
 	if conn.ApiKey != "" {
 		esConfig.APIKey = conn.ApiKey
+		log.RedactGlobally(conn.ApiKey)
 	}
 
 	if conn.ServiceToken != "" {
 		esConfig.ServiceToken = conn.ServiceToken
+		log.RedactGlobally(conn.ServiceToken)
 	}
 
 	s.esConfig = esConfig
