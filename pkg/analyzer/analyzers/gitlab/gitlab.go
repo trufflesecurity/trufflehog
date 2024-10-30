@@ -42,7 +42,7 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_GitLab,
+		AnalyzerType: analyzers.AnalyzerTypeGitLab,
 		Metadata: map[string]any{
 			"version":    info.Metadata.Version,
 			"enterprise": info.Metadata.Enterprise,
