@@ -1,9 +1,17 @@
 # catch-all
 * @trufflesecurity/product-eng
 
-# teams
-pkg/sources/ @trufflesecurity/backend
-pkg/detectors/ @trufflesecurity/detection
+# Scanning
+pkg/decoders/ @trufflesecurity/Scanning
+pkg/engine/ @trufflesecurity/Scanning
+pkg/gitparse/ @trufflesecurity/Scanning
+pkg/giturl/ @trufflesecurity/Scanning
+pkg/handlers/ @trufflesecurity/Scanning
+pkg/iobuf/ @trufflesecurity/Scanning
+pkg/sanitizer/ @trufflesecurity/Scanning
+pkg/sources/ @trufflesecurity/Scanning
+pkg/writers/ @trufflesecurity/Scanning
+proto/ @trufflesecurity/Scanning
 
 # critical detectors
 pkg/detectors/aws/ @trufflesecurity/backend
