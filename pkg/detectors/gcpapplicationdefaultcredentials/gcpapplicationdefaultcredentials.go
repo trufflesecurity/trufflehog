@@ -76,11 +76,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		// Trim prefix (".apps.googleusercontent.com") because it will be labeled as false positive
 		detectedClientID, _, _ := strings.Cut(creds.ClientID, ".")
 
+		redacted := "redacted"
+		if len(creds.RefreshToken) > 3 {
+			redacted = creds.RefreshToken[:3] + "..." + creds.RefreshToken[min(len(creds.RefreshToken)-1, 47):]
+		}
+
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GCPApplicationDefaultCredentials,
 			Raw:          []byte(detectedClientID),
 			RawV2:        []byte(detectedClientID + creds.RefreshToken),
-			Redacted:     creds.RefreshToken[:3] + "..." + creds.RefreshToken[min(len(creds.RefreshToken)-1, 47):], // censor the refresh token
+			Redacted:     redacted,
 		}
 
 		if verify {
