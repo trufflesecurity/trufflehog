@@ -344,5 +344,5 @@ func (s scanner) Type() detectorspb.DetectorType {
 }
 
 func (s scanner) Description() string {
-	return "AWS is a cloud service used offering over 200 API's to transact data and compute. AWS API keys can be used to access and modify this data and compute."
+	return "AWS (Amazon Web Services) is a comprehensive cloud computing platform offering a wide range of on-demand services like computing power, storage, databases. API keys for AWS can have varying amount of access to these services depending on the IAM policy attached. AWS Session Tokens are short-lived keys."
 }
