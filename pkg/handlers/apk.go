@@ -121,8 +121,7 @@ func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparse
 	if err != nil {
 		return fmt.Errorf("failed to parse strings from resources.arsc: %w", err)
 	}
-	h.handleAPKFileContent(ctx, rscStrRdr, "resources.arsc", apkChan)
-	return nil
+	return h.handleAPKFileContent(ctx, rscStrRdr, "resources.arsc", apkChan)
 }
 
 // processFile processes the file and sends the extracted data to the provided channel.
