@@ -16,6 +16,7 @@ const (
 
 func TestEmailRegexCheck(t *testing.T) {
 	testEmails := `
+		// positive cases
 		standard email     = john.doe@example.com
 		subdomain email    = jane_doe123@sub.domain.co.us
 		organization email = alice.smith@test.org
@@ -30,6 +31,12 @@ func TestEmailRegexCheck(t *testing.T) {
 		dot email          = test.email@my-email-service.xyz
 		special char email = special@characters.com
 		support email      = support@customer-service.org
+
+		// negative cases
+		not an email       = abc.123@z
+		looks like email   = test@user <- no domain
+		email but not      = user12@service.COM <- capital letters not supported for domain
+		random text        = here's some information about local-user@edu user
 	`
 
 	expectedStr := []string{
