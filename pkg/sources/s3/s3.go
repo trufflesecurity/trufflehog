@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -131,14 +132,16 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	cfg := aws.NewConfig()
 	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
-	cfg.LogLevel = aws.LogLevel(aws.LogDebugWithRequestErrors)
 	cfg.Region = aws.String(region)
 
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.S3_SessionToken:
 		cfg.Credentials = credentials.NewStaticCredentials(cred.SessionToken.Key, cred.SessionToken.Secret, cred.SessionToken.SessionToken)
+		log.RedactGlobally(cred.SessionToken.GetSecret())
+		log.RedactGlobally(cred.SessionToken.GetSessionToken())
 	case *sourcespb.S3_AccessKey:
 		cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.Key, cred.AccessKey.Secret, "")
+		log.RedactGlobally(cred.AccessKey.GetSecret())
 	case *sourcespb.S3_Unauthenticated:
 		cfg.Credentials = credentials.AnonymousCredentials
 	default:

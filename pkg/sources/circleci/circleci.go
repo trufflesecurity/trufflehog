@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/go-errors/errors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -73,6 +74,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 	switch conn.Credential.(type) {
 	case *sourcespb.CircleCI_Token:
 		s.token = conn.GetToken()
+		log.RedactGlobally(s.token)
 	}
 
 	return nil

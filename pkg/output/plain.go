@@ -30,7 +30,7 @@ type PlainPrinter struct{ mu sync.Mutex }
 func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
 		DetectorType:      r.Result.DetectorType.String(),
-		DecoderType:       r.Result.DecoderType.String(),
+		DecoderType:       r.DecoderType.String(),
 		Verified:          r.Result.Verified,
 		VerificationError: r.Result.VerificationError(),
 		MetaData:          r.SourceMetadata,

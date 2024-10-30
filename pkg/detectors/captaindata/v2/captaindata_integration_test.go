@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package alegra
+package captaindata
 
 import (
 	"context"
@@ -9,23 +9,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestAlegra_FromChunk(t *testing.T) {
+func TestCaptainData_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ALEGRA")
-	id := testSecrets.MustGetField("ACCOUNT_USER")
-	inactiveSecret := testSecrets.MustGetField("ALEGRA_INACTIVE")
+	projId := testSecrets.MustGetField("CAPTAINDATA_PROJID")
+	secret := testSecrets.MustGetField("CAPTAINDATA")
+	inactiveSecret := testSecrets.MustGetField("CAPTAINDATA_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -33,43 +34,46 @@ func TestAlegra_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a alegra secret %s within alegra %s", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a captaindata project %s with captaindata secret %s within", projId, secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Alegra,
+					DetectorType: detectorspb.DetectorType_CaptainData,
 					Verified:     true,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 		{
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a alegra secret %s within alegra %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a captaindata project %s with captaindata secret %s within but not valid", projId, inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Alegra,
+					DetectorType: detectorspb.DetectorType_CaptainData,
 					Verified:     false,
 				},
 			},
-			wantErr: false,
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 		{
 			name: "not found",
@@ -79,8 +83,9 @@ func TestAlegra_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:    nil,
-			wantErr: false,
+			want:                nil,
+			wantErr:             false,
+			wantVerificationErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -88,18 +93,20 @@ func TestAlegra_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Alegra.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CaptainData.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
-				got[i].RawV2 = nil
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Alegra.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "ExtraData", "verificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+				t.Errorf("CaptainData.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

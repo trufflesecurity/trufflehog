@@ -72,10 +72,10 @@ var (
 	jobReportFile        = cli.Flag("output-report", "Write a scan report to the provided path.").Hidden().OpenFile(os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 
 	// Add feature flags
-	forceSkipBinaries = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
-	forceSkipArchives = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
+	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
+	forceSkipArchives  = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
 	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
-	userAgentSuffix = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -287,7 +287,7 @@ func main() {
 	if *jsonOut {
 		logFormat = log.WithJSONSink
 	}
-	logger, sync := log.New("trufflehog", logFormat(os.Stderr))
+	logger, sync := log.New("trufflehog", logFormat(os.Stderr, log.WithGlobalRedaction()))
 	// make it the default logger for contexts
 	context.SetDefaultLogger(logger)
 
@@ -377,7 +377,7 @@ func run(state overseer.State) {
 		}()
 	}
 
-  	// Set feature configurations from CLI flags
+	// Set feature configurations from CLI flags
 	if *forceSkipBinaries {
 		feature.ForceSkipBinaries.Store(true)
 	}
@@ -385,7 +385,7 @@ func run(state overseer.State) {
 	if *forceSkipArchives {
 		feature.ForceSkipArchives.Store(true)
 	}
-	
+
 	if *skipAdditionalRefs {
 		feature.SkipAdditionalRefs.Store(true)
 	}
