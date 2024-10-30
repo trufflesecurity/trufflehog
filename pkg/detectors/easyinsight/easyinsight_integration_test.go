@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package apiscience
+package easyinsight
 
 import (
 	"context"
@@ -10,21 +10,22 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestApiScience_FromChunk(t *testing.T) {
+func TestEasyInsight_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("APISCIENCE")
-	inactiveSecret := testSecrets.MustGetField("APISCIENCE_INACTIVE")
+	secret := testSecrets.MustGetField("EASYINSIGHT")
+	inactiveSecret := testSecrets.MustGetField("EASYINSIGHT_INACTIVE")
+	id := testSecrets.MustGetField("EASYINSIGHT_ID")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +44,12 @@ func TestApiScience_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a apiscience secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a easyinsight secret %s within easyid %s", secret, id)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ApiScience,
+					DetectorType: detectorspb.DetectorType_EasyInsight,
 					Verified:     true,
 				},
 			},
@@ -59,12 +60,12 @@ func TestApiScience_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a apiscience secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a easyinsight secret %s within easyid %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_ApiScience,
+					DetectorType: detectorspb.DetectorType_EasyInsight,
 					Verified:     false,
 				},
 			},
@@ -87,7 +88,7 @@ func TestApiScience_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ApiScience.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("EasyInsight.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +98,7 @@ func TestApiScience_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("ApiScience.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("EasyInsight.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

@@ -127,7 +127,11 @@ func (h *archiveHandler) openArchive(ctx logContext.Context, depth int, reader f
 				ctx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
-			return fmt.Errorf("error creating custom reader: %w", err)
+			return fmt.Errorf(
+				"error creating reader for decompressor with format: %s %w",
+				reader.format.Name(),
+				err,
+			)
 		}
 		defer rdr.Close()
 
@@ -154,10 +158,10 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 			"filename", file.Name(),
 			"size", file.Size(),
 		)
-		lCtx.Logger().V(5).Info("Handling extracted file.")
+		lCtx.Logger().V(3).Info("Handling extracted file.")
 
 		if file.IsDir() || file.LinkTarget != "" {
-			lCtx.Logger().V(5).Info("skipping directory or symlink")
+			lCtx.Logger().V(3).Info("skipping directory or symlink")
 			return nil
 		}
 
@@ -172,13 +176,13 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 
 		fileSize := file.Size()
 		if int(fileSize) > maxSize {
-			lCtx.Logger().V(3).Info("skipping file due to size", "size", fileSize)
+			lCtx.Logger().V(2).Info("skipping file: size exceeds max allowed", "size", fileSize, "limit", maxSize)
 			h.metrics.incFilesSkipped()
 			return nil
 		}
 
 		if common.SkipFile(file.Name()) || common.IsBinary(file.Name()) {
-			lCtx.Logger().V(5).Info("skipping file")
+			lCtx.Logger().V(2).Info("skipping file: extension is ignored")
 			h.metrics.incFilesSkipped()
 			return nil
 		}
@@ -211,7 +215,7 @@ func (h *archiveHandler) extractorHandler(archiveChan chan []byte) func(context.
 				lCtx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
-			return fmt.Errorf("error creating custom reader: %w", err)
+			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
 		}
 		defer rdr.Close()
 
