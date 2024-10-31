@@ -2,7 +2,7 @@ version: 2
 builds:
   - binary: trufflehog
     ldflags:
-      - -X 'github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}'
+      - -s -w -X 'github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}'
     env: [CGO_ENABLED=0]
     goos:
     - linux
