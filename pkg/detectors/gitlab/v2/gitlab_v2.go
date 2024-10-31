@@ -61,7 +61,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			isVerified, extraData, verificationErr := s.verifyGitlab(ctx, resMatch)
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
+			for key, value := range extraData {
+				s1.ExtraData[key] = value
+			}
 
 			s1.SetVerificationError(verificationErr, resMatch)
 			s1.AnalysisInfo = map[string]string{
