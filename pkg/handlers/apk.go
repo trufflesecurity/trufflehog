@@ -27,15 +27,25 @@ import (
 // ToDo: Provide file location information to secret output.
 
 var (
-	targetInstructionTypes = []string{"const-string", "iput-object"}
-	// Note: We're only looking at `const-string` and `iput-objects` for now. This might need to be expanded.
-	// If expanding, update precompiled REGEX below + update the formatInstruction function.
+	stringInstructionType  = "const-string"
+	targetInstructionTypes = []string{stringInstructionType, "iput-object", "sput-object", "const-class", "invoke-virtual", "invoke-super", "invoke-direct", "invoke-static", "invoke-interface"}
+	// Note: We're only looking at a subset of instructions.
+	// If expanding, update precompiled REGEX below.
 	// - const-string: loads a string into a register (value)
 	// - iput-object: stores a string into a field (key)
-	reFieldPrefix = regexp.MustCompile(`iput-object obj=\d+ field=com/[a-zA-Z0-9/_]+:`)
-	reTypeSuffix  = regexp.MustCompile(`Ljava/lang/String; src=\d+`)
-	reConstString = regexp.MustCompile(`const-string dst=\d+`)
-	// Precompiling regexes for performance
+	// - the rest have to do with function, methods, objects and classes.
+	reIPutRegex       = regexp.MustCompile(`iput-object obj=\d+ field=com/[a-zA-Z0-9/_]+:([a-zA-Z0-9_]+):`)
+	reSPutRegex       = regexp.MustCompile(`sput-object field=com/[a-zA-Z0-9/_]+:([a-zA-Z0-9_]+):`)
+	reConstRegex      = regexp.MustCompile(`const-string(?:/jumbo)? dst=\d+ value='([^']*)'`)
+	reConstClassRegex = regexp.MustCompile(`const-class dst=\d+ value='[a-zA-Z0-9/_$]+/([a-zA-Z0-9]+)(?:\$|;)`)
+	reInvokeRegex     = regexp.MustCompile(`invoke-(?:virtual|super|direct|static|interface)(?:/range)? method=[a-zA-Z0-9/._$]+/([a-zA-Z0-9_$]+:[a-zA-Z0-9_<]+)`)
+	reInstructions    = []*regexp.Regexp{
+		reIPutRegex,
+		reSPutRegex,
+		reConstRegex,
+		reConstClassRegex,
+		reInvokeRegex,
+	}
 )
 
 // apkHandler handles apk archive formats.
@@ -77,7 +87,24 @@ func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 		}()
 
 		if err = h.processAPK(ctx, input, apkChan); err != nil {
-			ctx.Logger().Error(err, "error handling apk.")
+			// If we encounter an error during apk parsing, revert to zip handler.
+			// This ensures anything named .apk that isn't an Android package is still processed.
+			ctx.Logger().Error(err, "error processing apk content. reverting to zip handler.")
+			processingCtx, processingCancel := logContext.WithTimeout(logContext.Background(), maxTimeout)
+			defer processingCancel()
+
+			// Instantiate a new zip handler to process the apk as a zip archive.
+			zipHandler := newArchiveHandler()
+			zipChan, err := zipHandler.HandleFile(processingCtx, input)
+			if err != nil {
+				ctx.Logger().Error(err, "error handling zip content.")
+				// Question: Should we handle errors differently here? instead of just returning
+				return
+			}
+			// Copy the zipChan to the apkChan
+			for data := range zipChan {
+				apkChan <- data
+			}
 		}
 	}()
 	return apkChan, nil
@@ -219,16 +246,6 @@ func readFile(file *zip.File) (io.ReadCloser, error) {
 	return rc, nil
 }
 
-// hasSubstring checks if the string contains any of the provided substrings.
-func hasSubstring(s string, substrings []string) bool {
-	for _, sub := range substrings {
-		if strings.Contains(s, sub) {
-			return true
-		}
-	}
-	return false
-}
-
 // extractStringsFromResTable extracts the strings from the resources table
 // Note: This is a hacky way to get the strings from the resources table
 // APK strings are typically (always?) stored in the 0x7f000000-0x7fffffff range
@@ -277,6 +294,8 @@ func processDexFile(ctx logContext.Context, rdr io.ReadCloser) (io.Reader, error
 		return nil, err
 	}
 
+	defaultKeywords := DefaultDetectorKeywords()
+
 	// Get relevant instruction data from the dex file
 	var dexOutput bytes.Buffer
 	ci := dexReader.ClassIter()
@@ -285,60 +304,108 @@ func processDexFile(ctx logContext.Context, rdr io.ReadCloser) (io.Reader, error
 		if err != nil {
 			break
 		}
-		processDexClass(ctx, dexReader, node, &dexOutput)
+		processDexClass(ctx, dexReader, node, defaultKeywords, &dexOutput)
 	}
+
 	return &dexOutput, nil
 }
 
 // processDexClass processes a single class node's methods
-func processDexClass(ctx logContext.Context, dexReader *dextk.Reader, node dextk.ClassNode, dexOutput *bytes.Buffer) {
+func processDexClass(ctx logContext.Context, dexReader *dextk.Reader, node dextk.ClassNode, defaultKeywords map[string]struct{}, dexOutput *bytes.Buffer) {
+
+	var classOutput bytes.Buffer
+	methodValues := make(map[string]struct{})
+
 	// Process Direct Methods
-	processDexMethod(ctx, dexReader, node.DirectMethods, dexOutput)
+	processDexMethod(ctx, dexReader, node.DirectMethods, &classOutput, methodValues)
 	// Process Virtual Methods
-	processDexMethod(ctx, dexReader, node.VirtualMethods, dexOutput)
+	processDexMethod(ctx, dexReader, node.VirtualMethods, &classOutput, methodValues)
+
+	// Write the classOutput to the dexOutput
+	dexOutput.Write(classOutput.Bytes())
+
+	// Stringify the classOutput value for case-insensitive keyword matching
+	classOutputLower := strings.ToLower(classOutput.String())
+
+	// Check if classOutput contains any of the default keywords
+	foundKeywords := make(map[string]struct{})
+	for keyword := range defaultKeywords {
+		if strings.Contains(classOutputLower, keyword) {
+			foundKeywords[keyword] = struct{}{} // Directly add to the map
+		}
+	}
+
+	// For each found keyword, create a keyword:value pair and append to dexOutput
+	var keyValuePairs bytes.Buffer
+	for str := range methodValues {
+		for keyword := range foundKeywords {
+			keyValuePairs.Reset()
+			keyValuePairs.WriteString(keyword + ":" + str + "\n")
+			dexOutput.Write(keyValuePairs.Bytes())
+		}
+	}
 }
 
 // processDexMethod iterates over a slice of methods, processes each method,
 // handles errors, and writes the output to dexOutput.
-func processDexMethod(ctx logContext.Context, dexReader *dextk.Reader, methods []dextk.MethodNode, dexOutput *bytes.Buffer) {
+func processDexMethod(ctx logContext.Context, dexReader *dextk.Reader, methods []dextk.MethodNode, classOutput *bytes.Buffer, methodValues map[string]struct{}) {
 	for _, method := range methods {
-		out, err := parseDexInstructions(dexReader, method)
+		s, values, err := parseDexInstructions(dexReader, method)
 		if err != nil {
 			ctx.Logger().V(2).Info("failed to process dex method", "error", err)
-			continue // Continue processing other methods even if one fails
+			continue
 		}
-		dexOutput.WriteString(out)
+		classOutput.Write(s.Bytes())
+		for val := range values {
+			methodValues[val] = struct{}{}
+		}
 	}
 }
 
 // parseDexInstructions processes a dex method and returns the string representation of the instruction
-func parseDexInstructions(r *dextk.Reader, m dextk.MethodNode) (string, error) {
+func parseDexInstructions(r *dextk.Reader, m dextk.MethodNode) (*bytes.Buffer, map[string]struct{}, error) {
+	var s bytes.Buffer
+	values := make(map[string]struct{})
+
 	if m.CodeOff == 0 {
-		return "", nil
+		return &s, values, nil
 	}
 
 	c, err := r.ReadCodeAndParse(m.CodeOff)
 	if err != nil {
-		return "", err
+		return &s, values, err
 	}
 
-	var s strings.Builder
+	// Iterate over the instructions and extract the relevant values
 	for _, o := range c.Ops {
-		if hasSubstring(o.String(), targetInstructionTypes) {
-			s.WriteString(fmt.Sprintf("%s\n", formatInstruction(o.String())))
+		oStr := o.String()
+		// Filter out instructions that are not in our targetInstructionTypes
+		parsedVal := formatAndFilterInstruction(oStr)
+		if parsedVal == "" {
+			continue
 		}
+		// If instruction is a const-string, then store as in values map
+		// this is used when creating keyword:value pairs in processDexClass()
+		if strings.HasPrefix(oStr, stringInstructionType) {
+			values[parsedVal] = struct{}{}
+		}
+		// Write the parsedVal to the buffer
+		s.WriteString(parsedVal)
 	}
-	return s.String(), nil
+	return &s, values, nil
 }
 
-// formatInstruction removes unnecessary information from the dex instruction
+// formatAndFilterInstruction looks for a match to our regex and returns it
 // Note: This is critical for ensuring secret + keyword are in close proximity.
 // If we expand the instructions we're looking at, this function will need to be updated.
-func formatInstruction(line string) string {
-	line = reFieldPrefix.ReplaceAllString(line, "")
-	line = reTypeSuffix.ReplaceAllString(line, "")
-	line = reConstString.ReplaceAllString(line, "")
-	return line
+func formatAndFilterInstruction(line string) string {
+	for _, re := range reInstructions {
+		matches := re.FindStringSubmatch(line)
+		if len(matches) > 1 {
+			return matches[1]
+		}
+	}
+	return ""
 }
 
 func decodeXML(rdr io.ReadCloser, resTable *apkparser.ResourceTable) (io.Reader, error) {
