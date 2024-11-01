@@ -602,7 +602,6 @@ func (s *Source) getAllProjectRepos(
 	}
 
 	ctx.Logger().Info("Enumerated GitLab projects", "count", len(projectsWithNamespace))
-	ctx.Logger().V(2).Info("Enumerated GitLab projects", "projects", projectsWithNamespace)
 
 	return nil
 }
