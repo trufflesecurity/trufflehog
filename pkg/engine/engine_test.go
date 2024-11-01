@@ -281,6 +281,70 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
 
+// lineCaptureDispatcher is a test dispatcher that captures the line number
+// of detected secrets. It implements the Dispatcher interface and is used
+// to verify that the Engine correctly identifies and reports the line numbers
+// where secrets are found in the source code.
+type lineCaptureDispatcher struct{ line int64 }
+
+func (d *lineCaptureDispatcher) Dispatch(_ context.Context, result detectors.ResultWithMetadata) error {
+	d.line = result.SourceMetadata.GetFilesystem().GetLine()
+	return nil
+}
+
+func TestEngineLine(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tmpFile, err := os.CreateTemp("", "aws_credentials")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	//nolint:gosec // This is a test credential
+	content := `[default]
+aws_access_key_id = AKIA2OGYBAH6STMMNXWN
+aws_secret_access_key = 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
+output = json
+region = us-east-2`
+
+	err = os.WriteFile(tmpFile.Name(), []byte(content), os.ModeAppend)
+	assert.NoError(t, err)
+
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+	lineCapturer := new(lineCaptureDispatcher)
+
+	conf := Config{
+		Concurrency:   1,
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     DefaultDetectors(),
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    lineCapturer,
+	}
+
+	eng, err := NewEngine(ctx, &conf)
+	assert.NoError(t, err)
+
+	eng.Start(ctx)
+
+	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+	if err := eng.ScanFileSystem(ctx, cfg); err != nil {
+		return
+	}
+
+	// Wait for all the chunks to be processed.
+	assert.NoError(t, eng.Finish(ctx))
+	want := uint64(1)
+	assert.Equal(t, want, eng.GetMetrics().UnverifiedSecretsFound)
+	assert.Equal(t, int64(2), lineCapturer.line)
+}
+
 // TestEngine_VersionedDetectorsVerifiedSecrets is a test that detects ALL verified secrets across
 // versioned detectors.
 func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
@@ -636,6 +700,20 @@ func TestFragmentFirstLineAndLink(t *testing.T) {
 			},
 			expectedLine: 5,
 			expectedLink: "https://example.azure.com",
+		},
+		{
+			name: "Line number not set",
+			chunk: &sources.Chunk{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Link: "https://example.github.com",
+						},
+					},
+				},
+			},
+			expectedLine: 1,
+			expectedLink: "https://example.github.com",
 		},
 		{
 			name:         "Unsupported Type",
