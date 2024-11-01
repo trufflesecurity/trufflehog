@@ -17,6 +17,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+// TestZohocrm_FromChunk verifies the validity of a ZohoCRM access token
+// Note: The token validity test relies on an access token stored in the GCP secret manager.
+// Since Zoho CRM tokens expire after 60 minutes, this test will eventually fail once the token becomes invalid.
+// The official guide linked below can be followed in order to generate a new valid access token:
+// https://www.zoho.com/accounts/protocol/oauth/self-client/authorization-code-flow.html
+
 func TestZohocrm_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()

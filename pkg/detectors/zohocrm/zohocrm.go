@@ -19,10 +19,7 @@ type Scanner struct {
 }
 
 type UnauthorizedResponseBody struct {
-	Code    string                 `json:"code"`
-	Details map[string]interface{} `json:"details"`
-	Message string                 `json:"message"`
-	Status  string                 `json:"status"`
+	Code string `json:"code"`
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -74,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 // Verifies the Zoho CRM API key by making an HTTP request to the Zoho CRM API.
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
-	endpoint := "https://www.zohoapis.com/crm/v2/Leads"
+	endpoint := "https://www.zohoapis.com/crm/v7/Leads?fields=Email&per_page=1"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
