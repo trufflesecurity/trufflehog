@@ -15,7 +15,7 @@ replace github.com/STARRY-S/zip => github.com/STARRY-S/zip v0.1.0
 
 require (
 	cloud.google.com/go/secretmanager v1.14.2
-	cloud.google.com/go/storage v1.45.0
+	cloud.google.com/go/storage v1.46.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.13
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.3
 	github.com/BobuSumisu/aho-corasick v1.0.3
