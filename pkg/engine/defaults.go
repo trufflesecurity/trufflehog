@@ -780,6 +780,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraper"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/webscraping"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/websitepulse"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/weightsandbiases"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/whoxy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wistia"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wiz"
@@ -1644,6 +1645,7 @@ func DefaultDetectors() []detectors.Detector {
 		apimetrics.Scanner{},
 		captainDataV1.Scanner{},
 		captainDataV2.Scanner{},
+		weightsandbiases.Scanner{},
 	}
 
 	// Automatically initialize all detectors that implement
