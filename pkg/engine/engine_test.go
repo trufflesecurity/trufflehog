@@ -292,57 +292,95 @@ func (d *lineCaptureDispatcher) Dispatch(_ context.Context, result detectors.Res
 	return nil
 }
 
-func TestEngineLine(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func TestEngineLineVariations(t *testing.T) {
+	tests := []struct {
+		name         string
+		content      string
+		expectedLine int64
+	}{
+		{
+			name: "secret on first line",
+			content: `AKIA2OGYBAH6STMMNXNN
+aws_secret_access_key = 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`,
+			expectedLine: 1,
+		},
+		{
+			name: "secret after multiple newlines",
+			content: `
 
-	tmpFile, err := os.CreateTemp("", "aws_credentials")
-	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
 
-	//nolint:gosec // This is a test credential
-	content := `[default]
-aws_access_key_id = AKIA2OGYBAH6STMMNXWN
+AKIA2OGYBAH6STMMNXNN
+aws_secret_access_key = 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`,
+			expectedLine: 4,
+		},
+		{
+			name: "secret with mixed whitespace before",
+			content: `first line
+   
+		
+AKIA2OGYBAH6STMMNXNN
+aws_secret_access_key = 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`,
+			expectedLine: 4,
+		},
+		{
+			name: "secret with content after",
+			content: `[default]
+region = us-east-1
+AKIA2OGYBAH6STMMNXNN
 aws_secret_access_key = 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
-output = json
-region = us-east-2`
-
-	err = os.WriteFile(tmpFile.Name(), []byte(content), os.ModeAppend)
-	assert.NoError(t, err)
-
-	const defaultOutputBufferSize = 64
-	opts := []func(*sources.SourceManager){
-		sources.WithSourceUnits(),
-		sources.WithBufferedOutput(defaultOutputBufferSize),
+more content
+even more`,
+			expectedLine: 3,
+		},
 	}
 
-	sourceManager := sources.NewManager(opts...)
-	lineCapturer := new(lineCaptureDispatcher)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	conf := Config{
-		Concurrency:   1,
-		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     DefaultDetectors(),
-		Verify:        false,
-		SourceManager: sourceManager,
-		Dispatcher:    lineCapturer,
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			tmpFile, err := os.CreateTemp("", "test_aws_credentials")
+			assert.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
+
+			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
+			assert.NoError(t, err)
+
+			const defaultOutputBufferSize = 64
+			opts := []func(*sources.SourceManager){
+				sources.WithSourceUnits(),
+				sources.WithBufferedOutput(defaultOutputBufferSize),
+			}
+
+			sourceManager := sources.NewManager(opts...)
+			lineCapturer := new(lineCaptureDispatcher)
+
+			conf := Config{
+				Concurrency:   1,
+				Decoders:      decoders.DefaultDecoders(),
+				Detectors:     DefaultDetectors(),
+				Verify:        false,
+				SourceManager: sourceManager,
+				Dispatcher:    lineCapturer,
+			}
+
+			eng, err := NewEngine(ctx, &conf)
+			assert.NoError(t, err)
+
+			eng.Start(ctx)
+
+			cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+			err = eng.ScanFileSystem(ctx, cfg)
+			assert.NoError(t, err)
+
+			assert.NoError(t, eng.Finish(ctx))
+			want := uint64(1)
+			assert.Equal(t, want, eng.GetMetrics().UnverifiedSecretsFound)
+			assert.Equal(t, tt.expectedLine, lineCapturer.line)
+		})
 	}
-
-	eng, err := NewEngine(ctx, &conf)
-	assert.NoError(t, err)
-
-	eng.Start(ctx)
-
-	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-	if err := eng.ScanFileSystem(ctx, cfg); err != nil {
-		return
-	}
-
-	// Wait for all the chunks to be processed.
-	assert.NoError(t, eng.Finish(ctx))
-	want := uint64(1)
-	assert.Equal(t, want, eng.GetMetrics().UnverifiedSecretsFound)
-	assert.Equal(t, int64(2), lineCapturer.line)
 }
 
 // TestEngine_VersionedDetectorsVerifiedSecrets is a test that detects ALL verified secrets across
