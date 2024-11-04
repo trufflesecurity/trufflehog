@@ -1,4 +1,4 @@
-package artsy
+package awssessionkey
 
 import (
 	"context"
@@ -11,12 +11,23 @@ import (
 )
 
 var (
-	validPattern   = "artsy_key: rU0K6hwGw9AeANtXrZ8FQJT9jn4sRdlj - artsy_id: hvQ2fMvUPNczDCdmzi0i"
-	invalidPattern = "artsy_key: rU:K6hwGw9AeANtXrZ8F%JT9jn4sR,lj - artsy_id: hvQ2f-vUPNczD+dmzi0i"
+	validPattern = `
+		aws credentials{
+			id: ASIABBKK02W42Q3IPSPG
+			secret: fkhIiUwQY32Zu9e4a86g9r3WpTzfE1aXljVcgn8O
+			session: >aSqfp/GTZbJP+=tXPNCZ9GoveoM0vgxtlYXdzPQ2uYNMPPgUkt0VT7SoTLasAo7iVqWWREOUC6DEenlcgDEKyzIEgQ=W5Ju/b9K/Z176uD2HJYCfq/lyowHtt5PvJi7LR=uf/urSorGbTcqNUvP=i42YP1Ps/4F6He9hQA1io3EAGBC3ICGHXWf2IlvFoTNUyPTqhjnPEKMWZ42jblqNA=dD7hLpzNXmmGhdLCjy99XK8+gjHdZHkOeD/FIjRPRZ7Jl0tdwdqFEwzRVCzL2uelMVMd3UaZ+d4I4Kf+J464piO//jxx48Fs/mG3zr5ba9m2S+6gvUZJq4j+0uJ+jf6cG/x2G9XSybqYQRwvxfNquKB4TcKiGVH5+ZbJT4ASkARadwoSPMGfvMPje+X2zAziSzXfsxYfIQKf6iJ9p7VavlDGi+Acr4kwFXW5IfQs4uGk6AVQFsoZK3o1hhLOkuOwWQEWhDQGNLXwJbFqXfELOnUQvM0Z5NUm46bjAAi4g+X9gLPNR/KjzXuuTTaWYrQEjXLb7PxS0sIttAb1w+sTXXtc1kDIsABC6KcsyGlEwji5sLkbkUa~
+		}
+	`
+	invalidPattern = `
+		aws credentials{
+			id: ASIABBKK02W42Q3IPSPG
+			secret: $YenOG.PKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63;
+		}
+	`
 )
 
-func TestArtsy_Pattern(t *testing.T) {
-	d := Scanner{}
+func TestAWSSessionKey_Pattern(t *testing.T) {
+	d := scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
 	tests := []struct {
@@ -27,7 +38,7 @@ func TestArtsy_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{"rU0K6hwGw9AeANtXrZ8FQJT9jn4sRdljhvQ2fMvUPNczDCdmzi0i"},
+			want:  []string{"ASIABBKK02W42Q3IPSPGfkhIiUwQY32Zu9e4a86g9r3WpTzfE1aXljVcgn8OaSqfp/GTZbJP+=tXPNCZ9GoveoM0vgxtlYXdzPQ2uYNMPPgUkt0VT7SoTLasAo7iVqWWREOUC6DEenlcgDEKyzIEgQ=W5Ju/b9K/Z176uD2HJYCfq/lyowHtt5PvJi7LR=uf/urSorGbTcqNUvP=i42YP1Ps/4F6He9hQA1io3EAGBC3ICGHXWf2IlvFoTNUyPTqhjnPEKMWZ42jblqNA=dD7hLpzNXmmGhdLCjy99XK8+gjHdZHkOeD/FIjRPRZ7Jl0tdwdqFEwzRVCzL2uelMVMd3UaZ+d4I4Kf+J464piO//jxx48Fs/mG3zr5ba9m2S+6gvUZJq4j+0uJ+jf6cG/x2G9XSybqYQRwvxfNquKB4TcKiGVH5+ZbJT4ASkARadwoSPMGfvMPje+X2zAziSzXfsxYfIQKf6iJ9p7VavlDGi+Acr4kwFXW5IfQs4uGk6AVQFsoZK3o1hhLOkuOwWQEWhDQGNLXwJbFqXfELOnUQvM0Z5NUm46bjAAi4g+X9gLPNR/KjzXuuTTaWYrQEjXLb7PxS0sIttAb1w+sTXXtc1kDIsABC6KcsyGlEwji5sLkbkUa"},
 		},
 		{
 			name:  "invalid pattern",
