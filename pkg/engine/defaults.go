@@ -36,7 +36,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apilayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apimatic"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apiscience"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apimetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apitemplate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appcues"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appfollow"
@@ -90,6 +90,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bombbomb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boostnote"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/borgbase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/box"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boxoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintreepayments"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
@@ -111,7 +113,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/campayn"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cannyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/capsulecrm"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata"
+	captainDataV1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata/v1"
+	captainDataV2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/captaindata/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/carboninterface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cashboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/caspio"
@@ -1366,7 +1369,6 @@ func DefaultDetectors() []detectors.Detector {
 		livestorm.Scanner{},
 		// manifest.Scanner{},
 		formbucket.Scanner{},
-		apiscience.Scanner{},
 		dronahq.Scanner{},
 		webscraper.Scanner{},
 		versioneye.Scanner{},
@@ -1411,7 +1413,6 @@ func DefaultDetectors() []detectors.Detector {
 		checklyhq.Scanner{},
 		teamworkspaces.Scanner{},
 		cloudelements.Scanner{},
-		captaindata.Scanner{},
 		uploadcare.Scanner{},
 		moderation.Scanner{},
 		myintervals.Scanner{},
@@ -1633,11 +1634,16 @@ func DefaultDetectors() []detectors.Detector {
 		atlassianv1.Scanner{},
 		atlassianv2.Scanner{},
 		netsuite.Scanner{},
+		box.Scanner{},
 		robinhoodcrypto.Scanner{},
 		nvapi.Scanner{},
 		railwayapp.Scanner{},
 		meraki.Scanner{},
 		saladcloudapikey.Scanner{},
+		boxoauth.Scanner{},
+		apimetrics.Scanner{},
+		captainDataV1.Scanner{},
+		captainDataV2.Scanner{},
 	}
 
 	// Automatically initialize all detectors that implement

@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -27,7 +28,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"gocanvas"}) + `\b([0-9A-Za-z/+]{43}=[ \r\n]{1})`)
-	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gocanvas"}) + `\b([\w\.-]+@[\w-]+\.[\w\.-]{2,5})\b`)
+	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gocanvas"}) + common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -41,14 +42,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	emailMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, emailMatch := range emailMatches {
-		if len(emailMatch) != 2 {
-			continue
-		}
-		resEmailMatch := strings.TrimSpace(emailMatch[1])
+	uniqueEmailMatches := make(map[string]struct{})
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
+	for emailMatch := range uniqueEmailMatches {
 		for _, match := range matches {
 			if len(match) != 2 {
 				continue
@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := url.Values{}
-				payload.Add("username", resEmailMatch)
+				payload.Add("username", emailMatch)
 
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
 				if err != nil {

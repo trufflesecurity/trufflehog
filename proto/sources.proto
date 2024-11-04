@@ -219,6 +219,7 @@ message GitLab {
   repeated string ignore_repos = 6;
   bool skip_binaries = 7;
   bool skip_archives = 8;
+  repeated string include_repos = 9;
 }
 
 message GitHub {
@@ -243,6 +244,7 @@ message GitHub {
   bool skip_binaries = 17;
   bool skip_archives = 18;
   bool include_wikis = 19;
+  uint32 comments_timeframe_days = 20;
 }
 
 message GitHubExperimental {
@@ -427,13 +429,13 @@ message Postman {
     credentials.Unauthenticated unauthenticated = 1;
     string token = 2;
   }
-  repeated string workspaces = 3; 
+  repeated string workspaces = 3;
   repeated string collections = 4;
   repeated string environments = 5;
   repeated string exclude_collections = 6;
-  repeated string exclude_environments = 7; 
+  repeated string exclude_environments = 7;
   repeated string include_collections = 8;
-  repeated string include_environments = 9; 
+  repeated string include_environments = 9;
   repeated string detector_keywords = 10;
   repeated string workspace_paths = 11;
   repeated string collection_paths = 12;

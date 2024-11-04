@@ -281,18 +281,13 @@ func HandleFile(
 			ctx.Logger().V(5).Info("empty reader, skipping file")
 			return nil
 		}
-		return fmt.Errorf("error creating custom reader: %w", err)
+		return fmt.Errorf("failed to create file reader to handle file: %w", err)
 	}
 	defer func() {
 		// Ensure all data is read to prevent broken pipe.
-		_, copyErr := io.Copy(io.Discard, rdr)
-		if copyErr != nil {
-			err = fmt.Errorf("error discarding remaining data: %w", copyErr)
-		}
-		closeErr := rdr.Close()
-		if closeErr != nil {
+		if closeErr := rdr.Close(); closeErr != nil {
 			if err != nil {
-				err = fmt.Errorf("%v; error closing reader: %w", err, closeErr)
+				err = errors.Join(err, closeErr)
 			} else {
 				err = fmt.Errorf("error closing reader: %w", closeErr)
 			}

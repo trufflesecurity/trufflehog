@@ -2,21 +2,25 @@ package captaindata
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
+func (s Scanner) Version() int { return 1 }
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()

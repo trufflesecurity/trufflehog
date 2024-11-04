@@ -3,25 +3,22 @@ package log
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
-	"sort"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
 func TestNew(t *testing.T) {
 	var jsonBuffer, consoleBuffer bytes.Buffer
 	logger, flush := New("service-name",
-		WithJSONSink(&jsonBuffer),
-		WithConsoleSink(&consoleBuffer),
+		WithJSONSink(&jsonBuffer, WithGlobalRedaction()),
+		WithConsoleSink(&consoleBuffer, WithGlobalRedaction()),
 	)
 	logger.Info("yay")
 	assert.Nil(t, flush())
@@ -217,290 +214,6 @@ func TestWithLeveler(t *testing.T) {
 	assert.Contains(t, buf2.String(), "line 3")
 }
 
-func TestWithNamedLevelMoreVerbose(t *testing.T) {
-	var buf bytes.Buffer
-	globalControls = make(map[string]levelSetter, 16)
-
-	l1 := zap.NewAtomicLevel()
-	logger, flush := New(
-		"service-name",
-		WithConsoleSink(&buf, WithLeveler(l1)),
-	)
-
-	childLogger := WithNamedLevel(logger, "child")
-
-	SetLevelForControl(l1, 1)
-	SetLevelFor("child", 2)
-
-	logger.V(0).Info("line 1")
-	logger.V(1).Info("line 2")
-	logger.V(2).Info("line 3")
-	childLogger.V(0).Info("line A")
-	childLogger.V(1).Info("line B")
-	childLogger.V(2).Info("line C")
-	assert.Nil(t, flush())
-
-	// output should contain up to verbosity 1
-	assert.Equal(t, []string{
-		"info-0\tservice-name\tline 1",
-		"info-1\tservice-name\tline 2",
-		"info-0\tservice-name.child\tline A",
-		"info-1\tservice-name.child\tline B",
-	}, splitLines(buf.String()))
-}
-
-func TestWithNamedLevelLessVerbose(t *testing.T) {
-	var buf bytes.Buffer
-	globalControls = make(map[string]levelSetter, 16)
-
-	l1 := zap.NewAtomicLevel()
-	logger, flush := New(
-		"service-name",
-		WithConsoleSink(&buf, WithLeveler(l1)),
-	)
-
-	childLogger := WithNamedLevel(logger, "child")
-
-	SetLevelForControl(l1, 1)
-	SetLevelFor("child", 0)
-
-	logger.V(0).Info("line 1")
-	logger.V(1).Info("line 2")
-	logger.V(2).Info("line 3")
-	childLogger.V(0).Info("line A")
-	childLogger.V(1).Info("line B")
-	childLogger.V(2).Info("line C")
-	assert.Nil(t, flush())
-
-	// output should contain up to verbosity 1 for parent
-	// and verbosity 0 for child
-	assert.Equal(t, []string{
-		"info-0\tservice-name\tline 1",
-		"info-1\tservice-name\tline 2",
-		"info-0\tservice-name.child\tline A",
-	}, splitLines(buf.String()))
-}
-
-func TestNestedWithNamedLevel(t *testing.T) {
-	var buf bytes.Buffer
-	globalControls = make(map[string]levelSetter, 16)
-
-	grandParent, flush := New("grandParent", WithConsoleSink(&buf, WithLevel(1)))
-	parent := WithNamedLevel(grandParent, "parent")
-	child := WithNamedLevel(parent, "child")
-
-	SetLevelFor("parent", 0)
-	SetLevelFor("child", 2)
-
-	grandParent.V(0).Info("line 1")
-	parent.V(0).Info("line 2")
-	child.V(0).Info("line 3")
-
-	grandParent.V(1).Info("line 4")
-	parent.V(1).Info("line 5")
-	child.V(1).Info("line 6")
-
-	grandParent.V(2).Info("line 7")
-	parent.V(2).Info("line 8")
-	child.V(2).Info("line 9")
-
-	assert.Nil(t, flush())
-
-	lines := splitLines(buf.String())
-	assert.Equal(t, 4, len(lines))
-
-	assert.Equal(t, `info-0	grandParent	line 1`, lines[0])
-	assert.Equal(t, `info-0	grandParent.parent	line 2`, lines[1])
-	assert.Equal(t, `info-0	grandParent.parent.child	line 3`, lines[2])
-	assert.Equal(t, `info-1	grandParent	line 4`, lines[3])
-}
-
-func TestSiblingsWithNamedLevel(t *testing.T) {
-	var buf bytes.Buffer
-	globalControls = make(map[string]levelSetter, 16)
-
-	parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(1)))
-	alice := WithNamedLevel(parent, "alice")
-	bob := WithNamedLevel(parent, "bob")
-
-	SetLevelFor("alice", 0)
-	SetLevelFor("bob", 2)
-
-	parent.V(0).Info("line 1")
-	alice.V(0).Info("line 2")
-	bob.V(0).Info("line 3")
-
-	parent.V(1).Info("line 4")
-	alice.V(1).Info("line 5")
-	bob.V(1).Info("line 6")
-
-	parent.V(2).Info("line 7")
-	alice.V(2).Info("line 8")
-	bob.V(2).Info("line 9")
-
-	assert.Nil(t, flush())
-	lines := splitLines(buf.String())
-	assert.Equal(t, 5, len(lines))
-
-	assert.Equal(t, `info-0	parent	line 1`, lines[0])
-	assert.Equal(t, `info-0	parent.alice	line 2`, lines[1])
-	assert.Equal(t, `info-0	parent.bob	line 3`, lines[2])
-	assert.Equal(t, `info-1	parent	line 4`, lines[3])
-	assert.Equal(t, `info-1	parent.bob	line 6`, lines[4])
-}
-
-func TestWithNamedLevelConcurrency(t *testing.T) {
-	var buf bytes.Buffer
-	globalControls = make(map[string]levelSetter, 16)
-
-	parent, flush := New("parent", WithConsoleSink(&buf))
-
-	alice := WithNamedLevel(parent, "alice")
-	bob := WithNamedLevel(parent, "bob")
-
-	var wg sync.WaitGroup
-	f := func(logger logr.Logger) {
-		defer wg.Done()
-		for i := 0; i < 100_000; i++ {
-			logger.Info(fmt.Sprintf("%06d", i))
-		}
-	}
-	wg.Add(3)
-	go f(parent)
-	go f(alice)
-	go f(bob)
-	wg.Wait()
-
-	assert.Nil(t, flush())
-	logLines := splitLines(buf.String())
-	assert.Equal(t, 300_000, len(logLines))
-	sort.Slice(logLines, func(i, j int) bool {
-		return logLines[i] < logLines[j]
-	})
-
-	for i := 0; i < 100_000; i++ {
-		assert.Equal(t, fmt.Sprintf("info-0\tparent\t%06d", i), logLines[i])
-		assert.Equal(t, fmt.Sprintf("info-0\tparent.alice\t%06d", i), logLines[i+100_000])
-		assert.Equal(t, fmt.Sprintf("info-0\tparent.bob\t%06d", i), logLines[i+200_000])
-	}
-}
-
-func TestWithNamedLevelInheritance(t *testing.T) {
-	t.Run("child inherits parent level", func(t *testing.T) {
-		var buf bytes.Buffer
-		globalControls = make(map[string]levelSetter, 16)
-
-		parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(2)))
-		parent = parent.WithValues("key", "value")
-		// child will inherit parent's log level 2
-		child := WithNamedLevel(parent, "child")
-
-		parent.V(2).Info("yay")
-		child.V(2).Info("yay again")
-		assert.Nil(t, flush())
-
-		logLines := splitLines(buf.String())
-		assert.Equal(t, []string{
-			`info-2	parent	yay	{"key": "value"}`,
-			`info-2	parent.child	yay again	{"key": "value"}`,
-		}, logLines)
-	})
-
-	t.Run("child inherits existing named level", func(t *testing.T) {
-		var buf bytes.Buffer
-		globalControls = make(map[string]levelSetter, 16)
-
-		parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(2)))
-		parent = parent.WithValues("key", "value")
-		SetLevelFor("child", 0)
-		// child will inherit existing named level 0
-		child := WithNamedLevel(parent, "child")
-
-		parent.V(2).Info("yay")
-		child.V(2).Info("yay again")
-		assert.Nil(t, flush())
-
-		logLines := splitLines(buf.String())
-		assert.Equal(t, []string{`info-2	parent	yay	{"key": "value"}`}, logLines)
-	})
-}
-
-func TestExistingChildLevel(t *testing.T) {
-	var buf bytes.Buffer
-	globalControls = make(map[string]levelSetter, 16)
-
-	parent, flush := New("parent", WithConsoleSink(&buf, WithLevel(2)))
-
-	SetLevelFor("child", 2)
-	// child should start with a level of 2 due to SetLevelFor above
-	child := WithNamedLevel(parent, "child")
-
-	parent.V(2).Info("yay")
-	child.V(2).Info("yay again")
-	assert.Nil(t, flush())
-
-	assert.Contains(t, buf.String(), "info-2\tparent\tyay")
-	assert.Contains(t, buf.String(), "info-2\tparent.child\tyay again")
-}
-
-func TestSinkWithNamedLevel(t *testing.T) {
-	var buf1, buf2 bytes.Buffer
-	globalControls = make(map[string]levelSetter, 16)
-
-	parent, flush := New(
-		"parent",
-		WithConsoleSink(&buf1, WithLevel(0)),
-		WithConsoleSink(&buf2, WithLevel(2)),
-	)
-	child := WithNamedLevel(parent, "child")
-
-	for level := 0; level < 3; level++ {
-		SetLevelFor("child", int8(level))
-		child.Info("")
-		child.V(1).Info("")
-		child.V(2).Info("")
-	}
-	assert.Nil(t, flush())
-
-	// buf1 should get only level 0 logs
-	assert.Equal(t, []string{
-		"info-0\tparent.child",
-		"info-0\tparent.child",
-		"info-0\tparent.child",
-	}, splitLines(buf1.String()))
-
-	assert.Equal(t, []string{
-		// child level 0
-		"info-0\tparent.child",
-		// child level 1
-		"info-0\tparent.child",
-		"info-1\tparent.child",
-		// child level 2
-		"info-0\tparent.child",
-		"info-1\tparent.child",
-		"info-2\tparent.child",
-	}, splitLines(buf2.String()))
-}
-
-func TestAddLeveler(t *testing.T) {
-	l1, l2 := zap.NewAtomicLevel(), zap.NewAtomicLevel()
-	logger, _ := New("parent", WithConsoleSink(io.Discard, WithLeveler(l1)))
-
-	t.Run("child level more verbose", func(t *testing.T) {
-		l1.SetLevel(0)
-		l2.SetLevel(1)
-		_, err := AddLeveler(logger, l2)
-		assert.Nil(t, err)
-	})
-
-	t.Run("child level less verbose", func(t *testing.T) {
-		l1.SetLevel(1)
-		l2.SetLevel(0)
-		_, err := AddLeveler(logger, l2)
-		assert.Nil(t, err)
-	})
-}
-
 func splitLines(s string) []string {
 	lines := strings.Split(strings.TrimSpace(s), "\n")
 	logLines := make([]string, len(lines))
@@ -522,27 +235,122 @@ func TestFindLevel(t *testing.T) {
 	}
 }
 
-func TestOverwriteWithNamedLevel(t *testing.T) {
+func TestGlobalRedaction_Console(t *testing.T) {
+	oldState := globalRedactor
+	globalRedactor = &dynamicRedactor{
+		denySet: make(map[string]struct{}),
+	}
+	defer func() { globalRedactor = oldState }()
+
 	var buf bytes.Buffer
-	globalControls = make(map[string]levelSetter, 16)
-
-	parent, flush := New(
-		"parent",
-		WithConsoleSink(&buf, WithLevel(2)),
+	logger, flush := New("console-redaction-test",
+		WithConsoleSink(&buf, WithGlobalRedaction()),
 	)
-	SetLevelFor("child", 0)
-	child1 := WithNamedLevel(parent, "child")
-	child2 := WithNamedLevel(parent, "child")
-	SetLevelFor("child", 2)
+	RedactGlobally("foo")
+	RedactGlobally("bar")
 
-	child1.V(2).Info("")
-	child2.V(2).Info("")
+	logger.Info("this foo is :bar",
+		"foo", "bar",
+		"array", []string{"foo", "bar", "baz"},
+		"object", map[string]string{"foo": "bar"})
+	require.NoError(t, flush())
 
-	assert.Nil(t, flush())
+	gotParts := strings.Split(buf.String(), "\t")[1:] // The first item is the timestamp
+	wantParts := []string{
+		"info-0",
+		"console-redaction-test",
+		"this ***** is :*****",
+		"{\"foo\": \"*****\", \"array\": [\"foo\", \"bar\", \"baz\"], \"object\": {\"foo\":\"bar\"}}\n",
+	}
+	assert.Equal(t, wantParts, gotParts)
+}
 
-	// buf1 should get only level 0 logs
-	assert.Equal(t, []string{
-		"info-2\tparent.child",
-		"info-2\tparent.child",
-	}, splitLines(buf.String()))
+func TestGlobalRedaction_JSON(t *testing.T) {
+	oldState := globalRedactor
+	globalRedactor = &dynamicRedactor{
+		denySet: make(map[string]struct{}),
+	}
+	defer func() { globalRedactor = oldState }()
+
+	var jsonBuffer bytes.Buffer
+	logger, flush := New("json-redaction-test",
+		WithJSONSink(&jsonBuffer, WithGlobalRedaction()),
+	)
+	RedactGlobally("foo")
+	RedactGlobally("bar")
+	logger.Info("this foo is :bar",
+		"foo", "bar",
+		"array", []string{"foo", "bar", "baz"},
+		"object", map[string]string{"foo": "bar"})
+	require.NoError(t, flush())
+
+	var parsedJSON map[string]any
+	require.NoError(t, json.Unmarshal(jsonBuffer.Bytes(), &parsedJSON))
+	assert.NotEmpty(t, parsedJSON["ts"])
+	delete(parsedJSON, "ts")
+	assert.Equal(t,
+		map[string]any{
+			"level":  "info-0",
+			"logger": "json-redaction-test",
+			"msg":    "this ***** is :*****",
+			"foo":    "*****",
+			"array":  []any{"foo", "bar", "baz"},
+			"object": map[string]interface{}{"foo": "bar"},
+		},
+		parsedJSON,
+	)
+}
+
+func BenchmarkLoggerRedact(b *testing.B) {
+	msg := "this is a message with 'foo' in it"
+	logKvps := []any{"key", "value", "foo", "bar", "bar", "baz", "longval", "84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa"}
+	redactor := &dynamicRedactor{denySet: make(map[string]struct{})}
+	redactor.replacer.CompareAndSwap(nil, strings.NewReplacer())
+
+	b.Run("no redaction", func(b *testing.B) {
+		logger, flush := New("redaction-benchmark", WithJSONSink(
+			io.Discard,
+			func(conf *sinkConfig) { conf.redactor = redactor },
+		))
+		for i := 0; i < b.N; i++ {
+			logger.Info(msg, logKvps...)
+		}
+		require.NoError(b, flush())
+	})
+	b.Run("1 redaction", func(b *testing.B) {
+		logger, flush := New("redaction-benchmark", WithJSONSink(
+			io.Discard,
+			func(conf *sinkConfig) { conf.redactor = redactor },
+		))
+		redactor.configureForRedaction("84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa")
+		for i := 0; i < b.N; i++ {
+			logger.Info(msg, logKvps...)
+		}
+		require.NoError(b, flush())
+	})
+	b.Run("2 redactions", func(b *testing.B) {
+		logger, flush := New("redaction-benchmark", WithJSONSink(
+			io.Discard,
+			func(conf *sinkConfig) { conf.redactor = redactor },
+		))
+		redactor.configureForRedaction("84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa")
+		redactor.configureForRedaction("foo")
+		for i := 0; i < b.N; i++ {
+			logger.Info(msg, logKvps...)
+		}
+		require.NoError(b, flush())
+	})
+	b.Run("3 redactions", func(b *testing.B) {
+		logger, flush := New("redaction-benchmark", WithJSONSink(
+			io.Discard,
+			func(conf *sinkConfig) { conf.redactor = redactor },
+		))
+		redactor.configureForRedaction("84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa")
+		redactor.configureForRedaction("foo")
+		redactor.configureForRedaction("bar")
+		for i := 0; i < b.N; i++ {
+			logger.Info(msg, logKvps...)
+		}
+		require.NoError(b, flush())
+	})
 }

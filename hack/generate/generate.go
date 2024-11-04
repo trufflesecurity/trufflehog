@@ -43,6 +43,11 @@ func main() {
 				WritePath:     filepath.Join(folderPath(), nameLower+"_test.go"),
 				ReplaceString: []string{"alchemy"},
 			},
+			{
+				TemplatePath:  "pkg/detectors/alchemy/alchemy_integration_test.go",
+				WritePath:     filepath.Join(folderPath(), nameLower+"_integration_test.go"),
+				ReplaceString: []string{"alchemy"},
+			},
 		})
 		// case "source":
 		// 	mustWriteTemplates([]templateJob{

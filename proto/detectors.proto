@@ -654,7 +654,7 @@ enum DetectorType {
   Flightstats = 642;
   ChecIO = 643;
   Manifest = 644;
-  ApiScience = 645;
+  ApiScience = 645 [deprecated = true];
   AppSynergy = 646;
   Caflou = 647;
   Caspio = 648;
@@ -1011,6 +1011,9 @@ enum DetectorType {
   RailwayApp = 999;
   Meraki = 1000;
   SaladCloudApiKey = 1001;
+  Box = 1002;
+  BoxOauth = 1003;
+  ApiMetrics = 1004;
 }
 
 message Result {

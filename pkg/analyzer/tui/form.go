@@ -112,7 +112,7 @@ func (ui FormPage) View() string {
 func (ui FormPage) PrevPage() (tea.Model, tea.Cmd) {
 	page := NewKeyTypePage(ui.Common)
 	// Select what was previously selected.
-	index, ok := slices.BinarySearch(analyzers.AvailableAnalyzers, ui.KeyType)
+	index, ok := slices.BinarySearch(analyzers.AvailableAnalyzers(), ui.KeyType)
 	if !ok {
 		// Should be impossible.
 		index = 0
