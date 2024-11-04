@@ -219,7 +219,7 @@ func (s *Source) scanBuckets(
 			return
 		}
 
-		s.SetProgressComplete(i, len(bucketsToScan), "Bucket: "+bucket, "")
+		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 		ctx.Logger().V(3).Info("Scanning bucket")
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
