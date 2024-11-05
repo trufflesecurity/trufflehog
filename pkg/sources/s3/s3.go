@@ -1,7 +1,9 @@
 package s3
 
 import (
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -173,9 +175,16 @@ func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	return s3.New(sess), nil
 }
 
-// IAM identity needs s3:ListBuckets permission
+// getBucketsToScan returns a list of S3 buckets to scan.
+// If the connection has a list of buckets specified, those are returned.
+// Otherwise, it lists all buckets the client has access to and filters out the ignored ones.
+// The list of buckets is sorted lexicographically to ensure consistent ordering,
+// which allows resuming scanning from the same place if the scan is interrupted.
+//
+// Note: The IAM identity needs the s3:ListBuckets permission.
 func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 	if buckets := s.conn.GetBuckets(); len(buckets) > 0 {
+		slices.Sort(buckets)
 		return buckets, nil
 	}
 
@@ -196,7 +205,15 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 			bucketsToScan = append(bucketsToScan, name)
 		}
 	}
+	slices.Sort(bucketsToScan)
+
 	return bucketsToScan, nil
+}
+
+// ResumeInfo stores the state needed for resuming a scan.
+type ResumeInfo struct {
+	CurrentBucket string `json:"current_bucket"` // Current bucket being scanned
+	StartAfter    string `json:"start_after"`    // Last processed object key
 }
 
 func (s *Source) scanBuckets(
@@ -208,18 +225,36 @@ func (s *Source) scanBuckets(
 ) {
 	var objectCount uint64
 
-	if role != "" {
-		ctx = context.WithValue(ctx, "role", role)
+	// Decode resume information if it exists.
+	var resumeInfo *ResumeInfo
+	if s.Progress.EncodedResumeInfo != "" {
+		if err := json.Unmarshal([]byte(s.Progress.EncodedResumeInfo), &resumeInfo); err != nil {
+			ctx.Logger().Error(
+				err,
+				"failed to decode resume info",
+				"encoded_info", s.Progress.EncodedResumeInfo,
+			)
+		}
 	}
 
-	for i, bucket := range bucketsToScan {
+	startIdx := 0
+	if resumeInfo != nil && resumeInfo.CurrentBucket != "" {
+		startIdx, _ = slices.BinarySearch(bucketsToScan, resumeInfo.CurrentBucket)
+	}
+
+	for i := startIdx; i < len(bucketsToScan); i++ {
+		bucket := bucketsToScan[i]
 		ctx := context.WithValue(ctx, "bucket", bucket)
 
 		if common.IsDone(ctx) {
 			return
 		}
 
-		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
+		// Update progress with current bucket.
+		info := &ResumeInfo{CurrentBucket: bucket}
+		if encoded, err := json.Marshal(info); err == nil {
+			s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), string(encoded))
+		}
 		ctx.Logger().V(3).Info("Scanning bucket")
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
@@ -230,8 +265,15 @@ func (s *Source) scanBuckets(
 
 		errorCount := sync.Map{}
 
+		// Configure ListObjectsV2Input with resume point if needed
+		input := &s3.ListObjectsV2Input{Bucket: &bucket}
+		if resumeInfo != nil && bucket == resumeInfo.CurrentBucket && resumeInfo.StartAfter != "" {
+			input.StartAfter = &resumeInfo.StartAfter
+			ctx.Logger().V(3).Info("Resuming bucket scan", "start_after", resumeInfo.StartAfter)
+		}
+
 		err = regionalClient.ListObjectsV2PagesWithContext(
-			ctx, &s3.ListObjectsV2Input{Bucket: &bucket},
+			ctx, input,
 			func(page *s3.ListObjectsV2Output, _ bool) bool {
 				s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, i+1, &objectCount)
 				return true
@@ -241,14 +283,12 @@ func (s *Source) scanBuckets(
 			if role == "" {
 				ctx.Logger().Error(err, "could not list objects in bucket")
 			} else {
-				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
-				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
-				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
-				// and therefore not an error.
 				ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
 			}
 		}
 	}
+
+	// Clear resume info on completion.
 	s.SetProgressComplete(
 		len(bucketsToScan),
 		len(bucketsToScan),
