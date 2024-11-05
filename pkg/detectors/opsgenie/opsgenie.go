@@ -81,6 +81,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				err := json.NewDecoder(res.Body).Decode(&data)
 				if err != nil {
 					s1.Verified = false
+					// set verification error in result if failed to decode the body of response
+					s1.SetVerificationError(err, resMatch)
 					continue
 				}
 
