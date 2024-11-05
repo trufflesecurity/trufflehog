@@ -45,8 +45,10 @@ type Source struct {
 	jobID       sources.JobID
 	verify      bool
 	concurrency int
+	conn        *sourcespb.S3
+
+	progressTracker *ProgressTracker
 	sources.Progress
-	conn *sourcespb.S3
 
 	errorCount    *sync.Map
 	jobPool       *errgroup.Group
@@ -91,6 +93,8 @@ func (s *Source) Init(
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 	s.conn = &conn
+
+	s.progressTracker = NewProgressTracker(conn.GetEnableResumption(), &s.Progress)
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
@@ -223,6 +227,7 @@ func (s *Source) scanBuckets(
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
 ) {
+
 	var objectCount uint64
 
 	// Decode resume information if it exists.
@@ -272,10 +277,12 @@ func (s *Source) scanBuckets(
 			ctx.Logger().V(3).Info("Resuming bucket scan", "start_after", resumeInfo.StartAfter)
 		}
 
+		pageNumber := 1
 		err = regionalClient.ListObjectsV2PagesWithContext(
 			ctx, input,
 			func(page *s3.ListObjectsV2Output, _ bool) bool {
-				s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, i+1, &objectCount)
+				s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, pageNumber, &objectCount)
+				pageNumber++
 				return true
 			})
 
@@ -340,8 +347,13 @@ func (s *Source) pageChunker(
 	pageNumber int,
 	objectCount *uint64,
 ) {
-	for _, obj := range page.Contents {
+	s.progressTracker.Reset(ctx)
+
+	for objIdx, obj := range page.Contents {
 		if obj == nil {
+			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+				ctx.Logger().Error(err, "could not update progress for nil object")
+			}
 			continue
 		}
 
@@ -360,24 +372,36 @@ func (s *Source) pageChunker(
 		// Skip GLACIER and GLACIER_IR objects.
 		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
 			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass)
+			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+				ctx.Logger().Error(err, "could not update progress for glacier object")
+			}
 			continue
 		}
 
 		// Ignore large files.
 		if *obj.Size > s.maxObjectSize {
 			ctx.Logger().V(5).Info("Skipping %d byte file (over maxObjectSize limit)")
+			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+				ctx.Logger().Error(err, "could not update progress for large file")
+			}
 			continue
 		}
 
 		// File empty file.
 		if *obj.Size == 0 {
 			ctx.Logger().V(5).Info("Skipping empty file")
+			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+				ctx.Logger().Error(err, "could not update progress for empty file")
+			}
 			continue
 		}
 
 		// Skip incompatible extensions.
 		if common.SkipFile(*obj.Key) {
 			ctx.Logger().V(5).Info("Skipping file with incompatible extension")
+			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+				ctx.Logger().Error(err, "could not update progress for incompatible file")
+			}
 			continue
 		}
 
@@ -477,6 +501,11 @@ func (s *Source) pageChunker(
 			}
 			if nErr.(int) > 0 {
 				errorCount.Store(prefix, 0)
+			}
+
+			// Update progress after successful processing.
+			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+				ctx.Logger().Error(err, "could not update progress for scanned object")
 			}
 
 			return nil
