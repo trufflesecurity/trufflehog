@@ -2,6 +2,7 @@ package s3
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -13,25 +14,31 @@ import (
 
 // ProgressTracker maintains scan progress state for S3 bucket scanning,
 // enabling resumable scans by tracking which objects have been successfully processed.
-// It ensures scan reliability by maintaining checkpoints that can be used to resume
-// interrupted scans without missing objects.
+// It provides checkpoints that can be used to resume interrupted scans without missing objects.
 type ProgressTracker struct {
 	enabled bool
 
 	// completedObjects tracks which indices in the current page have been processed.
 	sync.Mutex
-	completedObjects map[int]bool
+	completedObjects []bool
 
 	// progress holds the scan's overall progress state and enables persistence.
 	progress *sources.Progress // Reference to source's Progress
 }
 
+const defaultMaxObjectsPerPage = 1000
+
 // NewProgressTracker creates a new progress tracker for S3 scanning operations.
 // The enabled parameter determines if progress tracking is active, and progress
 // provides the underlying mechanism for persisting scan state.
-func NewProgressTracker(enabled bool, progress *sources.Progress) *ProgressTracker {
+func NewProgressTracker(ctx context.Context, enabled bool, progress *sources.Progress) *ProgressTracker {
+	if progress == nil {
+		ctx.Logger().Info("Nil progress provided. Progress initialized.")
+		progress = new(sources.Progress)
+	}
+
 	return &ProgressTracker{
-		completedObjects: make(map[int]bool),
+		completedObjects: make([]bool, defaultMaxObjectsPerPage),
 		enabled:          enabled,
 		progress:         progress,
 	}
@@ -45,16 +52,87 @@ func (p *ProgressTracker) Reset(_ context.Context) {
 
 	p.Lock()
 	defer p.Unlock()
-	for k := range p.completedObjects {
-		delete(p.completedObjects, k)
-	}
+	p.completedObjects = p.completedObjects[:0]
 }
 
-// UpdateProgress records a successfully processed object and updates the scan's resume point.
-// It maintains a conservative checkpoint strategy by tracking consecutive completions,
-// ensuring no objects are missed when resuming an interrupted scan at the cost of
-// potentially re-scanning some objects.
-func (p *ProgressTracker) UpdateProgress(
+// ResumeInfo represents the state needed to resume an interrupted operation.
+// It contains the necessary information to continue processing from the last
+// successfully processed item.
+type ResumeInfo struct {
+	CurrentBucket string `json:"current_bucket"` // Current bucket being scanned
+	StartAfter    string `json:"start_after"`    // Last processed object key
+}
+
+// GetResumePoint retrieves the last saved checkpoint state if one exists.
+// It returns nil if progress tracking is disabled or no resume state exists.
+// This method decodes the stored resume information and validates it contains
+// the minimum required data to enable resumption.
+func (p *ProgressTracker) GetResumePoint(ctx context.Context) (ResumeInfo, error) {
+	resume := ResumeInfo{}
+	if p.progress == nil {
+		return resume, errors.New("progress is nil, progress is required for resuming")
+	}
+
+	if !p.enabled || p.progress.EncodedResumeInfo == "" {
+		return resume, nil
+	}
+
+	var resumeInfo ResumeInfo
+	if err := json.Unmarshal([]byte(p.progress.EncodedResumeInfo), &resumeInfo); err != nil {
+		return resume, fmt.Errorf("failed to decode resume info: %w", err)
+	}
+
+	if resumeInfo.CurrentBucket == "" {
+		ctx.Logger().V(2).Info("resume info is missing current bucket, resuming from the beginning")
+		return resume, nil
+	}
+
+	return ResumeInfo{
+		CurrentBucket: resumeInfo.CurrentBucket,
+		StartAfter:    resumeInfo.StartAfter,
+	}, nil
+}
+
+// UpdateScanProgress updates the overall progress state with current position and optionally
+// stores resume information. This method is used both for incremental updates during processing
+// and for finalizing operations.
+//
+// The method is safe for concurrent use and will not update progress if tracking is disabled.
+func (p *ProgressTracker) UpdateScanProgress(
+	_ context.Context,
+	currentIdx int,
+	total int,
+	message string,
+	resumeInfo ResumeInfo,
+) error {
+	if !p.enabled {
+		return nil
+	}
+
+	var encodedInfo string
+	encoded, err := json.Marshal(resumeInfo)
+	if err != nil {
+		return fmt.Errorf("failed to encode resume info: %w", err)
+	}
+	encodedInfo = string(encoded)
+
+	p.progress.SetProgressComplete(currentIdx, total, message, encodedInfo)
+	return nil
+}
+
+// UpdateObjectProgress records successfully processed objects within the current page
+// and maintains fine-grained resumption checkpoints. It uses a conservative tracking
+// strategy that ensures no objects are missed by only checkpointing consecutively
+// completed objects.
+//
+// This method manages the detailed object-level progress tracking and creates
+// checkpoints that enable resumption of interrupted scans.
+//
+// This approach ensures scan reliability by only checkpointing consecutively completed
+// objects. While this may result in re-scanning some objects when resuming, it guarantees
+// no objects are missed in case of interruption. The linear search through page contents
+// is efficient given the fixed maximum page size of 1000 objects.
+func (p *ProgressTracker) UpdateObjectProgress(
 	ctx context.Context,
 	completedIdx int,
 	bucket string,
@@ -73,59 +151,40 @@ func (p *ProgressTracker) UpdateProgress(
 	)
 	ctx.Logger().V(5).Info("Updating progress")
 
+	if completedIdx >= len(p.completedObjects) {
+		return fmt.Errorf("completed index %d exceeds maximum page size", completedIdx)
+	}
+
 	p.Lock()
 	defer p.Unlock()
 
 	p.completedObjects[completedIdx] = true
 
-	// updateResumePoint maintains a checkpoint of successfully scanned objects
-	// to enable scan resumption. It tracks the last consecutively completed object
-	// in the page (up to 1000 objects) as a checkpoint. When scanning resumes,
-	// it will start from this checkpoint, which may result in re-scanning some
-	// objects to ensure no objects are missed.
-	// This conservative approach prioritizes completeness over efficiency.
-	//
-	// The function uses a linear search through page.Contents (max 1000 objects) to find
-	// the latest consecutive completed object. While more efficient implementations are
-	// possible, the current approach is performant enough given the small fixed size
-	// of page.Contents.
+	// Find the highest consecutive completed index.
+	lastConsecutiveIdx := -1
 	for i := 0; i <= completedIdx; i++ {
-		if p.completedObjects[i] {
-			continue
+		if !p.completedObjects[i] {
+			break
 		}
-
-		// Found a gap - use previous index if it exists.
-		if i > 0 {
-			obj := pageContents[i-1]
-			info := &ResumeInfo{CurrentBucket: bucket, StartAfter: *obj.Key}
-			encoded, err := json.Marshal(info)
-			if err != nil {
-				return err
-			}
-
-			p.progress.SetProgressComplete(
-				pageNumber-1,
-				len(pageContents),
-				fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
-				string(encoded),
-			)
-		}
-		return nil
+		lastConsecutiveIdx = i
 	}
 
-	// If we get here, all objects up to completedIdx are done.
-	obj := pageContents[completedIdx]
-	info := &ResumeInfo{CurrentBucket: bucket, StartAfter: *obj.Key}
-	encoded, err := json.Marshal(info)
-	if err != nil {
-		return err
+	// Update progress if we have at least one completed object.
+	if lastConsecutiveIdx >= 0 {
+		obj := pageContents[lastConsecutiveIdx]
+		info := &ResumeInfo{CurrentBucket: bucket, StartAfter: *obj.Key}
+		encoded, err := json.Marshal(info)
+		if err != nil {
+			return err
+		}
+
+		p.progress.SetProgressComplete(
+			pageNumber-1,
+			len(pageContents),
+			fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
+			string(encoded),
+		)
 	}
 
-	p.progress.SetProgressComplete(
-		pageNumber-1,
-		len(pageContents),
-		fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
-		string(encoded),
-	)
 	return nil
 }

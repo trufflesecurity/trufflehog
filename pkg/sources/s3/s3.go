@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -71,7 +70,7 @@ func (s *Source) JobID() sources.JobID { return s.jobID }
 
 // Init returns an initialized AWS source
 func (s *Source) Init(
-	_ context.Context,
+	ctx context.Context,
 	name string,
 	jobID sources.JobID,
 	sourceID sources.SourceID,
@@ -94,7 +93,7 @@ func (s *Source) Init(
 	}
 	s.conn = &conn
 
-	s.progressTracker = NewProgressTracker(conn.GetEnableResumption(), &s.Progress)
+	s.progressTracker = NewProgressTracker(ctx, conn.GetEnableResumption(), &s.Progress)
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
@@ -214,12 +213,6 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 	return bucketsToScan, nil
 }
 
-// ResumeInfo stores the state needed for resuming a scan.
-type ResumeInfo struct {
-	CurrentBucket string `json:"current_bucket"` // Current bucket being scanned
-	StartAfter    string `json:"start_after"`    // Last processed object key
-}
-
 func (s *Source) scanBuckets(
 	ctx context.Context,
 	client *s3.S3,
@@ -227,27 +220,19 @@ func (s *Source) scanBuckets(
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
 ) {
-
 	var objectCount uint64
 
-	// Decode resume information if it exists.
-	var resumeInfo *ResumeInfo
-	if s.Progress.EncodedResumeInfo != "" {
-		if err := json.Unmarshal([]byte(s.Progress.EncodedResumeInfo), &resumeInfo); err != nil {
-			ctx.Logger().Error(
-				err,
-				"failed to decode resume info",
-				"encoded_info", s.Progress.EncodedResumeInfo,
-			)
-		}
+	// Determine starting point for resuming scan.
+	resumePoint, err := s.progressTracker.GetResumePoint(ctx)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to get resume point")
+		return
 	}
 
-	startIdx := 0
-	if resumeInfo != nil && resumeInfo.CurrentBucket != "" {
-		startIdx, _ = slices.BinarySearch(bucketsToScan, resumeInfo.CurrentBucket)
-	}
+	startIdx, _ := slices.BinarySearch(bucketsToScan, resumePoint.CurrentBucket)
 
-	for i := startIdx; i < len(bucketsToScan); i++ {
+	bucketsToScanCount := len(bucketsToScan)
+	for i := startIdx; i < bucketsToScanCount; i++ {
 		bucket := bucketsToScan[i]
 		ctx := context.WithValue(ctx, "bucket", bucket)
 
@@ -256,10 +241,18 @@ func (s *Source) scanBuckets(
 		}
 
 		// Update progress with current bucket.
-		info := &ResumeInfo{CurrentBucket: bucket}
-		if encoded, err := json.Marshal(info); err == nil {
-			s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), string(encoded))
+		err := s.progressTracker.UpdateScanProgress(
+			ctx,
+			i,
+			bucketsToScanCount,
+			fmt.Sprintf("Bucket: %s", bucket),
+			ResumeInfo{CurrentBucket: bucket},
+		)
+		if err != nil {
+			ctx.Logger().Error(err, "failed to update progress")
+			continue
 		}
+
 		ctx.Logger().V(3).Info("Scanning bucket")
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
@@ -272,9 +265,12 @@ func (s *Source) scanBuckets(
 
 		// Configure ListObjectsV2Input with resume point if needed
 		input := &s3.ListObjectsV2Input{Bucket: &bucket}
-		if resumeInfo != nil && bucket == resumeInfo.CurrentBucket && resumeInfo.StartAfter != "" {
-			input.StartAfter = &resumeInfo.StartAfter
-			ctx.Logger().V(3).Info("Resuming bucket scan", "start_after", resumeInfo.StartAfter)
+		if bucket == resumePoint.CurrentBucket && resumePoint.StartAfter != "" {
+			input.StartAfter = &resumePoint.StartAfter
+			ctx.Logger().V(3).Info(
+				"Resuming bucket scan",
+				"start_after", resumePoint.StartAfter,
+			)
 		}
 
 		pageNumber := 1
@@ -295,13 +291,15 @@ func (s *Source) scanBuckets(
 		}
 	}
 
-	// Clear resume info on completion.
-	s.SetProgressComplete(
-		len(bucketsToScan),
-		len(bucketsToScan),
+	if err := s.progressTracker.UpdateScanProgress(
+		ctx,
+		bucketsToScanCount,
+		bucketsToScanCount,
 		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount),
-		"",
-	)
+		resumePoint,
+	); err != nil {
+		ctx.Logger().Error(err, "failed to update final progress")
+	}
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -351,7 +349,7 @@ func (s *Source) pageChunker(
 
 	for objIdx, obj := range page.Contents {
 		if obj == nil {
-			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
 				ctx.Logger().Error(err, "could not update progress for nil object")
 			}
 			continue
@@ -372,7 +370,7 @@ func (s *Source) pageChunker(
 		// Skip GLACIER and GLACIER_IR objects.
 		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
 			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass)
-			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
 				ctx.Logger().Error(err, "could not update progress for glacier object")
 			}
 			continue
@@ -381,7 +379,7 @@ func (s *Source) pageChunker(
 		// Ignore large files.
 		if *obj.Size > s.maxObjectSize {
 			ctx.Logger().V(5).Info("Skipping %d byte file (over maxObjectSize limit)")
-			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
 				ctx.Logger().Error(err, "could not update progress for large file")
 			}
 			continue
@@ -390,7 +388,7 @@ func (s *Source) pageChunker(
 		// File empty file.
 		if *obj.Size == 0 {
 			ctx.Logger().V(5).Info("Skipping empty file")
-			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
 				ctx.Logger().Error(err, "could not update progress for empty file")
 			}
 			continue
@@ -399,7 +397,7 @@ func (s *Source) pageChunker(
 		// Skip incompatible extensions.
 		if common.SkipFile(*obj.Key) {
 			ctx.Logger().V(5).Info("Skipping file with incompatible extension")
-			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
 				ctx.Logger().Error(err, "could not update progress for incompatible file")
 			}
 			continue
@@ -504,7 +502,7 @@ func (s *Source) pageChunker(
 			}
 
 			// Update progress after successful processing.
-			if err := s.progressTracker.UpdateProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
 				ctx.Logger().Error(err, "could not update progress for scanned object")
 			}
 
