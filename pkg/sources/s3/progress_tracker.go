@@ -93,30 +93,20 @@ func (p *ProgressTracker) GetResumePoint(ctx context.Context) (ResumeInfo, error
 	}, nil
 }
 
-// UpdateScanProgress updates the overall progress state with current position and optionally
-// stores resume information. This method is used both for incremental updates during processing
-// and for finalizing operations.
-//
-// The method is safe for concurrent use and will not update progress if tracking is disabled.
-func (p *ProgressTracker) UpdateScanProgress(
-	_ context.Context,
-	currentIdx int,
-	total int,
-	message string,
-	resumeInfo ResumeInfo,
-) error {
+// Complete marks the entire scanning operation as finished and clears the resume state.
+// This should only be called once all scanning operations are complete.
+func (p *ProgressTracker) Complete(_ context.Context, message string) error {
 	if !p.enabled {
 		return nil
 	}
 
-	var encodedInfo string
-	encoded, err := json.Marshal(resumeInfo)
-	if err != nil {
-		return fmt.Errorf("failed to encode resume info: %w", err)
-	}
-	encodedInfo = string(encoded)
-
-	p.progress.SetProgressComplete(currentIdx, total, message, encodedInfo)
+	// Preserve existing progress counters while clearing resume state.
+	p.progress.SetProgressComplete(
+		int(p.progress.SectionsCompleted),
+		int(p.progress.SectionsRemaining),
+		message,
+		"", // Clear resume info as scanning is complete
+	)
 	return nil
 }
 

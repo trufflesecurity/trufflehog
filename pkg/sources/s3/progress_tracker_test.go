@@ -367,63 +367,104 @@ func TestProgressTrackerUpdateProgressNoResume(t *testing.T) {
 	}
 }
 
-func TestUpdateScanProgress(t *testing.T) {
+func TestComplete(t *testing.T) {
 	tests := []struct {
-		name        string
-		enabled     bool
-		currentIdx  int
-		total       int
-		message     string
-		resumeInfo  ResumeInfo
-		expectError bool
+		name         string
+		enabled      bool
+		initialState struct {
+			sectionsCompleted uint64
+			sectionsRemaining uint64
+			resumeInfo        string
+			message           string
+		}
+		completeMessage string
+		wantState       struct {
+			sectionsCompleted uint64
+			sectionsRemaining uint64
+			resumeInfo        string
+			message           string
+		}
 	}{
 		{
-			name:       "basic progress update",
-			enabled:    true,
-			currentIdx: 50,
-			total:      100,
-			message:    "Processing bucket contents",
-			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "key-50"},
+			name:    "marks completion with existing progress",
+			enabled: true,
+			initialState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 100,
+				sectionsRemaining: 100,
+				resumeInfo:        `{"CurrentBucket":"test-bucket","StartAfter":"some-key"}`,
+				message:           "In progress",
+			},
+			completeMessage: "Scan complete",
+			wantState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 100, // Should preserve existing progress
+				sectionsRemaining: 100, // Should preserve existing progress
+				resumeInfo:        "",  // Should clear resume info
+				message:           "Scan complete",
+			},
 		},
 		{
-			name:       "zero values",
-			enabled:    true,
-			currentIdx: 0,
-			total:      0,
-			message:    "",
-			resumeInfo: ResumeInfo{},
+			name:    "disabled tracker",
+			enabled: false,
+			initialState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 50,
+				sectionsRemaining: 100,
+				resumeInfo:        `{"CurrentBucket":"test-bucket","StartAfter":"some-key"}`,
+				message:           "Should not change",
+			},
+			completeMessage: "Completed",
+			wantState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 50,
+				sectionsRemaining: 100,
+				resumeInfo:        `{"CurrentBucket":"test-bucket","StartAfter":"some-key"}`,
+				message:           "Should not change",
+			},
 		},
 		{
-			name:       "disabled tracker",
-			enabled:    false,
-			currentIdx: 25,
-			total:      50,
-			message:    "Should not update",
-			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "key-25"},
-		},
-		{
-			name:       "max values",
-			enabled:    true,
-			currentIdx: 999999,
-			total:      1000000,
-			message:    "Processing large dataset",
-			resumeInfo: ResumeInfo{CurrentBucket: "large-bucket", StartAfter: "key-999999"},
-		},
-		{
-			name:       "special characters in message",
-			enabled:    true,
-			currentIdx: 10,
-			total:      20,
-			message:    "Processing 特殊字符 & symbols !@#$%",
-			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "key-with-特殊字符"},
-		},
-		{
-			name:       "current greater than total",
-			enabled:    true,
-			currentIdx: 100,
-			total:      50,
-			message:    "Invalid progress state",
-			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "last-key"},
+			name:    "completes with special characters",
+			enabled: true,
+			initialState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 75,
+				sectionsRemaining: 75,
+				resumeInfo:        `{"CurrentBucket":"bucket","StartAfter":"key"}`,
+				message:           "In progress",
+			},
+			completeMessage: "Completed scanning 特殊字符 & symbols !@#$%",
+			wantState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 75,
+				sectionsRemaining: 75,
+				resumeInfo:        "",
+				message:           "Completed scanning 特殊字符 & symbols !@#$%",
+			},
 		},
 	}
 
@@ -432,32 +473,21 @@ func TestUpdateScanProgress(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			progress := new(sources.Progress)
+			progress := &sources.Progress{
+				SectionsCompleted: int32(tt.initialState.sectionsCompleted),
+				SectionsRemaining: int32(tt.initialState.sectionsRemaining),
+				EncodedResumeInfo: tt.initialState.resumeInfo,
+				Message:           tt.initialState.message,
+			}
 			tracker := NewProgressTracker(ctx, tt.enabled, progress)
 
-			err := tracker.UpdateScanProgress(ctx, tt.currentIdx, tt.total, tt.message, tt.resumeInfo)
-			if tt.expectError {
-				assert.Error(t, err)
-				return
-			}
+			err := tracker.Complete(ctx, tt.completeMessage)
 			assert.NoError(t, err)
 
-			if !tt.enabled {
-				assert.Empty(t, progress.EncodedResumeInfo)
-				assert.Zero(t, progress.SectionsRemaining)
-				assert.Zero(t, progress.SectionsCompleted)
-				assert.Empty(t, progress.Message)
-				return
-			}
-
-			assert.Equal(t, tt.currentIdx, int(progress.SectionsCompleted))
-			assert.Equal(t, tt.total, int(progress.SectionsRemaining))
-			assert.Equal(t, tt.message, progress.Message)
-
-			var decodedInfo ResumeInfo
-			err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &decodedInfo)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.resumeInfo, decodedInfo)
+			assert.Equal(t, int32(tt.wantState.sectionsCompleted), progress.SectionsCompleted)
+			assert.Equal(t, int32(tt.wantState.sectionsRemaining), progress.SectionsRemaining)
+			assert.Equal(t, tt.wantState.resumeInfo, progress.EncodedResumeInfo)
+			assert.Equal(t, tt.wantState.message, progress.Message)
 		})
 	}
 }
