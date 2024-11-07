@@ -12,6 +12,49 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
+func TestProgressTrackerResumption(t *testing.T) {
+	ctx := context.Background()
+
+	// First scan - process 6 objects then interrupt.
+	initialProgress := &sources.Progress{}
+	tracker := NewProgressTracker(ctx, true, initialProgress)
+
+	firstPage := &s3.ListObjectsV2Output{
+		Contents: make([]*s3.Object, 12), // Total of 12 objects
+	}
+	for i := range 12 {
+		key := fmt.Sprintf("key-%d", i)
+		firstPage.Contents[i] = &s3.Object{Key: &key}
+	}
+
+	// Process first 6 objects.
+	for i := range 6 {
+		err := tracker.UpdateObjectProgress(ctx, i, "test-bucket", firstPage.Contents)
+		assert.NoError(t, err)
+	}
+
+	// Verify state after the intial scan.
+	assert.Equal(t, 6, int(initialProgress.SectionsCompleted), "Should have 6 completed")
+	assert.Equal(t, 12, int(initialProgress.SectionsRemaining), "Should have 12 total")
+
+	// Resume scan with existing progress.
+	resumeTracker := NewProgressTracker(ctx, true, initialProgress)
+	resumePage := &s3.ListObjectsV2Output{
+		Contents: firstPage.Contents[6:], // Remaining 6 objects
+	}
+
+	// Process remaining objects.
+	for i := range len(resumePage.Contents) {
+		err := resumeTracker.UpdateObjectProgress(ctx, i, "test-bucket", resumePage.Contents)
+		assert.NoError(t, err)
+	}
+
+	assert.Equal(t, 12, int(initialProgress.SectionsCompleted),
+		"Should have 12 total completed sections")
+	assert.Equal(t, 12, int(initialProgress.SectionsRemaining),
+		"Should have 12 total sections")
+}
+
 func TestProgressTrackerReset(t *testing.T) {
 	tests := []struct {
 		name    string

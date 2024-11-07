@@ -18,6 +18,7 @@ import (
 type ProgressTracker struct {
 	enabled bool
 
+	isResuming bool // Indicates if the tracker is resuming a previous scan
 	// completedObjects tracks which indices in the current page have been processed.
 	sync.Mutex
 	completedObjects []bool
@@ -41,9 +42,13 @@ func NewProgressTracker(ctx context.Context, enabled bool, progress *sources.Pro
 	}
 
 	return &ProgressTracker{
+		// We are resuming if we have completed objects from a previous scan.
+		isResuming:       progress.SectionsCompleted > 0 || progress.SectionsRemaining > 0,
 		completedObjects: make([]bool, defaultMaxObjectsPerPage),
+		completionOrder:  make([]int, 0, defaultMaxObjectsPerPage),
 		enabled:          enabled,
 		progress:         progress,
+		baseCompleted:    progress.SectionsCompleted,
 	}
 }
 
@@ -152,7 +157,10 @@ func (p *ProgressTracker) UpdateObjectProgress(
 	// Update remaining count only once per page.
 	pageSize := int32(len(pageContents))
 	if p.currentPageSize == 0 {
-		p.progress.SectionsRemaining += pageSize
+		if !p.isResuming {
+			// Only add to the total if this is a fresh scan.
+			p.progress.SectionsRemaining += pageSize
+		}
 		p.currentPageSize = pageSize
 	}
 
