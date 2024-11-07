@@ -3754,6 +3754,8 @@ func (m *S3) validate(all bool) error {
 
 	// no validation rules for MaxObjectSize
 
+	// no validation rules for EnableResumption
+
 	switch v := m.Credential.(type) {
 	case *S3_AccessKey:
 		if v == nil {
