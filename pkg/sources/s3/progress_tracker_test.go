@@ -134,7 +134,7 @@ func TestProgressTrackerUpdateProgressDisabled(t *testing.T) {
 	progress := new(sources.Progress)
 	tracker, page := setupTestTracker(t, false, progress, 5)
 
-	err := tracker.UpdateObjectProgress(context.Background(), 1, "test-bucket", page.Contents, 1)
+	err := tracker.UpdateObjectProgress(context.Background(), 1, "test-bucket", page.Contents)
 	assert.NoError(t, err, "Error updating progress when tracker disabled")
 
 	assert.Empty(t, progress.EncodedResumeInfo, "Progress updated when tracker disabled")
@@ -146,73 +146,167 @@ func TestProgressTrackerUpdateProgressCompletedIdxOOR(t *testing.T) {
 	progress := new(sources.Progress)
 	tracker, page := setupTestTracker(t, true, progress, 5)
 
-	err := tracker.UpdateObjectProgress(context.Background(), 1001, "test-bucket", page.Contents, 1)
+	err := tracker.UpdateObjectProgress(context.Background(), 1001, "test-bucket", page.Contents)
 	assert.Error(t, err, "Expected error when completedIdx out of range")
 
 	assert.Empty(t, progress.EncodedResumeInfo, "Progress updated when tracker disabled")
 }
 
+func TestProgressTrackerSequence(t *testing.T) {
+	tests := []struct {
+		name        string
+		description string
+		// Each update is a sequence of {completedIdx, expectedCompleted, expectedRemaining}
+		updates  [][3]int
+		pageSize int
+	}{
+		{
+			name:        "multiple updates same page",
+			description: "Verify remaining count isn't doubled and completed accumulates correctly",
+			pageSize:    5,
+			updates: [][3]int{
+				{0, 1, 5}, // First object - should set remaining to 5
+				{1, 2, 5}, // Second object - remaining should stay 5
+				{2, 3, 5}, // Third object - remaining should stay 5
+				{4, 3, 5}, // Gap at index 3 - completed should stay at 3
+			},
+		},
+		{
+			name:        "across page boundaries",
+			description: "Verify completed count accumulates across pages",
+			pageSize:    3,
+			updates: [][3]int{
+				// First page
+				{0, 1, 3},
+				{1, 2, 3},
+				{2, 3, 3},
+				// Reset and start new page.
+				{0, 4, 6}, // baseCompleted(3) + current(1)
+				{1, 5, 6}, // baseCompleted(3) + current(2)
+				{2, 6, 6}, // baseCompleted(3) + current(3)
+			},
+		},
+		{
+			name:        "incomplete page transition",
+			description: "Verify incomplete page properly sets base completed",
+			pageSize:    4,
+			updates: [][3]int{
+				// First page - only complete first 2.
+				{0, 1, 4},
+				{1, 2, 4},
+				// Skip 2,3 and move to next page.
+				// Reset and start new page.
+				{0, 3, 8}, // baseCompleted(2) + current(1)
+				{1, 4, 8}, // baseCompleted(2) + current(2)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			progress := new(sources.Progress)
+			tracker, page := setupTestTracker(t, true, progress, tt.pageSize)
+
+			pageCount := 0
+			for i, update := range tt.updates {
+				completedIdx, expectedCompleted, expectedRemaining := update[0], update[1], update[2]
+
+				// If this update starts a new page.
+				if completedIdx == 0 && i > 0 {
+					pageCount++
+					tracker.Reset(ctx)
+					// Create new page with same size.
+					page = &s3.ListObjectsV2Output{Contents: make([]*s3.Object, tt.pageSize)}
+					for j := range tt.pageSize {
+						key := fmt.Sprintf("page%d-key-%d", pageCount, j)
+						page.Contents[j] = &s3.Object{Key: &key}
+					}
+				}
+
+				err := tracker.UpdateObjectProgress(ctx, completedIdx, "test-bucket", page.Contents)
+				assert.NoError(t, err, "Unexpected error updating progress")
+
+				assert.Equal(t, expectedCompleted, int(progress.SectionsCompleted),
+					"Incorrect completed count at update %d", i)
+				assert.Equal(t, expectedRemaining, int(progress.SectionsRemaining),
+					"Incorrect remaining count at update %d", i)
+			}
+		})
+	}
+}
+
 func TestProgressTrackerUpdateProgressWithResume(t *testing.T) {
 	tests := []struct {
 		name         string
-		description  string // documents test purpose
+		description  string
 		completedIdx int
 		pageSize     int
 		preCompleted map[int]bool
-		pageNumber   int
-		expectedKey  string // key we expect to be set in resume info
+
+		expectedKey       string
+		expectedCompleted int
+		expectedRemaining int
 	}{
 		{
-			name:         "first object completed",
-			description:  "Basic case - completing first object",
-			completedIdx: 0,
-			pageSize:     3,
-			pageNumber:   1,
-			expectedKey:  "key-0",
+			name:              "first object completed",
+			description:       "Basic case - completing first object",
+			completedIdx:      0,
+			pageSize:          3,
+			expectedKey:       "key-0",
+			expectedCompleted: 1, // Only first object completed
+			expectedRemaining: 3, // Total objects in page
 		},
 		{
-			name:         "completing missing middle",
-			description:  "Completing object when previous is done",
-			completedIdx: 1,
-			pageSize:     3,
-			preCompleted: map[int]bool{0: true},
-			pageNumber:   1,
-			expectedKey:  "key-1",
+			name:              "completing missing middle",
+			description:       "Completing object when previous is done",
+			completedIdx:      1,
+			pageSize:          3,
+			preCompleted:      map[int]bool{0: true},
+			expectedKey:       "key-1",
+			expectedCompleted: 2, // First two objects completed
+			expectedRemaining: 3, // Total objects in page
 		},
 		{
-			name:         "completing first with last done",
-			description:  "Completing first object when last is already done",
-			completedIdx: 0,
-			pageSize:     3,
-			preCompleted: map[int]bool{2: true},
-			pageNumber:   1,
-			expectedKey:  "key-0",
+			name:              "completing first with last done",
+			description:       "Completing first object when last is already done",
+			completedIdx:      0,
+			pageSize:          3,
+			preCompleted:      map[int]bool{2: true},
+			expectedKey:       "key-0",
+			expectedCompleted: 1, // Only first object counts due to gap
+			expectedRemaining: 3, // Total objects in page
 		},
 		{
-			name:         "all objects completed in order",
-			description:  "Completing final object in sequence",
-			completedIdx: 2,
-			pageSize:     3,
-			preCompleted: map[int]bool{0: true, 1: true},
-			pageNumber:   1,
-			expectedKey:  "key-2",
+			name:              "all objects completed in order",
+			description:       "Completing final object in sequence",
+			completedIdx:      2,
+			pageSize:          3,
+			preCompleted:      map[int]bool{0: true, 1: true},
+			expectedKey:       "key-2",
+			expectedCompleted: 3, // All objects completed
+			expectedRemaining: 3, // Total objects in page
 		},
 		{
-			name:         "completing middle gaps",
-			description:  "Completing object with gaps in sequence",
-			completedIdx: 5,
-			pageSize:     10,
-			preCompleted: map[int]bool{0: true, 1: true, 2: true, 4: true},
-			pageNumber:   1,
-			expectedKey:  "key-2",
+			name:              "completing middle gaps",
+			description:       "Completing object with gaps in sequence",
+			completedIdx:      5,
+			pageSize:          10,
+			preCompleted:      map[int]bool{0: true, 1: true, 2: true, 4: true},
+			expectedKey:       "key-2", // Last consecutive completed
+			expectedCompleted: 3,       // Only first 3 count due to gap
+			expectedRemaining: 10,      // Total objects in page
 		},
 		{
-			name:         "zero index with empty pre-completed",
-			description:  "Edge case - minimum valid index",
-			completedIdx: 0,
-			pageSize:     1,
-			pageNumber:   1,
-			expectedKey:  "key-0",
+			name:              "zero index with empty pre-completed",
+			description:       "Edge case - minimum valid index",
+			completedIdx:      0,
+			pageSize:          1,
+			expectedKey:       "key-0",
+			expectedCompleted: 1,
+			expectedRemaining: 1,
 		},
 		{
 			name:         "last index in max page",
@@ -221,13 +315,14 @@ func TestProgressTrackerUpdateProgressWithResume(t *testing.T) {
 			pageSize:     1000,
 			preCompleted: func() map[int]bool {
 				m := make(map[int]bool)
-				for i := range 1000 {
+				for i := range 999 {
 					m[i] = true
 				}
 				return m
 			}(),
-			pageNumber:  1,
-			expectedKey: "key-999",
+			expectedKey:       "key-999",
+			expectedCompleted: 1000, // All objects completed
+			expectedRemaining: 1000, // Total objects in page
 		},
 		{
 			name:         "all previous completed",
@@ -241,17 +336,19 @@ func TestProgressTrackerUpdateProgressWithResume(t *testing.T) {
 				}
 				return m
 			}(),
-			pageNumber:  1,
-			expectedKey: "key-100",
+			expectedKey:       "key-100",
+			expectedCompleted: 101, // All objects completed
+			expectedRemaining: 101, // Total objects in page
 		},
 		{
-			name:         "large page number completion",
-			description:  "Edge case - very large page number",
-			completedIdx: 5,
-			pageSize:     10,
-			preCompleted: map[int]bool{0: true, 1: true, 2: true, 3: true, 4: true},
-			pageNumber:   999999,
-			expectedKey:  "key-5",
+			name:              "large page number completion",
+			description:       "Edge case - very large page number",
+			completedIdx:      5,
+			pageSize:          10,
+			preCompleted:      map[int]bool{0: true, 1: true, 2: true, 3: true, 4: true},
+			expectedKey:       "key-5",
+			expectedCompleted: 6,  // First 6 objects completed
+			expectedRemaining: 10, // Total objects in page
 		},
 	}
 
@@ -269,14 +366,21 @@ func TestProgressTrackerUpdateProgressWithResume(t *testing.T) {
 				}
 			}
 
-			err := tracker.UpdateObjectProgress(ctx, tt.completedIdx, "test-bucket", page.Contents, tt.pageNumber)
+			err := tracker.UpdateObjectProgress(ctx, tt.completedIdx, "test-bucket", page.Contents)
 			assert.NoError(t, err, "Unexpected error updating progress")
 
+			// Verify resume info.
 			assert.NotEmpty(t, progress.EncodedResumeInfo, "Expected progress update")
 			var info ResumeInfo
 			err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &info)
 			assert.NoError(t, err, "Failed to decode resume info")
 			assert.Equal(t, tt.expectedKey, info.StartAfter, "Incorrect resume point")
+
+			// Verify progress counts.
+			assert.Equal(t, tt.expectedCompleted, int(progress.SectionsCompleted),
+				"Incorrect completed count")
+			assert.Equal(t, tt.expectedRemaining, int(progress.SectionsRemaining),
+				"Incorrect remaining count")
 		})
 	}
 }
@@ -288,21 +392,18 @@ func TestProgressTrackerUpdateProgressNoResume(t *testing.T) {
 		completedIdx int
 		pageSize     int
 		preCompleted map[int]bool
-		pageNumber   int
 	}{
 		{
 			name:         "middle object completed first",
 			description:  "Basic case - completing middle object first",
 			completedIdx: 1,
 			pageSize:     3,
-			pageNumber:   1,
 		},
 		{
 			name:         "last object completed first",
 			description:  "Basic case - completing last object first",
 			completedIdx: 2,
 			pageSize:     3,
-			pageNumber:   1,
 		},
 		{
 			name:         "multiple gaps",
@@ -310,7 +411,6 @@ func TestProgressTrackerUpdateProgressNoResume(t *testing.T) {
 			completedIdx: 5,
 			pageSize:     10,
 			preCompleted: map[int]bool{1: true, 3: true, 4: true},
-			pageNumber:   1,
 		},
 		{
 			name:         "alternating completion pattern",
@@ -318,7 +418,6 @@ func TestProgressTrackerUpdateProgressNoResume(t *testing.T) {
 			completedIdx: 10,
 			pageSize:     20,
 			preCompleted: map[int]bool{2: true, 4: true, 6: true, 8: true},
-			pageNumber:   1,
 		},
 		{
 			name:         "sparse completion pattern",
@@ -326,7 +425,6 @@ func TestProgressTrackerUpdateProgressNoResume(t *testing.T) {
 			completedIdx: 50,
 			pageSize:     100,
 			preCompleted: map[int]bool{10: true, 20: true, 30: true, 40: true},
-			pageNumber:   1,
 		},
 		{
 			name:         "single gap breaks sequence",
@@ -341,7 +439,6 @@ func TestProgressTrackerUpdateProgressNoResume(t *testing.T) {
 				m[49] = false
 				return m
 			}(),
-			pageNumber: 1,
 		},
 	}
 
@@ -360,70 +457,111 @@ func TestProgressTrackerUpdateProgressNoResume(t *testing.T) {
 				}
 			}
 
-			err := tracker.UpdateObjectProgress(ctx, tt.completedIdx, "test-bucket", page.Contents, tt.pageNumber)
+			err := tracker.UpdateObjectProgress(ctx, tt.completedIdx, "test-bucket", page.Contents)
 			assert.NoError(t, err, "Unexpected error updating progress")
 			assert.Empty(t, progress.EncodedResumeInfo, "Expected no progress update")
 		})
 	}
 }
 
-func TestUpdateScanProgress(t *testing.T) {
+func TestComplete(t *testing.T) {
 	tests := []struct {
-		name        string
-		enabled     bool
-		currentIdx  int
-		total       int
-		message     string
-		resumeInfo  ResumeInfo
-		expectError bool
+		name         string
+		enabled      bool
+		initialState struct {
+			sectionsCompleted uint64
+			sectionsRemaining uint64
+			resumeInfo        string
+			message           string
+		}
+		completeMessage string
+		wantState       struct {
+			sectionsCompleted uint64
+			sectionsRemaining uint64
+			resumeInfo        string
+			message           string
+		}
 	}{
 		{
-			name:       "basic progress update",
-			enabled:    true,
-			currentIdx: 50,
-			total:      100,
-			message:    "Processing bucket contents",
-			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "key-50"},
+			name:    "marks completion with existing progress",
+			enabled: true,
+			initialState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 100,
+				sectionsRemaining: 100,
+				resumeInfo:        `{"CurrentBucket":"test-bucket","StartAfter":"some-key"}`,
+				message:           "In progress",
+			},
+			completeMessage: "Scan complete",
+			wantState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 100, // Should preserve existing progress
+				sectionsRemaining: 100, // Should preserve existing progress
+				resumeInfo:        "",  // Should clear resume info
+				message:           "Scan complete",
+			},
 		},
 		{
-			name:       "zero values",
-			enabled:    true,
-			currentIdx: 0,
-			total:      0,
-			message:    "",
-			resumeInfo: ResumeInfo{},
+			name:    "disabled tracker",
+			enabled: false,
+			initialState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 50,
+				sectionsRemaining: 100,
+				resumeInfo:        `{"CurrentBucket":"test-bucket","StartAfter":"some-key"}`,
+				message:           "Should not change",
+			},
+			completeMessage: "Completed",
+			wantState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 50,
+				sectionsRemaining: 100,
+				resumeInfo:        `{"CurrentBucket":"test-bucket","StartAfter":"some-key"}`,
+				message:           "Should not change",
+			},
 		},
 		{
-			name:       "disabled tracker",
-			enabled:    false,
-			currentIdx: 25,
-			total:      50,
-			message:    "Should not update",
-			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "key-25"},
-		},
-		{
-			name:       "max values",
-			enabled:    true,
-			currentIdx: 999999,
-			total:      1000000,
-			message:    "Processing large dataset",
-			resumeInfo: ResumeInfo{CurrentBucket: "large-bucket", StartAfter: "key-999999"},
-		},
-		{
-			name:       "special characters in message",
-			enabled:    true,
-			currentIdx: 10,
-			total:      20,
-			message:    "Processing 特殊字符 & symbols !@#$%",
-			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "key-with-特殊字符"},
-		},
-		{
-			name:       "current greater than total",
-			enabled:    true,
-			currentIdx: 100,
-			total:      50,
-			message:    "Invalid progress state",
-			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "last-key"},
+			name:    "completes with special characters",
+			enabled: true,
+			initialState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 75,
+				sectionsRemaining: 75,
+				resumeInfo:        `{"CurrentBucket":"bucket","StartAfter":"key"}`,
+				message:           "In progress",
+			},
+			completeMessage: "Completed scanning 特殊字符 & symbols !@#$%",
+			wantState: struct {
+				sectionsCompleted uint64
+				sectionsRemaining uint64
+				resumeInfo        string
+				message           string
+			}{
+				sectionsCompleted: 75,
+				sectionsRemaining: 75,
+				resumeInfo:        "",
+				message:           "Completed scanning 特殊字符 & symbols !@#$%",
+			},
 		},
 	}
 
@@ -432,32 +570,21 @@ func TestUpdateScanProgress(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			progress := new(sources.Progress)
+			progress := &sources.Progress{
+				SectionsCompleted: int32(tt.initialState.sectionsCompleted),
+				SectionsRemaining: int32(tt.initialState.sectionsRemaining),
+				EncodedResumeInfo: tt.initialState.resumeInfo,
+				Message:           tt.initialState.message,
+			}
 			tracker := NewProgressTracker(ctx, tt.enabled, progress)
 
-			err := tracker.UpdateScanProgress(ctx, tt.currentIdx, tt.total, tt.message, tt.resumeInfo)
-			if tt.expectError {
-				assert.Error(t, err)
-				return
-			}
+			err := tracker.Complete(ctx, tt.completeMessage)
 			assert.NoError(t, err)
 
-			if !tt.enabled {
-				assert.Empty(t, progress.EncodedResumeInfo)
-				assert.Zero(t, progress.SectionsRemaining)
-				assert.Zero(t, progress.SectionsCompleted)
-				assert.Empty(t, progress.Message)
-				return
-			}
-
-			assert.Equal(t, tt.currentIdx, int(progress.SectionsCompleted))
-			assert.Equal(t, tt.total, int(progress.SectionsRemaining))
-			assert.Equal(t, tt.message, progress.Message)
-
-			var decodedInfo ResumeInfo
-			err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &decodedInfo)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.resumeInfo, decodedInfo)
+			assert.Equal(t, int32(tt.wantState.sectionsCompleted), progress.SectionsCompleted)
+			assert.Equal(t, int32(tt.wantState.sectionsRemaining), progress.SectionsRemaining)
+			assert.Equal(t, tt.wantState.resumeInfo, progress.EncodedResumeInfo)
+			assert.Equal(t, tt.wantState.message, progress.Message)
 		})
 	}
 }

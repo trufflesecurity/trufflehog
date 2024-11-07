@@ -22,6 +22,9 @@ type ProgressTracker struct {
 	sync.Mutex
 	completedObjects []bool
 
+	baseCompleted   int32 // Track completed count from previous pages
+	currentPageSize int32 // Track the current page size to avoid double counting
+
 	// progress holds the scan's overall progress state and enables persistence.
 	progress *sources.Progress // Reference to source's Progress
 }
@@ -52,7 +55,10 @@ func (p *ProgressTracker) Reset(_ context.Context) {
 
 	p.Lock()
 	defer p.Unlock()
-	p.completedObjects = p.completedObjects[:0]
+	// Store the current completed count before moving to next page.
+	p.baseCompleted = p.progress.SectionsCompleted
+	p.currentPageSize = 0
+	p.completedObjects = make([]bool, defaultMaxObjectsPerPage)
 }
 
 // ResumeInfo represents the state needed to resume an interrupted operation.
@@ -93,30 +99,20 @@ func (p *ProgressTracker) GetResumePoint(ctx context.Context) (ResumeInfo, error
 	}, nil
 }
 
-// UpdateScanProgress updates the overall progress state with current position and optionally
-// stores resume information. This method is used both for incremental updates during processing
-// and for finalizing operations.
-//
-// The method is safe for concurrent use and will not update progress if tracking is disabled.
-func (p *ProgressTracker) UpdateScanProgress(
-	_ context.Context,
-	currentIdx int,
-	total int,
-	message string,
-	resumeInfo ResumeInfo,
-) error {
+// Complete marks the entire scanning operation as finished and clears the resume state.
+// This should only be called once all scanning operations are complete.
+func (p *ProgressTracker) Complete(_ context.Context, message string) error {
 	if !p.enabled {
 		return nil
 	}
 
-	var encodedInfo string
-	encoded, err := json.Marshal(resumeInfo)
-	if err != nil {
-		return fmt.Errorf("failed to encode resume info: %w", err)
-	}
-	encodedInfo = string(encoded)
-
-	p.progress.SetProgressComplete(currentIdx, total, message, encodedInfo)
+	// Preserve existing progress counters while clearing resume state.
+	p.progress.SetProgressComplete(
+		int(p.progress.SectionsCompleted),
+		int(p.progress.SectionsRemaining),
+		message,
+		"", // Clear resume info as scanning is complete
+	)
 	return nil
 }
 
@@ -137,18 +133,12 @@ func (p *ProgressTracker) UpdateObjectProgress(
 	completedIdx int,
 	bucket string,
 	pageContents []*s3.Object,
-	pageNumber int,
 ) error {
 	if !p.enabled {
 		return nil
 	}
 
-	ctx = context.WithValues(
-		ctx,
-		"bucket", bucket,
-		"pageNumber", pageNumber,
-		"completedIdx", completedIdx,
-	)
+	ctx = context.WithValues(ctx, "bucket", bucket, "completedIdx", completedIdx)
 	ctx.Logger().V(5).Info("Updating progress")
 
 	if completedIdx >= len(p.completedObjects) {
@@ -157,6 +147,13 @@ func (p *ProgressTracker) UpdateObjectProgress(
 
 	p.Lock()
 	defer p.Unlock()
+
+	// Update remaining count only once per page.
+	pageSize := int32(len(pageContents))
+	if p.currentPageSize == 0 {
+		p.progress.SectionsRemaining += pageSize
+		p.currentPageSize = pageSize
+	}
 
 	p.completedObjects[completedIdx] = true
 
@@ -170,21 +167,25 @@ func (p *ProgressTracker) UpdateObjectProgress(
 	}
 
 	// Update progress if we have at least one completed object.
-	if lastConsecutiveIdx >= 0 {
-		obj := pageContents[lastConsecutiveIdx]
-		info := &ResumeInfo{CurrentBucket: bucket, StartAfter: *obj.Key}
-		encoded, err := json.Marshal(info)
-		if err != nil {
-			return err
-		}
-
-		p.progress.SetProgressComplete(
-			pageNumber-1,
-			len(pageContents),
-			fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
-			string(encoded),
-		)
+	if lastConsecutiveIdx < 0 {
+		return nil
 	}
 
+	obj := pageContents[lastConsecutiveIdx]
+	info := &ResumeInfo{CurrentBucket: bucket, StartAfter: *obj.Key}
+	encoded, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+
+	// Set the total completed as base (from previous pages) plus consecutive completions in this page.
+	completedCount := p.baseCompleted + int32(lastConsecutiveIdx+1)
+
+	p.progress.SetProgressComplete(
+		int(completedCount),
+		int(p.progress.SectionsRemaining),
+		fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
+		string(encoded),
+	)
 	return nil
 }
