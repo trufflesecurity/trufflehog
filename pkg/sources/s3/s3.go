@@ -2,6 +2,7 @@ package s3
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -43,8 +44,10 @@ type Source struct {
 	jobID       sources.JobID
 	verify      bool
 	concurrency int
+	conn        *sourcespb.S3
+
+	progressTracker *ProgressTracker
 	sources.Progress
-	conn *sourcespb.S3
 
 	errorCount    *sync.Map
 	jobPool       *errgroup.Group
@@ -67,7 +70,7 @@ func (s *Source) JobID() sources.JobID { return s.jobID }
 
 // Init returns an initialized AWS source
 func (s *Source) Init(
-	_ context.Context,
+	ctx context.Context,
 	name string,
 	jobID sources.JobID,
 	sourceID sources.SourceID,
@@ -90,6 +93,12 @@ func (s *Source) Init(
 	}
 	s.conn = &conn
 
+	var err error
+	s.progressTracker, err = NewProgressTracker(ctx, conn.GetEnableResumption(), &s.Progress)
+	if err != nil {
+		return err
+	}
+
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
 	if len(conn.GetBuckets()) > 0 && len(conn.GetIgnoreBuckets()) > 0 {
@@ -101,11 +110,12 @@ func (s *Source) Init(
 
 func (s *Source) Validate(ctx context.Context) []error {
 	var errs []error
-	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) {
+	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error {
 		roleErrs := s.validateBucketAccess(c, defaultRegionClient, roleArn, buckets)
 		if len(roleErrs) > 0 {
 			errs = append(errs, roleErrs...)
 		}
+		return nil
 	}
 
 	if err := s.visitRoles(ctx, visitor); err != nil {
@@ -173,9 +183,16 @@ func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	return s3.New(sess), nil
 }
 
-// IAM identity needs s3:ListBuckets permission
+// getBucketsToScan returns a list of S3 buckets to scan.
+// If the connection has a list of buckets specified, those are returned.
+// Otherwise, it lists all buckets the client has access to and filters out the ignored ones.
+// The list of buckets is sorted lexicographically to ensure consistent ordering,
+// which allows resuming scanning from the same place if the scan is interrupted.
+//
+// Note: The IAM identity needs the s3:ListBuckets permission.
 func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 	if buckets := s.conn.GetBuckets(); len(buckets) > 0 {
+		slices.Sort(buckets)
 		return buckets, nil
 	}
 
@@ -196,7 +213,48 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 			bucketsToScan = append(bucketsToScan, name)
 		}
 	}
+	slices.Sort(bucketsToScan)
+
 	return bucketsToScan, nil
+}
+
+// workerSignal provides thread-safe tracking of cancellation state across multiple
+// goroutines processing S3 bucket pages. It ensures graceful shutdown when the context
+// is cancelled during bucket scanning operations.
+//
+// This type serves several key purposes:
+//  1. AWS ListObjectsV2PagesWithContext requires a callback that can only return bool,
+//     not error. workerSignal bridges this gap by providing a way to communicate
+//     cancellation back to the caller.
+//  2. The pageChunker spawns multiple concurrent workers to process objects within
+//     each page. workerSignal enables these workers to detect and respond to
+//     cancellation signals.
+//  3. Ensures proper progress tracking by allowing the main scanning loop to detect
+//     when workers have been cancelled and handle cleanup appropriately.
+type workerSignal struct{ cancelled atomic.Bool }
+
+// newWorkerSignal creates a new workerSignal
+func newWorkerSignal() *workerSignal { return new(workerSignal) }
+
+// MarkCancelled marks that a context cancellation was detected.
+func (ws *workerSignal) MarkCancelled() { ws.cancelled.Store(true) }
+
+// WasCancelled returns true if context cancellation was detected.
+func (ws *workerSignal) WasCancelled() bool { return ws.cancelled.Load() }
+
+// pageMetadata contains metadata about a single page of S3 objects being scanned.
+type pageMetadata struct {
+	bucket     string                  // The name of the S3 bucket being scanned
+	pageNumber int                     // Current page number in the pagination sequence
+	client     *s3.S3                  // AWS S3 client configured for the appropriate region
+	page       *s3.ListObjectsV2Output // Contains the list of S3 objects in this page
+}
+
+// processingState tracks the state of concurrent S3 object processing.
+type processingState struct {
+	errorCount   *sync.Map     // Thread-safe map tracking errors per prefix
+	objectCount  *uint64       // Total number of objects processed
+	workerSignal *workerSignal // Coordinates cancellation across worker goroutines
 }
 
 func (s *Source) scanBuckets(
@@ -205,22 +263,40 @@ func (s *Source) scanBuckets(
 	role string,
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
-) {
-	var objectCount uint64
-
+) error {
 	if role != "" {
 		ctx = context.WithValue(ctx, "role", role)
 	}
+	var objectCount uint64
 
-	for i, bucket := range bucketsToScan {
+	// Determine starting point for resuming scan.
+	resumePoint, err := s.progressTracker.GetResumePoint(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get resume point :%w", err)
+	}
+
+	startIdx, _ := slices.BinarySearch(bucketsToScan, resumePoint.CurrentBucket)
+
+	// Create worker signal to track cancellation across page processing.
+	workerSignal := newWorkerSignal()
+
+	bucketsToScanCount := len(bucketsToScan)
+	for i := startIdx; i < bucketsToScanCount; i++ {
+		bucket := bucketsToScan[i]
 		ctx := context.WithValue(ctx, "bucket", bucket)
 
 		if common.IsDone(ctx) {
-			return
+			return ctx.Err()
 		}
 
-		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 		ctx.Logger().V(3).Info("Scanning bucket")
+
+		s.SetProgressComplete(
+			i,
+			len(bucketsToScan),
+			fmt.Sprintf("Bucket: %s", bucket),
+			s.Progress.EncodedResumeInfo, // Do not set, resume handled by progressTracker
+		)
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
 		if err != nil {
@@ -230,12 +306,45 @@ func (s *Source) scanBuckets(
 
 		errorCount := sync.Map{}
 
+		input := &s3.ListObjectsV2Input{Bucket: &bucket}
+		if bucket == resumePoint.CurrentBucket && resumePoint.StartAfter != "" {
+			input.StartAfter = &resumePoint.StartAfter
+			ctx.Logger().V(3).Info(
+				"Resuming bucket scan",
+				"start_after", resumePoint.StartAfter,
+			)
+		}
+
+		pageNumber := 1
 		err = regionalClient.ListObjectsV2PagesWithContext(
-			ctx, &s3.ListObjectsV2Input{Bucket: &bucket},
+			ctx,
+			input,
 			func(page *s3.ListObjectsV2Output, _ bool) bool {
-				s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, i+1, &objectCount)
+				pageMetadata := pageMetadata{
+					bucket:     bucket,
+					pageNumber: pageNumber,
+					client:     regionalClient,
+					page:       page,
+				}
+				processingState := processingState{
+					errorCount:   &errorCount,
+					objectCount:  &objectCount,
+					workerSignal: workerSignal,
+				}
+				s.pageChunker(ctx, pageMetadata, processingState, chunksChan)
+
+				if workerSignal.WasCancelled() {
+					return false // Stop pagination
+				}
+
+				pageNumber++
 				return true
 			})
+
+		// Check if we stopped due to cancellation.
+		if workerSignal.WasCancelled() {
+			return ctx.Err()
+		}
 
 		if err != nil {
 			if role == "" {
@@ -249,18 +358,21 @@ func (s *Source) scanBuckets(
 			}
 		}
 	}
+
 	s.SetProgressComplete(
 		len(bucketsToScan),
 		len(bucketsToScan),
 		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount),
 		"",
 	)
+
+	return nil
 }
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) {
-		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
+	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error {
+		return s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
 	}
 
 	return s.visitRoles(ctx, visitor)
@@ -289,60 +401,73 @@ func (s *Source) getRegionalClientForBucket(
 	return regionalClient, nil
 }
 
-// pageChunker emits chunks onto the given channel from a page
+// pageChunker emits chunks onto the given channel from a page.
 func (s *Source) pageChunker(
 	ctx context.Context,
-	client *s3.S3,
+	metadata pageMetadata,
+	state processingState,
 	chunksChan chan *sources.Chunk,
-	bucket string,
-	page *s3.ListObjectsV2Output,
-	errorCount *sync.Map,
-	pageNumber int,
-	objectCount *uint64,
 ) {
-	for _, obj := range page.Contents {
+	s.progressTracker.Reset(ctx)
+	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
+
+	for objIdx, obj := range metadata.page.Contents {
 		if obj == nil {
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for nil object")
+			}
 			continue
 		}
 
-		ctx = context.WithValues(
-			ctx,
-			"key", *obj.Key,
-			"bucket", bucket,
-			"page", pageNumber,
-			"size", *obj.Size,
-		)
+		ctx = context.WithValues(ctx, "key", *obj.Key, "size", *obj.Size)
 
 		if common.IsDone(ctx) {
+			state.workerSignal.MarkCancelled()
 			return
 		}
 
 		// Skip GLACIER and GLACIER_IR objects.
 		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
 			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass)
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for glacier object")
+			}
 			continue
 		}
 
 		// Ignore large files.
 		if *obj.Size > s.maxObjectSize {
 			ctx.Logger().V(5).Info("Skipping %d byte file (over maxObjectSize limit)")
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for large file")
+			}
 			continue
 		}
 
 		// File empty file.
 		if *obj.Size == 0 {
 			ctx.Logger().V(5).Info("Skipping empty file")
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for empty file")
+			}
 			continue
 		}
 
 		// Skip incompatible extensions.
 		if common.SkipFile(*obj.Key) {
 			ctx.Logger().V(5).Info("Skipping file with incompatible extension")
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for incompatible file")
+			}
 			continue
 		}
 
 		s.jobPool.Go(func() error {
 			defer common.RecoverWithExit(ctx)
+			if common.IsDone(ctx) {
+				state.workerSignal.MarkCancelled()
+				return ctx.Err()
+			}
 
 			if strings.HasSuffix(*obj.Key, "/") {
 				ctx.Logger().V(5).Info("Skipping directory")
@@ -352,7 +477,7 @@ func (s *Source) pageChunker(
 			path := strings.Split(*obj.Key, "/")
 			prefix := strings.Join(path[:len(path)-1], "/")
 
-			nErr, ok := errorCount.Load(prefix)
+			nErr, ok := state.errorCount.Load(prefix)
 			if !ok {
 				nErr = 0
 			}
@@ -366,8 +491,8 @@ func (s *Source) pageChunker(
 			objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
 			defer cancel()
 
-			res, err := client.GetObjectWithContext(objCtx, &s3.GetObjectInput{
-				Bucket: &bucket,
+			res, err := metadata.client.GetObjectWithContext(objCtx, &s3.GetObjectInput{
+				Bucket: &metadata.bucket,
 				Key:    obj.Key,
 			})
 			if err != nil {
@@ -382,7 +507,7 @@ func (s *Source) pageChunker(
 					res.Body.Close()
 				}
 
-				nErr, ok := errorCount.Load(prefix)
+				nErr, ok := state.errorCount.Load(prefix)
 				if !ok {
 					nErr = 0
 				}
@@ -391,7 +516,7 @@ func (s *Source) pageChunker(
 					return nil
 				}
 				nErr = nErr.(int) + 1
-				errorCount.Store(prefix, nErr)
+				state.errorCount.Store(prefix, nErr)
 				// too many consecutive errors on this page
 				if nErr.(int) > 3 {
 					ctx.Logger().V(2).Info("Too many consecutive errors, excluding prefix", "prefix", prefix)
@@ -413,9 +538,9 @@ func (s *Source) pageChunker(
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_S3{
 						S3: &source_metadatapb.S3{
-							Bucket:    bucket,
+							Bucket:    metadata.bucket,
 							File:      sanitizer.UTF8(*obj.Key),
-							Link:      sanitizer.UTF8(makeS3Link(bucket, *client.Config.Region, *obj.Key)),
+							Link:      sanitizer.UTF8(makeS3Link(metadata.bucket, *metadata.client.Config.Region, *obj.Key)),
 							Email:     sanitizer.UTF8(email),
 							Timestamp: sanitizer.UTF8(modified),
 						},
@@ -429,14 +554,19 @@ func (s *Source) pageChunker(
 				return nil
 			}
 
-			atomic.AddUint64(objectCount, 1)
-			ctx.Logger().V(5).Info("S3 object scanned.", "object_count", objectCount)
-			nErr, ok = errorCount.Load(prefix)
+			atomic.AddUint64(state.objectCount, 1)
+			ctx.Logger().V(5).Info("S3 object scanned.", "object_count", state.objectCount)
+			nErr, ok = state.errorCount.Load(prefix)
 			if !ok {
 				nErr = 0
 			}
 			if nErr.(int) > 0 {
-				errorCount.Store(prefix, 0)
+				state.errorCount.Store(prefix, 0)
+			}
+
+			// Update progress after successful processing.
+			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+				ctx.Logger().Error(err, "could not update progress for scanned object")
 			}
 
 			return nil
@@ -485,10 +615,13 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleAr
 // for each role, passing in the default S3 client, the role ARN, and the list of
 // buckets to scan.
 //
+// The provided function parameter typically implements the core scanning logic
+// and must handle context cancellation appropriately.
+//
 // If no roles are configured, it will call the function with an empty role ARN.
 func (s *Source) visitRoles(
 	ctx context.Context,
-	f func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string),
+	f func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error,
 ) error {
 	roles := s.conn.GetRoles()
 	if len(roles) == 0 {
@@ -506,7 +639,9 @@ func (s *Source) visitRoles(
 			return fmt.Errorf("role %q could not list any s3 buckets for scanning: %w", role, err)
 		}
 
-		f(ctx, client, role, bucketsToScan)
+		if err := f(ctx, client, role, bucketsToScan); err != nil {
+			return err
+		}
 	}
 
 	return nil
