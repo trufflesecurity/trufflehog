@@ -366,3 +366,98 @@ func TestProgressTrackerUpdateProgressNoResume(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateScanProgress(t *testing.T) {
+	tests := []struct {
+		name        string
+		enabled     bool
+		currentIdx  int
+		total       int
+		message     string
+		resumeInfo  ResumeInfo
+		expectError bool
+	}{
+		{
+			name:       "basic progress update",
+			enabled:    true,
+			currentIdx: 50,
+			total:      100,
+			message:    "Processing bucket contents",
+			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "key-50"},
+		},
+		{
+			name:       "zero values",
+			enabled:    true,
+			currentIdx: 0,
+			total:      0,
+			message:    "",
+			resumeInfo: ResumeInfo{},
+		},
+		{
+			name:       "disabled tracker",
+			enabled:    false,
+			currentIdx: 25,
+			total:      50,
+			message:    "Should not update",
+			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "key-25"},
+		},
+		{
+			name:       "max values",
+			enabled:    true,
+			currentIdx: 999999,
+			total:      1000000,
+			message:    "Processing large dataset",
+			resumeInfo: ResumeInfo{CurrentBucket: "large-bucket", StartAfter: "key-999999"},
+		},
+		{
+			name:       "special characters in message",
+			enabled:    true,
+			currentIdx: 10,
+			total:      20,
+			message:    "Processing 特殊字符 & symbols !@#$%",
+			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "key-with-特殊字符"},
+		},
+		{
+			name:       "current greater than total",
+			enabled:    true,
+			currentIdx: 100,
+			total:      50,
+			message:    "Invalid progress state",
+			resumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "last-key"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			progress := new(sources.Progress)
+			tracker := NewProgressTracker(ctx, tt.enabled, progress)
+
+			err := tracker.UpdateScanProgress(ctx, tt.currentIdx, tt.total, tt.message, tt.resumeInfo)
+			if tt.expectError {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+
+			if !tt.enabled {
+				assert.Empty(t, progress.EncodedResumeInfo)
+				assert.Zero(t, progress.SectionsRemaining)
+				assert.Zero(t, progress.SectionsCompleted)
+				assert.Empty(t, progress.Message)
+				return
+			}
+
+			assert.Equal(t, tt.currentIdx, int(progress.SectionsCompleted))
+			assert.Equal(t, tt.total, int(progress.SectionsRemaining))
+			assert.Equal(t, tt.message, progress.Message)
+
+			var decodedInfo ResumeInfo
+			err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &decodedInfo)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.resumeInfo, decodedInfo)
+		})
+	}
+}
