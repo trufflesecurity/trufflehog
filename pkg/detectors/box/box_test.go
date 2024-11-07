@@ -1,6 +1,3 @@
-//go:build detectors
-// +build detectors
-
 package box
 
 import (
