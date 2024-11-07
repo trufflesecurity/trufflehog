@@ -55,8 +55,8 @@ func (p *ProgressTracker) Reset(_ context.Context) {
 
 	p.Lock()
 	defer p.Unlock()
-	// Store the current completed count before moving to next page
-	p.baseCompleted = int32(p.progress.SectionsCompleted)
+	// Store the current completed count before moving to next page.
+	p.baseCompleted = p.progress.SectionsCompleted
 	p.currentPageSize = 0
 	p.completedObjects = make([]bool, defaultMaxObjectsPerPage)
 }
