@@ -127,7 +127,6 @@ func (p *ProgressTracker) UpdateObjectProgress(
 	completedIdx int,
 	bucket string,
 	pageContents []*s3.Object,
-	pageNumber int,
 ) error {
 	if !p.enabled {
 		return nil
@@ -136,7 +135,6 @@ func (p *ProgressTracker) UpdateObjectProgress(
 	ctx = context.WithValues(
 		ctx,
 		"bucket", bucket,
-		"pageNumber", pageNumber,
 		"completedIdx", completedIdx,
 	)
 	ctx.Logger().V(5).Info("Updating progress")
@@ -168,9 +166,14 @@ func (p *ProgressTracker) UpdateObjectProgress(
 			return err
 		}
 
+		// Update progress with the number of objects processed in this page
+		// and the total objects we know about so far.
+		completedCount := int32(lastConsecutiveIdx + 1)
+		remainingCount := int32(len(pageContents))
+
 		p.progress.SetProgressComplete(
-			pageNumber-1,
-			len(pageContents),
+			int(p.progress.SectionsCompleted+completedCount),
+			int(p.progress.SectionsRemaining+remainingCount),
 			fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
 			string(encoded),
 		)
