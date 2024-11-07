@@ -577,7 +577,7 @@ func TestComplete(t *testing.T) {
 			}{
 				sectionsCompleted: 50,
 				sectionsRemaining: 100,
-				resumeInfo:        `{"CurrentBucket":"test-bucket","StartAfter":"some-key"}`,
+				resumeInfo:        "",
 				message:           "Should not change",
 			},
 			completeMessage: "Completed",
@@ -589,8 +589,8 @@ func TestComplete(t *testing.T) {
 			}{
 				sectionsCompleted: 50,
 				sectionsRemaining: 100,
-				resumeInfo:        `{"CurrentBucket":"test-bucket","StartAfter":"some-key"}`,
-				message:           "Should not change",
+				resumeInfo:        "",
+				message:           "Completed",
 			},
 		},
 		{
