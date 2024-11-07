@@ -22,6 +22,9 @@ type ProgressTracker struct {
 	sync.Mutex
 	completedObjects []bool
 
+	baseCompleted   int32 // Track completed count from previous pages
+	currentPageSize int32 // Track the current page size to avoid double counting
+
 	// progress holds the scan's overall progress state and enables persistence.
 	progress *sources.Progress // Reference to source's Progress
 }
@@ -52,7 +55,10 @@ func (p *ProgressTracker) Reset(_ context.Context) {
 
 	p.Lock()
 	defer p.Unlock()
-	p.completedObjects = p.completedObjects[:0]
+	// Store the current completed count before moving to next page
+	p.baseCompleted = int32(p.progress.SectionsCompleted)
+	p.currentPageSize = 0
+	p.completedObjects = make([]bool, defaultMaxObjectsPerPage)
 }
 
 // ResumeInfo represents the state needed to resume an interrupted operation.
@@ -132,11 +138,7 @@ func (p *ProgressTracker) UpdateObjectProgress(
 		return nil
 	}
 
-	ctx = context.WithValues(
-		ctx,
-		"bucket", bucket,
-		"completedIdx", completedIdx,
-	)
+	ctx = context.WithValues(ctx, "bucket", bucket, "completedIdx", completedIdx)
 	ctx.Logger().V(5).Info("Updating progress")
 
 	if completedIdx >= len(p.completedObjects) {
@@ -145,6 +147,13 @@ func (p *ProgressTracker) UpdateObjectProgress(
 
 	p.Lock()
 	defer p.Unlock()
+
+	// Update remaining count only once per page.
+	pageSize := int32(len(pageContents))
+	if p.currentPageSize == 0 {
+		p.progress.SectionsRemaining += pageSize
+		p.currentPageSize = pageSize
+	}
 
 	p.completedObjects[completedIdx] = true
 
@@ -169,14 +178,12 @@ func (p *ProgressTracker) UpdateObjectProgress(
 		return err
 	}
 
-	// Update progress with the number of objects processed in this page
-	// and the total objects we know about so far.
-	completedCount := int32(lastConsecutiveIdx + 1)
-	remainingCount := int32(len(pageContents))
+	// Set the total completed as base (from previous pages) plus consecutive completions in this page.
+	completedCount := p.baseCompleted + int32(lastConsecutiveIdx+1)
 
 	p.progress.SetProgressComplete(
-		int(p.progress.SectionsCompleted+completedCount),
-		int(p.progress.SectionsRemaining+remainingCount),
+		int(completedCount),
+		int(p.progress.SectionsRemaining),
 		fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
 		string(encoded),
 	)

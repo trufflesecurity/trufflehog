@@ -152,6 +152,92 @@ func TestProgressTrackerUpdateProgressCompletedIdxOOR(t *testing.T) {
 	assert.Empty(t, progress.EncodedResumeInfo, "Progress updated when tracker disabled")
 }
 
+func TestProgressTrackerSequence(t *testing.T) {
+	tests := []struct {
+		name        string
+		description string
+		// Each update is a sequence of {completedIdx, expectedCompleted, expectedRemaining}
+		updates  [][3]int
+		pageSize int
+	}{
+		{
+			name:        "multiple updates same page",
+			description: "Verify remaining count isn't doubled and completed accumulates correctly",
+			pageSize:    5,
+			updates: [][3]int{
+				{0, 1, 5}, // First object - should set remaining to 5
+				{1, 2, 5}, // Second object - remaining should stay 5
+				{2, 3, 5}, // Third object - remaining should stay 5
+				{4, 3, 5}, // Gap at index 3 - completed should stay at 3
+			},
+		},
+		{
+			name:        "across page boundaries",
+			description: "Verify completed count accumulates across pages",
+			pageSize:    3,
+			updates: [][3]int{
+				// First page
+				{0, 1, 3},
+				{1, 2, 3},
+				{2, 3, 3},
+				// Reset and start new page.
+				{0, 4, 6}, // baseCompleted(3) + current(1)
+				{1, 5, 6}, // baseCompleted(3) + current(2)
+				{2, 6, 6}, // baseCompleted(3) + current(3)
+			},
+		},
+		{
+			name:        "incomplete page transition",
+			description: "Verify incomplete page properly sets base completed",
+			pageSize:    4,
+			updates: [][3]int{
+				// First page - only complete first 2.
+				{0, 1, 4},
+				{1, 2, 4},
+				// Skip 2,3 and move to next page.
+				// Reset and start new page.
+				{0, 3, 8}, // baseCompleted(2) + current(1)
+				{1, 4, 8}, // baseCompleted(2) + current(2)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			progress := new(sources.Progress)
+			tracker, page := setupTestTracker(t, true, progress, tt.pageSize)
+
+			pageCount := 0
+			for i, update := range tt.updates {
+				completedIdx, expectedCompleted, expectedRemaining := update[0], update[1], update[2]
+
+				// If this update starts a new page.
+				if completedIdx == 0 && i > 0 {
+					pageCount++
+					tracker.Reset(ctx)
+					// Create new page with same size.
+					page = &s3.ListObjectsV2Output{Contents: make([]*s3.Object, tt.pageSize)}
+					for j := range tt.pageSize {
+						key := fmt.Sprintf("page%d-key-%d", pageCount, j)
+						page.Contents[j] = &s3.Object{Key: &key}
+					}
+				}
+
+				err := tracker.UpdateObjectProgress(ctx, completedIdx, "test-bucket", page.Contents)
+				assert.NoError(t, err, "Unexpected error updating progress")
+
+				assert.Equal(t, expectedCompleted, int(progress.SectionsCompleted),
+					"Incorrect completed count at update %d", i)
+				assert.Equal(t, expectedRemaining, int(progress.SectionsRemaining),
+					"Incorrect remaining count at update %d", i)
+			}
+		})
+	}
+}
+
 func TestProgressTrackerUpdateProgressWithResume(t *testing.T) {
 	tests := []struct {
 		name         string
