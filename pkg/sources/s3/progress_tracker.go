@@ -158,26 +158,27 @@ func (p *ProgressTracker) UpdateObjectProgress(
 	}
 
 	// Update progress if we have at least one completed object.
-	if lastConsecutiveIdx >= 0 {
-		obj := pageContents[lastConsecutiveIdx]
-		info := &ResumeInfo{CurrentBucket: bucket, StartAfter: *obj.Key}
-		encoded, err := json.Marshal(info)
-		if err != nil {
-			return err
-		}
-
-		// Update progress with the number of objects processed in this page
-		// and the total objects we know about so far.
-		completedCount := int32(lastConsecutiveIdx + 1)
-		remainingCount := int32(len(pageContents))
-
-		p.progress.SetProgressComplete(
-			int(p.progress.SectionsCompleted+completedCount),
-			int(p.progress.SectionsRemaining+remainingCount),
-			fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
-			string(encoded),
-		)
+	if lastConsecutiveIdx < 0 {
+		return nil
 	}
 
+	obj := pageContents[lastConsecutiveIdx]
+	info := &ResumeInfo{CurrentBucket: bucket, StartAfter: *obj.Key}
+	encoded, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+
+	// Update progress with the number of objects processed in this page
+	// and the total objects we know about so far.
+	completedCount := int32(lastConsecutiveIdx + 1)
+	remainingCount := int32(len(pageContents))
+
+	p.progress.SetProgressComplete(
+		int(p.progress.SectionsCompleted+completedCount),
+		int(p.progress.SectionsRemaining+remainingCount),
+		fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
+		string(encoded),
+	)
 	return nil
 }
