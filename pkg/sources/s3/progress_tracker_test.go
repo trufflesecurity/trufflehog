@@ -35,12 +35,21 @@ func TestProgressTrackerReset(t *testing.T) {
 
 			tracker.Reset(ctx)
 
-			if !tt.enabled {
-				assert.Equal(t, defaultMaxObjectsPerPage, len(tracker.completedObjects), "Reset did not clear completed objects")
-				return
-			}
+			// Length should always be defaultMaxObjectsPerPage.
+			assert.Equal(t, defaultMaxObjectsPerPage, len(tracker.completedObjects),
+				"Reset changed the length of completed objects")
 
-			assert.Equal(t, 0, len(tracker.completedObjects), "Reset did not clear completed objects")
+			if tt.enabled {
+				// All values should be false after reset.
+				for i, isCompleted := range tracker.completedObjects {
+					assert.False(t, isCompleted,
+						"Reset did not clear completed object at index %d", i)
+				}
+
+				// Completion order should be empty.
+				assert.Equal(t, 0, len(tracker.completionOrder),
+					"Reset did not clear completion order")
+			}
 		})
 	}
 }
@@ -119,7 +128,12 @@ func TestGetResumePoint(t *testing.T) {
 func setupTestTracker(t *testing.T, enabled bool, progress *sources.Progress, pageSize int) (*ProgressTracker, *s3.ListObjectsV2Output) {
 	t.Helper()
 
-	tracker := NewProgressTracker(context.Background(), enabled, progress)
+	tracker := &ProgressTracker{
+		enabled:          enabled,
+		progress:         progress,
+		completedObjects: make([]bool, pageSize),
+		completionOrder:  make([]int, 0, pageSize),
+	}
 	page := &s3.ListObjectsV2Output{Contents: make([]*s3.Object, pageSize)}
 	for i := range pageSize {
 		key := fmt.Sprintf("key-%d", i)
@@ -244,7 +258,7 @@ func TestProgressTrackerUpdateProgressWithResume(t *testing.T) {
 		description  string
 		completedIdx int
 		pageSize     int
-		preCompleted map[int]bool
+		preCompleted []int
 
 		expectedKey       string
 		expectedCompleted int
@@ -256,48 +270,48 @@ func TestProgressTrackerUpdateProgressWithResume(t *testing.T) {
 			completedIdx:      0,
 			pageSize:          3,
 			expectedKey:       "key-0",
-			expectedCompleted: 1, // Only first object completed
-			expectedRemaining: 3, // Total objects in page
+			expectedCompleted: 1,
+			expectedRemaining: 3,
 		},
 		{
 			name:              "completing missing middle",
 			description:       "Completing object when previous is done",
 			completedIdx:      1,
 			pageSize:          3,
-			preCompleted:      map[int]bool{0: true},
+			preCompleted:      []int{0},
 			expectedKey:       "key-1",
-			expectedCompleted: 2, // First two objects completed
-			expectedRemaining: 3, // Total objects in page
+			expectedCompleted: 2,
+			expectedRemaining: 3,
 		},
 		{
 			name:              "completing first with last done",
 			description:       "Completing first object when last is already done",
 			completedIdx:      0,
 			pageSize:          3,
-			preCompleted:      map[int]bool{2: true},
+			preCompleted:      []int{2},
 			expectedKey:       "key-0",
-			expectedCompleted: 1, // Only first object counts due to gap
-			expectedRemaining: 3, // Total objects in page
+			expectedCompleted: 1,
+			expectedRemaining: 3,
 		},
 		{
 			name:              "all objects completed in order",
 			description:       "Completing final object in sequence",
 			completedIdx:      2,
 			pageSize:          3,
-			preCompleted:      map[int]bool{0: true, 1: true},
+			preCompleted:      []int{0, 1},
 			expectedKey:       "key-2",
-			expectedCompleted: 3, // All objects completed
-			expectedRemaining: 3, // Total objects in page
+			expectedCompleted: 3,
+			expectedRemaining: 3,
 		},
 		{
 			name:              "completing middle gaps",
 			description:       "Completing object with gaps in sequence",
 			completedIdx:      5,
 			pageSize:          10,
-			preCompleted:      map[int]bool{0: true, 1: true, 2: true, 4: true},
-			expectedKey:       "key-2", // Last consecutive completed
-			expectedCompleted: 3,       // Only first 3 count due to gap
-			expectedRemaining: 10,      // Total objects in page
+			preCompleted:      []int{0, 1, 2, 4},
+			expectedKey:       "key-2",
+			expectedCompleted: 3,
+			expectedRemaining: 10,
 		},
 		{
 			name:              "zero index with empty pre-completed",
@@ -313,42 +327,42 @@ func TestProgressTrackerUpdateProgressWithResume(t *testing.T) {
 			description:  "Edge case - maximum page size boundary",
 			completedIdx: 999,
 			pageSize:     1000,
-			preCompleted: func() map[int]bool {
-				m := make(map[int]bool)
+			preCompleted: func() []int {
+				indices := make([]int, 999)
 				for i := range 999 {
-					m[i] = true
+					indices[i] = i
 				}
-				return m
+				return indices
 			}(),
 			expectedKey:       "key-999",
-			expectedCompleted: 1000, // All objects completed
-			expectedRemaining: 1000, // Total objects in page
+			expectedCompleted: 1000,
+			expectedRemaining: 1000,
 		},
 		{
 			name:         "all previous completed",
 			description:  "Edge case - all previous indices completed",
 			completedIdx: 100,
 			pageSize:     101,
-			preCompleted: func() map[int]bool {
-				m := make(map[int]bool)
+			preCompleted: func() []int {
+				indices := make([]int, 100)
 				for i := range 100 {
-					m[i] = true
+					indices[i] = i
 				}
-				return m
+				return indices
 			}(),
 			expectedKey:       "key-100",
-			expectedCompleted: 101, // All objects completed
-			expectedRemaining: 101, // Total objects in page
+			expectedCompleted: 101,
+			expectedRemaining: 101,
 		},
 		{
 			name:              "large page number completion",
 			description:       "Edge case - very large page number",
 			completedIdx:      5,
 			pageSize:          10,
-			preCompleted:      map[int]bool{0: true, 1: true, 2: true, 3: true, 4: true},
+			preCompleted:      []int{0, 1, 2, 3, 4},
 			expectedKey:       "key-5",
-			expectedCompleted: 6,  // First 6 objects completed
-			expectedRemaining: 10, // Total objects in page
+			expectedCompleted: 6,
+			expectedRemaining: 10,
 		},
 	}
 
@@ -360,23 +374,23 @@ func TestProgressTrackerUpdateProgressWithResume(t *testing.T) {
 			progress := new(sources.Progress)
 			tracker, page := setupTestTracker(t, true, progress, tt.pageSize)
 
+			// Apply pre-completed indices in order.
 			if tt.preCompleted != nil {
-				for k, v := range tt.preCompleted {
-					tracker.completedObjects[k] = v
+				for _, idx := range tt.preCompleted {
+					tracker.completedObjects[idx] = true
+					tracker.completionOrder = append(tracker.completionOrder, idx)
 				}
 			}
 
 			err := tracker.UpdateObjectProgress(ctx, tt.completedIdx, "test-bucket", page.Contents)
 			assert.NoError(t, err, "Unexpected error updating progress")
 
-			// Verify resume info.
 			assert.NotEmpty(t, progress.EncodedResumeInfo, "Expected progress update")
 			var info ResumeInfo
 			err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &info)
 			assert.NoError(t, err, "Failed to decode resume info")
 			assert.Equal(t, tt.expectedKey, info.StartAfter, "Incorrect resume point")
 
-			// Verify progress counts.
 			assert.Equal(t, tt.expectedCompleted, int(progress.SectionsCompleted),
 				"Incorrect completed count")
 			assert.Equal(t, tt.expectedRemaining, int(progress.SectionsRemaining),
