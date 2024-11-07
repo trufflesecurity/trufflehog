@@ -2,7 +2,6 @@ package s3
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -44,10 +43,8 @@ type Source struct {
 	jobID       sources.JobID
 	verify      bool
 	concurrency int
-	conn        *sourcespb.S3
-
-	progressTracker *ProgressTracker
 	sources.Progress
+	conn *sourcespb.S3
 
 	errorCount    *sync.Map
 	jobPool       *errgroup.Group
@@ -70,7 +67,7 @@ func (s *Source) JobID() sources.JobID { return s.jobID }
 
 // Init returns an initialized AWS source
 func (s *Source) Init(
-	ctx context.Context,
+	_ context.Context,
 	name string,
 	jobID sources.JobID,
 	sourceID sources.SourceID,
@@ -92,8 +89,6 @@ func (s *Source) Init(
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 	s.conn = &conn
-
-	s.progressTracker = NewProgressTracker(ctx, conn.GetEnableResumption(), &s.Progress)
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
@@ -178,16 +173,9 @@ func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 	return s3.New(sess), nil
 }
 
-// getBucketsToScan returns a list of S3 buckets to scan.
-// If the connection has a list of buckets specified, those are returned.
-// Otherwise, it lists all buckets the client has access to and filters out the ignored ones.
-// The list of buckets is sorted lexicographically to ensure consistent ordering,
-// which allows resuming scanning from the same place if the scan is interrupted.
-//
-// Note: The IAM identity needs the s3:ListBuckets permission.
+// IAM identity needs s3:ListBuckets permission
 func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 	if buckets := s.conn.GetBuckets(); len(buckets) > 0 {
-		slices.Sort(buckets)
 		return buckets, nil
 	}
 
@@ -208,8 +196,6 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 			bucketsToScan = append(bucketsToScan, name)
 		}
 	}
-	slices.Sort(bucketsToScan)
-
 	return bucketsToScan, nil
 }
 
@@ -222,37 +208,18 @@ func (s *Source) scanBuckets(
 ) {
 	var objectCount uint64
 
-	// Determine starting point for resuming scan.
-	resumePoint, err := s.progressTracker.GetResumePoint(ctx)
-	if err != nil {
-		ctx.Logger().Error(err, "failed to get resume point")
-		return
+	if role != "" {
+		ctx = context.WithValue(ctx, "role", role)
 	}
 
-	startIdx, _ := slices.BinarySearch(bucketsToScan, resumePoint.CurrentBucket)
-
-	bucketsToScanCount := len(bucketsToScan)
-	for i := startIdx; i < bucketsToScanCount; i++ {
-		bucket := bucketsToScan[i]
+	for i, bucket := range bucketsToScan {
 		ctx := context.WithValue(ctx, "bucket", bucket)
 
 		if common.IsDone(ctx) {
 			return
 		}
 
-		// Update progress with current bucket.
-		err := s.progressTracker.UpdateScanProgress(
-			ctx,
-			i,
-			bucketsToScanCount,
-			fmt.Sprintf("Bucket: %s", bucket),
-			ResumeInfo{CurrentBucket: bucket},
-		)
-		if err != nil {
-			ctx.Logger().Error(err, "failed to update progress")
-			continue
-		}
-
+		s.SetProgressComplete(i, len(bucketsToScan), fmt.Sprintf("Bucket: %s", bucket), "")
 		ctx.Logger().V(3).Info("Scanning bucket")
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
@@ -263,22 +230,10 @@ func (s *Source) scanBuckets(
 
 		errorCount := sync.Map{}
 
-		// Configure ListObjectsV2Input with resume point if needed
-		input := &s3.ListObjectsV2Input{Bucket: &bucket}
-		if bucket == resumePoint.CurrentBucket && resumePoint.StartAfter != "" {
-			input.StartAfter = &resumePoint.StartAfter
-			ctx.Logger().V(3).Info(
-				"Resuming bucket scan",
-				"start_after", resumePoint.StartAfter,
-			)
-		}
-
-		pageNumber := 1
 		err = regionalClient.ListObjectsV2PagesWithContext(
-			ctx, input,
+			ctx, &s3.ListObjectsV2Input{Bucket: &bucket},
 			func(page *s3.ListObjectsV2Output, _ bool) bool {
-				s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, pageNumber, &objectCount)
-				pageNumber++
+				s.pageChunker(ctx, regionalClient, chunksChan, bucket, page, &errorCount, i+1, &objectCount)
 				return true
 			})
 
@@ -286,20 +241,20 @@ func (s *Source) scanBuckets(
 			if role == "" {
 				ctx.Logger().Error(err, "could not list objects in bucket")
 			} else {
+				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
+				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
+				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
+				// and therefore not an error.
 				ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
 			}
 		}
 	}
-
-	if err := s.progressTracker.UpdateScanProgress(
-		ctx,
-		bucketsToScanCount,
-		bucketsToScanCount,
+	s.SetProgressComplete(
+		len(bucketsToScan),
+		len(bucketsToScan),
 		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount),
-		resumePoint,
-	); err != nil {
-		ctx.Logger().Error(err, "failed to update final progress")
-	}
+		"",
+	)
 }
 
 // Chunks emits chunks of bytes over a channel.
@@ -345,13 +300,8 @@ func (s *Source) pageChunker(
 	pageNumber int,
 	objectCount *uint64,
 ) {
-	s.progressTracker.Reset(ctx)
-
-	for objIdx, obj := range page.Contents {
+	for _, obj := range page.Contents {
 		if obj == nil {
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
-				ctx.Logger().Error(err, "could not update progress for nil object")
-			}
 			continue
 		}
 
@@ -370,36 +320,24 @@ func (s *Source) pageChunker(
 		// Skip GLACIER and GLACIER_IR objects.
 		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
 			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass)
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
-				ctx.Logger().Error(err, "could not update progress for glacier object")
-			}
 			continue
 		}
 
 		// Ignore large files.
 		if *obj.Size > s.maxObjectSize {
 			ctx.Logger().V(5).Info("Skipping %d byte file (over maxObjectSize limit)")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
-				ctx.Logger().Error(err, "could not update progress for large file")
-			}
 			continue
 		}
 
 		// File empty file.
 		if *obj.Size == 0 {
 			ctx.Logger().V(5).Info("Skipping empty file")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
-				ctx.Logger().Error(err, "could not update progress for empty file")
-			}
 			continue
 		}
 
 		// Skip incompatible extensions.
 		if common.SkipFile(*obj.Key) {
 			ctx.Logger().V(5).Info("Skipping file with incompatible extension")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
-				ctx.Logger().Error(err, "could not update progress for incompatible file")
-			}
 			continue
 		}
 
@@ -499,11 +437,6 @@ func (s *Source) pageChunker(
 			}
 			if nErr.(int) > 0 {
 				errorCount.Store(prefix, 0)
-			}
-
-			// Update progress after successful processing.
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, bucket, page.Contents, pageNumber); err != nil {
-				ctx.Logger().Error(err, "could not update progress for scanned object")
 			}
 
 			return nil
