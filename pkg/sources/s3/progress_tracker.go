@@ -21,9 +21,7 @@ type ProgressTracker struct {
 	// completedObjects tracks which indices in the current page have been processed.
 	sync.Mutex
 	completedObjects []bool
-
-	baseCompleted   int32 // Track completed count from previous pages
-	currentPageSize int32 // Track the current page size to avoid double counting
+	completionOrder  []int // Track the order in which objects complete
 
 	// progress holds the scan's overall progress state and enables persistence.
 	progress *sources.Progress // Reference to source's Progress
@@ -34,17 +32,18 @@ const defaultMaxObjectsPerPage = 1000
 // NewProgressTracker creates a new progress tracker for S3 scanning operations.
 // The enabled parameter determines if progress tracking is active, and progress
 // provides the underlying mechanism for persisting scan state.
-func NewProgressTracker(ctx context.Context, enabled bool, progress *sources.Progress) *ProgressTracker {
+func NewProgressTracker(_ context.Context, enabled bool, progress *sources.Progress) (*ProgressTracker, error) {
 	if progress == nil {
-		ctx.Logger().Info("Nil progress provided. Progress initialized.")
-		progress = new(sources.Progress)
+		return nil, errors.New("Nil progress provided; progress is required for tracking")
 	}
 
 	return &ProgressTracker{
+		// We are resuming if we have completed objects from a previous scan.
 		completedObjects: make([]bool, defaultMaxObjectsPerPage),
+		completionOrder:  make([]int, 0, defaultMaxObjectsPerPage),
 		enabled:          enabled,
 		progress:         progress,
-	}
+	}, nil
 }
 
 // Reset prepares the tracker for a new page of objects by clearing the completion state.
@@ -56,9 +55,8 @@ func (p *ProgressTracker) Reset(_ context.Context) {
 	p.Lock()
 	defer p.Unlock()
 	// Store the current completed count before moving to next page.
-	p.baseCompleted = p.progress.SectionsCompleted
-	p.currentPageSize = 0
 	p.completedObjects = make([]bool, defaultMaxObjectsPerPage)
+	p.completionOrder = make([]int, 0, defaultMaxObjectsPerPage)
 }
 
 // ResumeInfo represents the state needed to resume an interrupted operation.
@@ -93,19 +91,12 @@ func (p *ProgressTracker) GetResumePoint(ctx context.Context) (ResumeInfo, error
 		return resume, nil
 	}
 
-	return ResumeInfo{
-		CurrentBucket: resumeInfo.CurrentBucket,
-		StartAfter:    resumeInfo.StartAfter,
-	}, nil
+	return ResumeInfo{CurrentBucket: resumeInfo.CurrentBucket, StartAfter: resumeInfo.StartAfter}, nil
 }
 
 // Complete marks the entire scanning operation as finished and clears the resume state.
 // This should only be called once all scanning operations are complete.
 func (p *ProgressTracker) Complete(_ context.Context, message string) error {
-	if !p.enabled {
-		return nil
-	}
-
 	// Preserve existing progress counters while clearing resume state.
 	p.progress.SetProgressComplete(
 		int(p.progress.SectionsCompleted),
@@ -126,8 +117,7 @@ func (p *ProgressTracker) Complete(_ context.Context, message string) error {
 //
 // This approach ensures scan reliability by only checkpointing consecutively completed
 // objects. While this may result in re-scanning some objects when resuming, it guarantees
-// no objects are missed in case of interruption. The linear search through page contents
-// is efficient given the fixed maximum page size of 1000 objects.
+// no objects are missed in case of interruption.
 func (p *ProgressTracker) UpdateObjectProgress(
 	ctx context.Context,
 	completedIdx int,
@@ -148,43 +138,47 @@ func (p *ProgressTracker) UpdateObjectProgress(
 	p.Lock()
 	defer p.Unlock()
 
-	// Update remaining count only once per page.
-	pageSize := int32(len(pageContents))
-	if p.currentPageSize == 0 {
-		p.progress.SectionsRemaining += pageSize
-		p.currentPageSize = pageSize
+	// Only track completion if this is the first time this index is marked complete.
+	if !p.completedObjects[completedIdx] {
+		p.completedObjects[completedIdx] = true
+		p.completionOrder = append(p.completionOrder, completedIdx)
 	}
 
-	p.completedObjects[completedIdx] = true
+	// Find the highest safe checkpoint we can create.
+	lastSafeIdx := -1
+	var safeIndices [defaultMaxObjectsPerPage]bool
+
+	// Mark all completed indices.
+	for _, idx := range p.completionOrder {
+		safeIndices[idx] = true
+	}
 
 	// Find the highest consecutive completed index.
-	lastConsecutiveIdx := -1
-	for i := 0; i <= completedIdx; i++ {
-		if !p.completedObjects[i] {
+	for i := range len(p.completedObjects) {
+		if !safeIndices[i] {
 			break
 		}
-		lastConsecutiveIdx = i
+		lastSafeIdx = i
 	}
 
 	// Update progress if we have at least one completed object.
-	if lastConsecutiveIdx < 0 {
+	if lastSafeIdx < 0 {
 		return nil
 	}
 
-	obj := pageContents[lastConsecutiveIdx]
+	obj := pageContents[lastSafeIdx]
 	info := &ResumeInfo{CurrentBucket: bucket, StartAfter: *obj.Key}
 	encoded, err := json.Marshal(info)
 	if err != nil {
 		return err
 	}
 
-	// Set the total completed as base (from previous pages) plus consecutive completions in this page.
-	completedCount := p.baseCompleted + int32(lastConsecutiveIdx+1)
-
+	// Purposefully avoid updating any progress counts.
+	// Only update resume info.
 	p.progress.SetProgressComplete(
-		int(completedCount),
+		int(p.progress.SectionsCompleted),
 		int(p.progress.SectionsRemaining),
-		fmt.Sprintf("Processing: %s/%s", bucket, *obj.Key),
+		p.progress.Message,
 		string(encoded),
 	)
 	return nil
