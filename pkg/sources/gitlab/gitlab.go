@@ -48,6 +48,10 @@ type Source struct {
 	ignoreRepos  []string
 	includeRepos []string
 
+	// This is an experimental flag used to investigate some suspicious behavior we've seen with very large GitLab
+	// organizations that have lots of group sharing.
+	enumerateSharedProjects bool
+
 	useCustomContentWriter bool
 	git                    *git.Git
 	scanOptions            *git.ScanOptions
@@ -155,6 +159,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.repos = conn.GetRepositories()
 	s.ignoreRepos = conn.GetIgnoreRepos()
 	s.includeRepos = conn.GetIncludeRepos()
+	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
 
 	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
 	ctx.Logger().V(3).Info("setting include repos patterns", "patterns", s.includeRepos)
@@ -577,6 +582,7 @@ func (s *Source) getAllProjectRepos(
 			ListOptions:      listOpts,
 			OrderBy:          gitlab.Ptr(orderBy),
 			IncludeSubGroups: gitlab.Ptr(true),
+			WithShared:       gitlab.Ptr(s.enumerateSharedProjects),
 		}
 		for {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
