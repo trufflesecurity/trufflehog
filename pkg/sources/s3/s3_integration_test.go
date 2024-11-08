@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -215,4 +216,37 @@ func TestSource_Validate(t *testing.T) {
 			assert.Equal(t, tt.wantErrCount, len(errs))
 		})
 	}
+}
+
+// TestSourceCancellation tests that the source can be cancelled and that it does not complete
+// when the context is cancelled.
+func TestSourceCancellation(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	defer cancel()
+
+	src := Source{}
+	connection := &sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Buckets:    []string{"trufflesec-ahrav-test"},
+	}
+	conn, err := anypb.New(connection)
+	require.NoError(t, err)
+
+	err = src.Init(ctx, "test name", 0, 0, false, conn, 1)
+	chunksCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunksCh)
+		err = src.Chunks(ctx, chunksCh)
+		assert.Error(t, err, "expected context.Cancelled error")
+	}()
+
+	wantChunkCount := 9637
+	got := 0
+	for range chunksCh {
+		got++
+	}
+
+	assert.Less(t, int(src.PercentComplete), 100, "source should not have completed")
+	assert.Less(t, got, wantChunkCount,
+		"more chunks than expected were received")
 }
