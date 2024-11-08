@@ -27,12 +27,12 @@ func TestAppSynergy_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("appsynergy credentail: %s", validPattern),
+			input: fmt.Sprintf("appsynergy credential: %s", validPattern),
 			want:  []string{"mg1pgwlndtq7rbk8i3kum344aso8ggp02ximdhsp8nsqasd3btxf84lz9ekfdpwo"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("appsynergy credentail: %s", invalidPattern),
+			input: fmt.Sprintf("appsynergy credential: %s", invalidPattern),
 			want:  nil,
 		},
 	}

@@ -1,7 +1,7 @@
 //go:generate generate_permissions permissions.yaml permissions.go sourcegraph
 package sourcegraph
 
-// ToDo: Add suport for custom domain
+// ToDo: Add support for custom domain
 
 import (
 	"encoding/json"
