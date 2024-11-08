@@ -806,6 +806,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipbooks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodeapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodebase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zohocrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -1646,6 +1647,7 @@ func DefaultDetectors() []detectors.Detector {
 		captainDataV1.Scanner{},
 		captainDataV2.Scanner{},
 		weightsandbiases.Scanner{},
+		zohocrm.Scanner{},
 	}
 
 	// Automatically initialize all detectors that implement
