@@ -3,17 +3,18 @@ package mrticktock
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -24,7 +25,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	emailPat = regexp.MustCompile(`\b([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-z]+)\b`)
+	emailPat = regexp.MustCompile(common.EmailPattern)
 	pwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"mrticktock"}) + `\b([a-zA-Z0-9!=@#$%()_^]{1,50})`)
 )
 
@@ -38,15 +39,14 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := emailPat.FindAllStringSubmatch(dataStr, -1)
 	passwordMatches := pwordPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
+	uniqueEmailMatches := make(map[string]struct{})
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
+	for emailMatch := range uniqueEmailMatches {
 		for _, passwordMatch := range passwordMatches {
 			if len(passwordMatch) != 2 {
 				continue
@@ -55,11 +55,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Mrticktock,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(emailMatch),
 			}
 
 			if verify {
-				payload := strings.NewReader(fmt.Sprintf(`email=%s&password=%s`, resMatch, resPassword))
+				payload := strings.NewReader(fmt.Sprintf(`email=%s&password=%s`, emailMatch, resPassword))
 				req, err := http.NewRequestWithContext(ctx, "POST", "https://mrticktock.com/app/api/is_timer_active", payload)
 				if err != nil {
 					continue

@@ -1,117 +1,83 @@
-//go:build detectors
-// +build detectors
-
 package captaindata
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
-	"github.com/kylelemons/godebug/pretty"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestCaptainData_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	projId := testSecrets.MustGetField("CAPTAINDATA_PROJID")
-	secret := testSecrets.MustGetField("CAPTAINDATA")
-	inactiveSecret := testSecrets.MustGetField("CAPTAINDATA_INACTIVE")
-
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestCaptainData_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a captaindata project %s with captaindata secret %s within", projId, secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_CaptainData,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
+			name:  "typical pattern",
+			input: "captaindata_project = '12345678-1234-1234-1234-123456789012' captaindata_api_key = '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'",
+			want:  []string{"12345678-1234-1234-1234-1234567890121234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a captaindata project %s with captaindata secret %s within but not valid", projId, inactiveSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
+			name: "finds all matches",
+			input: `captaindata_project1 = '12345678-1234-1234-1234-123456789012' captaindata_api_key1 = '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+captaindata_project2 = '87654321-4321-4321-4321-210987654321' captaindata_api_key2 = 'fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321'`,
+			want: []string{
+				"12345678-1234-1234-1234-1234567890121234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+				"12345678-1234-1234-1234-123456789012fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+				"87654321-4321-4321-4321-210987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+				"87654321-4321-4321-4321-2109876543211234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_CaptainData,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name:  "invalid pattern",
+			input: "captaindata_project = '123456' captaindata_api_key = '1234567890'",
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("CaptainData.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("CaptainData.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				s.FromData(ctx, false, data)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

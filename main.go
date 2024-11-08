@@ -124,6 +124,8 @@ var (
 	gitlabScanToken        = gitlabScan.Flag("token", "GitLab token. Can be provided with environment variable GITLAB_TOKEN.").Envar("GITLAB_TOKEN").Required().String()
 	gitlabScanIncludePaths = gitlabScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitlabScanExcludePaths = gitlabScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
+	gitlabScanIncludeRepos = gitlabScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
+	gitlabScanExcludeRepos = gitlabScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
 
 	filesystemScan  = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemPaths = filesystemScan.Arg("path", "Path to file or directory to scan.").Strings()
@@ -674,10 +676,12 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 
 		cfg := sources.GitlabConfig{
-			Endpoint: *gitlabScanEndpoint,
-			Token:    *gitlabScanToken,
-			Repos:    *gitlabScanRepos,
-			Filter:   filter,
+			Endpoint:     *gitlabScanEndpoint,
+			Token:        *gitlabScanToken,
+			Repos:        *gitlabScanRepos,
+			IncludeRepos: *gitlabScanIncludeRepos,
+			ExcludeRepos: *gitlabScanExcludeRepos,
+			Filter:       filter,
 		}
 		if err := eng.ScanGitLab(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)

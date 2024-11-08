@@ -102,6 +102,10 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	close(resultsCh)
 
 	for result := range resultsCh {
+		if result.ExtraData != nil {
+			result.ExtraData["name"] = c.GetName()
+		}
+
 		results = append(results, result)
 	}
 
