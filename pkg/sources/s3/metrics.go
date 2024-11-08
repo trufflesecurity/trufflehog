@@ -29,6 +29,13 @@ type collector struct {
 	bucketsPerRole *prometheus.GaugeVec
 }
 
+var metricsInstance metricsCollector
+
+func init() { metricsInstance = newS3MetricsCollector() }
+
+// getMetricsCollector returns the singleton metrics collector instance..
+func getMetricsCollector() metricsCollector { return metricsInstance }
+
 func newS3MetricsCollector() metricsCollector {
 	return &collector{
 		objectsScanned: promauto.NewCounterVec(prometheus.CounterOpts{

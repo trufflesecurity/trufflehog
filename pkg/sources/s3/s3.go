@@ -99,7 +99,7 @@ func (s *Source) Init(
 	if err != nil {
 		return err
 	}
-	s.metricsCollector = newS3MetricsCollector()
+	s.metricsCollector = getMetricsCollector()
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
