@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bombbomb"}) + common.JWTPattern)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bombbomb"}) + common.BuildRegexJWT("0,140", "0,419", "0,171"))
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
