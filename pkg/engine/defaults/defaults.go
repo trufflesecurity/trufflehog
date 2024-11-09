@@ -108,7 +108,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/box"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boxoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintreepayments"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch"
+	brandfetchV1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v1"
+	brandfetchV2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browshot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
@@ -966,7 +967,8 @@ func buildDetectorList() []detectors.Detector {
 		&box.Scanner{},
 		&boxoauth.Scanner{},
 		&braintreepayments.Scanner{},
-		&brandfetch.Scanner{},
+		brandfetchV1.Scanner{},
+		brandfetchV2.Scanner{},
 		&browserstack.Scanner{},
 		&browshot.Scanner{},
 		&bscscan.Scanner{},
