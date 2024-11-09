@@ -83,13 +83,20 @@ func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string
 		}
 	}
 
-	var bindings []analyzers.Binding
-	parentAccountSID := info.ServicesRes.Services[0].AccountSID
-	parentAccountFriendlyName := info.ServicesRes.Services[0].FriendlyName
+	var (
+		bindings                  []analyzers.Binding
+		parentAccountSID          = ""
+		parentAccountFriendlyName = ""
+	)
+
+	if len(info.ServicesRes.Services) > 0 {
+		parentAccountSID = info.ServicesRes.Services[0].AccountSID
+		parentAccountFriendlyName = info.ServicesRes.Services[0].FriendlyName
+	}
 
 	for _, account := range accounts {
 		accountType := "Account"
-		if account.SID != parentAccountSID {
+		if parentAccountSID != "" && account.SID != parentAccountSID {
 			accountType = "SubAccount"
 		}
 		resource := analyzers.Resource{
@@ -97,7 +104,7 @@ func (a *Analyzer) Analyze(ctx context.Context, credentialInfo map[string]string
 			FullyQualifiedName: "twilio.com/account/" + account.SID,
 			Type:               accountType,
 		}
-		if account.SID != parentAccountSID {
+		if parentAccountSID != "" && account.SID != parentAccountSID {
 			resource.Parent = &analyzers.Resource{
 				Name:               parentAccountFriendlyName,
 				FullyQualifiedName: "twilio.com/account/" + parentAccountSID,
