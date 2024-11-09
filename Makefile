@@ -63,3 +63,7 @@ release-protos-image:
 
 test-release:
 	goreleaser release --clean --skip-publish --snapshot
+
+.PHONY: todo
+todo:
+	go run scripts/todo/main.go
