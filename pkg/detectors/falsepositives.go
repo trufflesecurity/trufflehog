@@ -191,7 +191,7 @@ func FilterKnownFalsePositives(ctx context.Context, detector Detector, results [
 		}
 
 		if isFp, reason := isFalsePositive(result); isFp {
-			ctx.Logger().V(4).Info("Skipping result: false positive", "result", result.Raw, "reason", reason)
+			ctx.Logger().V(4).Info("Skipping result: false positive", "result", string(result.Raw), "reason", reason)
 			continue
 		}
 		filteredResults = append(filteredResults, result)
