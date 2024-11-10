@@ -63,8 +63,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autopilot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/avazapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aviationstack"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
-	awssessionkey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
+	aws_access_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/access_keys"
+	aws_session_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/session_keys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
@@ -882,8 +882,8 @@ func buildDetectorList() []detectors.Detector {
 		&autopilot.Scanner{},
 		&avazapersonalaccesstoken.Scanner{},
 		&aviationstack.Scanner{},
-		aws.New(),
-		awssessionkey.New(),
+		aws_access_keys.New(),
+		aws_session_keys.New(),
 		&axonaut.Scanner{},
 		&aylien.Scanner{},
 		&ayrshare.Scanner{},
