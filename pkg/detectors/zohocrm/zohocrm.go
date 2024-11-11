@@ -37,7 +37,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"1000."}
 }
 
-// FromData will find and optionally verify Zohocrm secrets in a given set of bytes.
+// FromData will find and optionally verify Zoho CRM secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 	uniqueMatches := make(map[string]struct{})
@@ -69,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-// Verifies the Zoho CRM API key by making an HTTP request to the Zoho CRM API.
+// Verifies the Zoho CRM API access token by making a GET request to the Zoho CRM API.
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	endpoint := "https://www.zohoapis.com/crm/v7/Leads?fields=Email&per_page=1"
 
@@ -120,5 +120,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Zohocrm is a blockchain development platform that provides a suite of tools and services for building and scaling decentralized applications. Zohocrm API keys can be used to access these services."
+	return "Zoho CRM is a platform for managing sales, marketing, and customer support. Zoho CRM API access tokens allow access to these services through their REST API."
 }
