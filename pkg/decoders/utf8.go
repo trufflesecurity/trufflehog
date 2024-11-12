@@ -43,14 +43,9 @@ var utf8ReplacementBytes = []byte(string(utf8.RuneError))
 // For multi-byte sequences: preserves valid UTF-8 as-is, while invalid sequences
 // are replaced with a single UTF-8 replacement character.
 func extractSubstrings(b []byte) []byte {
-	length := len(b)
-	if length == 0 {
-		return nil
-	}
-
-	buf := make([]byte, 0, len(b))
-
-	for idx := 0; idx < len(b); {
+	dataLen := len(b)
+	buf := make([]byte, 0, dataLen)
+	for idx := 0; idx < dataLen; {
 		// If it's ASCII, handle separately.
 		// This is faster than decoding for common cases.
 		if b[idx] < utf8.RuneSelf {
