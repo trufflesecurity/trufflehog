@@ -1,7 +1,6 @@
 package decoders
 
 import (
-	"bytes"
 	"unicode/utf8"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -29,6 +28,11 @@ func (d *UTF8) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	return decodableChunk
 }
 
+// utf8ReplacementBytes holds the UTF-8 encoded form of the Unicode replacement character (U+FFFD).
+// This is pre-computed since it's used frequently when replacing invalid UTF-8 sequences
+// and control characters.
+var utf8ReplacementBytes = []byte(string(utf8.RuneError))
+
 // extractSubstrings sanitizes byte sequences to ensure consistent handling of malformed input
 // while maintaining readable content. It handles ASCII and UTF-8 data as follows:
 //
@@ -44,36 +48,35 @@ func extractSubstrings(b []byte) []byte {
 		return nil
 	}
 
-	buf := bytes.Buffer{}
-	buf.Grow(len(b))
+	buf := make([]byte, 0, len(b))
 
-	for idx := 0; idx < length; {
+	for idx := 0; idx < len(b); {
 		// If it's ASCII, handle separately.
 		// This is faster than decoding for common cases.
 		if b[idx] < utf8.RuneSelf {
 			if isPrintableByte(b[idx]) {
-				buf.WriteByte(b[idx])
+				buf = append(buf, b[idx])
 			} else {
-				buf.WriteRune(utf8.RuneError)
+				buf = append(buf, utf8ReplacementBytes...)
 			}
 			idx++
 			continue
 		}
 
-		decodeRune, size := utf8.DecodeRune(b[idx:])
-		if decodeRune == utf8.RuneError {
+		r, size := utf8.DecodeRune(b[idx:])
+		if r == utf8.RuneError {
 			// Collapse any malformed sequence into a single replacement character
 			// rather than replacing each byte individually.
-			buf.WriteRune(utf8.RuneError)
+			buf = append(buf, utf8ReplacementBytes...)
 			idx++
 		} else {
 			// Keep valid multi-byte UTF-8 sequences intact to preserve unicode characters.
-			buf.WriteRune(decodeRune)
+			buf = append(buf, b[idx:idx+size]...)
 			idx += size
 		}
 	}
 
-	return buf.Bytes()
+	return buf
 }
 
 // isPrintableByte reports whether a byte represents a printable ASCII character
