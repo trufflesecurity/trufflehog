@@ -1285,8 +1285,14 @@ func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
 		fragmentStart = &metadata.AzureRepos.Line
 		link = metadata.AzureRepos.Link
 	default:
-		return 0, nil, ""
+		return 1, nil, ""
 	}
+
+	// Ensure we maintain 1-based line indexing if fragmentStart is not set or is 0.
+	if *fragmentStart == 0 {
+		*fragmentStart = 1
+	}
+
 	return *fragmentStart, fragmentStart, link
 }
 

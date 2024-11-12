@@ -1,119 +1,90 @@
-//go:build detectors
-// +build detectors
-
 package cloudconvert
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestCloudConvert_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("CLOUDCONVERT")
-	inactiveSecret := testSecrets.MustGetField("CLOUDCONVERT_INACTIVE")
+var (
+	validPattern = `
+		# Configuration File: config.yaml
+		database:
+			host: $DB_HOST
+			port: $DB_PORT
+			username: $DB_USERNAME
+			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+		api:
+			auth_type: "Bearer"
+			base_url: "https://api.example.com/v1/user"
+			cloudconvert_key: "eypn1gEV3BnckI3jcYzUvliSbukvxzO5acvE?ey8VEaR0lmpRa4IXv02fDPnlfdukWtb1/p-nlQlPVGnB52f9KwY4q98aVghXZqoit4AeFxMAHcCytOj61o8lHdcUF9fIcyF2HaFIk/k3Hdt7pS/5rb2eeWcEvc-5XB0T_Oh68AtCG8mOPpwKvzrhhIuEJck3vtFncgbDrSxg5mKkw924rMLP3Tb5tgIRuawZLwBxJL/qVIhAzfDGiIeNTzYOB9zHfHlfw3aZ1i/terePSN5EafVJ1yYw1KRXWL9/kPdAO0yFwSv3mUWx04oIIUURG6QKwO0rk7L0eAxnu4djnSXtqdvH_G50H1SSwwfKUg2Xz25-OZLkhxiaxEMMMY=3x0Yjhs7O1KFkI5gUQKH_VYAU2bJSAqpCKsxaYrdw91wUoya5rflCBVDHjC/BsezIkPFFmEu7sqs3WJg6dZeAiguYx7uZtDx1ILH18f29q9o34bM9SNolZNcG3fN7L2eWjilbmUq/Ty2545WkbHTjlcjLlHPAAjzLebfcFnlMSKH9Tqb/qx3G1z8wfzMa3dn3iRqNHwfmGOmfgK7RjtlZwoVruMjDWEza/o8imZF513yM7FrHTJkTFa1JjVbjU/C85ItZTiJsBUKAt/DbLg6W7lieKgHbgmz3cuwgVR7YDLZJB056TRcU9wrV0SUYDz0gogrpOEnZxdo4fb5UcCllj/AD/dYsfqVSHtTxKWBhun9Iqmx8FjgPtFCFugTxfaaHZ9dUC7TPahdSxixGvnu8EEvAs0Te85eJ9iyeq628Tvboz9J7KMq/uwflJtecSquJiWJT9GsYL5dl3Hr6ZYhxqs1-mrrB5FNzn-NPclPSu9PANtQ1BDuahKy683/t85F8yjug5C5paamNfgiJgOm5Vi/USUmWeVmH_htZoYGJTbOywDkRT1bYp9JIxlWHA29MInhWNrdlxZ_1h-SQ3fM6pzKIoJ0m_T/KXYERPzle0cy_/OnlfIa-yUgBnx_slQ1f9h0AS/PVMv/yZ6W"
+
+		# Notes:
+		# - Remember to rotate the secret every 90 days.
+		# - The above credentials should only be used in a secure environment.
+	`
+	secret = "eypn1gEV3BnckI3jcYzUvliSbukvxzO5acvE?ey8VEaR0lmpRa4IXv02fDPnlfdukWtb1/p-nlQlPVGnB52f9KwY4q98aVghXZqoit4AeFxMAHcCytOj61o8lHdcUF9fIcyF2HaFIk/k3Hdt7pS/5rb2eeWcEvc-5XB0T_Oh68AtCG8mOPpwKvzrhhIuEJck3vtFncgbDrSxg5mKkw924rMLP3Tb5tgIRuawZLwBxJL/qVIhAzfDGiIeNTzYOB9zHfHlfw3aZ1i/terePSN5EafVJ1yYw1KRXWL9/kPdAO0yFwSv3mUWx04oIIUURG6QKwO0rk7L0eAxnu4djnSXtqdvH_G50H1SSwwfKUg2Xz25-OZLkhxiaxEMMMY=3x0Yjhs7O1KFkI5gUQKH_VYAU2bJSAqpCKsxaYrdw91wUoya5rflCBVDHjC/BsezIkPFFmEu7sqs3WJg6dZeAiguYx7uZtDx1ILH18f29q9o34bM9SNolZNcG3fN7L2eWjilbmUq/Ty2545WkbHTjlcjLlHPAAjzLebfcFnlMSKH9Tqb/qx3G1z8wfzMa3dn3iRqNHwfmGOmfgK7RjtlZwoVruMjDWEza/o8imZF513yM7FrHTJkTFa1JjVbjU/C85ItZTiJsBUKAt/DbLg6W7lieKgHbgmz3cuwgVR7YDLZJB056TRcU9wrV0SUYDz0gogrpOEnZxdo4fb5UcCllj/AD/dYsfqVSHtTxKWBhun9Iqmx8FjgPtFCFugTxfaaHZ9dUC7TPahdSxixGvnu8EEvAs0Te85eJ9iyeq628Tvboz9J7KMq/uwflJtecSquJiWJT9GsYL5dl3Hr6ZYhxqs1-mrrB5FNzn-NPclPSu9PANtQ1BDuahKy683/t85F8yjug5C5paamNfgiJgOm5Vi/USUmWeVmH_htZoYGJTbOywDkRT1bYp9JIxlWHA29MInhWNrdlxZ_1h-SQ3fM6pzKIoJ0m_T/KXYERPzle0cy_/OnlfIa-yUgBnx_slQ1f9h0AS/PVMv/yZ6W"
+)
+
+func TestCloudConvert_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a cloudconvert secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_CloudConvert,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a cloudconvert secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_CloudConvert,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name:  "valid pattern",
+			input: validPattern,
+			want:  []string{secret},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("CloudConvert.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("CloudConvert.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}
