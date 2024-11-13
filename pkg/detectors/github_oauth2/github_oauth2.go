@@ -13,7 +13,6 @@ import (
 )
 
 type Scanner struct {
-	detectors.EndpointSetter
 	detectors.DefaultMultiPartCredentialProvider
 }
 
