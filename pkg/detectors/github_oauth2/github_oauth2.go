@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
-
 	"golang.org/x/oauth2/clientcredentials"
 	"golang.org/x/oauth2/github"
 
