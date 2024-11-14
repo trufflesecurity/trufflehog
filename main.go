@@ -409,6 +409,9 @@ func run(state overseer.State) {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
 	}
 
+	// OSS Default APK handling on
+	feature.EnableAPKHandler.Store(true)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error

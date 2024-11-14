@@ -13,6 +13,7 @@ import (
 	"github.com/mholt/archiver/v4"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -115,22 +116,13 @@ func newFileReader(r io.Reader, options ...readerOption) (fileReader, error) {
 	}
 
 	// Check for APK files
-	// Note: We can't extend the mimetype package with an APK detection function b/c it would require adjusting settings
-	// so that all files are fully read into a byte slice for detection (mimetype.SetLimit(0)), which would bloat memory.
-	// Instead we call the isAPKFile function in here after ensuring it's a zip/jar file and has an .apk extension.
-	if cfg.fileExtension == apkExt && (fReader.mime.String() == string(zipMime) || fReader.mime.String() == string(jarMime)) {
+	if shouldHandleAsAPK(cfg, fReader) {
 		isAPK, err := isAPKFile(&fReader)
 		if err != nil {
 			return fReader, fmt.Errorf("error checking for APK: %w", err)
 		}
 		if isAPK {
-			// Add apk file extension to mimetype package so we can assign in next line
-			mimetype.Lookup("application/zip").Extend(func(r []byte, l uint32) bool { return false }, string(apkMime), ".apk")
-			fReader.mime = mimetype.Lookup(string(apkMime))
-			if _, err := fReader.Seek(0, io.SeekStart); err != nil {
-				return fReader, fmt.Errorf("error resetting reader after APK detection: %w", err)
-			}
-			return fReader, nil
+			return handleAPKFile(&fReader)
 		}
 	}
 
@@ -473,6 +465,16 @@ func getFileExtension(chunkSkel *sources.Chunk) string {
 	return ext
 }
 
+// shouldHandleAsAPK checks if the file should be handled as an APK based on config and MIME type.
+// Note: We can't extend the mimetype package with an APK detection function b/c it would require adjusting settings
+// so that all files are fully read into a byte slice for detection (mimetype.SetLimit(0)), which would bloat memory.
+// Instead we call the isAPKFile function in here after ensuring it's a zip/jar file and has an .apk extension.
+func shouldHandleAsAPK(cfg readerConfig, fReader fileReader) bool {
+	return feature.EnableAPKHandler.Load() &&
+		cfg.fileExtension == apkExt &&
+		(fReader.mime.String() == string(zipMime) || fReader.mime.String() == string(jarMime))
+}
+
 func isAPKFile(r *fileReader) (bool, error) {
 	size, _ := r.Size()
 	zipReader, err := zip.NewReader(r, size)
@@ -498,4 +500,17 @@ func isAPKFile(r *fileReader) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// handleAPKFile configures the MIME type for an APK and resets the reader.
+func handleAPKFile(fReader *fileReader) (fileReader, error) {
+	// Extend the MIME type to recognize APK files
+	mimetype.Lookup("application/zip").Extend(func(r []byte, l uint32) bool { return false }, string(apkMime), ".apk")
+	fReader.mime = mimetype.Lookup(string(apkMime))
+
+	// Reset reader for further handling
+	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+		return *fReader, fmt.Errorf("error resetting reader after APK detection: %w", err)
+	}
+	return *fReader, nil
 }
