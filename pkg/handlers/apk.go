@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/avast/apkparser"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
 )
 
 // General Note: There are tools that can fully decompile an apk (e.g. jadx, apktool, etc.)
@@ -87,24 +89,7 @@ func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) (chan 
 		}()
 
 		if err = h.processAPK(ctx, input, apkChan); err != nil {
-			// If we encounter an error during apk parsing, revert to zip handler.
-			// This ensures anything named .apk that isn't an Android package is still processed.
-			ctx.Logger().Error(err, "error processing apk content. reverting to zip handler.")
-			processingCtx, processingCancel := logContext.WithTimeout(logContext.Background(), maxTimeout)
-			defer processingCancel()
-
-			// Instantiate a new zip handler to process the apk as a zip archive.
-			zipHandler := newArchiveHandler()
-			zipChan, err := zipHandler.HandleFile(processingCtx, input)
-			if err != nil {
-				ctx.Logger().Error(err, "error handling zip content.")
-				// Question: Should we handle errors differently here? instead of just returning
-				return
-			}
-			// Copy the zipChan to the apkChan
-			for data := range zipChan {
-				apkChan <- data
-			}
+			ctx.Logger().Error(err, "error processing apk content")
 		}
 	}()
 	return apkChan, nil
@@ -158,30 +143,30 @@ func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTabl
 		return nil
 	}
 
-	// Read the file data
-	rdr, err := readFile(file)
+	// Open the file from the zip archive
+	rdr, err := openFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", file.Name, err)
 	}
 	defer rdr.Close()
 
+	var contentReader io.Reader
 	// Decode the file based on its extension
-	switch {
-	case strings.HasSuffix(file.Name, ".xml"):
-		xmlRdr, err := decodeXML(rdr, resTable)
+	switch strings.ToLower(filepath.Ext(file.Name)) {
+	case ".xml":
+		contentReader, err = decodeXML(rdr, resTable)
 		if err != nil {
 			return fmt.Errorf("failed to decode xml file %s: %w", file.Name, err)
 		}
-		return h.handleAPKFileContent(ctx, xmlRdr, file.Name, apkChan)
-	case strings.HasSuffix(file.Name, ".dex"):
-		dexRdr, err := processDexFile(ctx, rdr)
+	case ".dex":
+		contentReader, err = processDexFile(ctx, rdr)
 		if err != nil {
 			return fmt.Errorf("failed to decode dex file %s: %w", file.Name, err)
 		}
-		return h.handleAPKFileContent(ctx, dexRdr, file.Name, apkChan)
 	default:
-		return h.handleAPKFileContent(ctx, rdr, file.Name, apkChan)
+		contentReader = rdr
 	}
+	return h.handleAPKFileContent(ctx, contentReader, file.Name, apkChan)
 }
 
 // handleAPKFileContent sends the extracted data to the provided channel via the handleNonArchiveContent function.
@@ -199,16 +184,10 @@ func (h *apkHandler) handleAPKFileContent(ctx logContext.Context, rdr io.Reader,
 
 // createZipReader creates a new ZIP reader from the input fileReader.
 func createZipReader(input fileReader) (*zip.Reader, error) {
-	size, err := input.Seek(0, io.SeekEnd)
+	size, err := input.Size()
 	if err != nil {
 		return nil, err
 	}
-	// Reset the reader position to the start
-	_, err = input.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-	// Create a new ZIP reader for the data
 	zipReader, err := zip.NewReader(input, size)
 	if err != nil {
 		return nil, err
@@ -220,13 +199,13 @@ func createZipReader(input fileReader) (*zip.Reader, error) {
 func parseResTable(zipReader *zip.Reader) (*apkparser.ResourceTable, error) {
 	for _, file := range zipReader.File {
 		if file.Name == "resources.arsc" {
-			rdr, err := readFile(file)
+			rdr, err := openFile(file)
 			if err != nil {
 				return nil, err
 			}
-			defer rdr.Close()
 
 			resTable, err := apkparser.ParseResourceTable(rdr)
+			rdr.Close()
 			if err != nil {
 				return nil, err
 			}
@@ -236,9 +215,9 @@ func parseResTable(zipReader *zip.Reader) (*apkparser.ResourceTable, error) {
 	return nil, errors.New("resources.arsc file not found in the APK archive")
 }
 
-// readFile reads the file from the zip archive and returns the data as an io.ReadCloser
+// openFile opens the file from the zip archive and returns the data as an io.ReadCloser
 // Note: responsibility of calling function to close the reader
-func readFile(file *zip.File) (io.ReadCloser, error) {
+func openFile(file *zip.File) (io.ReadCloser, error) {
 	rc, err := file.Open()
 	if err != nil {
 		return nil, err
@@ -265,10 +244,10 @@ func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, e
 				return nil, err
 			}
 			// Write directly to the buffer
-			_, err = resourceStrings.WriteString(fmt.Sprintf("%s: %s\n", entry.Key, val))
-			if err != nil {
-				return nil, err
-			}
+			resourceStrings.WriteString(entry.Key)
+			resourceStrings.WriteString(": ")
+			resourceStrings.WriteString(val)
+			resourceStrings.WriteString("\n")
 		}
 		// Exit the loop if we've finished processing the strings
 		if inStrings && entry.ResourceType != "string" {
@@ -280,16 +259,8 @@ func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, e
 
 // processDexFile decodes the dex file and returns the relevant instructions
 func processDexFile(ctx logContext.Context, rdr io.ReadCloser) (io.Reader, error) {
-	// dextk.Read() requires an io.ReaderAt interface,
-	// so we first convert the reader to a byte slice
-	data, err := io.ReadAll(rdr)
-	if err != nil {
-		return nil, err
-	}
-	bytesRdr := bytes.NewReader(data)
-
-	// Read the dex file
-	dexReader, err := dextk.Read(bytesRdr)
+	// dextk.Read() requires an io.ReaderAt interface
+	dexReader, err := dextk.Read(iobuf.NewBufferedReaderSeeker(rdr))
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +388,7 @@ func decodeXML(rdr io.ReadCloser, resTable *apkparser.ResourceTable) (io.Reader,
 	err := apkparser.ParseXml(rdr, enc, resTable)
 	if err != nil {
 		// If the error is due to plaintext XML, return the plaintext XML stringified
-		if err.Error() == "xml is in plaintext, binary form expected" {
+		if errors.Is(err, apkparser.ErrPlainTextManifest) {
 			xmlData, readErr := io.ReadAll(rdr)
 			if readErr != nil {
 				return nil, readErr

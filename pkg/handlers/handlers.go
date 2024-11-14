@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"archive/zip"
 	"bufio"
 	"errors"
 	"fmt"
@@ -38,6 +39,14 @@ type fileReader struct {
 	isGenericArchive bool
 
 	*iobuf.BufferedReadSeeker
+}
+
+type readerConfig struct{ fileExtension string }
+
+type readerOption func(*readerConfig)
+
+func withFileExtension(ext string) readerOption {
+	return func(c *readerConfig) { c.fileExtension = ext }
 }
 
 var ErrEmptyReader = errors.New("reader is empty")
@@ -82,8 +91,15 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 }
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
-func newFileReader(r io.Reader) (fileReader, error) {
-	var fReader fileReader
+func newFileReader(r io.Reader, options ...readerOption) (fileReader, error) {
+	var (
+		fReader fileReader
+		cfg     readerConfig
+	)
+
+	for _, opt := range options {
+		opt(&cfg)
+	}
 
 	fReader.BufferedReadSeeker = iobuf.NewBufferedReaderSeeker(r)
 
@@ -96,6 +112,26 @@ func newFileReader(r io.Reader) (fileReader, error) {
 	// Reset the reader to the beginning because DetectReader consumes the reader.
 	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
+	}
+
+	// Check for APK files
+	// Note: We can't extend the mimetype package with an APK detection function b/c it would require adjusting settings
+	// so that all files are fully read into a byte slice for detection (mimetype.SetLimit(0)), which would bloat memory.
+	// Instead we call the isAPKFile function in here after ensuring it's a zip/jar file and has an .apk extension.
+	if cfg.fileExtension == apkExt && (fReader.mime.String() == string(zipMime) || fReader.mime.String() == string(jarMime)) {
+		isAPK, err := isAPKFile(&fReader)
+		if err != nil {
+			return fReader, fmt.Errorf("error checking for APK: %w", err)
+		}
+		if isAPK {
+			// Add apk file extension to mimetype package so we can assign in next line
+			mimetype.Lookup("application/zip").Extend(func(r []byte, l uint32) bool { return false }, string(apkMime), ".apk")
+			fReader.mime = mimetype.Lookup(string(apkMime))
+			if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+				return fReader, fmt.Errorf("error resetting reader after APK detection: %w", err)
+			}
+			return fReader, nil
+		}
 	}
 
 	// If a MIME type is known to not be an archive type, we might as well return here rather than
@@ -161,6 +197,7 @@ const (
 	rpmHandlerType     handlerType = "rpm"
 	apkHandlerType     handlerType = "apk"
 	defaultHandlerType handlerType = "default"
+	apkExt                         = ".apk"
 )
 
 type mimeType string
@@ -196,6 +233,8 @@ const (
 	tclTextMime  mimeType = "text/x-tcl"
 	tclMime      mimeType = "application/x-tcl"
 	apkMime      mimeType = "application/vnd.android.package-archive"
+	zipMime      mimeType = "application/zip"
+	jarMime      mimeType = "application/java-archive"
 )
 
 // skipArchiverMimeTypes is a set of MIME types that should bypass archiver library processing because they are either
@@ -283,7 +322,8 @@ func HandleFile(
 		return fmt.Errorf("reader is nil")
 	}
 
-	rdr, err := newFileReader(reader)
+	readerOption := withFileExtension(getFileExtension(chunkSkel))
+	rdr, err := newFileReader(reader, readerOption)
 	if err != nil {
 		if errors.Is(err, ErrEmptyReader) {
 			ctx.Logger().V(5).Info("empty reader, skipping file")
@@ -309,19 +349,6 @@ func HandleFile(
 	if config.skipArchives && rdr.isGenericArchive {
 		ctx.Logger().V(5).Info("skipping archive file", "mime", mimeT)
 		return nil
-	}
-
-	// If the file is an 'application/jar' or "application/zip" file, check filename for the .apk extension.
-	// This logic can't live inside the newReader() function b/c we don't have access to the filename.
-	// If we want to detect based on file contents instead, we need to read the file directory and look for
-	// the AndroidManifest.xml and resources.arsc files.
-	if mimeT == "application/jar" || mimeT == "application/zip" {
-		ext := getFileExtension(chunkSkel)
-		if ext == ".apk" {
-			ctx.Logger().V(3).Info("APK file detected by extension", "extension", ext)
-			mimeT = apkMime
-			ctx = logContext.WithValues(ctx, "mime", mimeT)
-		}
 	}
 
 	processingCtx, cancel := logContext.WithTimeout(ctx, maxTimeout)
@@ -444,4 +471,31 @@ func getFileExtension(chunkSkel *sources.Chunk) string {
 	// Use filepath.Ext to extract the file extension from the file name
 	ext := filepath.Ext(fileName)
 	return ext
+}
+
+func isAPKFile(r *fileReader) (bool, error) {
+	size, _ := r.Size()
+	zipReader, err := zip.NewReader(r, size)
+	if err != nil {
+		return false, fmt.Errorf("error creating zip reader: %w", err)
+	}
+
+	hasManifest := false
+	hasClasses := false
+
+	for _, file := range zipReader.File {
+		switch file.Name {
+		case "AndroidManifest.xml":
+			hasManifest = true
+		case "classes.dex":
+			hasClasses = true
+		default:
+			// Skip other files.
+		}
+		if hasManifest && hasClasses {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
