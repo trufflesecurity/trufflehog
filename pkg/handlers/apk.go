@@ -16,6 +16,7 @@ import (
 
 	"github.com/avast/apkparser"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
 )
 
@@ -51,11 +52,17 @@ var (
 )
 
 // apkHandler handles apk archive formats.
-type apkHandler struct{ *defaultHandler }
+type apkHandler struct {
+	keywordMatcher *defaults.DefaultDetectorKeywordMatcher
+	*defaultHandler
+}
 
 // newapkHandler creates an apkHandler.
 func newAPKHandler() *apkHandler {
-	return &apkHandler{defaultHandler: newDefaultHandler(apkHandlerType)}
+	return &apkHandler{
+		defaultHandler: newDefaultHandler(apkHandlerType),
+		keywordMatcher: defaults.NewDefaultDetectorKeywordMatcher(),
+	}
 }
 
 // HandleFile processes apk formatted files.
@@ -159,7 +166,7 @@ func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTabl
 			return fmt.Errorf("failed to decode xml file %s: %w", file.Name, err)
 		}
 	case ".dex":
-		contentReader, err = processDexFile(ctx, rdr)
+		contentReader, err = h.processDexFile(ctx, rdr)
 		if err != nil {
 			return fmt.Errorf("failed to decode dex file %s: %w", file.Name, err)
 		}
@@ -258,14 +265,12 @@ func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, e
 }
 
 // processDexFile decodes the dex file and returns the relevant instructions
-func processDexFile(ctx logContext.Context, rdr io.ReadCloser) (io.Reader, error) {
+func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReadCloser) (io.Reader, error) {
 	// dextk.Read() requires an io.ReaderAt interface
 	dexReader, err := dextk.Read(iobuf.NewBufferedReaderSeeker(rdr))
 	if err != nil {
 		return nil, err
 	}
-
-	defaultKeywords := DefaultDetectorKeywords()
 
 	// Get relevant instruction data from the dex file
 	var dexOutput bytes.Buffer
@@ -275,14 +280,14 @@ func processDexFile(ctx logContext.Context, rdr io.ReadCloser) (io.Reader, error
 		if err != nil {
 			break
 		}
-		processDexClass(ctx, dexReader, node, defaultKeywords, &dexOutput)
+		h.processDexClass(ctx, dexReader, node, &dexOutput)
 	}
 
 	return &dexOutput, nil
 }
 
 // processDexClass processes a single class node's methods
-func processDexClass(ctx logContext.Context, dexReader *dextk.Reader, node dextk.ClassNode, defaultKeywords map[string]struct{}, dexOutput *bytes.Buffer) {
+func (h *apkHandler) processDexClass(ctx logContext.Context, dexReader *dextk.Reader, node dextk.ClassNode, dexOutput *bytes.Buffer) {
 
 	var classOutput bytes.Buffer
 	methodValues := make(map[string]struct{})
@@ -295,21 +300,13 @@ func processDexClass(ctx logContext.Context, dexReader *dextk.Reader, node dextk
 	// Write the classOutput to the dexOutput
 	dexOutput.Write(classOutput.Bytes())
 
-	// Stringify the classOutput value for case-insensitive keyword matching
-	classOutputLower := strings.ToLower(classOutput.String())
-
 	// Check if classOutput contains any of the default keywords
-	foundKeywords := make(map[string]struct{})
-	for keyword := range defaultKeywords {
-		if strings.Contains(classOutputLower, keyword) {
-			foundKeywords[keyword] = struct{}{} // Directly add to the map
-		}
-	}
+	foundKeywords := h.keywordMatcher.FindKeywords(classOutput.Bytes())
 
 	// For each found keyword, create a keyword:value pair and append to dexOutput
 	var keyValuePairs bytes.Buffer
 	for str := range methodValues {
-		for keyword := range foundKeywords {
+		for _, keyword := range foundKeywords {
 			keyValuePairs.Reset()
 			keyValuePairs.WriteString(keyword + ":" + str + "\n")
 			dexOutput.Write(keyValuePairs.Bytes())
