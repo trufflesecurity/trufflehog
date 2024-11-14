@@ -115,7 +115,7 @@ require (
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	pault.ag/go/debian v0.16.0
+	pault.ag/go/debian v0.17.0
 	pgregory.net/rapid v1.1.0
 	sigs.k8s.io/yaml v1.4.0
 )
