@@ -380,20 +380,22 @@ func formatAndFilterInstruction(line string) string {
 }
 
 func decodeXML(rdr io.ReadCloser, resTable *apkparser.ResourceTable) (io.Reader, error) {
+	//Convert rdr to BufferedReadSeeker to support rewinding
+	bufRdr := iobuf.NewBufferedReaderSeeker(rdr)
+
 	// Create a buffer to store the formatted XML data
 	var buf bytes.Buffer
 	enc := xml.NewEncoder(&buf)
 
 	// Parse the XML data using the apkparser library + resource table
-	err := apkparser.ParseXml(rdr, enc, resTable)
+	err := apkparser.ParseXml(bufRdr, enc, resTable)
 	if err != nil {
-		// If the error is due to plaintext XML, return the plaintext XML stringified
+		// If the error is due to plaintext XML, return the plaintext XML
 		if errors.Is(err, apkparser.ErrPlainTextManifest) {
-			xmlData, readErr := io.ReadAll(rdr)
-			if readErr != nil {
-				return nil, readErr
+			if _, err := bufRdr.Seek(0, io.SeekStart); err != nil {
+				return bufRdr, fmt.Errorf("error resetting reader after XML parsing error: %w", err)
 			}
-			return bytes.NewReader(xmlData), nil
+			return bufRdr, nil
 		}
 		return nil, err
 	}
