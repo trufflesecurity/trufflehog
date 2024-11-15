@@ -166,7 +166,7 @@ func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTabl
 			return fmt.Errorf("failed to decode xml file %s: %w", file.Name, err)
 		}
 	case ".dex":
-		contentReader, err = h.processDexFile(ctx, rdr)
+		contentReader, err = h.processDexFile(ctx, iobuf.NewBufferedReaderSeeker(rdr))
 		if err != nil {
 			return fmt.Errorf("failed to decode dex file %s: %w", file.Name, err)
 		}
@@ -265,10 +265,8 @@ func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, e
 }
 
 // processDexFile decodes the dex file and returns the relevant instructions
-func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReadCloser) (io.Reader, error) {
-	// dextk.Read() requires an io.ReaderAt interface
-	dexReader, err := dextk.Read(iobuf.NewBufferedReaderSeeker(rdr))
-	//dexReader, err := dextk.Read(iobuf.NewBufferedReaderSeeker(rdr), dextk.WithReadCache(16))
+func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReaderAt) (io.Reader, error) {
+	dexReader, err := dextk.Read(rdr, dextk.WithReadCache(16))
 	if err != nil {
 		return nil, err
 	}
