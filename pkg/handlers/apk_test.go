@@ -19,7 +19,6 @@ func TestAPKHandler(t *testing.T) {
 		expectedChunks  int
 		expectedSecrets int
 		matchString     string
-		expectErr       bool
 	}{
 		"apk_with_3_leaked_keys": {
 			"https://github.com/joeleonjr/leakyAPK/raw/refs/heads/main/aws_leak.apk",
@@ -28,7 +27,6 @@ func TestAPKHandler(t *testing.T) {
 			// we're just looking for a string match. There is one extra string match in the APK (but only 3 detected secrets).
 			4,
 			"AKIA2UC3BSXMLSCLTUUS",
-			false,
 		},
 	}
 
@@ -47,11 +45,7 @@ func TestAPKHandler(t *testing.T) {
 			}
 			defer newReader.Close()
 
-			archiveChan, err := handler.HandleFile(logContext.Background(), newReader)
-			if testCase.expectErr {
-				assert.NoError(t, err)
-				return
-			}
+			archiveChan := handler.HandleFile(logContext.Background(), newReader)
 
 			chunkCount := 0
 			secretCount := 0
@@ -59,7 +53,7 @@ func TestAPKHandler(t *testing.T) {
 			matched := false
 			for chunk := range archiveChan {
 				chunkCount++
-				if re.Match(chunk) {
+				if re.Match(chunk.Data) {
 					secretCount++
 					matched = true
 				}
@@ -82,7 +76,7 @@ func TestOpenInvalidAPK(t *testing.T) {
 	assert.NoError(t, err)
 	defer rdr.Close()
 
-	archiveChan := make(chan []byte)
+	archiveChan := make(chan DataOrErr)
 
 	err = handler.processAPK(ctx, rdr, archiveChan)
 	assert.Contains(t, err.Error(), "zip: not a valid zip file")
@@ -106,7 +100,7 @@ func TestOpenValidZipInvalidAPK(t *testing.T) {
 	assert.NoError(t, err)
 	defer newReader.Close()
 
-	archiveChan := make(chan []byte)
+	archiveChan := make(chan DataOrErr)
 	ctx := logContext.AddLogger(context.Background())
 
 	err = handler.processAPK(ctx, newReader, archiveChan)
