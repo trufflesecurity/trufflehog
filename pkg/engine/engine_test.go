@@ -1188,3 +1188,82 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 		t.Fatal("no detectors found implementing Endpoints(), did EndpointSetter change?")
 	}
 }
+
+func TestEngineignoreLine(t *testing.T) {
+	tests := []struct {
+		name             string
+		content          string
+		expectedFindings int
+	}{
+		{
+			name: "ignore at end of line",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # Ignoring this does not work
+    assert connection_string == "postgres://master_user:master_password@hostname:1234/main"  # trufflehog:ignore`,
+			expectedFindings: 0,
+		},
+		{
+			name: "ignore not on secret line",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # Ignoring this does not work
+	assert some_other_stuff == "blah" # trufflehog:ignore
+    assert connection_string == "postgres://master_user:master_password@hostname:1234/main"`,
+			expectedFindings: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			tmpFile, err := os.CreateTemp("", "test_creds")
+			assert.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
+
+			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
+			assert.NoError(t, err)
+
+			const defaultOutputBufferSize = 64
+			opts := []func(*sources.SourceManager){
+				sources.WithSourceUnits(),
+				sources.WithBufferedOutput(defaultOutputBufferSize),
+			}
+
+			sourceManager := sources.NewManager(opts...)
+
+			conf := Config{
+				Concurrency:   1,
+				Decoders:      decoders.DefaultDecoders(),
+				Detectors:     DefaultDetectors(),
+				Verify:        false,
+				SourceManager: sourceManager,
+				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+			}
+
+			eng, err := NewEngine(ctx, &conf)
+			assert.NoError(t, err)
+
+			eng.Start(ctx)
+
+			cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+			err = eng.ScanFileSystem(ctx, cfg)
+			assert.NoError(t, err)
+
+			assert.NoError(t, eng.Finish(ctx))
+			assert.Equal(t, tt.expectedFindings, int(eng.GetMetrics().UnverifiedSecretsFound))
+		})
+	}
+}

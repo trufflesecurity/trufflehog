@@ -47,7 +47,7 @@ const (
 // happen to run into a case where this matters we can address it then.
 var (
 	_                  detectors.Detector = (*Scanner)(nil)
-	uriPattern                            = regexp.MustCompile(`\b(?i)postgres(?:ql)?://\S+\b`)
+	uriPattern                            = regexp.MustCompile(`\b(?i)(postgres(?:ql)?)://\S+\b`)
 	connStrPartPattern                    = regexp.MustCompile(`([[:alpha:]]+)='(.+?)' ?`)
 )
 
@@ -100,7 +100,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			params[pg_port] = port
 		}
 
-		raw := []byte(fmt.Sprintf("postgresql://%s:%s@%s:%s", user, password, host, port))
+		const defaultDBType = "postgresql"
+		dbType, ok := params["db_type"]
+		if !ok {
+			dbType = defaultDBType
+		}
+		raw := []byte(fmt.Sprintf("%s://%s:%s@%s:%s", dbType, user, password, host, port))
 
 		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Postgres,
@@ -158,6 +163,13 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 func findUriMatches(data []byte) []map[string]string {
 	var matches []map[string]string
 	for _, uri := range uriPattern.FindAll(data, -1) {
+		// Capture the database type (e.g., "postgres" or "postgresql")
+		dbTypeMatch := uriPattern.FindSubmatch(uri)
+		if len(dbTypeMatch) < 2 {
+			continue
+		}
+		dbType := string(dbTypeMatch[1])
+
 		connStr, err := pq.ParseURL(string(uri))
 		if err != nil {
 			continue
@@ -169,6 +181,7 @@ func findUriMatches(data []byte) []map[string]string {
 			params[part[1]] = part[2]
 		}
 
+		params["db_type"] = dbType
 		matches = append(matches, params)
 	}
 	return matches
