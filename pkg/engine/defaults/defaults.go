@@ -106,8 +106,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/budibase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkitev2"
+	buildKitev1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite/v1"
+	buildKitev2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulbul"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulksms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buttercms"
@@ -925,8 +925,8 @@ func buildDetectorList() []detectors.Detector {
 		&budibase.Scanner{},
 		&bugherd.Scanner{},
 		&bugsnag.Scanner{},
-		&buildkite.Scanner{},
-		&buildkitev2.Scanner{},
+		&buildKitev1.Scanner{},
+		&buildKitev2.Scanner{},
 		&bulbul.Scanner{},
 		&bulksms.Scanner{},
 		&buttercms.Scanner{},

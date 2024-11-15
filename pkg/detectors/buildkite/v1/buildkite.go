@@ -1,4 +1,4 @@
-package buildkitev2
+package buildkite
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 
 type Scanner struct{}
 
-func (s Scanner) Version() int { return 2 }
+func (s Scanner) Version() int { return 1 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -25,13 +25,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(bkua_[a-z0-9]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"buildkite"}) + `\b([a-z0-9]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"bkua_"}
+	return []string{"buildkite"}
 }
 
 // FromData will find and optionally verify Buildkite secrets in a given set of bytes.
@@ -52,17 +52,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.buildkite.com/v2/access-token", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
+			isVerified, verificationErr := VerifyBuildKite(ctx, client, resMatch)
+			s1.Verified = isVerified
+			if verificationErr != nil {
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 		}
 
@@ -77,5 +70,26 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Buildkite is a platform for running fast, secure, and scalable continuous integration and delivery pipelines. Buildkite access tokens can be used to interact with the Buildkite API."
+	return "Buildkite is a platform for running fast, secure, and scalable continuous integration pipelines. Buildkite API tokens can be used to access and modify pipeline data and configurations."
+}
+
+func VerifyBuildKite(ctx context.Context, client *http.Client, secret string) (bool, error) {
+	// create a request
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.buildkite.com/v2/access-token", nil)
+	if err != nil {
+		return false, err
+	}
+
+	// add authorization header
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", secret))
+
+	res, err := client.Do(req)
+	if err == nil {
+		defer res.Body.Close()
+		if res.StatusCode >= 200 && res.StatusCode < 300 {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
