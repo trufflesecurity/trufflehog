@@ -37,17 +37,14 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) (c
 	go func() {
 		defer close(dataChan)
 
-		// Update the metrics for the file processing.
 		start := time.Now()
-		var err error
-		defer func() {
-			h.measureLatencyAndHandleErrors(start, err)
+		err := h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(input), dataChan)
+		if err == nil {
 			h.metrics.incFilesProcessed()
-		}()
-
-		if err = h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(input), dataChan); err != nil {
-			ctx.Logger().Error(err, "error handling non-archive content.")
 		}
+
+		// Update the metrics for the file processing and handle errors.
+		h.measureLatencyAndHandleErrors(start, err)
 	}()
 
 	return dataChan, nil
