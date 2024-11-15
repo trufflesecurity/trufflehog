@@ -268,6 +268,7 @@ func extractStringsFromResTable(resTable *apkparser.ResourceTable) (io.Reader, e
 func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReadCloser) (io.Reader, error) {
 	// dextk.Read() requires an io.ReaderAt interface
 	dexReader, err := dextk.Read(iobuf.NewBufferedReaderSeeker(rdr))
+	//dexReader, err := dextk.Read(iobuf.NewBufferedReaderSeeker(rdr), dextk.WithReadCache(16))
 	if err != nil {
 		return nil, err
 	}
@@ -278,6 +279,7 @@ func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReadCloser) (
 	for ci.HasNext() {
 		node, err := ci.Next()
 		if err != nil {
+			ctx.Logger().Error(err, "failed to process a dex class")
 			break
 		}
 		h.processDexClass(ctx, dexReader, node, &dexOutput)
@@ -304,12 +306,9 @@ func (h *apkHandler) processDexClass(ctx logContext.Context, dexReader *dextk.Re
 	foundKeywords := h.keywordMatcher.FindKeywords(classOutput.Bytes())
 
 	// For each found keyword, create a keyword:value pair and append to dexOutput
-	var keyValuePairs bytes.Buffer
 	for str := range methodValues {
 		for _, keyword := range foundKeywords {
-			keyValuePairs.Reset()
-			keyValuePairs.WriteString(keyword + ":" + str + "\n")
-			dexOutput.Write(keyValuePairs.Bytes())
+			dexOutput.WriteString(keyword + ":" + str + "\n")
 		}
 	}
 }
@@ -318,49 +317,56 @@ func (h *apkHandler) processDexClass(ctx logContext.Context, dexReader *dextk.Re
 // handles errors, and writes the output to dexOutput.
 func processDexMethod(ctx logContext.Context, dexReader *dextk.Reader, methods []dextk.MethodNode, classOutput *bytes.Buffer, methodValues map[string]struct{}) {
 	for _, method := range methods {
-		s, values, err := parseDexInstructions(dexReader, method)
+		s, err := parseDexInstructions(dexReader, method, methodValues)
 		if err != nil {
 			ctx.Logger().V(2).Info("failed to process dex method", "error", err)
 			continue
 		}
 		classOutput.Write(s.Bytes())
-		for val := range values {
-			methodValues[val] = struct{}{}
-		}
 	}
 }
 
 // parseDexInstructions processes a dex method and returns the string representation of the instruction
-func parseDexInstructions(r *dextk.Reader, m dextk.MethodNode) (*bytes.Buffer, map[string]struct{}, error) {
-	var s bytes.Buffer
-	values := make(map[string]struct{})
+func parseDexInstructions(r *dextk.Reader, m dextk.MethodNode, methodValues map[string]struct{}) (*bytes.Buffer, error) {
+	var instrBuf bytes.Buffer
 
 	if m.CodeOff == 0 {
-		return &s, values, nil
+		return &instrBuf, nil
 	}
 
 	c, err := r.ReadCodeAndParse(m.CodeOff)
 	if err != nil {
-		return &s, values, err
+		return &instrBuf, err
 	}
 
 	// Iterate over the instructions and extract the relevant values
 	for _, o := range c.Ops {
 		oStr := o.String()
-		// Filter out instructions that are not in our targetInstructionTypes
-		parsedVal := formatAndFilterInstruction(oStr)
-		if parsedVal == "" {
+
+		instructionType := getInstructionType(oStr)
+		if instructionType == "" {
 			continue
 		}
-		// If instruction is a const-string, then store as in values map
-		// this is used when creating keyword:value pairs in processDexClass()
-		if strings.HasPrefix(oStr, stringInstructionType) {
-			values[parsedVal] = struct{}{}
+
+		val := formatAndFilterInstruction(oStr)
+		if val != "" {
+			instrBuf.WriteString(val + "\n")
+			if instructionType == stringInstructionType {
+				methodValues[val] = struct{}{}
+			}
 		}
-		// Write the parsedVal to the buffer
-		s.WriteString(parsedVal)
 	}
-	return &s, values, nil
+	return &instrBuf, nil
+}
+
+// getInstructionType checks for specific target instructions
+func getInstructionType(instruction string) string {
+	for _, t := range targetInstructionTypes {
+		if strings.HasPrefix(instruction, t) {
+			return t
+		}
+	}
+	return ""
 }
 
 // formatAndFilterInstruction looks for a match to our regex and returns it
@@ -381,6 +387,7 @@ func decodeXML(rdr io.ReadCloser, resTable *apkparser.ResourceTable) (io.Reader,
 	bufRdr := iobuf.NewBufferedReaderSeeker(rdr)
 
 	// Create a buffer to store the formatted XML data
+	// Note: in the future, consider a custom writer that spills to disk if the buffer gets too large
 	var buf bytes.Buffer
 	enc := xml.NewEncoder(&buf)
 
