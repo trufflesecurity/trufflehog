@@ -22,6 +22,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -259,7 +260,7 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	conf := Config{
 		Concurrency:   1,
 		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     DefaultDetectors(),
+		Detectors:     defaults.DefaultDetectors(),
 		Verify:        false,
 		SourceManager: sourceManager,
 		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
@@ -360,7 +361,7 @@ even more`,
 			conf := Config{
 				Concurrency:   1,
 				Decoders:      decoders.DefaultDecoders(),
-				Detectors:     DefaultDetectors(),
+				Detectors:     defaults.DefaultDetectors(),
 				Verify:        false,
 				SourceManager: sourceManager,
 				Dispatcher:    lineCapturer,
@@ -891,12 +892,12 @@ func TestLikelyDuplicate(t *testing.T) {
 	// Initialize detectors
 	// (not actually calling detector FromData or anything, just using detector struct for key creation)
 	detectorA := ahocorasick.DetectorMatch{
-		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[0]),
-		Detector: DefaultDetectors()[0],
+		Key:      ahocorasick.CreateDetectorKey(defaults.DefaultDetectors()[0]),
+		Detector: defaults.DefaultDetectors()[0],
 	}
 	detectorB := ahocorasick.DetectorMatch{
-		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[1]),
-		Detector: DefaultDetectors()[1],
+		Key:      ahocorasick.CreateDetectorKey(defaults.DefaultDetectors()[1]),
+		Detector: defaults.DefaultDetectors()[1],
 	}
 
 	// Define test cases
@@ -1037,7 +1038,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 }
 
 func BenchmarkPopulateMatchingDetectors(b *testing.B) {
-	allDetectors := DefaultDetectors()
+	allDetectors := defaults.DefaultDetectors()
 	ac := ahocorasick.NewAhoCorasickCore(allDetectors)
 
 	// Generate sample data with keywords from detectors.
@@ -1164,7 +1165,7 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	ctx := context.Background()
 	conf := Config{
 		Concurrency:   1,
-		Detectors:     DefaultDetectors(),
+		Detectors:     defaults.DefaultDetectors(),
 		Verify:        false,
 		SourceManager: sources.NewManager(),
 		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
