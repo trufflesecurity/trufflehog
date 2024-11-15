@@ -41,20 +41,20 @@ const (
 
 // TUI is the main TUI model.
 type TUI struct {
-	common     common.Common
-	pages      []common.Component
-	activePage page
-	state      sessionState
-	args       []string
+	common      common.Common
+	pages       []common.Component
+	pageHistory []page
+	state       sessionState
+	args        []string
 }
 
 // New returns a new TUI model.
 func New(c common.Common, args []string) *TUI {
 	ui := &TUI{
-		common:     c,
-		pages:      make([]common.Component, 6),
-		activePage: wizardIntroPage,
-		state:      startState,
+		common:      c,
+		pages:       make([]common.Component, 6),
+		pageHistory: []page{wizardIntroPage},
+		state:       startState,
 	}
 	switch {
 	case len(args) == 0:
@@ -62,10 +62,10 @@ func New(c common.Common, args []string) *TUI {
 	case len(args) == 1 && args[0] == "analyze":
 		// Set to analyze start page.
 		return &TUI{
-			common:     c,
-			pages:      make([]common.Component, 6),
-			activePage: analyzePage,
-			state:      startState,
+			common:      c,
+			pages:       make([]common.Component, 6),
+			pageHistory: []page{wizardIntroPage, analyzePage},
+			state:       startState,
 		}
 		// case len(args) >= 2 && args[0] == "analyze":
 		// Set analyze sub-page.
@@ -124,12 +124,12 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, ui.common.KeyMap.Help):
-			case key.Matches(msg, ui.common.KeyMap.CmdQuit) && ui.activePage != sourceConfigurePage:
+			case key.Matches(msg, ui.common.KeyMap.CmdQuit) && ui.activePage() != sourceConfigurePage:
 				return ui, tea.Quit
 			case key.Matches(msg, ui.common.KeyMap.Quit):
 				return ui, tea.Quit
-			case ui.activePage > 0 && key.Matches(msg, ui.common.KeyMap.Back):
-				ui.activePage -= 1
+			case ui.activePage() > 0 && key.Matches(msg, ui.common.KeyMap.Back):
+				_ = ui.popHistory()
 				return ui, nil
 			}
 		}
@@ -138,23 +138,24 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case selector.SelectMsg:
 		switch item := msg.IdentifiableItem.(type) {
 		case wizard_intro.Item:
+
 			switch item {
 			case wizard_intro.Quit:
 				cmds = append(cmds, tea.Quit)
 			case wizard_intro.ViewOSSProject:
-				ui.activePage = viewOSSProjectPage
+				ui.setActivePage(viewOSSProjectPage)
 			case wizard_intro.ViewHelpDocs:
 				ui.args = []string{"--help"}
 				return ui, tea.Quit
 			case wizard_intro.EnterpriseInquire:
-				ui.activePage = contactEnterprisePage
+				ui.setActivePage(contactEnterprisePage)
 			case wizard_intro.ScanSourceWithWizard:
-				ui.activePage = sourceSelectPage
+				ui.setActivePage(sourceSelectPage)
 			case wizard_intro.AnalyzeSecret:
-				ui.activePage = analyzePage
+				ui.setActivePage(analyzePage)
 			}
 		case source_select.SourceItem:
-			ui.activePage = sourceConfigurePage
+			ui.setActivePage(sourceConfigurePage)
 			cmds = append(cmds, func() tea.Msg {
 				return source_configure.SetSourceMsg{Source: item.ID()}
 			})
@@ -165,8 +166,8 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if ui.state == loadedState {
-		m, cmd := ui.pages[ui.activePage].Update(msg)
-		ui.pages[ui.activePage] = m.(common.Component)
+		m, cmd := ui.pages[ui.activePage()].Update(msg)
+		ui.pages[ui.activePage()] = m.(common.Component)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -184,7 +185,7 @@ func (ui *TUI) View() string {
 	case startState:
 		view = "Loading..."
 	case loadedState:
-		view = ui.pages[ui.activePage].View()
+		view = ui.pages[ui.activePage()].View()
 	default:
 		view = "Unknown state :/ this is a bug!"
 	}
@@ -210,4 +211,24 @@ func Run(args []string) []string {
 		os.Exit(1)
 	}
 	return m.args
+}
+
+func (ui *TUI) activePage() page {
+	if len(ui.pageHistory) == 0 {
+		return wizardIntroPage
+	}
+	return ui.pageHistory[len(ui.pageHistory)-1]
+}
+
+func (ui *TUI) popHistory() page {
+	if len(ui.pageHistory) == 0 {
+		return wizardIntroPage
+	}
+	p := ui.activePage()
+	ui.pageHistory = ui.pageHistory[:len(ui.pageHistory)-1]
+	return p
+}
+
+func (ui *TUI) setActivePage(p page) {
+	ui.pageHistory = append(ui.pageHistory, p)
 }
