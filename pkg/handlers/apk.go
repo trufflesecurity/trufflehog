@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/avast/apkparser"
 	dextk "github.com/csnewman/dextk"
 
-	"github.com/avast/apkparser"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
@@ -66,45 +66,42 @@ func newAPKHandler() *apkHandler {
 }
 
 // HandleFile processes apk formatted files.
-func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
-	apkChan := make(chan []byte, defaultBufferSize)
+func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
+	apkChan := make(chan DataOrErr, defaultBufferSize)
 
 	go func() {
 		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
 		defer cancel()
 		defer close(apkChan)
 
-		// Update the metrics for the file processing.
-		start := time.Now()
-		var err error
-		defer func() {
-			h.measureLatencyAndHandleErrors(start, err)
-			h.metrics.incFilesProcessed()
-		}()
-
 		// Defer a panic recovery to handle any panics that occur during the APK processing.
 		defer func() {
 			if r := recover(); r != nil {
 				// Return the panic as an error.
+				var panicErr error
 				if e, ok := r.(error); ok {
-					err = e
+					panicErr = e
 				} else {
-					err = fmt.Errorf("panic occurred: %v", r)
+					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(err, "Panic occurred when reading apk archive")
+				ctx.Logger().Error(panicErr, "Panic occurred when reading apk archive")
 			}
 		}()
 
-		if err = h.processAPK(ctx, input, apkChan); err != nil {
-			ctx.Logger().Error(err, "error processing apk content")
+		start := time.Now()
+		err := h.processAPK(ctx, input, apkChan)
+		if err == nil {
+			h.metrics.incFilesProcessed()
 		}
+
+		h.measureLatencyAndHandleErrors(ctx, start, err, apkChan)
 	}()
-	return apkChan, nil
+
+	return apkChan
 }
 
 // processAPK processes the apk file and sends the extracted data to the provided channel.
-func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkChan chan []byte) error {
-
+func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkChan chan DataOrErr) error {
 	// Create a ZIP reader from the input fileReader
 	zipReader, err := createZipReader(input)
 	if err != nil {
@@ -132,7 +129,7 @@ func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkCha
 }
 
 // processResources processes the resources.arsc file and sends the extracted data to the provided channel.
-func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparser.ResourceTable, apkChan chan []byte) error {
+func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparser.ResourceTable, apkChan chan DataOrErr) error {
 	if resTable == nil {
 		return errors.New("ResourceTable is nil")
 	}
@@ -144,7 +141,7 @@ func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparse
 }
 
 // processFile processes the file and sends the extracted data to the provided channel.
-func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTable *apkparser.ResourceTable, apkChan chan []byte) error {
+func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTable *apkparser.ResourceTable, apkChan chan DataOrErr) error {
 	// check if the file is empty
 	if file.UncompressedSize64 == 0 {
 		return nil
@@ -177,7 +174,7 @@ func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTabl
 }
 
 // handleAPKFileContent sends the extracted data to the provided channel via the handleNonArchiveContent function.
-func (h *apkHandler) handleAPKFileContent(ctx logContext.Context, rdr io.Reader, fileName string, apkChan chan []byte) error {
+func (h *apkHandler) handleAPKFileContent(ctx logContext.Context, rdr io.Reader, fileName string, apkChan chan DataOrErr) error {
 	mimeReader, err := newMimeTypeReader(rdr)
 	if err != nil {
 		return fmt.Errorf("failed to create mimeTypeReader for file %s: %w", fileName, err)

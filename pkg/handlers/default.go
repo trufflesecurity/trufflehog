@@ -57,7 +57,7 @@ func (h *defaultHandler) measureLatencyAndHandleErrors(
 	ctx logContext.Context,
 	start time.Time,
 	err error,
-	dataErrChan chan DataOrErr,
+	dataErrChan chan<- DataOrErr,
 ) {
 	if err == nil {
 		h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
