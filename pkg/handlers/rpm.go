@@ -49,13 +49,13 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 		start := time.Now()
 		rpm, err := rpmutils.ReadRpm(input)
 		if err != nil {
-			ctx.Logger().Error(err, "Error reading rpm file")
+			ctx.Logger().Error(err, "error reading rpm file")
 			return
 		}
 
 		reader, err := rpm.PayloadReaderExtended()
 		if err != nil {
-			ctx.Logger().Error(err, "Error reading rpm file")
+			ctx.Logger().Error(err, "error reading rpm payload")
 			return
 		}
 

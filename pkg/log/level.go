@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// TODO: Use a struct to make testing easier.
 var (
 	// Global, default log level control.
 	globalLogLevel levelSetter = zap.NewAtomicLevel()

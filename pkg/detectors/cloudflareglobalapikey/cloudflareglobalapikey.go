@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -24,7 +24,7 @@ var (
 
 	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b([A-Za-z0-9_-]{37})\b`)
 
-	emailPat = regexp.MustCompile(`\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(\.[A-Za-z]{2})?)\b`)
+	emailPat = regexp.MustCompile(common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -38,7 +38,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	apiKeyMatches := apiKeyPat.FindAllStringSubmatch(dataStr, -1)
-	emailMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
+
+	uniqueEmailMatches := make(map[string]struct{})
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
 	for _, apiKeyMatch := range apiKeyMatches {
 		if len(apiKeyMatch) != 2 {
@@ -46,17 +50,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		apiKeyRes := strings.TrimSpace(apiKeyMatch[1])
 
-		for _, emailMatch := range emailMatches {
-			if len(emailMatch) != 2 {
-				continue
-			}
-			emailRes := strings.TrimSpace(emailMatch[1])
-
+		for emailMatch := range uniqueEmailMatches {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_CloudflareGlobalApiKey,
-				Redacted:     emailRes,
+				Redacted:     emailMatch,
 				Raw:          []byte(apiKeyRes),
-				RawV2:        []byte(apiKeyRes + emailRes),
+				RawV2:        []byte(apiKeyRes + emailMatch),
 			}
 
 			if verify {
@@ -64,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err != nil {
 					continue
 				}
-				req.Header.Add("X-Auth-Email", emailRes)
+				req.Header.Add("X-Auth-Email", emailMatch)
 				req.Header.Add("X-Auth-Key", apiKeyRes)
 				req.Header.Add("Content-Type", "application/json")
 

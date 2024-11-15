@@ -25,7 +25,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"cloze"}) + `\b([0-9a-f]{32})\b`)
-	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloze"}) + `\b([\w\.-]+@[\w-]+\.[\w\.-]{2,5})\b`)
+	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloze"}) + common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -39,14 +39,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	emailMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, emailMatch := range emailMatches {
-		if len(emailMatch) != 2 {
-			continue
-		}
-		resEmailMatch := strings.TrimSpace(emailMatch[1])
+	uniqueEmailMatches := make(map[string]struct{})
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
+	for emailMatch := range uniqueEmailMatches {
 		for _, match := range matches {
 			if len(match) != 2 {
 				continue
@@ -60,7 +59,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if verify {
 				payload := url.Values{}
-				payload.Add("user", resEmailMatch)
+				payload.Add("user", emailMatch)
 				payload.Add("api_key", resMatch)
 
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloze.com/v1/profile?"+payload.Encode(), nil)
