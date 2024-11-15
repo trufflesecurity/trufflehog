@@ -53,9 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			isVerified, verificationErr := v1.VerifyBuildKite(ctx, client, resMatch)
 			s1.Verified = isVerified
-			if verificationErr != nil {
-				s1.SetVerificationError(verificationErr, resMatch)
-			}
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)

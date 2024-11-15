@@ -3,6 +3,7 @@ package buildkite
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -54,9 +55,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			isVerified, verificationErr := VerifyBuildKite(ctx, client, resMatch)
 			s1.Verified = isVerified
-			if verificationErr != nil {
-				s1.SetVerificationError(verificationErr, resMatch)
-			}
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -84,11 +83,16 @@ func VerifyBuildKite(ctx context.Context, client *http.Client, secret string) (b
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", secret))
 
 	res, err := client.Do(req)
-	if err == nil {
-		defer res.Body.Close()
-		if res.StatusCode >= 200 && res.StatusCode < 300 {
-			return true, nil
-		}
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	if res.StatusCode == http.StatusOK {
+		return true, nil
 	}
 
 	return false, nil
