@@ -16,8 +16,6 @@ import (
 // It provides checkpoints that can be used to resume interrupted scans without missing objects.
 //
 // S3 buckets are organized as flat namespaces of objects identified by unique keys.
-// When listing objects, S3 returns paginated results with a maximum of 1000 objects per page.
-// The ListObjectsV2 API accepts a 'StartAfter' parameter that allows resuming the listing
 // from a specific object key.
 //
 // The tracker maintains state for the current page of objects (up to 1000) using a boolean array
@@ -44,7 +42,6 @@ import (
 type ProgressTracker struct {
 	enabled bool
 
-	// completedObjects tracks which indices in the current page have been processed.
 	sync.Mutex
 	completedObjects []bool
 	completionOrder  []int // Track the order in which objects complete
