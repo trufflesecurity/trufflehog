@@ -80,7 +80,7 @@ func TestProgressTrackerReset(t *testing.T) {
 			tracker.completedObjects[1] = true
 			tracker.completedObjects[2] = true
 
-			tracker.Reset(ctx)
+			tracker.Reset()
 
 			assert.Equal(t, defaultMaxObjectsPerPage, len(tracker.completedObjects),
 				"Reset changed the length of completed objects")
