@@ -43,7 +43,6 @@ type fileReader struct {
 	*iobuf.BufferedReadSeeker
 }
 
-<<<<<<< HEAD
 var (
 	ErrEmptyReader = errors.New("reader is empty")
 
@@ -54,7 +53,7 @@ var (
 	// allowing processing to continue.
 	ErrProcessingWarning = errors.New("error processing file")
 )
-=======
+
 type readerConfig struct{ fileExtension string }
 
 type readerOption func(*readerConfig)
@@ -62,9 +61,6 @@ type readerOption func(*readerConfig)
 func withFileExtension(ext string) readerOption {
 	return func(c *readerConfig) { c.fileExtension = ext }
 }
-
-var ErrEmptyReader = errors.New("reader is empty")
->>>>>>> main
 
 // mimeTypeReader wraps an io.Reader with MIME type information.
 // This type is used to pass content through the processing pipeline
@@ -107,16 +103,12 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
 // The caller is responsible for closing the reader when it is no longer needed.
-<<<<<<< HEAD
-func newFileReader(r io.Reader) (fReader fileReader, err error) {
-=======
 func newFileReader(r io.Reader, options ...readerOption) (fReader fileReader, err error) {
 	var cfg readerConfig
 
 	for _, opt := range options {
 		opt(&cfg)
 	}
->>>>>>> main
 	// To detect the MIME type of the input data, we need a reader that supports seeking.
 	// This allows us to read the data multiple times if necessary without losing the original position.
 	// We use a BufferedReaderSeeker to wrap the original reader, enabling this functionality.
@@ -407,11 +399,7 @@ func HandleFile(
 // handleChunksWithError processes data and errors received from the dataErrChan channel.
 // For each DataOrErr received:
 // - If it contains data, the function creates a chunk based on chunkSkel and reports it through the reporter.
-<<<<<<< HEAD
 // - If it contains an error, the function returns the error immediately.
-=======
-// - If it contains an error, the function logs the error.
->>>>>>> main
 // The function also listens for context cancellation to gracefully terminate processing if the context is done.
 // It returns nil upon successful processing of all data, or the first encountered error.
 func handleChunksWithError(
@@ -429,14 +417,10 @@ func handleChunksWithError(
 				return nil
 			}
 			if dataOrErr.Err != nil {
-<<<<<<< HEAD
 				if isFatal(dataOrErr.Err) {
 					return dataOrErr.Err
 				}
 				ctx.Logger().Error(dataOrErr.Err, "non-critical error processing chunk")
-=======
-				ctx.Logger().Error(dataOrErr.Err, "error processing chunk")
->>>>>>> main
 				continue
 			}
 			if len(dataOrErr.Data) > 0 {
@@ -452,7 +436,6 @@ func handleChunksWithError(
 	}
 }
 
-<<<<<<< HEAD
 // isFatal determines whether the given error is a fatal error that should
 // terminate processing the current file, or a non-critical error that can be logged and ignored.
 // "Fatal" errors include context cancellation, deadline exceeded, and the
@@ -469,7 +452,8 @@ func isFatal(err error) bool {
 	default:
 		return false
 	}
-=======
+}
+
 // getFileExtension extracts the file extension from the chunk's SourceMetadata.
 // It considers all sources defined in the MetaData message.
 // Note: Probably should add this as a method to the source_metadatapb object.
@@ -596,5 +580,4 @@ func handleAPKFile(fReader *fileReader) (fileReader, error) {
 		return *fReader, fmt.Errorf("error resetting reader after APK detection: %w", err)
 	}
 	return *fReader, nil
->>>>>>> main
 }
