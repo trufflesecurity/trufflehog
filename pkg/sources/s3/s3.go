@@ -99,7 +99,7 @@ func (s *Source) Init(
 	if err != nil {
 		return err
 	}
-	s.metricsCollector = getMetricsCollector()
+	s.metricsCollector = metricsInstance
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 

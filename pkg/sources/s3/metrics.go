@@ -31,13 +31,8 @@ type collector struct {
 
 var metricsInstance metricsCollector
 
-func init() { metricsInstance = newS3MetricsCollector() }
-
-// getMetricsCollector returns the singleton metrics collector instance..
-func getMetricsCollector() metricsCollector { return metricsInstance }
-
-func newS3MetricsCollector() metricsCollector {
-	return &collector{
+func init() {
+	metricsInstance = &collector{
 		objectsScanned: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: common.MetricsNamespace,
 			Subsystem: common.MetricsSubsystem,
