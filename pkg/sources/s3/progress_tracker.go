@@ -2,7 +2,6 @@ package s3
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -32,10 +31,8 @@ const defaultMaxObjectsPerPage = 1000
 // NewProgressTracker creates a new progress tracker for S3 scanning operations.
 // The enabled parameter determines if progress tracking is active, and progress
 // provides the underlying mechanism for persisting scan state.
-func NewProgressTracker(_ context.Context, enabled bool, progress *sources.Progress) (*ProgressTracker, error) {
-	if progress == nil {
-		return nil, errors.New("Nil progress provided; progress is required for tracking")
-	}
+func NewProgressTracker(ctx context.Context, enabled bool, progress *sources.Progress) *ProgressTracker {
+	ctx.Logger().Info("Creating progress tracker")
 
 	return &ProgressTracker{
 		// We are resuming if we have completed objects from a previous scan.
@@ -43,7 +40,7 @@ func NewProgressTracker(_ context.Context, enabled bool, progress *sources.Progr
 		completionOrder:  make([]int, 0, defaultMaxObjectsPerPage),
 		enabled:          enabled,
 		progress:         progress,
-	}, nil
+	}
 }
 
 // Reset prepares the tracker for a new page of objects by clearing the completion state.
@@ -73,9 +70,6 @@ type ResumeInfo struct {
 // the minimum required data to enable resumption.
 func (p *ProgressTracker) GetResumePoint(ctx context.Context) (ResumeInfo, error) {
 	resume := ResumeInfo{}
-	if p.progress == nil {
-		return resume, errors.New("progress is nil, progress is required for resuming")
-	}
 
 	if !p.enabled || p.progress.EncodedResumeInfo == "" {
 		return resume, nil

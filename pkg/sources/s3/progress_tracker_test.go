@@ -18,8 +18,7 @@ func TestProgressTrackerResumption(t *testing.T) {
 
 	// First scan - process 6 objects then interrupt.
 	initialProgress := &sources.Progress{}
-	tracker, err := NewProgressTracker(ctx, true, initialProgress)
-	require.NoError(t, err)
+	tracker := NewProgressTracker(ctx, true, initialProgress)
 
 	firstPage := &s3.ListObjectsV2Output{
 		Contents: make([]*s3.Object, 12), // Total of 12 objects
@@ -42,8 +41,7 @@ func TestProgressTrackerResumption(t *testing.T) {
 	assert.Equal(t, "key-5", resumeInfo.StartAfter)
 
 	// Resume scan with existing progress.
-	resumeTracker, err := NewProgressTracker(ctx, true, initialProgress)
-	require.NoError(t, err)
+	resumeTracker := NewProgressTracker(ctx, true, initialProgress)
 
 	resumePage := &s3.ListObjectsV2Output{
 		Contents: firstPage.Contents[6:], // Remaining 6 objects
@@ -77,8 +75,7 @@ func TestProgressTrackerReset(t *testing.T) {
 
 			ctx := context.Background()
 			progress := new(sources.Progress)
-			tracker, err := NewProgressTracker(ctx, tt.enabled, progress)
-			require.NoError(t, err)
+			tracker := NewProgressTracker(ctx, tt.enabled, progress)
 
 			tracker.completedObjects[1] = true
 			tracker.completedObjects[2] = true
@@ -137,13 +134,6 @@ func TestGetResumePoint(t *testing.T) {
 			progress: &sources.Progress{
 				EncodedResumeInfo: `{"current_bucket":"","start_after":"test-key"}`,
 			},
-		},
-		{
-			name:               "nil progress",
-			enabled:            true,
-			progress:           nil,
-			expectedResumeInfo: ResumeInfo{},
-			expectError:        true,
 		},
 		{
 			name:    "unmarshal error",
@@ -323,10 +313,9 @@ func TestComplete(t *testing.T) {
 				EncodedResumeInfo: tt.initialState.resumeInfo,
 				Message:           tt.initialState.message,
 			}
-			tracker, err := NewProgressTracker(ctx, tt.enabled, progress)
-			assert.NoError(t, err)
+			tracker := NewProgressTracker(ctx, tt.enabled, progress)
 
-			err = tracker.Complete(ctx, tt.completeMessage)
+			err := tracker.Complete(ctx, tt.completeMessage)
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wantState.resumeInfo, progress.EncodedResumeInfo)
