@@ -70,8 +70,6 @@ func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 	apkChan := make(chan DataOrErr, defaultBufferSize)
 
 	go func() {
-		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
-		defer cancel()
 		defer close(apkChan)
 
 		// Defer a panic recovery to handle any panics that occur during the APK processing.
