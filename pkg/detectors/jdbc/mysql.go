@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	"github.com/go-sql-driver/mysql"
 )
 
@@ -49,7 +51,7 @@ func isMySQLErrorDeterminate(err error) bool {
 	return false
 }
 
-func parseMySQL(subname string) (jdbc, error) {
+func parseMySQL(_ logContext.Context, subname string) (jdbc, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected host to start with //")

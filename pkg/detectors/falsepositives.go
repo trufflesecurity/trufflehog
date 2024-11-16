@@ -13,7 +13,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-var DefaultFalsePositives = []FalsePositive{"example", "xxxxxx", "aaaaaa", "abcde", "00000", "sample", "*****"}
+var (
+	DefaultFalsePositives = map[FalsePositive]struct{}{
+		"example": {}, "xxxxxx": {}, "aaaaaa": {}, "abcde": {}, "00000": {}, "sample": {}, "*****": {},
+	}
+	UuidFalsePositives map[FalsePositive]struct{}
+)
 
 type FalsePositive string
 
@@ -24,18 +29,21 @@ type CustomFalsePositiveChecker interface {
 	IsFalsePositive(result Result) (bool, string)
 }
 
-//go:embed "badlist.txt"
-var badList []byte
+var (
+	filter *ahocorasick.Trie
 
-//go:embed "words.txt"
-var wordList []byte
-
-//go:embed "programmingbooks.txt"
-var programmingBookWords []byte
-
-var filter *ahocorasick.Trie
+	//go:embed "fp_badlist.txt"
+	badList []byte
+	//go:embed "fp_words.txt"
+	wordList []byte
+	//go:embed "fp_programmingbooks.txt"
+	programmingBookWords []byte
+	//go:embed "fp_uuids.txt"
+	uuidList []byte
+)
 
 func init() {
+	// Populate trie.
 	builder := ahocorasick.NewTrieBuilder()
 
 	wordList := bytesToCleanWordList(wordList)
@@ -47,7 +55,16 @@ func init() {
 	programmingBookWords := bytesToCleanWordList(programmingBookWords)
 	builder.AddStrings(programmingBookWords)
 
+	uuidList := bytesToCleanWordList(uuidList)
+	builder.AddStrings(uuidList)
+
 	filter = builder.Build()
+
+	// Populate custom FalsePositive list
+	UuidFalsePositives = make(map[FalsePositive]struct{}, len(uuidList))
+	for _, uuid := range uuidList {
+		UuidFalsePositives[FalsePositive(uuid)] = struct{}{}
+	}
 }
 
 func GetFalsePositiveCheck(detector Detector) func(Result) (bool, string) {
@@ -65,15 +82,20 @@ func GetFalsePositiveCheck(detector Detector) func(Result) (bool, string) {
 //
 // Currently, this includes: english word in key or matches common example patterns.
 // Only the secret key material should be passed into this function
-func IsKnownFalsePositive(match string, falsePositives []FalsePositive, wordCheck bool) (bool, string) {
+func IsKnownFalsePositive(match string, falsePositives map[FalsePositive]struct{}, wordCheck bool) (bool, string) {
 	if !utf8.ValidString(match) {
 		return true, "invalid utf8"
 	}
 	lower := strings.ToLower(match)
-	for _, fp := range falsePositives {
+
+	if _, exists := falsePositives[FalsePositive(lower)]; exists {
+		return true, "matches term: " + lower
+	}
+
+	for fp := range falsePositives {
 		fps := string(fp)
 		if strings.Contains(lower, fps) {
-			return true, "matches term: " + fps
+			return true, "contains term: " + fps
 		}
 	}
 
@@ -159,7 +181,7 @@ func FilterKnownFalsePositives(ctx context.Context, detector Detector, results [
 
 	for _, result := range results {
 		if len(result.Raw) == 0 {
-			ctx.Logger().Error(fmt.Errorf("empty raw"), "invalid result; skipping")
+			ctx.Logger().Error(fmt.Errorf("empty raw"), "Skipping result: invalid")
 			continue
 		}
 
@@ -168,9 +190,11 @@ func FilterKnownFalsePositives(ctx context.Context, detector Detector, results [
 			continue
 		}
 
-		if isFp, _ := isFalsePositive(result); !isFp {
-			filteredResults = append(filteredResults, result)
+		if isFp, reason := isFalsePositive(result); isFp {
+			ctx.Logger().V(4).Info("Skipping result: false positive", "result", string(result.Raw), "reason", reason)
+			continue
 		}
+		filteredResults = append(filteredResults, result)
 	}
 
 	return filteredResults
