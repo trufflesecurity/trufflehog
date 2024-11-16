@@ -20,8 +20,19 @@ func newRPMHandler() *rpmHandler {
 	return &rpmHandler{defaultHandler: newDefaultHandler(rpmHandlerType)}
 }
 
-// HandleFile processes RPM formatted files. Further implementation is required to appropriately
-// handle RPM specific archive operations.
+// HandleFile processes RPM formatted files.
+// It returns a channel of DataOrErr that will receive either file data
+// or errors encountered during processing.
+//
+// Fatal errors that will terminate processing include:
+// - Context cancellation or deadline exceeded
+// - Errors reading or uncompressing the RPM file
+// - Panics during processing (wrapped as ErrProcessingFatal)
+//
+// Non-fatal errors that will be reported but allow processing to continue include:
+// - Errors processing individual files within the RPM archive (wrapped as ErrProcessingWarning)
+//
+// The handler will skip processing entirely if ForceSkipArchives is enabled.
 func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
 	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 
@@ -42,20 +53,26 @@ func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan D
 				} else {
 					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(panicErr, "Panic occurred when attempting to open rpm archive")
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
+				}
 			}
 		}()
 
 		start := time.Now()
 		rpm, err := rpmutils.ReadRpm(input)
 		if err != nil {
-			ctx.Logger().Error(err, "error reading rpm file")
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: reading rpm error: %v", ErrProcessingFatal, err),
+			}
 			return
 		}
 
 		reader, err := rpm.PayloadReaderExtended()
 		if err != nil {
-			ctx.Logger().Error(err, "error reading rpm payload")
+			dataOrErrChan <- DataOrErr{
+				Err: fmt.Errorf("%w: uncompressing rpm error: %v", ErrProcessingFatal, err),
+			}
 			return
 		}
 
@@ -99,7 +116,9 @@ func (h *rpmHandler) processRPMFiles(
 			}
 
 			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
-				fileCtx.Logger().Error(err, "error handling archive content in RPM")
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: error processing RPM archive: %v", ErrProcessingWarning, err),
+				}
 				h.metrics.incErrors()
 			}
 

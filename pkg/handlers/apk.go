@@ -66,6 +66,16 @@ func newAPKHandler() *apkHandler {
 }
 
 // HandleFile processes apk formatted files.
+// Fatal errors that will stop processing:
+// - Unable to create ZIP reader from input
+// - Unable to parse resources.arsc file
+// - Panics during processing (recovered but returned as errors)
+//
+// Non-fatal errors that will be logged and continue processing:
+// - Failed to process individual files within the APK
+// - Failed to process resources.arsc contents
+// - Failed to process individual dex classes
+// - Failed to decode specific XML files
 func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
 	apkChan := make(chan DataOrErr, defaultBufferSize)
 

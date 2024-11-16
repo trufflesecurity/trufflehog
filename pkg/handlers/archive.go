@@ -40,10 +40,23 @@ func newArchiveHandler() *archiveHandler {
 	return &archiveHandler{defaultHandler: newDefaultHandler(archiveHandlerType)}
 }
 
-// HandleFile processes the input as either an archive or non-archive based on its content,
-// utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
-// it processes it accordingly; otherwise, it handles the input as non-archive content.
-// The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
+// HandleFile processes archive files and returns a channel of DataOrErr.
+//
+// Fatal errors that will terminate processing include:
+// - Context cancellation
+// - Context deadline exceeded
+// - Panics during archive processing (recovered and returned as fatal errors)
+// - Maximum archive depth exceeded
+// - Unknown archive formats
+// - Errors opening decompressors
+// - Errors creating readers for decompressed content
+// - Errors during archive extraction
+//
+// Non-fatal errors that will be logged but allow processing to continue include:
+// - Empty readers encountered during nested archive processing
+// - Files exceeding maximum size limits
+// - Files with ignored extensions or binary content
+// - Errors opening individual files within archives
 func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
 	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 
@@ -66,7 +79,9 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 				} else {
 					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(panicErr, "Panic occurred when attempting to open archive")
+				dataOrErrChan <- DataOrErr{
+					Err: fmt.Errorf("%w: panic error: %v", ErrProcessingFatal, panicErr),
+				}
 			}
 		}()
 

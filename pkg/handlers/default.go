@@ -27,10 +27,15 @@ func newDefaultHandler(handlerType handlerType) *defaultHandler {
 	return &defaultHandler{metrics: newHandlerMetrics(handlerType)}
 }
 
-// HandleFile processes the input as either an archive or non-archive based on its content,
-// utilizing a single output channel. It first tries to identify the input as an archive. If it is an archive,
-// it processes it accordingly; otherwise, it handles the input as non-archive content.
-// The function returns a channel that will receive the extracted data bytes and an error if the initial setup fails.
+// HandleFile processes non-archive files.
+//
+// Fatal errors that will terminate processing include:
+// - Context cancellation
+// - Context deadline exceeded
+// - Errors writing to the data channel
+//
+// Non-fatal errors that will be logged but allow processing to continue include:
+// - Errors reading individual chunks from the input (wrapped as ErrProcessingWarning)
 func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
 	// Shared channel for both archive and non-archive content.
 	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
@@ -106,9 +111,9 @@ func (h *defaultHandler) handleNonArchiveContent(
 		dataOrErr := DataOrErr{}
 		if err := data.Error(); err != nil {
 			h.metrics.incErrors()
-			dataOrErr.Err = fmt.Errorf("%w: error reading chunk", err)
+			dataOrErr.Err = fmt.Errorf("%w: error reading chunk: %v", ErrProcessingWarning, err)
 			if writeErr := common.CancellableWrite(ctx, dataOrErrChan, dataOrErr); writeErr != nil {
-				return fmt.Errorf("%w: error writing to data channel", writeErr)
+				return fmt.Errorf("%w: error writing to data channel: %v", ErrProcessingFatal, writeErr)
 			}
 			continue
 		}
