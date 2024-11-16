@@ -57,7 +57,7 @@ func (h *defaultHandler) measureLatencyAndHandleErrors(
 	ctx logContext.Context,
 	start time.Time,
 	err error,
-	dataErrChan chan DataOrErr,
+	dataErrChan chan<- DataOrErr,
 ) {
 	if err == nil {
 		h.metrics.observeHandleFileLatency(time.Since(start).Milliseconds())
@@ -94,7 +94,7 @@ func (h *defaultHandler) handleNonArchiveContent(
 	mimeExt := reader.mimeExt
 
 	if common.SkipFile(mimeExt) || common.IsBinary(mimeExt) {
-		ctx.Logger().V(2).Info("skipping file: extension is ignored", "ext", mimeExt)
+		ctx.Logger().V(3).Info("skipping file: extension is ignored", "ext", mimeExt)
 		h.metrics.incFilesSkipped()
 		// Make sure we consume the reader to avoid potentially blocking indefinitely.
 		_, _ = io.Copy(io.Discard, reader)

@@ -2,16 +2,17 @@ package magicbell
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -23,7 +24,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"magicbell"}) + `\b([a-zA-Z-0-9]{40})\b`)
-	emailPat = regexp.MustCompile(`\b([a-zA-Z0-9+._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)\b`)
+	emailPat = regexp.MustCompile(common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -37,7 +38,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	apiKeyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	emailMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
+
+	uniqueEmailMatches := make(map[string]struct{})
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
 	for _, keyMatch := range apiKeyMatches {
 		if len(keyMatch) != 2 {
@@ -45,12 +50,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		apiKeyRes := strings.TrimSpace(keyMatch[1])
 
-		for _, emailMatch := range emailMatches {
-			if len(emailMatch) != 2 {
-				continue
-			}
-			emailRes := strings.TrimSpace(emailMatch[1])
-
+		for emailMatch := range uniqueEmailMatches {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MagicBell,
 				Raw:          []byte(apiKeyRes),
@@ -62,7 +62,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 				req.Header.Add("X-MAGICBELL-API-KEY", apiKeyRes)
-				req.Header.Add("X-MAGICBELL-USER-EMAIL", emailRes)
+				req.Header.Add("X-MAGICBELL-USER-EMAIL", emailMatch)
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
