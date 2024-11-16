@@ -93,11 +93,7 @@ func (s *Source) Init(
 	}
 	s.conn = &conn
 
-	var err error
-	s.progressTracker, err = NewProgressTracker(ctx, conn.GetEnableResumption(), &s.Progress)
-	if err != nil {
-		return err
-	}
+	s.progressTracker = NewProgressTracker(ctx, conn.GetEnableResumption(), &s.Progress)
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
@@ -408,7 +404,7 @@ func (s *Source) pageChunker(
 	state processingState,
 	chunksChan chan *sources.Chunk,
 ) {
-	s.progressTracker.Reset(ctx)
+	s.progressTracker.Reset()
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
 
 	for objIdx, obj := range metadata.page.Contents {

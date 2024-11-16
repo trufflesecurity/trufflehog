@@ -7,6 +7,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
@@ -321,6 +323,17 @@ func main() {
 	}
 }
 
+// Function to check if the commit is valid
+func isValidCommit(commit string) bool {
+	cmd := exec.Command("git", "cat-file", "-t", commit)
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+
+	return strings.TrimSpace(string(output)) == "commit"
+}
+
 func run(state overseer.State) {
 
 	ctx, cancel := context.WithCancelCause(context.Background())
@@ -361,6 +374,9 @@ func run(state overseer.State) {
 	// When setting a base commit, chunks must be scanned in order.
 	if *gitScanSinceCommit != "" {
 		*concurrency = 1
+		if !isValidCommit(*gitScanSinceCommit) {
+			logger.Info("Warning: The provided commit hash appears to be invalid.")
+		}
 	}
 
 	if *profile {
@@ -393,6 +409,9 @@ func run(state overseer.State) {
 	if *userAgentSuffix != "" {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
 	}
+
+	// OSS Default APK handling on
+	feature.EnableAPKHandler.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -446,7 +465,7 @@ func run(state overseer.State) {
 		// default detectors, which can be further filtered by the
 		// user. The filters are applied by the engine and are only
 		// subtractive.
-		Detectors:             append(engine.DefaultDetectors(), conf.Detectors...),
+		Detectors:             append(defaults.DefaultDetectors(), conf.Detectors...),
 		Verify:                !*noVerification,
 		IncludeDetectors:      *includeDetectors,
 		ExcludeDetectors:      *excludeDetectors,

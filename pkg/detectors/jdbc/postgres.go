@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	"github.com/lib/pq"
 )
 
@@ -57,7 +59,7 @@ func joinKeyValues(m map[string]string, sep string) string {
 	return strings.Join(data, sep)
 }
 
-func parsePostgres(subname string) (jdbc, error) {
+func parsePostgres(_ logContext.Context, subname string) (jdbc, error) {
 	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
 
 	if !strings.HasPrefix(subname, "//") {
