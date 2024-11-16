@@ -404,7 +404,7 @@ func HandleFile(
 // It returns nil upon successful processing of all data, or the first encountered error.
 func handleChunksWithError(
 	ctx logContext.Context,
-	dataErrChan chan DataOrErr,
+	dataErrChan <-chan DataOrErr,
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 ) error {
