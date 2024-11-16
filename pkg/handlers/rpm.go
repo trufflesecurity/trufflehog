@@ -20,8 +20,19 @@ func newRPMHandler() *rpmHandler {
 	return &rpmHandler{defaultHandler: newDefaultHandler(rpmHandlerType)}
 }
 
-// HandleFile processes RPM formatted files. Further implementation is required to appropriately
-// handle RPM specific archive operations.
+// HandleFile processes RPM formatted files.
+// It returns a channel of DataOrErr that will receive either file data
+// or errors encountered during processing.
+//
+// Fatal errors that will terminate processing include:
+// - Context cancellation or deadline exceeded
+// - Errors reading or uncompressing the RPM file
+// - Panics during processing (wrapped as ErrProcessingFatal)
+//
+// Non-fatal errors that will be reported but allow processing to continue include:
+// - Errors processing individual files within the RPM archive (wrapped as ErrProcessingWarning)
+//
+// The handler will skip processing entirely if ForceSkipArchives is enabled.
 func (h *rpmHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
 	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 

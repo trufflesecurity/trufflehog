@@ -20,8 +20,16 @@ func newARHandler() *arHandler {
 	return &arHandler{defaultHandler: newDefaultHandler(arHandlerType)}
 }
 
-// HandleFile processes AR formatted files. This function needs to be implemented to extract or
-// manage data from AR files according to specific requirements.
+// HandleFile processes AR formatted files and returns a channel of DataOrErr.
+// Fatal errors that will terminate processing include:
+// - Context cancellation
+// - Context deadline exceeded
+// - Errors loading the AR file
+// - Panics during processing (recovered and returned as fatal errors)
+//
+// Non-fatal errors that will be logged but allow processing to continue include:
+// - Errors creating mime-type readers for individual AR entries
+// - Errors handling content within AR entries
 func (h *arHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
 	dataOrErrChan := make(chan DataOrErr, defaultBufferSize)
 

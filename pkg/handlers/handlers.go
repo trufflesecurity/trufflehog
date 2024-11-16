@@ -399,9 +399,11 @@ func HandleFile(
 // handleChunksWithError processes data and errors received from the dataErrChan channel.
 // For each DataOrErr received:
 // - If it contains data, the function creates a chunk based on chunkSkel and reports it through the reporter.
-// - If it contains an error, the function returns the error immediately.
+// - If it contains an error, the function handles it based on severity:
+//   - Fatal errors (context cancellation, deadline exceeded, ErrProcessingFatal) cause immediate termination
+//   - Non-fatal errors (ErrProcessingWarning and others) are logged and processing continues
 // The function also listens for context cancellation to gracefully terminate processing if the context is done.
-// It returns nil upon successful processing of all data, or the first encountered error.
+// It returns nil upon successful processing of all data, or the first encountered fatal error.
 func handleChunksWithError(
 	ctx logContext.Context,
 	dataErrChan <-chan DataOrErr,
