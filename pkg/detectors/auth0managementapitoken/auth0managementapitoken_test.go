@@ -19,7 +19,7 @@ var (
 	validPattern   = generateRandomString() // this has the exact token string only which can be used in want too
 	validDomain    = "QHHPu7VPj.sI.auth0.com"
 	invalidPattern = `
-		auth0_credentails:
+		auth0_credentials:
 			apiToken: eywT2nGMZwOcbsUVBwfiRPEl8P_wnmo6XfdUoGVwxDfOSjNyqhYqFdi.KojZZOM8Ox
 			domain: QHHPu7VPj.sI.auth0.com
 	`

@@ -66,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s1.Verified = true
 				}
 			} else {
-				// if any error happens during api request capture that as verificaiton error
+				// if any error happens during api request capture that as verification error
 				s1.SetVerificationError(err, apiKey)
 			}
 		}

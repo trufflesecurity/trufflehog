@@ -80,7 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			results = append(results, s1)
 
-			// box client supportes only one client id and secret pair
+			// box client supports only one client id and secret pair
 			if s1.Verified {
 				break
 			}
