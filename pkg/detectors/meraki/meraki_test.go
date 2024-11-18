@@ -2,7 +2,10 @@ package meraki
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -99,4 +102,88 @@ func TestMeraki_Pattern(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMeraki_Fake(t *testing.T) {
+	// mock response data
+	mockOrganizations := []merakiOrganizations{
+		{ID: "123", Name: "Example Organization 1"},
+		{ID: "456", Name: "Example Organization 2"},
+	}
+	mockResponse, err := json.Marshal(mockOrganizations)
+	if err != nil {
+		t.Fatalf("failed to marshal mock organizations: %v", err)
+	}
+
+	// create a fake HTTP handler function
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the Authorization Header
+		if r.Header.Get("X-Cisco-Meraki-API-Key") != "e9e0f062f587b423bb6cc6328eb786d75b45783e" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// this is to test the failed decoding scenario
+		if r.Header.Get("X-Cisco-Meraki-API-Key") == "failed-to-decode" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"id": 123}`))
+
+			return
+		}
+
+		// Send back mock response for 200 OK
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(mockResponse)
+	})
+	// create a mock server
+	server := CreateMockServer(handler)
+	defer server.Close()
+
+	// test cases
+	tests := []struct {
+		name     string
+		secret   string
+		verified bool
+		wantErr  bool
+	}{
+		{
+			name:     "success - 200 OK",
+			secret:   "e9e0f062f587b423bb6cc6328eb786d75b45783e",
+			verified: true,
+			wantErr:  false,
+		},
+		{
+			name:     "fail - 401 UnAuthorized",
+			secret:   "e9e0f062f587b423bb6cc6328eb786d75b45783f",
+			verified: false,
+			wantErr:  false,
+		},
+		{
+			name:     "fail - failed to decode response",
+			secret:   "failed-to-decode",
+			verified: false,
+			wantErr:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, isVerified, verificationErr := verifyMerakiApiKey(context.Background(), server.Client(), server.URL, test.secret)
+			if verificationErr != nil && !test.wantErr {
+				t.Errorf("verification failed; got error, want: %t", test.wantErr)
+			}
+
+			if isVerified != test.verified {
+				t.Errorf("verification failed; isVerified: %t, want: %t", isVerified, test.verified)
+			}
+
+			// additional checks if required
+		})
+	}
+}
+
+// CreateMockServer creates a mock HTTP server with a given handler function.
+func CreateMockServer(handler func(w http.ResponseWriter, r *http.Request)) *httptest.Server {
+	// Create and return a new mock server
+	return httptest.NewServer(http.HandlerFunc(handler))
 }
