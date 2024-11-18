@@ -68,7 +68,7 @@ func TestFilesystem(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	e.Start(ctx)
-	err = e.ScanFileSystem(ctx, sources.FilesystemConfig{
+	_, err = e.ScanFileSystem(ctx, sources.FilesystemConfig{
 		Paths:            []string{rootDir},
 		ExcludePathsFile: filepath.Join(configDir, "exclude"),
 	})

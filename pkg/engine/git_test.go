@@ -90,7 +90,7 @@ func TestGitEngine(t *testing.T) {
 				BaseRef:  tTest.base,
 				MaxDepth: tTest.maxDepth,
 			}
-			if err := e.ScanGit(ctx, cfg); err != nil {
+			if _, err := e.ScanGit(ctx, cfg); err != nil {
 				return
 			}
 
@@ -154,7 +154,7 @@ func BenchmarkGitEngine(b *testing.B) {
 	cfg := sources.GitConfig{URI: repoUrl}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := e.ScanGit(ctx, cfg); err != nil {
+		if _, err := e.ScanGit(ctx, cfg); err != nil {
 			return
 		}
 	}

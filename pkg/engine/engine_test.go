@@ -271,7 +271,7 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
 		return
 	}
 
@@ -372,7 +372,7 @@ even more`,
 			eng.Start(ctx)
 
 			cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-			err = eng.ScanFileSystem(ctx, cfg)
+			_, err = eng.ScanFileSystem(ctx, cfg)
 			assert.NoError(t, err)
 
 			assert.NoError(t, eng.Finish(ctx))
@@ -420,7 +420,7 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
 		return
 	}
 
@@ -490,7 +490,7 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
 		return
 	}
 
@@ -540,7 +540,7 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
 		return
 	}
 
@@ -630,7 +630,7 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	err = e.ScanFileSystem(ctx, cfg)
+	_, err = e.ScanFileSystem(ctx, cfg)
 	assert.NoError(t, err)
 
 	// Wait for all the chunks to be processed.
@@ -678,7 +678,7 @@ func TestRetainFalsePositives(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	err = e.ScanFileSystem(ctx, cfg)
+	_, err = e.ScanFileSystem(ctx, cfg)
 	assert.NoError(t, err)
 
 	// Wait for all the chunks to be processed.
