@@ -416,15 +416,16 @@ func decodeXML(rdr io.ReadSeeker, resTable *apkparser.ResourceTable) (io.Reader,
 
 	// Parse the XML data using the apkparser library + resource table
 	err := apkparser.ParseXml(rdr, enc, resTable)
-	if err != nil {
-		// If the error is due to plaintext XML, return the plaintext XML
-		if errors.Is(err, apkparser.ErrPlainTextManifest) {
-			if _, err := rdr.Seek(0, io.SeekStart); err != nil {
-				return rdr, fmt.Errorf("error resetting reader after XML parsing error: %w", err)
-			}
-			return rdr, nil
-		}
-		return nil, err
+	if err == nil {
+		return &buf, nil
 	}
-	return &buf, nil
+
+	// If the error is due to plaintext XML, return the plaintext XML.
+	if errors.Is(err, apkparser.ErrPlainTextManifest) {
+		if _, err := rdr.Seek(0, io.SeekStart); err != nil {
+			return rdr, fmt.Errorf("error resetting reader after XML parsing error: %w", err)
+		}
+		return rdr, nil
+	}
+	return nil, err
 }
