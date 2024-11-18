@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -74,6 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			results = append(results, s1)
 		}
+		// Pretty print results
+		fmt.Println(results)
 	}
 
 	return results, nil
