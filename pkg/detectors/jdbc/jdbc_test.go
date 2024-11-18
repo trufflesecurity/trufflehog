@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package jdbc
 
 import (
@@ -8,7 +11,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/kylelemons/godebug/pretty"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
