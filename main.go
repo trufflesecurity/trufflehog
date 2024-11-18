@@ -28,6 +28,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
@@ -409,6 +410,9 @@ func run(state overseer.State) {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
 	}
 
+	// OSS Default APK handling on
+	feature.EnableAPKHandler.Store(true)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
@@ -461,7 +465,7 @@ func run(state overseer.State) {
 		// default detectors, which can be further filtered by the
 		// user. The filters are applied by the engine and are only
 		// subtractive.
-		Detectors:             append(engine.DefaultDetectors(), conf.Detectors...),
+		Detectors:             append(defaults.DefaultDetectors(), conf.Detectors...),
 		Verify:                !*noVerification,
 		IncludeDetectors:      *includeDetectors,
 		ExcludeDetectors:      *excludeDetectors,

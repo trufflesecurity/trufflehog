@@ -1,12 +1,9 @@
-package auth0managementapitoken
+package zohocrm
 
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -15,34 +12,32 @@ import (
 )
 
 var (
-	// TODO(kashif): Refactor the fake token generation if possible
-	validPattern   = generateRandomString() // this has the exact token string only which can be used in want too
-	validDomain    = "QHHPu7VPj.sI.auth0.com"
-	invalidPattern = `
-		auth0_credentials:
-			apiToken: eywT2nGMZwOcbsUVBwfiRPEl8P_wnmo6XfdUoGVwxDfOSjNyqhYqFdi.KojZZOM8Ox
-			domain: QHHPu7VPj.sI.auth0.com
-	`
+	validPattern   = "1000.1fa6966eafbb115624baa4103269e50e.e57d155232227b4e41fa7dd2b88dd4d4"
+	invalidPattern = "1000.24baa4103269e50e.41fa7dd2b88dd4d4"
 )
 
-func TestAuth0ManagementApitToken_Pattern(t *testing.T) {
+func TestZohocrm_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: makeFakeTokenString(validPattern, validDomain),
-			want:  []string{validPattern + validDomain},
+			name:  "typical pattern - with keyword zoho crm",
+			input: fmt.Sprintf("zoho crm token = '%s'", validPattern),
+			want:  []string{"1000.1fa6966eafbb115624baa4103269e50e.e57d155232227b4e41fa7dd2b88dd4d4"},
+		},
+		{
+			name:  "typical pattern - ignore duplicate",
+			input: fmt.Sprintf("zoho crm token = '%s' | '%s'", validPattern, validPattern),
+			want:  []string{"1000.1fa6966eafbb115624baa4103269e50e.e57d155232227b4e41fa7dd2b88dd4d4"},
 		},
 		{
 			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			input: fmt.Sprintf("zoho crm = '%s'", invalidPattern),
+			want:  []string{},
 		},
 	}
 
@@ -87,28 +82,4 @@ func TestAuth0ManagementApitToken_Pattern(t *testing.T) {
 			}
 		})
 	}
-}
-
-// makeFakeTokenString take a string token as parameter and make a string that looks like a token for testing
-func makeFakeTokenString(token, domain string) string {
-	return fmt.Sprintf("auth0:\n apiToken: %s \n domain: %s", token, domain)
-}
-
-// generateRandomString generates exactly 2001 char string for a fake token to by pass the check in detector for testing
-func generateRandomString() string {
-	const length = 2001
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
-
-	random := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	var builder strings.Builder
-	builder.Grow(length)
-
-	for i := 0; i < length; i++ {
-		randomChar := charset[random.Intn(len(charset))]
-		builder.WriteByte(randomChar)
-	}
-
-	// append ey in start as the token must start with 'ey'
-	return fmt.Sprintf("ey%s", builder.String())
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
@@ -73,7 +74,7 @@ func TestGitEngine(t *testing.T) {
 			conf := Config{
 				Concurrency:   1,
 				Decoders:      decoders.DefaultDecoders(),
-				Detectors:     DefaultDetectors(),
+				Detectors:     defaults.DefaultDetectors(),
 				Verify:        true,
 				SourceManager: sourceManager,
 				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
@@ -135,7 +136,7 @@ func BenchmarkGitEngine(b *testing.B) {
 	conf := Config{
 		Concurrency:   runtime.NumCPU(),
 		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     DefaultDetectors(),
+		Detectors:     defaults.DefaultDetectors(),
 		Verify:        false,
 		SourceManager: sourceManager,
 		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),

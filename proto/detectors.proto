@@ -1015,6 +1015,7 @@ enum DetectorType {
   BoxOauth = 1003;
   ApiMetrics = 1004;
   WeightsAndBiases = 1005;
+  ZohoCRM = 1006;
 }
 
 message Result {
