@@ -2,11 +2,9 @@ package mixpanel
 
 import (
 	"context"
-	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
-
-	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -40,14 +38,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-	for i, match := range matches {
-		fmt.Printf("Match %d: %v\n", i, match)
-		fmt.Printf("Len %d\n", len(match))
-	}
-	for i, match := range idMatches {
-		fmt.Printf("ID Match %d: %v\n", i, match)
-		fmt.Printf("Len %d\n", len(match))
-	}
 
 	for _, match := range matches {
 		if len(match) != 2 {
