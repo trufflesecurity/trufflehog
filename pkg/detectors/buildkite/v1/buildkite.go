@@ -2,6 +2,7 @@ package buildkite
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,10 @@ import (
 )
 
 type Scanner struct{}
+
+type APIResponse struct {
+	Scopes []string `json:"scopes"`
+}
 
 func (s Scanner) Version() int { return 1 }
 
@@ -50,12 +55,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Buildkite,
 			Raw:          []byte(resMatch),
+			ExtraData:    make(map[string]string),
 		}
 
 		if verify {
-			isVerified, verificationErr := VerifyBuildKite(ctx, client, resMatch)
+			extraData, isVerified, verificationErr := VerifyBuildKite(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
+
+			s1.ExtraData = extraData
 		}
 
 		results = append(results, s1)
@@ -72,11 +80,12 @@ func (s Scanner) Description() string {
 	return "Buildkite is a platform for running fast, secure, and scalable continuous integration pipelines. Buildkite API tokens can be used to access and modify pipeline data and configurations."
 }
 
-func VerifyBuildKite(ctx context.Context, client *http.Client, secret string) (bool, error) {
+func VerifyBuildKite(ctx context.Context, client *http.Client, secret string) (map[string]string, bool, error) {
 	// create a request
+	// api doc: https://buildkite.com/docs/apis/rest-api/access-token#get-the-current-token
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.buildkite.com/v2/access-token", nil)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
 	// add authorization header
@@ -84,16 +93,28 @@ func VerifyBuildKite(ctx context.Context, client *http.Client, secret string) (b
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
 
-	if res.StatusCode == http.StatusOK {
-		return true, nil
-	}
+	switch res.StatusCode {
+	case http.StatusOK:
+		var response APIResponse
 
-	return false, nil
+		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+			return nil, false, err
+		}
+
+		extraData := make(map[string]string)
+
+		extraData["scopes"] = strings.Join(response.Scopes, ", ")
+		return extraData, true, nil
+	case http.StatusUnauthorized:
+		return nil, false, nil
+	default:
+		return nil, false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
