@@ -1259,7 +1259,7 @@ def test_something():
 			eng.Start(ctx)
 
 			cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-			err = eng.ScanFileSystem(ctx, cfg)
+			_, err = eng.ScanFileSystem(ctx, cfg)
 			assert.NoError(t, err)
 
 			assert.NoError(t, eng.Finish(ctx))
