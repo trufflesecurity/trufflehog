@@ -173,6 +173,8 @@ github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 h1:DklsrG3d
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
 github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
 github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
+github.com/avast/apkparser v0.0.0-20240729092610-90591e0804ae h1:rDNramK9mnAbvUBJyIRZnzHchM45cXexHIX9pS9da4Q=
+github.com/avast/apkparser v0.0.0-20240729092610-90591e0804ae/go.mod h1:GNvprXNmXaDjpHmN3RFxz5QdK5VXTUvmQludCbjoBy4=
 github.com/aws/aws-sdk-go v1.55.5 h1:KKUZBfBoyqy5d3swXyiC7Q76ic40rYcbqH7qjh59kzU=
 github.com/aws/aws-sdk-go v1.55.5/go.mod h1:eRwEWoyTWFMVYVQzKMNHWP5/RV4xIUGMQfXQHfHkpNU=
 github.com/aws/smithy-go v1.20.1 h1:4SZlSlMr36UEqC7XOyRVb27XMeZubNcBNN+9IgEPIQw=
@@ -277,6 +279,8 @@ github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
 github.com/creack/pty v1.1.18/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
 github.com/crewjam/rfc5424 v0.1.0 h1:MSeXJm22oKovLzWj44AHwaItjIMUMugYGkEzfa831H8=
 github.com/crewjam/rfc5424 v0.1.0/go.mod h1:RCi9M3xHVOeerf6ULZzqv2xOGRO/zYaVUeRyPnBW3gQ=
+github.com/csnewman/dextk v0.3.0 h1:gigNZlZRNfCuARV7depunRlafEAzGhyvgBQo1FT3/0M=
+github.com/csnewman/dextk v0.3.0/go.mod h1:FcDoI3258ea0KPQogyv4iazQRGcLFNOW+I4pHBUfNO0=
 github.com/cyphar/filepath-securejoin v0.2.4 h1:Ugdm7cg7i6ZK6x3xDF1oEu1nfkyfH53EtKeQYTC3kyg=
 github.com/cyphar/filepath-securejoin v0.2.4/go.mod h1:aPGpWjXOXUn2NCNjFvBE6aRxGGx79pTxQpKOJNYHHl4=
 github.com/danieljoos/wincred v1.1.2 h1:QLdCxFs1/Yl4zduvBdcHB8goaYk9RARS2SgLLRuAyr0=
