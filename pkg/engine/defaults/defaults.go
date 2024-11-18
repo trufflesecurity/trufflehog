@@ -811,6 +811,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipbooks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodeapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodebase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zohocrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -1649,6 +1650,7 @@ func buildDetectorList() []detectors.Detector {
 		&zipbooks.Scanner{},
 		&zipcodeapi.Scanner{},
 		&zipcodebase.Scanner{},
+		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
 	}
