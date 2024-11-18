@@ -321,6 +321,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
+	godaddyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v1"
+	godaddyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
@@ -1149,6 +1151,8 @@ func buildDetectorList() []detectors.Detector {
 		&glassnode.Scanner{},
 		&gocanvas.Scanner{},
 		&gocardless.Scanner{},
+		&godaddyv1.Scanner{},
+		&godaddyv2.Scanner{},
 		&goodday.Scanner{},
 		&googleoauth2.Scanner{},
 		&grafana.Scanner{},
