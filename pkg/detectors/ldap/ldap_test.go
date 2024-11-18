@@ -20,7 +20,6 @@ var (
 	invalidPasswordPattern = "A:J$NL9~6:u:L$_:VO4tf))h#v0i}O"
 	validIadPattern        = "OpenDSObject(\"ldaps://www\", \"ABC\", \"XYZ\", 123)"
 	invalidIadPattern      = "OpenDSObject(\"ldaps://www\", \"ABC\", \"XYZ\", ?)"
-	keyword                = "ldap"
 )
 
 func TestLdap_Pattern(t *testing.T) {
