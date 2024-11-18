@@ -1,4 +1,4 @@
-package analyze
+package analyze_keys
 
 import (
 	"github.com/charmbracelet/bubbles/key"
@@ -87,7 +87,8 @@ func (ui KeyTypePage) View() string {
 }
 
 func (ui KeyTypePage) NextPage(keyType string) (tea.Model, tea.Cmd) {
-	return NewFormPage(ui.Common, keyType), SetKeyTypeCmd(keyType)
+	return nil
+	// return NewFormPage(ui.Common, keyType), SetKeyTypeCmd(keyType)
 }
 
 type KeyTypeItem string

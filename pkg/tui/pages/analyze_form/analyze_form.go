@@ -1,26 +1,37 @@
-package analyze
+package analyze_form
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
-type FormPage struct {
-	Common  *common.Common
+var (
+	titleStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FFFDF5")).
+		Background(lipgloss.Color(styles.Colors["bronze"])).
+		Padding(0, 1)
+)
+
+type AnalyzeForm struct {
+	common.Common
 	KeyType string
 	form    textinputs.Model
 }
 
-func NewFormPage(c *common.Common, keyType string) FormPage {
+type SecretInfo struct {
+	Parts map[string]string
+	Cfg   *config.Config
+}
+
+func New(c common.Common, keyType string) *AnalyzeForm {
 	var inputs []textinputs.InputConfig
 	switch strings.ToLower(keyType) {
 	case "twilio":
@@ -65,25 +76,25 @@ func NewFormPage(c *common.Common, keyType string) FormPage {
 		SetHeader(titleStyle.Render(fmt.Sprintf("Configuring %s analyzer", keyType))).
 		SetFooter("⚠️  Running TruffleHog Analyze will send a lot of requests ⚠️\n\n🚧 Please confirm you have permission to run TruffleHog Analyze against this secret 🚧").
 		SetSubmitMsg("Run TruffleHog Analyze")
-	return FormPage{
+	return &AnalyzeForm{
 		Common:  c,
 		KeyType: keyType,
 		form:    form,
 	}
 }
 
-func (FormPage) Init() tea.Cmd {
+func (AnalyzeForm) Init() tea.Cmd {
 	return nil
 }
 
-func (ui FormPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (ui *AnalyzeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// TODO: Check form focus.
-	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch {
-		case key.Matches(msg, ui.Common.KeyMap.Back):
-			return ui.PrevPage()
-		}
-	}
+	// if msg, ok := msg.(tea.KeyMsg); ok {
+	// 	switch {
+	// 	case key.Matches(msg, ui.Common.KeyMap.Back):
+	// 		return ui.PrevPage()
+	// 	}
+	// }
 	if _, ok := msg.(textinputs.SelectNextMsg); ok {
 		values := make(map[string]string)
 		for k, v := range ui.form.GetInputs() {
@@ -105,18 +116,28 @@ func (ui FormPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return ui, cmd
 }
 
-func (ui FormPage) View() string {
+func (ui *AnalyzeForm) View() string {
 	return styles.AppStyle.Render(ui.form.View())
 }
 
-func (ui FormPage) PrevPage() (tea.Model, tea.Cmd) {
-	page := NewKeyTypePage(ui.Common)
-	// Select what was previously selected.
-	index, ok := slices.BinarySearch(analyzers.AvailableAnalyzers(), ui.KeyType)
-	if !ok {
-		// Should be impossible.
-		index = 0
-	}
-	page.list.Select(index)
-	return page, nil
+// func (ui AnalyzeForm) PrevPage() (tea.Model, tea.Cmd) {
+// 	page := NewKeyTypePage(ui.Common)
+// 	// Select what was previously selected.
+// 	index, ok := slices.BinarySearch(analyzers.AvailableAnalyzers(), ui.KeyType)
+// 	if !ok {
+// 		// Should be impossible.
+// 		index = 0
+// 	}
+// 	page.list.Select(index)
+// 	return page, nil
+// }
+
+func (m *AnalyzeForm) ShortHelp() []key.Binding {
+	// TODO: actually return something
+	return nil
+}
+
+func (m *AnalyzeForm) FullHelp() [][]key.Binding {
+	// TODO: actually return something
+	return nil
 }

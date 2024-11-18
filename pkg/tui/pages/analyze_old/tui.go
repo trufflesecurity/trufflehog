@@ -1,4 +1,4 @@
-package analyze
+package analyze_keys
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/analyze_form"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
@@ -110,7 +111,7 @@ func (ui *Analyze) SetSize(width, height int) {
 	// TODO: Responsive pages.
 	ui.model = NewKeyTypePage(ui.common)
 	if len(ui.args) > 0 {
-		ui.model = NewFormPage(ui.common, ui.args[0])
+		ui.model = analyze_form.NewAnalyzeForm(ui.common, ui.args[0])
 	}
 
 	// if ui.keyType == "" {

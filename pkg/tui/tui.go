@@ -11,7 +11,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/keymap"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/analyze"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/analyze_form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/analyze_keys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/contact_enterprise"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_select"
@@ -28,7 +29,8 @@ const (
 	sourceConfigurePage
 	viewOSSProjectPage
 	contactEnterprisePage
-	analyzePage
+	analyzeKeysPage
+	analyzeFormPage
 )
 
 type sessionState int
@@ -52,7 +54,7 @@ type TUI struct {
 func New(c common.Common, args []string) *TUI {
 	ui := &TUI{
 		common:      c,
-		pages:       make([]common.Component, 6),
+		pages:       make([]common.Component, 7),
 		pageHistory: []page{wizardIntroPage},
 		state:       startState,
 	}
@@ -63,8 +65,8 @@ func New(c common.Common, args []string) *TUI {
 		// Set to analyze start page.
 		return &TUI{
 			common:      c,
-			pages:       make([]common.Component, 6),
-			pageHistory: []page{wizardIntroPage, analyzePage},
+			pages:       make([]common.Component, 7),
+			pageHistory: []page{wizardIntroPage, analyzeKeysPage},
 			state:       startState,
 		}
 		// case len(args) >= 2 && args[0] == "analyze":
@@ -90,7 +92,8 @@ func (ui *TUI) Init() tea.Cmd {
 	ui.pages[sourceConfigurePage] = source_configure.New(ui.common)
 	ui.pages[viewOSSProjectPage] = view_oss.New(ui.common)
 	ui.pages[contactEnterprisePage] = contact_enterprise.New(ui.common)
-	ui.pages[analyzePage] = analyze.New(ui.common, ui.args)
+	ui.pages[analyzeKeysPage] = analyze_keys.New(ui.common)
+	ui.pages[analyzeFormPage] = analyze_form.New(ui.common, "stripe")
 	ui.SetSize(ui.common.Width, ui.common.Height)
 	cmds := make([]tea.Cmd, 0)
 	cmds = append(cmds,
@@ -99,7 +102,8 @@ func (ui *TUI) Init() tea.Cmd {
 		ui.pages[sourceConfigurePage].Init(),
 		ui.pages[viewOSSProjectPage].Init(),
 		ui.pages[contactEnterprisePage].Init(),
-		ui.pages[analyzePage].Init(),
+		ui.pages[analyzeKeysPage].Init(),
+		ui.pages[analyzeFormPage].Init(),
 	)
 	ui.state = loadedState
 	ui.SetSize(ui.common.Width, ui.common.Height)
@@ -152,7 +156,7 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case wizard_intro.ScanSourceWithWizard:
 				ui.setActivePage(sourceSelectPage)
 			case wizard_intro.AnalyzeSecret:
-				ui.setActivePage(analyzePage)
+				ui.setActivePage(analyzeKeysPage)
 			}
 		case source_select.SourceItem:
 			ui.setActivePage(sourceConfigurePage)
@@ -160,6 +164,9 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return source_configure.SetSourceMsg{Source: item.ID()}
 			})
 		}
+		// TODO figure this out
+		// case analyze_form:
+		// 	ui.setActivePage(analyzeFormPage)
 	case source_configure.SetArgsMsg:
 		ui.args = strings.Split(string(msg), " ")[1:]
 		return ui, tea.Quit
