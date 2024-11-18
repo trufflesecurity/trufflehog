@@ -42,7 +42,8 @@ import (
 type ProgressTracker struct {
 	enabled bool
 
-	sync.Mutex
+	mu sync.Mutex // protects concurrent access to completion state.
+	// completedObjects tracks which indices in the current page have been processed.
 	completedObjects []bool
 	completionOrder  []int // Track the order in which objects complete
 
@@ -74,8 +75,8 @@ func (p *ProgressTracker) Reset() {
 		return
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	// Store the current completed count before moving to next page.
 	p.completedObjects = make([]bool, defaultMaxObjectsPerPage)
 	p.completionOrder = make([]int, 0, defaultMaxObjectsPerPage)
@@ -143,9 +144,9 @@ func (p *ProgressTracker) Complete(_ context.Context, message string) error {
 //   - Objects completed: [0,1,2,3,4,5,7,8]
 //   - The checkpoint will only include objects 0-5 since they are consecutive
 //   - If scanning is interrupted and resumed:
-//     - Scan resumes after object 5 (the last checkpoint)
-//     - Objects 7-8 will be re-scanned even though they completed before
-//     - This ensures object 6 is not missed
+//   - Scan resumes after object 5 (the last checkpoint)
+//   - Objects 7-8 will be re-scanned even though they completed before
+//   - This ensures object 6 is not missed
 func (p *ProgressTracker) UpdateObjectProgress(
 	ctx context.Context,
 	completedIdx int,
@@ -163,8 +164,8 @@ func (p *ProgressTracker) UpdateObjectProgress(
 		return fmt.Errorf("completed index %d exceeds maximum page size", completedIdx)
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	// Only track completion if this is the first time this index is marked complete.
 	if !p.completedObjects[completedIdx] {
