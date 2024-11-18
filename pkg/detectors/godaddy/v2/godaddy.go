@@ -25,9 +25,9 @@ var (
 
 	defaultClient = common.SaneHttpClient()
 
-	// the key for the GoDaddy OTE environment is a 35-character alphanumeric string that may include underscores.
+	// the key for the GoDaddy Prod environment is a 35-character alphanumeric string that may include underscores.
 	keyPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy"}) + common.BuildRegex("a-zA-Z0-9", "_", 35))
-	// the secret for the GoDaddy OTE environment is a 22-character alphanumeric string.
+	// the secret for the GoDaddy Prod environment is a 22-character alphanumeric string.
 	secretPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy"}) + common.BuildRegex("a-zA-Z0-9", "", 22))
 )
 
