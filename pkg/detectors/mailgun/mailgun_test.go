@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	validTokenPattern   = "gRtZTX7RaarK8pXdNcUBDcgvmIP6qi-5QCjxGlABBFJwHO353-1AFxCzlaSZS6KNkBQH7Lmk"
+	validTokenPattern   = "gRtZTX7RaarK8pXdNcUBDcgvmIP6qiX5QCjxGlABBFJwHO3531XAFxCzlaSZS6KNkBQH7Lmk"
 	invalidTokenPattern = "=RtZTX7RaarK8pXdNcUBDcgvmIP6qi-5QCjxGlABBFJwHO353-1AFxCzlaSZS6KNkBQH7Lmk"
 	validKeyPattern     = "key-dirirygl04i92ww1uuvz9owuc9sb0fpm"
 	invalidKeyPattern   = "key-dirirygl04i92ww1uuvz9owuc9sb0fp="
