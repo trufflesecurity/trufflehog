@@ -144,9 +144,9 @@ func (p *ProgressTracker) Complete(_ context.Context, message string) error {
 //   - Objects completed: [0,1,2,3,4,5,7,8]
 //   - The checkpoint will only include objects 0-5 since they are consecutive
 //   - If scanning is interrupted and resumed:
-//   - Scan resumes after object 5 (the last checkpoint)
-//   - Objects 7-8 will be re-scanned even though they completed before
-//   - This ensures object 6 is not missed
+//     -- Scan resumes after object 5 (the last checkpoint)
+//     -- Objects 7-8 will be re-scanned even though they completed before
+//     -- This ensures object 6 is not missed
 func (p *ProgressTracker) UpdateObjectProgress(
 	ctx context.Context,
 	completedIdx int,
