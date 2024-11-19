@@ -301,6 +301,52 @@ func TestGlobalRedaction_JSON(t *testing.T) {
 	)
 }
 
+func TestToLogger(t *testing.T) {
+	var jsonBuffer bytes.Buffer
+	l, flush := New("service-name",
+		WithJSONSink(&jsonBuffer),
+	)
+	logger := ToLogger(l)
+	logger.Println("yay")
+	assert.Nil(t, flush())
+
+	var parsedJSON map[string]any
+	assert.Nil(t, json.Unmarshal(jsonBuffer.Bytes(), &parsedJSON))
+	assert.NotEmpty(t, parsedJSON["ts"])
+	delete(parsedJSON, "ts")
+	delete(parsedJSON, "caller") // log.Logger adds a "caller" field
+	assert.Equal(t,
+		map[string]any{
+			"level":  "info-0",
+			"logger": "service-name",
+			"msg":    "yay",
+		},
+		parsedJSON,
+	)
+}
+
+func TestToSlogger(t *testing.T) {
+	var jsonBuffer bytes.Buffer
+	l, flush := New("service-name", WithJSONSink(&jsonBuffer))
+	logger := ToSlogger(l)
+	logger.Info("yay")
+	assert.Nil(t, flush())
+
+	var parsedJSON map[string]any
+	assert.Nil(t, json.Unmarshal(jsonBuffer.Bytes(), &parsedJSON))
+	assert.NotEmpty(t, parsedJSON["ts"])
+	delete(parsedJSON, "ts")
+	delete(parsedJSON, "caller") // slog.Logger adds a "caller" field
+	assert.Equal(t,
+		map[string]any{
+			"level":  "info-0",
+			"logger": "service-name",
+			"msg":    "yay",
+		},
+		parsedJSON,
+	)
+}
+
 func BenchmarkLoggerRedact(b *testing.B) {
 	msg := "this is a message with 'foo' in it"
 	logKvps := []any{"key", "value", "foo", "bar", "bar", "baz", "longval", "84hblnqwp97ewilbgoab8fhqlngahs6dl3i269haa"}
