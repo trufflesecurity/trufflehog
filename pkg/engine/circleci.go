@@ -33,6 +33,6 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) error {
 	if err := circleSource.Init(ctx, "trufflehog - Circle CI", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, circleSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, circleSource)
 	return err
 }

@@ -39,6 +39,6 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 		return err
 	}
 
-	_, err := e.sourceManager.Run(ctx, sourceName, gitSource)
+	_, err := e.sourceManager.EnumerateAndScan(ctx, sourceName, gitSource)
 	return err
 }

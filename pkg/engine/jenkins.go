@@ -76,6 +76,6 @@ func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) e
 	if err := jenkinsSource.Init(ctx, "trufflehog - Jenkins", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, jenkinsSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, jenkinsSource)
 	return err
 }

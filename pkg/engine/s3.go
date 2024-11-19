@@ -68,6 +68,6 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 	if err := s3Source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, s3Source)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, s3Source)
 	return err
 }

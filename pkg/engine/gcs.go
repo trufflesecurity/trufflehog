@@ -51,7 +51,7 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 	if err := gcsSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, int(c.Concurrency)); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, gcsSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, gcsSource)
 	return err
 }
 

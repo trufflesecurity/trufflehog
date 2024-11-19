@@ -75,6 +75,6 @@ func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) error
 	if err := huggingfaceSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, huggingfaceSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, huggingfaceSource)
 	return err
 }

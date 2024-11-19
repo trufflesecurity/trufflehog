@@ -41,6 +41,6 @@ func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchC
 	if err := elasticsearchSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, elasticsearchSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, elasticsearchSource)
 	return err
 }

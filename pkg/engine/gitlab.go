@@ -66,6 +66,6 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 		return err
 	}
 	gitlabSource.WithScanOptions(scanOptions)
-	_, err = e.sourceManager.Run(ctx, sourceName, gitlabSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, gitlabSource)
 	return err
 }

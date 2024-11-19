@@ -59,6 +59,6 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 		return err
 	}
 	githubSource.WithScanOptions(scanOptions)
-	_, err = e.sourceManager.Run(ctx, sourceName, githubSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, githubSource)
 	return err
 }

@@ -33,6 +33,6 @@ func (e *Engine) ScanTravisCI(ctx context.Context, token string) error {
 	if err := travisSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, travisSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, travisSource)
 	return err
 }

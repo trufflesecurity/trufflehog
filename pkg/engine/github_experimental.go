@@ -60,6 +60,6 @@ func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExp
 		return err
 	}
 	githubExperimentalSource.WithScanOptions(scanOptions)
-	_, err = e.sourceManager.Run(ctx, sourceName, githubExperimentalSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, githubExperimentalSource)
 	return err
 }

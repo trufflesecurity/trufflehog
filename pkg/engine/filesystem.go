@@ -33,6 +33,6 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 	if err := fileSystemSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, fileSystemSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, fileSystemSource)
 	return err
 }

@@ -49,6 +49,6 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) error {
 	}
 	syslogSource.InjectConnection(connection)
 
-	_, err = e.sourceManager.Run(ctx, sourceName, syslogSource)
+	_, err = e.sourceManager.EnumerateAndScan(ctx, sourceName, syslogSource)
 	return err
 }
