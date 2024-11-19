@@ -2313,6 +2313,8 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
+	// no validation rules for ExcludeProjectsSharedIntoGroups
+
 	switch v := m.Credential.(type) {
 	case *GitLab_Token:
 		if v == nil {
