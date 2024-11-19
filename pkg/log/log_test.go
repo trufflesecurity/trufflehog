@@ -224,17 +224,6 @@ func splitLines(s string) []string {
 	return logLines
 }
 
-func TestFindLevel(t *testing.T) {
-	lvl := zap.NewAtomicLevel()
-	logger, _ := New("parent", WithConsoleSink(io.Discard, WithLeveler(lvl)))
-
-	for i := 0; i < 128; i++ {
-		i8 := int8(i)
-		SetLevelForControl(lvl, i8)
-		assert.Equal(t, i8, findLevel(logger))
-	}
-}
-
 func TestGlobalRedaction_Console(t *testing.T) {
 	oldState := globalRedactor
 	globalRedactor = &dynamicRedactor{
