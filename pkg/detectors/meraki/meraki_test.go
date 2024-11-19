@@ -168,6 +168,7 @@ func TestMeraki_Fake(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// calling FromData does not work cause APIURLs are hardcoded
 			_, isVerified, verificationErr := verifyMerakiApiKey(context.Background(), server.Client(), server.URL, test.secret)
 			if verificationErr != nil && !test.wantErr {
 				t.Errorf("verification failed; got error, want: %t", test.wantErr)
@@ -182,6 +183,7 @@ func TestMeraki_Fake(t *testing.T) {
 	}
 }
 
+// this i am thinking to move to common
 // CreateMockServer creates a mock HTTP server with a given handler function.
 func CreateMockServer(handler func(w http.ResponseWriter, r *http.Request)) *httptest.Server {
 	// Create and return a new mock server
