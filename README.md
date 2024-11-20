@@ -36,6 +36,26 @@ We take the revenue from the enterprise product to fund more awesome open source
 
 </div>
 
+# What is TruffleHog 🐽
+
+TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
+
+## Discovery 🔍
+
+TruffleHog can look for secrets in many places including Git, chats, wikis, logs, API testing platforms, object stores, filesystems and more
+
+## Classification 📁
+
+TruffleHog classifies over 800 secret types, mapping them back to the specific identity they belong to. Is it an AWS secret? Stripe secret? Cloudflare secret? Postgres password? SSL Private key? Sometimes its hard to tell looking at it, so TruffleHog classifies everything it finds.
+
+## Validation ✅
+
+For every secret TruffleHog can classify, it can also log in to confirm if that secret is live or not. This step is critical to know if there’s an active present danger or not.
+
+## Analysis 🔬
+
+For the 20 some of the most commonly leaked out credential types, instead of sending one request to check if the secret can log in, TruffleHog can send many requests to learn everything there is to know about the secret. Who created it? What resources can it access? What permissions does it have on those resources?
+
 # :loudspeaker: Join Our Community
 
 Have questions? Feedback? Jump in slack or discord and hang out with us
@@ -127,7 +147,7 @@ Checksums are applied to all artifacts, and the resulting checksum file is signe
 
 You need the following tool to verify signature:
 
-- [Cosign](https://docs.sigstore.dev/cosign/installation/)
+- [Cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
 
 Verification steps are as follow:
 

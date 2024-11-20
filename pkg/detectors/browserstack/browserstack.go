@@ -3,15 +3,16 @@ package browserstack
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+	"golang.org/x/net/publicsuffix"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/net/publicsuffix"
 )
 
 type Scanner struct {
@@ -126,4 +127,8 @@ func verifyBrowserStackCredentials(ctx context.Context, client *http.Client, use
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BrowserStack
+}
+
+func (s Scanner) Description() string {
+	return "BrowserStack is a cloud web and mobile testing platform. BrowserStack credentials can be used to access and manage testing environments."
 }

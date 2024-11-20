@@ -98,3 +98,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Voiceflow
 }
+
+func (s Scanner) Description() string {
+	return "Voiceflow is an AI service designed to transact with customers. API keys may be used to access customer data."
+}

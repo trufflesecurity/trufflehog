@@ -129,3 +129,7 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BraintreePayments
 }
+
+func (s Scanner) Description() string {
+	return "Braintree is a full-stack payment platform that makes it easy to accept payments in your mobile app or website. Braintree API keys can be used to access and manage payment transactions, customer data, and other payment-related operations."
+}

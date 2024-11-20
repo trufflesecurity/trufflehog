@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v66/github"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
@@ -26,10 +28,13 @@ func newConnector(source *Source) (connector, error) {
 
 	switch cred := source.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_GithubApp:
+		log.RedactGlobally(cred.GithubApp.GetPrivateKey())
 		return newAppConnector(apiEndpoint, cred.GithubApp)
 	case *sourcespb.GitHub_BasicAuth:
+		log.RedactGlobally(cred.BasicAuth.GetPassword())
 		return newBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
+		log.RedactGlobally(cred.Token)
 		return newTokenConnector(apiEndpoint, cred.Token, source.handleRateLimit)
 	case *sourcespb.GitHub_Unauthenticated:
 		return newUnauthenticatedConnector(apiEndpoint)

@@ -98,3 +98,7 @@ func verifyAbstract(ctx context.Context, client *http.Client, resMatch string) (
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Abstract
 }
+
+func (s Scanner) Description() string {
+	return "Abstract API provides various services including exchange rates. The API keys can be used to access these services and retrieve data."
+}

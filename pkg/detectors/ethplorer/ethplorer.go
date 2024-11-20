@@ -2,9 +2,10 @@ package ethplorer
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -71,4 +72,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Ethplorer
+}
+
+func (s Scanner) Description() string {
+	return "Ethplorer API keys can be used to interact with the Ethplorer service, which provides access to Ethereum blockchain data and analytics."
 }

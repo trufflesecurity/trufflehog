@@ -3,10 +3,11 @@ package dyspatch
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -79,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Dyspatch
+}
+
+func (s Scanner) Description() string {
+	return "Dyspatch is a platform for managing and sending transactional emails. Dyspatch API keys can be used to access and manage email templates and sending operations."
 }

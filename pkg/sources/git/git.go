@@ -19,7 +19,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v66/github"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
@@ -654,12 +654,11 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 			commitHash := plumbing.NewHash(fullHash)
 			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.V(1).Info(
+				logger.Error(
+					err,
 					"error handling binary file",
-					"error", err,
-					"filename", fileName,
 					"commit", commitHash,
-					"file", diff.PathB,
+					"path", fileName,
 				)
 			}
 			continue
@@ -677,9 +676,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			if err != nil {
 				ctx.Logger().Error(
 					err, "error creating reader for commits",
-					"filename", fileName,
 					"commit", fullHash,
-					"file", diff.PathB,
+					"path", fileName,
 				)
 				return nil
 			}
@@ -687,11 +685,10 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 			data := make([]byte, d.Len())
 			if _, err := io.ReadFull(reader, data); err != nil {
-				ctx.Logger().Error(
+				logger.Error(
 					err, "error reading diff content for commit",
-					"filename", fileName,
 					"commit", fullHash,
-					"file", diff.PathB,
+					"path", fileName,
 				)
 				return nil
 			}
@@ -829,7 +826,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 	)
 	for diff := range diffChan {
 		fullHash := diff.Commit.Hash
-		logger := ctx.Logger().WithValues("filename", diff.PathB, "commit", fullHash, "file", diff.PathB)
+		logger := ctx.Logger().WithValues("commit", fullHash, "path", diff.PathB)
 		logger.V(2).Info("scanning staged changes from git")
 
 		if scanOptions.MaxDepth > 0 && depth >= scanOptions.MaxDepth {
@@ -877,7 +874,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				Verify:         s.verify,
 			}
 			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
-				logger.V(1).Info("error handling binary file", "error", err, "filename", fileName)
+				logger.Error(err, "error handling binary file")
 			}
 			continue
 		}
@@ -887,24 +884,14 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 
 			reader, err := d.ReadCloser()
 			if err != nil {
-				ctx.Logger().Error(
-					err, "error creating reader for staged",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
+				logger.Error(err, "error creating reader for staged")
 				return nil
 			}
 			defer reader.Close()
 
 			data := make([]byte, d.Len())
 			if _, err := reader.Read(data); err != nil {
-				ctx.Logger().Error(
-					err, "error reading diff content for staged",
-					"filename", fileName,
-					"commit", fullHash,
-					"file", diff.PathB,
-				)
+				logger.Error(err, "error reading diff content for staged")
 				return nil
 			}
 			chunk := sources.Chunk{
@@ -1226,7 +1213,14 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.ChunkReporter, chunkSkel *sources.Chunk, commitHash plumbing.Hash, path string) error {
+func (s *Git) handleBinary(
+	ctx context.Context,
+	gitDir string,
+	reporter sources.ChunkReporter,
+	chunkSkel *sources.Chunk,
+	commitHash plumbing.Hash,
+	path string,
+) (err error) {
 	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
 	fileCtx.Logger().V(5).Info("handling binary file")
 
@@ -1240,48 +1234,66 @@ func (s *Git) handleBinary(ctx context.Context, gitDir string, reporter sources.
 		return nil
 	}
 
-	cmd := exec.Command("git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
-	stdout, err := s.executeCatFileCmd(cmd)
-	if err != nil {
-		return err
-	}
+	const (
+		cmdTimeout = 60 * time.Second
+		waitDelay  = 5 * time.Second
+	)
+	// NOTE: This kludge ensures the context timeout for the 'git cat-file' command
+	// matches the timeout for the HandleFile operation.
+	// By setting both timeouts to the same value, we can be more confident
+	// that both operations will run for the same duration.
+	// The command execution includes a small Wait delay before terminating the process,
+	// giving HandleFile time to respect the context
+	// and return before the process is forcibly killed.
+	// This approach helps prevent premature termination and allows for more complete processing.
 
-	done := make(chan error, 1)
-	// Read from stdout to prevent the pipe buffer from filling up and causing the command to hang.
-	// This allows us to stream the file contents to the handler.
-	go func() {
-		defer close(done)
-		done <- handlers.HandleFile(ctx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
-	}()
+	// TODO: Develop a more robust mechanism to ensure consistent timeout behavior between the command execution
+	// and the HandleFile operation. This should prevent premature termination and allow for complete processing.
+	handlers.SetArchiveMaxTimeout(cmdTimeout)
 
-	// Close to signal that we are done writing to the pipe, which allows the reading goroutine to finish.
-	if closeErr := stdout.Close(); closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
-		ctx.Logger().Error(fmt.Errorf("error closing stdout: %w", closeErr), "closing stdout failed")
-	}
+	// Create a timeout context for the 'git cat-file' command to ensure it does not run indefinitely.
+	// This prevents potential resource exhaustion by terminating the command if it exceeds the specified duration.
+	catFileCtx, cancel := context.WithTimeoutCause(fileCtx, cmdTimeout, errors.New("git cat-file timeout"))
+	defer cancel()
 
-	if waitErr := cmd.Wait(); waitErr != nil {
-		return fmt.Errorf("error waiting for git cat-file: %w", waitErr)
-	}
-
-	// Wait for the command to finish and the handler to complete.
-	// Capture any error from the file handling process.
-	return <-done
-}
-
-func (s *Git) executeCatFileCmd(cmd *exec.Cmd) (io.ReadCloser, error) {
+	cmd := exec.CommandContext(catFileCtx, "git", "-C", gitDir, "cat-file", "blob", commitHash.String()+":"+path)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+	cmd.WaitDelay = waitDelay // give the command a chance to finish before the timeout :)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
+		return fmt.Errorf("error running git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
+		return fmt.Errorf("error starting git cat-file: %w\n%s", err, stderr.Bytes())
 	}
 
-	return stdout, nil
+	// Ensure all data from the reader (stdout) is consumed to prevent broken pipe errors.
+	// This operation discards any remaining data after HandleFile completion.
+	// If the reader is fully consumed, the copy is essentially a no-op.
+	// If an error occurs while discarding, it will be logged and combined with any existing error.
+	// The command's completion is then awaited and any execution errors are handled.
+	defer func() {
+		n, copyErr := io.Copy(io.Discard, stdout)
+		if copyErr != nil {
+			ctx.Logger().Error(
+				copyErr,
+				"Failed to discard remaining stdout data after HandleFile completion",
+			)
+		}
+
+		ctx.Logger().V(3).Info(
+			"HandleFile did not consume all stdout data; excess discarded",
+			"bytes_discarded", n)
+
+		// Wait for the command to finish and handle any errors.
+		waitErr := cmd.Wait()
+		err = errors.Join(err, copyErr, waitErr)
+	}()
+
+	return handlers.HandleFile(catFileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {

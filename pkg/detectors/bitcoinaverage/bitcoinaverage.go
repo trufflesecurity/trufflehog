@@ -3,9 +3,10 @@ package bitcoinaverage
 import (
 	"context"
 	"encoding/json"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -81,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BitcoinAverage
+}
+
+func (s Scanner) Description() string {
+	return "BitcoinAverage is a service that provides cryptocurrency market data. BitcoinAverage API keys can be used to access and retrieve this market data."
 }

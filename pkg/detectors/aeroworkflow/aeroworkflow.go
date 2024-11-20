@@ -27,7 +27,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"aeroworkflow"}) + `([a-zA-Z0-9^!?#:*;]{20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"aeroworkflow"}) + `\b([a-zA-Z0-9^!?#:*;]{20})`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"aeroworkflow"}) + `\b([0-9]{1,})\b`)
 )
 
@@ -85,7 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyAeroworkflow(ctx context.Context, client *http.Client, resMatch, resIdMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aeroworkflowURL+"/api/"+resIdMatch+"/v1/AeroAppointments", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aeroworkflowURL+"/api/"+resIdMatch+"/me", nil)
 	if err != nil {
 		return false, err
 	}
@@ -112,4 +112,8 @@ func verifyAeroworkflow(ctx context.Context, client *http.Client, resMatch, resI
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Aeroworkflow
+}
+
+func (s Scanner) Description() string {
+	return "Aeroworkflow is a service for managing workflows. Aeroworkflow API keys and Account IDs can be used to access and manage workflows."
 }

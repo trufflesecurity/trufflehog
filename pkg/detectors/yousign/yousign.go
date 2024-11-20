@@ -3,9 +3,10 @@ package yousign
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -13,6 +14,10 @@ import (
 )
 
 type Scanner struct{}
+
+// docs: https://dev.yousign.com/#api-v3-documentation-new
+const PROD_URL = "https://api.yousign.com"
+const STAGING_URL = "https://staging-api.yousign.com"
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -48,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://staging-api.yousign.com/users", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/users", PROD_URL), nil)
 			if err != nil {
 				continue
 			}
@@ -59,6 +64,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
+				} else {
+					req, err = http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/users", STAGING_URL), nil)
+					if err != nil {
+						continue
+					}
+					req.Header.Add("Content-Type", "application/json")
+					req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
+					res, err = client.Do(req)
+					if err == nil {
+						defer res.Body.Close()
+						if res.StatusCode >= 200 && res.StatusCode < 300 {
+							s1.Verified = true
+						}
+					}
 				}
 			}
 		}
@@ -71,4 +90,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_YouSign
+}
+
+func (s Scanner) Description() string {
+	return "Yousign is an electronic signature service used to sign and manage documents online. Yousign API keys can be used to access and manage these documents."
 }

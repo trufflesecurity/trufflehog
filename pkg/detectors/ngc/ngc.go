@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_NGC
 }
+
+func (s Scanner) Description() string {
+	return "Nvidia's API for AI related things"
+}

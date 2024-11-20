@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Optimizely
 }
+
+func (s Scanner) Description() string {
+	return "Optimizely is a platform for A/B testing and feature flagging. Optimizely API keys can be used to manage and access these services."
+}

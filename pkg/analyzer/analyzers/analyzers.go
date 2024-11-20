@@ -5,21 +5,23 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
 
 	"github.com/fatih/color"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type (
 	Analyzer interface {
-		Type() analyzerpb.AnalyzerType
+		Type() AnalyzerType
 		Analyze(ctx context.Context, credentialInfo map[string]string) (*AnalyzerResult, error)
 	}
 
+	AnalyzerType int
+
 	// AnalyzerResult is the output of analysis.
 	AnalyzerResult struct {
-		AnalyzerType       analyzerpb.AnalyzerType
+		AnalyzerType       AnalyzerType
 		Bindings           []Binding
 		UnboundedResources []Resource
 		Metadata           map[string]any
@@ -56,30 +58,80 @@ const (
 	FullAccess string = "full_access"
 )
 
-// Sorted list of all available analyzers. Used for valid sub-commands and TUI
-// selection. TODO: Change slice type to Analyzer interface when all available
-// analyzers implement it.
-var AvailableAnalyzers = []string{
-	"Airbrake",
-	"Asana",
-	"Bitbucket",
-	"GitHub",
-	"GitLab",
-	"HuggingFace",
-	"Mailchimp",
-	"Mailgun",
-	"MySQL",
-	"OpenAI",
-	"Opsgenie",
-	"Postgres",
-	"Postman",
-	"Sendgrid",
-	"Shopify",
-	"Slack",
-	"Sourcegraph",
-	"Square",
-	"Stripe",
-	"Twilio",
+const (
+	AnalyzerTypeInvalid AnalyzerType = iota
+	AnalyzerTypeAirbrake
+	AnalyzerTypeAsana
+	AnalyzerTypeBitbucket
+	AnalyzerTypeGitHub
+	AnalyzerTypeGitLab
+	AnalyzerTypeHuggingFace
+	AnalyzerTypeMailchimp
+	AnalyzerTypeMailgun
+	AnalyzerTypeMySQL
+	AnalyzerTypeOpenAI
+	AnalyzerTypeOpsgenie
+	AnalyzerTypePostgres
+	AnalyzerTypePostman
+	AnalyzerTypeSendgrid
+	AnalyzerTypeShopify
+	AnalyzerTypeSlack
+	AnalyzerTypeSourcegraph
+	AnalyzerTypeSquare
+	AnalyzerTypeStripe
+	AnalyzerTypeTwilio
+	// Add new items here with AnalyzerType prefix
+)
+
+// analyzerTypeStrings maps the enum to its string representation.
+var analyzerTypeStrings = map[AnalyzerType]string{
+	AnalyzerTypeInvalid:     "Invalid",
+	AnalyzerTypeAirbrake:    "Airbrake",
+	AnalyzerTypeAsana:       "Asana",
+	AnalyzerTypeBitbucket:   "Bitbucket",
+	AnalyzerTypeGitHub:      "GitHub",
+	AnalyzerTypeGitLab:      "GitLab",
+	AnalyzerTypeHuggingFace: "HuggingFace",
+	AnalyzerTypeMailchimp:   "Mailchimp",
+	AnalyzerTypeMailgun:     "Mailgun",
+	AnalyzerTypeMySQL:       "MySQL",
+	AnalyzerTypeOpenAI:      "OpenAI",
+	AnalyzerTypeOpsgenie:    "Opsgenie",
+	AnalyzerTypePostgres:    "Postgres",
+	AnalyzerTypePostman:     "Postman",
+	AnalyzerTypeSendgrid:    "Sendgrid",
+	AnalyzerTypeShopify:     "Shopify",
+	AnalyzerTypeSlack:       "Slack",
+	AnalyzerTypeSourcegraph: "Sourcegraph",
+	AnalyzerTypeSquare:      "Square",
+	AnalyzerTypeStripe:      "Stripe",
+	AnalyzerTypeTwilio:      "Twilio",
+	// Add new mappings here
+}
+
+// String method to get the string representation of an AnalyzerType.
+func (a AnalyzerType) String() string {
+	if str, ok := analyzerTypeStrings[a]; ok {
+		return str
+	}
+	return "Unknown"
+}
+
+// GetSortedAnalyzerTypes returns a sorted slice of AnalyzerType strings, skipping "Invalid".
+func AvailableAnalyzers() []string {
+	var analyzerStrings []string
+
+	// Iterate through the map to collect all string values except "Invalid".
+	for typ, str := range analyzerTypeStrings {
+		if typ != AnalyzerTypeInvalid {
+			analyzerStrings = append(analyzerStrings, str)
+		}
+	}
+
+	// Sort the slice alphabetically.
+	sort.Strings(analyzerStrings)
+
+	return analyzerStrings
 }
 
 type PermissionStatus struct {

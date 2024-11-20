@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,12 +13,14 @@ import (
 	"strings"
 	"time"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -134,4 +135,8 @@ func getCexIOPassphrase(apiSecret string, apiKey string, nonce string, userId st
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CexIO
+}
+
+func (s Scanner) Description() string {
+	return "CexIO is a cryptocurrency exchange platform. CexIO API keys can be used to access and manage cryptocurrency accounts and transactions."
 }

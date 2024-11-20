@@ -73,3 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ScrapingAnt
 }
+
+func (s Scanner) Description() string {
+	return "ScrapingAnt is a web scraping service that provides API keys to authenticate and make requests to their scraping endpoints."
+}

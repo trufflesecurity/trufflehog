@@ -2,9 +2,10 @@ package cliengo
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -68,4 +69,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Cliengo
+}
+
+func (s Scanner) Description() string {
+	return "Cliengo is a chatbot service that helps businesses convert website visitors into leads. Cliengo API keys can be used to access and manage the chatbot configurations and data."
 }

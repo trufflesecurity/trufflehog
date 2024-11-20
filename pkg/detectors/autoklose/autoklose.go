@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -50,24 +51,37 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.autoklose.com/api/campaigns/?api_token=%s", resMatch), nil)
+			// API Documentation: https://api.aklab.xyz/#auth-info-fd71acd1-2e41-4991-8789-3edfd258479a
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.autoklose.com/api/me/?api_token=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
+			req.Header.Add("Accept", "application/json")
 			res, err := client.Do(req)
 			if err == nil {
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					if json.Valid(bodyBytes) {
-						s1.Verified = true
-					} else {
-						s1.Verified = false
+				defer func() {
+					_, _ = io.Copy(io.Discard, res.Body)
+					_ = res.Body.Close()
+				}()
+
+				if res.StatusCode == http.StatusOK {
+					s1.Verified = true
+					bodyBytes, err := io.ReadAll(res.Body)
+					if err != nil {
+						continue
+					}
+
+					var responseBody map[string]interface{}
+					if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
+						if email, ok := responseBody["email"].(string); ok {
+							s1.ExtraData = map[string]string{
+								"email": email,
+							}
+						}
 					}
 				}
+			} else {
+				s1.SetVerificationError(err, resMatch)
 			}
 		}
 
@@ -79,4 +93,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Autoklose
+}
+
+func (s Scanner) Description() string {
+	return "Autoklose is a sales automation tool that allows users to streamline their email outreach and follow-up processes. Autoklose API tokens can be used to access and manage campaigns, contacts, and other related data."
 }

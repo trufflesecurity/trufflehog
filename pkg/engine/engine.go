@@ -21,6 +21,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -267,7 +268,6 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if len(detectorsWithCustomVerifierEndpoints) > 0 {
 		filters = append(filters, func(d detectors.Detector) bool {
 			urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
@@ -279,12 +279,15 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 				return false
 			}
 
-			if !cfg.CustomVerifiersOnly || len(urls) == 0 {
-				urls = append(urls, customizer.DefaultEndpoint())
+			if cfg.CustomVerifiersOnly && len(urls) > 0 {
+				customizer.UseCloudEndpoint(false)
+				customizer.UseFoundEndpoints(false)
 			}
-			if err := customizer.SetEndpoints(urls...); err != nil {
+
+			if err := customizer.SetConfiguredEndpoints(urls...); err != nil {
 				return false
 			}
+
 			return true
 		})
 	}
@@ -343,7 +346,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 
 	// Only use the default detectors if none are provided.
 	if len(e.detectors) == 0 {
-		e.detectors = DefaultDetectors()
+		e.detectors = defaults.DefaultDetectors()
 	}
 
 	if e.dispatcher == nil {
@@ -396,7 +399,7 @@ func parseCustomVerifierEndpoints(endpoints map[string]string) (map[config.Detec
 		return nil, fmt.Errorf("invalid verifier detector configuration id %v: %w", id, err)
 	}
 	// Extra check for endpoint customization.
-	isEndpointCustomizer := DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
+	isEndpointCustomizer := defaults.DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
 	for id := range customVerifierEndpoints {
 		if _, ok := isEndpointCustomizer[id.ID]; !ok {
 			return nil, fmt.Errorf("endpoint provided but detector does not support endpoint customization: %w", err)
@@ -433,7 +436,7 @@ func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T
 // verifyDetectorsAreVersioner checks all keys in a provided map to verify the
 // provided type is actually a Versioner.
 func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (config.DetectorID, error) {
-	isVersioner := DefaultDetectorTypesImplementing[detectors.Versioner]()
+	isVersioner := defaults.DefaultDetectorTypesImplementing[detectors.Versioner]()
 	for id := range data {
 		if id.Version == 0 {
 			// Version not provided.
@@ -562,7 +565,7 @@ func (e *Engine) GetDetectorsMetrics() map[string]time.Duration {
 	e.metrics.mu.RLock()
 	defer e.metrics.mu.RUnlock()
 
-	result := make(map[string]time.Duration, len(DefaultDetectors()))
+	result := make(map[string]time.Duration, len(defaults.DefaultDetectors()))
 	for detectorName, durations := range e.DetectorAvgTime() {
 		var total time.Duration
 		for _, d := range durations {
@@ -771,7 +774,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
 
 			if decoded == nil {
-				ctx.Logger().V(4).Info("decoder not applicable for chunk", "decoder", decoder.Type().String(), "chunk", chunk)
+				ctx.Logger().V(5).Info("decoder not applicable for chunk", "decoder", decoder.Type().String(), "chunk", chunk)
 				continue
 			}
 
@@ -1033,7 +1036,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 
 	ctx = context.WithValue(ctx, "detector", data.detector.Key.Loggable())
 
-	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
+	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
 	var matchCount int
 	// To reduce the overhead of regex calls in the detector,
@@ -1154,6 +1157,7 @@ func (e *Engine) processResult(
 
 	secret := detectors.CopyMetadata(&data.chunk, res)
 	secret.DecoderType = data.decoder
+	secret.DetectorDescription = data.detector.Detector.Description()
 
 	if !res.Verified && res.Raw != nil {
 		isFp, _ := isFalsePositive(res)
@@ -1283,8 +1287,14 @@ func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
 		fragmentStart = &metadata.AzureRepos.Line
 		link = metadata.AzureRepos.Link
 	default:
-		return 0, nil, ""
+		return 1, nil, ""
 	}
+
+	// Ensure we maintain 1-based line indexing if fragmentStart is not set or is 0.
+	if *fragmentStart == 0 {
+		*fragmentStart = 1
+	}
+
 	return *fragmentStart, fragmentStart, link
 }
 

@@ -76,3 +76,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SatismeterWritekey
 }
+
+func (s Scanner) Description() string {
+	return "Satismeter is a customer feedback platform. Satismeter Writekeys can be used to send event data to Satismeter's API."
+}

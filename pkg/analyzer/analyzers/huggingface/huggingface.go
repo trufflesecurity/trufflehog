@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go huggingface
+
 package huggingface
 
 import (
@@ -11,7 +13,6 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -27,7 +28,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_HuggingFace }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeHuggingFace }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
@@ -46,8 +47,9 @@ func bakeUnboundedResources(tokenJSON HFTokenJSON) []analyzers.Resource {
 	unboundedResources := make([]analyzers.Resource, len(tokenJSON.Orgs))
 	for idx, org := range tokenJSON.Orgs {
 		unboundedResources[idx] = analyzers.Resource{
-			Name: org.Name,
-			Type: "organization",
+			Name:               org.Name,
+			FullyQualifiedName: "huggingface.com/user/" + tokenJSON.Username + "/organization/" + org.Name,
+			Type:               "organization",
 			Metadata: map[string]interface{}{
 				"role":          org.Role,
 				"is_enterprise": org.IsEnterprise,
@@ -63,8 +65,9 @@ func bakeUnfineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analy
 	for idx, model := range allModels {
 		// Add Read Privs to All Models
 		modelResource := analyzers.Resource{
-			Name: model.Name,
-			Type: "model",
+			Name:               model.Name,
+			FullyQualifiedName: "huggingface.com/model/" + model.ID,
+			Type:               "model",
 			Metadata: map[string]interface{}{
 				"private": model.Private,
 			},
@@ -112,8 +115,9 @@ func bakefineGrainedBindings(allModels []Model, tokenJSON HFTokenJSON) []analyze
 
 		// Add Read Privs to All Models
 		modelResource := analyzers.Resource{
-			Name: model.Name,
-			Type: "model",
+			Name:               model.Name,
+			FullyQualifiedName: "huggingface.com/model/" + model.ID,
+			Type:               "model",
 			Metadata: map[string]interface{}{
 				"private": model.Private,
 			},
@@ -148,8 +152,9 @@ func bakeOrganizationBindings(tokenJSON HFTokenJSON) []analyzers.Binding {
 	for _, permission := range tokenJSON.Auth.AccessToken.FineGrained.Scoped {
 		if permission.Entity.Type == "org" {
 			orgResource = &analyzers.Resource{
-				Name: permission.Entity.Name,
-				Type: "organization",
+				Name:               permission.Entity.Name,
+				FullyQualifiedName: "hugggingface.com/organization/" + permission.Entity.ID,
+				Type:               "organization",
 			}
 			for _, perm := range permission.Permissions {
 				orgPermissions[perm] = struct{}{}
@@ -207,8 +212,9 @@ func bakeUserBindings(tokenJSON HFTokenJSON) []analyzers.Binding {
 	}
 
 	userResource := analyzers.Resource{
-		Name: tokenJSON.Username,
-		Type: "user",
+		Name:               tokenJSON.Name,
+		FullyQualifiedName: "huggingface.com/user/" + tokenJSON.Username,
+		Type:               "user",
 	}
 	for _, permission := range user_scopes_order {
 		for key, value := range user_scopes[permission] {
@@ -232,7 +238,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_HuggingFace,
+		AnalyzerType: analyzers.AnalyzerTypeHuggingFace,
 		Metadata: map[string]interface{}{
 			"username":   info.Token.Username,
 			"name":       info.Token.Name,
@@ -246,15 +252,13 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	result.Bindings = make([]analyzers.Binding, 0)
-	if info.Token.Auth.AccessToken.Type != FINEGRAINED {
-		result.Bindings = append(result.Bindings, bakeUnfineGrainedBindings(info.Models, info.Token)...)
-	}
-
-	result.Bindings = append(result.Bindings, bakefineGrainedBindings(info.Models, info.Token)...)
 
 	if info.Token.Auth.AccessToken.Type == FINEGRAINED {
+		result.Bindings = append(result.Bindings, bakefineGrainedBindings(info.Models, info.Token)...)
 		result.Bindings = append(result.Bindings, bakeOrganizationBindings(info.Token)...)
 		result.Bindings = append(result.Bindings, bakeUserBindings(info.Token)...)
+	} else {
+		result.Bindings = append(result.Bindings, bakeUnfineGrainedBindings(info.Models, info.Token)...)
 	}
 
 	return &result

@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Atera
 }
+
+func (s Scanner) Description() string {
+	return "Atera is an IT management platform that provides remote monitoring and management for IT professionals. Atera API keys can be used to interact with the Atera API to manage alerts, tickets, devices, and more."
+}

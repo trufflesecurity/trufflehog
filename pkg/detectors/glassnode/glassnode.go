@@ -2,9 +2,10 @@ package glassnode
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -69,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Glassnode
+}
+
+func (s Scanner) Description() string {
+	return "Glassnode is an on-chain market intelligence platform providing data and insights on blockchain and cryptocurrency markets. Glassnode API keys can be used to access various blockchain metrics and data points."
 }

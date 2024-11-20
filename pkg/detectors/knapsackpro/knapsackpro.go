@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_KnapsackPro
 }
+
+func (s Scanner) Description() string {
+	return "KnapsackPro is a tool for optimal test suite parallelization. Its tokens can be used to access and manage test suite runs and configurations."
+}

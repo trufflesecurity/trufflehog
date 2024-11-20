@@ -3,9 +3,10 @@ package anypoint
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -51,6 +52,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			orgRes := strings.TrimSpace(orgMatch[1])
 
+			// regex for both key and org are same, so to avoid same string processing
+			if resMatch == orgRes {
+				continue
+			}
+
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Anypoint,
 				Raw:          []byte(resMatch),
@@ -82,4 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Anypoint
+}
+
+func (s Scanner) Description() string {
+	return "Anypoint is a unified platform that allows organizations to build and manage APIs and integrations. Anypoint credentials can be used to access and manipulate these integrations and API data."
 }

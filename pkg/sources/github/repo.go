@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v66/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -217,7 +217,7 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 			s.totalRepoSize += r.GetSize()
 			s.filteredRepoCache.Set(repoName, repoURL)
 			s.cacheRepoInfo(r)
-			if err := reporter.UnitOk(ctx, RepoUnit{name: repoName, url: repoURL}); err != nil {
+			if err := reporter.UnitOk(ctx, RepoUnit{Name: repoName, URL: repoURL}); err != nil {
 				return err
 			}
 			logger.V(3).Info("repo attributes", "name", repoName, "kb_size", r.GetSize(), "repo_url", repoURL)

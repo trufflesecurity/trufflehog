@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Vbout
 }
+
+func (s Scanner) Description() string {
+	return "Vbout is a marketing automation platform. Vbout API keys can be used to access and manage marketing data and campaigns."
+}

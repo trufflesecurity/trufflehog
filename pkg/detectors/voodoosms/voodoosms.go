@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_VoodooSMS
 }
+
+func (s Scanner) Description() string {
+	return "VoodooSMS is a service for sending SMS messages. VoodooSMS API keys can be used to send SMS messages and check account balance."
+}

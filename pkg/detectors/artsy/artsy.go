@@ -83,3 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Artsy
 }
+
+func (s Scanner) Description() string {
+	return "Artsy is an online platform for discovering, buying, and selling art. Artsy API keys can be used to access Artsy's services and data."
+}

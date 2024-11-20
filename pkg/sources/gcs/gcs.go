@@ -12,13 +12,14 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -149,6 +150,7 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 	switch conn.Credential.(type) {
 	case *sourcespb.GCS_ApiKey:
 		gcsManagerAuthOption = withAPIKey(aCtx, conn.GetApiKey())
+		log.RedactGlobally(conn.GetApiKey())
 	case *sourcespb.GCS_ServiceAccountFile:
 		b, err := os.ReadFile(conn.GetServiceAccountFile())
 		if err != nil {
@@ -263,7 +265,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	var wg sync.WaitGroup
 	for obj := range objectCh {
-		obj := obj
 		o, ok := obj.(object)
 		if !ok {
 			ctx.Logger().Error(fmt.Errorf("unexpected object type: %T", obj), "GCS source unexpected object type", "name", s.name)
@@ -296,15 +297,15 @@ func (s *Source) setupCache(ctx context.Context) *persistableCache {
 	var c cache.Cache[string]
 	if s.Progress.EncodedResumeInfo != "" {
 		keys := strings.Split(s.Progress.EncodedResumeInfo, ",")
-		entries := make([]memory.CacheEntry[string], len(keys))
+		entries := make([]simple.CacheEntry[string], len(keys))
 		for i, val := range keys {
-			entries[i] = memory.CacheEntry[string]{Key: val, Value: val}
+			entries[i] = simple.CacheEntry[string]{Key: val, Value: val}
 		}
 
-		c = memory.NewWithData[string](entries)
+		c = simple.NewCacheWithData[string](entries)
 		ctx.Logger().V(3).Info("Loaded cache", "num_entries", len(entries))
 	} else {
-		c = memory.New[string]()
+		c = simple.NewCache[string]()
 	}
 
 	// TODO (ahrav): Make this configurable via conn.

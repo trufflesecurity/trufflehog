@@ -3,9 +3,10 @@ package companyhub
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -84,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CompanyHub
+}
+
+func (s Scanner) Description() string {
+	return "CompanyHub is a CRM tool used to manage customer relationships. CompanyHub keys can be used to access and manipulate CRM data."
 }

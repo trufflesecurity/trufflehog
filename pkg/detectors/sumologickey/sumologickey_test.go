@@ -1,120 +1,93 @@
-//go:build detectors
-// +build detectors
-
 package sumologickey
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
-	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/google/go-cmp/cmp"
 )
 
-func TestSumoLogicKey_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	id := testSecrets.MustGetField("SUMOLOGIC_ACCESSID")
-	secret := testSecrets.MustGetField("SUMOLOGIC_ACCESSKEY")
-	inactiveId := testSecrets.MustGetField("SUMOLOGIC_ACCESSKEY_INACTIVE")
-
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestSumoLogicKey_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sumologickey secret %s within %s", id, secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SumoLogicKey,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
+			name: "typical pattern",
+			input: `sumologic:
+  accessId: suDkVYKjXZAwsz
+  accessKey: Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK70a0LckgRSCL
+  clusterName: Kubernetes_cluster-2024-10-25T21:34:23.096Z`,
+			want: []string{`{"accessId":"suDkVYKjXZAwsz","accessKey":"Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK70a0LckgRSCL"}`},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sumologickey secret %s within %s but not valid", inactiveId, secret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SumoLogicKey,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
+			name: "pattern with url",
+			input: `sumologic:
+  baseUrl: api.us2.sumologic.com
+  accessId: suDkVYKjXZAwsz
+  accessKey: Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK70a0LckgRSCL
+  clusterName: Kubernetes_cluster-2024-10-25T21:34:23.096Z`,
+			want: []string{`{"accessId":"suDkVYKjXZAwsz","accessKey":"Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK70a0LckgRSCL","url":"api.us2.sumologic.com"}`},
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name: "finds all matches",
+			input: `sumoId1 = 'suaRYt6iLL8cxl'
+sumoKey1 = 'CzrMhR8zzy1eH1F0XlY1tu5ywqa2yaSFoWGg2cqE43XkfnUVCytnPQfv1enUYrzv'
+sumoId2 = 'suDkVYKjXZBwsz'
+sumoKey2 = 'Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK21a0LckgRSCL'`,
+			want: []string{"CzrMhR8zzy1eH1F0XlY1tu5ywqa2yaSFoWGg2cqE43XkfnUVCytnPQfv1enUYrzv", "Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK21a0LckgRSCL"},
+		},
+		{
+			name:  "invalid pattern",
+			input: "sumoId = 'doDkVYKjXZAwsz'",
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("SumoLogicKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("SumoLogicKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

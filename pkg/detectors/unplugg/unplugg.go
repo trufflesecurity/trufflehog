@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Unplugg
 }
+
+func (s Scanner) Description() string {
+	return "Unplugg is a service for forecasting and data analysis. Unplugg API keys can be used to access and manipulate forecast data."
+}

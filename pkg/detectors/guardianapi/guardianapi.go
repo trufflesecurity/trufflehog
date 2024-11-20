@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Guardianapi
 }
+
+func (s Scanner) Description() string {
+	return "Guardian API keys are used to access content and data from The Guardian's API. These keys can be used to retrieve articles, search content, and interact with The Guardian's content platform."
+}

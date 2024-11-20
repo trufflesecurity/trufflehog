@@ -91,7 +91,7 @@ func TestArchiveHandler(t *testing.T) {
 			}
 			defer newReader.Close()
 
-			archiveChan, err := handler.HandleFile(logContext.Background(), newReader)
+			dataOrErrChan := handler.HandleFile(logContext.Background(), newReader)
 			if testCase.expectErr {
 				assert.NoError(t, err)
 				return
@@ -100,9 +100,9 @@ func TestArchiveHandler(t *testing.T) {
 			count := 0
 			re := regexp.MustCompile(testCase.matchString)
 			matched := false
-			for chunk := range archiveChan {
+			for chunk := range dataOrErrChan {
 				count++
-				if re.Match(chunk) {
+				if re.Match(chunk.Data) {
 					matched = true
 				}
 			}
@@ -123,8 +123,8 @@ func TestOpenInvalidArchive(t *testing.T) {
 	assert.NoError(t, err)
 	defer rdr.Close()
 
-	archiveChan := make(chan []byte)
+	dataOrErrChan := make(chan DataOrErr)
 
-	err = handler.openArchive(ctx, 0, rdr, archiveChan)
+	err = handler.openArchive(ctx, 0, rdr, dataOrErrChan)
 	assert.Error(t, err)
 }

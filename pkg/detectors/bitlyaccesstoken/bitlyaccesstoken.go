@@ -3,9 +3,10 @@ package bitlyaccesstoken
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -70,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BitLyAccessToken
+}
+
+func (s Scanner) Description() string {
+	return "Bitly is a URL shortening service. Bitly access tokens can be used to interact with the Bitly API, allowing users to create, manage, and track shortened URLs."
 }

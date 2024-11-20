@@ -32,7 +32,6 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify SplunkAccessToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-	// log.Println(dataStr)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
@@ -71,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SplunkOberservabilityToken
+}
+
+func (s Scanner) Description() string {
+	return "Splunk Observability Tokens are used to access and interact with Splunk's observability suite, allowing for monitoring and analyzing application performance and infrastructure."
 }

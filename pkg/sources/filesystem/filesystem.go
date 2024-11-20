@@ -153,7 +153,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 var skipSymlinkErr = errors.New("skipping symlink")
 
 func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
-	logger := ctx.Logger().WithValues("path", path)
+	fileCtx := context.WithValues(ctx, "path", path)
 	fileStat, err := os.Lstat(path)
 	if err != nil {
 		return fmt.Errorf("unable to stat file: %w", err)
@@ -168,7 +168,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	}
 	defer inputFile.Close()
 
-	logger.V(3).Info("scanning file")
+	fileCtx.Logger().V(3).Info("scanning file")
 
 	chunkSkel := &sources.Chunk{
 		SourceType: s.Type(),
@@ -185,7 +185,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		Verify: s.verify,
 	}
 
-	return handlers.HandleFile(ctx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan})
+	return handlers.HandleFile(fileCtx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 }
 
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply

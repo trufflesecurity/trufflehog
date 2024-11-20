@@ -123,3 +123,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PyPI
 }
+
+func (s Scanner) Description() string {
+	return "PyPI is a repository of software for the Python programming language. The credential allows for managing Pypi packages."
+}

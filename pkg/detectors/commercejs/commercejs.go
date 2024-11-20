@@ -2,9 +2,10 @@ package commercejs
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -69,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CommerceJS
+}
+
+func (s Scanner) Description() string {
+	return "CommerceJS is a headless commerce platform that provides APIs for building custom e-commerce experiences. CommerceJS API keys can be used to access and manage e-commerce functionalities."
 }

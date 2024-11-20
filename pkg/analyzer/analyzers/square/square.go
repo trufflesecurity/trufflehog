@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go square
+
 package square
 
 import (
@@ -12,7 +14,6 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -22,7 +23,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Square }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSquare }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
@@ -41,7 +42,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType:       analyzerpb.AnalyzerType_Square,
+		AnalyzerType:       analyzers.AnalyzerTypeSquare,
 		UnboundedResources: []analyzers.Resource{},
 		Metadata: map[string]any{
 			"expires_at":  info.Permissions.ExpiresAt,
@@ -102,6 +103,9 @@ func getBindingsAndUnboundedResources(scopes []string) ([]analyzers.Binding, []a
 					Parent:             &parentResource,
 				}
 				for _, permission := range requiredPermissions {
+					if _, ok := StringToPermission[permission]; !ok { // skip unknown permissions
+						continue
+					}
 					if contains(scopes, permission) {
 						categoryBinding = append(categoryBinding, analyzers.Binding{
 							Resource: resource,

@@ -237,6 +237,8 @@ type GithubConfig struct {
 	SkipBinaries bool
 	// IncludeWikis indicates whether to include repository wikis in the scan.
 	IncludeWikis bool
+	// CommentsTimeframeDays indicates how many days of comments to include in the scan.
+	CommentsTimeframeDays uint32
 	// SinceDate indicates the last X days commits to scan
 	SinceDate string
 }
@@ -267,6 +269,10 @@ type GitlabConfig struct {
 	Filter *common.Filter
 	// SkipBinaries allows skipping binary files from the scan.
 	SkipBinaries bool
+	// IncludeRepos is a list of repositories to include in the scan.
+	IncludeRepos []string
+	// ExcludeRepos is a list of repositories to exclude from the scan.
+	ExcludeRepos []string
 }
 
 // FilesystemConfig defines the optional configuration for a filesystem source.

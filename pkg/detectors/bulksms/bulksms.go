@@ -2,18 +2,17 @@ package bulksms
 
 import (
 	"context"
-	b64 "encoding/base64"
-	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
-	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -24,12 +23,11 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([a-fA-Z0-9*]{29})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([a-zA-Z0-9!@#$%^&*()]{29})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"bulksms"}) + `\b([A-F0-9-]{37})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
-// Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"bulksms"}
 }
@@ -38,46 +36,51 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueIds = make(map[string]struct{})
+	var uniqueKeys = make(map[string]struct{})
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
-		for _, idmatch := range idMatches {
-			if len(match) != 2 {
-				continue
-			}
-			resIdMatch := strings.TrimSpace(idmatch[1])
+	for _, match := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueIds[match[1]] = struct{}{}
+	}
 
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[match[1]] = struct{}{}
+	}
+
+	for id := range uniqueIds {
+		for key := range uniqueKeys {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Bulksms,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				Raw:          []byte(key),
+				RawV2:        []byte(key + id),
 			}
 
 			if verify {
-				data := fmt.Sprintf("%s:%s", resIdMatch, resMatch)
-				sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.bulksms.com/v1/messages", nil)
 				if err != nil {
 					continue
 				}
-				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
+				req.SetBasicAuth(id, key)
 				res, err := client.Do(req)
 				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
+					defer func() {
+						_, _ = io.Copy(io.Discard, res.Body)
+						_ = res.Body.Close()
+					}()
+
+					if res.StatusCode == http.StatusOK {
 						s1.Verified = true
+						results = append(results, s1)
+						// move to next id, by skipping remaining key's
+						break
 					}
+				} else {
+					s1.SetVerificationError(err, key)
 				}
 			}
 
 			results = append(results, s1)
 		}
-
 	}
 
 	return results, nil
@@ -85,4 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Bulksms
+}
+
+func (s Scanner) Description() string {
+	return "BulkSMS is a service used for sending SMS messages in bulk. BulkSMS credentials can be used to access and send messages through the BulkSMS API."
 }

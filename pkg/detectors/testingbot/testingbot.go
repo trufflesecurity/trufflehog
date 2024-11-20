@@ -80,3 +80,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TestingBot
 }
+
+func (s Scanner) Description() string {
+	return "TestingBot provides cross-browser testing services. TestingBot credentials can be used to automate tests on various browsers and devices."
+}

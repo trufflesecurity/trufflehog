@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"airship"}) + `\b([0-9Aa-zA-Z]{91})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"airship"}) + `\b([0-9a-zA-Z]{91})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -71,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Airship
+}
+
+func (s Scanner) Description() string {
+	return "Airship is a customer engagement platform that provides tools for mobile app messaging, in-app messaging, and web notifications. Airship API keys can be used to access and manage these messaging services."
 }

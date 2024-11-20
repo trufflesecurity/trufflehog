@@ -2,9 +2,10 @@ package debounce
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -69,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Debounce
+}
+
+func (s Scanner) Description() string {
+	return "Debounce is an email validation service that helps in reducing bounce rates by verifying email addresses. Debounce API keys can be used to access and validate email addresses."
 }

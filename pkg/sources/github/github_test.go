@@ -11,18 +11,19 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v66/github"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -96,8 +97,9 @@ func TestAddReposByOrg(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		Repositories: nil,
-		IgnoreRepos:  []string{"secret/super-*-repo2"},
+		Repositories:          nil,
+		IgnoreRepos:           []string{"secret/super-*-repo2"},
+		CommentsTimeframeDays: 10,
 	})
 	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
 	assert.Nil(t, err)
@@ -416,9 +418,9 @@ func TestEnumerateUnauthenticated(t *testing.T) {
 		Endpoint:   apiEndpoint,
 		Credential: &sourcespb.GitHub_Unauthenticated{},
 	})
-	s.orgsCache = memory.New[string]()
+	s.orgsCache = simple.NewCache[string]()
 	s.orgsCache.Set("super-secret-org", "super-secret-org")
-	//s.enumerateUnauthenticated(context.Background(), apiEndpoint)
+	// s.enumerateUnauthenticated(context.Background(), apiEndpoint)
 	s.enumerateUnauthenticated(context.Background(), noopReporter())
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
@@ -566,8 +568,18 @@ func TestEnumerate(t *testing.T) {
 	s.cacheRepoInfo(repo)
 	s.filteredRepoCache.Set(repo.GetFullName(), repo.GetCloneURL())
 
+	var reportedRepos []string
+	reporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
+			url, _ := su.SourceUnitID()
+			reportedRepos = append(reportedRepos, url)
+			return nil
+		},
+	}
+
 	// Act
-	err := s.enumerate(context.Background())
+	err := s.Enumerate(context.Background(), reporter)
+	slices.Sort(reportedRepos)
 
 	// Assert
 	assert.Nil(t, err)
@@ -576,6 +588,8 @@ func TestEnumerate(t *testing.T) {
 	assert.True(t, s.filteredRepoCache.Exists("super-secret-user/super-secret-repo"))
 	assert.True(t, s.filteredRepoCache.Exists("cached-user/cached-repo"))
 	assert.True(t, s.filteredRepoCache.Exists("2801a2b0523099d0614a951579d99ba9"))
+	assert.Equal(t, 3, len(s.repos))
+	assert.Equal(t, s.repos, reportedRepos)
 	// Enumeration cached all repos.
 	assert.Equal(t, 3, len(s.repoInfoCache.cache))
 	_, ok := s.repoInfoCache.get("https://github.com/super-secret-user/super-secret-repo.git")
@@ -640,7 +654,7 @@ func BenchmarkEnumerate(b *testing.B) {
 		setupMocks(b)
 
 		b.StartTimer()
-		_ = s.enumerate(context.Background())
+		_ = s.Enumerate(context.Background(), noopReporter())
 	}
 }
 

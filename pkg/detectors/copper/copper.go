@@ -2,9 +2,10 @@ package copper
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -90,4 +91,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Copper
+}
+
+func (s Scanner) Description() string {
+	return "Copper is a CRM platform that helps businesses manage their relationships with customers and leads. Copper API keys can be used to access and modify customer data and interactions."
 }

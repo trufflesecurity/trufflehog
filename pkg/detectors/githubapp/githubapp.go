@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/golang-jwt/jwt"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -110,4 +109,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GitHubApp
+}
+
+func (s Scanner) Description() string {
+	return "GitHub Apps allow you to automate and improve your workflow. GitHub App keys can be used to authenticate and interact with the GitHub API on behalf of the app."
 }

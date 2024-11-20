@@ -6,13 +6,14 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -118,4 +119,8 @@ func getKrakenSignature(url_path string, values url.Values, secret []byte) strin
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Kraken
+}
+
+func (s Scanner) Description() string {
+	return "Kraken is a cryptocurrency exchange that allows trading of various digital assets. Kraken API keys can be used to access and manage account information and perform trading operations."
 }

@@ -70,3 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Apacta
 }
+
+func (s Scanner) Description() string {
+	return "Apacta is a project management tool designed for the construction industry. Apacta API keys can be used to access and manage project data within the Apacta platform."
+}

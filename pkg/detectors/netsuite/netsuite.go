@@ -117,6 +117,10 @@ func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Netsuite
 }
 
+func (s Scanner) Description() string {
+	return "Netsuite is a cloud business management suite. These credentials can be used to access and modify data within Netsuite."
+}
+
 func verifyCredentials(ctx context.Context, client *http.Client, cs credentialSet) (bool, error) {
 	// for url, filter or replace underscore in accountID if needed and lower case the accountID
 	urlAccountId := strings.ToLower(strings.Replace(cs.accountID, "_", "-", -1))

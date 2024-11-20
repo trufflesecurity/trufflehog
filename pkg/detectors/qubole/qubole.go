@@ -72,3 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Qubole
 }
+
+func (s Scanner) Description() string {
+	return "Qubole is a cloud-based data platform that provides data processing, management, and analytics services. Qubole API keys can be used to access and manage data workflows and resources."
+}

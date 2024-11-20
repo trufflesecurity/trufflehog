@@ -122,3 +122,7 @@ type scopesResponse struct {
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SendGrid
 }
+
+func (s Scanner) Description() string {
+	return "SendGrid is a cloud-based service that provides email delivery and marketing campaigns. SendGrid API keys can be used to send emails and manage other email-related tasks."
+}

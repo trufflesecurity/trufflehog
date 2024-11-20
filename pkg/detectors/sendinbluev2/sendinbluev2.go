@@ -69,3 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SendinBlueV2
 }
+
+func (s Scanner) Description() string {
+	return "SendinBlue is a cloud-based marketing communication software. SendinBlue API keys can be used to access and modify marketing campaigns and contact data."
+}

@@ -2,9 +2,10 @@ package exportsdk
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -81,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ExportSDK
+}
+
+func (s Scanner) Description() string {
+	return "ExportSDK is a service used for exporting data and generating PDFs. ExportSDK keys can be used to authenticate API requests and generate documents."
 }

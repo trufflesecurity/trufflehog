@@ -3,9 +3,10 @@ package coinbase
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -70,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Coinbase
+}
+
+func (s Scanner) Description() string {
+	return "Coinbase is a digital currency exchange that allows users to buy, sell, and store various cryptocurrencies. A Coinbase API key can be used to access and manage a user's account and transactions."
 }

@@ -95,3 +95,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Caspio
 }
+
+func (s Scanner) Description() string {
+	return "Caspio is a cloud platform for building custom database applications. Caspio credentials can be used to access and manage these applications."
+}

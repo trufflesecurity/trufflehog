@@ -22,7 +22,7 @@ check:
 	go vet $(shell go list ./... | grep -v /vendor/)
 
 lint:
-	golangci-lint run --enable bodyclose --enable exportloopref --out-format=colored-line-number --timeout 10m
+	golangci-lint run --enable bodyclose --enable copyloopvar --enable misspell --out-format=colored-line-number --timeout 10m
 
 test-failing:
 	CGO_ENABLED=0 go test -timeout=5m $(shell go list ./... | grep -v /vendor/) | grep FAIL
@@ -60,9 +60,6 @@ protos-windows:
 release-protos-image:
 	docker buildx build --push --platform=linux/amd64,linux/arm64 \
 	-t ${PROTOS_IMAGE} -f hack/Dockerfile.protos .
-
-snifftest:
-	./hack/snifftest/snifftest.sh
 
 test-release:
 	goreleaser release --clean --skip-publish --snapshot

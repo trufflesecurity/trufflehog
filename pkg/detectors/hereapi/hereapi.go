@@ -3,9 +3,10 @@ package hereapi
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -66,4 +67,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_HereAPI
+}
+
+func (s Scanner) Description() string {
+	return "HereAPI provides access to a wide range of location-based services including maps, geocoding, and traffic information. HereAPI keys can be used to authenticate and access these services."
 }

@@ -82,3 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_InvoiceOcean
 }
+
+func (s Scanner) Description() string {
+	return "InvoiceOcean is an online invoicing service. InvoiceOcean API tokens can be used to access and manage invoices and other financial data."
+}

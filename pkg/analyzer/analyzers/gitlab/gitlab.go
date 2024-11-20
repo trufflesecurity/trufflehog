@@ -1,8 +1,11 @@
+//go:generate generate_permissions permissions.yaml permissions.go gitlab
+
 package gitlab
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,7 +16,6 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -23,30 +25,96 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_GitLab }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeGitLab }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("not implemented")
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeGitLab,
+		Metadata: map[string]any{
+			"version":    info.Metadata.Version,
+			"enterprise": info.Metadata.Enterprise,
+		},
+		Bindings: []analyzers.Binding{},
+	}
+
+	// Add user and it's permissions to bindings
+	userFullyQualifiedName := fmt.Sprintf("gitlab.com/user/%d", info.AccessToken.UserID)
+	userResource := analyzers.Resource{
+		Name:               userFullyQualifiedName,
+		FullyQualifiedName: userFullyQualifiedName,
+		Type:               "user",
+		Metadata: map[string]any{
+			"token_name":       info.AccessToken.Name,
+			"token_id":         info.AccessToken.ID,
+			"token_created_at": info.AccessToken.CreatedAt,
+			"token_revoked":    info.AccessToken.Revoked,
+			"token_expires_at": info.AccessToken.ExpiresAt,
+		},
+	}
+
+	for _, scope := range info.AccessToken.Scopes {
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource: userResource,
+			Permission: analyzers.Permission{
+				Value: scope,
+			},
+		})
+	}
+
+	// append project and it's permissions to bindings
+	for _, project := range info.Projects {
+		projectResource := analyzers.Resource{
+			Name:               project.NameWithNamespace,
+			FullyQualifiedName: fmt.Sprintf("gitlab.com/project/%d", project.ID),
+			Type:               "project",
+		}
+
+		accessLevel, ok := access_level_map[project.Permissions.ProjectAccess.AccessLevel]
+		if !ok {
+			continue
+		}
+
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource: projectResource,
+			Permission: analyzers.Permission{
+				Value: accessLevel,
+			},
+		})
+	}
+
+	return &result
 }
 
 // consider calling /api/v4/metadata to learn about gitlab instance version and whether neterrprises is enabled
 
-// we'll call /api/v4/personal_access_tokens and /api/v4/user and then filter down to scopes.
+// we'll call /api/v4/personal_access_tokens and then filter down to scopes.
 
 type AccessTokenJSON struct {
+	ID         int      `json:"id"`
 	Name       string   `json:"name"`
 	Revoked    bool     `json:"revoked"`
 	CreatedAt  string   `json:"created_at"`
 	Scopes     []string `json:"scopes"`
 	LastUsedAt string   `json:"last_used_at"`
 	ExpiresAt  string   `json:"expires_at"`
+	UserID     int      `json:"user_id"`
 }
 
 type ProjectsJSON struct {
+	ID                int    `json:"id"`
 	NameWithNamespace string `json:"name_with_namespace"`
 	Permissions       struct {
 		ProjectAccess struct {
@@ -249,6 +317,7 @@ func printTokenInfo(token AccessTokenJSON) {
 	color.Green("Token Name: %s\n", token.Name)
 	color.Green("Created At: %s\n", token.CreatedAt)
 	color.Green("Last Used At: %s\n", token.LastUsedAt)
+	color.Green("User ID: %d\n", token.UserID)
 	color.Green("Expires At: %s  (%v remaining)\n\n", token.ExpiresAt, getRemainingTime(token.ExpiresAt))
 	if token.Revoked {
 		color.Red("Token Revoked: %v\n", token.Revoked)

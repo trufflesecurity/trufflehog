@@ -24,6 +24,8 @@ type Detector interface {
 	Keywords() []string
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
+	// Description returns a description for the result being detected
+	Description() string
 }
 
 // CustomResultsCleaner is an optional interface that a detector can implement to customize how its generated results
@@ -72,8 +74,14 @@ type MultiPartCredentialProvider interface {
 // EndpointCustomizer is an optional interface that a detector can implement to
 // support verifying against user-supplied endpoints.
 type EndpointCustomizer interface {
-	SetEndpoints(...string) error
-	DefaultEndpoint() string
+	SetConfiguredEndpoints(...string) error
+	SetCloudEndpoint(string)
+	UseCloudEndpoint(bool)
+	UseFoundEndpoints(bool)
+}
+
+type CloudProvider interface {
+	CloudEndpoint() string
 }
 
 type Result struct {
@@ -81,9 +89,7 @@ type Result struct {
 	DetectorType detectorspb.DetectorType
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
-	// DecoderType is the type of Decoder.
-	DecoderType detectorspb.DecoderType
-	Verified    bool
+	Verified     bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -160,6 +166,10 @@ type ResultWithMetadata struct {
 	Result
 	// Data from the sources.Chunk which this result was emitted for
 	Data []byte
+	// DetectorDescription is the description of the Detector.
+	DetectorDescription string
+	// DecoderType is the type of decoder that was used to generate this result's data.
+	DecoderType detectorspb.DecoderType
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.

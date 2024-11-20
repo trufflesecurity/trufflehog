@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
-
 	"golang.org/x/oauth2/google"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -102,14 +101,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		credBytes, _ := json.Marshal(creds)
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GCP,
 			Raw:          raw,
 			RawV2:        credBytes,
 			Redacted:     creds.ClientEmail,
 		}
 		// Set the RotationGuideURL in the ExtraData
-		s.ExtraData = map[string]string{
+		result.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
 			"project":        creds.ProjectID,
 		}
@@ -122,12 +121,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if credentials != nil {
 				_, err = credentials.TokenSource.Token()
 				if err == nil {
-					s.Verified = true
+					result.Verified = true
 				}
 			}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return
@@ -139,4 +138,8 @@ func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GCP
+}
+
+func (s Scanner) Description() string {
+	return "GCP (Google Cloud Platform) is a suite of cloud computing services that runs on the same infrastructure that Google uses internally for its end-user products. GCP keys can be used to access and manage these services."
 }

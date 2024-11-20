@@ -136,3 +136,7 @@ func verifyJiratoken(ctx context.Context, client *http.Client, email, domain, to
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_JiraToken
 }
+
+func (s Scanner) Description() string {
+	return "Jira is a proprietary issue tracking product developed by Atlassian that allows bug tracking and agile project management. Jira tokens can be used to authenticate API requests."
+}

@@ -654,7 +654,7 @@ enum DetectorType {
   Flightstats = 642;
   ChecIO = 643;
   Manifest = 644;
-  ApiScience = 645;
+  ApiScience = 645 [deprecated = true];
   AppSynergy = 646;
   Caflou = 647;
   Caspio = 648;
@@ -715,7 +715,7 @@ enum DetectorType {
   Goshippo = 703;
   Sigopt = 704;
   Sugester = 705;
-  Viewneo = 706; 
+  Viewneo = 706;
   BoostNote = 707;
   CaptainData = 708;
   Checkvist = 709;
@@ -1008,6 +1008,15 @@ enum DetectorType {
   RobinhoodCrypto = 996;
   NVAPI = 997;
   PyPI = 998;
+  RailwayApp = 999;
+  Meraki = 1000;
+  SaladCloudApiKey = 1001;
+  Box = 1002;
+  BoxOauth = 1003;
+  ApiMetrics = 1004;
+  WeightsAndBiases = 1005;
+  ZohoCRM = 1006;
+  AzureOpenAI = 1007;
 }
 
 message Result {

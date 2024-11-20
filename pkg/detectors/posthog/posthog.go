@@ -83,3 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PosthogApp
 }
+
+func (s Scanner) Description() string {
+	return "PostHog is an open-source product analytics platform. The phx_ keys are used to authenticate and track events in PostHog."
+}

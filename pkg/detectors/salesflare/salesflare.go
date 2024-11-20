@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Salesflare
 }
+
+func (s Scanner) Description() string {
+	return "Salesflare is a simple yet powerful CRM tool for small businesses. Salesflare API keys can be used to access and manage customer data and interactions."
+}

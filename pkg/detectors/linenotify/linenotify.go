@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LineNotify
 }
+
+func (s Scanner) Description() string {
+	return "Line Notify is a service provided by LINE Corporation that allows you to send notifications to your LINE app. The API keys can be used to send messages to users or groups."
+}

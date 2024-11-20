@@ -2,9 +2,10 @@ package hunter
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -67,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Hunter
+}
+
+func (s Scanner) Description() string {
+	return "Hunter is a service that helps find and verify professional email addresses. Hunter API keys can be used to access and retrieve data from the Hunter service."
 }

@@ -71,3 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SupabaseToken
 }
+
+func (s Scanner) Description() string {
+	return "Supabase is an open source Firebase alternative. Supabase tokens can be used to access and manage Supabase projects and data."
+}

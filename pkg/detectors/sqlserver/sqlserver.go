@@ -31,7 +31,7 @@ func (s Scanner) Keywords() []string {
 	return []string{"sql", "database", "Data Source", "Server=", "Network address="}
 }
 
-// FromData will find and optionally verify SpotifyKey secrets in a given set of bytes.
+// FromData will find and optionally verify SQL Server credentials in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	matches := pattern.FindAllStringSubmatch(string(data), -1)
 	for _, match := range matches {
@@ -107,4 +107,8 @@ var ping = func(config msdsn.Config) (bool, error) {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SQLServer
+}
+
+func (s Scanner) Description() string {
+	return "SQL Server is a relational database management system developed by Microsoft. SQL Server credentials can be used to access and manage databases."
 }
