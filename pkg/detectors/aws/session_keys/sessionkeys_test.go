@@ -1,4 +1,4 @@
-package awssessionkey
+package session_keys
 
 import (
 	"context"

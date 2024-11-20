@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package aws
+package access_keys
 
 import (
 	"context"

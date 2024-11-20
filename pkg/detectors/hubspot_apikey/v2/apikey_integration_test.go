@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package azure
+package v2
 
 import (
 	"context"
@@ -10,22 +10,22 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestAzure_FromChunk(t *testing.T) {
+func TestHubSpotApiKey_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AZURE_SECRET")
-	secretInactive := testSecrets.MustGetField("AZURE_INACTIVE")
-	id := testSecrets.MustGetField("AZURE_ID")
-	tenantId := testSecrets.MustGetField("AZURE_TENANT_ID")
+	secret := testSecrets.MustGetField("HUBSPOTAPIKEY_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("HUBSPOTAPIKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -43,19 +43,13 @@ func TestAzure_FromChunk(t *testing.T) {
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
-				tenant_id=%s
-				client_id=%s
-				client_secret=%s
-				client_secret=%s
-				`, tenantId, id, secretInactive, secret)),
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a hubspotapikey secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Azure,
-					Redacted:     id,
+					DetectorType: detectorspb.DetectorType_HubSpotApiKey,
 					Verified:     true,
 				},
 			},
@@ -65,18 +59,13 @@ func TestAzure_FromChunk(t *testing.T) {
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`
-				tenant_id=%s
-				client_id=%s
-				client_secret=%s
-				`, tenantId, id, secretInactive)),
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a hubspotapikey secret %s within but unverified", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Azure,
-					Redacted:     id,
+					DetectorType: detectorspb.DetectorType_HubSpotApiKey,
 					Verified:     false,
 				},
 			},
@@ -99,14 +88,33 @@ func TestAzure_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Azure.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("HubSpotApiKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no raw secret present: \n %+v", got[i])
+				}
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Azure.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("HubSpotApiKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
+func BenchmarkFromData(benchmark *testing.B) {
+	ctx := context.Background()
+	s := Scanner{}
+	for name, data := range detectors.MustGetBenchmarkData() {
+		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				_, err := s.FromData(ctx, false, data)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
