@@ -1016,6 +1016,7 @@ enum DetectorType {
   ApiMetrics = 1004;
   WeightsAndBiases = 1005;
   ZohoCRM = 1006;
+  Flexport = 1007;
 }
 
 message Result {
