@@ -57,7 +57,7 @@ type apkHandler struct {
 	*defaultHandler
 }
 
-// newapkHandler creates an apkHandler.
+// newAPKHandler creates an apkHandler.
 func newAPKHandler() *apkHandler {
 	return &apkHandler{
 		defaultHandler: newDefaultHandler(apkHandlerType),
