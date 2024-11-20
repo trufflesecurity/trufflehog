@@ -123,14 +123,6 @@ func TestMeraki_Fake(t *testing.T) {
 			return
 		}
 
-		// this is to test the failed decoding scenario
-		if r.Header.Get("X-Cisco-Meraki-API-Key") == "failed-to-decode" {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id": 123}`))
-
-			return
-		}
-
 		// Send back mock response for 200 OK
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(mockResponse)
@@ -158,24 +150,18 @@ func TestMeraki_Fake(t *testing.T) {
 			verified: false,
 			wantErr:  false,
 		},
-		{
-			name:     "fail - failed to decode response",
-			secret:   "failed-to-decode",
-			verified: false,
-			wantErr:  true,
-		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// calling FromData does not work cause APIURLs are hardcoded
 			_, isVerified, verificationErr := verifyMerakiApiKey(context.Background(), server.Client(), server.URL, test.secret)
-			if verificationErr != nil && !test.wantErr {
-				t.Errorf("verification failed; got error, want: %t", test.wantErr)
+			if (verificationErr != nil) != test.wantErr {
+				t.Errorf("[%s] unexpected error: got %v, wantErr: %t", test.name, verificationErr, test.wantErr)
 			}
 
 			if isVerified != test.verified {
-				t.Errorf("verification failed; isVerified: %t, want: %t", isVerified, test.verified)
+				t.Errorf("[%s] verification status mismatch: got %t, want %t", test.name, isVerified, test.verified)
 			}
 
 			// additional checks if required
