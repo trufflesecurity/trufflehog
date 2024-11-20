@@ -29,6 +29,9 @@ var (
 	keyPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy"}) + common.BuildRegex("a-zA-Z0-9", "_", 35))
 	// the secret for the GoDaddy Prod environment is a 22-character alphanumeric string.
 	secretPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy"}) + common.BuildRegex("a-zA-Z0-9", "", 22))
+
+	// prod environment
+	prod = "api.godaddy.com"
 )
 
 func (s *Scanner) getClient() *http.Client {
@@ -81,7 +84,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := VerifyGoDaddySecret(ctx, s.getClient(), v1.Prod, v1.MakeAuthHeaderValue(key, secret))
+				isVerified, verificationErr := VerifyGoDaddySecret(ctx, s.getClient(), prod, v1.MakeAuthHeaderValue(key, secret))
 
 				result.Verified = isVerified
 				result.SetVerificationError(verificationErr, secret)
@@ -101,7 +104,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 // VerifyGoDaddySecret make a call to godaddy api with given secret to check if secret is valid or not.
-func VerifyGoDaddySecret(ctx context.Context, client *http.Client, environment v1.GoDaddyEnv, secret string) (bool, error) {
+func VerifyGoDaddySecret(ctx context.Context, client *http.Client, environment, secret string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/v1/domains/available?domain=example.com", environment), http.NoBody)
 	if err != nil {
 		return false, err

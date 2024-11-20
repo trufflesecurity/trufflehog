@@ -17,8 +17,6 @@ type Scanner struct {
 	client *http.Client
 }
 
-type GoDaddyEnv string
-
 var (
 	// ensure the scanner satisfies the interface at compile time.
 	_ detectors.Detector  = (*Scanner)(nil)
@@ -30,12 +28,9 @@ var (
 	keyPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy", "ote"}) + common.BuildRegex("a-zA-Z0-9", "_", 37))
 	// the secret for the GoDaddy OTE environment is a 22-character alphanumeric string.
 	secretPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy", "ote"}) + common.BuildRegex("a-zA-Z0-9", "", 22))
-)
 
-// supported environments for godaddy
-var (
-	OTE  GoDaddyEnv = "api.ote-godaddy.com"
-	Prod GoDaddyEnv = "api.godaddy.com"
+	// ote environment
+	ote = "api.ote-godaddy.com"
 )
 
 func (s *Scanner) getClient() *http.Client {
@@ -88,7 +83,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := VerifyGoDaddySecret(ctx, s.getClient(), OTE, MakeAuthHeaderValue(key, secret))
+				isVerified, verificationErr := VerifyGoDaddySecret(ctx, s.getClient(), ote, MakeAuthHeaderValue(key, secret))
 
 				result.Verified = isVerified
 				result.SetVerificationError(verificationErr, secret)
@@ -108,7 +103,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 // VerifyGoDaddySecret make a call to godaddy api with given secret to check if secret is valid or not.
-func VerifyGoDaddySecret(ctx context.Context, client *http.Client, environment GoDaddyEnv, secret string) (bool, error) {
+func VerifyGoDaddySecret(ctx context.Context, client *http.Client, environment, secret string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/v1/domains/available?domain=example.com", environment), http.NoBody)
 	if err != nil {
 		return false, err
