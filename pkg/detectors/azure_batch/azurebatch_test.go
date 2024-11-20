@@ -1,4 +1,4 @@
-package azure
+package azure_batch
 
 import (
 	"context"
@@ -12,20 +12,18 @@ import (
 
 var (
 	validPattern = `
-	azure credentials:
-		azureClientID: clientid9304d5df4-aac1-6117-552c-7f70c89a40d9
-		azureTenant: tenant_idid9304d5df4-aac1-6117-552c-7f70c89a40d9
-		azureClientSecret: clientsecretY_0w|[cGpan41k6ng.ol414sp4ccw2v_rkfmbs537i
+	azure batch:
+		url: https://JrxlYxT+0hW.YSA.batch.azure.com
+		secret: BXIMbhBlC3=5hIbqCEKvq7opaV2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/LB0
 	`
 	invalidPattern = `
-	azure credentials:
-		azureClientID: 9304d5df4-aac1-6117-552c-7f70c89a
-		azureTenant: id9304d5df4-aac1-6117-55-7f70c89a40d9
-		azureClientSecret: Y_0w|[cGpan41k6ng.
+	azure batch:
+		url: http://invalid.this.batch.azure.com
+		secret: BXIMbhBlC3=5hIbqCEKvq7op!V2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/
 	`
 )
 
-func TestAzure_Pattern(t *testing.T) {
+func TestAzureBatch_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -37,7 +35,7 @@ func TestAzure_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{"304d5df4-aac1-6117-552c-7f70c89a40d9cGpan41k6ng.ol414sp4ccw2v_rkfmbs53304d5df4-aac1-6117-552c-7f70c89a40d9"},
+			want:  []string{"https://JrxlYxT+0hW.YSA.batch.azure.comBXIMbhBlC3=5hIbqCEKvq7opaV2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/LB0"},
 		},
 		{
 			name:  "invalid pattern",

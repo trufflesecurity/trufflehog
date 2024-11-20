@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -68,9 +69,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_batch"
+	azure_serviceprincipal_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v1"
+	azure_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_openai"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
@@ -888,8 +890,9 @@ func buildDetectorList() []detectors.Detector {
 		&axonaut.Scanner{},
 		&aylien.Scanner{},
 		&ayrshare.Scanner{},
-		&azure.Scanner{},
-		&azurebatch.Scanner{},
+		&azure_serviceprincipal_v1.Scanner{},
+		&azure_serviceprincipal_v2.Scanner{},
+		&azure_batch.Scanner{},
 		&azurecontainerregistry.Scanner{},
 		&azuredevopspersonalaccesstoken.Scanner{},
 		// &azurefunctionkey.Scanner{}, // detector is throwing some FPs

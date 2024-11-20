@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package azurebatch
+package azure_batch
 
 import (
 	"context"
