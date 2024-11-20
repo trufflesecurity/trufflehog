@@ -1,4 +1,4 @@
-package aws
+package access_keys
 
 import (
 	"context"
