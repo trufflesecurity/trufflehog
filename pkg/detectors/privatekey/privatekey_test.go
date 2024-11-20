@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -78,7 +79,11 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 					Verified:     true,
 					Redacted:     "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgw",
 					ExtraData: map[string]string{
-						"certificate_urls": "https://crt.sh/?q=1e20c40deb44a8539dd3ac3e8c53b72750cb19f9, https://crt.sh/?q=0e9de31fb2ee16465a4d5d93b227d54f870326d1",
+						"cert_0_expiration":  "2018-06-05T10:00:32Z",
+						"cert_0_fingerprint": "0e9de31fb2ee16465a4d5d93b227d54f870326d1",
+						"cert_1_expiration":  "2017-06-13T07:08:51Z",
+						"cert_1_fingerprint": "1e20c40deb44a8539dd3ac3e8c53b72750cb19f9",
+						"certificate_urls":   "https://crt.sh/?q=0e9de31fb2ee16465a4d5d93b227d54f870326d1, https://crt.sh/?q=1e20c40deb44a8539dd3ac3e8c53b72750cb19f9",
 					},
 				},
 			},

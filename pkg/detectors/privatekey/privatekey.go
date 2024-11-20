@@ -87,8 +87,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			var (
 				wg                 sync.WaitGroup
-				extraData          = newExtraData()
 				verificationErrors = newVerificationErrors()
+				extraData          = newExtraData()
 			)
 
 			// Look up certificate information.
@@ -98,7 +98,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				data, err := lookupFingerprint(ctx, fingerprint, s.IncludeExpired)
 				if err == nil {
 					if data != nil {
-						extraData.Add("certificate_urls", strings.Join(data.CertificateURLs, ", "))
+						if len(data.CertificateURLs) > 0 {
+							extraData.Add("certificate_urls", strings.Join(data.CertificateURLs, ", "))
+						}
+
+						// Inlcude certificate details in the extra data.
+						for i, cert := range data.CertDetails {
+							prefix := fmt.Sprintf("cert_%d_", i)
+							extraData.Add(prefix+"fingerprint", cert.CertificateFingerprint)
+							extraData.Add(prefix+"expiration", cert.ExpirationTimestamp.Format(time.RFC3339))
+							if cert.IssuerName != "" {
+								extraData.Add(prefix+"issuer_name", cert.IssuerName)
+							}
+							if cert.SubjectName != "" {
+								extraData.Add(prefix+"subject_name", cert.SubjectName)
+							}
+							if len(cert.IssuerOrganization) > 0 {
+								extraData.Add(prefix+"issuer_org", strings.Join(cert.IssuerOrganization, ", "))
+							}
+							if len(cert.SubjectOrganization) > 0 {
+								extraData.Add(prefix+"subject_org", strings.Join(cert.SubjectOrganization, ", "))
+							}
+							if len(cert.KeyUsages) > 0 {
+								extraData.Add(prefix+"key_usages", strings.Join(cert.KeyUsages, ", "))
+							}
+							if len(cert.ExtendedKeyUsages) > 0 {
+								extraData.Add(prefix+"extended_key_usages", strings.Join(cert.ExtendedKeyUsages, ", "))
+							}
+							if cert.SubjectKeyID != "" {
+								extraData.Add(prefix+"subject_key_id", cert.SubjectKeyID)
+							}
+							if cert.AuthorityKeyID != "" {
+								extraData.Add(prefix+"authority_key_id", cert.AuthorityKeyID)
+							}
+							if cert.SerialNumber != "" {
+								extraData.Add(prefix+"serial_number", cert.SerialNumber)
+							}
+						}
 					}
 				} else {
 					verificationErrors.Add(err)
@@ -162,6 +198,21 @@ func (s Scanner) Description() string {
 type result struct {
 	CertificateURLs []string
 	GitHubUsername  string
+	CertDetails     []certDetails
+}
+
+type certDetails struct {
+	CertificateFingerprint string
+	ExpirationTimestamp    time.Time
+	IssuerName             string
+	SubjectName            string
+	IssuerOrganization     []string
+	SubjectOrganization    []string
+	KeyUsages              []string
+	ExtendedKeyUsages      []string
+	SubjectKeyID           string
+	AuthorityKeyID         string
+	SerialNumber           string
 }
 
 func lookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
@@ -181,7 +232,7 @@ func lookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string, in
 		return nil, err
 	}
 
-	var data *result
+	data := result{CertDetails: make([]certDetails, 0)}
 
 	seen := map[string]struct{}{}
 	for _, r := range results.CertificateResults {
@@ -191,20 +242,43 @@ func lookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string, in
 		if !includeExpired && time.Since(r.ExpirationTimestamp) > 0 {
 			continue
 		}
-		if data == nil {
-			data = &result{}
-		}
+
 		data.CertificateURLs = append(data.CertificateURLs, fmt.Sprintf("https://crt.sh/?q=%s", r.CertificateFingerprint))
+
+		// Note: Driftwood may not provide all certificate details in the results.
+		data.CertDetails = append(data.CertDetails, certDetails{
+			CertificateFingerprint: r.CertificateFingerprint,
+			ExpirationTimestamp:    r.ExpirationTimestamp,
+			IssuerName:             r.IssuerName,
+			SubjectName:            r.SubjectName,
+			IssuerOrganization:     r.IssuerOrganization,
+			SubjectOrganization:    r.SubjectOrganization,
+			KeyUsages:              r.KeyUsages,
+			ExtendedKeyUsages:      r.ExtendedKeyUsages,
+			SubjectKeyID:           r.SubjectKeyID,
+			AuthorityKeyID:         r.AuthorityKeyID,
+			SerialNumber:           r.SerialNumber,
+		})
+
 		seen[r.CertificateFingerprint] = struct{}{}
 	}
 
-	return data, nil
+	return &data, nil
 }
 
 type DriftwoodResult struct {
 	CertificateResults []struct {
 		CertificateFingerprint string    `json:"CertificateFingerprint"`
 		ExpirationTimestamp    time.Time `json:"ExpirationTimestamp"`
+		IssuerName             string    `json:"IssuerName,omitempty"`          // CA information
+		SubjectName            string    `json:"SubjectName,omitempty"`         // Certificate subject
+		IssuerOrganization     []string  `json:"IssuerOrganization,omitempty"`  // CA organization(s)
+		SubjectOrganization    []string  `json:"SubjectOrganization,omitempty"` // Subject organization(s)
+		KeyUsages              []string  `json:"KeyUsages,omitempty"`           // e.g., ["DigitalSignature", "KeyEncipherment"]
+		ExtendedKeyUsages      []string  `json:"ExtendedKeyUsages,omitempty"`   // e.g., ["ServerAuth", "ClientAuth"]
+		SubjectKeyID           string    `json:"SubjectKeyID,omitempty"`        // hex encoded
+		AuthorityKeyID         string    `json:"AuthorityKeyID,omitempty"`      // hex encoded
+		SerialNumber           string    `json:"SerialNumber,omitempty"`        // hex encoded
 	} `json:"CertificateResults"`
 	GitHubSSHResults []struct {
 		Username string `json:"Username"`
