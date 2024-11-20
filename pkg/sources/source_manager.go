@@ -338,6 +338,7 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 	return s.runWithoutUnits(ctx, source, report, targets...)
 }
 
+// enumerate is a helper method to enumerate a Source.
 func (s *SourceManager) enumerate(ctx context.Context, source Source, report *JobProgress, reporter UnitReporter) error {
 	report.Start(time.Now())
 	defer func() { report.End(time.Now()) }()
@@ -372,6 +373,9 @@ func (s *SourceManager) enumerate(ctx context.Context, source Source, report *Jo
 	return fmt.Errorf("Enumeration not supported or configured for source: %s", source.Type().String())
 }
 
+// enumerateWithUnits is a helper method to enumerate a Source that is also a
+// SourceUnitEnumerator. This allows better introspection of what is getting
+// enumerated and any errors encountered.
 func (s *SourceManager) enumerateWithUnits(ctx context.Context, source SourceUnitEnumerator, report *JobProgress, reporter UnitReporter) error {
 	// Create a function that will save the first error encountered (if
 	// any) and discard the rest.
@@ -419,6 +423,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, repo
 			s.outputChunks <- chunk
 		}
 	}()
+
 	// Don't return from this function until the goroutine has finished
 	// outputting chunks to the downstream channel. Closing the channel
 	// will stop the goroutine, so that needs to happen first in the defer
