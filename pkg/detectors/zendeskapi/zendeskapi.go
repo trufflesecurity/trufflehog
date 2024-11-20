@@ -23,8 +23,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
-	token  = regexp.MustCompile(detectors.PrefixRegex([]string{"zendesk"}) + `([A-Za-z0-9_-]{40})`)
-	email  = regexp.MustCompile(`\b([a-zA-Z-0-9-]{5,16}\@[a-zA-Z-0-9]{4,16}\.[a-zA-Z-0-9]{3,6})\b`)
+	token  = regexp.MustCompile(`([A-Za-z0-9_-]{40})`)
+	email  = regexp.MustCompile(`\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b`)
 	domain = regexp.MustCompile(`\b([a-zA-Z-0-9]{3,16}\.zendesk\.com)\b`)
 )
 
