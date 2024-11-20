@@ -204,7 +204,9 @@ func (h *apkHandler) handleAPKFileContent(
 		ctx,
 		"filename", fileName,
 	)
-	return h.handleNonArchiveContent(ctx, mimeReader, apkChan)
+	//Note: the *zip.File.Name attribute (passed into this function as fileName)
+	// includes the full path within the apk.
+	return h.handleNonArchiveContent(ctx, fileName, mimeReader, apkChan)
 }
 
 // createZipReader creates a new ZIP reader from the input fileReader.

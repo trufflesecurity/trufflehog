@@ -1155,6 +1155,17 @@ func (e *Engine) processResult(
 		return
 	}
 
+	// Add in handler metadata
+	if res.ExtraData == nil && data.chunk.HandleMetadata != nil {
+		res.ExtraData = data.chunk.HandleMetadata
+	} else {
+		for k, v := range data.chunk.HandleMetadata {
+			if _, ok := res.ExtraData[k]; !ok {
+				res.ExtraData[k] = v
+			}
+		}
+	}
+
 	secret := detectors.CopyMetadata(&data.chunk, res)
 	secret.DecoderType = data.decoder
 	secret.DetectorDescription = data.detector.Detector.Description()

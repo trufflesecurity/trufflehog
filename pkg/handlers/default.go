@@ -44,7 +44,7 @@ func (h *defaultHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 		defer close(dataOrErrChan)
 
 		start := time.Now()
-		err := h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(input), dataOrErrChan)
+		err := h.handleNonArchiveContent(ctx, emptyFilePath, newMimeTypeReaderFromFileReader(input), dataOrErrChan)
 		if err == nil {
 			h.metrics.incFilesProcessed()
 		}
@@ -93,6 +93,7 @@ func (h *defaultHandler) measureLatencyAndHandleErrors(
 // file content, regardless of being an archive or not, is handled appropriately.
 func (h *defaultHandler) handleNonArchiveContent(
 	ctx logContext.Context,
+	archiveEntryPath string,
 	reader mimeTypeReader,
 	dataOrErrChan chan DataOrErr,
 ) error {
@@ -109,6 +110,9 @@ func (h *defaultHandler) handleNonArchiveContent(
 	chunkReader := sources.NewChunkReader()
 	for data := range chunkReader(ctx, reader) {
 		dataOrErr := DataOrErr{}
+		if archiveEntryPath != "" {
+			dataOrErr.ArchiveEntryPath = archiveEntryPath
+		}
 		if err := data.Error(); err != nil {
 			h.metrics.incErrors()
 			dataOrErr.Err = fmt.Errorf("%w: error reading chunk: %v", ErrProcessingWarning, err)

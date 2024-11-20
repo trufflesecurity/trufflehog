@@ -19,60 +19,71 @@ func TestArchiveHandler(t *testing.T) {
 		expectedChunks int
 		matchString    string
 		expectErr      bool
+		matchFileName  string
 	}{
 		"gzip-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one-zip.gz",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
+			"",
 		},
 		"gzip-nested": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/double-zip.gz",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
+			// This is b/c we can't get file path from nested archiver.OpenReader()
+			"(decompressed .gz file)",
 		},
 		"gzip-too-deep": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six-zip.gz",
 			0,
 			"",
 			true,
+			"",
 		},
 		"tar-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/one.tar",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
+			"/aws-canary-creds",
 		},
 		"tar-nested": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/two.tar",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
+			"/one.tar/aws-canary-creds",
 		},
 		"tar-too-deep": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six.tar",
 			0,
 			"",
 			true,
+			"",
 		},
 		"targz-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/tar-archive.tar.gz",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
+			"/aws-canary-creds",
 		},
 		"gzip-large": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/FifteenMB.gz",
 			1543,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
+			"",
 		},
 		"zip-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
+			"/aws-canary-creds",
 		},
 	}
 
@@ -104,6 +115,7 @@ func TestArchiveHandler(t *testing.T) {
 				count++
 				if re.Match(chunk.Data) {
 					matched = true
+					assert.Equal(t, chunk.ArchiveEntryPath, testCase.matchFileName)
 				}
 			}
 
@@ -125,6 +137,6 @@ func TestOpenInvalidArchive(t *testing.T) {
 
 	dataOrErrChan := make(chan DataOrErr)
 
-	err = handler.openArchive(ctx, 0, rdr, dataOrErrChan)
+	err = handler.openArchive(ctx, 0, emptyFilePath, rdr, dataOrErrChan)
 	assert.Error(t, err)
 }

@@ -40,6 +40,8 @@ type Chunk struct {
 	SourceMetadata *source_metadatapb.MetaData
 	// SourceType is the type of Source that produced the chunk.
 	SourceType sourcespb.SourceType
+	// HandleMetadata holds the metadata from a handler if one was used.
+	HandleMetadata map[string]string
 
 	// Verify specifies whether any secrets in the Chunk should be verified.
 	Verify bool
