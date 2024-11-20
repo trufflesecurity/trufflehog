@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-)
+	)
 
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
@@ -25,10 +25,10 @@ var _ detectors.Detector = Scanner{}
 var (
 	defaultClient = common.SaneHttpClient()
 	tokenPats     = map[string]*regexp.Regexp{
-		"Slack Bot Token":               regexp.MustCompile(`xoxb\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
-		"Slack User Token":              regexp.MustCompile(`xoxp\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
-		"Slack Workspace Access Token":  regexp.MustCompile(`xoxa\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
-		"Slack Workspace Refresh Token": regexp.MustCompile(`xoxr\-[0-9]{10,13}\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
+		"Slack Bot Token":               regexp.MustCompile(`xoxb\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
+		"Slack User Token":              regexp.MustCompile(`xoxp\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
+		"Slack Workspace Access Token":  regexp.MustCompile(`xoxa\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
+		"Slack Workspace Refresh Token": regexp.MustCompile(`xoxr\-[0-9]{10,13}[a-zA-Z0-9\-]*`),
 	}
 	verifyURL = "https://slack.com/api/auth.test"
 )
