@@ -26,7 +26,7 @@ func TestArchiveHandler(t *testing.T) {
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
-			"",
+			"(decompressed .gz file)",
 		},
 		"gzip-nested": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/double-zip.gz",
@@ -34,7 +34,7 @@ func TestArchiveHandler(t *testing.T) {
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
 			// This is b/c we can't get file path from nested archiver.OpenReader()
-			"(decompressed .gz file)",
+			"(decompressed .gz file)/(decompressed .gz file)",
 		},
 		"gzip-too-deep": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six-zip.gz",
@@ -48,14 +48,14 @@ func TestArchiveHandler(t *testing.T) {
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
-			"/aws-canary-creds",
+			"aws-canary-creds",
 		},
 		"tar-nested": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/two.tar",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
-			"/one.tar/aws-canary-creds",
+			"one.tar/aws-canary-creds",
 		},
 		"tar-too-deep": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/six.tar",
@@ -69,21 +69,21 @@ func TestArchiveHandler(t *testing.T) {
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
-			"/aws-canary-creds",
+			"(decompressed .tar.gz file)/aws-canary-creds",
 		},
 		"gzip-large": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/FifteenMB.gz",
 			1543,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
-			"",
+			"(decompressed .gz file)",
 		},
 		"zip-single": {
 			"https://raw.githubusercontent.com/bill-rich/bad-secrets/master/aws-canary-creds.zip",
 			1,
 			"AKIAYVP4CIPPH5TNP3SW",
 			false,
-			"/aws-canary-creds",
+			"aws-canary-creds",
 		},
 	}
 
@@ -137,6 +137,6 @@ func TestOpenInvalidArchive(t *testing.T) {
 
 	dataOrErrChan := make(chan DataOrErr)
 
-	err = handler.openArchive(ctx, 0, emptyFilePath, rdr, dataOrErrChan)
+	err = handler.openArchive(ctx, []string{}, rdr, dataOrErrChan)
 	assert.Error(t, err)
 }

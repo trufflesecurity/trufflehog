@@ -1155,7 +1155,7 @@ func (e *Engine) processResult(
 		return
 	}
 
-	// Add in handler metadata
+	// Add in handler metadata. Existing extra data is not overwritten.
 	if res.ExtraData == nil && data.chunk.HandleMetadata != nil {
 		res.ExtraData = data.chunk.HandleMetadata
 	} else {
