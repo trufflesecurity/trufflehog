@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -111,12 +112,14 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 		if len(s.token) == 0 {
 			return errors.Errorf("Jenkins source basic auth credential requires 'password' to be specified")
 		}
+		log.RedactGlobally(s.token)
 	case *sourcespb.Jenkins_Header:
 		unparsedURL = conn.Endpoint
 		s.header = &header{
 			key:   cred.Header.Key,
 			value: cred.Header.Value,
 		}
+		log.RedactGlobally(cred.Header.GetValue())
 	case *sourcespb.Jenkins_Unauthenticated:
 		unparsedURL = conn.Endpoint
 	default:

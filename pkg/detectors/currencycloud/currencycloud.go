@@ -3,17 +3,18 @@ package currencycloud
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -25,7 +26,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"currencycloud"}) + `\b([0-9a-z]{64})\b`)
-	emailPat = regexp.MustCompile(`\b([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-z]+)\b`)
+	emailPat = regexp.MustCompile(common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -39,7 +40,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	emailMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
+
+	uniqueEmailMatches := make(map[string]struct{})
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
 	for _, match := range matches {
 		if len(match) != 2 {
@@ -47,12 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
-		for _, emailmatch := range emailMatches {
-			if len(emailmatch) != 2 {
-				continue
-			}
-			resEmailMatch := strings.TrimSpace(emailmatch[1])
-
+		for emailmatch := range uniqueEmailMatches {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_CurrencyCloud,
 				Raw:          []byte(resMatch),
@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				for _, env := range environments {
 					// Get authentication token
-					payload := strings.NewReader(`{"login_id":"` + resEmailMatch + `","api_key":"` + resMatch + `"`)
+					payload := strings.NewReader(`{"login_id":"` + emailmatch + `","api_key":"` + resMatch + `"`)
 					req, err := http.NewRequestWithContext(ctx, "POST", "https://"+env+".currencycloud.com/v2/authenticate/api", payload)
 					if err != nil {
 						continue

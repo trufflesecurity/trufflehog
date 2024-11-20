@@ -13,16 +13,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/custom_detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -259,7 +259,7 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	conf := Config{
 		Concurrency:   1,
 		Decoders:      decoders.DefaultDecoders(),
-		Detectors:     DefaultDetectors(),
+		Detectors:     defaults.DefaultDetectors(),
 		Verify:        false,
 		SourceManager: sourceManager,
 		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
@@ -271,7 +271,7 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
 		return
 	}
 
@@ -279,6 +279,108 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	assert.Nil(t, e.Finish(ctx))
 	want := uint64(5)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
+}
+
+// lineCaptureDispatcher is a test dispatcher that captures the line number
+// of detected secrets. It implements the Dispatcher interface and is used
+// to verify that the Engine correctly identifies and reports the line numbers
+// where secrets are found in the source code.
+type lineCaptureDispatcher struct{ line int64 }
+
+func (d *lineCaptureDispatcher) Dispatch(_ context.Context, result detectors.ResultWithMetadata) error {
+	d.line = result.SourceMetadata.GetFilesystem().GetLine()
+	return nil
+}
+
+func TestEngineLineVariations(t *testing.T) {
+	tests := []struct {
+		name         string
+		content      string
+		expectedLine int64
+	}{
+		{
+			name: "secret on first line",
+			content: `AKIA2OGYBAH6STMMNXNN
+aws_secret_access_key = 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`,
+			expectedLine: 1,
+		},
+		{
+			name: "secret after multiple newlines",
+			content: `
+
+
+AKIA2OGYBAH6STMMNXNN
+aws_secret_access_key = 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`,
+			expectedLine: 4,
+		},
+		{
+			name: "secret with mixed whitespace before",
+			content: `first line
+
+
+AKIA2OGYBAH6STMMNXNN
+aws_secret_access_key = 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`,
+			expectedLine: 4,
+		},
+		{
+			name: "secret with content after",
+			content: `[default]
+region = us-east-1
+AKIA2OGYBAH6STMMNXNN
+aws_secret_access_key = 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
+more content
+even more`,
+			expectedLine: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			tmpFile, err := os.CreateTemp("", "test_aws_credentials")
+			assert.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
+
+			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
+			assert.NoError(t, err)
+
+			const defaultOutputBufferSize = 64
+			opts := []func(*sources.SourceManager){
+				sources.WithSourceUnits(),
+				sources.WithBufferedOutput(defaultOutputBufferSize),
+			}
+
+			sourceManager := sources.NewManager(opts...)
+			lineCapturer := new(lineCaptureDispatcher)
+
+			conf := Config{
+				Concurrency:   1,
+				Decoders:      decoders.DefaultDecoders(),
+				Detectors:     defaults.DefaultDetectors(),
+				Verify:        false,
+				SourceManager: sourceManager,
+				Dispatcher:    lineCapturer,
+			}
+
+			eng, err := NewEngine(ctx, &conf)
+			assert.NoError(t, err)
+
+			eng.Start(ctx)
+
+			cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+			_, err = eng.ScanFileSystem(ctx, cfg)
+			assert.NoError(t, err)
+
+			assert.NoError(t, eng.Finish(ctx))
+			want := uint64(1)
+			assert.Equal(t, want, eng.GetMetrics().UnverifiedSecretsFound)
+			assert.Equal(t, tt.expectedLine, lineCapturer.line)
+		})
+	}
 }
 
 // TestEngine_VersionedDetectorsVerifiedSecrets is a test that detects ALL verified secrets across
@@ -318,7 +420,7 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
 		return
 	}
 
@@ -388,7 +490,7 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
 		return
 	}
 
@@ -438,7 +540,7 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	if err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
 		return
 	}
 
@@ -528,7 +630,7 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	err = e.ScanFileSystem(ctx, cfg)
+	_, err = e.ScanFileSystem(ctx, cfg)
 	assert.NoError(t, err)
 
 	// Wait for all the chunks to be processed.
@@ -576,7 +678,7 @@ func TestRetainFalsePositives(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	err = e.ScanFileSystem(ctx, cfg)
+	_, err = e.ScanFileSystem(ctx, cfg)
 	assert.NoError(t, err)
 
 	// Wait for all the chunks to be processed.
@@ -636,6 +738,20 @@ func TestFragmentFirstLineAndLink(t *testing.T) {
 			},
 			expectedLine: 5,
 			expectedLink: "https://example.azure.com",
+		},
+		{
+			name: "Line number not set",
+			chunk: &sources.Chunk{
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Link: "https://example.github.com",
+						},
+					},
+				},
+			},
+			expectedLine: 1,
+			expectedLink: "https://example.github.com",
 		},
 		{
 			name:         "Unsupported Type",
@@ -775,12 +891,12 @@ func TestLikelyDuplicate(t *testing.T) {
 	// Initialize detectors
 	// (not actually calling detector FromData or anything, just using detector struct for key creation)
 	detectorA := ahocorasick.DetectorMatch{
-		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[0]),
-		Detector: DefaultDetectors()[0],
+		Key:      ahocorasick.CreateDetectorKey(defaults.DefaultDetectors()[0]),
+		Detector: defaults.DefaultDetectors()[0],
 	}
 	detectorB := ahocorasick.DetectorMatch{
-		Key:      ahocorasick.CreateDetectorKey(DefaultDetectors()[1]),
-		Detector: DefaultDetectors()[1],
+		Key:      ahocorasick.CreateDetectorKey(defaults.DefaultDetectors()[1]),
+		Detector: defaults.DefaultDetectors()[1],
 	}
 
 	// Define test cases
@@ -921,7 +1037,7 @@ func TestFilterResults_CustomCleaner(t *testing.T) {
 }
 
 func BenchmarkPopulateMatchingDetectors(b *testing.B) {
-	allDetectors := DefaultDetectors()
+	allDetectors := defaults.DefaultDetectors()
 	ac := ahocorasick.NewAhoCorasickCore(allDetectors)
 
 	// Generate sample data with keywords from detectors.
@@ -1048,7 +1164,7 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 	ctx := context.Background()
 	conf := Config{
 		Concurrency:   1,
-		Detectors:     DefaultDetectors(),
+		Detectors:     defaults.DefaultDetectors(),
 		Verify:        false,
 		SourceManager: sources.NewManager(),
 		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
@@ -1070,5 +1186,84 @@ func TestEngineInitializesCloudProviderDetectors(t *testing.T) {
 
 	if count == 0 {
 		t.Fatal("no detectors found implementing Endpoints(), did EndpointSetter change?")
+	}
+}
+
+func TestEngineignoreLine(t *testing.T) {
+	tests := []struct {
+		name             string
+		content          string
+		expectedFindings int
+	}{
+		{
+			name: "ignore at end of line",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # Ignoring this does not work
+    assert connection_string == "postgres://master_user:master_password@hostname:1234/main"  # trufflehog:ignore`,
+			expectedFindings: 0,
+		},
+		{
+			name: "ignore not on secret line",
+			content: `
+# tests/example_false_positive.py
+
+def test_something():
+    connection_string = "who-cares"
+
+    # Ignoring this does not work
+	assert some_other_stuff == "blah" # trufflehog:ignore
+    assert connection_string == "postgres://master_user:master_password@hostname:1234/main"`,
+			expectedFindings: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			tmpFile, err := os.CreateTemp("", "test_creds")
+			assert.NoError(t, err)
+			defer os.Remove(tmpFile.Name())
+
+			err = os.WriteFile(tmpFile.Name(), []byte(tt.content), os.ModeAppend)
+			assert.NoError(t, err)
+
+			const defaultOutputBufferSize = 64
+			opts := []func(*sources.SourceManager){
+				sources.WithSourceUnits(),
+				sources.WithBufferedOutput(defaultOutputBufferSize),
+			}
+
+			sourceManager := sources.NewManager(opts...)
+
+			conf := Config{
+				Concurrency:   1,
+				Decoders:      decoders.DefaultDecoders(),
+				Detectors:     defaults.DefaultDetectors(),
+				Verify:        false,
+				SourceManager: sourceManager,
+				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+			}
+
+			eng, err := NewEngine(ctx, &conf)
+			assert.NoError(t, err)
+
+			eng.Start(ctx)
+
+			cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
+			_, err = eng.ScanFileSystem(ctx, cfg)
+			assert.NoError(t, err)
+
+			assert.NoError(t, eng.Finish(ctx))
+			assert.Equal(t, tt.expectedFindings, int(eng.GetMetrics().UnverifiedSecretsFound))
+		})
 	}
 }

@@ -38,6 +38,7 @@ func secretInfoToAnalyzerResult(info *common.SecretInfo) *analyzers.AnalyzerResu
 	}
 	result := &analyzers.AnalyzerResult{
 		Metadata: map[string]any{
+			"owner":      info.Metadata.User.Login,
 			"type":       info.Metadata.Type,
 			"expiration": info.Metadata.Expiration,
 		},

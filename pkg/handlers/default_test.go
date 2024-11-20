@@ -23,12 +23,12 @@ func TestHandleNonArchiveFile(t *testing.T) {
 	defer rdr.Close()
 
 	handler := newDefaultHandler(defaultHandlerType)
-	archiveChan, err := handler.HandleFile(context.AddLogger(ctx), rdr)
+	dataOrErrChan := handler.HandleFile(context.AddLogger(ctx), rdr)
 	assert.NoError(t, err)
 
 	wantChunkCount := 6
 	count := 0
-	for range archiveChan {
+	for range dataOrErrChan {
 		count++
 	}
 
