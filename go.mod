@@ -18,7 +18,6 @@ replace github.com/STARRY-S/zip => github.com/STARRY-S/zip v0.1.0
 require (
 	cloud.google.com/go/secretmanager v1.14.2
 	cloud.google.com/go/storage v1.47.0
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.2
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
@@ -137,6 +136,7 @@ require (
 	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.2 // indirect
 	github.com/DataDog/zstd v1.5.5 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.1 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.1 // indirect
