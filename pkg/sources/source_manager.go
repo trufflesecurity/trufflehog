@@ -217,6 +217,48 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 	return progress.Ref(), nil
 }
 
+// Scan blocks until a resource is available to run the source against a single
+// SourceUnit, then asynchronously runs it. Error information is stored and
+// accessible via the JobProgressRef as it becomes available.
+func (s *SourceManager) Scan(ctx context.Context, sourceName string, source Source, unit SourceUnit) (JobProgressRef, error) {
+	sourceID, jobID := source.SourceID(), source.JobID()
+	// Do preflight checks before waiting on the pool.
+	if err := s.preflightChecks(ctx); err != nil {
+		return JobProgressRef{
+			SourceName: sourceName,
+			SourceID:   sourceID,
+			JobID:      jobID,
+		}, err
+	}
+	// Create a JobProgress object for tracking progress.
+	ctx, cancel := context.WithCancelCause(ctx)
+	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
+	if err := s.sem.Acquire(ctx, 1); err != nil {
+		// Context cancelled.
+		progress.ReportError(Fatal{err})
+		return progress.Ref(), Fatal{err}
+	}
+	s.wg.Add(1)
+	go func() {
+		// Call Finish after the semaphore has been released.
+		defer progress.Finish()
+		defer s.sem.Release(1)
+		defer s.wg.Done()
+		ctx := context.WithValues(ctx,
+			"source_manager_worker_id", common.RandomID(5),
+		)
+		defer common.Recover(ctx)
+		defer cancel(nil)
+		if err := s.scan(ctx, source, progress, unit); err != nil {
+			select {
+			case s.firstErr <- err:
+			default:
+			}
+		}
+	}()
+	return progress.Ref(), nil
+}
+
 // Chunks returns the read only channel of all the chunks produced by all of
 // the sources managed by this manager.
 func (s *SourceManager) Chunks() <-chan *Chunk {
@@ -369,6 +411,42 @@ func (s *SourceManager) enumerate(ctx context.Context, source Source, report *Jo
 	return fmt.Errorf("Enumeration not supported or configured for source: %s", source.Type().String())
 }
 
+// scan runs a scan against a single SourceUnit as its only job. This method
+// manages the lifecycle of the provided report.
+func (s *SourceManager) scan(ctx context.Context, source Source, report *JobProgress, unit SourceUnit) error {
+	report.Start(time.Now())
+	defer func() { report.End(time.Now()) }()
+
+	defer func() {
+		if err := context.Cause(ctx); err != nil {
+			report.ReportError(Fatal{err})
+		}
+	}()
+
+	report.TrackProgress(source.GetProgress())
+	if ctx.Value("job_id") == "" {
+		ctx = context.WithValue(ctx, "job_id", report.JobID)
+	}
+	if ctx.Value("source_id") == "" {
+		ctx = context.WithValue(ctx, "source_id", report.SourceID)
+	}
+	if ctx.Value("source_name") == "" {
+		ctx = context.WithValue(ctx, "source_name", report.SourceName)
+	}
+	if ctx.Value("source_type") == "" {
+		ctx = context.WithValue(ctx, "source_type", source.Type().String())
+	}
+
+	// Check for the preferred method of tracking source units.
+	canUseSourceUnits := s.useSourceUnitsFunc != nil
+	if unitChunker, ok := source.(SourceUnitChunker); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
+		ctx.Logger().Info("running source",
+			"with_units", true)
+		return s.scanWithUnits(ctx, unitChunker, report, unit)
+	}
+	return fmt.Errorf("source units not supported or configured for source: %s", source.Type().String())
+}
+
 // enumerateWithUnits is a helper method to enumerate a Source that is also a
 // SourceUnitEnumerator. This allows better introspection of what is getting
 // enumerated and any errors encountered.
@@ -509,6 +587,44 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 	default:
 		return nil
 	}
+}
+
+// scanWithUnits produces chunks from a single SourceUnit.
+func (s *SourceManager) scanWithUnits(ctx context.Context, source SourceUnitChunker, report *JobProgress, unit SourceUnit) error {
+	// Create a function that will save the first error encountered (if
+	// any) and discard the rest.
+	chunkReporter := &mgrChunkReporter{
+		unit:    unit,
+		chunkCh: make(chan *Chunk, defaultChannelSize),
+		report:  report,
+	}
+	// Produce chunks from the given unit.
+	var chunkErr error
+	go func() {
+		report.StartUnitChunking(unit, time.Now())
+		// TODO: Catch panics and add to report.
+		defer close(chunkReporter.chunkCh)
+		id, kind := unit.SourceUnitID()
+		ctx := context.WithValues(ctx, "unit_kind", kind, "unit", id)
+		ctx.Logger().V(3).Info("chunking unit")
+		if err := source.ChunkUnit(ctx, unit, chunkReporter); err != nil {
+			report.ReportError(Fatal{ChunkError{Unit: unit, Err: err}})
+			chunkErr = Fatal{err}
+		}
+	}()
+	// Consume chunks and export chunks.
+	// This anonymous function blocks until the chunkReporter.chunkCh is
+	// closed in the above goroutine.
+	func() {
+		defer func() { report.EndUnitChunking(unit, time.Now()) }()
+		for chunk := range chunkReporter.chunkCh {
+			if src, ok := source.(Source); ok {
+				chunk.JobID = src.JobID()
+			}
+			s.outputChunks <- chunk
+		}
+	}()
+	return chunkErr
 }
 
 // headlessAPI implements the apiClient interface locally.
