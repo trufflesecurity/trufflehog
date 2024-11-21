@@ -333,7 +333,7 @@ func (s *Source) scanBuckets(
 		errorCount := sync.Map{}
 
 		input := &s3.ListObjectsV2Input{Bucket: &bucket}
-		if pos.startAfter != "" {
+		if bucket == pos.bucket && pos.startAfter != "" {
 			input.StartAfter = &pos.startAfter
 			ctx.Logger().V(3).Info(
 				"Resuming bucket scan",

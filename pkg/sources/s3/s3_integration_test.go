@@ -82,37 +82,6 @@ func TestSource_ChunksLarge(t *testing.T) {
 	assert.Equal(t, got, wantChunkCount)
 }
 
-func TestSourceChunksNoResumption(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-
-	s := Source{}
-	connection := &sourcespb.S3{
-		Credential: &sourcespb.S3_Unauthenticated{},
-		Buckets:    []string{"integration-resumption-tests"},
-	}
-	conn, err := anypb.New(connection)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.Init(ctx, "test name", 0, 0, false, conn, 1)
-	chunksCh := make(chan *sources.Chunk)
-	go func() {
-		defer close(chunksCh)
-		err = s.Chunks(ctx, chunksCh)
-		assert.Nil(t, err)
-	}()
-
-	wantChunkCount := 19787
-	got := 0
-
-	for range chunksCh {
-		got++
-	}
-	assert.Equal(t, wantChunkCount, got)
-}
-
 func TestSource_Validate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
@@ -248,7 +217,42 @@ func TestSource_Validate(t *testing.T) {
 	}
 }
 
+func TestSourceChunksNoResumption(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	s := Source{}
+	connection := &sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Buckets:    []string{"integration-resumption-tests"},
+	}
+	conn, err := anypb.New(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.Init(ctx, "test name", 0, 0, false, conn, 1)
+	chunksCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunksCh)
+		err = s.Chunks(ctx, chunksCh)
+		assert.Nil(t, err)
+	}()
+
+	wantChunkCount := 19787
+	got := 0
+
+	for range chunksCh {
+		got++
+	}
+	assert.Equal(t, wantChunkCount, got)
+}
+
 func TestSourceChunksResumption(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -294,6 +298,8 @@ func TestSourceChunksResumption(t *testing.T) {
 }
 
 func TestSourceChunksNoResumptionMultipleBuckets(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
@@ -322,4 +328,50 @@ func TestSourceChunksNoResumptionMultipleBuckets(t *testing.T) {
 		got++
 	}
 	assert.Equal(t, wantChunkCount, got)
+}
+
+func TestSourceChunksResumptionMultipleBucketsIgnoredBucket(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	src := new(Source)
+
+	// The bucket stored in EncodedResumeInfo is NOT in the list of buckets to scan.
+	// Therefore, resume from the other provided bucket (truffletestbucket).
+	src.Progress = sources.Progress{
+		Message:           "Bucket: integration-resumption-tests",
+		EncodedResumeInfo: "{\"current_bucket\":\"integration-resumption-tests\",\"start_after\":\"test-dir/\"}",
+		SectionsCompleted: 0,
+		SectionsRemaining: 1,
+	}
+	connection := &sourcespb.S3{
+		Credential:       &sourcespb.S3_Unauthenticated{},
+		Buckets:          []string{"truffletestbucket"},
+		EnableResumption: true,
+	}
+	conn, err := anypb.New(connection)
+	require.NoError(t, err)
+
+	err = src.Init(ctx, "test name", 0, 0, false, conn, 2)
+	require.NoError(t, err)
+
+	chunksCh := make(chan *sources.Chunk)
+	var count int
+
+	cancelCtx, ctxCancel := context.WithCancel(ctx)
+	defer ctxCancel()
+
+	go func() {
+		defer close(chunksCh)
+		err = src.Chunks(cancelCtx, chunksCh)
+		assert.NoError(t, err, "Should not error during scan")
+	}()
+
+	for range chunksCh {
+		count++
+	}
+
+	assert.Equal(t, 103, count, "Should have processed all remaining data on resume")
 }
