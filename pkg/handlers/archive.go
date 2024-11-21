@@ -153,8 +153,9 @@ func (h *archiveHandler) openArchive(
 		}
 		defer rdr.Close()
 
-		// Note: We're limited in our ability to add file names to the archiveEntryPath here, as the decompressor doesn't have access to a fileName value. Instead, we're adding a generic string to indicate that the file is decompressed. This could be improved.
-		return h.openArchive(ctx, append(archiveEntryPaths, "(decompressed "+reader.format.Name()+" file)"), rdr, dataOrErrChan)
+		// Note: We're limited in our ability to add file names to the archiveEntryPath here, as the decompressor doesn't have access to a fileName value.
+		// We add a empty string so we can keep track of the archive depth.
+		return h.openArchive(ctx, append(archiveEntryPaths, ""), rdr, dataOrErrChan)
 	case archiver.Extractor:
 		err := archive.Extract(ctx, reader, nil, h.extractorHandler(archiveEntryPaths, dataOrErrChan))
 		if err != nil {
