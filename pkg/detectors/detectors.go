@@ -177,6 +177,10 @@ type ResultWithMetadata struct {
 	Result
 	// Data from the sources.Chunk which this result was emitted for
 	Data []byte
+	// DetectorDescription is the description of the Detector.
+	DetectorDescription string
+	// DecoderType is the type of decoder that was used to generate this result's data.
+	DecoderType detectorspb.DecoderType
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.

@@ -19,7 +19,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -29,7 +28,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_MySQL }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeMySQL }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	uri, ok := credInfo["connection_string"]
@@ -48,16 +47,16 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_MySQL,
+		AnalyzerType: analyzers.AnalyzerTypeMySQL,
 		Metadata:     nil,
 		Bindings:     []analyzers.Binding{},
 	}
 
-	// add user priviliges to bindings
+	// add user privileges to bindings
 	userBindings, userResource := bakeUserBindings(info)
 	result.Bindings = append(result.Bindings, userBindings...)
 
-	// add user's database priviliges to bindings
+	// add user's database privileges to bindings
 	databaseBindings := bakeDatabaseBindings(userResource, info)
 	result.Bindings = append(result.Bindings, databaseBindings...)
 
@@ -68,7 +67,7 @@ func bakeUserBindings(info *SecretInfo) ([]analyzers.Binding, *analyzers.Resourc
 
 	var userBindings []analyzers.Binding
 
-	// add user and their priviliges to bindings
+	// add user and their privileges to bindings
 	userResource := analyzers.Resource{
 		Name:               info.User,
 		FullyQualifiedName: info.Host + "/" + info.User,

@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
-
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
@@ -79,6 +78,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_GCPApplicationDefaultCredentials,
 			Raw:          []byte(detectedClientID),
+			RawV2:        []byte(detectedClientID + creds.RefreshToken),
+		}
+
+		if len(creds.RefreshToken) > 3 {
+			s1.Redacted = creds.RefreshToken[:3] + "..." + creds.RefreshToken[min(len(creds.RefreshToken)-1, 47):]
 		}
 
 		if verify {

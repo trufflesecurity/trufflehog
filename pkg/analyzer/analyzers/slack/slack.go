@@ -15,7 +15,6 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -25,7 +24,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Slack }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSlack }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
@@ -45,7 +44,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_Slack,
+		AnalyzerType: analyzers.AnalyzerTypeSlack,
 		Metadata:     nil,
 	}
 

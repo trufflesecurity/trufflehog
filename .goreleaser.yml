@@ -2,7 +2,7 @@ version: 2
 builds:
   - binary: trufflehog
     ldflags:
-      - -X 'github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}'
+      - -s -w -X 'github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}'
     env: [CGO_ENABLED=0]
     goos:
     - linux
@@ -11,9 +11,6 @@ builds:
     goarch:
     - amd64
     - arm64
-    hooks:
-      post:
-        - bash -c 'if [ "{{ .Env.GGOOS  }}" != "darwin" ]; then upx -q "{{ .Path }}"; fi'
 dockers:
   - image_templates: ["trufflesecurity/{{ .ProjectName }}:{{ .Version }}-amd64"]
     dockerfile: Dockerfile.goreleaser

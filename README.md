@@ -36,6 +36,26 @@ We take the revenue from the enterprise product to fund more awesome open source
 
 </div>
 
+# What is TruffleHog 🐽
+
+TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
+
+## Discovery 🔍
+
+TruffleHog can look for secrets in many places including Git, chats, wikis, logs, API testing platforms, object stores, filesystems and more
+
+## Classification 📁
+
+TruffleHog classifies over 800 secret types, mapping them back to the specific identity they belong to. Is it an AWS secret? Stripe secret? Cloudflare secret? Postgres password? SSL Private key? Sometimes its hard to tell looking at it, so TruffleHog classifies everything it finds.
+
+## Validation ✅
+
+For every secret TruffleHog can classify, it can also log in to confirm if that secret is live or not. This step is critical to know if there’s an active present danger or not.
+
+## Analysis 🔬
+
+For the 20 some of the most commonly leaked out credential types, instead of sending one request to check if the secret can log in, TruffleHog can send many requests to learn everything there is to know about the secret. Who created it? What resources can it access? What permissions does it have on those resources?
+
 # :loudspeaker: Join Our Community
 
 Have questions? Feedback? Jump in slack or discord and hang out with us
@@ -237,13 +257,25 @@ docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest 
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 9: Scan GCS buckets for verified secrets
+## 9: Scan a local git repo
+
+Clone the git repo. For example [test keys](git@github.com:trufflesecurity/test_keys.git) repo.
+```bash
+$ git clone git@github.com:trufflesecurity/test_keys.git
+```
+
+Run trufflehog from the parent directory (outside the git repo).
+```bash
+$ trufflehog git file://test_keys --only-verified
+```
+
+## 10: Scan GCS buckets for verified secrets
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 ```
 
-## 10: Scan a Docker image for verified secrets
+## 11: Scan a Docker image for verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
@@ -251,7 +283,7 @@ Use the `--image` flag multiple times to scan multiple images.
 trufflehog docker --image trufflesecurity/secrets --only-verified
 ```
 
-## 11: Scan in CI
+## 12: Scan in CI
 
 Set the `--since-commit` flag to your default branch that people merge into (ex: "main"). Set the `--branch` flag to your PR's branch name (ex: "feature-1"). Depending on the CI/CD platform you use, this value can be pulled in dynamically (ex: [CIRCLE_BRANCH in Circle CI](https://circleci.com/docs/variables/) and [TRAVIS_PULL_REQUEST_BRANCH in Travis CI](https://docs.travis-ci.com/user/environment-variables/)). If the repo is cloned and the target branch is already checked out during the CI/CD workflow, then `--branch HEAD` should be sufficient. The `--fail` flag will return an 183 error code if valid credentials are found.
 
@@ -259,7 +291,7 @@ Set the `--since-commit` flag to your default branch that people merge into (ex:
 trufflehog git file://. --since-commit main --branch feature-1 --only-verified --fail
 ```
 
-## 12: Scan a Postman workspace
+## 13: Scan a Postman workspace
 
 Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
 
@@ -267,13 +299,13 @@ Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple time
 trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
 
-## 13: Scan a Jenkins server
+## 14: Scan a Jenkins server
 
 ```bash
 trufflehog jenkins --url https://jenkins.example.com --username admin --password admin
 ```
 
-## 14: Scan an Elasticsearch server
+## 15: Scan an Elasticsearch server
 
 ### Scan a Local Cluster
 
@@ -301,7 +333,7 @@ trufflehog elasticsearch \
   --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
 ```
 
-## 15. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
+## 16. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
 
 The following command will enumerate deleted and hidden commits on a GitHub repository and then scan them for secrets. This is an alpha release feature.
 
@@ -315,7 +347,7 @@ In addition to the normal TruffleHog output, the `--object-discovery` flag creat
 
 For more information on Cross Fork Object References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github).
 
-## 16. Scan Hugging Face
+## 17. Scan Hugging Face
 
 ### Scan a Hugging Face Model, Dataset or Space
 
@@ -390,8 +422,7 @@ Find credentials in git repositories.
 
 Flags:
   -h, --help                Show context-sensitive help (also try --help-long and --help-man).
-      --debug               Run in debug mode.
-      --trace               Run in trace mode.
+      --log-level=0         Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".
       --profile             Enables profiling and sets a pprof and fgprof server on :18066.
   -j, --json                Output in JSON format.
       --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
@@ -547,7 +578,7 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
     # Scan commits until here (usually dev branch).
     head: # optional
     # Extra args to be passed to the trufflehog cli.
-    extra_args: --debug --only-verified
+    extra_args: --log-level=2 --only-verified
 ```
 
 If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.

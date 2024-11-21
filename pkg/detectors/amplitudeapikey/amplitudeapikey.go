@@ -2,16 +2,17 @@ package amplitudeapikey
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -50,6 +51,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
+
+			// regex for both key and secret are same so the set of strings could possibly be same as well
+			if resMatch == resSecretMatch {
+				continue
+			}
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AmplitudeApiKey,

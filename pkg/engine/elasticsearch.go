@@ -13,7 +13,7 @@ import (
 )
 
 // ScanElasticsearch scans a Elasticsearch installation.
-func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchConfig) error {
+func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchConfig) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Elasticsearch{
 		Nodes:          c.Nodes,
 		Username:       c.Username,
@@ -31,7 +31,7 @@ func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchC
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal Elasticsearch connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - Elasticsearch"
@@ -39,8 +39,7 @@ func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchC
 
 	elasticsearchSource := &elasticsearch.Source{}
 	if err := elasticsearchSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, elasticsearchSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, elasticsearchSource)
 }

@@ -4,9 +4,10 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -25,7 +26,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"zipapi"}) + `\b([0-9a-z]{32})\b`)
-	emailPat = regexp.MustCompile(`\b([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-z]+)\b`)
+	emailPat = regexp.MustCompile(common.EmailPattern)
 	pwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zipapi"}) + `\b([a-zA-Z0-9!=@#$%^]{7,})`)
 )
 
@@ -39,35 +40,31 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	emailMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
-	pwordMatches := pwordPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueEmailMatches, uniqueKeyMatches, uniquePassMatches := make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
-		for _, emailMatch := range emailMatches {
-			if len(emailMatch) != 2 {
-				continue
-			}
-			resEmail := strings.TrimSpace(emailMatch[1])
-			for _, pwordMatch := range pwordMatches {
-				if len(pwordMatch) != 2 {
-					continue
-				}
-				resPword := strings.TrimSpace(pwordMatch[1])
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeyMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
+	for _, match := range pwordPat.FindAllStringSubmatch(dataStr, -1) {
+		uniquePassMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
+
+	for keyMatch := range uniqueKeyMatches {
+		for emailMatch := range uniqueEmailMatches {
+			for passMatch := range uniquePassMatches {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZipAPI,
-					Raw:          []byte(resMatch),
+					Raw:          []byte(keyMatch),
 				}
 
 				if verify {
-					data := fmt.Sprintf("%s:%s", resEmail, resPword)
+					data := fmt.Sprintf("%s:%s", emailMatch, passMatch)
 					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://service.zipapi.us/zipcode/90210/?X-API-KEY=%s", resMatch), nil)
+					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://service.zipapi.us/zipcode/90210/?X-API-KEY=%s", keyMatch), nil)
 					if err != nil {
 						continue
 					}

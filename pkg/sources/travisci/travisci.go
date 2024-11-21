@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/shuheiktgw/go-travis"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -76,6 +77,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		}
 		s.client = travis.NewClient(baseURL, conn.GetToken())
 		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3)
+		log.RedactGlobally(conn.GetToken())
 
 		user, _, err := s.client.User.Current(ctx, nil)
 		if err != nil {

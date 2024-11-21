@@ -13,7 +13,7 @@ import (
 )
 
 // ScanGitHub scans GitHub with the provided options.
-func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
+func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (sources.JobProgressRef, error) {
 	connection := sourcespb.GitHub{
 		Endpoint:                   c.Endpoint,
 		Organizations:              c.Orgs,
@@ -41,7 +41,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal github connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	logOptions := &gogit.LogOptions{}
@@ -56,9 +56,8 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) error {
 
 	githubSource := &github.Source{}
 	if err := githubSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
 	githubSource.WithScanOptions(scanOptions)
-	_, err = e.sourceManager.Run(ctx, sourceName, githubSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, githubSource)
 }

@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v67/github"
 	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -629,7 +629,6 @@ func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error
 	s.repos = reposToScan
 
 	for i, repoURL := range s.repos {
-		i, repoURL := i, repoURL
 		s.jobPool.Go(func() error {
 			if common.IsDone(ctx) {
 				return nil
@@ -959,8 +958,11 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 		if s.handleRateLimit(ctx, err) {
 			continue
 		}
-		if err != nil || len(members) == 0 {
-			return fmt.Errorf("could not list organization members: account may not have access to list organization members %w", err)
+		if err != nil {
+			return fmt.Errorf("could not list organization (%q) members: account may not have access to list organization members: %w", org, err)
+		}
+		if len(members) == 0 {
+			return fmt.Errorf("organization (%q) had 0 members: account may not have access to list organization members", org)
 		}
 
 		logger.V(2).Info("Listed members", "page", opts.Page, "last_page", res.LastPage)
