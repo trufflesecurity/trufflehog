@@ -46,7 +46,7 @@ func (s *Scanner) Version() int { return 1 }
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"godaddy"}
+	return []string{"godaddy", "ote"}
 }
 
 func (s Scanner) Description() string {
