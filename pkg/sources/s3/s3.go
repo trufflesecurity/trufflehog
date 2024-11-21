@@ -46,7 +46,7 @@ type Source struct {
 	concurrency int
 	conn        *sourcespb.S3
 
-	progressTracker *ProgressTracker
+	checkpointer *Checkpointer
 	sources.Progress
 
 	errorCount    *sync.Map
@@ -93,7 +93,7 @@ func (s *Source) Init(
 	}
 	s.conn = &conn
 
-	s.progressTracker = NewProgressTracker(ctx, conn.GetEnableResumption(), &s.Progress)
+	s.checkpointer = NewCheckpointer(ctx, conn.GetEnableResumption(), &s.Progress)
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
 
@@ -255,8 +255,8 @@ type resumePosition struct {
 //     In this case, we use binary search to find the closest position where the bucket would have been,
 //     allowing us to resume from the nearest available point in our sorted bucket list rather than
 //     restarting the entire scan.
-func determineResumePosition(ctx context.Context, tracker *ProgressTracker, buckets []string) resumePosition {
-	resumePoint, err := tracker.GetResumePoint(ctx)
+func determineResumePosition(ctx context.Context, tracker *Checkpointer, buckets []string) resumePosition {
+	resumePoint, err := tracker.ResumePoint(ctx)
 	if err != nil {
 		ctx.Logger().Error(err, "failed to get resume point; starting from the beginning")
 		return resumePosition{isNewScan: true}
@@ -269,6 +269,7 @@ func determineResumePosition(ctx context.Context, tracker *ProgressTracker, buck
 	startIdx, found := slices.BinarySearch(buckets, resumePoint.CurrentBucket)
 	return resumePosition{
 		bucket:     resumePoint.CurrentBucket,
+		startAfter: resumePoint.StartAfter,
 		index:      startIdx,
 		exactMatch: found,
 	}
@@ -286,7 +287,7 @@ func (s *Source) scanBuckets(
 	}
 	var objectCount uint64
 
-	pos := determineResumePosition(ctx, s.progressTracker, bucketsToScan)
+	pos := determineResumePosition(ctx, s.checkpointer, bucketsToScan)
 	switch {
 	case pos.isNewScan:
 		ctx.Logger().Info("Starting new scan from beginning")
@@ -421,12 +422,12 @@ func (s *Source) pageChunker(
 	state processingState,
 	chunksChan chan *sources.Chunk,
 ) {
-	s.progressTracker.Reset()
+	s.checkpointer.Reset()
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
 
 	for objIdx, obj := range metadata.page.Contents {
 		if obj == nil {
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for nil object")
 			}
 			continue
@@ -441,7 +442,7 @@ func (s *Source) pageChunker(
 		// Skip GLACIER and GLACIER_IR objects.
 		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
 			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass)
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for glacier object")
 			}
 			continue
@@ -450,7 +451,7 @@ func (s *Source) pageChunker(
 		// Ignore large files.
 		if *obj.Size > s.maxObjectSize {
 			ctx.Logger().V(5).Info("Skipping %d byte file (over maxObjectSize limit)")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for large file")
 			}
 			continue
@@ -459,7 +460,7 @@ func (s *Source) pageChunker(
 		// File empty file.
 		if *obj.Size == 0 {
 			ctx.Logger().V(5).Info("Skipping empty file")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for empty file")
 			}
 			continue
@@ -468,7 +469,7 @@ func (s *Source) pageChunker(
 		// Skip incompatible extensions.
 		if common.SkipFile(*obj.Key) {
 			ctx.Logger().V(5).Info("Skipping file with incompatible extension")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for incompatible file")
 			}
 			continue
@@ -576,7 +577,7 @@ func (s *Source) pageChunker(
 			}
 
 			// Update progress after successful processing.
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for scanned object")
 			}
 

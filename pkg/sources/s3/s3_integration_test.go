@@ -89,7 +89,7 @@ func TestSourceChunksNoResumption(t *testing.T) {
 	s := Source{}
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_Unauthenticated{},
-		Buckets:    []string{"trufflesec-ahrav-test-2"},
+		Buckets:    []string{"integration-resumption-tests"},
 	}
 	conn, err := anypb.New(connection)
 	if err != nil {
@@ -110,7 +110,7 @@ func TestSourceChunksNoResumption(t *testing.T) {
 	for range chunksCh {
 		got++
 	}
-	assert.Equal(t, got, wantChunkCount)
+	assert.Equal(t, wantChunkCount, got)
 }
 
 func TestSource_Validate(t *testing.T) {
@@ -254,14 +254,14 @@ func TestSourceChunksResumption(t *testing.T) {
 
 	src := new(Source)
 	src.Progress = sources.Progress{
-		Message:           "Bucket: trufflesec-ahrav-test-2",
-		EncodedResumeInfo: "{\"current_bucket\":\"trufflesec-ahrav-test-2\",\"start_after\":\"test-dir/\"}",
+		Message:           "Bucket: integration-resumption-tests",
+		EncodedResumeInfo: "{\"current_bucket\":\"integration-resumption-tests\",\"start_after\":\"test-dir/\"}",
 		SectionsCompleted: 0,
 		SectionsRemaining: 1,
 	}
 	connection := &sourcespb.S3{
 		Credential:       &sourcespb.S3_Unauthenticated{},
-		Buckets:          []string{"trufflesec-ahrav-test-2"},
+		Buckets:          []string{"integration-resumption-tests"},
 		EnableResumption: true,
 	}
 	conn, err := anypb.New(connection)
@@ -291,4 +291,35 @@ func TestSourceChunksResumption(t *testing.T) {
 	sourceTotalChunkCount := 19787
 	assert.Equal(t, 9638, count, "Should have processed all remaining data on resume")
 	assert.Less(t, count, sourceTotalChunkCount, "Should have processed less than total chunks on resume")
+}
+
+func TestSourceChunksNoResumptionMultipleBuckets(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	s := Source{}
+	connection := &sourcespb.S3{
+		Credential: &sourcespb.S3_Unauthenticated{},
+		Buckets:    []string{"integration-resumption-tests", "truffletestbucket"},
+	}
+	conn, err := anypb.New(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.Init(ctx, "test name", 0, 0, false, conn, 1)
+	chunksCh := make(chan *sources.Chunk)
+	go func() {
+		defer close(chunksCh)
+		err = s.Chunks(ctx, chunksCh)
+		assert.Nil(t, err)
+	}()
+
+	wantChunkCount := 19890
+	got := 0
+
+	for range chunksCh {
+		got++
+	}
+	assert.Equal(t, wantChunkCount, got)
 }
