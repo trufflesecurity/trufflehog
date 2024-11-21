@@ -33,6 +33,9 @@ func init() { defaultBufferPool = pool.NewBufferPool(defaultBufferSize) }
 // If the underlying reader is seekable, direct seeking operations are performed
 // on it. For non-seekable readers, seeking is emulated using the buffer or
 // temporary file.
+//
+// The caller MUST call Close() when done using the BufferedReadSeeker to clean up
+// resources like temporary files and buffers.
 type BufferedReadSeeker struct {
 	reader io.Reader
 	seeker io.Seeker // If the reader supports seeking, it's stored here for direct access
@@ -73,6 +76,9 @@ func asSeeker(r io.Reader) io.Seeker {
 // NewBufferedReaderSeeker creates and initializes a BufferedReadSeeker.
 // It takes an io.Reader and checks if it supports seeking.
 // If the reader supports seeking, it is stored in the seeker field.
+//
+// The caller MUST call Close() when done using the returned BufferedReadSeeker
+// to clean up resources like temporary files and buffers.
 func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 	const defaultThreshold = 1 << 24 // 16MB threshold for switching to file buffering
 
@@ -266,6 +272,10 @@ func (br *BufferedReadSeeker) readToEnd() error {
 }
 
 func (br *BufferedReadSeeker) writeData(data []byte) error {
+	if br.buf == nil {
+		br.buf = br.bufPool.Get()
+	}
+
 	_, err := br.buf.Write(data)
 	if err != nil {
 		return err

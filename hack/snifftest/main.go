@@ -17,7 +17,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -247,7 +247,7 @@ func main() {
 
 func getAllScanners() map[string]detectors.Detector {
 	allScanners := map[string]detectors.Detector{}
-	for _, s := range engine.DefaultDetectors() {
+	for _, s := range defaults.DefaultDetectors() {
 		secretType := reflect.Indirect(reflect.ValueOf(s)).Type().PkgPath()
 		path := strings.Split(secretType, "/")[len(strings.Split(secretType, "/"))-1]
 		allScanners[path] = s

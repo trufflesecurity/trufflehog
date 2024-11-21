@@ -28,6 +28,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
@@ -409,6 +410,9 @@ func run(state overseer.State) {
 		feature.UserAgentSuffix.Store(*userAgentSuffix)
 	}
 
+	// OSS Default APK handling on
+	feature.EnableAPKHandler.Store(true)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
@@ -461,7 +465,7 @@ func run(state overseer.State) {
 		// default detectors, which can be further filtered by the
 		// user. The filters are applied by the engine and are only
 		// subtractive.
-		Detectors:             append(engine.DefaultDetectors(), conf.Detectors...),
+		Detectors:             append(defaults.DefaultDetectors(), conf.Detectors...),
 		Verify:                !*noVerification,
 		IncludeDetectors:      *includeDetectors,
 		ExcludeDetectors:      *excludeDetectors,
@@ -629,6 +633,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 	}()
 
+	var ref sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
 		gitCfg := sources.GitConfig{
@@ -641,7 +646,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Bare:             *gitScanBare,
 			ExcludeGlobs:     *gitScanExcludeGlobs,
 		}
-		if err = eng.ScanGit(ctx, gitCfg); err != nil {
+		if ref, err = eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
 		}
 	case githubScan.FullCommand():
@@ -670,7 +675,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CommentsTimeframeDays:      *githubCommentsTimeframeDays,
 			Filter:                     filter,
 		}
-		if err := eng.ScanGitHub(ctx, cfg); err != nil {
+		if ref, err = eng.ScanGitHub(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)
 		}
 	case githubExperimentalScan.FullCommand():
@@ -681,7 +686,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CollisionThreshold: *githubExperimentalCollisionThreshold,
 			DeleteCachedData:   *githubExperimentalDeleteCache,
 		}
-		if err := eng.ScanGitHubExperimental(ctx, cfg); err != nil {
+		if ref, err = eng.ScanGitHubExperimental(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan using Github Experimental: %v", err)
 		}
 	case gitlabScan.FullCommand():
@@ -698,7 +703,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ExcludeRepos: *gitlabScanExcludeRepos,
 			Filter:       filter,
 		}
-		if err := eng.ScanGitLab(ctx, cfg); err != nil {
+		if ref, err = eng.ScanGitLab(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)
 		}
 	case filesystemScan.FullCommand():
@@ -713,7 +718,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludePathsFile: *filesystemScanIncludePaths,
 			ExcludePathsFile: *filesystemScanExcludePaths,
 		}
-		if err = eng.ScanFileSystem(ctx, cfg); err != nil {
+		if ref, err = eng.ScanFileSystem(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
 		}
 	case s3Scan.FullCommand():
@@ -727,7 +732,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
 		}
-		if err := eng.ScanS3(ctx, cfg); err != nil {
+		if ref, err = eng.ScanS3(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)
 		}
 	case syslogScan.FullCommand():
@@ -739,15 +744,15 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			KeyPath:     *syslogTLSKey,
 			Concurrency: *concurrency,
 		}
-		if err := eng.ScanSyslog(ctx, cfg); err != nil {
+		if ref, err = eng.ScanSyslog(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan syslog: %v", err)
 		}
 	case circleCiScan.FullCommand():
-		if err := eng.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
+		if ref, err = eng.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan CircleCI: %v", err)
 		}
 	case travisCiScan.FullCommand():
-		if err := eng.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
+		if ref, err = eng.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan TravisCI: %v", err)
 		}
 	case gcsScan.FullCommand():
@@ -764,7 +769,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Concurrency:    *concurrency,
 			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
-		if err := eng.ScanGCS(ctx, cfg); err != nil {
+		if ref, err = eng.ScanGCS(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GCS: %v", err)
 		}
 	case dockerScan.FullCommand():
@@ -773,7 +778,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Images:            *dockerScanImages,
 			UseDockerKeychain: *dockerScanToken == "",
 		}
-		if err := eng.ScanDocker(ctx, cfg); err != nil {
+		if ref, err = eng.ScanDocker(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)
 		}
 	case postmanScan.FullCommand():
@@ -810,7 +815,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			WorkspacePaths:      *postmanWorkspacePaths,
 			EnvironmentPaths:    *postmanEnvironmentPaths,
 		}
-		if err := eng.ScanPostman(ctx, cfg); err != nil {
+		if ref, err = eng.ScanPostman(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Postman: %v", err)
 		}
 	case elasticsearchScan.FullCommand():
@@ -826,7 +831,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			SinceTimestamp: *elasticsearchSinceTimestamp,
 			BestEffortScan: *elasticsearchBestEffortScan,
 		}
-		if err := eng.ScanElasticsearch(ctx, cfg); err != nil {
+		if ref, err = eng.ScanElasticsearch(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Elasticsearch: %v", err)
 		}
 	case jenkinsScan.FullCommand():
@@ -836,7 +841,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Username:              *jenkinsUsername,
 			Password:              *jenkinsPassword,
 		}
-		if err := eng.ScanJenkins(ctx, cfg); err != nil {
+		if ref, err = eng.ScanJenkins(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
 		}
 	case huggingfaceScan.FullCommand():
@@ -869,7 +874,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludePrs:         *huggingfaceIncludePrs,
 			Concurrency:        *concurrency,
 		}
-		if err := eng.ScanHuggingface(ctx, cfg); err != nil {
+		if ref, err = eng.ScanHuggingface(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan HuggingFace: %v", err)
 		}
 	default:
@@ -879,6 +884,15 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	// Wait for all workers to finish.
 	if err = eng.Finish(ctx); err != nil {
 		return scanMetrics, fmt.Errorf("engine failed to finish execution: %v", err)
+	}
+
+	// Print any errors reported during the scan.
+	if errs := ref.Snapshot().Errors; len(errs) > 0 {
+		errMsgs := make([]string, len(errs))
+		for i := 0; i < len(errs); i++ {
+			errMsgs[i] = errs[i].Error()
+		}
+		ctx.Logger().Error(nil, "encountered errors during scan", "errors", errMsgs)
 	}
 
 	if *printAvgDetectorTime {

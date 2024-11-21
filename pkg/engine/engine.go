@@ -21,6 +21,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -345,7 +346,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 
 	// Only use the default detectors if none are provided.
 	if len(e.detectors) == 0 {
-		e.detectors = DefaultDetectors()
+		e.detectors = defaults.DefaultDetectors()
 	}
 
 	if e.dispatcher == nil {
@@ -398,7 +399,7 @@ func parseCustomVerifierEndpoints(endpoints map[string]string) (map[config.Detec
 		return nil, fmt.Errorf("invalid verifier detector configuration id %v: %w", id, err)
 	}
 	// Extra check for endpoint customization.
-	isEndpointCustomizer := DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
+	isEndpointCustomizer := defaults.DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
 	for id := range customVerifierEndpoints {
 		if _, ok := isEndpointCustomizer[id.ID]; !ok {
 			return nil, fmt.Errorf("endpoint provided but detector does not support endpoint customization: %w", err)
@@ -435,7 +436,7 @@ func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T
 // verifyDetectorsAreVersioner checks all keys in a provided map to verify the
 // provided type is actually a Versioner.
 func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (config.DetectorID, error) {
-	isVersioner := DefaultDetectorTypesImplementing[detectors.Versioner]()
+	isVersioner := defaults.DefaultDetectorTypesImplementing[detectors.Versioner]()
 	for id := range data {
 		if id.Version == 0 {
 			// Version not provided.
@@ -564,7 +565,7 @@ func (e *Engine) GetDetectorsMetrics() map[string]time.Duration {
 	e.metrics.mu.RLock()
 	defer e.metrics.mu.RUnlock()
 
-	result := make(map[string]time.Duration, len(DefaultDetectors()))
+	result := make(map[string]time.Duration, len(defaults.DefaultDetectors()))
 	for detectorName, durations := range e.DetectorAvgTime() {
 		var total time.Duration
 		for _, d := range durations {

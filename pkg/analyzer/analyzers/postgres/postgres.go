@@ -54,11 +54,11 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	userResource, userBindings := bakeUserBindings(info)
 	result.Bindings = append(result.Bindings, userBindings...)
 
-	// add user's database priviliges to bindings
+	// add user's database privileges to bindings
 	dbNameToResourceMap, dbBindings := bakeDatabaseBindings(userResource, info)
 	result.Bindings = append(result.Bindings, dbBindings...)
 
-	// add user's table priviliges to bindings
+	// add user's table privileges to bindings
 	tableBindings := bakeTableBindings(dbNameToResourceMap, info)
 	result.Bindings = append(result.Bindings, tableBindings...)
 
