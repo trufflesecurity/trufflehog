@@ -93,7 +93,7 @@ func (ui *TUI) Init() tea.Cmd {
 	ui.pages[viewOSSProjectPage] = view_oss.New(ui.common)
 	ui.pages[contactEnterprisePage] = contact_enterprise.New(ui.common)
 	ui.pages[analyzeKeysPage] = analyze_keys.New(ui.common)
-	ui.pages[analyzeFormPage] = analyze_form.New(ui.common, "stripe")
+	ui.pages[analyzeFormPage] = analyze_form.New(ui.common, "this is a bug")
 	ui.SetSize(ui.common.Width, ui.common.Height)
 	cmds := make([]tea.Cmd, 0)
 	cmds = append(cmds,
@@ -162,6 +162,11 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ui.setActivePage(sourceConfigurePage)
 			cmds = append(cmds, func() tea.Msg {
 				return source_configure.SetSourceMsg{Source: item.ID()}
+			})
+		case analyze_keys.KeyTypeItem:
+			ui.setActivePage(analyzeFormPage)
+			cmds = append(cmds, func() tea.Msg {
+				return analyze_form.SetAnalyzerMsg(item.ID())
 			})
 		}
 		// TODO figure this out

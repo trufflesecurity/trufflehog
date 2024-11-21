@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
@@ -63,10 +64,12 @@ func (ui *AnalyzeKeyPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch {
 			case key.Matches(msg, ui.Common.KeyMap.Back):
 				return nil, tea.Quit
-				// case key.Matches(msg, ui.Common.KeyMap.Select):
-				// 	chosen := string(ui.list.SelectedItem().(KeyTypeItem))
-				// 	return NewFormPage(ui.Common, chosen), SetKeyTypeCmd(chosen)
-				// }
+			case key.Matches(msg, ui.Common.KeyMap.Select):
+				chosenAnalyzer := ui.list.SelectedItem().(KeyTypeItem)
+
+				return ui, func() tea.Msg {
+					return selector.SelectMsg{IdentifiableItem: chosenAnalyzer}
+				}
 			}
 		}
 

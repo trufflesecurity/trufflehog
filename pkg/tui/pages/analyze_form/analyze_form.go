@@ -87,14 +87,20 @@ func (AnalyzeForm) Init() tea.Cmd {
 	return nil
 }
 
+type SetAnalyzerMsg string
+
 func (ui *AnalyzeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// TODO: Check form focus.
-	// if msg, ok := msg.(tea.KeyMsg); ok {
-	// 	switch {
-	// 	case key.Matches(msg, ui.Common.KeyMap.Back):
-	// 		return ui.PrevPage()
-	// 	}
-	// }
+	switch msg := msg.(type) {
+	case SetAnalyzerMsg:
+		ui = New(ui.Common, string(msg))
+		return ui, nil
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(msg, ui.Common.KeyMap.Back):
+			return nil, tea.Quit
+		}
+	}
+
 	if _, ok := msg.(textinputs.SelectNextMsg); ok {
 		values := make(map[string]string)
 		for k, v := range ui.form.GetInputs() {
@@ -109,8 +115,9 @@ func (ui *AnalyzeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return SecretInfo{Cfg: &cfg, Parts: values}
 		}
-		return nil, secretInfoCmd
+		return ui, secretInfoCmd
 	}
+
 	form, cmd := ui.form.Update(msg)
 	ui.form = form.(textinputs.Model)
 	return ui, cmd
@@ -119,18 +126,6 @@ func (ui *AnalyzeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (ui *AnalyzeForm) View() string {
 	return styles.AppStyle.Render(ui.form.View())
 }
-
-// func (ui AnalyzeForm) PrevPage() (tea.Model, tea.Cmd) {
-// 	page := NewKeyTypePage(ui.Common)
-// 	// Select what was previously selected.
-// 	index, ok := slices.BinarySearch(analyzers.AvailableAnalyzers(), ui.KeyType)
-// 	if !ok {
-// 		// Should be impossible.
-// 		index = 0
-// 	}
-// 	page.list.Select(index)
-// 	return page, nil
-// }
 
 func (m *AnalyzeForm) ShortHelp() []key.Binding {
 	// TODO: actually return something
