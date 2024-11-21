@@ -53,12 +53,12 @@ func New(c common.Common) *AnalyzeKeyPage {
 }
 
 func (ui *AnalyzeKeyPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// if msg, ok := msg.(tea.WindowSizeMsg); ok {
-	// 	ui.SetAnalyzeSize(msg.Width, msg.Height)
-	// }
-
 	if !ui.list.SettingFilter() {
 		switch msg := msg.(type) {
+
+		case tea.WindowSizeMsg:
+			h, v := styles.AppStyle.GetFrameSize()
+			ui.list.SetSize(msg.Width-h, msg.Height-v)
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, ui.Common.KeyMap.Back):
@@ -76,13 +76,6 @@ func (ui *AnalyzeKeyPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return ui, func() tea.Msg { return nil }
 }
-
-// func (ui *AnalyzeKeyPage) SetAnalyzeSize(width, height int) {
-// 	h, v := styles.AppStyle.GetFrameSize()
-// 	h, v = width-h, height-v
-// 	ui.Common.SetSize(h, v)
-// 	*ui = New(&ui.Common)
-// }
 
 func (ui AnalyzeKeyPage) View() string {
 	return styles.AppStyle.Render(ui.list.View())
