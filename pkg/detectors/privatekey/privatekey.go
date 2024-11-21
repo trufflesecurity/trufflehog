@@ -87,8 +87,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			var (
 				wg                 sync.WaitGroup
-				verificationErrors = newVerificationErrors()
 				extraData          = newExtraData()
+				verificationErrors = newVerificationErrors()
 			)
 
 			// Look up certificate information.
