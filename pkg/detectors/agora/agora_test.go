@@ -15,7 +15,7 @@ var (
 	validKeyPattern    = "asdf0987mnbv1234qsxojb6ygb2wsx0o"
 	validSecretPattern = "beqr7215fr4g6bfjkmnvxrtygb2wsxap"
 	complexPattern     = `agora credentials
-							these are some example credentails for login.
+							these are some example credentials for login.
 							use these to login.
 							key: asdf0987mnbv1234qsxojb6ygb2wsx0o
 							secret: beqr7215fr4g6bfjkmnvxrtygb2wsxap

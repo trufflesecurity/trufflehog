@@ -57,7 +57,7 @@ type apkHandler struct {
 	*defaultHandler
 }
 
-// newapkHandler creates an apkHandler.
+// newAPKHandler creates an apkHandler.
 func newAPKHandler() *apkHandler {
 	return &apkHandler{
 		defaultHandler: newDefaultHandler(apkHandlerType),
@@ -149,17 +149,25 @@ func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparse
 }
 
 // processFile processes the file and sends the extracted data to the provided channel.
-func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTable *apkparser.ResourceTable, apkChan chan DataOrErr) error {
+func (h *apkHandler) processFile(
+	ctx logContext.Context,
+	file *zip.File,
+	resTable *apkparser.ResourceTable,
+	apkChan chan DataOrErr,
+) error {
 	// check if the file is empty
 	if file.UncompressedSize64 == 0 {
 		return nil
 	}
 
 	// Open the file from the zip archive
-	rdr, err := openFile(file)
+	f, err := openFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", file.Name, err)
 	}
+	defer f.Close()
+
+	rdr := iobuf.NewBufferedReaderSeeker(f)
 	defer rdr.Close()
 
 	var contentReader io.Reader
@@ -171,7 +179,7 @@ func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTabl
 			return fmt.Errorf("failed to decode xml file %s: %w", file.Name, err)
 		}
 	case ".dex":
-		contentReader, err = h.processDexFile(ctx, iobuf.NewBufferedReaderSeeker(rdr))
+		contentReader, err = h.processDexFile(ctx, rdr)
 		if err != nil {
 			return fmt.Errorf("failed to decode dex file %s: %w", file.Name, err)
 		}
@@ -182,7 +190,12 @@ func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTabl
 }
 
 // handleAPKFileContent sends the extracted data to the provided channel via the handleNonArchiveContent function.
-func (h *apkHandler) handleAPKFileContent(ctx logContext.Context, rdr io.Reader, fileName string, apkChan chan DataOrErr) error {
+func (h *apkHandler) handleAPKFileContent(
+	ctx logContext.Context,
+	rdr io.Reader,
+	fileName string,
+	apkChan chan DataOrErr,
+) error {
 	mimeReader, err := newMimeTypeReader(rdr)
 	if err != nil {
 		return fmt.Errorf("failed to create mimeTypeReader for file %s: %w", fileName, err)
@@ -292,8 +305,12 @@ func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReaderAt) (io
 }
 
 // processDexClass processes a single class node's methods
-func (h *apkHandler) processDexClass(ctx logContext.Context, dexReader *dextk.Reader, node dextk.ClassNode, dexOutput *bytes.Buffer) {
-
+func (h *apkHandler) processDexClass(
+	ctx logContext.Context,
+	dexReader *dextk.Reader,
+	node dextk.ClassNode,
+	dexOutput *bytes.Buffer,
+) {
 	var classOutput bytes.Buffer
 	methodValues := make(map[string]struct{})
 
@@ -318,7 +335,13 @@ func (h *apkHandler) processDexClass(ctx logContext.Context, dexReader *dextk.Re
 
 // processDexMethod iterates over a slice of methods, processes each method,
 // handles errors, and writes the output to dexOutput.
-func processDexMethod(ctx logContext.Context, dexReader *dextk.Reader, methods []dextk.MethodNode, classOutput *bytes.Buffer, methodValues map[string]struct{}) {
+func processDexMethod(
+	ctx logContext.Context,
+	dexReader *dextk.Reader,
+	methods []dextk.MethodNode,
+	classOutput *bytes.Buffer,
+	methodValues map[string]struct{},
+) {
 	for _, method := range methods {
 		s, err := parseDexInstructions(dexReader, method, methodValues)
 		if err != nil {
@@ -385,26 +408,24 @@ func formatAndFilterInstruction(line string) string {
 	return ""
 }
 
-func decodeXML(rdr io.ReadCloser, resTable *apkparser.ResourceTable) (io.Reader, error) {
-	//Convert rdr to BufferedReadSeeker to support rewinding
-	bufRdr := iobuf.NewBufferedReaderSeeker(rdr)
-
+func decodeXML(rdr io.ReadSeeker, resTable *apkparser.ResourceTable) (io.Reader, error) {
 	// Create a buffer to store the formatted XML data
 	// Note: in the future, consider a custom writer that spills to disk if the buffer gets too large
 	var buf bytes.Buffer
 	enc := xml.NewEncoder(&buf)
 
 	// Parse the XML data using the apkparser library + resource table
-	err := apkparser.ParseXml(bufRdr, enc, resTable)
-	if err != nil {
-		// If the error is due to plaintext XML, return the plaintext XML
-		if errors.Is(err, apkparser.ErrPlainTextManifest) {
-			if _, err := bufRdr.Seek(0, io.SeekStart); err != nil {
-				return bufRdr, fmt.Errorf("error resetting reader after XML parsing error: %w", err)
-			}
-			return bufRdr, nil
-		}
-		return nil, err
+	err := apkparser.ParseXml(rdr, enc, resTable)
+	if err == nil {
+		return &buf, nil
 	}
-	return &buf, nil
+
+	// If the error is due to plaintext XML, return the plaintext XML.
+	if errors.Is(err, apkparser.ErrPlainTextManifest) {
+		if _, err := rdr.Seek(0, io.SeekStart); err != nil {
+			return rdr, fmt.Errorf("error resetting reader after XML parsing error: %w", err)
+		}
+		return rdr, nil
+	}
+	return nil, err
 }

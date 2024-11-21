@@ -21,12 +21,12 @@ func TestAPKHandler(t *testing.T) {
 		matchString     string
 	}{
 		"apk_with_3_leaked_keys": {
-			"https://github.com/joeleonjr/leakyAPK/raw/refs/heads/main/aws_leak.apk",
-			942,
+			archiveURL:     "https://github.com/joeleonjr/leakyAPK/raw/refs/heads/main/aws_leak.apk",
+			expectedChunks: 942,
 			// Note: the secret count is 4 instead of 3 b/c we're not actually running the secret detection engine,
 			// we're just looking for a string match. There is one extra string match in the APK (but only 3 detected secrets).
-			4,
-			"AKIA2UC3BSXMLSCLTUUS",
+			expectedSecrets: 4,
+			matchString:     "AKIA2UC3BSXMLSCLTUUS",
 		},
 	}
 
@@ -60,7 +60,10 @@ func TestAPKHandler(t *testing.T) {
 			}
 
 			assert.True(t, matched)
-			assert.Equal(t, testCase.expectedChunks, chunkCount)
+			// The APK handler's chunk count may increase over time as new keywords are added
+			// as the default detector list grows. We use GreaterOrEqual to ensure the test remains
+			// stable while allowing for this expected growth.
+			assert.GreaterOrEqual(t, chunkCount, testCase.expectedChunks)
 			assert.Equal(t, testCase.expectedSecrets, secretCount)
 		})
 	}
