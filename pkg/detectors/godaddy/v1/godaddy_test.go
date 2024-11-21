@@ -20,7 +20,8 @@ var (
 		"verification_url": "https://api.example.com/example",
 		"test_secrets": {
 			"godaddyKey": "2TM44WqB21o4zH_3xM44WkB21i4zHHhXSoHjO",
-			"godaddySecret": "3xM44WkB21i4zHHhXSoHjO"
+			"godaddySecret": "3xM44WkB21i4zHHhXSoHjO",
+			"not_godaddySecret": "2TM44WqB21o4zH$3xM44WkB21i4zHHhXSoHjO"
 		},
 		"expected_response": "200",
 		"method": "GET",
