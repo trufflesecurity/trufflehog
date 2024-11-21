@@ -47,7 +47,7 @@ type Checkpointer struct {
 	enabled bool
 
 	// completedObjects tracks which indices in the current page have been processed.
-	sync.Mutex
+	mu               sync.Mutex // protects concurrent access to completion state.
 	completedObjects []bool
 	completionOrder  []int // Track the order in which objects complete
 
@@ -84,8 +84,8 @@ func (p *Checkpointer) Reset() {
 		return
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	// Store the current completed count before moving to next page.
 	p.completedObjects = make([]bool, defaultMaxObjectsPerPage)
 	p.completionOrder = make([]int, 0, defaultMaxObjectsPerPage)
@@ -174,8 +174,8 @@ func (p *Checkpointer) UpdateObjectCompletion(
 		return fmt.Errorf("completed index %d exceeds maximum page size", completedIdx)
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	// Only process if this is the first time this index is marked complete.
 	if !p.completedObjects[completedIdx] {
