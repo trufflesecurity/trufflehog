@@ -227,6 +227,53 @@ type processingState struct {
 	objectCount *uint64   // Total number of objects processed
 }
 
+// resumePosition tracks where to restart scanning S3 buckets and objects after an interruption.
+// It encapsulates all the information needed to resume a scan from its last known position.
+type resumePosition struct {
+	bucket     string // The bucket name we were processing
+	index      int    // Index in the buckets slice where we should resume
+	startAfter string // The last processed object key within the bucket
+	isNewScan  bool   // True if we're starting a fresh scan
+	exactMatch bool   // True if we found the exact bucket we were previously processing
+}
+
+// determineResumePosition calculates where to resume scanning from based on the last saved checkpoint
+// and the current list of available buckets to scan. It handles several scenarios:
+//
+//  1. If getting the resume point fails or there is no previous bucket saved (CurrentBucket is empty),
+//     we start a new scan from the beginning, this is the safest option.
+//
+//  2. If the previous bucket exists in our current scan list (exactMatch=true),
+//     we resume from that exact position
+//     and use the StartAfter value to continue from the last processed object within that bucket.
+//
+// 3. If the previous bucket is not found in our current scan list (exactMatch=false), this typically means:
+//   - The bucket was deleted since our last scan
+//   - The bucket was explicitly excluded from this scan's configuration
+//   - The IAM role no longer has access to the bucket
+//   - The bucket name changed due to a configuration update
+//     In this case, we use binary search to find the closest position where the bucket would have been,
+//     allowing us to resume from the nearest available point in our sorted bucket list rather than
+//     restarting the entire scan.
+func determineResumePosition(ctx context.Context, tracker *ProgressTracker, buckets []string) resumePosition {
+	resumePoint, err := tracker.GetResumePoint(ctx)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to get resume point; starting from the beginning")
+		return resumePosition{isNewScan: true}
+	}
+
+	if resumePoint.CurrentBucket == "" {
+		return resumePosition{isNewScan: true}
+	}
+
+	startIdx, found := slices.BinarySearch(buckets, resumePoint.CurrentBucket)
+	return resumePosition{
+		bucket:     resumePoint.CurrentBucket,
+		index:      startIdx,
+		exactMatch: found,
+	}
+}
+
 func (s *Source) scanBuckets(
 	ctx context.Context,
 	client *s3.S3,
@@ -239,18 +286,27 @@ func (s *Source) scanBuckets(
 	}
 	var objectCount uint64
 
-	// Determine starting point for resuming scan.
-	resumePoint, err := s.progressTracker.GetResumePoint(ctx)
-	if err != nil {
-		ctx.Logger().Error(err, "failed to get resume point")
-		return
+	pos := determineResumePosition(ctx, s.progressTracker, bucketsToScan)
+	switch {
+	case pos.isNewScan:
+		ctx.Logger().Info("Starting new scan from beginning")
+	case !pos.exactMatch:
+		ctx.Logger().Info(
+			"Resume bucket no longer available, starting from closest position",
+			"original_bucket", pos.bucket,
+			"position", pos.index,
+		)
+	default:
+		ctx.Logger().Info(
+			"Resuming scan from previous scan's bucket",
+			"bucket", pos.bucket,
+			"position", pos.index,
+		)
 	}
 
-	startIdx, _ := slices.BinarySearch(bucketsToScan, resumePoint.CurrentBucket)
-
 	bucketsToScanCount := len(bucketsToScan)
-	for i := startIdx; i < bucketsToScanCount; i++ {
-		bucket := bucketsToScan[i]
+	for bucketIdx := pos.index; bucketIdx < bucketsToScanCount; bucketIdx++ {
+		bucket := bucketsToScan[bucketIdx]
 		ctx := context.WithValue(ctx, "bucket", bucket)
 
 		if common.IsDone(ctx) {
@@ -261,7 +317,7 @@ func (s *Source) scanBuckets(
 		ctx.Logger().V(3).Info("Scanning bucket")
 
 		s.SetProgressComplete(
-			i,
+			bucketIdx,
 			len(bucketsToScan),
 			fmt.Sprintf("Bucket: %s", bucket),
 			s.Progress.EncodedResumeInfo,
@@ -276,11 +332,11 @@ func (s *Source) scanBuckets(
 		errorCount := sync.Map{}
 
 		input := &s3.ListObjectsV2Input{Bucket: &bucket}
-		if bucket == resumePoint.CurrentBucket && resumePoint.StartAfter != "" {
-			input.StartAfter = &resumePoint.StartAfter
+		if pos.startAfter != "" {
+			input.StartAfter = &pos.startAfter
 			ctx.Logger().V(3).Info(
 				"Resuming bucket scan",
-				"start_after", resumePoint.StartAfter,
+				"start_after", pos.startAfter,
 			)
 		}
 
