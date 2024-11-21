@@ -185,7 +185,7 @@ This required Cosign binary to be installed prior to running installation script
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --only-verified
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown
 ```
 
 Expected output:
@@ -209,7 +209,7 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 ## 2: Scan a GitHub Org for only verified secrets
 
 ```bash
-trufflehog github --org=trufflesecurity --only-verified
+trufflehog github --org=trufflesecurity --results=verified,unknown
 ```
 
 ## 3: Scan a GitHub Repo for only verified keys and get JSON output
@@ -217,7 +217,7 @@ trufflehog github --org=trufflesecurity --only-verified
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --only-verified --json
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown --json
 ```
 
 Expected output:
@@ -236,7 +236,7 @@ trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-co
 ## 5: Scan an S3 bucket for verified keys
 
 ```bash
-trufflehog s3 --bucket=<bucket name> --only-verified
+trufflehog s3 --bucket=<bucket name> --results=verified,unknown
 ```
 
 ## 6: Scan S3 buckets using IAM Roles
@@ -260,7 +260,7 @@ trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ## 9: Scan GCS buckets for verified secrets
 
 ```bash
-trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
+trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified,unknown
 ```
 
 ## 10: Scan a Docker image for verified secrets
@@ -268,7 +268,7 @@ trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
 Use the `--image` flag multiple times to scan multiple images.
 
 ```bash
-trufflehog docker --image trufflesecurity/secrets --only-verified
+trufflehog docker --image trufflesecurity/secrets --results=verified,unknown
 ```
 
 ## 11: Scan in CI
@@ -276,7 +276,7 @@ trufflehog docker --image trufflesecurity/secrets --only-verified
 Set the `--since-commit` flag to your default branch that people merge into (ex: "main"). Set the `--branch` flag to your PR's branch name (ex: "feature-1"). Depending on the CI/CD platform you use, this value can be pulled in dynamically (ex: [CIRCLE_BRANCH in Circle CI](https://circleci.com/docs/variables/) and [TRAVIS_PULL_REQUEST_BRANCH in Travis CI](https://docs.travis-ci.com/user/environment-variables/)). If the repo is cloned and the target branch is already checked out during the CI/CD workflow, then `--branch HEAD` should be sufficient. The `--fail` flag will return an 183 error code if valid credentials are found.
 
 ```bash
-trufflehog git file://. --since-commit main --branch feature-1 --only-verified --fail
+trufflehog git file://. --since-commit main --branch feature-1 --results=verified,unknown --fail
 ```
 
 ## 12: Scan a Postman workspace
@@ -418,7 +418,7 @@ Flags:
       --github-actions      Output in GitHub Actions format.
       --concurrency=20           Number of concurrent workers.
       --no-verification     Don't verify the results.
-      --only-verified       Only output verified results.
+      --results=RESULTS          Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to all types.
       --allow-verification-overlap
                                  Allow verification of similar credentials across detectors
       --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
@@ -515,7 +515,7 @@ jobs:
     - name: Secret Scanning
       uses: trufflesecurity/trufflehog@main
       with:
-        extra_args: --only-verified
+        extra_args: --results=verified,unknown
 ```
 
 In the example config above, we're scanning for live secrets in all PRs and Pushes to `main`. Only code changes in the referenced commits are scanned. If you'd like to scan an entire branch, please see the "Advanced Usage" section below.
@@ -542,7 +542,7 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
           fetch-depth: ${{env.depth}}
       - uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --only-verified
+          extra_args: --results=verified,unknown
 ...
 ```
 
@@ -567,7 +567,7 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
     # Scan commits until here (usually dev branch).
     head: # optional
     # Extra args to be passed to the trufflehog cli.
-    extra_args: --debug --only-verified
+    extra_args: --debug --results=verified,unknown
 ```
 
 If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
@@ -580,7 +580,7 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
         with:
           base: ""
           head: ${{ github.ref_name }}
-          extra_args: --only-verified
+          extra_args: --results=verified,unknown
 ```
 
 ## TruffleHog GitLab CI
@@ -601,7 +601,7 @@ security-secrets:
     - apk add --no-cache git curl jq
     - curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
   script:
-    - trufflehog filesystem "$SCAN_PATH" --only-verified --fail --json | jq
+    - trufflehog filesystem "$SCAN_PATH" --results=verified,unknown --fail --json | jq
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 ```
@@ -626,9 +626,9 @@ repos:
       - id: trufflehog
         name: TruffleHog
         description: Detect secrets in your data.
-        entry: bash -c 'trufflehog git file://. --since-commit HEAD --only-verified --fail'
+        entry: bash -c 'trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail'
         # For running trufflehog in docker, use the following entry instead:
-        # entry: bash -c 'docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --only-verified --fail'
+        # entry: bash -c 'docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --results=verified,unknown --fail'
         language: system
         stages: ["commit", "push"]
 ```
@@ -667,7 +667,7 @@ detectors:
 ```
 
 ```
-$ trufflehog filesystem /tmp --config config.yaml --only-verified
+$ trufflehog filesystem /tmp --config config.yaml --results=verified,unknown
 🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
 
 Found verified result 🐷🔑
