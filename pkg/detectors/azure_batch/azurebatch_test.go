@@ -1,4 +1,4 @@
-package azurebatch
+package azure_batch
 
 import (
 	"context"

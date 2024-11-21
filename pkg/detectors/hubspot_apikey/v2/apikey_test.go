@@ -1,4 +1,4 @@
-package azure
+package v2
 
 import (
 	"context"
@@ -10,39 +10,31 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-	azure credentials:
-		azureClientID: clientid9304d5df4-aac1-6117-552c-7f70c89a40d9
-		azureTenant: tenant_idid9304d5df4-aac1-6117-552c-7f70c89a40d9
-		azureClientSecret: clientsecretY_0w|[cGpan41k6ng.ol414sp4ccw2v_rkfmbs537i
-	`
-	invalidPattern = `
-	azure credentials:
-		azureClientID: 9304d5df4-aac1-6117-552c-7f70c89a
-		azureTenant: id9304d5df4-aac1-6117-55-7f70c89a40d9
-		azureClientSecret: Y_0w|[cGpan41k6ng.
-	`
-)
-
-func TestAzure_Pattern(t *testing.T) {
+func TestHubspotV2_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{"304d5df4-aac1-6117-552c-7f70c89a40d9cGpan41k6ng.ol414sp4ccw2v_rkfmbs53304d5df4-aac1-6117-552c-7f70c89a40d9"},
+			name: "eu key",
+			input: `
+const private_app_token = 'pat-eu1-1457aed5-04c6-40e2-83ad-a862d3cf19f2';
+
+app.get('/homepage', async (req, res) => {
+    const contactsEndpoint = 'https://api.hubspot.com/crm/v3/objects/contacts';`,
+			want: []string{"pat-eu1-1457aed5-04c6-40e2-83ad-a862d3cf19f2"},
 		},
 		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "na key",
+			input: `hubspot:
+   api:
+      url: https://api.hubapi.com
+      auth-token: pat-na1-ffbb9f50-d96b-4abc-84f1-b986617be1b5
+   subscriptions:`,
+			want: []string{"pat-na1-ffbb9f50-d96b-4abc-84f1-b986617be1b5"},
 		},
 	}
 

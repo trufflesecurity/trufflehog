@@ -1,4 +1,4 @@
-package azurestorage
+package v1
 
 import (
 	"context"
@@ -10,35 +10,58 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-	azure storage:
-		DefaultEndpointsProtocol=https;AccountName=myStorageAccount;AccountKey=myAccountKey12345==;EndpointSuffix=core.windows.net
-	`
-	invalidPattern = `
-	azure storage:
-		DefaultEndpointsProtocol=https;AccountName=;AccountKey=myAccountKey12345==;EndpointSuffix=core.ubuntu.net
-	`
-)
-
-func TestAzureStorage_Pattern(t *testing.T) {
+func TestHubspotV1_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{"myAccountKey12345=="},
+			name: "hapikey",
+			input: `// const hapikey = 'b714cac4-a45c-42af-9905-da4de8838d75';
+const { HAPI_KEY } = process.env;
+const hs = new HubSpotAPI({ hapikey: HAPI_KEY });`,
+			want: []string{"b714cac4-a45c-42af-9905-da4de8838d75"},
+		},
+		// TODO: Doesn't work because it's more than 40 characters.
+		//	{
+		//		name: "hubapi",
+		//		input: `curl https://api.hubapi.com/contacts/v1/lists/all/contacts/all \
+		//--header "Authorization: Bearer b71aa2ed-9c76-417d-bd8e-c5f4980d21ef"`,
+		//		want: []string{"b71aa2ed-9c76-417d-bd8e-c5f4980d21ef"},
+		//	},
+		{
+			name: "hubspot_1",
+			input: `const hs = new HubSpotAPI("76a836c8-469d-4426-8a3b-194ca930b7a1");
+
+const blogPosts = hs.blog.getPosts({ name: 'Inbound' });`,
+			want: []string{"76a836c8-469d-4426-8a3b-194ca930b7a1"},
 		},
 		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "hubspot_2",
+			input: `	'hubspot' => [
+	       // 'api_key' => 'e9ff285d-6b7f-455a-a56d-9ec8c4abbd47',         // @ts dev`,
+			want: []string{"e9ff285d-6b7f-455a-a56d-9ec8c4abbd47"},
+		},
+		{
+			name: "hubspot_3",
+			input: `[{
+		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
+		"name": "HubSpotAPIKey",
+		"type": "Detector",
+		"api": true,
+		"authentication_type": "",
+		"verification_url": "https://api.example.com/example",
+		"test_secrets": {
+			"hubspot_secret": "hDNxPGyQ-AOMZ-w9Sp-aw5t-TwKLBQjQ85go"
+		},
+		"expected_response": "200",
+		"method": "GET",
+		"deprecated": false
+	}]`,
+			want: []string{""},
 		},
 	}
 
