@@ -20,7 +20,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
-	detectors.MultiPartCredentialProvider
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 var _ detectors.Detector = (*Scanner)(nil)
@@ -29,13 +29,13 @@ var (
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	namePat = regexp.MustCompile(`(?i:Account[_.-]?Name|Storage[_.-]?(?:Account|Name))(?:.|\s){0,20}?\b([a-z0-9]{3,24})\b|([a-z0-9]{3,24})(?i:\.blob\.core\.windows\.net)`) // Names can only be lowercase alphanumeric.
+	keyPat  = regexp.MustCompile(`(?i:(?:Access|Account|Storage)[_.-]?Key)(?:.|\s){0,25}?([a-zA-Z0-9+\/-]{86,88}={0,2})`)
+
 	// https://learn.microsoft.com/en-us/azure/storage/common/storage-use-emulator
 	testNames = map[string]struct{}{
 		"devstoreaccount1": {},
 		"storagesample":    {},
 	}
-
-	keyPat   = regexp.MustCompile(`(?i:(?:Access|Account|Storage)[_.-]?Key)(?:.|\s){0,25}?([a-zA-Z0-9+\/-]{86,88}={0,2})`)
 	testKeys = map[string]struct{}{
 		"Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==": {},
 	}
