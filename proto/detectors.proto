@@ -1017,6 +1017,7 @@ enum DetectorType {
   WeightsAndBiases = 1005;
   ZohoCRM = 1006;
   AzureOpenAI = 1007;
+  GoDaddy = 1008;
 }
 
 message Result {
