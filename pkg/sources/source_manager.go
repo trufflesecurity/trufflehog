@@ -212,6 +212,7 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 			case s.firstErr <- err:
 			default:
 			}
+			progress.ReportError(Fatal{err})
 		}
 	}()
 	return progress.Ref(), nil
@@ -254,6 +255,7 @@ func (s *SourceManager) Scan(ctx context.Context, sourceName string, source Sour
 			case s.firstErr <- err:
 			default:
 			}
+			progress.ReportError(Fatal{err})
 		}
 	}()
 	return progress.Ref(), nil
