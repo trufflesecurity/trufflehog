@@ -217,10 +217,6 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 	return progress.Ref(), nil
 }
 
-// func (s *SourceManager) Scan(ctx context.Context, sourceName string, source Source, unit SourceUnit) (JobProgressRef, error) {
-// 	panic("todo")
-// }
-
 // Chunks returns the read only channel of all the chunks produced by all of
 // the sources managed by this manager.
 func (s *SourceManager) Chunks() <-chan *Chunk {
