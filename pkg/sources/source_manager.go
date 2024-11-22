@@ -364,7 +364,7 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 		ctx = context.WithValue(ctx, "source_type", source.Type().String())
 	}
 
-	// Check for the preferred method of tracking source units.
+	// Check if source units are supported and configured.
 	canUseSourceUnits := len(targets) == 0 && s.useSourceUnitsFunc != nil
 	if enumChunker, ok := source.(SourceUnitEnumChunker); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
 		ctx.Logger().Info("running source",
@@ -403,7 +403,7 @@ func (s *SourceManager) enumerate(ctx context.Context, source Source, report *Jo
 		ctx = context.WithValue(ctx, "source_type", source.Type().String())
 	}
 
-	// Check for the preferred method of tracking source units.
+	// Check if source units are supported and configured.
 	canUseSourceUnits := s.useSourceUnitsFunc != nil
 	if enumChunker, ok := source.(SourceUnitEnumerator); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
 		ctx.Logger().Info("running source",
@@ -439,7 +439,7 @@ func (s *SourceManager) scan(ctx context.Context, source Source, report *JobProg
 		ctx = context.WithValue(ctx, "source_type", source.Type().String())
 	}
 
-	// Check for the preferred method of tracking source units.
+	// Check if source units are supported and configured.
 	canUseSourceUnits := s.useSourceUnitsFunc != nil
 	if unitChunker, ok := source.(SourceUnitChunker); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
 		ctx.Logger().Info("running source",
