@@ -444,7 +444,7 @@ func (s *SourceManager) scan(ctx context.Context, source Source, report *JobProg
 	if unitChunker, ok := source.(SourceUnitChunker); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
 		ctx.Logger().Info("running source",
 			"with_units", true)
-		return s.scanWithUnits(ctx, unitChunker, report, unit)
+		return s.scanWithUnit(ctx, unitChunker, report, unit)
 	}
 	return fmt.Errorf("source units not supported or configured for source: %s (%s)", report.SourceName, source.Type().String())
 }
@@ -591,8 +591,8 @@ func (s *SourceManager) runWithUnits(ctx context.Context, source SourceUnitEnumC
 	}
 }
 
-// scanWithUnits produces chunks from a single SourceUnit.
-func (s *SourceManager) scanWithUnits(ctx context.Context, source SourceUnitChunker, report *JobProgress, unit SourceUnit) error {
+// scanWithUnit produces chunks from a single SourceUnit.
+func (s *SourceManager) scanWithUnit(ctx context.Context, source SourceUnitChunker, report *JobProgress, unit SourceUnit) error {
 	// Create a function that will save the first error encountered (if
 	// any) and discard the rest.
 	chunkReporter := &mgrChunkReporter{
