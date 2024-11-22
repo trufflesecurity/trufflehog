@@ -46,7 +46,6 @@ import (
 type Checkpointer struct {
 	enabled bool
 
-	mu sync.Mutex // protects concurrent access to completion state.
 	// completedObjects tracks which indices in the current page have been processed.
 	mu               sync.Mutex // protects concurrent access to completion state.
 	completedObjects []bool
