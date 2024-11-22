@@ -446,7 +446,7 @@ func (s *SourceManager) scan(ctx context.Context, source Source, report *JobProg
 			"with_units", true)
 		return s.scanWithUnits(ctx, unitChunker, report, unit)
 	}
-	return fmt.Errorf("source units not supported or configured for source: %s", source.Type().String())
+	return fmt.Errorf("source units not supported or configured for source: %s (%s)", report.SourceName, source.Type().String())
 }
 
 // enumerateWithUnits is a helper method to enumerate a Source that is also a
