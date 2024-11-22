@@ -244,8 +244,8 @@ type resumePosition struct {
 //     we start a new scan from the beginning, this is the safest option.
 //
 //  2. If the previous bucket exists in our current scan list (exactMatch=true),
-//     we resume from that exact position
-//     and use the StartAfter value to continue from the last processed object within that bucket.
+//     we resume from that exact position and use the StartAfter value
+//     to continue from the last processed object within that bucket.
 //
 // 3. If the previous bucket is not found in our current scan list (exactMatch=false), this typically means:
 //   - The bucket was deleted since our last scan
