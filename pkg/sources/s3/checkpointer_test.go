@@ -13,12 +13,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-func TestProgressTrackerResumption(t *testing.T) {
+func TestCheckpointerResumption(t *testing.T) {
 	ctx := context.Background()
 
 	// First scan - process 6 objects then interrupt.
 	initialProgress := &sources.Progress{}
-	tracker := NewProgressTracker(ctx, true, initialProgress)
+	tracker := NewCheckpointer(ctx, true, initialProgress)
 
 	firstPage := &s3.ListObjectsV2Output{
 		Contents: make([]*s3.Object, 12), // Total of 12 objects
@@ -30,18 +30,18 @@ func TestProgressTrackerResumption(t *testing.T) {
 
 	// Process first 6 objects.
 	for i := range 6 {
-		err := tracker.UpdateObjectProgress(ctx, i, "test-bucket", firstPage.Contents)
+		err := tracker.UpdateObjectCompletion(ctx, i, "test-bucket", firstPage.Contents)
 		assert.NoError(t, err)
 	}
 
 	// Verify resume info is set correctly.
-	resumeInfo, err := tracker.GetResumePoint(ctx)
+	resumeInfo, err := tracker.ResumePoint(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "test-bucket", resumeInfo.CurrentBucket)
 	assert.Equal(t, "key-5", resumeInfo.StartAfter)
 
 	// Resume scan with existing progress.
-	resumeTracker := NewProgressTracker(ctx, true, initialProgress)
+	resumeTracker := NewCheckpointer(ctx, true, initialProgress)
 
 	resumePage := &s3.ListObjectsV2Output{
 		Contents: firstPage.Contents[6:], // Remaining 6 objects
@@ -49,18 +49,18 @@ func TestProgressTrackerResumption(t *testing.T) {
 
 	// Process remaining objects.
 	for i := range len(resumePage.Contents) {
-		err := resumeTracker.UpdateObjectProgress(ctx, i, "test-bucket", resumePage.Contents)
+		err := resumeTracker.UpdateObjectCompletion(ctx, i, "test-bucket", resumePage.Contents)
 		assert.NoError(t, err)
 	}
 
 	// Verify final resume info.
-	finalResumeInfo, err := resumeTracker.GetResumePoint(ctx)
+	finalResumeInfo, err := resumeTracker.ResumePoint(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "test-bucket", finalResumeInfo.CurrentBucket)
 	assert.Equal(t, "key-11", finalResumeInfo.StartAfter)
 }
 
-func TestProgressTrackerReset(t *testing.T) {
+func TestCheckpointerReset(t *testing.T) {
 	tests := []struct {
 		name    string
 		enabled bool
@@ -75,7 +75,7 @@ func TestProgressTrackerReset(t *testing.T) {
 
 			ctx := context.Background()
 			progress := new(sources.Progress)
-			tracker := NewProgressTracker(ctx, tt.enabled, progress)
+			tracker := NewCheckpointer(ctx, tt.enabled, progress)
 
 			tracker.completedObjects[1] = true
 			tracker.completedObjects[2] = true
@@ -150,9 +150,9 @@ func TestGetResumePoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tracker := &ProgressTracker{enabled: tt.enabled, progress: tt.progress}
+			tracker := &Checkpointer{enabled: tt.enabled, progress: tt.progress}
 
-			resumePoint, err := tracker.GetResumePoint(context.Background())
+			resumePoint, err := tracker.ResumePoint(context.Background())
 			if tt.expectError {
 				assert.Error(t, err, "Expected an error decoding resume info")
 			} else {
@@ -164,37 +164,50 @@ func TestGetResumePoint(t *testing.T) {
 	}
 }
 
-func TestProgressTrackerUpdateProgress(t *testing.T) {
+func TestCheckpointerUpdate(t *testing.T) {
 	tests := []struct {
-		name         string
-		description  string
-		completedIdx int
-		pageSize     int
-		preCompleted []int
-		expectedKey  string
+		name                     string
+		description              string
+		completedIdx             int
+		pageSize                 int
+		preCompleted             []int
+		expectedKey              string
+		expectedLowestIncomplete int
 	}{
 		{
-			name:         "first object completed",
-			description:  "Basic case - completing first object",
-			completedIdx: 0,
-			pageSize:     3,
-			expectedKey:  "key-0",
+			name:                     "first object completed",
+			description:              "Basic case - completing first object",
+			completedIdx:             0,
+			pageSize:                 3,
+			expectedKey:              "key-0",
+			expectedLowestIncomplete: 1,
 		},
 		{
-			name:         "completing missing middle",
-			description:  "Completing object when previous is done",
-			completedIdx: 1,
-			pageSize:     3,
-			preCompleted: []int{0},
-			expectedKey:  "key-1",
+			name:                     "completing missing middle",
+			description:              "Completing object when previous is done",
+			completedIdx:             1,
+			pageSize:                 3,
+			preCompleted:             []int{0},
+			expectedKey:              "key-1",
+			expectedLowestIncomplete: 2,
 		},
 		{
-			name:         "all objects completed in order",
-			description:  "Completing final object in sequence",
-			completedIdx: 2,
-			pageSize:     3,
-			preCompleted: []int{0, 1},
-			expectedKey:  "key-2",
+			name:                     "all objects completed in order",
+			description:              "Completing final object in sequence",
+			completedIdx:             2,
+			pageSize:                 3,
+			preCompleted:             []int{0, 1},
+			expectedKey:              "key-2",
+			expectedLowestIncomplete: 3,
+		},
+		{
+			name:                     "out of order completion before lowest",
+			description:              "Completing object before current lowest incomplete - should not affect checkpoint",
+			completedIdx:             1,
+			pageSize:                 4,
+			preCompleted:             []int{0, 2, 3},
+			expectedKey:              "key-3",
+			expectedLowestIncomplete: 4,
 		},
 		{
 			name:         "last index in max page",
@@ -203,12 +216,13 @@ func TestProgressTrackerUpdateProgress(t *testing.T) {
 			pageSize:     1000,
 			preCompleted: func() []int {
 				indices := make([]int, 999)
-				for i := range 999 {
+				for i := range indices {
 					indices[i] = i
 				}
 				return indices
 			}(),
-			expectedKey: "key-999",
+			expectedKey:              "key-999",
+			expectedLowestIncomplete: 1000,
 		},
 	}
 
@@ -218,11 +232,12 @@ func TestProgressTrackerUpdateProgress(t *testing.T) {
 
 			ctx := context.Background()
 			progress := new(sources.Progress)
-			tracker := &ProgressTracker{
-				enabled:          true,
-				progress:         progress,
-				completedObjects: make([]bool, tt.pageSize),
-				completionOrder:  make([]int, 0, tt.pageSize),
+			tracker := &Checkpointer{
+				enabled:             true,
+				progress:            progress,
+				completedObjects:    make([]bool, tt.pageSize),
+				completionOrder:     make([]int, 0, tt.pageSize),
+				lowestIncompleteIdx: 0,
 			}
 
 			page := &s3.ListObjectsV2Output{Contents: make([]*s3.Object, tt.pageSize)}
@@ -231,21 +246,30 @@ func TestProgressTrackerUpdateProgress(t *testing.T) {
 				page.Contents[i] = &s3.Object{Key: &key}
 			}
 
-			// Apply pre-completed indices in order.
-			if tt.preCompleted != nil {
-				for _, idx := range tt.preCompleted {
-					tracker.completedObjects[idx] = true
-					tracker.completionOrder = append(tracker.completionOrder, idx)
+			// Setup pre-completed objects.
+			for _, idx := range tt.preCompleted {
+				tracker.completedObjects[idx] = true
+				tracker.completionOrder = append(tracker.completionOrder, idx)
+			}
+
+			// Find the correct lowest incomplete index after pre-completion.
+			for i := range tt.pageSize {
+				if !tracker.completedObjects[i] {
+					tracker.lowestIncompleteIdx = i
+					break
 				}
 			}
 
-			err := tracker.UpdateObjectProgress(ctx, tt.completedIdx, "test-bucket", page.Contents)
+			err := tracker.UpdateObjectCompletion(ctx, tt.completedIdx, "test-bucket", page.Contents)
 			assert.NoError(t, err, "Unexpected error updating progress")
 
 			var info ResumeInfo
 			err = json.Unmarshal([]byte(progress.EncodedResumeInfo), &info)
 			assert.NoError(t, err, "Failed to decode resume info")
 			assert.Equal(t, tt.expectedKey, info.StartAfter, "Incorrect resume point")
+
+			assert.Equal(t, tt.expectedLowestIncomplete, tracker.lowestIncompleteIdx,
+				"Incorrect lowest incomplete index")
 		})
 	}
 }
@@ -313,7 +337,7 @@ func TestComplete(t *testing.T) {
 				EncodedResumeInfo: tt.initialState.resumeInfo,
 				Message:           tt.initialState.message,
 			}
-			tracker := NewProgressTracker(ctx, tt.enabled, progress)
+			tracker := NewCheckpointer(ctx, tt.enabled, progress)
 
 			err := tracker.Complete(ctx, tt.completeMessage)
 			assert.NoError(t, err)
