@@ -64,7 +64,7 @@ type Checkpointer struct {
 const defaultMaxObjectsPerPage = 1000
 
 // NewCheckpointer creates a new checkpointer for S3 scanning operations.
-// The enabled parameter determines if checkpointer is active, and progress
+// The enabled parameter determines if checkpointing is active, and progress
 // provides the underlying mechanism for persisting scan state.
 func NewCheckpointer(ctx context.Context, enabled bool, progress *sources.Progress) *Checkpointer {
 	ctx.Logger().Info("Creating checkpointer")
