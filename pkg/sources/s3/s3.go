@@ -422,7 +422,7 @@ func (s *Source) pageChunker(
 	state processingState,
 	chunksChan chan *sources.Chunk,
 ) {
-	s.checkpointer.Reset()
+	s.checkpointer.Reset() // Reset the checkpointer for each PAGE
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
 
 	for objIdx, obj := range metadata.page.Contents {
