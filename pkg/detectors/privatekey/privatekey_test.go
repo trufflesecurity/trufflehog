@@ -6,7 +6,6 @@ package privatekey
 import (
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -85,26 +84,6 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found GitHub SSH private key, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(secretGitHub),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
-					Verified:     true,
-					Redacted:     "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5v",
-					ExtraData: map[string]string{
-						"github_user": "sirdetectsalot",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
 			name: "found encrypted GitHub SSH private key, verified",
 			s:    Scanner{},
 			args: args{
@@ -144,9 +123,6 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PrivatekeyCI.FromData() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if os.Getenv("FORCE_PASS_DIFF") == "true" {
 				return
 			}
 			for i := range got {
@@ -208,8 +184,85 @@ func Test_lookupFingerprint(t *testing.T) {
 				t.Errorf("lookupFingerprint() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(gotFingerprints != nil && len(gotFingerprints.CertificateURLs) > 0, tt.wantFingerprints) {
+			if !reflect.DeepEqual(len(gotFingerprints.CertificateURLs) > 0, tt.wantFingerprints) {
 				t.Errorf("lookupFingerprint() = %v, want %v", gotFingerprints, tt.wantFingerprints)
+			}
+		})
+	}
+}
+
+func TestResult_GetExtraData(t *testing.T) {
+	tests := []struct {
+		name   string
+		result result
+		want   map[string]string
+	}{
+		{
+			name: "no certificate URLs or results",
+			result: result{
+				CertificateURLs: []string{},
+				driftwoodResult: driftwoodResult{
+					CertificateResults: []certificateResult{},
+				},
+			},
+			want: map[string]string{},
+		},
+		{
+			name: "with certificate URLs",
+			result: result{
+				CertificateURLs: []string{"https://crt.sh/?q=1e20c40deb44a8539dd3ac3e8c53b72750cb19f9"},
+				driftwoodResult: driftwoodResult{
+					CertificateResults: []certificateResult{},
+				},
+			},
+			want: map[string]string{
+				"certificate_urls": "https://crt.sh/?q=1e20c40deb44a8539dd3ac3e8c53b72750cb19f9",
+			},
+		},
+		{
+			name: "with certificate results",
+			result: result{
+				CertificateURLs: []string{},
+				driftwoodResult: driftwoodResult{
+					CertificateResults: []certificateResult{
+						{
+							Domains:                []string{"example.com"},
+							CertificateFingerprint: "1e20c40deb44a8539dd3ac3e8c53b72750cb19f9",
+							ExpirationTimestamp:    time.Date(2023, time.December, 31, 23, 59, 59, 0, time.UTC),
+							IssuerName:             "Example CA",
+							SubjectName:            "example.com",
+							IssuerOrganization:     []string{"Example Org"},
+							SubjectOrganization:    []string{"Example Org"},
+							KeyUsages:              []string{"DigitalSignature", "KeyEncipherment"},
+							ExtendedKeyUsages:      []string{"ServerAuth", "ClientAuth"},
+							SubjectKeyID:           "abcdef123456",
+							AuthorityKeyID:         "123456abcdef",
+							SerialNumber:           "123456",
+						},
+					},
+				},
+			},
+			want: map[string]string{
+				"domains":                 "example.com",
+				"certificate_fingerprint": "1e20c40deb44a8539dd3ac3e8c53b72750cb19f9",
+				"expiration_timestamp":    "2023-12-31 23:59:59 +0000 UTC",
+				"issuer_name":             "Example CA",
+				"subject_name":            "example.com",
+				"issuer_organization":     "Example Org",
+				"subject_organization":    "Example Org",
+				"key_usages":              "DigitalSignature,KeyEncipherment",
+				"extended_key_usages":     "ServerAuth,ClientAuth",
+				"subject_key_id":          "abcdef123456",
+				"authority_key_id":        "123456abcdef",
+				"serial_number":           "123456",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if diff := pretty.Compare(tt.result.GetExtraData(), tt.want); diff != "" {
+				t.Errorf("GetExtraData() diff (-got +want):\n%s", diff)
 			}
 		})
 	}

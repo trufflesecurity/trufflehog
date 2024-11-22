@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	regexp "github.com/wasilibs/go-re2"
 	"golang.org/x/crypto/ssh"
@@ -97,7 +99,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer wg.Done()
 				data, err := lookupFingerprint(ctx, fingerprint, s.IncludeExpired)
 				if err == nil {
-					if data != nil {
+					if len(data.CertificateResults) > 0 {
 						extraData.Add("certificate_urls", strings.Join(data.CertificateURLs, ", "))
 					}
 				} else {
@@ -114,7 +116,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					verificationErrors.Add(err)
 				}
 				if user != nil {
-					extraData.Add("github_user", *user)
+					extraData.Add("github_user", "Key can SSH pull/push as user: "+*user)
 				}
 			}()
 
@@ -127,11 +129,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					verificationErrors.Add(err)
 				}
 				if user != nil {
-					extraData.Add("gitlab_user", *user)
+					extraData.Add("gitlab_user", "Key can SSH pull/push as user: "+*user)
 				}
 			}()
 
 			wg.Wait()
+
 			if len(extraData.data) > 0 {
 				s1.Verified = true
 				for k, v := range extraData.data {
@@ -161,27 +164,78 @@ func (s Scanner) Description() string {
 
 type result struct {
 	CertificateURLs []string
-	GitHubUsername  string
+	driftwoodResult
 }
 
-func lookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
+func (r result) GetExtraData() map[string]string {
+	data := map[string]string{}
+	if len(r.CertificateURLs) > 0 {
+		data["certificate_urls"] = strings.Join(r.CertificateURLs, ",")
+	}
+	if len(r.CertificateResults) > 0 {
+		for _, cert := range r.CertificateResults {
+			v := reflect.ValueOf(cert)
+			t := v.Type()
+			for i := 0; i < v.NumField(); i++ {
+				field := v.Field(i)
+				fieldName := t.Field(i).Name
+				// Convert field name to snake_case
+				snakeCase := ""
+				for i, r := range fieldName {
+					if i > 0 && unicode.IsUpper(r) {
+						if string(r) == "D" && i > 0 && string(fieldName[i-1]) == "I" {
+							snakeCase += string(unicode.ToLower(r))
+						} else {
+							snakeCase += "_" + string(unicode.ToLower(r))
+						}
+					} else {
+						snakeCase += string(unicode.ToLower(r))
+					}
+				}
+				switch field.Kind() {
+				case reflect.String:
+					if str := field.String(); str != "" {
+						data[snakeCase] = str
+					}
+				case reflect.Slice:
+					if slice := field.Interface(); field.Len() > 0 {
+						if strSlice, ok := slice.([]string); ok {
+							data[snakeCase] = strings.Join(strSlice, ",")
+						}
+					}
+				case reflect.Struct:
+					if !field.IsZero() {
+						if timeField, ok := field.Interface().(time.Time); ok {
+							data[snakeCase] = timeField.String()
+						}
+					}
+				}
+			}
+		}
+	}
+	return data
+}
+
+func lookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string, includeExpired bool) (result, error) {
+	data := result{}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
 	if err != nil {
-		return nil, err
+		return data, err
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return data, err
 	}
 	defer res.Body.Close()
 
-	results := DriftwoodResult{}
+	results := driftwoodResult{}
 	err = json.NewDecoder(res.Body).Decode(&results)
 	if err != nil {
-		return nil, err
+		return data, err
 	}
 
-	var data *result
+	data.driftwoodResult = results
 
 	seen := map[string]struct{}{}
 	for _, r := range results.CertificateResults {
@@ -191,9 +245,6 @@ func lookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string, in
 		if !includeExpired && time.Since(r.ExpirationTimestamp) > 0 {
 			continue
 		}
-		if data == nil {
-			data = &result{}
-		}
 		data.CertificateURLs = append(data.CertificateURLs, fmt.Sprintf("https://crt.sh/?q=%s", r.CertificateFingerprint))
 		seen[r.CertificateFingerprint] = struct{}{}
 	}
@@ -201,14 +252,23 @@ func lookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string, in
 	return data, nil
 }
 
-type DriftwoodResult struct {
-	CertificateResults []struct {
-		CertificateFingerprint string    `json:"CertificateFingerprint"`
-		ExpirationTimestamp    time.Time `json:"ExpirationTimestamp"`
-	} `json:"CertificateResults"`
-	GitHubSSHResults []struct {
-		Username string `json:"Username"`
-	} `json:"GitHubSSHResults"`
+type driftwoodResult struct {
+	CertificateResults []certificateResult `json:"CertificateResults,omitempty"`
+}
+
+type certificateResult struct {
+	Domains                []string `json:",omitempty"`
+	CertificateFingerprint string
+	ExpirationTimestamp    time.Time
+	IssuerName             string   `json:",omitempty"` // CA information
+	SubjectName            string   `json:",omitempty"` // Certificate subject
+	IssuerOrganization     []string `json:",omitempty"` // CA organization(s)
+	SubjectOrganization    []string `json:",omitempty"` // Subject organization(s)
+	KeyUsages              []string `json:",omitempty"` // e.g., ["DigitalSignature", "KeyEncipherment"]
+	ExtendedKeyUsages      []string `json:",omitempty"` // e.g., ["ServerAuth", "ClientAuth"]
+	SubjectKeyID           string   `json:",omitempty"` // hex encoded
+	AuthorityKeyID         string   `json:",omitempty"` // hex encoded
+	SerialNumber           string   `json:",omitempty"` // hex encoded
 }
 
 type extraData struct {
