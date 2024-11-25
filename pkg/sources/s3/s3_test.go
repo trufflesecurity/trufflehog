@@ -10,12 +10,13 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestSource_Init_IncludeAndIgnoreBucketsError(t *testing.T) {
