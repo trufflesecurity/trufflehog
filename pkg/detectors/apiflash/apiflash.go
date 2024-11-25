@@ -3,6 +3,7 @@ package apiflash
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -79,6 +80,10 @@ func verifyAPIFlash(ctx context.Context, client *http.Client, accessKey string) 
 	if err != nil {
 		return false, nil
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
@@ -86,6 +91,6 @@ func verifyAPIFlash(ctx context.Context, client *http.Client, accessKey string) 
 	case http.StatusUnauthorized:
 		return false, nil
 	default:
-		return false, fmt.Errorf("unexpected status code recieved: %v", err)
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }
