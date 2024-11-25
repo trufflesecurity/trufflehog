@@ -33,5 +33,5 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 	if err := fileSystemSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.Run(ctx, sourceName, fileSystemSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, fileSystemSource)
 }

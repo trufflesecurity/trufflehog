@@ -123,10 +123,10 @@ func (s *SourceManager) GetIDs(ctx context.Context, sourceName string, kind sour
 	return s.api.GetIDs(ctx, sourceName, kind)
 }
 
-// Run blocks until a resource is available to run the source, then
+// EnumerateAndScan blocks until a resource is available to run the source, then
 // asynchronously runs it. Error information is stored and accessible via the
 // JobProgressRef as it becomes available.
-func (s *SourceManager) Run(ctx context.Context, sourceName string, source Source, targets ...ChunkingTarget) (JobProgressRef, error) {
+func (s *SourceManager) EnumerateAndScan(ctx context.Context, sourceName string, source Source, targets ...ChunkingTarget) (JobProgressRef, error) {
 	sourceID, jobID := source.SourceID(), source.JobID()
 	// Do preflight checks before waiting on the pool.
 	if err := s.preflightChecks(ctx); err != nil {
@@ -160,6 +160,54 @@ func (s *SourceManager) Run(ctx context.Context, sourceName string, source Sourc
 		defer common.Recover(ctx)
 		defer cancel(nil)
 		if err := s.run(ctx, source, progress, targets...); err != nil {
+			select {
+			case s.firstErr <- err:
+			default:
+			}
+		}
+	}()
+	return progress.Ref(), nil
+}
+
+func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source Source, reporter UnitReporter) (JobProgressRef, error) {
+	sourceID, jobID := source.SourceID(), source.JobID()
+	// Do preflight checks before waiting on the pool.
+	if err := s.preflightChecks(ctx); err != nil {
+		return JobProgressRef{
+			SourceName: sourceName,
+			SourceID:   sourceID,
+			JobID:      jobID,
+		}, err
+	}
+
+	// Create a JobProgress object for tracking progress.
+	sem := s.sem
+	ctx, cancel := context.WithCancelCause(ctx)
+	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
+	if err := sem.Acquire(ctx, 1); err != nil {
+		// Context cancelled.
+		progress.ReportError(Fatal{err})
+		return progress.Ref(), Fatal{err}
+	}
+
+	// Wrap the passed in reporter so we update the progress information.
+	reporter = baseUnitReporter{
+		child:    reporter,
+		progress: progress,
+	}
+
+	s.wg.Add(1)
+	go func() {
+		// Call Finish after the semaphore has been released.
+		defer progress.Finish()
+		defer sem.Release(1)
+		defer s.wg.Done()
+		ctx := context.WithValues(ctx,
+			"source_manager_worker_id", common.RandomID(5),
+		)
+		defer common.Recover(ctx)
+		defer cancel(nil)
+		if err := s.enumerate(ctx, source, progress, reporter); err != nil {
 			select {
 			case s.firstErr <- err:
 			default:
@@ -286,6 +334,75 @@ func (s *SourceManager) run(ctx context.Context, source Source, report *JobProgr
 	return s.runWithoutUnits(ctx, source, report, targets...)
 }
 
+// enumerate is a helper method to enumerate a Source.
+func (s *SourceManager) enumerate(ctx context.Context, source Source, report *JobProgress, reporter UnitReporter) error {
+	report.Start(time.Now())
+	defer func() { report.End(time.Now()) }()
+
+	defer func() {
+		if err := context.Cause(ctx); err != nil {
+			report.ReportError(Fatal{err})
+		}
+	}()
+
+	report.TrackProgress(source.GetProgress())
+	if ctx.Value("job_id") == "" {
+		ctx = context.WithValue(ctx, "job_id", report.JobID)
+	}
+	if ctx.Value("source_id") == "" {
+		ctx = context.WithValue(ctx, "source_id", report.SourceID)
+	}
+	if ctx.Value("source_name") == "" {
+		ctx = context.WithValue(ctx, "source_name", report.SourceName)
+	}
+	if ctx.Value("source_type") == "" {
+		ctx = context.WithValue(ctx, "source_type", source.Type().String())
+	}
+
+	// Check for the preferred method of tracking source units.
+	canUseSourceUnits := s.useSourceUnitsFunc != nil
+	if enumChunker, ok := source.(SourceUnitEnumerator); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
+		ctx.Logger().Info("running source",
+			"with_units", true)
+		return s.enumerateWithUnits(ctx, enumChunker, report, reporter)
+	}
+	return fmt.Errorf("Enumeration not supported or configured for source: %s", source.Type().String())
+}
+
+// enumerateWithUnits is a helper method to enumerate a Source that is also a
+// SourceUnitEnumerator. This allows better introspection of what is getting
+// enumerated and any errors encountered.
+func (s *SourceManager) enumerateWithUnits(ctx context.Context, source SourceUnitEnumerator, report *JobProgress, reporter UnitReporter) error {
+	// Create a function that will save the first error encountered (if
+	// any) and discard the rest.
+	fatalErr := make(chan error, 1)
+	catchFirstFatal := func(err error) {
+		select {
+		case fatalErr <- err:
+		default:
+		}
+	}
+
+	// Produce units.
+	func() {
+		// TODO: Catch panics and add to report.
+		report.StartEnumerating(time.Now())
+		defer func() { report.EndEnumerating(time.Now()) }()
+		ctx.Logger().V(2).Info("enumerating source with units")
+		if err := source.Enumerate(ctx, reporter); err != nil {
+			report.ReportError(Fatal{err})
+			catchFirstFatal(Fatal{err})
+		}
+	}()
+
+	select {
+	case err := <-fatalErr:
+		return err
+	default:
+		return nil
+	}
+}
+
 // runWithoutUnits is a helper method to run a Source. It has coarse-grained
 // job reporting.
 func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, report *JobProgress, targets ...ChunkingTarget) error {
@@ -302,6 +419,7 @@ func (s *SourceManager) runWithoutUnits(ctx context.Context, source Source, repo
 			s.outputChunks <- chunk
 		}
 	}()
+
 	// Don't return from this function until the goroutine has finished
 	// outputting chunks to the downstream channel. Closing the channel
 	// will stop the goroutine, so that needs to happen first in the defer

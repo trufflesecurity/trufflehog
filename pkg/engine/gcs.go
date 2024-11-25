@@ -51,7 +51,7 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) (sources.JobP
 	if err := gcsSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, int(c.Concurrency)); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.Run(ctx, sourceName, gcsSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gcsSource)
 }
 
 func isAuthValid(ctx context.Context, c sources.GCSConfig, connection *sourcespb.GCS) bool {

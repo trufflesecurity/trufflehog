@@ -60,5 +60,5 @@ func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExp
 		return sources.JobProgressRef{}, err
 	}
 	githubExperimentalSource.WithScanOptions(scanOptions)
-	return e.sourceManager.Run(ctx, sourceName, githubExperimentalSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, githubExperimentalSource)
 }

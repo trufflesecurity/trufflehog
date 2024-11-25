@@ -34,5 +34,5 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) (sources.JobPro
 	if err := circleSource.Init(ctx, "trufflehog - Circle CI", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.Run(ctx, sourceName, circleSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, circleSource)
 }
