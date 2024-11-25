@@ -173,6 +173,56 @@ func TestSourceManagerReport(t *testing.T) {
 	}
 }
 
+func TestSourceManagerEnumerate(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
+	source, err := buildDummy(&counterChunker{count: 1})
+	assert.NoError(t, err)
+	var enumeratedUnits []SourceUnit
+	reporter := visitorUnitReporter{
+		ok: func(_ context.Context, unit SourceUnit) error {
+			enumeratedUnits = append(enumeratedUnits, unit)
+			return nil
+		},
+	}
+	for i := 0; i < 3; i++ {
+		ref, err := mgr.Enumerate(context.Background(), "dummy", source, reporter)
+		<-ref.Done()
+		assert.NoError(t, err)
+		assert.NoError(t, ref.Snapshot().FatalError())
+		// The Chunks channel should be empty because we only enumerated.
+		_, err = tryRead(mgr.Chunks())
+		assert.Error(t, err)
+		// Each time the loop iterates, we add 1 unit to the slice.
+		assert.Equal(t, i+1, len(enumeratedUnits), ref.Snapshot())
+	}
+}
+
+func TestSourceManagerScan(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
+	source, err := buildDummy(&counterChunker{count: 1})
+	assert.NoError(t, err)
+	for i := 0; i < 3; i++ {
+		ref, err := mgr.Scan(context.Background(), "dummy", source, countChunk(123))
+		<-ref.Done()
+		assert.NoError(t, err)
+		assert.NoError(t, ref.Snapshot().FatalError())
+		chunk, err := tryRead(mgr.Chunks())
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{123}, chunk.Data)
+		// The Chunks channel should be empty now.
+		_, err = tryRead(mgr.Chunks())
+		assert.Error(t, err)
+	}
+}
+
+type visitorUnitReporter struct {
+	ok  func(context.Context, SourceUnit) error
+	err func(context.Context, error) error
+}
+
+func (v visitorUnitReporter) UnitOk(ctx context.Context, u SourceUnit) error { return v.ok(ctx, u) }
+func (v visitorUnitReporter) UnitErr(ctx context.Context, err error) error   { return v.err(ctx, err) }
+
 type unitChunk struct {
 	unit   string
 	output string
