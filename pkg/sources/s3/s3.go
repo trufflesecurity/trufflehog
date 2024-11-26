@@ -46,7 +46,7 @@ type Source struct {
 	concurrency int
 	conn        *sourcespb.S3
 
-	progressTracker *ProgressTracker
+	checkpointer *Checkpointer
 	sources.Progress
 	metricsCollector metricsCollector
 
@@ -94,7 +94,7 @@ func (s *Source) Init(
 	}
 	s.conn = &conn
 
-	s.progressTracker = NewProgressTracker(ctx, conn.GetEnableResumption(), &s.Progress)
+	s.checkpointer = NewCheckpointer(ctx, conn.GetEnableResumption(), &s.Progress)
 	s.metricsCollector = metricsInstance
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())
@@ -230,44 +230,102 @@ type processingState struct {
 	objectCount *uint64   // Total number of objects processed
 }
 
+// resumePosition tracks where to restart scanning S3 buckets and objects after an interruption.
+// It encapsulates all the information needed to resume a scan from its last known position.
+type resumePosition struct {
+	bucket     string // The bucket name we were processing
+	index      int    // Index in the buckets slice where we should resume
+	startAfter string // The last processed object key within the bucket
+	isNewScan  bool   // True if we're starting a fresh scan
+	exactMatch bool   // True if we found the exact bucket we were previously processing
+}
+
+// determineResumePosition calculates where to resume scanning from based on the last saved checkpoint
+// and the current list of available buckets to scan. It handles several scenarios:
+//
+//  1. If getting the resume point fails or there is no previous bucket saved (CurrentBucket is empty),
+//     we start a new scan from the beginning, this is the safest option.
+//
+//  2. If the previous bucket exists in our current scan list (exactMatch=true),
+//     we resume from that exact position and use the StartAfter value
+//     to continue from the last processed object within that bucket.
+//
+// 3. If the previous bucket is not found in our current scan list (exactMatch=false), this typically means:
+//   - The bucket was deleted since our last scan
+//   - The bucket was explicitly excluded from this scan's configuration
+//   - The IAM role no longer has access to the bucket
+//   - The bucket name changed due to a configuration update
+//     In this case, we use binary search to find the closest position where the bucket would have been,
+//     allowing us to resume from the nearest available point in our sorted bucket list rather than
+//     restarting the entire scan.
+func determineResumePosition(ctx context.Context, tracker *Checkpointer, buckets []string) resumePosition {
+	resumePoint, err := tracker.ResumePoint(ctx)
+	if err != nil {
+		ctx.Logger().Error(err, "failed to get resume point; starting from the beginning")
+		return resumePosition{isNewScan: true}
+	}
+
+	if resumePoint.CurrentBucket == "" {
+		return resumePosition{isNewScan: true}
+	}
+
+	startIdx, found := slices.BinarySearch(buckets, resumePoint.CurrentBucket)
+	return resumePosition{
+		bucket:     resumePoint.CurrentBucket,
+		startAfter: resumePoint.StartAfter,
+		index:      startIdx,
+		exactMatch: found,
+	}
+}
+
 func (s *Source) scanBuckets(
 	ctx context.Context,
 	client *s3.S3,
 	role string,
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
-) error {
+) {
 	if role != "" {
 		ctx = context.WithValue(ctx, "role", role)
 	}
 	var objectCount uint64
 
-	// Determine starting point for resuming scan.
-	resumePoint, err := s.progressTracker.GetResumePoint(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get resume point :%w", err)
+	pos := determineResumePosition(ctx, s.checkpointer, bucketsToScan)
+	switch {
+	case pos.isNewScan:
+		ctx.Logger().Info("Starting new scan from beginning")
+	case !pos.exactMatch:
+		ctx.Logger().Info(
+			"Resume bucket no longer available, starting from closest position",
+			"original_bucket", pos.bucket,
+			"position", pos.index,
+		)
+	default:
+		ctx.Logger().Info(
+			"Resuming scan from previous scan's bucket",
+			"bucket", pos.bucket,
+			"position", pos.index,
+		)
 	}
 
-	startIdx, _ := slices.BinarySearch(bucketsToScan, resumePoint.CurrentBucket)
-
 	bucketsToScanCount := len(bucketsToScan)
-	for i := startIdx; i < bucketsToScanCount; i++ {
+	for bucketIdx := pos.index; bucketIdx < bucketsToScanCount; bucketIdx++ {
 		s.metricsCollector.RecordBucketForRole(role)
-
-		bucket := bucketsToScan[i]
+		bucket := bucketsToScan[bucketIdx]
 		ctx := context.WithValue(ctx, "bucket", bucket)
 
 		if common.IsDone(ctx) {
-			return ctx.Err()
+			ctx.Logger().Error(ctx.Err(), "context done, while scanning bucket")
+			return
 		}
 
 		ctx.Logger().V(3).Info("Scanning bucket")
 
 		s.SetProgressComplete(
-			i,
+			bucketIdx,
 			len(bucketsToScan),
 			fmt.Sprintf("Bucket: %s", bucket),
-			s.Progress.EncodedResumeInfo, // Do not set, resume handled by progressTracker
+			s.Progress.EncodedResumeInfo,
 		)
 
 		regionalClient, err := s.getRegionalClientForBucket(ctx, client, role, bucket)
@@ -279,11 +337,11 @@ func (s *Source) scanBuckets(
 		errorCount := sync.Map{}
 
 		input := &s3.ListObjectsV2Input{Bucket: &bucket}
-		if bucket == resumePoint.CurrentBucket && resumePoint.StartAfter != "" {
-			input.StartAfter = &resumePoint.StartAfter
+		if bucket == pos.bucket && pos.startAfter != "" {
+			input.StartAfter = &pos.startAfter
 			ctx.Logger().V(3).Info(
 				"Resuming bucket scan",
-				"start_after", resumePoint.StartAfter,
+				"start_after", pos.startAfter,
 			)
 		}
 
@@ -327,14 +385,13 @@ func (s *Source) scanBuckets(
 		fmt.Sprintf("Completed scanning source %s. %d objects scanned.", s.name, objectCount),
 		"",
 	)
-
-	return nil
 }
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error {
-		return s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
+		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
+		return nil
 	}
 
 	return s.visitRoles(ctx, visitor)
@@ -370,13 +427,13 @@ func (s *Source) pageChunker(
 	state processingState,
 	chunksChan chan *sources.Chunk,
 ) {
-	s.progressTracker.Reset()
+	s.checkpointer.Reset() // Reset the checkpointer for each PAGE
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
 
 	for objIdx, obj := range metadata.page.Contents {
 		if obj == nil {
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "nil_object")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for nil object")
 			}
 			continue
@@ -392,7 +449,7 @@ func (s *Source) pageChunker(
 		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
 			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass)
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "storage_class")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for glacier object")
 			}
 			continue
@@ -402,7 +459,7 @@ func (s *Source) pageChunker(
 		if *obj.Size > s.maxObjectSize {
 			ctx.Logger().V(5).Info("Skipping %d byte file (over maxObjectSize limit)")
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "size_limit")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for large file")
 			}
 			continue
@@ -412,7 +469,7 @@ func (s *Source) pageChunker(
 		if *obj.Size == 0 {
 			ctx.Logger().V(5).Info("Skipping empty file")
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "empty_file")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for empty file")
 			}
 			continue
@@ -422,7 +479,7 @@ func (s *Source) pageChunker(
 		if common.SkipFile(*obj.Key) {
 			ctx.Logger().V(5).Info("Skipping file with incompatible extension")
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "incompatible_extension")
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for incompatible file")
 			}
 			continue
@@ -536,7 +593,7 @@ func (s *Source) pageChunker(
 			}
 
 			// Update progress after successful processing.
-			if err := s.progressTracker.UpdateObjectProgress(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
+			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for scanned object")
 			}
 			s.metricsCollector.RecordObjectScanned(metadata.bucket)

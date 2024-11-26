@@ -13,7 +13,7 @@ import (
 )
 
 // ScanPostman scans Postman with the provided options.
-func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error {
+func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sources.JobProgressRef, error) {
 	connection := sourcespb.Postman{
 		Workspaces:          c.Workspaces,
 		Collections:         c.Collections,
@@ -36,7 +36,7 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 	} else if len(c.WorkspacePaths) > 0 || len(c.CollectionPaths) > 0 || len(c.EnvironmentPaths) > 0 {
 		connection.Credential = &sourcespb.Postman_Unauthenticated{}
 	} else {
-		return errors.New("no path to locally exported data or API token provided")
+		return sources.JobProgressRef{}, errors.New("no path to locally exported data or API token provided")
 	}
 
 	// Turn AhoCorasick keywordsToDetectors into a map of keywords
@@ -49,7 +49,7 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal Postman connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - postman"
@@ -59,8 +59,7 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 		DetectorKeywords: keywords,
 	}
 	if err := postmanSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, postmanSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, postmanSource)
 }

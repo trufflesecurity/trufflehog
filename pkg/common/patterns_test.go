@@ -25,7 +25,7 @@ func TestEmailRegexCheck(t *testing.T) {
 		hyphen domain      = info@my-site.net
 		service email      = contact@web-service.io
 		underscore email   = example_user@domain.info
-		departement email  = first.last@department.company.edu
+		department email   = first.last@department.company.edu
 		alphanumeric email = user1234@domain.co
 		local server email = admin@local-server.local
 		dot email          = test.email@my-email-service.xyz

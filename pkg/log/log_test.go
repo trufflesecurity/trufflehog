@@ -224,17 +224,6 @@ func splitLines(s string) []string {
 	return logLines
 }
 
-func TestFindLevel(t *testing.T) {
-	lvl := zap.NewAtomicLevel()
-	logger, _ := New("parent", WithConsoleSink(io.Discard, WithLeveler(lvl)))
-
-	for i := 0; i < 128; i++ {
-		i8 := int8(i)
-		SetLevelForControl(lvl, i8)
-		assert.Equal(t, i8, findLevel(logger))
-	}
-}
-
 func TestGlobalRedaction_Console(t *testing.T) {
 	oldState := globalRedactor
 	globalRedactor = &dynamicRedactor{
@@ -296,6 +285,52 @@ func TestGlobalRedaction_JSON(t *testing.T) {
 			"foo":    "*****",
 			"array":  []any{"foo", "bar", "baz"},
 			"object": map[string]interface{}{"foo": "bar"},
+		},
+		parsedJSON,
+	)
+}
+
+func TestToLogger(t *testing.T) {
+	var jsonBuffer bytes.Buffer
+	l, flush := New("service-name",
+		WithJSONSink(&jsonBuffer),
+	)
+	logger := ToLogger(l)
+	logger.Println("yay")
+	assert.Nil(t, flush())
+
+	var parsedJSON map[string]any
+	assert.Nil(t, json.Unmarshal(jsonBuffer.Bytes(), &parsedJSON))
+	assert.NotEmpty(t, parsedJSON["ts"])
+	delete(parsedJSON, "ts")
+	delete(parsedJSON, "caller") // log.Logger adds a "caller" field
+	assert.Equal(t,
+		map[string]any{
+			"level":  "info-0",
+			"logger": "service-name",
+			"msg":    "yay",
+		},
+		parsedJSON,
+	)
+}
+
+func TestToSlogger(t *testing.T) {
+	var jsonBuffer bytes.Buffer
+	l, flush := New("service-name", WithJSONSink(&jsonBuffer))
+	logger := ToSlogger(l)
+	logger.Info("yay")
+	assert.Nil(t, flush())
+
+	var parsedJSON map[string]any
+	assert.Nil(t, json.Unmarshal(jsonBuffer.Bytes(), &parsedJSON))
+	assert.NotEmpty(t, parsedJSON["ts"])
+	delete(parsedJSON, "ts")
+	delete(parsedJSON, "caller") // slog.Logger adds a "caller" field
+	assert.Equal(t,
+		map[string]any{
+			"level":  "info-0",
+			"logger": "service-name",
+			"msg":    "yay",
 		},
 		parsedJSON,
 	)

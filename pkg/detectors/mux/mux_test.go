@@ -1,121 +1,87 @@
-//go:build detectors
-// +build detectors
-
 package mux
 
 import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestMux_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	key := testSecrets.MustGetField("MUX_KEY")
-	inactiveKey := testSecrets.MustGetField("MUX_KEY_INACTIVE")
-	secret := testSecrets.MustGetField("MUX")
-	inactiveSecret := testSecrets.MustGetField("MUX_INACTIVE")
+var (
+	validKeyPattern      = "87c64847-eda7-a832-6273-8b8b300b29ac"
+	invalidKeyPattern    = "G7c64847-eda7-a832-6273-8b8b300b29aG"
+	validSecretPattern   = "B8O9w0a7rh0jPxAkfZBhDqb9yppJ4WiiT6yfRR6Fd1eMKL0cAAnv3ShEQU+quVs9xJZgTv0/blh"
+	invalidSecretPattern = "B8O9w0a7rh0jPxAkfZBhDqb9yppJ4WiiT6.fRR6Fd1eMKL0cAAnv3ShEQU+quVs9xJZgTv0/blh"
+	keyword              = "mux"
+)
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestMux_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a mux key %s with mux secret %s within", key, secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Mux,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern - with keyword mux",
+			input: fmt.Sprintf("%s '%s' %s ' %s '", keyword, validKeyPattern, keyword, validSecretPattern),
+			want:  []string{validKeyPattern + validSecretPattern},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a mux key %s with mux secret %s within but not valid", inactiveKey, inactiveSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Mux,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern - key out of prefix range",
+			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s' secret = ' %s '", keyword, validKeyPattern, validSecretPattern),
+			want:  []string{},
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name:  "invalid pattern",
+			input: fmt.Sprintf("%s key = '%s' secret = ' %s '", keyword, invalidKeyPattern, invalidSecretPattern),
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Mux.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Mux.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

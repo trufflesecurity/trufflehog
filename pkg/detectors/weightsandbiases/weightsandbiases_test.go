@@ -30,7 +30,7 @@ WANDB_API_KEY= 'eedf1c984f6b995ec40ecc6658356044847ffb32'`,
 			want: []string{"eedf1c984f6b995ec40ecc6658356044847ffb31", "eedf1c984f6b995ec40ecc6658356044847ffb32"},
 		},
 		{
-			name:  "invald pattern",
+			name:  "invalid pattern",
 			input: "WANDB_API_KEY = 'e84f6b995ec40ecc6658356044847ffb31'",
 			want:  []string{},
 		},

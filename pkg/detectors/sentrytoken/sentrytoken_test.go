@@ -125,7 +125,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, account deactivated",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, reponseAccountDeactivated)},
+			s:    Scanner{client: common.ConstantResponseHttpClient(200, responseAccountDeactivated)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
@@ -142,7 +142,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, account deactivated",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, responseEnmpty)},
+			s:    Scanner{client: common.ConstantResponseHttpClient(200, responseEmpty)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
@@ -209,8 +209,8 @@ const (
   }
 ]
 `
-	reponseAccountDeactivated = `{"detail": "Authentication credentials were not provided"}`
-	responseEnmpty            = `[]`
+	responseAccountDeactivated = `{"detail": "Authentication credentials were not provided"}`
+	responseEmpty              = `[]`
 )
 
 func BenchmarkFromData(benchmark *testing.B) {
