@@ -167,12 +167,12 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 	}
 
 	// If we still need to read more data.
-	var raderBytes int
-	raderBytes, err = br.reader.Read(out)
-	totalBytesRead += raderBytes
-	br.index += int64(raderBytes)
+	var readerBytes int
+	readerBytes, err = br.reader.Read(out)
+	totalBytesRead += readerBytes
+	br.index += int64(readerBytes)
 
-	if writeErr := br.writeData(out[:raderBytes]); writeErr != nil {
+	if writeErr := br.writeData(out[:readerBytes]); writeErr != nil {
 		return totalBytesRead, writeErr
 	}
 
