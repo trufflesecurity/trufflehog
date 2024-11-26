@@ -138,8 +138,9 @@ func verifyMatch(ctx context.Context, appId, apiKey string) (bool, map[string]st
 	case http.StatusUnauthorized:
 		return false, nil, nil
 	case http.StatusForbidden:
-		// Key is valid but lacks permissions.
-		return true, nil, nil
+		// Invalidated key.
+		// {"message":"Invalid Application-ID or API key","status":403}
+		return false, nil, nil
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}

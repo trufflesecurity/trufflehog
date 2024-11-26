@@ -66,5 +66,5 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 		return sources.JobProgressRef{}, err
 	}
 	gitlabSource.WithScanOptions(scanOptions)
-	return e.sourceManager.Run(ctx, sourceName, gitlabSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gitlabSource)
 }

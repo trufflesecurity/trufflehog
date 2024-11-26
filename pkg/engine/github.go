@@ -59,5 +59,5 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 		return sources.JobProgressRef{}, err
 	}
 	githubSource.WithScanOptions(scanOptions)
-	return e.sourceManager.Run(ctx, sourceName, githubSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, githubSource)
 }

@@ -34,5 +34,5 @@ func (e *Engine) ScanTravisCI(ctx context.Context, token string) (sources.JobPro
 	if err := travisSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.Run(ctx, sourceName, travisSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, travisSource)
 }

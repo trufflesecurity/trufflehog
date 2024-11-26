@@ -49,5 +49,5 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) (source
 	}
 	syslogSource.InjectConnection(connection)
 
-	return e.sourceManager.Run(ctx, sourceName, syslogSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, syslogSource)
 }
