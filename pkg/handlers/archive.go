@@ -102,7 +102,7 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 var ErrMaxDepthReached = errors.New("max archive depth reached")
 
 // openArchive recursively extracts content from an archive up to a maximum depth, handling nested archives if necessary.
-// It takes a string representing the path to the archive and a reader from which it attempts to identify and process the archive format.
+// It takes a string slice representing the path to the archive and a reader from which it attempts to identify and process the archive format.
 // Depending on the archive type, it either decompresses or extracts the contents directly, sending data to the provided channel.
 // Returns an error if the archive cannot be processed due to issues like exceeding maximum depth or unsupported formats.
 func (h *archiveHandler) openArchive(
@@ -204,7 +204,7 @@ func (h *archiveHandler) extractorHandler(archiveEntryPaths []string, dataOrErrC
 
 		f, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
+			return fmt.Errorf("error opening file %s: %w", file.NameInArchive, err)
 		}
 		defer f.Close()
 
@@ -230,7 +230,7 @@ func (h *archiveHandler) extractorHandler(archiveEntryPaths []string, dataOrErrC
 				lCtx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
-			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
+			return fmt.Errorf("error creating reader for file %s: %w", file.NameInArchive, err)
 		}
 		defer rdr.Close()
 
@@ -238,6 +238,6 @@ func (h *archiveHandler) extractorHandler(archiveEntryPaths []string, dataOrErrC
 		h.metrics.observeFileSize(fileSize)
 
 		lCtx.Logger().V(4).Info("Processed file successfully", "filename", file.Name(), "size", file.Size())
-		return h.openArchive(lCtx, append(archiveEntryPaths, file.Name()), rdr, dataOrErrChan)
+		return h.openArchive(lCtx, append(archiveEntryPaths, file.NameInArchive), rdr, dataOrErrChan)
 	}
 }
