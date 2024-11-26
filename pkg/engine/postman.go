@@ -61,5 +61,5 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sour
 	if err := postmanSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.Run(ctx, sourceName, postmanSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, postmanSource)
 }
