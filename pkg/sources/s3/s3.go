@@ -216,30 +216,6 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 	return bucketsToScan, nil
 }
 
-// workerSignal provides thread-safe tracking of cancellation state across multiple
-// goroutines processing S3 bucket pages. It ensures graceful shutdown when the context
-// is cancelled during bucket scanning operations.
-//
-// This type serves several key purposes:
-//  1. AWS ListObjectsV2PagesWithContext requires a callback that can only return bool,
-//     not error. workerSignal bridges this gap by providing a way to communicate
-//     cancellation back to the caller.
-//  2. The pageChunker spawns multiple concurrent workers to process objects within
-//     each page. workerSignal enables these workers to detect and respond to
-//     cancellation signals.
-//  3. Ensures proper progress tracking by allowing the main scanning loop to detect
-//     when workers have been cancelled and handle cleanup appropriately.
-type workerSignal struct{ cancelled atomic.Bool }
-
-// newWorkerSignal creates a new workerSignal
-func newWorkerSignal() *workerSignal { return new(workerSignal) }
-
-// MarkCancelled marks that a context cancellation was detected.
-func (ws *workerSignal) MarkCancelled() { ws.cancelled.Store(true) }
-
-// WasCancelled returns true if context cancellation was detected.
-func (ws *workerSignal) WasCancelled() bool { return ws.cancelled.Load() }
-
 // pageMetadata contains metadata about a single page of S3 objects being scanned.
 type pageMetadata struct {
 	bucket     string                  // The name of the S3 bucket being scanned
@@ -250,9 +226,8 @@ type pageMetadata struct {
 
 // processingState tracks the state of concurrent S3 object processing.
 type processingState struct {
-	errorCount   *sync.Map     // Thread-safe map tracking errors per prefix
-	objectCount  *uint64       // Total number of objects processed
-	workerSignal *workerSignal // Coordinates cancellation across worker goroutines
+	errorCount  *sync.Map // Thread-safe map tracking errors per prefix
+	objectCount *uint64   // Total number of objects processed
 }
 
 func (s *Source) scanBuckets(
@@ -274,9 +249,6 @@ func (s *Source) scanBuckets(
 	}
 
 	startIdx, _ := slices.BinarySearch(bucketsToScan, resumePoint.CurrentBucket)
-
-	// Create worker signal to track cancellation across page processing.
-	workerSignal := newWorkerSignal()
 
 	bucketsToScanCount := len(bucketsToScan)
 	for i := startIdx; i < bucketsToScanCount; i++ {
@@ -327,24 +299,14 @@ func (s *Source) scanBuckets(
 					page:       page,
 				}
 				processingState := processingState{
-					errorCount:   &errorCount,
-					objectCount:  &objectCount,
-					workerSignal: workerSignal,
+					errorCount:  &errorCount,
+					objectCount: &objectCount,
 				}
 				s.pageChunker(ctx, pageMetadata, processingState, chunksChan)
-
-				if workerSignal.WasCancelled() {
-					return false // Stop pagination
-				}
 
 				pageNumber++
 				return true
 			})
-
-		// Check if we stopped due to cancellation.
-		if workerSignal.WasCancelled() {
-			return ctx.Err()
-		}
 
 		if err != nil {
 			if role == "" {
@@ -423,7 +385,6 @@ func (s *Source) pageChunker(
 		ctx = context.WithValues(ctx, "key", *obj.Key, "size", *obj.Size)
 
 		if common.IsDone(ctx) {
-			state.workerSignal.MarkCancelled()
 			return
 		}
 
@@ -470,7 +431,6 @@ func (s *Source) pageChunker(
 		s.jobPool.Go(func() error {
 			defer common.RecoverWithExit(ctx)
 			if common.IsDone(ctx) {
-				state.workerSignal.MarkCancelled()
 				return ctx.Err()
 			}
 
