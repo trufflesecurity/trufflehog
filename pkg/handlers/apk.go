@@ -69,7 +69,6 @@ func defaultDetectorKeywords() []string {
 // The Aho-Corasick algorithm provides fast, simultaneous matching of multiple patterns in
 // a single pass through the text, which is crucial for performance when scanning large APK files.
 type detectorKeywordMatcher struct {
-	mu   sync.RWMutex
 	trie *ahocorasick.Trie
 }
 
@@ -94,9 +93,6 @@ func getDefaultDetectorKeywordMatcher() *detectorKeywordMatcher {
 // It returns unique matches only, eliminating duplicates that may occur when
 // the same keyword appears multiple times in the input text.
 func (km *detectorKeywordMatcher) FindKeywords(text []byte) []string {
-	km.mu.RLock()
-	defer km.mu.RUnlock()
-
 	matches := km.trie.Match(bytes.ToLower(text))
 	found := make([]string, 0, len(matches))
 	seen := make(map[string]struct{}) // To avoid duplicate entries
