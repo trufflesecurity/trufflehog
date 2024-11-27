@@ -3,7 +3,6 @@ package netsuite
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -91,23 +90,5 @@ func TestZohocrm_Pattern(t *testing.T) {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
-	}
-}
-
-func printStruct(s interface{}) {
-	val := reflect.ValueOf(s)
-	typ := reflect.TypeOf(s)
-
-	// Ensure the input is a struct
-	if typ.Kind() != reflect.Struct {
-		fmt.Println("Not a struct")
-		return
-	}
-
-	// Iterate through the fields
-	for i := 0; i < typ.NumField(); i++ {
-		field := typ.Field(i)
-		value := val.Field(i)
-		fmt.Printf("%s: %v\n", field.Name, value.Interface())
 	}
 }
