@@ -3,6 +3,7 @@ package cloudflarecakey
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -80,6 +81,11 @@ func verifyCloudFlareCAKey(ctx context.Context, client *http.Client, caKey strin
 	if err != nil {
 		return false, err
 	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
