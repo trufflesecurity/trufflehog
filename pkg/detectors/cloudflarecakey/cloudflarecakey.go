@@ -2,7 +2,7 @@ package cloudflarecakey
 
 import (
 	"context"
-	"io"
+	"fmt"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// origin ca keys documentation: https://developers.cloudflare.com/fundamentals/api/get-started/ca-keys/
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b(v1\.0-[A-Za-z0-9-]{171})\b`)
+	keyPat = regexp.MustCompile(`\b(v1\.0-[A-Za-z0-9-]{171})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,27 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/certificates?zone_id=a", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("user-agent", "curl/7.68.0") // pretend to be from curl so we do not wait 100+ seconds -> nice try did not work
-
-			req.Header.Add("X-Auth-User-Service-Key", caKey)
-			resp, err := client.Do(req)
-			if err == nil {
-				defer func() {
-					_, _ = io.Copy(io.Discard, resp.Body)
-					_ = resp.Body.Close()
-				}()
-
-				if resp.StatusCode == 200 {
-					s1.Verified = true
-				}
-			} else {
-				s1.SetVerificationError(err, caKey)
-			}
+			isVerified, verificationErr := verifyCloudFlareCAKey(ctx, client, caKey)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, caKey)
 		}
 
 		results = append(results, s1)
@@ -82,4 +64,29 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Cloudflare is a web infrastructure and website security company. Cloudflare CA keys can be used to manage SSL/TLS certificates and other security settings."
+}
+
+func verifyCloudFlareCAKey(ctx context.Context, client *http.Client, caKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/certificates?zone_id=a", nil)
+	if err != nil {
+		return false, nil
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("user-agent", "curl/7.68.0") // pretend to be from curl so we do not wait 100+ seconds -> nice try did not work
+
+	req.Header.Add("X-Auth-User-Service-Key", caKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
