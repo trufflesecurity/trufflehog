@@ -68,9 +68,7 @@ func defaultDetectorKeywords() []string {
 // out irrelevant data and focus on content that is more likely to contain credentials.
 // The Aho-Corasick algorithm provides fast, simultaneous matching of multiple patterns in
 // a single pass through the text, which is crucial for performance when scanning large APK files.
-type detectorKeywordMatcher struct {
-	trie *ahocorasick.Trie
-}
+type detectorKeywordMatcher struct{ trie *ahocorasick.Trie }
 
 // getDefaultDetectorKeywordMatcher creates or returns the singleton detectorKeywordMatcher.
 // This is implemented as a singleton for several important reasons:
