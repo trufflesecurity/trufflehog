@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
+	ahocorasick "github.com/BobuSumisu/aho-corasick"
 	"github.com/avast/apkparser"
 	dextk "github.com/csnewman/dextk"
 
@@ -28,6 +30,86 @@ import (
 
 // ToDo: Scan nested APKs (aka XAPK files). ATM the archive.go file will skip over them.
 // ToDo: Provide file location information to secret output.
+
+var (
+	keywordMatcherOnce sync.Once
+	keywordMatcher     *detectorKeywordMatcher
+)
+
+func defaultDetectorKeywords() []string {
+	allDetectors := defaults.DefaultDetectors()
+
+	// Remove keywords that cause lots of false positives.
+	var exclusions = []string{
+		"AKIA", "SG.", "pat", "token", "gh", "github", "sql", "database", "http", "key", "api-", "sdk-", "float", "-us", "gh", "pat", "token", "sid", "http", "private", "key", "segment", "close", "protocols", "verifier", "box", "privacy", "dm", "sl.", "vf", "flat",
+	}
+
+	var keywords []string
+	exclusionSet := make(map[string]struct{})
+	for _, excl := range exclusions {
+		exclusionSet[strings.ToLower(excl)] = struct{}{}
+	}
+
+	// Aggregate all keywords from detectors.
+	for _, detector := range allDetectors {
+		for _, kw := range detector.Keywords() {
+			kwLower := strings.ToLower(kw)
+			if _, excluded := exclusionSet[kwLower]; !excluded {
+				keywords = append(keywords, kwLower)
+			}
+		}
+	}
+	return keywords
+}
+
+// detectorKeywordMatcher encapsulates the Aho-Corasick trie for efficient keyword matching.
+// It is used to scan APK file contents for keywords associated with our credential detectors.
+// By only processing files/sections that contain these keywords, we can efficiently filter
+// out irrelevant data and focus on content that is more likely to contain credentials.
+// The Aho-Corasick algorithm provides fast, simultaneous matching of multiple patterns in
+// a single pass through the text, which is crucial for performance when scanning large APK files.
+type detectorKeywordMatcher struct {
+	mu   sync.RWMutex
+	trie *ahocorasick.Trie
+}
+
+// getDefaultDetectorKeywordMatcher creates or returns the singleton detectorKeywordMatcher.
+// This is implemented as a singleton for several important reasons:
+// 1. Building the Aho-Corasick trie is computationally expensive and should only be done once.
+// 2. The trie is immutable after construction and can be safely shared across goroutines.
+// 3. The keyword list from the detectors is static for a given program execution.
+// 4. Memory efficiency - we avoid duplicating the trie structure for each handler instance.
+func getDefaultDetectorKeywordMatcher() *detectorKeywordMatcher {
+	keywordMatcherOnce.Do(func() {
+		keywords := defaultDetectorKeywords()
+		keywordMatcher = &detectorKeywordMatcher{
+			trie: ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
+		}
+	})
+	return keywordMatcher
+}
+
+// FindKeywords scans the input text and returns a slice of matched keywords.
+// The method is thread-safe and uses a read lock since the trie is immutable.
+// It returns unique matches only, eliminating duplicates that may occur when
+// the same keyword appears multiple times in the input text.
+func (km *detectorKeywordMatcher) FindKeywords(text []byte) []string {
+	km.mu.RLock()
+	defer km.mu.RUnlock()
+
+	matches := km.trie.Match(bytes.ToLower(text))
+	found := make([]string, 0, len(matches))
+	seen := make(map[string]struct{}) // To avoid duplicate entries
+
+	for _, match := range matches {
+		keyword := match.MatchString()
+		if _, exists := seen[keyword]; !exists {
+			found = append(found, keyword)
+			seen[keyword] = struct{}{}
+		}
+	}
+	return found
+}
 
 var (
 	stringInstructionType  = "const-string"
@@ -53,7 +135,7 @@ var (
 
 // apkHandler handles apk archive formats.
 type apkHandler struct {
-	keywordMatcher *defaults.DefaultDetectorKeywordMatcher
+	keywordMatcher *detectorKeywordMatcher
 	*defaultHandler
 }
 
@@ -61,7 +143,7 @@ type apkHandler struct {
 func newAPKHandler() *apkHandler {
 	return &apkHandler{
 		defaultHandler: newDefaultHandler(apkHandlerType),
-		keywordMatcher: defaults.NewDefaultDetectorKeywordMatcher(),
+		keywordMatcher: getDefaultDetectorKeywordMatcher(),
 	}
 }
 
