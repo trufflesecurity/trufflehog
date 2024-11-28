@@ -13,11 +13,10 @@ import (
 
 var (
 	validPattern = `
-		satismeter_key = satismeter12345678901234 
-		satismeter_email = satismeter@example.com 
-		satismeter_pass = satismeterSecureP@ss123
+		satismeter_project = satismeter12345678901234 
+		satusmeter_token = VVVCVDXuoVwRFAKEiCseXmDiaC32jq7x
 	`
-	invalidPattern = "abcde/testing@go"
+	invalidPattern = "satismeter45678901234/testing@go"
 )
 
 func TestSatisMeterProjectKey_Pattern(t *testing.T) {
@@ -32,11 +31,7 @@ func TestSatisMeterProjectKey_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want: []string{
-				"satismeter12345678901234satismeter12345678901234",
-				"satismeter12345678901234satismeter@example",
-				"satismeter12345678901234satismeterSecureP@ss123",
-			},
+			want:  []string{"satismeter12345678901234VVVCVDXuoVwRFAKEiCseXmDiaC32jq7x"},
 		},
 		{
 			name:  "invalid pattern",
