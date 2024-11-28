@@ -17,7 +17,7 @@ var (
 	keyword        = "opsgenie"
 )
 
-func TestZohocrm_Pattern(t *testing.T) {
+func TestOpsgenie_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {

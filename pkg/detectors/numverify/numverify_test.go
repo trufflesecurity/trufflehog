@@ -17,7 +17,7 @@ var (
 	keyword        = "numverify"
 )
 
-func TestZohocrm_Pattern(t *testing.T) {
+func TestNumverify_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {

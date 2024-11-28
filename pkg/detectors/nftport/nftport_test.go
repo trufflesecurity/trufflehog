@@ -17,7 +17,7 @@ var (
 	keyword        = "nftport"
 )
 
-func TestZohocrm_Pattern(t *testing.T) {
+func TestNftport_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
