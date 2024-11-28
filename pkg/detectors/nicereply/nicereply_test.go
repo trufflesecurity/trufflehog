@@ -17,7 +17,7 @@ var (
 	keyword        = "nicereply"
 )
 
-func TestZohocrm_Pattern(t *testing.T) {
+func TestNicereply_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
