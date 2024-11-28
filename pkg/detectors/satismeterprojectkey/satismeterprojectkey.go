@@ -3,6 +3,7 @@ package satismeterprojectkey
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -88,6 +89,10 @@ func verifySatisMeterApp(ctx context.Context, client *http.Client, projectID, to
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
