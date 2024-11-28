@@ -19,7 +19,7 @@ var (
     keyword    = "neutrinoapi"
 )
 
-func TestZohocrm_Pattern(t *testing.T) {
+func TestNeutrinoApi_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {

@@ -19,7 +19,7 @@ var (
 	keyword    = "nethunt"
 )
 
-func TestZohocrm_Pattern(t *testing.T) {
+func TestNethunt_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
