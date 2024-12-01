@@ -410,8 +410,7 @@ Find credentials in git repositories.
 
 Flags:
   -h, --help                Show context-sensitive help (also try --help-long and --help-man).
-      --debug               Run in debug mode.
-      --trace               Run in trace mode.
+      --log-level=0         Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".
       --profile             Enables profiling and sets a pprof and fgprof server on :18066.
   -j, --json                Output in JSON format.
       --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
@@ -567,7 +566,7 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
     # Scan commits until here (usually dev branch).
     head: # optional
     # Extra args to be passed to the trufflehog cli.
-    extra_args: --debug --only-verified
+    extra_args: --log-level=2 --only-verified
 ```
 
 If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
