@@ -1,3 +1,9 @@
+// Package iobuf provides a buffered reading interface with seeking capabilities.
+//
+// For small amounts of data, it uses an in-memory buffer (bytes.Buffer) to store
+// read bytes. When the amount of data exceeds a specified threshold, it switches
+// to disk-based buffering using a temporary file. This approach balances memory
+// usage and performance, allowing efficient handling of both small and large data streams.
 package iobuf
 
 import (
