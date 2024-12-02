@@ -42,11 +42,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	uniqueKeys, uniqueIds := make(map[string]struct{}), make(map[string]struct{})
 
 	for _, foundKey := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueKeys[foundKey[1]] = struct{}{}
+		key := foundKey[1]
+		if detectors.StringShannonEntropy(key) < 3 {
+			continue
+		}
+
+		uniqueKeys[key] = struct{}{}
 	}
 
 	for _, foundId := range idPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueIds[foundId[1]] = struct{}{}
+		id := foundId[1]
+		if detectors.StringShannonEntropy(id) < 3 {
+			continue
+		}
+
+		uniqueIds[id] = struct{}{}
 	}
 
 	for key := range uniqueKeys {
