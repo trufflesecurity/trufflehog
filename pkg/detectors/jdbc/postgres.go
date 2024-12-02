@@ -10,6 +10,8 @@ import (
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/lib/pq"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type postgresJDBC struct {
@@ -90,7 +92,9 @@ func parsePostgres(_ logContext.Context, subname string) (jdbc, error) {
 		}
 	}
 
-	if v := u.Query()["sslmode"]; len(v) > 0 {
+	if !common.VerifySsl {
+		params["sslmode"] = "disable"
+	} else if v := u.Query()["sslmode"]; len(v) > 0 {
 		switch v[0] {
 		// https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
 		case "disable", "allow", "prefer",
