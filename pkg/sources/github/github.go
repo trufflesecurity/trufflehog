@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v67/github"
 	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
