@@ -3,16 +3,17 @@ package plaidkey
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -37,20 +38,22 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	// find all the matching keys and ids in the data and make a unique maps for both.
+	uniqueKeys, uniqueIds := make(map[string]struct{}), make(map[string]struct{})
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
+	for _, foundKey := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[foundKey[1]] = struct{}{}
+	}
 
-		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
-			idresMatch := strings.TrimSpace(idMatch[1])
+	for _, foundId := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueIds[foundId[1]] = struct{}{}
+	}
+
+	for key := range uniqueKeys {
+		resMatch := strings.TrimSpace(key)
+
+		for id := range uniqueIds {
+			idresMatch := strings.TrimSpace(id)
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PlaidKey,
@@ -79,6 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if s1.Verified {
 					break
 				}
+			} else {
+				results = append(results, s1)
 			}
 		}
 	}
