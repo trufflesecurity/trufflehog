@@ -103,6 +103,30 @@ type SourceUnitEnumerator interface {
 	Enumerate(ctx context.Context, reporter UnitReporter) error
 }
 
+// BaseUnitReporter is a helper struct that implements the UnitReporter interface
+// and includes a JobProgress reference.
+type baseUnitReporter struct {
+	child       UnitReporter
+	progress *JobProgress
+}
+
+func (b baseUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
+	b.progress.ReportUnit(unit)
+	if b.child != nil {
+		return b.child.UnitOk(ctx, unit)
+	}
+	return nil
+}
+
+func (b baseUnitReporter) UnitErr(ctx context.Context, err error) error {
+	b.progress.ReportError(err)
+	if b.child != nil {
+		return b.child.UnitErr(ctx, err)
+	}
+	return nil
+}
+
+
 // UnitReporter defines the interface a source will use to report whether a
 // unit was found during enumeration. Either method may be called any number of
 // times. Implementors of this interface should allow for concurrent calls.

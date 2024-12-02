@@ -2,10 +2,12 @@ package algoliaadminkey
 
 import (
 	"context"
-	"fmt"
 	"encoding/json"
+	"fmt"
 	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -13,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -24,8 +26,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"algolia", "docsearch", "apiKey"}) + `\b([a-zA-Z0-9]{32})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"algolia", "docsearch", "appId"}) + `\b([A-Z0-9]{10})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"algolia", "docsearch", "apiKey"}) + `\b([a-zA-Z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -38,105 +40,116 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
-
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
+	// Deduplicate matches.
+	idMatches := make(map[string]struct{})
+	for _, match := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		id := match[1]
+		if detectors.StringShannonEntropy(id) > 2 {
+			idMatches[id] = struct{}{}
 		}
-		resMatch := strings.TrimSpace(match[1])
-		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
-			resIdMatch := strings.TrimSpace(idMatch[1])
+	}
+	keyMatches := make(map[string]struct{})
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		key := match[1]
+		if detectors.StringShannonEntropy(key) > 3 {
+			keyMatches[key] = struct{}{}
+		}
+	}
 
-			s1 := detectors.Result{
+	// Test matches.
+	for key := range keyMatches {
+		for id := range idMatches {
+			r := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AlgoliaAdminKey,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				Raw:          []byte(key),
+				RawV2:        []byte(id + ":" + key),
 			}
 
 			if verify {
 				// Verify if the key is a valid Algolia Admin Key.
-				isVerified, verificationErr := verifyAlgoliaKey(ctx, resIdMatch, resMatch)
-
-				// Verify if the key has sensitive permissions, even if it's not an Admin Key.
-				if !isVerified {
-					isVerified, verificationErr = verifyAlgoliaKeyACL(ctx, resIdMatch, resMatch)
-				}
-
-				s1.SetVerificationError(verificationErr, resMatch)
-				s1.Verified = isVerified
+				isVerified, extraData, verificationErr := verifyMatch(ctx, id, key)
+				r.Verified = isVerified
+				r.ExtraData = extraData
+				r.SetVerificationError(verificationErr, key)
 			}
 
-			results = append(results, s1)
+			results = append(results, r)
+			if r.Verified {
+				break
+			}
 		}
 	}
 	return results, nil
 }
 
-func verifyAlgoliaKey(ctx context.Context, appId, apiKey string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+appId+"-dsn.algolia.net/1/keys", nil)
-	if err != nil {
-		return false, err
-	}
-
-	req.Header.Add("X-Algolia-Application-Id", appId)
-	req.Header.Add("X-Algolia-API-Key", apiKey)
-
-	res, err := client.Do(req)
-	if err != nil {
-		return false, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode == 403 {
-		return false, nil
-	} else if res.StatusCode < 200 || res.StatusCode > 299 {
-		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-	}
-
-	return true, nil
+// https://www.algolia.com/doc/guides/security/api-keys/#access-control-list-acl
+var nonSensitivePermissions = map[string]struct{}{
+	"listIndexes": {},
+	"search":      {},
+	"settings":    {},
 }
 
-func verifyAlgoliaKeyACL(ctx context.Context, appId, apiKey string) (bool, error) {
+func verifyMatch(ctx context.Context, appId, apiKey string) (bool, map[string]string, error) {
+	// https://www.algolia.com/doc/rest-api/search/#section/Base-URLs
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+appId+".algolia.net/1/keys/"+apiKey, nil)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
-	req.Header.Add("X-Algolia-Application-Id", appId)
-	req.Header.Add("X-Algolia-API-Key", apiKey)
+	req.Header.Set("X-Algolia-Application-Id", appId)
+	req.Header.Set("X-Algolia-API-Key", apiKey)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
-	if res.StatusCode == 403 {
-		return false, nil
-	} else if res.StatusCode < 200 || res.StatusCode > 299 {
-		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-	}
-
-	var jsonResponse struct {
-		ACL []string `json:"acl"`
-	}
-
-	if err := json.NewDecoder(res.Body).Decode(&jsonResponse); err != nil {
-		return false, err
-	}
-
-	for _, acl := range jsonResponse.ACL {
-		if acl != "search" && acl != "listIndexes" && acl != "settings" {
-			return true, nil // Other permissions are sensitive.
+	switch res.StatusCode {
+	case http.StatusOK:
+		var keyRes keyResponse
+		if err := json.NewDecoder(res.Body).Decode(&keyRes); err != nil {
+			return false, nil, err
 		}
-	}
 
-	return false, nil
+		// Check if the key has sensitive permissions, even if it's not an Admin Key.
+		hasSensitivePerms := false
+		for _, acl := range keyRes.ACL {
+			if _, ok := nonSensitivePermissions[acl]; !ok {
+				hasSensitivePerms = true
+				break
+			}
+		}
+		if !hasSensitivePerms {
+			return false, nil, nil
+		}
+
+		slices.Sort(keyRes.ACL)
+		extraData := map[string]string{
+			"acl": strings.Join(keyRes.ACL, ","),
+		}
+		if keyRes.Description != "" && keyRes.Description != "<redacted>" {
+			extraData["description"] = keyRes.Description
+		}
+		return true, extraData, nil
+	case http.StatusUnauthorized:
+		return false, nil, nil
+	case http.StatusForbidden:
+		// Invalidated key.
+		// {"message":"Invalid Application-ID or API key","status":403}
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+}
+
+// https://www.algolia.com/doc/rest-api/search/#tag/Api-Keys/operation/getApiKey
+type keyResponse struct {
+	ACL         []string `json:"acl"`
+	Description string   `json:"description"`
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

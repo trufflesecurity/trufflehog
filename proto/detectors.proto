@@ -1016,7 +1016,9 @@ enum DetectorType {
   ApiMetrics = 1004;
   WeightsAndBiases = 1005;
   ZohoCRM = 1006;
-  Flexport = 1007;
+  AzureOpenAI = 1007;
+  GoDaddy = 1008;
+  Flexport = 1009;
 }
 
 message Result {

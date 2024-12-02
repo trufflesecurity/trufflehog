@@ -76,5 +76,5 @@ func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) (sour
 	if err := huggingfaceSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.Run(ctx, sourceName, huggingfaceSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, huggingfaceSource)
 }

@@ -51,6 +51,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			u, err := detectors.ParseURLAndStripPathAndParams(resEndpointMatch)
 			if err != nil {
+				fmt.Printf("\nINVALID URL\n")
 				// if the URL is invalid just move onto the next one
 				continue
 			}

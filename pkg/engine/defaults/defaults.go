@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -63,18 +64,20 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autopilot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/avazapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aviationstack"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
-	awssessionkey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
+	aws_access_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/access_keys"
+	aws_session_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/session_keys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_batch"
+	azure_serviceprincipal_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v1"
+	azure_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_openai"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_storage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurestorage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
@@ -106,8 +109,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/budibase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkitev2"
+	buildKitev1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite/v1"
+	buildKitev2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulbul"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulksms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buttercms"
@@ -319,6 +322,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
+	godaddyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v1"
+	godaddyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
@@ -344,7 +349,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/honeycomb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/host"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/html2pdf"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspotapikey"
+	hubspot_apikey_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspot_apikey/v1"
+	hubspot_apikey_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspot_apikey/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/humanity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hunter"
@@ -883,19 +889,21 @@ func buildDetectorList() []detectors.Detector {
 		&autopilot.Scanner{},
 		&avazapersonalaccesstoken.Scanner{},
 		&aviationstack.Scanner{},
-		aws.New(),
-		awssessionkey.New(),
+		aws_access_keys.New(),
+		aws_session_keys.New(),
 		&axonaut.Scanner{},
 		&aylien.Scanner{},
 		&ayrshare.Scanner{},
-		&azure.Scanner{},
-		&azurebatch.Scanner{},
+		&azure_serviceprincipal_v1.Scanner{},
+		&azure_serviceprincipal_v2.Scanner{},
+		&azure_batch.Scanner{},
 		&azurecontainerregistry.Scanner{},
 		&azuredevopspersonalaccesstoken.Scanner{},
 		// &azurefunctionkey.Scanner{}, // detector is throwing some FPs
+		&azure_openai.Scanner{},
 		&azuresearchadminkey.Scanner{},
 		&azuresearchquerykey.Scanner{},
-		&azurestorage.Scanner{},
+		&azure_storage.Scanner{},
 		&bannerbear.Scanner{},
 		&baremetrics.Scanner{},
 		&beamer.Scanner{},
@@ -927,8 +935,8 @@ func buildDetectorList() []detectors.Detector {
 		&budibase.Scanner{},
 		&bugherd.Scanner{},
 		&bugsnag.Scanner{},
-		&buildkite.Scanner{},
-		&buildkitev2.Scanner{},
+		&buildKitev1.Scanner{},
+		&buildKitev2.Scanner{},
 		&bulbul.Scanner{},
 		&bulksms.Scanner{},
 		&buttercms.Scanner{},
@@ -1145,6 +1153,8 @@ func buildDetectorList() []detectors.Detector {
 		&glassnode.Scanner{},
 		&gocanvas.Scanner{},
 		&gocardless.Scanner{},
+		&godaddyv1.Scanner{},
+		&godaddyv2.Scanner{},
 		&goodday.Scanner{},
 		&googleoauth2.Scanner{},
 		&grafana.Scanner{},
@@ -1171,7 +1181,8 @@ func buildDetectorList() []detectors.Detector {
 		&honeycomb.Scanner{},
 		&host.Scanner{},
 		&html2pdf.Scanner{},
-		&hubspotapikey.Scanner{},
+		&hubspot_apikey_v1.Scanner{},
+		&hubspot_apikey_v2.Scanner{},
 		&huggingface.Scanner{},
 		&humanity.Scanner{},
 		&hunter.Scanner{},

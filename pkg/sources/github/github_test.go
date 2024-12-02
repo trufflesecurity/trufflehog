@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -203,6 +204,41 @@ func TestAddMembersByOrg(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = s.memberCache["testman2"]
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
+func TestAddMembersByOrg_AuthFailure(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/org1/members").
+		Reply(401).
+		JSON([]map[string]string{{
+			"message":           "Bad credentials",
+			"documentation_url": "https://docs.github.com/rest",
+			"status":            "401",
+		}})
+
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	err := s.addMembersByOrg(context.Background(), "org1")
+	assert.True(t, strings.HasPrefix(err.Error(), "could not list organization"))
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
+func TestAddMembersByOrg_NoMembers(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/org1/members").
+		Reply(200).
+		JSON([]map[string]string{})
+
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	err := s.addMembersByOrg(context.Background(), "org1")
+
+	assert.Equal(t, fmt.Sprintf("organization (%q) had 0 members: account may not have access to list organization members", "org1"), err.Error())
 	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
