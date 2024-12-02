@@ -42,16 +42,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range idMatches {
-		if len(match) != 2 {
-			continue
-		}
 
 		idMatch := strings.TrimSpace(match[1])
 
 		for _, secret := range keyMatches {
-			if len(secret) != 2 {
-				continue
-			}
 
 			keyMatch := strings.TrimSpace(secret[1])
 

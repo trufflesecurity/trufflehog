@@ -48,9 +48,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for emailMatch := range uniqueEmailMatches {
 		for _, pwordMatch := range pwordMatches {
-			if len(pwordMatch) != 2 {
-				continue
-			}
 			resPword := strings.TrimSpace(pwordMatch[1])
 
 			s1 := detectors.Result{
