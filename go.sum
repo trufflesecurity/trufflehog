@@ -736,6 +736,8 @@ github.com/testcontainers/testcontainers-go/modules/postgres v0.34.0 h1:c51aBXT3
 github.com/testcontainers/testcontainers-go/modules/postgres v0.34.0/go.mod h1:EWP75ogLQU4M4L8U+20mFipjV4WIR9WtlMXSB6/wiuc=
 github.com/tetratelabs/wazero v1.8.0 h1:iEKu0d4c2Pd+QSRieYbnQC9yiFlMS9D+Jr0LsRmcF4g=
 github.com/tetratelabs/wazero v1.8.0/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
+github.com/tetratelabs/wazero v1.8.2 h1:yIgLR/b2bN31bjxwXHD8a3d+BogigR952csSDdLYEv4=
+github.com/tetratelabs/wazero v1.8.2/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
 github.com/therootcompany/xz v1.0.1 h1:CmOtsn1CbtmyYiusbfmhmkpAAETj0wBIH6kCYaX+xzw=
 github.com/therootcompany/xz v1.0.1/go.mod h1:3K3UH1yCKgBneZYhuQUvJ9HPD19UEXEI0BWbMn8qNMY=
 github.com/tklauser/go-sysconf v0.3.12 h1:0QaGUFOdQaIVdPgfITYzaTegZvdCjmYO52cSFAEVmqU=
@@ -760,6 +762,8 @@ github.com/vbatts/tar-split v0.11.3 h1:hLFqsOLQ1SsppQNTMpkpPXClLDfC2A3Zgy9OUU+RV
 github.com/vbatts/tar-split v0.11.3/go.mod h1:9QlHN18E+fEH7RdG+QAJJcuya3rqT7eXSTY7wGrAokY=
 github.com/wasilibs/go-re2 v1.7.0 h1:bYhl8gn+a9h01dxwotNycxkiFPTiSgwUrIz8KZJ90Lc=
 github.com/wasilibs/go-re2 v1.7.0/go.mod h1:sUsZMLflgl+LNivDE229omtmvjICmOseT9xOy199VDU=
+github.com/wasilibs/go-re2 v1.8.0 h1:6wpqZ31vdoJRSOM41bWEd1AbSmRe161yQkTzoihqwEg=
+github.com/wasilibs/go-re2 v1.8.0/go.mod h1:RjA3Y/yW6xFL8Iyz8f5sVhttLq5b5DRF8baZ7Sh+elk=
 github.com/wasilibs/nottinygc v0.4.0 h1:h1TJMihMC4neN6Zq+WKpLxgd9xCFMw7O9ETLwY2exJQ=
 github.com/wasilibs/nottinygc v0.4.0/go.mod h1:oDcIotskuYNMpqMF23l7Z8uzD4TC0WXHK8jetlB3HIo=
 github.com/wasilibs/wazero-helpers v0.0.0-20240620070341-3dff1577cd52 h1:OvLBa8SqJnZ6P+mjlzc2K7PM22rRUPE1x32G9DTPrC4=
