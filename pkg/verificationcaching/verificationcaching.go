@@ -4,7 +4,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 // FromDataCached executes detection on chunk data in a way that uses a provided verification cache to deduplicate
@@ -71,8 +70,6 @@ func FromDataCached(
 		// Do not persist raw secret values in a long-lived cache
 		copyForCaching.Raw = nil
 		copyForCaching.RawV2 = nil
-		// Decoder type will be set later, so clear it out now to minimize the chance of accidentally cloning it
-		copyForCaching.DecoderType = detectorspb.DecoderType_UNKNOWN
 		verificationCache.Set(getCacheKey(&r), &copyForCaching)
 	}
 
