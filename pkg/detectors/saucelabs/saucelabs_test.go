@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -44,13 +44,19 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a saucelabs secret %s within saucelabs id %s but verified", secret, id)),
+				data:   []byte(createFakeString(id, secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SauceLabs,
 					Verified:     true,
+					RawV2:        []byte(id + secret),
+				},
+				{
+					DetectorType: detectorspb.DetectorType_SauceLabs,
+					Verified:     false,
+					RawV2:        []byte(secret + secret),
 				},
 			},
 			wantErr: false,
@@ -60,13 +66,19 @@ func TestSauceLabs_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a saucelabs secret %s within saucelabs id %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("username: %s\n saucelabskey: %s", id, inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SauceLabs,
 					Verified:     false,
+					RawV2:        []byte(id + inactiveSecret),
+				},
+				{
+					DetectorType: detectorspb.DetectorType_SauceLabs,
+					Verified:     false,
+					RawV2:        []byte(inactiveSecret + inactiveSecret),
 				},
 			},
 			wantErr: false,
@@ -118,4 +130,11 @@ func BenchmarkFromData(benchmark *testing.B) {
 			}
 		})
 	}
+}
+
+func createFakeString(username, key string) string {
+	return `
+	username: ` + username + `
+	saucelabskey: ` + key + `
+	`
 }
