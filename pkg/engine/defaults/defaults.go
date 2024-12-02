@@ -275,6 +275,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fixerio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flatio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fleetbase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flexport"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flickr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightlabs"
@@ -1102,6 +1103,7 @@ func buildDetectorList() []detectors.Detector {
 		&fixerio.Scanner{},
 		&flatio.Scanner{},
 		&fleetbase.Scanner{},
+		&flexport.Scanner{},
 		&flickr.Scanner{},
 		&flightapi.Scanner{},
 		&flightlabs.Scanner{},
