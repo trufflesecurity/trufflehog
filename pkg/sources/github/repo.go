@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v67/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"

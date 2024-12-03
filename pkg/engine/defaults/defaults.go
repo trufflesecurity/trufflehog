@@ -1,12 +1,6 @@
 package defaults
 
 import (
-	"bytes"
-	"strings"
-	"sync"
-
-	ahocorasick "github.com/BobuSumisu/aho-corasick"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -275,6 +269,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fixerio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flatio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fleetbase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flexport"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flickr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightlabs"
@@ -1102,6 +1097,7 @@ func buildDetectorList() []detectors.Detector {
 		&fixerio.Scanner{},
 		&flatio.Scanner{},
 		&fleetbase.Scanner{},
+		&flexport.Scanner{},
 		&flickr.Scanner{},
 		&flightapi.Scanner{},
 		&flightlabs.Scanner{},
@@ -1696,61 +1692,4 @@ func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]stru
 		}
 	}
 	return out
-}
-
-func defaultDetectorKeywords() []string {
-	allDetectors := buildDetectorList()
-
-	// Remove keywords that cause lots of false positives.
-	var exclusions = []string{
-		"AKIA", "SG.", "pat", "token", "gh", "github", "sql", "database", "http", "key", "api-", "sdk-", "float", "-us", "gh", "pat", "token", "sid", "http", "private", "key", "segment", "close", "protocols", "verifier", "box", "privacy", "dm", "sl.", "vf", "flat",
-	}
-
-	var keywords []string
-	exclusionSet := make(map[string]struct{})
-	for _, excl := range exclusions {
-		exclusionSet[strings.ToLower(excl)] = struct{}{}
-	}
-
-	// Aggregate all keywords from detectors.
-	for _, detector := range allDetectors {
-		for _, kw := range detector.Keywords() {
-			kwLower := strings.ToLower(kw)
-			if _, excluded := exclusionSet[kwLower]; !excluded {
-				keywords = append(keywords, kwLower)
-			}
-		}
-	}
-	return keywords
-}
-
-// DefaultDetectorKeywordMatcher encapsulates the Aho-Corasick trie for keyword matching.
-type DefaultDetectorKeywordMatcher struct {
-	mu   sync.RWMutex
-	trie *ahocorasick.Trie
-}
-
-// NewDefaultDetectorKeywordMatcher creates a new DefaultDetectorKeywordMatcher.
-func NewDefaultDetectorKeywordMatcher() *DefaultDetectorKeywordMatcher {
-	keywords := defaultDetectorKeywords()
-	return &DefaultDetectorKeywordMatcher{trie: ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()}
-}
-
-// FindKeywords scans the input text and returns a slice of matched keywords.
-func (km *DefaultDetectorKeywordMatcher) FindKeywords(text []byte) []string {
-	km.mu.RLock()
-	defer km.mu.RUnlock()
-
-	matches := km.trie.Match(bytes.ToLower(text))
-	found := make([]string, 0, len(matches))
-	seen := make(map[string]struct{}) // To avoid duplicate entries
-
-	for _, match := range matches {
-		keyword := match.MatchString()
-		if _, exists := seen[keyword]; !exists {
-			found = append(found, keyword)
-			seen[keyword] = struct{}{}
-		}
-	}
-	return found
 }
