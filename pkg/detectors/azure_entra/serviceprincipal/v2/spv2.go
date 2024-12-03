@@ -26,11 +26,13 @@ var _ interface {
 	detectors.Versioner
 } = (*Scanner)(nil)
 
-var (
-	defaultClient = common.SaneHttpClient()
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Azure
+}
 
-	SecretPat = regexp.MustCompile(`(?:[^a-zA-Z0-9_~.-]|\A)([a-zA-Z0-9_~.-]{3}\dQ~[a-zA-Z0-9_~.-]{31,34})(?:[^a-zA-Z0-9_~.-]|\z)`)
-)
+func (s Scanner) Description() string {
+	return serviceprincipal.Description
+}
 
 func (s Scanner) Version() int {
 	return 2
@@ -42,13 +44,11 @@ func (s Scanner) Keywords() []string {
 	return []string{"q~"}
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Azure
-}
+var (
+	defaultClient = common.SaneHttpClient()
 
-func (s Scanner) Description() string {
-	return serviceprincipal.Description
-}
+	SecretPat = regexp.MustCompile(`(?:[^a-zA-Z0-9_~.-]|\A)([a-zA-Z0-9_~.-]{3}\dQ~[a-zA-Z0-9_~.-]{31,34})(?:[^a-zA-Z0-9_~.-]|\z)`)
+)
 
 // FromData will find and optionally verify Azure secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -181,7 +181,11 @@ func createResult(tenantId string, clientId string, clientSecret string, verifie
 func findSecretMatches(data string) map[string]struct{} {
 	uniqueMatches := make(map[string]struct{})
 	for _, match := range SecretPat.FindAllStringSubmatch(data, -1) {
-		uniqueMatches[match[1]] = struct{}{}
+		m := match[1]
+		if detectors.StringShannonEntropy(m) < 3 {
+			continue
+		}
+		uniqueMatches[m] = struct{}{}
 	}
 	return uniqueMatches
 }
