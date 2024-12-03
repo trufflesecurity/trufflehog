@@ -30,9 +30,6 @@ func newConnector(source *Source) (connector, error) {
 	case *sourcespb.GitHub_GithubApp:
 		log.RedactGlobally(cred.GithubApp.GetPrivateKey())
 		return newAppConnector(apiEndpoint, cred.GithubApp)
-	case *sourcespb.GitHub_BasicAuth:
-		log.RedactGlobally(cred.BasicAuth.GetPassword())
-		return newBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		log.RedactGlobally(cred.Token)
 		return newTokenConnector(apiEndpoint, cred.Token, source.handleRateLimit)

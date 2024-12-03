@@ -399,10 +399,6 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		if err := s.enumerateWithApp(ctx, c.InstallationClient(), dedupeReporter); err != nil {
 			return err
 		}
-	case *basicAuthConnector:
-		if err := s.enumerateBasicAuth(ctx, dedupeReporter); err != nil {
-			return err
-		}
 	case *tokenConnector:
 		if err := s.enumerateWithToken(ctx, c.IsGithubEnterprise(), dedupeReporter); err != nil {
 			return err
