@@ -229,7 +229,7 @@ message GitHub {
     credentials.GitHubApp github_app = 2;
     string token = 3;
     credentials.Unauthenticated unauthenticated = 4;
-    credentials.BasicAuth basic_auth = 13;
+    credentials.BasicAuth basic_auth = 13 [deprecated = true];
   }
   repeated string repositories = 5;
   repeated string organizations = 6;
