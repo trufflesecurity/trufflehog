@@ -113,6 +113,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
 				"project":        creds.ProjectID,
 			},
+			AnalysisInfo: map[string]string{"user": creds.ClientEmail},
 		}
 
 		if verify {
