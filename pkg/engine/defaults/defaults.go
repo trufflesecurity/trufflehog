@@ -743,7 +743,8 @@ import (
 	twitterv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitterconsumerkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tyntec"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform"
+	typeformv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform/v1"
+	typeformv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typetalk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ubidots"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uclassify"
@@ -1586,7 +1587,8 @@ func buildDetectorList() []detectors.Detector {
 		&twitterv1.Scanner{},
 		&twitterv2.Scanner{},
 		&tyntec.Scanner{},
-		&typeform.Scanner{},
+		&typeformv1.Scanner{},
+		&typeformv2.Scanner{},
 		&typetalk.Scanner{},
 		&ubidots.Scanner{},
 		&uclassify.Scanner{},
