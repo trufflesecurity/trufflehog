@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	zone "github.com/lrstanley/bubblezone"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/keymap"
@@ -57,20 +58,13 @@ func New(c common.Common, args []string) *TUI {
 		pages:       make([]common.Component, 7),
 		pageHistory: []page{wizardIntroPage},
 		state:       startState,
+		args:        args,
 	}
 	switch {
 	case len(args) == 0:
 		return ui
 	case len(args) == 1 && args[0] == "analyze":
-		// Set to analyze start page.
-		return &TUI{
-			common:      c,
-			pages:       make([]common.Component, 7),
-			pageHistory: []page{wizardIntroPage, analyzeKeysPage},
-			state:       startState,
-		}
-		// case len(args) >= 2 && args[0] == "analyze":
-		// Set analyze sub-page.
+		ui.pageHistory = []page{wizardIntroPage, analyzeKeysPage}
 	}
 	return ui
 }
@@ -87,13 +81,28 @@ func (ui *TUI) SetSize(width, height int) {
 
 // Init implements tea.Model.
 func (ui *TUI) Init() tea.Cmd {
+
 	ui.pages[wizardIntroPage] = wizard_intro.New(ui.common)
 	ui.pages[sourceSelectPage] = source_select.New(ui.common)
 	ui.pages[sourceConfigurePage] = source_configure.New(ui.common)
 	ui.pages[viewOSSProjectPage] = view_oss.New(ui.common)
 	ui.pages[contactEnterprisePage] = contact_enterprise.New(ui.common)
 	ui.pages[analyzeKeysPage] = analyze_keys.New(ui.common)
-	ui.pages[analyzeFormPage] = analyze_form.New(ui.common, "this is a bug")
+
+	if len(ui.args) > 1 && ui.args[0] == "analyze" {
+		analyzerArg := strings.ToLower(ui.args[1])
+		ui.pages[analyzeFormPage] = analyze_form.New(ui.common, analyzerArg)
+		ui.setActivePage(analyzeKeysPage)
+
+		for _, analyzer := range analyzers.AvailableAnalyzers() {
+			if strings.ToLower(analyzer) == analyzerArg {
+				ui.setActivePage(analyzeFormPage)
+			}
+		}
+	} else {
+		ui.pages[analyzeFormPage] = analyze_form.New(ui.common, "this is a bug")
+	}
+
 	ui.SetSize(ui.common.Width, ui.common.Height)
 	cmds := make([]tea.Cmd, 0)
 	cmds = append(cmds,
