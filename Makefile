@@ -12,7 +12,7 @@ PROTOS_IMAGE ?= trufflesecurity/protos:1.22
 .PHONY: dogfood
 
 dogfood:
-	CGO_ENABLED=0 go run . git file://. --json --debug
+	CGO_ENABLED=0 go run . git file://. --json --log-level=2
 
 install:
 	CGO_ENABLED=0 go install .
@@ -49,7 +49,7 @@ run:
 	CGO_ENABLED=0 go run . git file://. --json
 
 run-debug:
-	CGO_ENABLED=0 go run . git file://. --json --debug
+	CGO_ENABLED=0 go run . git file://. --json --log-level=2
 
 protos:
 	docker run --rm -u "$(shell id -u)" -v "$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))":/pwd "${PROTOS_IMAGE}" bash -c "cd /pwd; /pwd/scripts/gen_proto.sh"

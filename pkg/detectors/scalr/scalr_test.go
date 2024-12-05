@@ -47,6 +47,10 @@ func TestScalr_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Scalr,
+					Verified:     false,
+				},
+				{
+					DetectorType: detectorspb.DetectorType_Scalr,
 					Verified:     true,
 				},
 			},
@@ -61,6 +65,10 @@ func TestScalr_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Scalr,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_Scalr,
 					Verified:     false,

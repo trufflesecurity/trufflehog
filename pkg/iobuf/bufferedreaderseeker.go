@@ -1,3 +1,9 @@
+// Package iobuf provides a buffered reading interface with seeking capabilities.
+//
+// For small amounts of data, it uses an in-memory buffer (bytes.Buffer) to store
+// read bytes. When the amount of data exceeds a specified threshold, it switches
+// to disk-based buffering using a temporary file. This approach balances memory
+// usage and performance, allowing efficient handling of both small and large data streams.
 package iobuf
 
 import (
@@ -167,12 +173,12 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 	}
 
 	// If we still need to read more data.
-	var raderBytes int
-	raderBytes, err = br.reader.Read(out)
-	totalBytesRead += raderBytes
-	br.index += int64(raderBytes)
+	var readerBytes int
+	readerBytes, err = br.reader.Read(out)
+	totalBytesRead += readerBytes
+	br.index += int64(readerBytes)
 
-	if writeErr := br.writeData(out[:raderBytes]); writeErr != nil {
+	if writeErr := br.writeData(out[:readerBytes]); writeErr != nil {
 		return totalBytesRead, writeErr
 	}
 
