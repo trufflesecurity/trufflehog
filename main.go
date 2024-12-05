@@ -40,10 +40,12 @@ import (
 )
 
 var (
-	cli                 = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
-	cmd                 string
-	debug               = cli.Flag("debug", "Run in debug mode.").Bool()
-	trace               = cli.Flag("trace", "Run in trace mode.").Bool()
+	cli = kingpin.New("TruffleHog", "TruffleHog is a tool for finding credentials.")
+	cmd string
+	// https://github.com/trufflesecurity/trufflehog/blob/main/CONTRIBUTING.md#logging-in-trufflehog
+	logLevel            = cli.Flag("log-level", `Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".`).Default("0").Int()
+	debug               = cli.Flag("debug", "Run in debug mode.").Hidden().Bool()
+	trace               = cli.Flag("trace", "Run in trace mode.").Hidden().Bool()
 	profile             = cli.Flag("profile", "Enables profiling and sets a pprof and fgprof server on :18066.").Bool()
 	localDev            = cli.Flag("local-dev", "Hidden feature to disable overseer for local dev.").Hidden().Bool()
 	jsonOut             = cli.Flag("json", "Output in JSON format.").Short('j').Bool()
@@ -275,11 +277,26 @@ func init() {
 
 	cmd = kingpin.MustParse(cli.Parse(os.Args[1:]))
 
+	// Configure logging.
 	switch {
 	case *trace:
 		log.SetLevel(5)
 	case *debug:
 		log.SetLevel(2)
+	default:
+		l := int8(*logLevel)
+		if l < -1 || l > 5 {
+			fmt.Fprintf(os.Stderr, "invalid log level: %d\n", *logLevel)
+			os.Exit(1)
+		}
+
+		if l == -1 {
+			// Zap uses "5" as the value for fatal.
+			// We need to pass in "-5" because `SetLevel` passes the negation.
+			log.SetLevel(-5)
+		} else {
+			log.SetLevel(l)
+		}
 	}
 }
 
