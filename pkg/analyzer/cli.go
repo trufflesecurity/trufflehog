@@ -56,7 +56,7 @@ func Command(app *kingpin.Application) *kingpin.CmdClause {
 	return cli
 }
 
-func Run(cmd string, keyType string, secretInfo SecretInfo) {
+func Run(keyType string, secretInfo SecretInfo) {
 	if secretInfo.Cfg == nil {
 		secretInfo.Cfg = &config.Config{}
 	}

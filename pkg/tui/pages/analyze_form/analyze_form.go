@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/textinputs"
@@ -26,9 +27,9 @@ type AnalyzeForm struct {
 	form    textinputs.Model
 }
 
-type SecretInfo struct {
-	Parts map[string]string
-	Cfg   *config.Config
+type Submission struct {
+	AnalyzerType string
+	AnalyzerInfo analyzer.SecretInfo
 }
 
 func New(c common.Common, keyType string) *AnalyzeForm {
@@ -113,7 +114,10 @@ func (ui *AnalyzeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				LogFile:        logFile,
 				LoggingEnabled: logFile != "",
 			}
-			return SecretInfo{Cfg: &cfg, Parts: values}
+			return Submission{
+				AnalyzerType: ui.KeyType,
+				AnalyzerInfo: analyzer.SecretInfo{Cfg: &cfg, Parts: values},
+			}
 		}
 		return ui, secretInfoCmd
 	}

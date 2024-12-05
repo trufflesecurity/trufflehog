@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	zone "github.com/lrstanley/bubblezone"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
@@ -49,6 +50,10 @@ type TUI struct {
 	pageHistory []page
 	state       sessionState
 	args        []string
+
+	// Analyzer specific values that are only set if running an analysis.
+	analyzerType string
+	analyzerInfo analyzer.SecretInfo
 }
 
 // New returns a new TUI model.
@@ -184,6 +189,10 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case source_configure.SetArgsMsg:
 		ui.args = strings.Split(string(msg), " ")[1:]
 		return ui, tea.Quit
+	case analyze_form.Submission:
+		ui.analyzerType = msg.AnalyzerType
+		ui.analyzerInfo = msg.AnalyzerInfo
+		return ui, tea.Quit
 	}
 
 	if ui.state == loadedState {
@@ -230,6 +239,10 @@ func Run(args []string) []string {
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
+	}
+	if m.analyzerType != "" {
+		analyzer.Run(m.analyzerType, m.analyzerInfo)
+		os.Exit(0)
 	}
 	return m.args
 }
