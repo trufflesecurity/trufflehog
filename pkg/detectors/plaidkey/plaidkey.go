@@ -69,26 +69,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_PlaidKey,
 				Raw:          []byte(resMatch),
 			}
-			environments := []string{"development", "production"}
+			environments := []string{"sandbox", "production"}
 			if verify {
 				for _, env := range environments {
-					payload := strings.NewReader(`{"client_id":"` + idresMatch + `","secret":"` + resMatch + `","user":{"client_user_id":"60e3ee4019a2660010f8bc54","phone_number_verified_time":"0001-01-01T00:00:00Z","email_address_verified_time":"0001-01-01T00:00:00Z"},"client_name":"Plaid Test App","products":["auth","transactions"],"country_codes":["US"],"webhook":"https://webhook-uri.com","account_filters":{"depository":{"account_subtypes":["checking","savings"]}},"language":"en","link_customization_name":"default"}`)
-					req, err := http.NewRequestWithContext(ctx, "POST", "https://"+env+".plaid.com/link/token/create", payload)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Content-Type", "application/json")
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-							s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", env)}
-						}
-					}
+					isVerified, _, verificationErr := verifyMatch(ctx, client, idresMatch, resMatch, env)
+					s1.Verified = isVerified
+					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", env)}
+					s1.SetVerificationError(verificationErr, idresMatch, resMatch)
 				}
 				results = append(results, s1)
-				// if the environment is dev, we don't need to check production
+				// if the environment is sandbox, we don't need to check production
 				if s1.Verified {
 					break
 				}
@@ -99,6 +89,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, id string, secret string, env string) (bool, map[string]string, error) {
+	payload := strings.NewReader(`{"client_id":"` + id + `","secret":"` + secret + `","user":{"client_user_id":"60e3ee4019a2660010f8bc54","phone_number_verified_time":"0001-01-01T00:00:00Z","email_address_verified_time":"0001-01-01T00:00:00Z"},"client_name":"Plaid Test App","products":["auth","transactions"],"country_codes":["US"],"webhook":"https://webhook-uri.com","account_filters":{"depository":{"account_subtypes":["checking","savings"]}},"language":"en","link_customization_name":"default"}`)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://"+env+".plaid.com/link/token/create", payload)
+	if err != nil {
+		return false, nil, nil
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	defer res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil, nil
+	case http.StatusBadRequest:
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
