@@ -183,9 +183,6 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return analyze_form.SetAnalyzerMsg(item.ID())
 			})
 		}
-		// TODO figure this out
-		// case analyze_form:
-		// 	ui.setActivePage(analyzeFormPage)
 	case source_configure.SetArgsMsg:
 		ui.args = strings.Split(string(msg), " ")[1:]
 		return ui, tea.Quit

@@ -84,11 +84,6 @@ func (ui AnalyzeKeyPage) View() string {
 	return styles.AppStyle.Render(ui.list.View())
 }
 
-// func (ui AnalyzeKeyPage) NextPage(keyType string) (tea.Model, tea.Cmd) {
-// 	return nil
-// 	// return NewFormPage(ui.Common, keyType), SetKeyTypeCmd(keyType)
-// }
-
 type KeyTypeItem string
 
 func (i KeyTypeItem) ID() string          { return string(i) }
