@@ -52,6 +52,9 @@ var (
 	// ErrProcessingWarning indicates a recoverable error that can be logged,
 	// allowing processing to continue.
 	ErrProcessingWarning = errors.New("error processing file")
+
+	// emptyFilePath is used to represent an empty file path.
+	emptyFilePath = ""
 )
 
 type readerConfig struct{ fileExtension string }
@@ -183,8 +186,9 @@ func newFileReader(r io.Reader, options ...readerOption) (fReader fileReader, er
 // efficient streaming of file contents while also providing a way to propagate errors
 // that may occur during the file handling process.
 type DataOrErr struct {
-	Data []byte
-	Err  error
+	Data             []byte
+	Err              error
+	ArchiveEntryPath string //optional, only for archived files
 }
 
 // FileHandler represents a handler for files.
@@ -402,6 +406,7 @@ func HandleFile(
 // - If it contains an error, the function handles it based on severity:
 //   - Fatal errors (context cancellation, deadline exceeded, ErrProcessingFatal) cause immediate termination
 //   - Non-fatal errors (ErrProcessingWarning and others) are logged and processing continues
+//
 // The function also listens for context cancellation to gracefully terminate processing if the context is done.
 // It returns nil upon successful processing of all data, or the first encountered fatal error.
 func handleChunksWithError(
@@ -428,6 +433,9 @@ func handleChunksWithError(
 			if len(dataOrErr.Data) > 0 {
 				chunk := *chunkSkel
 				chunk.Data = dataOrErr.Data
+				if dataOrErr.ArchiveEntryPath != "" {
+					chunk.HandleMetadata = map[string]string{"Archive Entry Path": dataOrErr.ArchiveEntryPath}
+				}
 				if err := reporter.ChunkOk(ctx, chunk); err != nil {
 					return fmt.Errorf("error reporting chunk: %w", err)
 				}

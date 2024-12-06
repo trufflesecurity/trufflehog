@@ -104,7 +104,8 @@ func (h *arHandler) processARFiles(ctx logContext.Context, reader *deb.Ar, dataO
 				continue
 			}
 
-			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
+			// Note: emptyFilePath is used as the archiveEntryPath value b/c the `ar` format is a flat archive format (no nested dirs).
+			if err := h.handleNonArchiveContent(fileCtx, emptyFilePath, rdr, dataOrErrChan); err != nil {
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error handling archive content in AR: %v", ErrProcessingWarning, err),
 				}

@@ -115,7 +115,9 @@ func (h *rpmHandler) processRPMFiles(
 				return fmt.Errorf("error creating mime-type reader: %w", err)
 			}
 
-			if err := h.handleNonArchiveContent(fileCtx, rdr, dataOrErrChan); err != nil {
+			// ToDo: Update processRPMFiles to accommodate nested archives. Once completed,
+			// adjust the emptyFilePath value to reflect the actual file path.
+			if err := h.handleNonArchiveContent(fileCtx, emptyFilePath, rdr, dataOrErrChan); err != nil {
 				dataOrErrChan <- DataOrErr{
 					Err: fmt.Errorf("%w: error processing RPM archive: %v", ErrProcessingWarning, err),
 				}

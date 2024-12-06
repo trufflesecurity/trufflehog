@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/mholt/archiver/v4"
@@ -86,7 +87,7 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 		}()
 
 		start := time.Now()
-		err := h.openArchive(ctx, 0, input, dataOrErrChan)
+		err := h.openArchive(ctx, []string{}, input, dataOrErrChan)
 		if err == nil {
 			h.metrics.incFilesProcessed()
 		}
@@ -101,37 +102,37 @@ func (h *archiveHandler) HandleFile(ctx logContext.Context, input fileReader) ch
 var ErrMaxDepthReached = errors.New("max archive depth reached")
 
 // openArchive recursively extracts content from an archive up to a maximum depth, handling nested archives if necessary.
-// It takes a reader from which it attempts to identify and process the archive format. Depending on the archive type,
-// it either decompresses or extracts the contents directly, sending data to the provided channel.
+// It takes a string slice representing the path to the archive and a reader from which it attempts to identify and process the archive format.
+// Depending on the archive type, it either decompresses or extracts the contents directly, sending data to the provided channel.
 // Returns an error if the archive cannot be processed due to issues like exceeding maximum depth or unsupported formats.
 func (h *archiveHandler) openArchive(
 	ctx logContext.Context,
-	depth int,
+	archiveEntryPaths []string,
 	reader fileReader,
 	dataOrErrChan chan DataOrErr,
 ) error {
-	ctx.Logger().V(4).Info("Starting archive processing", "depth", depth)
-	defer ctx.Logger().V(4).Info("Finished archive processing", "depth", depth)
+	ctx.Logger().V(4).Info("Starting archive processing", "depth", len(archiveEntryPaths))
+	defer ctx.Logger().V(4).Info("Finished archive processing", "depth", len(archiveEntryPaths))
 
 	if common.IsDone(ctx) {
 		return ctx.Err()
 	}
 
-	if depth >= maxDepth {
+	if len(archiveEntryPaths) >= maxDepth {
 		h.metrics.incMaxArchiveDepthCount()
 		return ErrMaxDepthReached
 	}
 
 	if reader.format == nil {
-		if depth > 0 {
-			return h.handleNonArchiveContent(ctx, newMimeTypeReaderFromFileReader(reader), dataOrErrChan)
+		if len(archiveEntryPaths) > 0 {
+			return h.handleNonArchiveContent(ctx, filepath.Join(archiveEntryPaths...), newMimeTypeReaderFromFileReader(reader), dataOrErrChan)
 		}
 		return fmt.Errorf("unknown archive format")
 	}
 
 	switch archive := reader.format.(type) {
 	case archiver.Decompressor:
-		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
+		// Decompress the archive and feed the decompressed data back into the archive handler to extract any nested archives.
 		compReader, err := archive.OpenReader(reader)
 		if err != nil {
 			return fmt.Errorf("error opening decompressor with format: %s %w", reader.format.Name(), err)
@@ -152,9 +153,11 @@ func (h *archiveHandler) openArchive(
 		}
 		defer rdr.Close()
 
-		return h.openArchive(ctx, depth+1, rdr, dataOrErrChan)
+		// Note: We're limited in our ability to add file names to the archiveEntryPath here, as the decompressor doesn't have access to a fileName value.
+		// We add a empty string so we can keep track of the archive depth.
+		return h.openArchive(ctx, append(archiveEntryPaths, ""), rdr, dataOrErrChan)
 	case archiver.Extractor:
-		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, nil, h.extractorHandler(dataOrErrChan))
+		err := archive.Extract(ctx, reader, nil, h.extractorHandler(archiveEntryPaths, dataOrErrChan))
 		if err != nil {
 			return fmt.Errorf("error extracting archive with format: %s: %w", reader.format.Name(), err)
 		}
@@ -168,7 +171,7 @@ func (h *archiveHandler) openArchive(
 // It logs the extraction, checks for cancellation, and decides whether to skip the file based on its name or type,
 // particularly for binary files if configured to skip. If the file is not skipped, it recursively calls openArchive
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
-func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(context.Context, archiver.File) error {
+func (h *archiveHandler) extractorHandler(archiveEntryPaths []string, dataOrErrChan chan DataOrErr) func(context.Context, archiver.File) error {
 	return func(ctx context.Context, file archiver.File) error {
 		lCtx := logContext.WithValues(
 			logContext.AddLogger(ctx),
@@ -186,11 +189,6 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 			return ctx.Err()
 		}
 
-		depth := 0
-		if ctxDepth, ok := ctx.Value(depthKey).(int); ok {
-			depth = ctxDepth
-		}
-
 		fileSize := file.Size()
 		if int(fileSize) > maxSize {
 			lCtx.Logger().V(2).Info("skipping file: size exceeds max allowed", "size", fileSize, "limit", maxSize)
@@ -206,7 +204,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 
 		f, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("error opening file %s: %w", file.Name(), err)
+			return fmt.Errorf("error opening file %s: %w", file.NameInArchive, err)
 		}
 		defer f.Close()
 
@@ -232,7 +230,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 				lCtx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
-			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
+			return fmt.Errorf("error creating reader for file %s: %w", file.NameInArchive, err)
 		}
 		defer rdr.Close()
 
@@ -240,6 +238,6 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		h.metrics.observeFileSize(fileSize)
 
 		lCtx.Logger().V(4).Info("Processed file successfully", "filename", file.Name(), "size", file.Size())
-		return h.openArchive(lCtx, depth, rdr, dataOrErrChan)
+		return h.openArchive(lCtx, append(archiveEntryPaths, file.NameInArchive), rdr, dataOrErrChan)
 	}
 }
