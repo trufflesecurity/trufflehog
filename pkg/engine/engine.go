@@ -159,7 +159,7 @@ type Engine struct {
 	decoders    []decoders.Decoder
 	detectors   []detectors.Detector
 	// verificationCache must be thread-safe
-	verificationCache cache.Cache[*detectors.Result]
+	verificationCache cache.Cache[detectors.Result]
 	// getVerificationCacheKey must be thread-safe
 	getVerificationCacheKey func(result *detectors.Result) string
 	// Any detectors configured to override sources' verification flags
