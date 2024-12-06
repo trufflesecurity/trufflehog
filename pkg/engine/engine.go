@@ -158,7 +158,7 @@ type Engine struct {
 	concurrency int
 	decoders    []decoders.Decoder
 	detectors   []detectors.Detector
-	// verificationCache must be thread-safe
+	// verificationCache must be thread-safe. Leave nil to disable verification caching.
 	verificationCache cache.Cache[detectors.Result]
 	// getVerificationCacheKey must be thread-safe
 	getVerificationCacheKey func(result detectors.Result) string
