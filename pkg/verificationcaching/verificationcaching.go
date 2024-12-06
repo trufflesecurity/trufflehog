@@ -23,7 +23,7 @@ import (
 // results are used to update the cache before being returned.
 func FromDataCached(
 	ctx context.Context,
-	verificationCache cache.Cache[*detectors.Result],
+	verificationCache cache.Cache[detectors.Result],
 	getCacheKey func(result *detectors.Result) string,
 	detector detectors.Detector,
 	verify bool,
@@ -45,10 +45,11 @@ func FromDataCached(
 			return withoutRemoteVerification, nil
 		}
 
-		isEverythingCached := false
-		for _, r := range withoutRemoteVerification {
+		isEverythingCached := true
+		for i, r := range withoutRemoteVerification {
 			if cacheHit, ok := verificationCache.Get(getCacheKey(&r)); ok {
-				r.CopyVerificationInfo(cacheHit)
+				withoutRemoteVerification[i].CopyVerificationInfo(&cacheHit)
+				withoutRemoteVerification[i].VerificationFromCache = true
 			} else {
 				isEverythingCached = false
 				break
@@ -70,7 +71,7 @@ func FromDataCached(
 		// Do not persist raw secret values in a long-lived cache
 		copyForCaching.Raw = nil
 		copyForCaching.RawV2 = nil
-		verificationCache.Set(getCacheKey(&r), &copyForCaching)
+		verificationCache.Set(getCacheKey(&r), copyForCaching)
 	}
 
 	return withRemoteVerification, nil
