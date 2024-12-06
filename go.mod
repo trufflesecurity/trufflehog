@@ -2,7 +2,7 @@ module github.com/trufflesecurity/trufflehog/v3
 
 go 1.23.1
 
-toolchain go1.23.3
+toolchain go1.23.4
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2.8
 
@@ -44,7 +44,7 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/felixge/fgprof v0.9.5
 	github.com/gabriel-vasile/mimetype v1.4.7
-	github.com/getsentry/sentry-go v0.29.1
+	github.com/getsentry/sentry-go v0.30.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-ldap/ldap/v3 v3.4.8
@@ -109,8 +109,8 @@ require (
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
 	golang.org/x/net v0.31.0
 	golang.org/x/oauth2 v0.24.0
-	golang.org/x/sync v0.9.0
-	golang.org/x/text v0.20.0
+	golang.org/x/sync v0.10.0
+	golang.org/x/text v0.21.0
 	google.golang.org/api v0.209.0
 	google.golang.org/protobuf v1.35.2
 	gopkg.in/h2non/gock.v1 v1.1.2
