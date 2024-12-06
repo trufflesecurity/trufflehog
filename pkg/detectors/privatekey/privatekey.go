@@ -41,7 +41,7 @@ func (s Scanner) Keywords() []string {
 
 const maxPrivateKeySize = 4096
 
-// ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
+// MaxSecretSize returns the maximum size of a secret that this detector can find.
 func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
 
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
@@ -105,7 +105,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}()
 
-			// Test SSH key against github.com
+			// Test SSH key against github.com.
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -118,7 +118,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}()
 
-			// Test SSH key against gitlab.com
+			// Test SSH key against gitlab.com.
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -132,6 +132,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}()
 
 			wg.Wait()
+			if err := ctx.Err(); err != nil {
+				verificationErrors.Add(err)
+			}
+
 			if len(extraData.data) > 0 {
 				s1.Verified = true
 				for k, v := range extraData.data {
@@ -140,6 +144,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			} else {
 				s1.ExtraData = nil
 			}
+
 			if len(verificationErrors.errors) > 0 {
 				s1.SetVerificationError(fmt.Errorf("verification failures: %s", strings.Join(verificationErrors.errors, ", ")), token)
 			}
