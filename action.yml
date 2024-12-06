@@ -71,7 +71,7 @@ runs:
           fi
           HEAD=${{ github.event.after }}
           if [ ${{ github.event.before }} == "0000000000000000000000000000000000000000" ]; then
-            BASE=$(git rev-parse $HEAD~$COMMIT_LENGTH)
+            BASE=""
           else
             BASE=${{ github.event.before }}
           fi
