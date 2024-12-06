@@ -108,7 +108,10 @@ func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: false},
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
 	}, results)
-	assert.ElementsMatch(t, []detectors.Result{{Redacted: "hello"}, {Redacted: "world"}}, cache.Values())
+	assert.ElementsMatch(t, []detectors.Result{
+		{Redacted: "hello", Verified: false},
+		{Redacted: "world", Verified: false},
+	}, cache.Values())
 }
 
 func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T) {
