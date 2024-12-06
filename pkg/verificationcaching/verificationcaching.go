@@ -24,7 +24,7 @@ import (
 func FromDataCached(
 	ctx context.Context,
 	verificationCache cache.Cache[detectors.Result],
-	getCacheKey func(result *detectors.Result) string,
+	getCacheKey func(result detectors.Result) string,
 	detector detectors.Detector,
 	verify bool,
 	forceCacheUpdate bool,
@@ -47,7 +47,7 @@ func FromDataCached(
 
 		isEverythingCached := true
 		for i, r := range withoutRemoteVerification {
-			if cacheHit, ok := verificationCache.Get(getCacheKey(&r)); ok {
+			if cacheHit, ok := verificationCache.Get(getCacheKey(r)); ok {
 				withoutRemoteVerification[i].CopyVerificationInfo(&cacheHit)
 				withoutRemoteVerification[i].VerificationFromCache = true
 			} else {
@@ -71,7 +71,7 @@ func FromDataCached(
 		// Do not persist raw secret values in a long-lived cache
 		copyForCaching.Raw = nil
 		copyForCaching.RawV2 = nil
-		verificationCache.Set(getCacheKey(&r), copyForCaching)
+		verificationCache.Set(getCacheKey(r), copyForCaching)
 	}
 
 	return withRemoteVerification, nil

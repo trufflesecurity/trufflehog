@@ -161,7 +161,7 @@ type Engine struct {
 	// verificationCache must be thread-safe
 	verificationCache cache.Cache[detectors.Result]
 	// getVerificationCacheKey must be thread-safe
-	getVerificationCacheKey func(result *detectors.Result) string
+	getVerificationCacheKey func(result detectors.Result) string
 	// Any detectors configured to override sources' verification flags
 	detectorVerificationOverrides map[config.DetectorID]bool
 
@@ -227,7 +227,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		decoders:                            cfg.Decoders,
 		detectors:                           cfg.Detectors,
 		verificationCache:                   nil,
-		getVerificationCacheKey:             func(result *detectors.Result) string { panic("cache should be unused") },
+		getVerificationCacheKey:             func(result detectors.Result) string { panic("cache should be unused") },
 		dispatcher:                          cfg.Dispatcher,
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,

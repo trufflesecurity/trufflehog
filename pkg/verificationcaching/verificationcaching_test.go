@@ -37,7 +37,7 @@ func (t *testDetector) Description() string            { return "" }
 
 var _ detectors.Detector = (*testDetector)(nil)
 
-func getCacheKey(result *detectors.Result) string {
+func getCacheKey(result detectors.Result) string {
 	return string(result.Raw)
 }
 
@@ -50,7 +50,7 @@ func TestFromDataCached_NilCache(t *testing.T) {
 		results, err := FromDataCached(
 			logContext.Background(),
 			nil,
-			func(result *detectors.Result) string { panic("shouldn't happen") },
+			func(result detectors.Result) string { panic("shouldn't happen") },
 			&detector,
 			true,
 			true,
