@@ -18,13 +18,19 @@ var (
 	b64Charset  = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/-_=")
 	b64EndChars = "+/-_="
 
-	b64CharsetMapping [128]bool
+	b64CharsetMapping  [128]bool
+	b64EndCharsMapping [128]bool
 )
 
 func init() {
 	for _, char := range b64Charset {
 		if char < 128 {
 			b64CharsetMapping[char] = true
+		}
+	}
+	for _, char := range b64EndChars {
+		if char < 128 {
+			b64EndCharsMapping[char] = true
 		}
 	}
 }
@@ -35,7 +41,7 @@ func (d *Base64) Type() detectorspb.DecoderType {
 
 func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	decodableChunk := &DecodableChunk{Chunk: chunk, DecoderType: d.Type()}
-	candidates := getSubstringsOfCharacterSet(chunk.Data, 20, b64CharsetMapping, b64EndChars)
+	candidates := getSubstringsOfCharacterSet(chunk.Data, 20, b64CharsetMapping, b64EndCharsMapping)
 
 	if len(candidates) == 0 {
 		return nil
@@ -101,9 +107,7 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	return decodableChunk
 }
 
-func bytesToString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
-}
+func bytesToString(b []byte) string { return *(*string)(unsafe.Pointer(&b)) }
 
 func isASCII(b []byte) bool {
 	for _, c := range b {
@@ -117,7 +121,6 @@ func isASCII(b []byte) bool {
 type candidate struct {
 	start int
 	end   int
-	hasEq bool
 }
 
 type decodedCandidate struct {
@@ -126,7 +129,7 @@ type decodedCandidate struct {
 	decoded []byte
 }
 
-func getSubstringsOfCharacterSet(data []byte, threshold int, charsetMapping [128]bool, endChars string) []candidate {
+func getSubstringsOfCharacterSet(data []byte, threshold int, charsetMapping [128]bool, endCharsMapping [128]bool) []candidate {
 	if len(data) == 0 {
 		return nil
 	}
@@ -155,51 +158,62 @@ func getSubstringsOfCharacterSet(data []byte, threshold int, charsetMapping [128
 
 	count = 0
 	start := 0
-	equalsFound := false
 	for i, char := range data {
 		if char < 128 && charsetMapping[char] {
 			if count == 0 {
 				start = i
-				equalsFound = false
-			}
-			if char == '=' {
-				equalsFound = true
 			}
 			count++
 		} else {
 			if count > threshold {
-				candidates = appendB64Substring(data, start, count, candidates, endChars, equalsFound)
+				candidates = appendB64Substring(data, start, count, candidates, endCharsMapping)
 			}
 			count = 0
 		}
 	}
-	// handle trailing substring if needed
+	// Handle trailing substring if needed.
 	if count > threshold {
-		candidates = appendB64Substring(data, start, count, candidates, endChars, equalsFound)
+		candidates = appendB64Substring(data, start, count, candidates, endCharsMapping)
 	}
 	return candidates
 }
 
-func appendB64Substring(data []byte, start, count int, candidates []candidate, endChars string, hasEq bool) []candidate {
-	substring := bytes.TrimLeft(data[start:start+count], endChars)
-	trimmedRight := bytes.TrimRight(substring, endChars)
+func appendB64Substring(data []byte, start, count int, candidates []candidate, endCharsMapping [128]bool) []candidate {
+	sub := data[start : start+count] // Original slice before trimming
 
+	// Manually trim left.
+	left := 0
+	for left < len(sub) && sub[left] < 128 && endCharsMapping[sub[left]] {
+		left++
+	}
+	substring := sub[left:] // substring after left trim
+	substringLength := len(substring)
+
+	// Manually trim right on 'substring'.
+	right := substringLength - 1
+	for right >= 0 && substring[right] < 128 && endCharsMapping[substring[right]] {
+		right--
+	}
+
+	// If right < 0, everything got trimmed out.
+	if right < 0 {
+		// This matches the original behavior: if nothing remains after trimming, we don't add a candidate.
+		return candidates
+	}
+
+	trimmedRight := substring[:right+1]
 	idx := bytes.IndexByte(trimmedRight, '=')
+
 	if idx != -1 {
-		// substring after '='
-		// Note: substring and trimmedRight differ potentially on trailing chars,
-		// but trimming right doesn't affect the position of '=' relative to substring.
-		// idx is from trimmedRight start, which has the same start as substring.
+		// Substring after '='.
 		candidates = append(candidates, candidate{
-			start: start + (count - len(substring)) + idx + 1,
-			end:   start + (count - len(substring)) + len(substring),
-			hasEq: hasEq,
+			start: start + (count - substringLength) + idx + 1,
+			end:   start + (count - substringLength) + substringLength,
 		})
 	} else {
 		candidates = append(candidates, candidate{
-			start: start + (count - len(substring)),
-			end:   start + (count - len(substring)) + len(substring),
-			hasEq: hasEq,
+			start: start + (count - substringLength),
+			end:   start + (count - substringLength) + substringLength,
 		})
 	}
 	return candidates
