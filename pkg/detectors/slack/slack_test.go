@@ -52,7 +52,12 @@ func TestSlack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Slack,
 					Verified:     true,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
+					ExtraData: map[string]string{
+						"name":           "marge.haskell.bridge",
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
+						"team":           "ct.org",
+						"token_type":     "Slack User Token",
+					},
 				},
 			},
 			wantErr: false,
@@ -68,7 +73,10 @@ func TestSlack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Slack,
 					Verified:     false,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
+						"token_type":     "Slack User Token",
+					},
 				},
 			},
 			wantErr: false,
@@ -85,7 +93,10 @@ func TestSlack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Slack,
 					Verified:     false,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
+						"token_type":     "Slack User Token",
+					},
 				},
 			},
 			wantErr:             false,
@@ -103,7 +114,10 @@ func TestSlack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Slack,
 					Verified:     false,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
+						"token_type":     "Slack User Token",
+					},
 				},
 			},
 			wantErr:             false,
@@ -121,7 +135,10 @@ func TestSlack_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Slack,
 					Verified:     false,
-					ExtraData:    map[string]string{"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/"},
+					ExtraData: map[string]string{
+						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
+						"token_type":     "Slack User Token",
+					},
 				},
 			},
 			wantErr:             false,
