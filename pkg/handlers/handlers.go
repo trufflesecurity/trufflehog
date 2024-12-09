@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/mholt/archiver/v4"
+	"github.com/mholt/archives"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
@@ -36,7 +36,7 @@ import (
 // promotes a more cohesive and maintainable codebase. It also embeds a BufferedFileReader to provide efficient
 // random access to the file content.
 type fileReader struct {
-	format           archiver.Format
+	format           archives.Format
 	mime             *mimetype.MIME
 	isGenericArchive bool
 
@@ -153,14 +153,14 @@ func newFileReader(r io.Reader, options ...readerOption) (fReader fileReader, er
 		return fReader, nil
 	}
 
-	var format archiver.Format
-	format, _, err = archiver.Identify("", fReader)
+	var format archives.Format
+	format, _, err = archives.Identify(context.Background(), "", fReader)
 	switch {
 	case err == nil:
 		fReader.isGenericArchive = true
 		fReader.format = format
 
-	case errors.Is(err, archiver.ErrNoMatch):
+	case errors.Is(err, archives.NoMatch):
 		// Not an archive handled by archiver.
 		// Continue with the default reader.
 	default:
@@ -402,6 +402,7 @@ func HandleFile(
 // - If it contains an error, the function handles it based on severity:
 //   - Fatal errors (context cancellation, deadline exceeded, ErrProcessingFatal) cause immediate termination
 //   - Non-fatal errors (ErrProcessingWarning and others) are logged and processing continues
+//
 // The function also listens for context cancellation to gracefully terminate processing if the context is done.
 // It returns nil upon successful processing of all data, or the first encountered fatal error.
 func handleChunksWithError(
