@@ -154,7 +154,7 @@ func newFileReader(r io.Reader, options ...readerOption) (fReader fileReader, er
 	}
 
 	var format archives.Format
-	format, _, err = archives.Identify(context.Background(), "", fReader)
+	format, _, err = archives.Identify(context.TODO(), "", fReader)
 	switch {
 	case err == nil:
 		fReader.isGenericArchive = true
