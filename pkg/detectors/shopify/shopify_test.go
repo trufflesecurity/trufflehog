@@ -50,7 +50,7 @@ func TestShopify_FromChunk(t *testing.T) {
 					Redacted:     domain,
 					Verified:     true,
 					ExtraData: map[string]string{
-						"access_scopes": "read_analytics,unauthenticated_read_selling_plans",
+						"access_scopes": "read_analytics,read_apps,write_assigned_fulfillment_orders,read_assigned_fulfillment_orders,write_customers,read_customers,write_discovery,read_discovery,write_merchant_managed_fulfillment_orders,read_merchant_managed_fulfillment_orders,write_reports,read_reports,write_cart_transforms,read_cart_transforms",
 					},
 				},
 			},
