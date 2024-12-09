@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func TestSkyBiometry_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
 	if err != nil {
@@ -53,6 +53,10 @@ func TestSkyBiometry_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_SkyBiometry,
 					Verified:     true,
 				},
+				{
+					DetectorType: detectorspb.DetectorType_SkyBiometry,
+					Verified:     false,
+				},
 			},
 			wantErr: false,
 		},
@@ -65,6 +69,10 @@ func TestSkyBiometry_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SkyBiometry,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_SkyBiometry,
 					Verified:     false,
