@@ -3,16 +3,17 @@ package plaidkey
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -37,53 +38,81 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	// find all the matching keys and ids in the data and make a unique maps for both.
+	uniqueKeys, uniqueIds := make(map[string]struct{}), make(map[string]struct{})
 
-	for _, match := range matches {
-		if len(match) != 2 {
+	for _, foundKey := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		key := foundKey[1]
+		if detectors.StringShannonEntropy(key) < 3 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
 
-		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
-			idresMatch := strings.TrimSpace(idMatch[1])
+		uniqueKeys[key] = struct{}{}
+	}
+
+	for _, foundId := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		id := foundId[1]
+		if detectors.StringShannonEntropy(id) < 3 {
+			continue
+		}
+
+		uniqueIds[id] = struct{}{}
+	}
+
+	for key := range uniqueKeys {
+		resMatch := strings.TrimSpace(key)
+
+		for id := range uniqueIds {
+			idresMatch := strings.TrimSpace(id)
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PlaidKey,
 				Raw:          []byte(resMatch),
 			}
-			environments := []string{"development", "production"}
+			environments := []string{"sandbox", "production"}
 			if verify {
 				for _, env := range environments {
-					payload := strings.NewReader(`{"client_id":"` + idresMatch + `","secret":"` + resMatch + `","user":{"client_user_id":"60e3ee4019a2660010f8bc54","phone_number_verified_time":"0001-01-01T00:00:00Z","email_address_verified_time":"0001-01-01T00:00:00Z"},"client_name":"Plaid Test App","products":["auth","transactions"],"country_codes":["US"],"webhook":"https://webhook-uri.com","account_filters":{"depository":{"account_subtypes":["checking","savings"]}},"language":"en","link_customization_name":"default"}`)
-					req, err := http.NewRequestWithContext(ctx, "POST", "https://"+env+".plaid.com/link/token/create", payload)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Content-Type", "application/json")
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-							s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", env)}
-						}
-					}
+					isVerified, _, verificationErr := verifyMatch(ctx, client, idresMatch, resMatch, env)
+					s1.Verified = isVerified
+					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", env)}
+					s1.SetVerificationError(verificationErr, idresMatch, resMatch)
 				}
 				results = append(results, s1)
-				// if the environment is dev, we don't need to check production
+				// if the environment is sandbox, we don't need to check production
 				if s1.Verified {
 					break
 				}
+			} else {
+				results = append(results, s1)
 			}
 		}
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, id string, secret string, env string) (bool, map[string]string, error) {
+	payload := strings.NewReader(`{"client_id":"` + id + `","secret":"` + secret + `","user":{"client_user_id":"60e3ee4019a2660010f8bc54","phone_number_verified_time":"0001-01-01T00:00:00Z","email_address_verified_time":"0001-01-01T00:00:00Z"},"client_name":"Plaid Test App","products":["auth","transactions"],"country_codes":["US"],"webhook":"https://webhook-uri.com","account_filters":{"depository":{"account_subtypes":["checking","savings"]}},"language":"en","link_customization_name":"default"}`)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://"+env+".plaid.com/link/token/create", payload)
+	if err != nil {
+		return false, nil, nil
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	defer res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil, nil
+	case http.StatusBadRequest:
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
