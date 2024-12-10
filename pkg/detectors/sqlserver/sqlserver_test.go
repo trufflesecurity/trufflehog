@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestSQLServer_pattern(t *testing.T) {
+func TestSQLServer_Pattern(t *testing.T) {
 	if !pattern.Match([]byte(`builder.Services.AddDbContext<Database>(optionsBuilder => optionsBuilder.UseSqlServer("Server=localhost;Initial Catalog=master;User ID=sa;Password=P@ssw0rd!;Persist Security Info=true;MultipleActiveResultSets=true;"));`)) {
 		t.Errorf("SQLServer.pattern: did not find connection string from Program.cs")
 	}

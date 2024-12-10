@@ -1,188 +1,86 @@
-//go:build detectors
-// +build detectors
-
 package slack
 
 import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestSlack_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("SLACK")
-	secretInactive := testSecrets.MustGetField("SLACK_INACTIVE")
+var (
+	validBotToken                = "xoxb-65677559833-9613778673399u"
+	invalidBotToken              = "xoxb-65677559833?9613778673399u"
+	validUserToken               = "xoxp-24232636415-0285024315463c"
+	invalidUserToken             = "xoxp-24232636415?0285024315463c"
+	validWorkspaceAccessToken    = "xoxa-08532509747-07570405353c"
+	invalidWorkspaceAccessToken  = "xoxa-08532509747?07570405353c"
+	validWorkspaceRefreshToken   = "xoxr-833485595373-24619897332l"
+	invalidWorkspaceRefreshToken = "xoxr-833485595373?24619897332l"
+	keyword                      = "slack"
+)
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
-
+func TestSlack_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		wantResults         []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
-				verify: true,
-			},
-			wantResults: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Slack,
-					Verified:     true,
-					ExtraData: map[string]string{
-						"name":           "marge.haskell.bridge",
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
-						"team":           "ct.org",
-						"token_type":     "Slack User Token",
-					},
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern - with keyword slack",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n", keyword, validBotToken, keyword, validUserToken, keyword, validWorkspaceAccessToken, keyword, validWorkspaceRefreshToken),
+			want:  []string{validBotToken, validUserToken, validWorkspaceAccessToken, validWorkspaceRefreshToken},
 		},
 		{
-			name: "found but unverified",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secretInactive)),
-				verify: true,
-			},
-			wantResults: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Slack,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
-						"token_type":     "Slack User Token",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "account_inactive",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, `{"ok": false, "error": "account_inactive"}`)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
-				verify: true,
-			},
-			wantResults: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Slack,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
-						"token_type":     "Slack User Token",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
-		},
-		{
-			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
-				verify: true,
-			},
-			wantResults: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Slack,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
-						"token_type":     "Slack User Token",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "unexpected auth response",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, `{"ok": false, "error": "unexpected_error"}`)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a slack secret %s within", secret)),
-				verify: true,
-			},
-			wantResults: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Slack,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/slack/",
-						"token_type":     "Slack User Token",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
+			name:  "invalid pattern",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n", keyword, invalidBotToken, keyword, invalidUserToken, keyword, invalidWorkspaceAccessToken, keyword, invalidWorkspaceRefreshToken),
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Slack.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
 
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
-				}
-				got[i].Raw = nil
-				got[i].AnalysisInfo = nil
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
 
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.wantResults, ignoreOpts); diff != "" {
-				t.Errorf("Slack.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
 			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
-				}
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}
