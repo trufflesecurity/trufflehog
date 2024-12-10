@@ -38,7 +38,8 @@ func init() {
 			Subsystem: common.MetricsSubsystem,
 			Name:      "objects_scanned_bytes",
 			Help:      "Size distribution of successfully scanned S3 objects in bytes",
-			Buckets:   prometheus.LinearBuckets(0, defaultMaxObjectSize, 10),
+			// 64B, 512B, 4KB, 32KB, 256KB, 2MB, 16MB, 128MB, 1GB.
+			Buckets: prometheus.ExponentialBuckets(64, 8, 9),
 		}, []string{"bucket"}),
 
 		objectsSkipped: promauto.NewHistogramVec(prometheus.HistogramOpts{
@@ -46,7 +47,8 @@ func init() {
 			Subsystem: common.MetricsSubsystem,
 			Name:      "objects_skipped_bytes",
 			Help:      "Size distribution of skipped S3 objects in bytes",
-			Buckets:   prometheus.LinearBuckets(0, defaultMaxObjectSize, 10),
+			// 64B, 512B, 4KB, 32KB, 256KB, 2MB, 16MB, 128MB, 1GB.
+			Buckets: prometheus.ExponentialBuckets(64, 8, 9),
 		}, []string{"bucket", "reason"}),
 
 		objectsErrors: promauto.NewCounterVec(prometheus.CounterOpts{
