@@ -37,7 +37,7 @@ type asciiSet [8]uint32
 
 // makeASCIISet creates a set of ASCII characters and reports whether all
 // characters in chars are ASCII. It uses bit manipulation to create an efficient
-// lookup table where each bit represents presence/absence of a character.
+// lookup table constructed at startup where each bit represents presence/absence of a character.
 func makeASCIISet(chars string) (as asciiSet, ok bool) {
 	for i := 0; i < len(chars); i++ {
 		c := chars[i]
@@ -77,7 +77,7 @@ func (d *Base64) Type() detectorspb.DecoderType {
 // It returns a new chunk with any found base64 strings decoded, or nil if no valid base64 was found.
 func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 	decodableChunk := &DecodableChunk{Chunk: chunk, DecoderType: d.Type()}
-	// Find potential base64 substrings that are at least 20 chars long
+	// Find potential base64 substrings that are at least 20 chars long.
 	candidates := getSubstringsOfCharacterSet(chunk.Data, 20, b64CharsetSet, b64EndCharsSet)
 
 	if len(candidates) == 0 {
@@ -100,6 +100,9 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 		//    skip trying the other encoding.
 		var dec []byte
 		if bytes.Contains(data, []byte("=")) {
+			// We ignore decode errors since we only care if we get valid output.
+			// For invalid base64 input, DecodeString will return an empty result,
+			// which we handle by trying the alternate encoding.
 			dec, _ = base64.StdEncoding.DecodeString(substring)
 			if len(dec) == 0 {
 				dec, _ = base64.RawURLEncoding.DecodeString(substring)
@@ -111,7 +114,7 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 			}
 		}
 
-		// Only keep successfully decoded strings that are ASCII
+		// Only keep successfully decoded strings that are ASCII.
 		if len(dec) > 0 && isASCII(dec) {
 			decodedCandidates = append(decodedCandidates, decodedCandidate{
 				start:   c.start,
@@ -125,7 +128,7 @@ func (d *Base64) FromChunk(chunk *sources.Chunk) *DecodableChunk {
 		return nil
 	}
 
-	// Rebuild the chunk data by replacing base64 strings with their decoded values
+	// Rebuild the chunk data by replacing base64 strings with their decoded values.
 	var result bytes.Buffer
 	result.Grow(len(chunk.Data))
 
@@ -183,7 +186,7 @@ func getSubstringsOfCharacterSet(data []byte, threshold int, charsetMapping asci
 	count := 0
 	substringsCount := 0
 	for _, char := range data {
-		if char < 128 && charsetMapping.contains(byte(char)) {
+		if char < utf8.RuneSelf && charsetMapping.contains(byte(char)) {
 			count++
 		} else {
 			if count > threshold {
@@ -206,7 +209,7 @@ func getSubstringsOfCharacterSet(data []byte, threshold int, charsetMapping asci
 	count = 0
 	start := 0
 	for i, char := range data {
-		if char < 128 && charsetMapping.contains(byte(char)) {
+		if char < utf8.RuneSelf && charsetMapping.contains(byte(char)) {
 			if count == 0 {
 				start = i
 			}
@@ -231,9 +234,16 @@ func getSubstringsOfCharacterSet(data []byte, threshold int, charsetMapping asci
 func appendB64Substring(data []byte, start, count int, candidates []candidate, endCharsMapping asciiSet) []candidate {
 	sub := data[start : start+count] // Original slice before trimming.
 
+	// While bytes.TrimLeft/bytes.TrimRight let us remove characters using a cutset, they return a
+	// subslice rather than just giving us the trimmed boundaries. In this context, we don't need a
+	// fully trimmed subslice; we only need to identify the start and end indexes for subsequent logic.
+	// By manually scanning from both ends and using a precomputed asciiSet (endCharsMapping), we can
+	// determine those boundaries directly, avoid reprocessing the cutset for each trim, and maintain
+	// control over the trimming logic without adding unnecessary slice operations.
+
 	// Trim padding chars from the left.
 	left := 0
-	for left < len(sub) && sub[left] < 128 && endCharsMapping.contains(sub[left]) {
+	for left < len(sub) && sub[left] < utf8.RuneSelf && endCharsMapping.contains(sub[left]) {
 		left++
 	}
 	substring := sub[left:] // substring after left trim
@@ -241,7 +251,7 @@ func appendB64Substring(data []byte, start, count int, candidates []candidate, e
 
 	// Trim padding chars from the right.
 	right := substringLength - 1
-	for right >= 0 && substring[right] < 128 && endCharsMapping.contains(substring[right]) {
+	for right >= 0 && substring[right] < utf8.RuneSelf && endCharsMapping.contains(substring[right]) {
 		right--
 	}
 
@@ -255,7 +265,7 @@ func appendB64Substring(data []byte, start, count int, candidates []candidate, e
 
 	// Handle special case where '=' is found mid-string.
 	if idx != -1 {
-		// Add substring after the '=' character
+		// Add substring after the '=' character.
 		candidates = append(candidates, candidate{
 			start: start + (count - substringLength) + idx + 1,
 			end:   start + (count - substringLength) + substringLength,
