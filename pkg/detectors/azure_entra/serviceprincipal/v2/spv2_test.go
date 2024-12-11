@@ -13,6 +13,7 @@ type testCase struct {
 
 func Test_FindClientSecretMatches(t *testing.T) {
 	cases := map[string]testCase{
+		// Valid
 		"secret": {
 			Input: `servicePrincipal:
   tenantId: "608e4ac4-2ca8-40dd-a046-4064540a1cde"
@@ -49,6 +50,12 @@ OPENID_GRANT_TYPE=client_credentials`,
 			Expected: map[string]struct{}{
 				"-6s8Q~.Q9CKMOXHGs_BA3ig2wUzyDRyulhWEOc3u": {},
 			},
+		},
+
+		// Invalid
+		"invalid - low entropy": {
+			Input:    `CLIENT_SECRET = 'USe8Q~xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'`,
+			Expected: nil,
 		},
 	}
 
