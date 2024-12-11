@@ -54,6 +54,8 @@ func makeASCIISet(chars string) (as asciiSet, ok bool) {
 
 // contains reports whether c is inside the set by using bitwise operations
 // to check if the corresponding bit is set in the lookup table.
+// This approach was taken from the bytes package.
+// https://cs.opensource.google/go/go/+/refs/tags/go1.23.4:src/bytes/bytes.go;l=899
 func (as *asciiSet) contains(c byte) bool {
 	return (as[c/32] & (1 << (c % 32))) != 0
 }
