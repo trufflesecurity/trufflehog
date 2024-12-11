@@ -263,8 +263,8 @@ func init() {
 	// Support -h for help
 	cli.HelpFlag.Short('h')
 
-	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
-		args := tui.Run()
+	if isatty.IsTerminal(os.Stdout.Fd()) && (len(os.Args) <= 1 || os.Args[1] == analyzeCmd.FullCommand()) {
+		args := tui.Run(os.Args[1:])
 		if len(args) == 0 {
 			os.Exit(0)
 		}
@@ -504,31 +504,26 @@ func run(state overseer.State) {
 		return
 	}
 
-	topLevelSubCommand, _, _ := strings.Cut(cmd, " ")
-	switch topLevelSubCommand {
-	case analyzeCmd.FullCommand():
-		analyzer.Run(cmd)
-	default:
-		metrics, err := runSingleScan(ctx, cmd, engConf)
-		if err != nil {
-			logFatal(err, "error running scan")
-		}
-
-		// Print results.
-		logger.Info("finished scanning",
-			"chunks", metrics.ChunksScanned,
-			"bytes", metrics.BytesScanned,
-			"verified_secrets", metrics.VerifiedSecretsFound,
-			"unverified_secrets", metrics.UnverifiedSecretsFound,
-			"scan_duration", metrics.ScanDuration.String(),
-			"trufflehog_version", version.BuildVersion,
-		)
-
-		if metrics.hasFoundResults && *fail {
-			logger.V(2).Info("exiting with code 183 because results were found")
-			os.Exit(183)
-		}
+	metrics, err := runSingleScan(ctx, cmd, engConf)
+	if err != nil {
+		logFatal(err, "error running scan")
 	}
+
+	// Print results.
+	logger.Info("finished scanning",
+		"chunks", metrics.ChunksScanned,
+		"bytes", metrics.BytesScanned,
+		"verified_secrets", metrics.VerifiedSecretsFound,
+		"unverified_secrets", metrics.UnverifiedSecretsFound,
+		"scan_duration", metrics.ScanDuration.String(),
+		"trufflehog_version", version.BuildVersion,
+	)
+
+	if metrics.hasFoundResults && *fail {
+		logger.V(2).Info("exiting with code 183 because results were found")
+		os.Exit(183)
+	}
+
 }
 
 func compareScans(ctx context.Context, cmd string, cfg engine.Config) error {

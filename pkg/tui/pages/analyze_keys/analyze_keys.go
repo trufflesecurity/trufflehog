@@ -1,4 +1,4 @@
-package tui
+package analyze_keys
 
 import (
 	"github.com/charmbracelet/bubbles/key"
@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
 
@@ -23,17 +24,16 @@ var (
 			Padding(0, 1)
 )
 
-type KeyTypePage struct {
-	Common *common.Common
-
+type AnalyzeKeyPage struct {
+	common.Common
 	list list.Model
 }
 
-func (ui KeyTypePage) Init() tea.Cmd {
+func (ui *AnalyzeKeyPage) Init() tea.Cmd {
 	return nil
 }
 
-func NewKeyTypePage(c *common.Common) KeyTypePage {
+func New(c common.Common) *AnalyzeKeyPage {
 	items := make([]list.Item, len(analyzers.AvailableAnalyzers()))
 	for i, analyzerType := range analyzers.AvailableAnalyzers() {
 		items[i] = KeyTypeItem(analyzerType)
@@ -47,37 +47,41 @@ func NewKeyTypePage(c *common.Common) KeyTypePage {
 	list.Title = "Select an analyzer type"
 	list.SetShowStatusBar(false)
 	list.Styles.Title = titleStyle
-	return KeyTypePage{
+	return &AnalyzeKeyPage{
 		Common: c,
 		list:   list,
 	}
 }
 
-func (ui KeyTypePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (ui *AnalyzeKeyPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !ui.list.SettingFilter() {
 		switch msg := msg.(type) {
+
+		case tea.WindowSizeMsg:
+			h, v := styles.AppStyle.GetFrameSize()
+			ui.list.SetSize(msg.Width-h, msg.Height-v)
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, ui.Common.KeyMap.Back):
 				return nil, tea.Quit
 			case key.Matches(msg, ui.Common.KeyMap.Select):
-				chosen := string(ui.list.SelectedItem().(KeyTypeItem))
-				return NewFormPage(ui.Common, chosen), SetKeyTypeCmd(chosen)
+				chosenAnalyzer := ui.list.SelectedItem().(KeyTypeItem)
+
+				return ui, func() tea.Msg {
+					return selector.SelectMsg{IdentifiableItem: chosenAnalyzer}
+				}
 			}
 		}
+
+		var cmd tea.Cmd
+		ui.list, cmd = ui.list.Update(msg)
+		return ui, cmd
 	}
-
-	var cmd tea.Cmd
-	ui.list, cmd = ui.list.Update(msg)
-	return ui, cmd
+	return ui, func() tea.Msg { return nil }
 }
 
-func (ui KeyTypePage) View() string {
+func (ui AnalyzeKeyPage) View() string {
 	return styles.AppStyle.Render(ui.list.View())
-}
-
-func (ui KeyTypePage) NextPage(keyType string) (tea.Model, tea.Cmd) {
-	return NewFormPage(ui.Common, keyType), SetKeyTypeCmd(keyType)
 }
 
 type KeyTypeItem string
@@ -87,10 +91,12 @@ func (i KeyTypeItem) Title() string       { return string(i) }
 func (i KeyTypeItem) Description() string { return "" }
 func (i KeyTypeItem) FilterValue() string { return string(i) }
 
-func init() {
-	// Preload HasDarkBackground call. For some reason, if we don't do
-	// this, the TUI can take a noticeably long time to start. We should
-	// investigate further, but this is a good-enough bandaid for now.
-	// See: https://github.com/charmbracelet/lipgloss/issues/73
-	_ = lipgloss.HasDarkBackground()
+func (m AnalyzeKeyPage) ShortHelp() []key.Binding {
+	// TODO: actually return something
+	return nil
+}
+
+func (m AnalyzeKeyPage) FullHelp() [][]key.Binding {
+	// TODO: actually return something
+	return nil
 }
