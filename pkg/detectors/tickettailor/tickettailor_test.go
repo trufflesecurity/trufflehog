@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	validPattern   = "skOFK3Yf_WW6E3TND0PXT5L4LPeOfVG7cEE_CdL2Y92fWNR"
-	invalidPattern = "skOFK3Yf_WW6E3TND0PXT5L?LPeOfVG7cEE_CdL2Y92fWNR"
+	validPattern   = "sk_6551_225099_d9a4d4b7d506fba4d2cbb2ed803d088b"
+	invalidPattern = "sk_1234_225099_WW6E3TND0PXT5L?LPeOfVG7c2Y92fWNR"
 	keyword        = "tickettailor"
 )
 
