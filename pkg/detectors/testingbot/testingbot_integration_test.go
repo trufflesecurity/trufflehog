@@ -50,6 +50,10 @@ func TestTestingBot_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_TestingBot,
+					Verified:     false,
+				},
+				{
+					DetectorType: detectorspb.DetectorType_TestingBot,
 					Verified:     true,
 				},
 			},
@@ -64,6 +68,10 @@ func TestTestingBot_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_TestingBot,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_TestingBot,
 					Verified:     false,
