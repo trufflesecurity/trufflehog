@@ -2,8 +2,8 @@ package satismeterprojectkey
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -25,9 +25,8 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"satismeter"}) + `\b([a-zA-Z0-9]{24})\b`)
-	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"satismeter"}) + common.EmailPattern)
-	passPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"satismeter"}) + `\b([a-zA-Z0-9!=@#$%^]{6,32})`)
+	projectPat = regexp.MustCompile(detectors.PrefixRegex([]string{"satismeter"}) + `\b([a-zA-Z0-9]{24})\b`)
+	tokenPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"satismeter"}) + `\b([A-Za-z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -40,49 +39,30 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	uniqueEmailMatches, uniqueKeyMatches, uniquePassMatches := make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
-	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	uniqueProjectMatches, uniqueTokenMatches := make(map[string]struct{}), make(map[string]struct{})
+	for _, match := range projectPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueProjectMatches[strings.TrimSpace(match[1])] = struct{}{}
 	}
 
-	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueKeyMatches[strings.TrimSpace(match[1])] = struct{}{}
+	for _, match := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueTokenMatches[strings.TrimSpace(match[1])] = struct{}{}
 	}
 
-	for _, match := range passPat.FindAllStringSubmatch(dataStr, -1) {
-		uniquePassMatches[strings.TrimSpace(match[1])] = struct{}{}
-	}
-
-	for keyMatch := range uniqueKeyMatches {
-		for emailMatch := range uniqueEmailMatches {
-			for passMatch := range uniquePassMatches {
-				s1 := detectors.Result{
-					DetectorType: detectorspb.DetectorType_SatismeterProjectkey,
-					Raw:          []byte(keyMatch),
-					RawV2:        []byte(keyMatch + passMatch),
-				}
-
-				if verify {
-
-					data := fmt.Sprintf("%s:%s", emailMatch, passMatch)
-					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-
-					req, err := http.NewRequestWithContext(ctx, "GET", "https://app.satismeter.com/api/users?project="+keyMatch, nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-						}
-					}
-				}
-
-				results = append(results, s1)
+	for projectID := range uniqueProjectMatches {
+		for token := range uniqueTokenMatches {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_SatismeterProjectkey,
+				Raw:          []byte(projectID),
+				RawV2:        []byte(projectID + token),
 			}
+
+			if verify {
+				isVerified, verificationErr := verifySatisMeterApp(ctx, client, projectID, token)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, token)
+			}
+
+			results = append(results, s1)
 		}
 
 	}
@@ -96,4 +76,33 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Satismeter is a customer feedback platform. Satismeter project keys can be used to access project-specific data and manage feedback settings."
+}
+
+func verifySatisMeterApp(ctx context.Context, client *http.Client, projectID, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://app.satismeter.com/api/users?project="+projectID, nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	case http.StatusNotFound:
+		// if project id is not found, api return 401
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
