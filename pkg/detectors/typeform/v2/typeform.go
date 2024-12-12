@@ -27,6 +27,14 @@ var (
 	keyPat = regexp.MustCompile(`\btfp_[a-zA-Z0-9_]{40,59}\b`)
 )
 
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+
+	return client
+}
+
 func (s Scanner) Version() int { return 2 }
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -55,7 +63,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			verified, typeformResponse, requestErr := verifyMatch(ctx, client, match)
+			verified, typeformResponse, requestErr := verifyMatch(ctx, s.getClient(), match)
 			s1.Verified = verified
 			s1.SetVerificationError(requestErr)
 
