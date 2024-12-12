@@ -29,7 +29,7 @@ const hs = new HubSpotAPI({ hapikey: HAPI_KEY });`,
 		//	{
 		//		name: "hubapi",
 		//		input: `curl https://api.hubapi.com/contacts/v1/lists/all/contacts/all \
-		//--header "Authorization: Bearer b71aa2ed-9c76-417d-bd8e-c5f4980d21ef"`,
+		// --header "Authorization: Bearer b71aa2ed-9c76-417d-bd8e-c5f4980d21ef"`,
 		//		want: []string{"b71aa2ed-9c76-417d-bd8e-c5f4980d21ef"},
 		//	},
 		{
@@ -61,7 +61,7 @@ const blogPosts = hs.blog.getPosts({ name: 'Inbound' });`,
 		"method": "GET",
 		"deprecated": false
 	}]`,
-			want: []string{""},
+			want: []string{"hDNxPGyQ-AOMZ-w9Sp-aw5t-TwKLBQjQ85go"},
 		},
 	}
 
