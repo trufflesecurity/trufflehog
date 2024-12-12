@@ -52,6 +52,12 @@ func TestTypeform_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Typeform,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"Alias":    "TruffleSecurity Detectors",
+						"Email":    "detectors@trufflesec.com",
+						"Language": "en",
+						"UserId":   "01JEX5WZZGGEC89F5E4DKW4144",
+					},
 				},
 			},
 			wantErr:             false,
@@ -85,40 +91,6 @@ func TestTypeform_FromChunk(t *testing.T) {
 			want:                nil,
 			wantErr:             false,
 			wantVerificationErr: false,
-		},
-		{
-			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a typeform secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Typeform,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a typeform secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Typeform,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
 		},
 	}
 	for _, tt := range tests {

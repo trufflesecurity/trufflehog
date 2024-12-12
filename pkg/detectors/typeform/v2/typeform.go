@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -13,7 +14,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -23,6 +26,14 @@ var (
 
 	keyPat = regexp.MustCompile(`\btfp_[a-zA-Z0-9_]{40,59}\b`)
 )
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+
+	return client
+}
 
 func (s Scanner) Version() int { return 2 }
 
@@ -52,11 +63,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			verified, typeformResponse, requestErr := verifyMatch(ctx, client, match)
+			verified, typeformResponse, requestErr := verifyMatch(ctx, s.getClient(), match)
 			s1.Verified = verified
-			if requestErr != nil {
-				s1.SetVerificationError(err, match)
-			} else {
+			s1.SetVerificationError(requestErr)
+
+			if typeformResponse != nil {
 				s1.ExtraData = map[string]string{
 					"UserId":   typeformResponse.UserID,
 					"Email":    typeformResponse.Email,
@@ -72,26 +83,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, secret string) (bool, TypeFormResponse, error) {
-	var response TypeFormResponse
-
+func verifyMatch(ctx context.Context, client *http.Client, secret string) (bool, *TypeFormResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.typeform.com/me", nil)
 	if err != nil {
-		return false, response, nil
+		return false, nil, nil
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", secret))
 	res, err := client.Do(req)
 	if err != nil {
-		return false, response, err
+		return false, nil, err
 	}
-	defer res.Body.Close()
-	if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return false, response, err
-	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
 	if res.StatusCode == 200 {
+		var response *TypeFormResponse
+		if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
+			return false, nil, err
+		}
+
 		return true, response, nil
+	} else if res.StatusCode == 401 || res.StatusCode == 403 {
+		return false, nil, nil
 	} else {
-		return false, response, fmt.Errorf("unexpected status code %d", res.StatusCode)
+		return false, nil, fmt.Errorf("unexpected status code %d", res.StatusCode)
 	}
 }
 
