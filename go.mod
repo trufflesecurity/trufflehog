@@ -42,7 +42,7 @@ require (
 	github.com/getsentry/sentry-go v0.30.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.12.0
-	github.com/go-ldap/ldap/v3 v3.4.8
+	github.com/go-ldap/ldap/v3 v3.4.9
 	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/zapr v1.3.0
 	github.com/go-redis/redis v6.15.9+incompatible
@@ -190,7 +190,7 @@ require (
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
-	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
+	github.com/go-asn1-ber/asn1-ber v1.5.7 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
