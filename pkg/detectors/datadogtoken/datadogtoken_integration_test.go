@@ -111,6 +111,11 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Scanner{}
+
+			// use default cloud endpoint
+			s.UseCloudEndpoint(true)
+			s.SetCloudEndpoint(s.CloudEndpoint())
+
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DatadogToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
@@ -122,6 +127,7 @@ func TestDatadogToken_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 				got[i].RawV2 = nil
+				delete(got[i].ExtraData, "user_emails")
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("DatadogToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

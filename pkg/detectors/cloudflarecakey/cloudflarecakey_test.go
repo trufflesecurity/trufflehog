@@ -21,14 +21,14 @@ var (
 
 		api:
 			auth_type: "API-Key"
-			base_url: "https://api.example.com/v1/user"
-			cloudflare: "vR2hGdmAyzLxI4kR34v-fgtaIug7VC_xudRuku6UQd5t9RoiY3zGiuVxMGiN6qR6O0cGjbGepFsHHrfm-9QmBahS.tvHRjYvf_c5XOKReWeVXsp3T-_gilqReVlS-U_9vj1tcMAwRjWCcehKiCOPnXEeN.Xg.lmwp0.mAIsgbrdPJsJE4hz7OF5PQ7D"
+			base_url: "https://api.cloudflare.com/v1/user"
+			ca_key: "v1.0-13vvv5141b975834504fc75b-a670d21e1e012816c3c8d9745e2693adc2d2ec7c402f607dbf7f2bd5de3bdb490cce4420ef13179957c5651e1ee5d952b1e03bd0271e2b43a9847f0713f4d3942cde4a7bc2e4770615"
 
 		# Notes:
 		# - Remember to rotate the secret every 90 days.
 		# - The above credentials should only be used in a secure environment.
 	`
-	secret = "vR2hGdmAyzLxI4kR34v-fgtaIug7VC_xudRuku6UQd5t9RoiY3zGiuVxMGiN6qR6O0cGjbGepFsHHrfm-9QmBahS.tvHRjYvf_c5XOKReWeVXsp3T-_gilqReVlS-U_9vj1tcMAwRjWCcehKiCOPnXEeN.Xg.lmwp0.mAIsgbrdPJsJE4hz7OF5PQ7D"
+	secret = "v1.0-13vvv5141b975834504fc75b-a670d21e1e012816c3c8d9745e2693adc2d2ec7c402f607dbf7f2bd5de3bdb490cce4420ef13179957c5651e1ee5d952b1e03bd0271e2b43a9847f0713f4d3942cde4a7bc2e4770615"
 )
 
 func TestCloudFlareCAKey_Pattern(t *testing.T) {

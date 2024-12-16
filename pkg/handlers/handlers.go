@@ -1,17 +1,22 @@
 package handlers
 
 import (
+	"archive/zip"
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/mholt/archiver/v4"
+	"github.com/mholt/archives"
 
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -31,14 +36,31 @@ import (
 // promotes a more cohesive and maintainable codebase. It also embeds a BufferedFileReader to provide efficient
 // random access to the file content.
 type fileReader struct {
-	format           archiver.Format
+	format           archives.Format
 	mime             *mimetype.MIME
 	isGenericArchive bool
 
 	*iobuf.BufferedReadSeeker
 }
 
-var ErrEmptyReader = errors.New("reader is empty")
+var (
+	ErrEmptyReader = errors.New("reader is empty")
+
+	// ErrProcessingFatal indicates a severe error that requires stopping the file processing.
+	ErrProcessingFatal = errors.New("fatal error processing file")
+
+	// ErrProcessingWarning indicates a recoverable error that can be logged,
+	// allowing processing to continue.
+	ErrProcessingWarning = errors.New("error processing file")
+)
+
+type readerConfig struct{ fileExtension string }
+
+type readerOption func(*readerConfig)
+
+func withFileExtension(ext string) readerOption {
+	return func(c *readerConfig) { c.fileExtension = ext }
+}
 
 // mimeTypeReader wraps an io.Reader with MIME type information.
 // This type is used to pass content through the processing pipeline
@@ -80,20 +102,49 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 }
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
-func newFileReader(r io.Reader) (fileReader, error) {
-	var fReader fileReader
+// The caller is responsible for closing the reader when it is no longer needed.
+func newFileReader(r io.Reader, options ...readerOption) (fReader fileReader, err error) {
+	var cfg readerConfig
 
+	for _, opt := range options {
+		opt(&cfg)
+	}
+	// To detect the MIME type of the input data, we need a reader that supports seeking.
+	// This allows us to read the data multiple times if necessary without losing the original position.
+	// We use a BufferedReaderSeeker to wrap the original reader, enabling this functionality.
 	fReader.BufferedReadSeeker = iobuf.NewBufferedReaderSeeker(r)
 
-	mime, err := mimetype.DetectReader(fReader)
+	// If an error occurs during MIME type detection, it is important we close the BufferedReaderSeeker
+	// to release any resources it holds (checked out buffers or temp file).
+	defer func() {
+		if err != nil {
+			if closeErr := fReader.Close(); closeErr != nil {
+				err = fmt.Errorf("%w; error closing reader: %w", err, closeErr)
+			}
+		}
+	}()
+
+	var mime *mimetype.MIME
+	mime, err = mimetype.DetectReader(fReader)
 	if err != nil {
 		return fReader, fmt.Errorf("unable to detect MIME type: %w", err)
 	}
 	fReader.mime = mime
 
 	// Reset the reader to the beginning because DetectReader consumes the reader.
-	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+	if _, err = fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after MIME detection: %w", err)
+	}
+
+	// Check for APK files
+	if shouldHandleAsAPK(cfg, fReader) {
+		isAPK, err := isAPKFile(&fReader)
+		if err != nil {
+			return fReader, fmt.Errorf("error checking for APK: %w", err)
+		}
+		if isAPK {
+			return handleAPKFile(&fReader)
+		}
 	}
 
 	// If a MIME type is known to not be an archive type, we might as well return here rather than
@@ -102,13 +153,14 @@ func newFileReader(r io.Reader) (fileReader, error) {
 		return fReader, nil
 	}
 
-	format, _, err := archiver.Identify("", fReader)
+	var format archives.Format
+	format, _, err = archives.Identify(context.TODO(), "", fReader)
 	switch {
 	case err == nil:
 		fReader.isGenericArchive = true
 		fReader.format = format
 
-	case errors.Is(err, archiver.ErrNoMatch):
+	case errors.Is(err, archives.NoMatch):
 		// Not an archive handled by archiver.
 		// Continue with the default reader.
 	default:
@@ -117,18 +169,29 @@ func newFileReader(r io.Reader) (fileReader, error) {
 
 	// Reset the reader to the beginning again to allow the handler to read from the start.
 	// This is necessary because Identify consumes the reader.
-	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+	if _, err = fReader.Seek(0, io.SeekStart); err != nil {
 		return fReader, fmt.Errorf("error resetting reader after archive identification: %w", err)
 	}
 
 	return fReader, nil
 }
 
+// DataOrErr represents a result that can either contain data or an error.
+// The Data field holds the byte slice of data, and the Err field holds any error that occurred.
+// This structure is used to handle asynchronous file processing where each chunk of data
+// or potential error needs to be communicated back to the caller. It allows for
+// efficient streaming of file contents while also providing a way to propagate errors
+// that may occur during the file handling process.
+type DataOrErr struct {
+	Data []byte
+	Err  error
+}
+
 // FileHandler represents a handler for files.
 // It has a single method, HandleFile, which takes a context and a fileReader as input,
 // and returns a channel of byte slices and an error.
 type FileHandler interface {
-	HandleFile(ctx logContext.Context, reader fileReader) (chan []byte, error)
+	HandleFile(ctx logContext.Context, reader fileReader) chan DataOrErr
 }
 
 // fileHandlingConfig encapsulates configuration settings that control the behavior of file processing.
@@ -157,7 +220,9 @@ const (
 	archiveHandlerType handlerType = "archive"
 	arHandlerType      handlerType = "ar"
 	rpmHandlerType     handlerType = "rpm"
+	apkHandlerType     handlerType = "apk"
 	defaultHandlerType handlerType = "default"
+	apkExt                         = ".apk"
 )
 
 type mimeType string
@@ -192,6 +257,9 @@ const (
 	pyScriptMime mimeType = "application/x-script.python"
 	tclTextMime  mimeType = "text/x-tcl"
 	tclMime      mimeType = "application/x-tcl"
+	apkMime      mimeType = "application/vnd.android.package-archive"
+	zipMime      mimeType = "application/zip"
+	jarMime      mimeType = "application/java-archive"
 )
 
 // skipArchiverMimeTypes is a set of MIME types that should bypass archiver library processing because they are either
@@ -226,6 +294,7 @@ var skipArchiverMimeTypes = map[mimeType]struct{}{
 	pyScriptMime: {},
 	tclTextMime:  {},
 	tclMime:      {},
+	apkMime:      {},
 }
 
 // selectHandler dynamically selects and configures a FileHandler based on the provided |mimetype| type and archive flag.
@@ -233,6 +302,7 @@ var skipArchiverMimeTypes = map[mimeType]struct{}{
 // This method uses specialized handlers for specific file types:
 // - arHandler is used for Unix archives and Debian packages ('arMime', 'unixArMime', and 'debMime').
 // - rpmHandler is used for RPM and CPIO archives ('rpmMime' and 'cpioMime').
+// - apkHandler is used for APK archives ('apkMime').
 // - archiveHandler is used for common archive formats supported by the archiver library (.zip, .tar, .gz, etc.).
 // - defaultHandler is used for non-archive files.
 // The selected handler is then returned, ready to handle the file according to its specific format and requirements.
@@ -242,6 +312,8 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 		return newARHandler()
 	case rpmMime, cpioMime:
 		return newRPMHandler()
+	case apkMime:
+		return newAPKHandler()
 	default:
 		if isGenericArchive {
 			return newArchiveHandler()
@@ -256,14 +328,25 @@ var maxTimeout = time.Duration(60) * time.Second
 func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 
 // HandleFile orchestrates the complete file handling process for a given file.
-// It determines the MIME type of the file, selects the appropriate handler based on this type, and processes the file.
-// This function initializes the handling process and delegates to the specific handler to manage file
-// extraction or processing. Errors at any stage result in an error return value.
-// Successful handling passes the file content through a channel to be chunked and reported.
-// The function will close the reader when it has consumed all the data.
+// It determines the MIME type of the file,
+// selects the appropriate handler based on this type, and processes the file.
+// This function initializes the handling process and delegates to the specific
+// handler to manage file extraction or processing.
 //
-// If the skipArchives option is set to true and the detected MIME type is a known archive type,
-// the function will skip processing the file and return nil.
+// The function will return nil (success) in the following cases:
+// - If the reader is empty (ErrEmptyReader)
+// - If skipArchives option is true and the file is detected as an archive
+// - If all chunks are processed successfully without critical errors
+//
+// The function will return an error in the following cases:
+// - If the reader is nil
+// - If there's an error creating the file reader
+// - If there's an error closing the reader
+// - If a critical error occurs during chunk processing (context cancellation, deadline exceeded, or ErrProcessingFatal)
+// - If there's an error reporting a chunk
+//
+// Non-critical errors during chunk processing are logged
+// but do not cause the function to return an error.
 func HandleFile(
 	ctx logContext.Context,
 	reader io.Reader,
@@ -272,16 +355,17 @@ func HandleFile(
 	options ...func(*fileHandlingConfig),
 ) error {
 	if reader == nil {
-		return fmt.Errorf("reader is nil")
+		return errors.New("reader is nil")
 	}
 
-	rdr, err := newFileReader(reader)
+	readerOption := withFileExtension(getFileExtension(chunkSkel))
+	rdr, err := newFileReader(reader, readerOption)
 	if err != nil {
 		if errors.Is(err, ErrEmptyReader) {
 			ctx.Logger().V(5).Info("empty reader, skipping file")
 			return nil
 		}
-		return fmt.Errorf("failed to create file reader to handle file: %w", err)
+		return fmt.Errorf("unable to HandleFile, error creating file reader: %w", err)
 	}
 	defer func() {
 		// Ensure all data is read to prevent broken pipe.
@@ -307,42 +391,196 @@ func HandleFile(
 	defer cancel()
 
 	handler := selectHandler(mimeT, rdr.isGenericArchive)
-	archiveChan, err := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
-	if err != nil {
-		return fmt.Errorf("error handling file: %w", err)
-	}
+	dataOrErrChan := handler.HandleFile(processingCtx, rdr) // Delegate to the specific handler to process the file.
 
-	return handleChunks(processingCtx, archiveChan, chunkSkel, reporter)
+	return handleChunksWithError(processingCtx, dataOrErrChan, chunkSkel, reporter)
 }
 
-// handleChunks reads data from the handlerChan and uses it to fill chunks according to a predefined skeleton (chunkSkel).
-// Each filled chunk is reported using the provided reporter. This function manages the lifecycle of the channel,
-// handling the termination condition when the channel closes and ensuring the cancellation of the operation if the context
-// is done. It returns true if all chunks are processed successfully, otherwise returns false on errors or cancellation.
-func handleChunks(
+// handleChunksWithError processes data and errors received from the dataErrChan channel.
+// For each DataOrErr received:
+// - If it contains data, the function creates a chunk based on chunkSkel and reports it through the reporter.
+// - If it contains an error, the function handles it based on severity:
+//   - Fatal errors (context cancellation, deadline exceeded, ErrProcessingFatal) cause immediate termination
+//   - Non-fatal errors (ErrProcessingWarning and others) are logged and processing continues
+//
+// The function also listens for context cancellation to gracefully terminate processing if the context is done.
+// It returns nil upon successful processing of all data, or the first encountered fatal error.
+func handleChunksWithError(
 	ctx logContext.Context,
-	handlerChan chan []byte,
+	dataErrChan <-chan DataOrErr,
 	chunkSkel *sources.Chunk,
 	reporter sources.ChunkReporter,
 ) error {
-	if handlerChan == nil {
-		return fmt.Errorf("handler channel is nil")
-	}
-
 	for {
 		select {
-		case data, open := <-handlerChan:
-			if !open {
-				ctx.Logger().V(5).Info("handler channel closed, all chunks processed")
+		case dataOrErr, ok := <-dataErrChan:
+			if !ok {
+				// Channel closed, processing complete.
+				ctx.Logger().V(5).Info("dataErrChan closed, all chunks processed")
 				return nil
 			}
-			chunk := *chunkSkel
-			chunk.Data = data
-			if err := reporter.ChunkOk(ctx, chunk); err != nil {
-				return fmt.Errorf("error reporting chunk: %w", err)
+			if dataOrErr.Err != nil {
+				if isFatal(dataOrErr.Err) {
+					return dataOrErr.Err
+				}
+				ctx.Logger().Error(dataOrErr.Err, "non-critical error processing chunk")
+				continue
+			}
+			if len(dataOrErr.Data) > 0 {
+				chunk := *chunkSkel
+				chunk.Data = dataOrErr.Data
+				if err := reporter.ChunkOk(ctx, chunk); err != nil {
+					return fmt.Errorf("error reporting chunk: %w", err)
+				}
 			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
+}
+
+// isFatal determines whether the given error is a fatal error that should
+// terminate processing the current file, or a non-critical error that can be logged and ignored.
+// "Fatal" errors include context cancellation, deadline exceeded, and the
+// ErrProcessingFatal error. Non-fatal errors include the ErrProcessingWarning
+// error as well as any other error that is not one of the fatal errors.
+func isFatal(err error) bool {
+	switch {
+	case errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, ErrProcessingFatal):
+		return true
+	case errors.Is(err, ErrProcessingWarning):
+		return false
+	default:
+		return false
+	}
+}
+
+// getFileExtension extracts the file extension from the chunk's SourceMetadata.
+// It considers all sources defined in the MetaData message.
+// Note: Probably should add this as a method to the source_metadatapb object.
+// then it'd just be chunkSkel.SourceMetadata.GetFileExtension()
+func getFileExtension(chunkSkel *sources.Chunk) string {
+	if chunkSkel == nil || chunkSkel.SourceMetadata == nil {
+		return ""
+	}
+
+	var fileName string
+
+	// Inspect the SourceMetadata to determine the source type
+	switch metadata := chunkSkel.SourceMetadata.Data.(type) {
+	case *source_metadatapb.MetaData_Artifactory:
+		fileName = metadata.Artifactory.Path
+	case *source_metadatapb.MetaData_Azure:
+		fileName = metadata.Azure.File
+	case *source_metadatapb.MetaData_AzureRepos:
+		fileName = metadata.AzureRepos.File
+	case *source_metadatapb.MetaData_Bitbucket:
+		fileName = metadata.Bitbucket.File
+	case *source_metadatapb.MetaData_Buildkite:
+		fileName = metadata.Buildkite.Link
+	case *source_metadatapb.MetaData_Circleci:
+		fileName = metadata.Circleci.Link
+	case *source_metadatapb.MetaData_Confluence:
+		fileName = metadata.Confluence.File
+	case *source_metadatapb.MetaData_Docker:
+		fileName = metadata.Docker.File
+	case *source_metadatapb.MetaData_Ecr:
+		fileName = metadata.Ecr.File
+	case *source_metadatapb.MetaData_Filesystem:
+		fileName = metadata.Filesystem.File
+	case *source_metadatapb.MetaData_Git:
+		fileName = metadata.Git.File
+	case *source_metadatapb.MetaData_Github:
+		fileName = metadata.Github.File
+	case *source_metadatapb.MetaData_Gitlab:
+		fileName = metadata.Gitlab.File
+	case *source_metadatapb.MetaData_Gcs:
+		fileName = metadata.Gcs.Filename
+	case *source_metadatapb.MetaData_GoogleDrive:
+		fileName = metadata.GoogleDrive.File
+	case *source_metadatapb.MetaData_Huggingface:
+		fileName = metadata.Huggingface.File
+	case *source_metadatapb.MetaData_Jira:
+		fileName = metadata.Jira.Link
+	case *source_metadatapb.MetaData_Jenkins:
+		fileName = metadata.Jenkins.Link
+	case *source_metadatapb.MetaData_Npm:
+		fileName = metadata.Npm.File
+	case *source_metadatapb.MetaData_Pypi:
+		fileName = metadata.Pypi.File
+	case *source_metadatapb.MetaData_S3:
+		fileName = metadata.S3.File
+	case *source_metadatapb.MetaData_Slack:
+		fileName = metadata.Slack.File
+	case *source_metadatapb.MetaData_Sharepoint:
+		fileName = metadata.Sharepoint.Link
+	case *source_metadatapb.MetaData_Gerrit:
+		fileName = metadata.Gerrit.File
+	case *source_metadatapb.MetaData_Test:
+		fileName = metadata.Test.File
+	case *source_metadatapb.MetaData_Teams:
+		fileName = metadata.Teams.File
+	case *source_metadatapb.MetaData_TravisCI:
+		fileName = metadata.TravisCI.Link
+	// Add other sources if they have a file or equivalent field
+	// Skipping Syslog, Forager, Postman, Vector, Webhook and Elasticsearch
+	default:
+		return ""
+	}
+
+	// Use filepath.Ext to extract the file extension from the file name
+	ext := filepath.Ext(fileName)
+	return ext
+}
+
+// shouldHandleAsAPK checks if the file should be handled as an APK based on config and MIME type.
+// Note: We can't extend the mimetype package with an APK detection function b/c it would require adjusting settings
+// so that all files are fully read into a byte slice for detection (mimetype.SetLimit(0)), which would bloat memory.
+// Instead we call the isAPKFile function in here after ensuring it's a zip/jar file and has an .apk extension.
+func shouldHandleAsAPK(cfg readerConfig, fReader fileReader) bool {
+	return feature.EnableAPKHandler.Load() &&
+		cfg.fileExtension == apkExt &&
+		(fReader.mime.String() == string(zipMime) || fReader.mime.String() == string(jarMime))
+}
+
+func isAPKFile(r *fileReader) (bool, error) {
+	size, _ := r.Size()
+	zipReader, err := zip.NewReader(r, size)
+	if err != nil {
+		return false, fmt.Errorf("error creating zip reader: %w", err)
+	}
+
+	hasManifest := false
+	hasClasses := false
+
+	for _, file := range zipReader.File {
+		switch file.Name {
+		case "AndroidManifest.xml":
+			hasManifest = true
+		case "classes.dex":
+			hasClasses = true
+		default:
+			// Skip other files.
+		}
+		if hasManifest && hasClasses {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// handleAPKFile configures the MIME type for an APK and resets the reader.
+func handleAPKFile(fReader *fileReader) (fileReader, error) {
+	// Extend the MIME type to recognize APK files
+	mimetype.Lookup("application/zip").Extend(func(r []byte, l uint32) bool { return false }, string(apkMime), ".apk")
+	fReader.mime = mimetype.Lookup(string(apkMime))
+
+	// Reset reader for further handling
+	if _, err := fReader.Seek(0, io.SeekStart); err != nil {
+		return *fReader, fmt.Errorf("error resetting reader after APK detection: %w", err)
+	}
+	return *fReader, nil
 }

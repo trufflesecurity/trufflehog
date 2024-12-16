@@ -114,7 +114,7 @@ func TestSourceManagerRun(t *testing.T) {
 	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
 	for i := 0; i < 3; i++ {
-		ref, err := mgr.Run(context.Background(), "dummy", source)
+		ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 		<-ref.Done()
 		assert.NoError(t, err)
 		assert.NoError(t, ref.Snapshot().FatalError())
@@ -132,7 +132,7 @@ func TestSourceManagerWait(t *testing.T) {
 	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
 	// Asynchronously run the source.
-	_, err = mgr.Run(context.Background(), "dummy", source)
+	_, err = mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	// Read the 1 chunk we're expecting so Waiting completes.
 	<-mgr.Chunks()
@@ -141,7 +141,7 @@ func TestSourceManagerWait(t *testing.T) {
 	// Run should return an error now.
 	_, err = buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
-	_, err = mgr.Run(context.Background(), "dummy", source)
+	_, err = mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.Error(t, err)
 }
 
@@ -149,7 +149,7 @@ func TestSourceManagerError(t *testing.T) {
 	mgr := NewManager()
 	source, err := buildDummy(errorChunker{fmt.Errorf("oops")})
 	assert.NoError(t, err)
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
 	assert.Error(t, ref.Snapshot().FatalError())
@@ -165,13 +165,63 @@ func TestSourceManagerReport(t *testing.T) {
 		mgr := NewManager(opts...)
 		source, err := buildDummy(&counterChunker{count: 4})
 		assert.NoError(t, err)
-		ref, err := mgr.Run(context.Background(), "dummy", source)
+		ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 		assert.NoError(t, err)
 		<-ref.Done()
 		assert.Equal(t, 0, len(ref.Snapshot().Errors))
 		assert.Equal(t, uint64(4), ref.Snapshot().TotalChunks)
 	}
 }
+
+func TestSourceManagerEnumerate(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
+	source, err := buildDummy(&counterChunker{count: 1})
+	assert.NoError(t, err)
+	var enumeratedUnits []SourceUnit
+	reporter := visitorUnitReporter{
+		ok: func(_ context.Context, unit SourceUnit) error {
+			enumeratedUnits = append(enumeratedUnits, unit)
+			return nil
+		},
+	}
+	for i := 0; i < 3; i++ {
+		ref, err := mgr.Enumerate(context.Background(), "dummy", source, reporter)
+		<-ref.Done()
+		assert.NoError(t, err)
+		assert.NoError(t, ref.Snapshot().FatalError())
+		// The Chunks channel should be empty because we only enumerated.
+		_, err = tryRead(mgr.Chunks())
+		assert.Error(t, err)
+		// Each time the loop iterates, we add 1 unit to the slice.
+		assert.Equal(t, i+1, len(enumeratedUnits), ref.Snapshot())
+	}
+}
+
+func TestSourceManagerScan(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
+	source, err := buildDummy(&counterChunker{count: 1})
+	assert.NoError(t, err)
+	for i := 0; i < 3; i++ {
+		ref, err := mgr.Scan(context.Background(), "dummy", source, countChunk(123))
+		<-ref.Done()
+		assert.NoError(t, err)
+		assert.NoError(t, ref.Snapshot().FatalError())
+		chunk, err := tryRead(mgr.Chunks())
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{123}, chunk.Data)
+		// The Chunks channel should be empty now.
+		_, err = tryRead(mgr.Chunks())
+		assert.Error(t, err)
+	}
+}
+
+type visitorUnitReporter struct {
+	ok  func(context.Context, SourceUnit) error
+	err func(context.Context, error) error
+}
+
+func (v visitorUnitReporter) UnitOk(ctx context.Context, u SourceUnit) error { return v.ok(ctx, u) }
+func (v visitorUnitReporter) UnitErr(ctx context.Context, err error) error   { return v.err(ctx, err) }
 
 type unitChunk struct {
 	unit   string
@@ -230,7 +280,7 @@ func TestSourceManagerNonFatalError(t *testing.T) {
 	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
 	source, err := buildDummy(&unitChunker{input})
 	assert.NoError(t, err)
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
 	report := ref.Snapshot()
@@ -247,7 +297,7 @@ func TestSourceManagerContextCancelled(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ref, err := mgr.Run(ctx, "dummy", source)
+	ref, err := mgr.EnumerateAndScan(ctx, "dummy", source)
 	assert.NoError(t, err)
 
 	cancel()
@@ -291,7 +341,7 @@ func TestSourceManagerCancelRun(t *testing.T) {
 	}})
 	assert.NoError(t, err)
 
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 
 	cancelErr := fmt.Errorf("abort! abort!")
@@ -313,7 +363,7 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1337, mgr.AvailableCapacity())
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 
 	<-start // Wait for start signal.
@@ -338,7 +388,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	)
 	source, err := buildDummy(&unitChunker{input})
 	assert.NoError(t, err)
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
 	assert.NoError(t, mgr.Wait())
@@ -399,7 +449,7 @@ func TestSourceManagerUnitHookBackPressure(t *testing.T) {
 	)
 	source, err := buildDummy(&unitChunker{input})
 	assert.NoError(t, err)
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 
 	var metrics []UnitMetrics
@@ -428,7 +478,7 @@ func TestSourceManagerUnitHookNoUnits(t *testing.T) {
 	source, err := buildDummy(&counterChunker{count: 5})
 	assert.NoError(t, err)
 
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
 	assert.NoError(t, mgr.Wait())
