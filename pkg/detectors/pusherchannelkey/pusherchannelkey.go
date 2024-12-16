@@ -54,21 +54,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, appMatch := range appMatches {
-		if len(appMatch) != 2 {
-			continue
-		}
 		resappMatch := strings.TrimSpace(appMatch[1])
 
 		for _, keyMatch := range keyMatches {
-			if len(keyMatch) != 2 {
-				continue
-			}
 			reskeyMatch := strings.TrimSpace(keyMatch[1])
 
 			for _, secretMatch := range secretMatches {
-				if len(secretMatch) != 2 {
-					continue
-				}
 				ressecretMatch := strings.TrimSpace(secretMatch[1])
 
 				s1 := detectors.Result{

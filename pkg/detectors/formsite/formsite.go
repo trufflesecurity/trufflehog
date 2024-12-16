@@ -44,19 +44,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	userMatches := userPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, serverMatch := range serverMatches {
-			if len(serverMatch) != 2 {
-				continue
-			}
 			resServerMatch := strings.TrimSpace(serverMatch[1])
 			for _, userMatch := range userMatches {
-				if len(userMatch) != 2 {
-					continue
-				}
 				resUserMatch := strings.TrimSpace(userMatch[1])
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Formsite,
