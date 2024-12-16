@@ -52,6 +52,12 @@ func TestPusherChannelKey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_PusherChannelKey,
 					Verified:     true,
+					RawV2:        []byte(appId + key),
+				},
+				{
+					DetectorType: detectorspb.DetectorType_PusherChannelKey,
+					Verified:     false,
+					RawV2:        []byte(appId + key),
 				},
 			},
 			wantErr: false,
@@ -68,6 +74,12 @@ func TestPusherChannelKey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_PusherChannelKey,
 					Verified:     false,
+					RawV2:        []byte(appId + key),
+				},
+				{
+					DetectorType: detectorspb.DetectorType_PusherChannelKey,
+					Verified:     false,
+					RawV2:        []byte(appId + key),
 				},
 			},
 			wantErr: false,
