@@ -50,7 +50,13 @@ func TestVouchery_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Vouchery,
+					Verified:     false,
+					RawV2:        []byte(secret + "secret"),
+				},
+				{
+					DetectorType: detectorspb.DetectorType_Vouchery,
 					Verified:     true,
+					RawV2:        []byte(secret + subdomain),
 				},
 			},
 			wantErr: false,
@@ -67,6 +73,12 @@ func TestVouchery_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Vouchery,
 					Verified:     false,
+					RawV2:        []byte(inactiveSecret + "secret"),
+				},
+				{
+					DetectorType: detectorspb.DetectorType_Vouchery,
+					Verified:     false,
+					RawV2:        []byte(inactiveSecret + subdomain),
 				},
 			},
 			wantErr: false,
