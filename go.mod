@@ -69,7 +69,7 @@ require (
 	github.com/lrstanley/bubblezone v0.0.0-20240125042004-b7bafc493195
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
-	github.com/mholt/archives v0.0.0-20241207175349-5e373c52f8aa
+	github.com/mholt/archives v0.0.0-20241216060121-23e0af8fe73d
 	github.com/microsoft/go-mssqldb v1.8.0
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/muesli/reflow v0.3.0
