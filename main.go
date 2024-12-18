@@ -20,6 +20,8 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcaching"
 	"go.uber.org/automaxprocs/maxprocs"
 
@@ -76,6 +78,8 @@ var (
 	includeDetectors     = cli.Flag("include-detectors", "Comma separated list of detector types to include. Protobuf name or IDs may be used, as well as ranges.").Default("all").String()
 	excludeDetectors     = cli.Flag("exclude-detectors", "Comma separated list of detector types to exclude. Protobuf name or IDs may be used, as well as ranges. IDs defined here take precedence over the include list.").String()
 	jobReportFile        = cli.Flag("output-report", "Write a scan report to the provided path.").Hidden().OpenFile(os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+
+	noVerificationCache = cli.Flag("no-verification-cache", "Disable verification caching").Bool()
 
 	// Add feature flags
 	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
@@ -500,6 +504,11 @@ func run(state overseer.State) {
 		Results:               parsedResults,
 		PrintAvgDetectorTime:  *printAvgDetectorTime,
 		ShouldScanEntireChunk: *scanEntireChunk,
+	}
+
+	if !*noVerificationCache {
+		engConf.VerificationCache = simple.NewCache[detectors.Result]()
+		engConf.GetVerificationCacheKey = func(result detectors.Result) string { return string(result.Raw) + string(result.RawV2) }
 	}
 
 	if *compareDetectionStrategies {
