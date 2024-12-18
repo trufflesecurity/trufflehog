@@ -11,8 +11,8 @@ import (
 type metricsCollector interface {
 	// Object metrics.
 
-	RecordObjectScanned(bucket string)
-	RecordObjectSkipped(bucket, reason string)
+	RecordObjectScanned(bucket string, sizeBytes float64)
+	RecordObjectSkipped(bucket, reason string, sizeBytes float64)
 	RecordObjectError(bucket string)
 
 	// Role metrics.
@@ -22,8 +22,8 @@ type metricsCollector interface {
 }
 
 type collector struct {
-	objectsScanned *prometheus.CounterVec
-	objectsSkipped *prometheus.CounterVec
+	objectsScanned *prometheus.HistogramVec
+	objectsSkipped *prometheus.HistogramVec
 	objectsErrors  *prometheus.CounterVec
 	rolesScanned   *prometheus.GaugeVec
 	bucketsPerRole *prometheus.GaugeVec
@@ -33,18 +33,22 @@ var metricsInstance metricsCollector
 
 func init() {
 	metricsInstance = &collector{
-		objectsScanned: promauto.NewCounterVec(prometheus.CounterOpts{
+		objectsScanned: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
 			Subsystem: common.MetricsSubsystem,
-			Name:      "objects_scanned_total",
-			Help:      "Total number of S3 objects successfully scanned",
+			Name:      "objects_scanned_bytes",
+			Help:      "Size distribution of successfully scanned S3 objects in bytes",
+			// 64B, 512B, 4KB, 32KB, 256KB, 2MB, 16MB, 128MB, 1GB.
+			Buckets: prometheus.ExponentialBuckets(64, 8, 9),
 		}, []string{"bucket"}),
 
-		objectsSkipped: promauto.NewCounterVec(prometheus.CounterOpts{
+		objectsSkipped: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: common.MetricsNamespace,
 			Subsystem: common.MetricsSubsystem,
-			Name:      "objects_skipped_total",
-			Help:      "Total number of S3 objects skipped during scan",
+			Name:      "objects_skipped_bytes",
+			Help:      "Size distribution of skipped S3 objects in bytes",
+			// 64B, 512B, 4KB, 32KB, 256KB, 2MB, 16MB, 128MB, 1GB.
+			Buckets: prometheus.ExponentialBuckets(64, 8, 9),
 		}, []string{"bucket", "reason"}),
 
 		objectsErrors: promauto.NewCounterVec(prometheus.CounterOpts{
@@ -70,12 +74,12 @@ func init() {
 	}
 }
 
-func (c *collector) RecordObjectScanned(bucket string) {
-	c.objectsScanned.WithLabelValues(bucket).Inc()
+func (c *collector) RecordObjectScanned(bucket string, sizeBytes float64) {
+	c.objectsScanned.WithLabelValues(bucket).Observe(sizeBytes)
 }
 
-func (c *collector) RecordObjectSkipped(bucket, reason string) {
-	c.objectsSkipped.WithLabelValues(bucket, reason).Inc()
+func (c *collector) RecordObjectSkipped(bucket, reason string, sizeBytes float64) {
+	c.objectsSkipped.WithLabelValues(bucket, reason).Observe(sizeBytes)
 }
 
 func (c *collector) RecordObjectError(bucket string) {

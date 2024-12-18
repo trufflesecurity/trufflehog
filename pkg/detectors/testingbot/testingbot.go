@@ -2,16 +2,18 @@ package testingbot
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
+	"io"
 	"net/http"
-	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -36,38 +38,31 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idmatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueIDMatches, uniqueKeyMatches := make(map[string]struct{}), make(map[string]struct{})
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
-		for _, idmatch := range idmatches {
-			if len(idmatch) != 2 {
+	for _, match := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueIDMatches[match[1]] = struct{}{}
+	}
+
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeyMatches[match[1]] = struct{}{}
+	}
+
+	for id := range uniqueIDMatches {
+		for key := range uniqueKeyMatches {
+			if id == key {
 				continue
 			}
-			resIdMatch := strings.TrimSpace(idmatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_TestingBot,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(key),
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.testingbot.com/v1/user", nil)
-				if err != nil {
-					continue
-				}
-				req.SetBasicAuth(resIdMatch, resMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyTestingBot(ctx, client, id, key)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, key)
 			}
 
 			results = append(results, s1)
@@ -83,4 +78,31 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "TestingBot provides cross-browser testing services. TestingBot credentials can be used to automate tests on various browsers and devices."
+}
+
+func verifyTestingBot(ctx context.Context, client *http.Client, id, secret string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.testingbot.com/v1/user", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.SetBasicAuth(id, secret)
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

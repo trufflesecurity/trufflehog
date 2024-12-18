@@ -116,7 +116,7 @@ func TestBrowserStack_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, verified but blocked by browserstack",
-			s:    Scanner{client: common.SaneHttpClient()},
+			s:    Scanner{client: common.ConstantResponseHttpClient(403, "blocked")},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a BROWSERSTACK_ACCESS_KEY %s within BROWSERSTACK_USERNAME %s", secret, secretUser)),

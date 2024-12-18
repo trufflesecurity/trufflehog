@@ -1019,6 +1019,7 @@ enum DetectorType {
   AzureOpenAI = 1007;
   GoDaddy = 1008;
   Flexport = 1009;
+  TwitchAccessToken = 1010;
 }
 
 message Result {

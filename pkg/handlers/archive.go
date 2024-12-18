@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mholt/archiver/v4"
+	"github.com/mholt/archives"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -130,11 +130,11 @@ func (h *archiveHandler) openArchive(
 	}
 
 	switch archive := reader.format.(type) {
-	case archiver.Decompressor:
+	case archives.Decompressor:
 		// Decompress tha archive and feed the decompressed data back into the archive handler to extract any nested archives.
 		compReader, err := archive.OpenReader(reader)
 		if err != nil {
-			return fmt.Errorf("error opening decompressor with format: %s %w", reader.format.Name(), err)
+			return fmt.Errorf("error opening decompressor with format: %s %w", reader.format.MediaType(), err)
 		}
 		defer compReader.Close()
 
@@ -146,21 +146,21 @@ func (h *archiveHandler) openArchive(
 			}
 			return fmt.Errorf(
 				"error creating reader for decompressor with format: %s %w",
-				reader.format.Name(),
+				reader.format.MediaType(),
 				err,
 			)
 		}
 		defer rdr.Close()
 
 		return h.openArchive(ctx, depth+1, rdr, dataOrErrChan)
-	case archiver.Extractor:
-		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, nil, h.extractorHandler(dataOrErrChan))
+	case archives.Extractor:
+		err := archive.Extract(logContext.WithValue(ctx, depthKey, depth+1), reader, h.extractorHandler(dataOrErrChan))
 		if err != nil {
-			return fmt.Errorf("error extracting archive with format: %s: %w", reader.format.Name(), err)
+			return fmt.Errorf("error extracting archive with format: %s: %w", reader.format.MediaType(), err)
 		}
 		return nil
 	default:
-		return fmt.Errorf("unknown archive type: %s", reader.format.Name())
+		return fmt.Errorf("unknown archive type: %s", reader.format.MediaType())
 	}
 }
 
@@ -168,8 +168,8 @@ func (h *archiveHandler) openArchive(
 // It logs the extraction, checks for cancellation, and decides whether to skip the file based on its name or type,
 // particularly for binary files if configured to skip. If the file is not skipped, it recursively calls openArchive
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
-func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(context.Context, archiver.File) error {
-	return func(ctx context.Context, file archiver.File) error {
+func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(context.Context, archives.FileInfo) error {
+	return func(ctx context.Context, file archives.FileInfo) error {
 		lCtx := logContext.WithValues(
 			logContext.AddLogger(ctx),
 			"filename", file.Name(),
