@@ -30,7 +30,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const detectionTimeout = 10 * time.Second
+var detectionTimeout = 10 * time.Second
 
 var errOverlap = errors.New(
 	"More than one detector has found this result. For your safety, verification has been disabled." +
@@ -315,6 +315,9 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 
 	return engine, nil
 }
+
+// SetDetectorTimeout sets the maximum timeout for each detector to scan a chunk.
+func SetDetectorTimeout(timeout time.Duration) { detectionTimeout = timeout }
 
 // setDefaults ensures that if specific engine properties aren't provided,
 // they're set to reasonable default values. It makes the engine robust to

@@ -25,10 +25,10 @@ const (
 	defaultDateFormat = "Mon Jan 2 15:04:05 2006 -0700"
 
 	// defaultMaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
-	defaultMaxDiffSize = 2 * 1024 * 1024 * 1024 // 2GB
+	defaultMaxDiffSize int64 = 2 * 1024 * 1024 * 1024 // 2GB
 
 	// defaultMaxCommitSize is the maximum size for a commit. Larger commits will be cut off.
-	defaultMaxCommitSize = 2 * 1024 * 1024 * 1024 // 2GB
+	defaultMaxCommitSize int64 = 2 * 1024 * 1024 * 1024 // 2GB
 )
 
 // contentWriter defines a common interface for writing, reading, and managing diff content.
@@ -210,8 +210,8 @@ type Option func(*Parser)
 func NewParser(options ...Option) *Parser {
 	parser := &Parser{
 		dateFormat:    defaultDateFormat,
-		maxDiffSize:   defaultMaxDiffSize,
-		maxCommitSize: defaultMaxCommitSize,
+		maxDiffSize:   int(defaultMaxDiffSize),
+		maxCommitSize: int(defaultMaxCommitSize),
 	}
 	for _, option := range options {
 		option(parser)
