@@ -266,7 +266,7 @@ $ git clone git@github.com:trufflesecurity/test_keys.git
 
 Run trufflehog from the parent directory (outside the git repo).
 ```bash
-$ trufflehog git file://test_keys --only-verified
+$ trufflehog git file://test_keys --results=verified,unknown
 ```
 
 ## 10: Scan GCS buckets for verified secrets
