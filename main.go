@@ -540,6 +540,7 @@ func run(state overseer.State) {
 			"verification_cache_misses", verificationcaching.CacheMisses.Load(),
 			"verification_cache_hits_wasted", verificationcaching.CacheHitsWasted.Load(),
 			"verification_cache_calls_saved", verificationcaching.VerificationCallsSaved.Load(),
+			"verification_time_spent", verificationcaching.VerificationTimeSpentMS.Load(),
 		)
 
 		if metrics.hasFoundResults && *fail {
