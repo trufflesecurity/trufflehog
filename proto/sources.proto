@@ -246,6 +246,7 @@ message GitHub {
   bool skip_archives = 18;
   bool include_wikis = 19;
   uint32 comments_timeframe_days = 20;
+  bool include_dangling_commits = 21;
 }
 
 message GitHubExperimental {
