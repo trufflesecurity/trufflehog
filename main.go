@@ -20,6 +20,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
 	"github.com/mattn/go-isatty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcaching"
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
@@ -526,6 +527,10 @@ func run(state overseer.State) {
 			"unverified_secrets", metrics.UnverifiedSecretsFound,
 			"scan_duration", metrics.ScanDuration.String(),
 			"trufflehog_version", version.BuildVersion,
+			"verification_cache_hits", verificationcaching.CacheHits.Load(),
+			"verification_cache_misses", verificationcaching.CacheMisses.Load(),
+			"verification_cache_hits_wasted", verificationcaching.CacheHitsWasted.Load(),
+			"verification_cached_calls_saved", verificationcaching.VerificationCallsSaved.Load(),
 		)
 
 		if metrics.hasFoundResults && *fail {

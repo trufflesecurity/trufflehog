@@ -14,6 +14,7 @@ import (
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcaching"
 	"google.golang.org/protobuf/proto"
 
@@ -226,8 +227,8 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		concurrency:                         cfg.Concurrency,
 		decoders:                            cfg.Decoders,
 		detectors:                           cfg.Detectors,
-		verificationCache:                   nil,
-		getVerificationCacheKey:             func(result detectors.Result) string { panic("cache should be unused") },
+		verificationCache:                   simple.NewCache[detectors.Result](),
+		getVerificationCacheKey:             func(result detectors.Result) string { return string(result.Raw) + string(result.RawV2) },
 		dispatcher:                          cfg.Dispatcher,
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,

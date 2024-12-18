@@ -1,10 +1,17 @@
 package verificationcaching
 
 import (
+	"sync/atomic"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
+
+var CacheHits atomic.Int32
+var CacheHitsWasted atomic.Int32
+var CacheMisses atomic.Int32
+var VerificationCallsSaved atomic.Int32
 
 // FromDataCached executes detection on chunk data in a way that uses a provided verification cache to deduplicate
 // verification requests when possible.
@@ -46,17 +53,23 @@ func FromDataCached(
 		}
 
 		isEverythingCached := true
+		var cacheHitsInCurrentChunk int32
 		for i, r := range withoutRemoteVerification {
 			if cacheHit, ok := verificationCache.Get(getCacheKey(r)); ok {
 				withoutRemoteVerification[i].CopyVerificationInfo(&cacheHit)
 				withoutRemoteVerification[i].VerificationFromCache = true
+				CacheHits.Add(1)
+				cacheHitsInCurrentChunk++
 			} else {
+				CacheMisses.Add(1)
 				isEverythingCached = false
+				CacheHitsWasted.Add(cacheHitsInCurrentChunk)
 				break
 			}
 		}
 
 		if isEverythingCached {
+			VerificationCallsSaved.Add(int32(len(withoutRemoteVerification)))
 			return withoutRemoteVerification, nil
 		}
 	}
