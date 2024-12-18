@@ -1383,12 +1383,12 @@ index 239b415..2ee133b 100644
 +++ b/aws2
 !!!ERROR!!!
  blah blaj
-
+ 
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
-
+ 
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye
@@ -1452,7 +1452,7 @@ func TestMaxDiffSize(t *testing.T) {
 	builder.WriteString(singleCommitSingleDiff)
 
 	// Generate a diff that is larger than the maxDiffSize.
-	for i := int64(0); i <= (parser.maxDiffSize/1024)+10; i++ {
+	for i := int64(0); i <= parser.maxDiffSize/1024+10; i++ {
 		builder.WriteString("+" + strings.Repeat("0", 1024) + "\n")
 	}
 	bigReader := strings.NewReader(builder.String())
@@ -1825,7 +1825,7 @@ Commit: rjtmahinay <rjt.mahinay@gmail.com>
 CommitDate:   Mon Jul 10 01:22:32 2023 +0800
 
     Add QuarkusApplication javadoc
-
+    
     * Fix #34463
 
 diff --git a/core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java b/core/runtime/src/main/java/io/quarkus/runtime/QuarkusApplication.java
@@ -2383,12 +2383,12 @@ index 239b415..2ee133b 100644
 +++ b/aws2
 @@ -1,5 +1,7 @@
  blah blaj
-
+ 
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
-
+ 
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye
@@ -2516,12 +2516,12 @@ index 239b415..2ee133b 100644
 +++ b/aws
 @@ -1,5 +1,7 @@
  blah blaj
-
+ 
 -this is the secret: AKIA2E0A8F3B244C9986
 +this is the secret: [Default]
 +Access key Id: AKIAILE3JG6KMS3HZGCA
 +Secret Access Key: 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
-
+ 
 -okay thank you bye
 \ No newline at end of file
 +okay thank you bye
