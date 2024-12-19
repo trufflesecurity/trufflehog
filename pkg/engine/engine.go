@@ -148,7 +148,7 @@ type Config struct {
 	// VerificationOverlapWorkerMultiplier is used to determine the number of verification overlap workers to spawn.
 	VerificationOverlapWorkerMultiplier int
 
-	VerificationCache       cache.Cache[detectors.Result]
+	VerificationResultCache cache.Cache[detectors.Result]
 	GetVerificationCacheKey func(result detectors.Result) string
 }
 
@@ -158,13 +158,10 @@ type Config struct {
 // customization through various options and configurations.
 type Engine struct {
 	// CLI flags.
-	concurrency int
-	decoders    []decoders.Decoder
-	detectors   []detectors.Detector
-	// verificationCache must be thread-safe. Leave nil to disable verification caching.
-	verificationCache cache.Cache[detectors.Result]
-	// getVerificationCacheKey must be thread-safe
-	getVerificationCacheKey func(result detectors.Result) string
+	concurrency       int
+	decoders          []decoders.Decoder
+	detectors         []detectors.Detector
+	verificationCache verificationcaching.VerificationCache
 	// Any detectors configured to override sources' verification flags
 	detectorVerificationOverrides map[config.DetectorID]bool
 
@@ -229,8 +226,7 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 		concurrency:                         cfg.Concurrency,
 		decoders:                            cfg.Decoders,
 		detectors:                           cfg.Detectors,
-		verificationCache:                   cfg.VerificationCache,
-		getVerificationCacheKey:             cfg.GetVerificationCacheKey,
+		verificationCache:                   verificationcaching.New(cfg.VerificationResultCache, cfg.GetVerificationCacheKey),
 		dispatcher:                          cfg.Dispatcher,
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,
@@ -1067,10 +1063,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
 			ctx.Logger().Error(nil, "a detector ignored the context timeout")
 		})
-		results, err := verificationcaching.FromDataCached(
+		results, err := e.verificationCache.FromData(
 			ctx,
-			e.verificationCache,
-			e.getVerificationCacheKey,
 			data.detector.Detector,
 			data.chunk.Verify,
 			data.chunk.SecretID != 0,

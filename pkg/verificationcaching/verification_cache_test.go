@@ -41,16 +41,15 @@ func getCacheKey(result detectors.Result) string {
 	return string(result.Raw)
 }
 
-func TestFromDataCached_NilCache(t *testing.T) {
+func TestVerificationCacheFromData_Passthrough(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 	}}
 
 	require.NotPanics(t, func() {
-		results, err := FromDataCached(
+		cache := New(nil, func(result detectors.Result) string { panic("shouldn't happen") })
+		results, err := cache.FromData(
 			logContext.Background(),
-			nil,
-			func(result detectors.Result) string { panic("shouldn't happen") },
 			&detector,
 			true,
 			true,
@@ -59,19 +58,18 @@ func TestFromDataCached_NilCache(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, detector.fromDataCallCount)
 		assert.ElementsMatch(t, detector.results, results)
+		assert.Equal(t, VerificationCacheMetrics{}, cache.Metrics)
 	})
 }
 
-func TestFromDataCached_VerifyFalseForceCacheUpdateFalse(t *testing.T) {
+func TestVerificationCacheFromData_VerifyFalseForceCacheUpdateFalse(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 	}}
-	cache := simple.NewCache[detectors.Result]()
+	cache := New(simple.NewCache[detectors.Result](), getCacheKey)
 
-	results, err := FromDataCached(
+	results, err := cache.FromData(
 		logContext.Background(),
-		cache,
-		getCacheKey,
 		&detector,
 		false,
 		false,
@@ -82,7 +80,8 @@ func TestFromDataCached_VerifyFalseForceCacheUpdateFalse(t *testing.T) {
 	assert.ElementsMatch(t, []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: false},
 	}, results)
-	assert.Empty(t, cache.Values())
+	assert.Empty(t, cache.resultCache.Values())
+	assert.Equal(t, VerificationCacheMetrics{}, cache.Metrics)
 }
 
 func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
@@ -91,12 +90,10 @@ func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
 	}}
 	detector.results[1].SetVerificationError(errors.New("test verification error"))
-	cache := simple.NewCache[detectors.Result]()
+	cache := New(simple.NewCache[detectors.Result](), getCacheKey)
 
-	results, err := FromDataCached(
+	results, err := cache.FromData(
 		logContext.Background(),
-		cache,
-		getCacheKey,
 		&detector,
 		false,
 		true,
@@ -111,7 +108,8 @@ func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
 	assert.ElementsMatch(t, []detectors.Result{
 		{Redacted: "hello", Verified: false},
 		{Redacted: "world", Verified: false},
-	}, cache.Values())
+	}, cache.resultCache.Values())
+	assert.Equal(t, VerificationCacheMetrics{}, cache.Metrics)
 }
 
 func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T) {
@@ -126,14 +124,12 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T
 		{Redacted: "world", Verified: true},
 	}
 	cacheData[0].SetVerificationError(errors.New("test verification error"))
-	cache := simple.NewCache[detectors.Result]()
-	cache.Set("hello", cacheData[0])
-	cache.Set("world", cacheData[1])
+	cache := New(simple.NewCache[detectors.Result](), getCacheKey)
+	cache.resultCache.Set("hello", cacheData[0])
+	cache.resultCache.Set("world", cacheData[1])
 
-	results, err := FromDataCached(
+	results, err := cache.FromData(
 		logContext.Background(),
-		cache,
-		getCacheKey,
 		&detector,
 		true,
 		false,
@@ -147,7 +143,11 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T
 	}
 	wantResults[0].SetVerificationError(errors.New("test verification error"))
 	assert.ElementsMatch(t, wantResults, results)
-	assert.ElementsMatch(t, cacheData, cache.Values())
+	assert.ElementsMatch(t, cacheData, cache.resultCache.Values())
+	assert.Equal(t, int32(2), cache.Metrics.CredentialVerificationsSaved.Load())
+	assert.Equal(t, int32(2), cache.Metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(0), cache.Metrics.ResultCacheHitsWasted.Load())
+	assert.Equal(t, int32(0), cache.Metrics.ResultCacheMisses.Load())
 }
 
 func TestFromDataCached_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
@@ -160,12 +160,11 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
 		{Redacted: "hello", Verified: false},
 	}
 	cacheData[0].SetVerificationError(errors.New("test verification error"))
-	cache := simple.NewCacheWithData([]simple.CacheEntry[detectors.Result]{{Key: "hello", Value: cacheData[0]}})
+	resultCache := simple.NewCacheWithData([]simple.CacheEntry[detectors.Result]{{Key: "hello", Value: cacheData[0]}})
+	cache := New(resultCache, getCacheKey)
 
-	results, err := FromDataCached(
+	results, err := cache.FromData(
 		logContext.Background(),
-		cache,
-		getCacheKey,
 		&detector,
 		true,
 		false,
@@ -179,7 +178,11 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
 		{Redacted: "world", Verified: false},
 	}
 	wantCacheData[1].SetVerificationError(errors.New("test verification error"))
-	assert.ElementsMatch(t, wantCacheData, cache.Values())
+	assert.ElementsMatch(t, wantCacheData, cache.resultCache.Values())
+	assert.Equal(t, int32(0), cache.Metrics.CredentialVerificationsSaved.Load())
+	assert.Equal(t, int32(1), cache.Metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(1), cache.Metrics.ResultCacheMisses.Load())
+	assert.Equal(t, int32(1), cache.Metrics.ResultCacheHitsWasted.Load())
 }
 
 func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
@@ -188,14 +191,12 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
 	}}
 	detector.results[1].SetVerificationError(errors.New("test verification error"))
-	cache := simple.NewCache[detectors.Result]()
-	cache.Set("hello", detectors.Result{Redacted: "hello", Verified: false})
-	cache.Set("world", detectors.Result{Redacted: "world", Verified: true})
+	cache := New(simple.NewCache[detectors.Result](), getCacheKey)
+	cache.resultCache.Set("hello", detectors.Result{Redacted: "hello", Verified: false})
+	cache.resultCache.Set("world", detectors.Result{Redacted: "world", Verified: true})
 
-	results, err := FromDataCached(
+	results, err := cache.FromData(
 		logContext.Background(),
-		cache,
-		getCacheKey,
 		&detector,
 		true,
 		true,
@@ -209,5 +210,6 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
 		{Redacted: "world", Verified: false},
 	}
 	wantCacheData[1].SetVerificationError(errors.New("test verification error"))
-	assert.ElementsMatch(t, wantCacheData, cache.Values())
+	assert.ElementsMatch(t, wantCacheData, cache.resultCache.Values())
+	assert.Equal(t, VerificationCacheMetrics{}, cache.Metrics)
 }
