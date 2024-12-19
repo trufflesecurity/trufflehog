@@ -3,6 +3,7 @@ package verificationcache
 import "time"
 
 // MetricsReporter is an interface used by a verification cache to report various metrics related to its operation.
+// Implementations must be thread-safe.
 type MetricsReporter interface {
 	// AddCredentialVerificationsSaved records "saved" verification attempts, which is when credential verification
 	// status is loaded from the cache instead of retrieved from a remote verification endpoint. This number might not
