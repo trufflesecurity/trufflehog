@@ -1,6 +1,9 @@
 package verificationcaching
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"time"
+)
 
 type InMemoryMetrics struct {
 	CredentialVerificationsSaved atomic.Int32
@@ -16,8 +19,8 @@ func (m *InMemoryMetrics) AddCredentialVerificationsSaved(count int) {
 	m.CredentialVerificationsSaved.Add(int32(count))
 }
 
-func (m *InMemoryMetrics) AddFromDataVerifyTimeSpent(ms int64) {
-	m.FromDataVerifyTimeSpentMS.Add(ms)
+func (m *InMemoryMetrics) AddFromDataVerifyTimeSpent(wallTime time.Duration) {
+	m.FromDataVerifyTimeSpentMS.Add(wallTime.Milliseconds())
 }
 
 func (m *InMemoryMetrics) AddResultCacheHits(count int) {

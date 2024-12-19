@@ -40,7 +40,7 @@ func (v *VerificationCache) FromData(
 		if verify {
 			start := time.Now()
 			defer func() {
-				v.metrics.AddFromDataVerifyTimeSpent(time.Since(start).Milliseconds())
+				v.metrics.AddFromDataVerifyTimeSpent(time.Since(start))
 			}()
 		}
 
@@ -90,7 +90,7 @@ func (v *VerificationCache) FromData(
 	start := time.Now()
 	withRemoteVerification, err := detector.FromData(ctx, verify, data)
 	if verify {
-		v.metrics.AddFromDataVerifyTimeSpent(time.Since(start).Milliseconds())
+		v.metrics.AddFromDataVerifyTimeSpent(time.Since(start))
 	}
 	if err != nil {
 		return nil, err

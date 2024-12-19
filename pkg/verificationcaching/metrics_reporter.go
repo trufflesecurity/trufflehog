@@ -1,5 +1,7 @@
 package verificationcaching
 
+import "time"
+
 // MetricsReporter is an interface used by a verification cache to report various metrics related to its operation.
 type MetricsReporter interface {
 	// AddCredentialVerificationsSaved records "saved" verification attempts, which is when credential verification
@@ -8,7 +10,7 @@ type MetricsReporter interface {
 	AddCredentialVerificationsSaved(count int)
 
 	// AddFromDataVerifyTimeSpent records wall time spent in calls to FromData with verify = true.
-	AddFromDataVerifyTimeSpent(ms int64)
+	AddFromDataVerifyTimeSpent(wallTime time.Duration)
 
 	// AddResultCacheHits records result cache hits. Not all cache hits result in elided remote verification requests
 	// due to cache hit "wasting"; see AddResultCacheHitsWasted for more information.
