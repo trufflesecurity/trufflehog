@@ -4,18 +4,17 @@ import (
 	"context"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
 type VerificationCache struct {
 	getResultCacheKey func(result detectors.Result) string
 	metrics           MetricsReporter
-	resultCache       cache.Cache[detectors.Result]
+	resultCache       ResultCache
 }
 
 func New(
-	resultCache cache.Cache[detectors.Result],
+	resultCache ResultCache,
 	getResultCacheKey func(result detectors.Result) string,
 	metrics MetricsReporter,
 ) VerificationCache {
