@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// InMemoryMetrics is a MetricsReporter that stores reported metrics in memory for retrieval at the end of a scan.
 type InMemoryMetrics struct {
 	CredentialVerificationsSaved atomic.Int32
 	FromDataVerifyTimeSpentMS    atomic.Int64

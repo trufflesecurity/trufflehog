@@ -9,6 +9,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/hasher"
 )
 
+// VerificationCache is a structure that can be used to cache verification results from detectors so that a given
+// credential does not trigger multiple identical remote verification attempts.
 type VerificationCache struct {
 	metrics     MetricsReporter
 	resultCache ResultCache
@@ -17,7 +19,14 @@ type VerificationCache struct {
 	hasher hasher.Hasher
 }
 
+// New creates a new verification cache with the provided result cache and metrics reporter. If resultCache is nil, the
+// verification cache will be a no-op passthrough, although it will still record relevant metrics to the provided
+// metrics reporter in this case.
 func New(resultCache ResultCache, metrics MetricsReporter) VerificationCache {
+	if metrics == nil {
+		metrics = &InMemoryMetrics{}
+	}
+
 	return VerificationCache{
 		metrics:     metrics,
 		resultCache: resultCache,
@@ -25,6 +34,17 @@ func New(resultCache ResultCache, metrics MetricsReporter) VerificationCache {
 	}
 }
 
+// FromData is a cache-aware facade in front of the provided detector's FromData method.
+//
+// If the verification cache's underlying result cache is nil, or verify is false, or forceCacheUpdate is true, this
+// method invokes the provided detector's FromData method with the provided arguments and returns the result. If the
+// result cache is non-nil and forceCacheUpdate is true, the result cache is updated with the results before they are
+// returned.
+//
+// Otherwise, the detector's FromData method is called with verify=false. The results cache is then checked for each
+// returned result. If there is a cache hit for each result, these cached values are all returned. Otherwise, the
+// detector's FromData method is called again, but with verify=true, and the results are stored in the cache and then
+// returned.
 func (v *VerificationCache) FromData(
 	ctx context.Context,
 	detector detectors.Detector,
