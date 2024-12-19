@@ -22,6 +22,7 @@ var (
 	boldGreenPrinter = color.New(color.Bold, color.FgHiGreen)
 	whitePrinter     = color.New(color.FgWhite)
 	boldWhitePrinter = color.New(color.Bold, color.FgWhite)
+	cyanPrinter      = color.New(color.FgCyan)
 )
 
 // PlainPrinter is a printer that prints results in plain text format.
@@ -55,6 +56,9 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 		if out.VerificationError != nil {
 			yellowPrinter.Printf("Verification issue: %s\n", out.VerificationError)
 		}
+	}
+	if r.VerificationFromCache {
+		cyanPrinter.Print("(Verification info cached)\n")
 	}
 	printer.Printf("Detector Type: %s\n", out.DetectorType)
 	printer.Printf("Decoder Type: %s\n", out.DecoderType)
