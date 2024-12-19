@@ -50,6 +50,10 @@ func TestNeutrinoApi_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_NeutrinoApi,
+					Verified:     false,
+				},
+				{
+					DetectorType: detectorspb.DetectorType_NeutrinoApi,
 					Verified:     true,
 				},
 			},
@@ -64,6 +68,10 @@ func TestNeutrinoApi_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_NeutrinoApi,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_NeutrinoApi,
 					Verified:     false,
