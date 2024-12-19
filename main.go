@@ -511,7 +511,6 @@ func run(state overseer.State) {
 
 	if !*noVerificationCache {
 		engConf.VerificationResultCache = simple.NewCache[detectors.Result]()
-		engConf.GetVerificationCacheKey = func(result detectors.Result) string { return string(result.Raw) + string(result.RawV2) }
 	}
 
 	if *compareDetectionStrategies {

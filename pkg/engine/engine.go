@@ -13,7 +13,6 @@ import (
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcaching"
 	"google.golang.org/protobuf/proto"
 
@@ -148,8 +147,7 @@ type Config struct {
 	// VerificationOverlapWorkerMultiplier is used to determine the number of verification overlap workers to spawn.
 	VerificationOverlapWorkerMultiplier int
 
-	VerificationResultCache  cache.Cache[detectors.Result]
-	GetVerificationCacheKey  func(result detectors.Result) string
+	VerificationResultCache  verificationcaching.ResultCache
 	VerificationCacheMetrics verificationcaching.MetricsReporter
 }
 
@@ -225,7 +223,6 @@ type Engine struct {
 func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 	verificationCache := verificationcaching.New(
 		cfg.VerificationResultCache,
-		cfg.GetVerificationCacheKey,
 		cfg.VerificationCacheMetrics)
 
 	engine := &Engine{

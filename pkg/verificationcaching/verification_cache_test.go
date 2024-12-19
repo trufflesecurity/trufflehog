@@ -43,8 +43,10 @@ func (t *testDetector) Description() string            { return "" }
 
 var _ detectors.Detector = (*testDetector)(nil)
 
-func getCacheKey(result detectors.Result) string {
-	return string(result.Raw)
+func getResultCacheKey(t *testing.T, cache *VerificationCache, result detectors.Result) string {
+	key, err := cache.getResultCacheKey(result)
+	require.NoError(t, err)
+	return string(key)
 }
 
 func TestVerificationCacheFromData_Passthrough(t *testing.T) {
@@ -54,10 +56,7 @@ func TestVerificationCacheFromData_Passthrough(t *testing.T) {
 
 	metrics := InMemoryMetrics{}
 	require.NotPanics(t, func() {
-		cache := New(
-			nil,
-			func(result detectors.Result) string { panic("shouldn't happen") },
-			&metrics)
+		cache := New(nil, &metrics)
 		results, err := cache.FromData(
 			logContext.Background(),
 			&detector,
@@ -81,7 +80,7 @@ func TestVerificationCacheFromData_VerifyFalseForceCacheUpdateFalse(t *testing.T
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 	}}
 	metrics := InMemoryMetrics{}
-	cache := New(simple.NewCache[detectors.Result](), getCacheKey, &metrics)
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
 
 	results, err := cache.FromData(
 		logContext.Background(),
@@ -106,7 +105,7 @@ func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
 	}}
 	detector.results[1].SetVerificationError(errors.New("test verification error"))
 	metrics := InMemoryMetrics{}
-	cache := New(simple.NewCache[detectors.Result](), getCacheKey, &metrics)
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
 
 	results, err := cache.FromData(
 		logContext.Background(),
@@ -141,9 +140,9 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T
 	}
 	cacheData[0].SetVerificationError(errors.New("test verification error"))
 	metrics := InMemoryMetrics{}
-	cache := New(simple.NewCache[detectors.Result](), getCacheKey, &metrics)
-	cache.resultCache.Set("hello", cacheData[0])
-	cache.resultCache.Set("world", cacheData[1])
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	cache.resultCache.Set(getResultCacheKey(t, &cache, remoteResults[0]), cacheData[0])
+	cache.resultCache.Set(getResultCacheKey(t, &cache, remoteResults[1]), cacheData[1])
 
 	results, err := cache.FromData(
 		logContext.Background(),
@@ -174,13 +173,12 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
 	}}
 	detector.results[1].SetVerificationError(errors.New("test verification error"))
-	cacheData := []detectors.Result{
-		{Redacted: "hello", Verified: false},
-	}
-	cacheData[0].SetVerificationError(errors.New("test verification error"))
-	resultCache := simple.NewCacheWithData([]simple.CacheEntry[detectors.Result]{{Key: "hello", Value: cacheData[0]}})
+	cachedResult := detectors.Result{Redacted: "hello", Verified: false}
+	cachedResult.SetVerificationError(errors.New("test verification error"))
+	resultCache := simple.NewCache[detectors.Result]()
 	metrics := InMemoryMetrics{}
-	cache := New(resultCache, getCacheKey, &metrics)
+	cache := New(resultCache, &metrics)
+	cache.resultCache.Set(getResultCacheKey(t, &cache, detector.results[0]), cachedResult)
 
 	results, err := cache.FromData(
 		logContext.Background(),
@@ -212,9 +210,9 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
 	}}
 	detector.results[1].SetVerificationError(errors.New("test verification error"))
 	metrics := InMemoryMetrics{}
-	cache := New(simple.NewCache[detectors.Result](), getCacheKey, &metrics)
-	cache.resultCache.Set("hello", detectors.Result{Redacted: "hello", Verified: false})
-	cache.resultCache.Set("world", detectors.Result{Redacted: "world", Verified: true})
+	cache := New(simple.NewCache[detectors.Result](), &metrics)
+	cache.resultCache.Set(getResultCacheKey(t, &cache, detector.results[0]), detectors.Result{Redacted: "hello", Verified: false})
+	cache.resultCache.Set(getResultCacheKey(t, &cache, detector.results[1]), detectors.Result{Redacted: "world", Verified: true})
 
 	results, err := cache.FromData(
 		logContext.Background(),

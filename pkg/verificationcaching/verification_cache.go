@@ -1,27 +1,30 @@
 package verificationcaching
 
 import (
-	"context"
+	"sync"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/hasher"
 )
 
 type VerificationCache struct {
-	getResultCacheKey func(result detectors.Result) string
-	metrics           MetricsReporter
-	resultCache       ResultCache
+	metrics     MetricsReporter
+	resultCache ResultCache
+
+	hashMu sync.Mutex
+	hasher hasher.Hasher
 }
 
 func New(
 	resultCache ResultCache,
-	getResultCacheKey func(result detectors.Result) string,
 	metrics MetricsReporter,
 ) VerificationCache {
 	return VerificationCache{
-		getResultCacheKey: getResultCacheKey,
-		metrics:           metrics,
-		resultCache:       resultCache,
+		metrics:     metrics,
+		resultCache: resultCache,
+		hasher:      hasher.NewBlake2B(),
 	}
 }
 
@@ -57,7 +60,15 @@ func (v *VerificationCache) FromData(
 		isEverythingCached := true
 		var cacheHitsInCurrentChunk int
 		for i, r := range withoutRemoteVerification {
-			if cacheHit, ok := v.resultCache.Get(v.getResultCacheKey(r)); ok {
+			cacheKey, err := v.getResultCacheKey(r)
+			if err != nil {
+				ctx.Logger().Error(err, "error getting result cache key for verification caching",
+					"operation", "read")
+				isEverythingCached = false
+				v.metrics.AddResultCacheHitsWasted(cacheHitsInCurrentChunk)
+				break
+			}
+			if cacheHit, ok := v.resultCache.Get(string(cacheKey)); ok {
 				withoutRemoteVerification[i].CopyVerificationInfo(&cacheHit)
 				withoutRemoteVerification[i].VerificationFromCache = true
 				v.metrics.AddResultCacheHits(1)
@@ -86,12 +97,26 @@ func (v *VerificationCache) FromData(
 	}
 
 	for _, r := range withRemoteVerification {
+		cacheKey, err := v.getResultCacheKey(r)
+		if err != nil {
+			ctx.Logger().Error(err, "error getting result cache key for verification caching",
+				"operation", "write")
+			continue
+		}
+
 		copyForCaching := r
 		// Do not persist raw secret values in a long-lived cache
 		copyForCaching.Raw = nil
 		copyForCaching.RawV2 = nil
-		v.resultCache.Set(v.getResultCacheKey(r), copyForCaching)
+		v.resultCache.Set(string(cacheKey), copyForCaching)
 	}
 
 	return withRemoteVerification, nil
+}
+
+func (v *VerificationCache) getResultCacheKey(result detectors.Result) ([]byte, error) {
+	v.hashMu.Lock()
+	defer v.hashMu.Unlock()
+
+	return v.hasher.Hash(append(result.Raw, result.RawV2...))
 }
