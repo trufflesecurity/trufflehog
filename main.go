@@ -485,29 +485,32 @@ func run(state overseer.State) {
 		logFatal(err, "failed to configure results flag")
 	}
 
+	verificationCacheMetrics := verificationcaching.InMemoryMetrics{}
+
 	engConf := engine.Config{
 		Concurrency: *concurrency,
 		// The engine must always be configured with the list of
 		// default detectors, which can be further filtered by the
 		// user. The filters are applied by the engine and are only
 		// subtractive.
-		Detectors:             append(defaults.DefaultDetectors(), conf.Detectors...),
-		Verify:                !*noVerification,
-		IncludeDetectors:      *includeDetectors,
-		ExcludeDetectors:      *excludeDetectors,
-		CustomVerifiersOnly:   *customVerifiersOnly,
-		VerifierEndpoints:     *verifiers,
-		Dispatcher:            engine.NewPrinterDispatcher(printer),
-		FilterUnverified:      *filterUnverified,
-		FilterEntropy:         *filterEntropy,
-		VerificationOverlap:   *allowVerificationOverlap,
-		Results:               parsedResults,
-		PrintAvgDetectorTime:  *printAvgDetectorTime,
-		ShouldScanEntireChunk: *scanEntireChunk,
+		Detectors:                append(defaults.DefaultDetectors(), conf.Detectors...),
+		Verify:                   !*noVerification,
+		IncludeDetectors:         *includeDetectors,
+		ExcludeDetectors:         *excludeDetectors,
+		CustomVerifiersOnly:      *customVerifiersOnly,
+		VerifierEndpoints:        *verifiers,
+		Dispatcher:               engine.NewPrinterDispatcher(printer),
+		FilterUnverified:         *filterUnverified,
+		FilterEntropy:            *filterEntropy,
+		VerificationOverlap:      *allowVerificationOverlap,
+		Results:                  parsedResults,
+		PrintAvgDetectorTime:     *printAvgDetectorTime,
+		ShouldScanEntireChunk:    *scanEntireChunk,
+		VerificationCacheMetrics: &verificationCacheMetrics,
 	}
 
 	if !*noVerificationCache {
-		engConf.VerificationCache = simple.NewCache[detectors.Result]()
+		engConf.VerificationResultCache = simple.NewCache[detectors.Result]()
 		engConf.GetVerificationCacheKey = func(result detectors.Result) string { return string(result.Raw) + string(result.RawV2) }
 	}
 
@@ -528,6 +531,20 @@ func run(state overseer.State) {
 			logFatal(err, "error running scan")
 		}
 
+		verificationCacheMetrics := struct {
+			Hits                    int32
+			Misses                  int32
+			HitsWasted              int32
+			AttemptsSaved           int32
+			VerificationTimeSpentMS int64
+		}{
+			Hits:                    verificationCacheMetrics.ResultCacheHits.Load(),
+			Misses:                  verificationCacheMetrics.ResultCacheMisses.Load(),
+			HitsWasted:              verificationCacheMetrics.ResultCacheHitsWasted.Load(),
+			AttemptsSaved:           verificationCacheMetrics.CredentialVerificationsSaved.Load(),
+			VerificationTimeSpentMS: verificationCacheMetrics.FromDataVerifyTimeSpentMS.Load(),
+		}
+
 		// Print results.
 		logger.Info("finished scanning",
 			"chunks", metrics.ChunksScanned,
@@ -536,11 +553,7 @@ func run(state overseer.State) {
 			"unverified_secrets", metrics.UnverifiedSecretsFound,
 			"scan_duration", metrics.ScanDuration.String(),
 			"trufflehog_version", version.BuildVersion,
-			"verification_cache_hits", verificationcaching.CacheHits.Load(),
-			"verification_cache_misses", verificationcaching.CacheMisses.Load(),
-			"verification_cache_hits_wasted", verificationcaching.CacheHitsWasted.Load(),
-			"verification_cache_calls_saved", verificationcaching.VerificationCallsSaved.Load(),
-			"verification_time_spent", verificationcaching.VerificationTimeSpentMS.Load(),
+			"verification_caching", verificationCacheMetrics,
 		)
 
 		if metrics.hasFoundResults && *fail {

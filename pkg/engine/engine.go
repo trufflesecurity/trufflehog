@@ -148,8 +148,9 @@ type Config struct {
 	// VerificationOverlapWorkerMultiplier is used to determine the number of verification overlap workers to spawn.
 	VerificationOverlapWorkerMultiplier int
 
-	VerificationResultCache cache.Cache[detectors.Result]
-	GetVerificationCacheKey func(result detectors.Result) string
+	VerificationResultCache  cache.Cache[detectors.Result]
+	GetVerificationCacheKey  func(result detectors.Result) string
+	VerificationCacheMetrics verificationcaching.MetricsReporter
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -222,11 +223,16 @@ type Engine struct {
 
 // NewEngine creates a new Engine instance with the provided configuration.
 func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
+	verificationCache := verificationcaching.New(
+		cfg.VerificationResultCache,
+		cfg.GetVerificationCacheKey,
+		cfg.VerificationCacheMetrics)
+
 	engine := &Engine{
 		concurrency:                         cfg.Concurrency,
 		decoders:                            cfg.Decoders,
 		detectors:                           cfg.Detectors,
-		verificationCache:                   verificationcaching.New(cfg.VerificationResultCache, cfg.GetVerificationCacheKey),
+		verificationCache:                   verificationCache,
 		dispatcher:                          cfg.Dispatcher,
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,
