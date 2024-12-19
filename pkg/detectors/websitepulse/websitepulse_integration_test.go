@@ -47,6 +47,10 @@ func TestWebsitepulse_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Websitepulse,
+					Verified:     false,
+				},
+				{
+					DetectorType: detectorspb.DetectorType_Websitepulse,
 					Verified:     true,
 				},
 			},
@@ -61,6 +65,10 @@ func TestWebsitepulse_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Websitepulse,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_Websitepulse,
 					Verified:     false,
