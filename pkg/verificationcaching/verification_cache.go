@@ -17,10 +17,7 @@ type VerificationCache struct {
 	hasher hasher.Hasher
 }
 
-func New(
-	resultCache ResultCache,
-	metrics MetricsReporter,
-) VerificationCache {
+func New(resultCache ResultCache, metrics MetricsReporter) VerificationCache {
 	return VerificationCache{
 		metrics:     metrics,
 		resultCache: resultCache,
