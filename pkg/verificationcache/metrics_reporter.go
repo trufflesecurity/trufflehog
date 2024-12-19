@@ -6,11 +6,11 @@ import "time"
 // Implementations must be thread-safe.
 type MetricsReporter interface {
 	// AddCredentialVerificationsSaved records "saved" verification attempts, which is when credential verification
-	// status is loaded from the cache instead of retrieved from a remote verification endpoint. This number might not
-	// match the number of cache hits due to hit "wasting"; see AddResultCacheHitsWasted for more information.
+	// status is loaded from the cache instead of retrieved from a remote verification endpoint. This number might be
+	// smaller than the cache hit count due to cache hit "wasting"; see AddResultCacheHitsWasted for more information.
 	AddCredentialVerificationsSaved(count int)
 
-	// AddFromDataVerifyTimeSpent records wall time spent in calls to FromData with verify = true.
+	// AddFromDataVerifyTimeSpent records wall time spent in calls to detector.FromData with verify=true.
 	AddFromDataVerifyTimeSpent(wallTime time.Duration)
 
 	// AddResultCacheHits records result cache hits. Not all cache hits result in elided remote verification requests
