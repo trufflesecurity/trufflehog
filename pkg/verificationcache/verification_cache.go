@@ -41,7 +41,7 @@ func New(resultCache ResultCache, metrics MetricsReporter) VerificationCache {
 // result cache is non-nil and forceCacheUpdate is true, the result cache is updated with the results before they are
 // returned.
 //
-// Otherwise, the detector's FromData method is called with verify=false. The results cache is then checked for each
+// Otherwise, the detector's FromData method is called with verify=false. The result cache is then checked for each
 // returned result. If there is a cache hit for each result, these cached values are all returned. Otherwise, the
 // detector's FromData method is called again, but with verify=true, and the results are stored in the cache and then
 // returned.
