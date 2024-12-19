@@ -87,7 +87,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitmex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blazemeter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blitapp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blocknative"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blogger"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bombbomb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boostnote"
@@ -916,7 +915,7 @@ func buildDetectorList() []detectors.Detector {
 		&bitmex.Scanner{},
 		&blazemeter.Scanner{},
 		&blitapp.Scanner{},
-		&blocknative.Scanner{},
+		// &blocknative.Scanner{}, // temporary disabled due to API issue
 		&blogger.Scanner{},
 		&bombbomb.Scanner{},
 		&boostnote.Scanner{},
