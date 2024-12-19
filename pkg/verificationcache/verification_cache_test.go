@@ -89,7 +89,11 @@ func TestVerificationCacheFromData_VerifyFalseForceCacheUpdateFalse(t *testing.T
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: false},
 	}, results)
 	assert.Empty(t, cache.resultCache.Values())
-	assert.Equal(t, InMemoryMetrics{}, metrics)
+	assert.Equal(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+	assert.Equal(t, int32(0), metrics.CredentialVerificationsSaved.Load())
+	assert.Equal(t, int32(0), metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(0), metrics.ResultCacheHitsWasted.Load())
+	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 }
 
 func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
@@ -118,7 +122,11 @@ func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
 		{Redacted: "hello", Verified: false},
 		{Redacted: "world", Verified: false},
 	}, cache.resultCache.Values())
-	assert.Equal(t, InMemoryMetrics{}, metrics)
+	assert.Equal(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
+	assert.Equal(t, int32(0), metrics.CredentialVerificationsSaved.Load())
+	assert.Equal(t, int32(0), metrics.ResultCacheHits.Load())
+	assert.Equal(t, int32(0), metrics.ResultCacheHitsWasted.Load())
+	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 }
 
 func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T) {
