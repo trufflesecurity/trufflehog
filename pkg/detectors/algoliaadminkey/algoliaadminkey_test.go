@@ -28,7 +28,7 @@ func TestAlgoliaAdminKey_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: fmt.Sprintf("algolia: '%s'", validPattern),
-			want:  []string{"AlgoliaAdminKey010TESTINGPlmiOPCADMIN01KEY"},
+			want:  []string{"ADMIN01KEY:AlgoliaAdminKey010TESTINGPlmiOPC"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
