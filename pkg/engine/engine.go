@@ -13,6 +13,8 @@ import (
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcaching"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -145,6 +147,10 @@ type Config struct {
 
 	// VerificationOverlapWorkerMultiplier is used to determine the number of verification overlap workers to spawn.
 	VerificationOverlapWorkerMultiplier int
+
+	VerificationResultCache  cache.Cache[detectors.Result]
+	GetVerificationCacheKey  func(result detectors.Result) string
+	VerificationCacheMetrics verificationcaching.MetricsReporter
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -153,9 +159,10 @@ type Config struct {
 // customization through various options and configurations.
 type Engine struct {
 	// CLI flags.
-	concurrency int
-	decoders    []decoders.Decoder
-	detectors   []detectors.Detector
+	concurrency       int
+	decoders          []decoders.Decoder
+	detectors         []detectors.Detector
+	verificationCache verificationcaching.VerificationCache
 	// Any detectors configured to override sources' verification flags
 	detectorVerificationOverrides map[config.DetectorID]bool
 
@@ -216,10 +223,16 @@ type Engine struct {
 
 // NewEngine creates a new Engine instance with the provided configuration.
 func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
+	verificationCache := verificationcaching.New(
+		cfg.VerificationResultCache,
+		cfg.GetVerificationCacheKey,
+		cfg.VerificationCacheMetrics)
+
 	engine := &Engine{
 		concurrency:                         cfg.Concurrency,
 		decoders:                            cfg.Decoders,
 		detectors:                           cfg.Detectors,
+		verificationCache:                   verificationCache,
 		dispatcher:                          cfg.Dispatcher,
 		verify:                              cfg.Verify,
 		filterUnverified:                    cfg.FilterUnverified,
@@ -1056,7 +1069,12 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
 			ctx.Logger().Error(nil, "a detector ignored the context timeout")
 		})
-		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
+		results, err := e.verificationCache.FromData(
+			ctx,
+			data.detector.Detector,
+			data.chunk.Verify,
+			data.chunk.SecretID != 0,
+			matchBytes)
 		t.Stop()
 		cancel()
 		if err != nil {
