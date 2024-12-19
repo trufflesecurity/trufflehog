@@ -47,6 +47,10 @@ func TestOpsgenie_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Opsgenie,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"account": "secretdetectors",
+						"plan":    "Free",
+					},
 				},
 			},
 			wantErr: false,
