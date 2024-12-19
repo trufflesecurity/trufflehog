@@ -22,7 +22,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcaching"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcache"
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
@@ -485,7 +485,7 @@ func run(state overseer.State) {
 		logFatal(err, "failed to configure results flag")
 	}
 
-	verificationCacheMetrics := verificationcaching.InMemoryMetrics{}
+	verificationCacheMetrics := verificationcache.InMemoryMetrics{}
 
 	engConf := engine.Config{
 		Concurrency: *concurrency,

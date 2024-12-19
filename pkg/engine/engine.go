@@ -13,7 +13,7 @@ import (
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcaching"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcache"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -147,8 +147,8 @@ type Config struct {
 	// VerificationOverlapWorkerMultiplier is used to determine the number of verification overlap workers to spawn.
 	VerificationOverlapWorkerMultiplier int
 
-	VerificationResultCache  verificationcaching.ResultCache
-	VerificationCacheMetrics verificationcaching.MetricsReporter
+	VerificationResultCache  verificationcache.ResultCache
+	VerificationCacheMetrics verificationcache.MetricsReporter
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -160,7 +160,7 @@ type Engine struct {
 	concurrency       int
 	decoders          []decoders.Decoder
 	detectors         []detectors.Detector
-	verificationCache verificationcaching.VerificationCache
+	verificationCache verificationcache.VerificationCache
 	// Any detectors configured to override sources' verification flags
 	detectorVerificationOverrides map[config.DetectorID]bool
 
@@ -221,9 +221,7 @@ type Engine struct {
 
 // NewEngine creates a new Engine instance with the provided configuration.
 func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
-	verificationCache := verificationcaching.New(
-		cfg.VerificationResultCache,
-		cfg.VerificationCacheMetrics)
+	verificationCache := verificationcache.New(cfg.VerificationResultCache, cfg.VerificationCacheMetrics)
 
 	engine := &Engine{
 		concurrency:                         cfg.Concurrency,

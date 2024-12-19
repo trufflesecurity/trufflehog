@@ -1,4 +1,4 @@
-package verificationcaching
+package verificationcache
 
 import (
 	"sync/atomic"
