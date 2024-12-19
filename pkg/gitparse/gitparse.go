@@ -120,8 +120,8 @@ type Commit struct {
 
 // Parser sets values used in GitParse.
 type Parser struct {
-	maxDiffSize   int
-	maxCommitSize int
+	maxDiffSize   int64
+	maxCommitSize int64
 	dateFormat    string
 
 	useCustomContentWriter bool
@@ -188,7 +188,7 @@ func UseCustomContentWriter() Option {
 
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
 // be truncated.
-func WithMaxDiffSize(maxDiffSize int) Option {
+func WithMaxDiffSize(maxDiffSize int64) Option {
 	return func(parser *Parser) {
 		parser.maxDiffSize = maxDiffSize
 	}
@@ -197,7 +197,7 @@ func WithMaxDiffSize(maxDiffSize int) Option {
 // WithMaxCommitSize sets maxCommitSize option. Commits larger than maxCommitSize
 // will be put in the commit channel and additional diffs will be added to a
 // new commit.
-func WithMaxCommitSize(maxCommitSize int) Option {
+func WithMaxCommitSize(maxCommitSize int64) Option {
 	return func(parser *Parser) {
 		parser.maxCommitSize = maxCommitSize
 	}
@@ -210,8 +210,8 @@ type Option func(*Parser)
 func NewParser(options ...Option) *Parser {
 	parser := &Parser{
 		dateFormat:    defaultDateFormat,
-		maxDiffSize:   int(defaultMaxDiffSize),
-		maxCommitSize: int(defaultMaxCommitSize),
+		maxDiffSize:   defaultMaxDiffSize,
+		maxCommitSize: defaultMaxCommitSize,
 	}
 	for _, option := range options {
 		option(parser)
@@ -572,7 +572,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			latestState = ParseFailure
 		}
 
-		if currentDiff.Len() > c.maxDiffSize {
+		if int64(currentDiff.Len()) > c.maxDiffSize {
 			ctx.Logger().V(2).Info(fmt.Sprintf(
 				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
 			))
