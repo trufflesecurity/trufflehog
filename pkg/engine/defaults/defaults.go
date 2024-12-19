@@ -737,6 +737,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprise"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twelvedata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twilio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twilioapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitchaccesstoken"
@@ -1582,6 +1583,7 @@ func buildDetectorList() []detectors.Detector {
 		&trufflehogenterprise.Scanner{},
 		&twelvedata.Scanner{},
 		&twilio.Scanner{},
+		&twilioapikey.Scanner{},
 		&twist.Scanner{},
 		&twitch.Scanner{},
 		&twitchaccesstoken.Scanner{},
