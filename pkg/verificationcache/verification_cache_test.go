@@ -135,8 +135,8 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T
 	cacheData[0].SetVerificationError(errors.New("test verification error"))
 	metrics := InMemoryMetrics{}
 	cache := New(simple.NewCache[detectors.Result](), &metrics)
-	cache.resultCache.Set(getResultCacheKey(t, &cache, remoteResults[0]), cacheData[0])
-	cache.resultCache.Set(getResultCacheKey(t, &cache, remoteResults[1]), cacheData[1])
+	cache.resultCache.Set(getResultCacheKey(t, cache, remoteResults[0]), cacheData[0])
+	cache.resultCache.Set(getResultCacheKey(t, cache, remoteResults[1]), cacheData[1])
 
 	results, err := cache.FromData(
 		logContext.Background(),
@@ -172,7 +172,7 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
 	resultCache := simple.NewCache[detectors.Result]()
 	metrics := InMemoryMetrics{}
 	cache := New(resultCache, &metrics)
-	cache.resultCache.Set(getResultCacheKey(t, &cache, detector.results[0]), cachedResult)
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[0]), cachedResult)
 
 	results, err := cache.FromData(
 		logContext.Background(),
@@ -205,8 +205,8 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
 	detector.results[1].SetVerificationError(errors.New("test verification error"))
 	metrics := InMemoryMetrics{}
 	cache := New(simple.NewCache[detectors.Result](), &metrics)
-	cache.resultCache.Set(getResultCacheKey(t, &cache, detector.results[0]), detectors.Result{Redacted: "hello", Verified: false})
-	cache.resultCache.Set(getResultCacheKey(t, &cache, detector.results[1]), detectors.Result{Redacted: "world", Verified: true})
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[0]), detectors.Result{Redacted: "hello", Verified: false})
+	cache.resultCache.Set(getResultCacheKey(t, cache, detector.results[1]), detectors.Result{Redacted: "world", Verified: true})
 
 	results, err := cache.FromData(
 		logContext.Background(),
