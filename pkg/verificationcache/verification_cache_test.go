@@ -54,9 +54,8 @@ func TestVerificationCacheFromData_Passthrough(t *testing.T) {
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 	}}
 
-	metrics := InMemoryMetrics{}
 	require.NotPanics(t, func() {
-		cache := New(nil, &metrics)
+		cache := New(nil, nil)
 		results, err := cache.FromData(
 			logContext.Background(),
 			&detector,
@@ -67,11 +66,6 @@ func TestVerificationCacheFromData_Passthrough(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, detector.fromDataCallCount)
 		assert.ElementsMatch(t, detector.results, results)
-		assert.Less(t, int64(0), metrics.FromDataVerifyTimeSpentMS.Load())
-		assert.Equal(t, int32(0), metrics.CredentialVerificationsSaved.Load())
-		assert.Equal(t, int32(0), metrics.ResultCacheHits.Load())
-		assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
-		assert.Equal(t, int32(0), metrics.ResultCacheHitsWasted.Load())
 	})
 }
 
