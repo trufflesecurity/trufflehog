@@ -160,7 +160,7 @@ type Engine struct {
 	concurrency       int
 	decoders          []decoders.Decoder
 	detectors         []detectors.Detector
-	verificationCache verificationcache.VerificationCache
+	verificationCache *verificationcache.VerificationCache
 	// Any detectors configured to override sources' verification flags
 	detectorVerificationOverrides map[config.DetectorID]bool
 

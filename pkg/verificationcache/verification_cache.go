@@ -22,12 +22,12 @@ type VerificationCache struct {
 // New creates a new verification cache with the provided result cache and metrics reporter. If resultCache is nil, the
 // verification cache will be a no-op passthrough, although it will still record relevant metrics to the provided
 // metrics reporter in this case.
-func New(resultCache ResultCache, metrics MetricsReporter) VerificationCache {
+func New(resultCache ResultCache, metrics MetricsReporter) *VerificationCache {
 	if metrics == nil {
 		metrics = &InMemoryMetrics{}
 	}
 
-	return VerificationCache{
+	return &VerificationCache{
 		metrics:     metrics,
 		resultCache: resultCache,
 		hasher:      hasher.NewBlake2B(),
