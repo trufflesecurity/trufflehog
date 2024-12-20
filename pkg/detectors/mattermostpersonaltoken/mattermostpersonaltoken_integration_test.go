@@ -51,6 +51,7 @@ func TestMattermostPersonalToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_MattermostPersonalToken,
 					Verified:     true,
+					RawV2:        []byte(secret + server),
 				},
 			},
 			wantErr: false,
@@ -60,13 +61,14 @@ func TestMattermostPersonalToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a mattermost secret %s within mattermost server %s but not valid", inactiveSecret, "test323561.cloud.mattermost.com")), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a mattermost secret %s within mattermost server %s but not valid", inactiveSecret, server)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_MattermostPersonalToken,
 					Verified:     false,
+					RawV2:        []byte(inactiveSecret + server),
 				},
 			},
 			wantErr: false,
