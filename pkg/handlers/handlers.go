@@ -54,12 +54,18 @@ var (
 	ErrProcessingWarning = errors.New("error processing file")
 )
 
-type readerConfig struct{ fileExtension string }
+type readerConfig struct {
+	fileName      string
+	fileExtension string
+}
 
 type readerOption func(*readerConfig)
 
-func withFileExtension(ext string) readerOption {
-	return func(c *readerConfig) { c.fileExtension = ext }
+func withFileName(name string) readerOption {
+	return func(c *readerConfig) {
+		c.fileName = name
+		c.fileExtension = filepath.Ext(c.fileName)
+	}
 }
 
 // mimeTypeReader wraps an io.Reader with MIME type information.
@@ -358,7 +364,7 @@ func HandleFile(
 		return errors.New("reader is nil")
 	}
 
-	readerOption := withFileExtension(getFileExtension(chunkSkel))
+	readerOption := withFileName(getFileName(chunkSkel))
 	rdr, err := newFileReader(reader, readerOption)
 	if err != nil {
 		if errors.Is(err, ErrEmptyReader) {
@@ -457,11 +463,11 @@ func isFatal(err error) bool {
 	}
 }
 
-// getFileExtension extracts the file extension from the chunk's SourceMetadata.
+// getFileName extracts the file name from the chunk's SourceMetadata.
 // It considers all sources defined in the MetaData message.
 // Note: Probably should add this as a method to the source_metadatapb object.
-// then it'd just be chunkSkel.SourceMetadata.GetFileExtension()
-func getFileExtension(chunkSkel *sources.Chunk) string {
+// then it'd just be chunkSkel.SourceMetadata.GetFileName()
+func getFileName(chunkSkel *sources.Chunk) string {
 	if chunkSkel == nil || chunkSkel.SourceMetadata == nil {
 		return ""
 	}
@@ -530,9 +536,7 @@ func getFileExtension(chunkSkel *sources.Chunk) string {
 		return ""
 	}
 
-	// Use filepath.Ext to extract the file extension from the file name
-	ext := filepath.Ext(fileName)
-	return ext
+	return fileName
 }
 
 // shouldHandleAsAPK checks if the file should be handled as an APK based on config and MIME type.
