@@ -9,8 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -95,10 +94,9 @@ func TestMailchimp_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 				got[i].AnalysisInfo = nil
+				got[i].ExtraData = nil
 			}
-
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "AnalysisInfo", "ExtraData")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Mailchimp.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
