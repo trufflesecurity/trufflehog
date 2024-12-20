@@ -103,7 +103,7 @@ func newMimeTypeReader(r io.Reader) (mimeTypeReader, error) {
 
 // newFileReader creates a fileReader from an io.Reader, optionally using BufferedFileWriter for certain formats.
 // The caller is responsible for closing the reader when it is no longer needed.
-func newFileReader(r io.Reader, options ...readerOption) (fReader fileReader, err error) {
+func newFileReader(ctx context.Context, r io.Reader, options ...readerOption) (fReader fileReader, err error) {
 	var cfg readerConfig
 
 	for _, opt := range options {
@@ -154,7 +154,7 @@ func newFileReader(r io.Reader, options ...readerOption) (fReader fileReader, er
 	}
 
 	var format archives.Format
-	format, _, err = archives.Identify(context.TODO(), "", fReader)
+	format, _, err = archives.Identify(ctx, "", fReader)
 	switch {
 	case err == nil:
 		fReader.isGenericArchive = true
@@ -359,7 +359,7 @@ func HandleFile(
 	}
 
 	readerOption := withFileExtension(getFileExtension(chunkSkel))
-	rdr, err := newFileReader(reader, readerOption)
+	rdr, err := newFileReader(ctx, reader, readerOption)
 	if err != nil {
 		if errors.Is(err, ErrEmptyReader) {
 			ctx.Logger().V(5).Info("empty reader, skipping file")
