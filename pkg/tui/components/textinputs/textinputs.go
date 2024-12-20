@@ -4,6 +4,7 @@ package textinputs
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -47,6 +48,7 @@ type InputConfig struct {
 	Required    bool
 	Placeholder string
 	RedactInput bool
+	AllowEnv    bool
 }
 
 type Input struct {
@@ -63,6 +65,9 @@ func (m Model) GetInputs() map[string]Input {
 		if value == "" && m.configs[i].Required {
 			isDefault = true
 			value = input.Placeholder
+		}
+		if m.configs[i].AllowEnv && strings.HasPrefix(value, "$") {
+			value = os.ExpandEnv(value)
 		}
 		inputs[m.configs[i].Key] = Input{Value: value, IsDefault: isDefault}
 	}
@@ -191,15 +196,10 @@ func (m Model) View() string {
 			b.WriteString(m.GetLabel(m.configs[i]))
 		}
 
+		// Make a copy of the input so we don't update the display.
 		input := m.inputs[i]
-		if val := input.Value(); len(val) > 4 && m.configs[i].RedactInput {
-			if len(val) > 10 {
-				// start***end
-				input.SetValue(val[:4] + strings.Repeat("*", len(val)-8) + val[len(val)-4:])
-			} else {
-				// start***
-				input.SetValue(val[:4] + strings.Repeat("*", len(val)-4))
-			}
+		if redacted, ok := redactFilter(input.Value(), m.configs[i]); ok {
+			input.SetValue(redacted)
 		}
 		b.WriteString(input.View())
 		b.WriteRune('\n')
@@ -219,6 +219,21 @@ func (m Model) View() string {
 	fmt.Fprintf(&b, "\n\n%s\n\n", button)
 
 	return b.String()
+}
+
+func redactFilter(input string, config InputConfig) (string, bool) {
+	if !config.RedactInput || len(input) <= 4 {
+		return input, false
+	}
+	if config.AllowEnv && strings.HasPrefix(input, "$") {
+		return input, false
+	}
+	if len(input) <= 10 {
+		// start***
+		return input[:4] + strings.Repeat("*", len(input)-4), true
+	}
+	// start***end
+	return input[:4] + strings.Repeat("*", len(input)-8) + input[len(input)-4:], true
 }
 
 func (m Model) GetLabel(c InputConfig) string {
