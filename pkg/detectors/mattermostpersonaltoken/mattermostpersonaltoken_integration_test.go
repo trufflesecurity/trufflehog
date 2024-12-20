@@ -60,7 +60,7 @@ func TestMattermostPersonalToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a mattermost secret %s within mattermost server %s but not valid", inactiveSecret, "test323561.cloud.mattermost.com")), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a mattermost secret %s within mattermost server %s but not valid", inactiveSecret, server)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -96,6 +96,11 @@ func TestMattermostPersonalToken_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no RawV2 secret present: \n %+v", got[i])
+				}
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("MattermostPersonalToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
