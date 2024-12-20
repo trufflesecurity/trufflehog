@@ -51,7 +51,6 @@ func TestMattermostPersonalToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_MattermostPersonalToken,
 					Verified:     true,
-					RawV2:        []byte(secret + server),
 				},
 			},
 			wantErr: false,
@@ -68,7 +67,6 @@ func TestMattermostPersonalToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_MattermostPersonalToken,
 					Verified:     false,
-					RawV2:        []byte(inactiveSecret + server),
 				},
 			},
 			wantErr: false,
@@ -98,6 +96,11 @@ func TestMattermostPersonalToken_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no RawV2 secret present: \n %+v", got[i])
+				}
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("MattermostPersonalToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
