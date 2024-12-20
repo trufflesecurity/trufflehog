@@ -90,6 +90,9 @@ type Result struct {
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
 	Verified     bool
+	// VerificationFromCache indicates whether this result's verification result came from the verification cache rather
+	// than an actual remote request.
+	VerificationFromCache bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -111,7 +114,15 @@ type Result struct {
 	AnalysisInfo map[string]string
 }
 
-// SetVerificationError is the only way to set a verification error. Any sensitive values should be passed-in as secrets to be redacted.
+// CopyVerificationInfo clones verification info (status and error) from another Result struct. This is used when
+// loading verification info from a verification cache. (A method is necessary because verification errors are not
+// exported, to prevent the accidental storage of sensitive information in them.)
+func (r *Result) CopyVerificationInfo(from *Result) {
+	r.Verified = from.Verified
+	r.verificationError = from.verificationError
+}
+
+// SetVerificationError is the only way to set a new verification error. Any sensitive values should be passed-in as secrets to be redacted.
 func (r *Result) SetVerificationError(err error, secrets ...string) {
 	if err != nil {
 		r.verificationError = redactSecrets(err, secrets...)
