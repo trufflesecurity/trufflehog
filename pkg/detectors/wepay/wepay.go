@@ -42,16 +42,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	resAppIDMatch := ""
 	for _, appIDMatch := range appIDmatches {
-		if len(appIDMatch) != 2 {
-			continue
-		}
 		resAppIDMatch = strings.TrimSpace(appIDMatch[1])
 	}
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_WePay,

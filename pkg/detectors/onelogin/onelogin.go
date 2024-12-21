@@ -41,13 +41,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	for _, clientID := range oauthClientIDPat.FindAllStringSubmatch(dataStr, -1) {
-		if len(clientID) != 2 {
-			continue
-		}
 		for _, clientSecret := range oauthClientSecretPat.FindAllStringSubmatch(dataStr, -1) {
-			if len(clientSecret) != 2 {
-				continue
-			}
 
 			result := detectors.Result{
 				DetectorType: detectorspb.DetectorType_OneLogin,

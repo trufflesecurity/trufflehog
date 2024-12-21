@@ -40,15 +40,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, domainmatch := range domainMatches {
-			if len(domainmatch) != 2 {
-				continue
-			}
 			resDomainMatch := strings.TrimSpace(domainmatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Sugester,
