@@ -13,7 +13,7 @@ replace github.com/coinbase/waas-client-library-go => github.com/trufflesecurity
 
 require (
 	cloud.google.com/go/secretmanager v1.14.2
-	cloud.google.com/go/storage v1.48.0
+	cloud.google.com/go/storage v1.49.0
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
