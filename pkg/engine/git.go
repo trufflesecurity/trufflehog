@@ -39,5 +39,5 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) (sources.JobP
 		return sources.JobProgressRef{}, err
 	}
 
-	return e.sourceManager.Run(ctx, sourceName, gitSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gitSource)
 }

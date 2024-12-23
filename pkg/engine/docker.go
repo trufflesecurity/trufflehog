@@ -39,5 +39,5 @@ func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) (source
 	if err := dockerSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.Run(ctx, sourceName, dockerSource)
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, dockerSource)
 }

@@ -1,119 +1,80 @@
-//go:build detectors
-// +build detectors
-
 package reallysimplesystems
 
 import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestReallySimpleSystems_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("REALLYSIMPLESYSTEMS")
-	inactiveSecret := testSecrets.MustGetField("REALLYSIMPLESYSTEMS_INACTIVE")
+var (
+	validPattern   = "eyt_8-ytglklqvyjGF6dgbXsCSMRLdryUWQCSQ1n1uSph1Ppl.jMeMx0EkxVLcmbKPTi7kPYKzNa04V96eiJlV.XxtKFDKTJCkcThvKR2x0ctVUL.FrbHVXEx55VZZPD0FKW4onNDO05Ab_9cbnrLTr4d--.eyX.hZw.Q5g-pvyWS5jjDUyiE60WZSgQq4uM8PUVw1-OJegMnGGLEKq48G5X7zgQAcYvUIRQy4Ku.gKQkNFIL4Nlj3ob7Bi4VUDs_DjvtS_Jxho-Hn_hgIhfYQVw19wQCcc8m7v2jCXz2MTi74vpzW7aY2C123i5uFr1KdVQLX.Xlf5ZtuLAsYZ5MsG1G6VYO_t7l6nl8D-Y3fml7uSGPXkeQT7AW1HKOTrBdGj0L_OMMYBaZ4-R9tnUjM7Jf1LExVn2NIQnNGR7Jyl69WigxQGLaUbNvE9DQkVtV4ar0FORi8mrwAQdb5UxZkOxW4me_F189Y-rs0h9q4vrjmM3Fu1Uj_UCrV4IP6AYr4b9yXzgAlcybQSNUISltLwYC.07LKjRy.dLvF-A2b5mIjyKbR3rOUmiXfeAveBRakkEOKSNOSTDVM839O9a-8tqAggj8eDdPunO8Pg6L_Af_eJowZNhtRluVuFDTHuUW.lAG1bqm.ZJQak800cspbDbB8InwOb0V1UvoO.c.ZOAWM3fQVoidNeDbKbWKR3JdE3iWCGsqz89Zdd6LkxwHAd5TRLn.ZVg67d1.g2S3kadXrTZ0qN6o_7apQ38PbGKydnCTLMfdgN6uIPqAtQntsF6YNvNfFHnXgsfhTkVUDJc5g6oQB_jDeGa8rkCmH6_DO6Z1qV04G.fj.QLJIgMhcdGL8Y3NMRv87spZxNWmX1glZ1AYQlWbbqwzAC1v-p0ImXQSuq6G8aIt8e4w7FnOmOn_Q0NwD85JRgdy.W4f.5hX-zLhj1RDqvC1-Ebd2OLDdne0xqMMNe4kGnzQ6dpDtbZXPcim443CyFxaFD_DK5-Iupc032AKV_Sm9eDSlRuAmAQ7LhvypNWi_6e9NuVUEQ5P6HfBe1eXkZ3y5HkZpWbJqJW2D"
+	invalidPattern = "ayt_8-ytglklqvyjGF6dgbXsCSMRLdryUWQCSQ1n1uSph1Ppl.jMeMx0EkxVLcmbKPTi7kPYKzNa04V96eiJlV.XxtKFDKTJCkcThvKR2x0ctVUL.FrbHVXEx55VZZPD0FKW4onNDO05Ab_9cbnrLTr4d--.eyX.hZw.Q5g-pvyWS5jjDUyiE60WZSgQq4uM8PUVw1-OJegMnGGLEKq48G5X7zgQAcYvUIRQy4Ku.gKQkNFIL4Nlj3ob7Bi4VUDs_DjvtS_Jxho-Hn_hgIhfYQVw19wQCcc8m7v2jCXz2MTi74vpzW7aY2C123i5uFr1KdVQLX.Xlf5ZtuLAsYZ5MsG1G6VYO_t7l6nl8D-Y3fml7uSGPXkeQT7AW1HKOTrBdGj0L_OMMYBaZ4-R9tnUjM7Jf1LExVn2NIQnNGR7Jyl69WigxQGLaUbNvE9DQkVtV4ar0FORi8mrwAQdb5UxZkOxW4me_F189Y-rs0h9q4vrjmM3Fu1Uj_UCrV4IP6AYr4b9yXzgAlcybQSNUISltLwYC.07LKjRy.dLvF-A2b5mIjyKbR3rOUmiXfeAveBRakkEOKSNOSTDVM839O9a-8tqAggj8eDdPunO8Pg6L_Af_eJowZNhtRluVuFDTHuUW.lAG1bqm.ZJQak800cspbDbB8InwOb0V1UvoO.c.ZOAWM3fQVoidNeDbKbWKR3JdE3iWCGsqz89Zdd6LkxwHAd5TRLn.ZVg67d1.g2S3kadXrTZ0qN6o_7apQ38PbGKydnCTLMfdgN6uIPqAtQntsF6YNvNfFHnXgsfhTkVUDJc5g6oQB_jDeGa8rkCmH6_DO6Z1qV04G.fj.QLJIgMhcdGL8Y3NMRv87spZxNWmX1glZ1AYQlWbbqwzAC1v-p0ImXQSuq6G8aIt8e4w7FnOmOn_Q0NwD85JRgdy.W4f.5hX-zLhj1RDqvC1-Ebd2OLDdne0xqMMNe4kGnzQ6dpDtbZXPcim443CyFxaFD_DK5-Iupc032AKV_Sm9eDSlRuAmAQ7LhvypNWi_6e9NuVUEQ5P6HfBe1eXkZ3y5HkZpWbJqJW2D"
+	keyword        = "reallysimplesystems"
+)
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestReallySimpleSystems_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a reallysimplesystems secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_ReallySimpleSystems,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern - with keyword reallysimplesystems",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			want:  []string{validPattern},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a reallysimplesystems secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_ReallySimpleSystems,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name:  "invalid pattern",
+			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReallySimpleSystems.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("ReallySimpleSystems.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

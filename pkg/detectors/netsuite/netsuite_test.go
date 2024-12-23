@@ -1,140 +1,93 @@
-//go:build detectors
-// +build detectors
-
 package netsuite
 
 import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestNetsuite_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
+var (
+	validConsumerKey      = "3WaMEd0KQtHSU7b24HEd79RZzSpMOfMdMUpIaXjq83DbNHVosCVrEVDxKiEQzT15"
+	invalidConsumerKey    = "3Wa?Ed0KQtHSU7b24HEd79RZzSpMOfMdMUpIaXjq83DbNHVosCVrEVDxKiEQzT15"
+	validConsumerSecret   = "5BZ70LfNshsJkDya1XaD8bMqtPWlOa2o1yKCk0H2DxnjtoaJKIcAw75GdI6zRaRD"
+	invalidConsumerSecret = "5BZ70LfNshsJkDya?XaD8bMqtPWlOa2o1yKCk0H2DxnjtoaJKIcAw75GdI6zRaRD"
+	validTokenKey         = "KeYcG56ViFDleXPFJuEQ5CAGSJn7o2WDa5iGvLIvVBqZj5rMkaWFmzkp4bveJa74"
+	invalidTokenKey       = "KeYcG56ViFDleXPFJuEQ5CAGSJn7o2WD?5iGvLIvVBqZj5rMkaWFmzkp4bveJa74"
+	validTokenSecret      = "GGQUdyYOGDfDImJWCz4Kufk2GevaIDuVv83kIa9zCRuXIDLB4oh2eVDVPmsaSai2"
+	invalidTokenSecret    = "GGQUdyYOGDfDImJWCz4Kufk2Ge?aIDuVv83kIa9zCRuXIDLB4oh2eVDVPmsaSai2"
+	validAccountID        = "x1L2_BXo"
+	invalidAccountID      = "x1L2?BXo"
+	keyword               = "netsuite"
+	inputFormat           = `%s id - '%s'
+consumer - '%s' consumer - '%s'
+token - '%s' token - '%s'`
+	outputPair1 = validConsumerKey + validConsumerSecret
+	outputPair2 = validConsumerSecret + validConsumerKey
+)
 
-	consumerKey := testSecrets.MustGetField("NETSUITE_CONSUMER_KEY")
-	consumerSecret := testSecrets.MustGetField("NETSUITE_CONSUMER_SECRET")
-	tokenKey := testSecrets.MustGetField("NETSUITE_TOKEN_KEY")
-	tokenSecret := testSecrets.MustGetField("NETSUITE_TOKEN_SECRET")
-	accountID := testSecrets.MustGetField("NETSUITE_ACCOUNT_ID")
-
-	inactiveConsumerSecret := testSecrets.MustGetField("NETSUITE_CONSUMER_SECRET_INACTIVE")
-
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestNetsuite_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name               string
-		s                  Scanner
-		args               args
-		wantCount          int
-		wantErr            bool
-		ShouldHaveVerified bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf(`netsuite credentials
-					 consumer key %s 
-					 consumer secret %s, 
-					 token key %s, 
-					 token secret %s, 
-					 account id %s`,
-					consumerKey,
-					consumerSecret,
-					tokenKey,
-					tokenSecret,
-					accountID)),
-				verify: true,
-			},
-			ShouldHaveVerified: true,
-			wantCount:          1,
-			wantErr:            false,
+			name:  "valid pattern - with keyword netsuite",
+			input: fmt.Sprintf(inputFormat, keyword, validAccountID, validConsumerKey, validConsumerSecret, validTokenKey, validTokenSecret),
+			want:  []string{outputPair1, outputPair2, outputPair1, outputPair2},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx: context.Background(),
-				data: []byte(fmt.Sprintf("You can find a netsuite consumer key %s but not valid with secret %s, token key %s, token secret %s, account id %s",
-					consumerKey,
-					inactiveConsumerSecret,
-					tokenKey,
-					tokenSecret,
-					accountID)),
-				verify: true,
-			},
-			ShouldHaveVerified: false,
-			wantCount:          21,
-			wantErr:            false,
-		},
-		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			ShouldHaveVerified: false,
-			wantCount:          0,
-			wantErr:            false,
+			name:  "invalid pattern",
+			input: fmt.Sprintf(inputFormat, keyword, invalidAccountID, invalidConsumerKey, invalidConsumerSecret, invalidTokenKey, invalidTokenSecret),
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Netsuite.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
 
-			if tt.ShouldHaveVerified {
-				var verifiedResults []detectors.Result
-				// filter verified results
-				for i := range got {
-					if got[i].Verified {
-						verifiedResults = append(verifiedResults, got[i])
-					}
-				}
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
 
-				if len(verifiedResults) != tt.wantCount {
-					t.Errorf("Netsuite.FromData() got = %v, want %v", len(verifiedResults), tt.wantCount)
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
-			} else {
-				if len(got) != tt.wantCount {
-					t.Errorf("Netsuite.FromData() got = %v, want %v", len(got), tt.wantCount)
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
 				}
 			}
-		})
-	}
-}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
-				}
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

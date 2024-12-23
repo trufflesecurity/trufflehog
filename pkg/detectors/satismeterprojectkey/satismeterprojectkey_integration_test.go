@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -23,10 +23,11 @@ func TestSatismeterProjectkey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SATISMETERPROJECTKEY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SATISMETERPROJECTKEY_INACTIVE")
-	email := testSecrets.MustGetField("SATISMETERPROJECTKEY_EMAIL")
-	password := testSecrets.MustGetField("SATISMETERPROJECTKEY_PASSWORD")
+
+	projectID := testSecrets.MustGetField("SATISMETERPROJECTKEY")
+	inactiveProjectID := testSecrets.MustGetField("SATISMETERPROJECTKEY_INACTIVE")
+	token := testSecrets.MustGetField("SATISMETER_TOKEN")
+	inactiveToken := testSecrets.MustGetField("SATISMETER_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,13 +46,14 @@ func TestSatismeterProjectkey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a satismeterprojectkey secret %s within satismeterprojectkeyemail %s satismeterprojectkeypassword %s", secret, email, password)),
+				data:   []byte(fmt.Sprintf("You can find a satismeterprojectkey id %s within satismetertoken %s", projectID, token)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SatismeterProjectkey,
 					Verified:     true,
+					RawV2:        []byte(projectID + token),
 				},
 			},
 			wantErr: false,
@@ -61,13 +63,14 @@ func TestSatismeterProjectkey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a satismeterprojectkey secret %s within but not valid satismeterprojectkeyemail %s satismeterprojectkeypassword %s", inactiveSecret, email, password)), // the secret would satisfy the regex but not pass validation),
+				data:   []byte(fmt.Sprintf("You can find a satismeterprojectkey secret %s within satismetertoken: %s", inactiveProjectID, inactiveToken)), // the secret would satisfy the regex but not pass validation),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_SatismeterProjectkey,
 					Verified:     false,
+					RawV2:        []byte(inactiveProjectID + inactiveToken),
 				},
 			},
 			wantErr: false,

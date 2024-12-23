@@ -1016,6 +1016,11 @@ enum DetectorType {
   ApiMetrics = 1004;
   WeightsAndBiases = 1005;
   ZohoCRM = 1006;
+  AzureOpenAI = 1007;
+  GoDaddy = 1008;
+  Flexport = 1009;
+  TwitchAccessToken = 1010;
+  TwilioApiKey = 1011;
 }
 
 message Result {

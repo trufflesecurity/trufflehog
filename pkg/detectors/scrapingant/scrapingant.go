@@ -2,10 +2,13 @@ package scrapingant
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -48,20 +51,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			timeout := 10 * time.Second
-			client.Timeout = timeout
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.scrapingant.com/v1/general?url=google.com", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("x-api-key", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyScrapingAnt(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -76,4 +68,34 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "ScrapingAnt is a web scraping service that provides API keys to authenticate and make requests to their scraping endpoints."
+}
+
+func verifyScrapingAnt(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	// do not use google.com as url as it cannot be used under free subscription
+	apiUrl := fmt.Sprintf("https://api.scrapingant.com/v1/general?url=example.com&x-api-key=%s", apiKey)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiUrl, http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, nil
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode == http.StatusOK {
+		return true, nil
+	} else if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return false, nil
+	} else {
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

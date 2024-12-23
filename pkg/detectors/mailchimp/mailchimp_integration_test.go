@@ -94,6 +94,7 @@ func TestMailchimp_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 				got[i].AnalysisInfo = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Mailchimp.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
