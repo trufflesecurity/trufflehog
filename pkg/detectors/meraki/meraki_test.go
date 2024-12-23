@@ -117,15 +117,21 @@ func TestMeraki_Fake(t *testing.T) {
 
 	// create a fake HTTP handler function
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify the Authorization Header
-		if r.Header.Get("X-Cisco-Meraki-API-Key") != "e9e0f062f587b423bb6cc6328eb786d75b45783e" {
+		switch r.Header.Get("X-Cisco-Meraki-API-Key") {
+		case "e9e0f062f587b423bb6cc6328eb786d75b45783e":
+			// send back mock response for 200 OK
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(mockResponse)
+			return
+		case "e9e0f062f587b423bb6cc6328eb786d75b45783f":
+			// send back mock 401 error for mock expired key
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
+		case "":
+			// if not auth header is sent, return 400 with unexpected status code
+			http.Error(w, "got unexpected status code: 400", http.StatusBadRequest)
+			return
 		}
-
-		// Send back mock response for 200 OK
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(mockResponse)
 	})
 	// create a mock server
 	server := CreateMockServer(handler)
@@ -149,6 +155,12 @@ func TestMeraki_Fake(t *testing.T) {
 			secret:   "e9e0f062f587b423bb6cc6328eb786d75b45783f",
 			verified: false,
 			wantErr:  false,
+		},
+		{
+			name:     "fail - 400 unexpected status code error",
+			secret:   "",
+			verified: false,
+			wantErr:  true,
 		},
 	}
 
