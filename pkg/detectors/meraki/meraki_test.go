@@ -125,11 +125,11 @@ func TestMeraki_Fake(t *testing.T) {
 			return
 		case "e9e0f062f587b423bb6cc6328eb786d75b45783f":
 			// send back mock 401 error for mock expired key
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		case "":
-			// if not auth header is sent, return 400 with unexpected status code
-			http.Error(w, "got unexpected status code: 400", http.StatusBadRequest)
+			// if not auth header is sent, return 400
+			w.WriteHeader(http.StatusBadGateway)
 			return
 		}
 	})
