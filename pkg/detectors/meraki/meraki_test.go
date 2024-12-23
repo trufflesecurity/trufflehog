@@ -129,7 +129,7 @@ func TestMeraki_Fake(t *testing.T) {
 			return
 		case "":
 			// if not auth header is sent, return 400
-			w.WriteHeader(http.StatusBadGateway)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	})
