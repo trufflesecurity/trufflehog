@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
@@ -115,49 +115,31 @@ func TestMeraki_Fake(t *testing.T) {
 		t.Fatalf("failed to marshal mock organizations: %v", err)
 	}
 
-	// create a fake HTTP handler function
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.Header.Get("X-Cisco-Meraki-API-Key") {
-		case "e9e0f062f587b423bb6cc6328eb786d75b45783e":
-			// send back mock response for 200 OK
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(mockResponse)
-			return
-		case "e9e0f062f587b423bb6cc6328eb786d75b45783f":
-			// send back mock 401 error for mock expired key
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		case "":
-			// if not auth header is sent, return 400
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-	})
-	// create a mock server
-	server := CreateMockServer(handler)
-	defer server.Close()
-
 	// test cases
 	tests := []struct {
 		name     string
+		client   *http.Client
 		secret   string
 		verified bool
 		wantErr  bool
 	}{
 		{
 			name:     "success - 200 OK",
+			client:   common.ConstantResponseHttpClient(http.StatusOK, string(mockResponse)),
 			secret:   "e9e0f062f587b423bb6cc6328eb786d75b45783e",
 			verified: true,
 			wantErr:  false,
 		},
 		{
 			name:     "fail - 401 UnAuthorized",
+			client:   common.ConstantResponseHttpClient(http.StatusUnauthorized, ""),
 			secret:   "e9e0f062f587b423bb6cc6328eb786d75b45783f",
 			verified: false,
 			wantErr:  false,
 		},
 		{
 			name:     "fail - 400 unexpected status code error",
+			client:   common.ConstantResponseHttpClient(http.StatusBadRequest, ""),
 			secret:   "",
 			verified: false,
 			wantErr:  true,
@@ -167,7 +149,7 @@ func TestMeraki_Fake(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// calling FromData does not work cause APIURLs are hardcoded
-			_, isVerified, verificationErr := verifyMerakiApiKey(context.Background(), server.Client(), server.URL, test.secret)
+			_, isVerified, verificationErr := verifyMerakiApiKey(context.Background(), test.client, "http://example.com", test.secret)
 			if (verificationErr != nil) != test.wantErr {
 				t.Errorf("[%s] unexpected error: got %v, wantErr: %t", test.name, verificationErr, test.wantErr)
 			}
@@ -179,11 +161,4 @@ func TestMeraki_Fake(t *testing.T) {
 			// additional checks if required
 		})
 	}
-}
-
-// this i am thinking to move to common
-// CreateMockServer creates a mock HTTP server with a given handler function.
-func CreateMockServer(handler func(w http.ResponseWriter, r *http.Request)) *httptest.Server {
-	// Create and return a new mock server
-	return httptest.NewServer(http.HandlerFunc(handler))
 }
