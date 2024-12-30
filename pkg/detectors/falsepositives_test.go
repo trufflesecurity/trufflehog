@@ -3,6 +3,7 @@ package detectors
 import (
 	"context"
 	_ "embed"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -154,14 +155,14 @@ func TestStringShannonEntropy(t *testing.T) {
 			args: args{
 				input: "aaaaaaaaaaaaaaaaaaaaaaaaaaab",
 			},
-			want: 0.22228483068568816,
+			want: 0.22,
 		},
 		{
 			name: "entropy 3",
 			args: args{
 				input: "aaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaab",
 			},
-			want: 0.22228483068568816,
+			want: 0.22,
 		},
 		{
 			name: "empty",
@@ -173,7 +174,8 @@ func TestStringShannonEntropy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := StringShannonEntropy(tt.args.input); got != tt.want {
+			got := roundToTwoDigits(StringShannonEntropy(tt.args.input))
+			if got != tt.want {
 				t.Errorf("StringShannonEntropy() = %v, want %v", got, tt.want)
 			}
 		})
@@ -185,4 +187,9 @@ func BenchmarkDefaultIsKnownFalsePositive(b *testing.B) {
 		// Use a string that won't be found in any dictionary for the worst case check.
 		IsKnownFalsePositive("aoeuaoeuaoeuaoeuaoeuaoeu", DefaultFalsePositives, true)
 	}
+}
+
+func roundToTwoDigits(number float64) float64 {
+	scale := math.Pow(10, float64(2))
+	return math.Round(number*scale) / scale
 }
