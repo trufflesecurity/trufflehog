@@ -9,7 +9,7 @@ import (
 func TestEmbeddedEndpointSetter(t *testing.T) {
 	type Scanner struct{ EndpointSetter }
 	var s Scanner
-	// set useFoundEndpoints to set the "baz" in endpoints
+	// set useFoundEndpoints to true to add the "baz" in endpoints
 	s.useFoundEndpoints = true
 	assert.Equal(t, []string{"baz"}, s.Endpoints("baz"))
 	// setting "foo" and "bar" as configured endpoint
