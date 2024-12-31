@@ -32,9 +32,9 @@ func TestURI_Pattern(t *testing.T) {
 			want:  []string{validPattern},
 		},
 		{
-			name:  "valid pattern - capture two outputs",
+			name:  "valid pattern - do not process duplicate",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern2),
-			want:  []string{"http://username:password@127.0.0.1", "http://username:password@127.0.0.1"},
+			want:  []string{"http://username:password@127.0.0.1"},
 		},
 		{
 			name:  "invalid pattern",
