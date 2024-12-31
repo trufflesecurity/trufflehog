@@ -23,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\b(?:https?:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\b(?:https?:\/\/)?[\w-\.$~!]{3,50}:([\w-\.%$^&#]{3,50})@[-.\w]+\b`)
 
 	// TODO: make local addr opt-out
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
@@ -39,10 +39,10 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
+	var isProcessed = make(map[string]struct{})
+
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
-
 		if !s.allowKnownTestSites {
 			if strings.Contains(match[0], "httpbin.org") {
 				continue
@@ -58,6 +58,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		// Skip findings where the password only has "*" characters, this is a redacted password
 		// Also include the url encoded "*" characters: "%2A"
 		if strings.Trim(password, "*") == "" || strings.Trim(password, "%2A") == "" {
+			continue
+		}
+
+		// if "url+password" combination is already processed continue
+		if _, ok := isProcessed[urlMatch+password]; ok {
 			continue
 		}
 
@@ -98,6 +103,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		results = append(results, s1)
+
+		// add url+password in isProcessed list
+		isProcessed[urlMatch+password] = struct{}{}
 	}
 
 	return results, nil
