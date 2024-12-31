@@ -60,22 +60,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for key := range uniqueKeys {
-		resMatch := strings.TrimSpace(key)
-
 		for id := range uniqueIds {
-			idresMatch := strings.TrimSpace(id)
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PlaidKey,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(key),
 			}
 			environments := []string{"sandbox", "production"}
 			if verify {
 				for _, env := range environments {
-					isVerified, _, verificationErr := verifyMatch(ctx, client, idresMatch, resMatch, env)
+					isVerified, _, verificationErr := verifyMatch(ctx, client, id, key, env)
 					s1.Verified = isVerified
 					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", env)}
-					s1.SetVerificationError(verificationErr, idresMatch, resMatch)
+					s1.SetVerificationError(verificationErr, id, key)
 				}
 				results = append(results, s1)
 				// if the environment is sandbox, we don't need to check production

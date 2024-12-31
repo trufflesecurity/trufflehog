@@ -45,18 +45,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, managementApiTokenMatch := range managementAPITokenMatches {
-		if len(managementApiTokenMatch) != 2 {
-			continue
-		}
 		managementAPITokenRes := strings.TrimSpace(managementApiTokenMatch[1])
 		if len(managementAPITokenRes) < 2000 || len(managementAPITokenRes) > 5000 {
 			continue
 		}
 
 		for _, domainMatch := range domainMatches {
-			if len(domainMatch) != 2 {
-				continue
-			}
 			domainRes := strings.TrimSpace(domainMatch[1])
 
 			s1 := detectors.Result{
