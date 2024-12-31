@@ -9,6 +9,7 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -30,7 +31,7 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{5,24}\.[a-zA-Z-0-9]{3,16}\.[a-zA-Z-0-9]{3,16})\b`)
-	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`)
+	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + common.EmailPattern)
 )
 
 const (
@@ -48,31 +49,27 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	tokens := tokenPat.FindAllStringSubmatch(dataStr, -1)
-	domains := domainPat.FindAllStringSubmatch(dataStr, -1)
-	emails := emailPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueTokens, uniqueDomains, uniqueEmails = make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
 
-	for _, email := range emails {
-		email = strings.Split(email[0], " ")
-		if len(email) != 2 {
-			continue
-		}
-		resEmail := strings.TrimSpace(email[1])
-		for _, token := range tokens {
-			if len(token) != 2 {
-				continue
-			}
-			resToken := strings.TrimSpace(token[1])
-			for _, domain := range domains {
-				if len(domain) != 2 {
-					continue
-				}
-				resDomain := strings.TrimSpace(domain[1])
+	for _, token := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueTokens[token[1]] = struct{}{}
+	}
 
+	for _, domain := range domainPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueDomains[domain[1]] = struct{}{}
+	}
+
+	for _, email := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmails[strings.ToLower(email[1])] = struct{}{}
+	}
+
+	for email := range uniqueEmails {
+		for token := range uniqueTokens {
+			for domain := range uniqueDomains {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_JiraToken,
-					Raw:          []byte(resToken),
-					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", resEmail, resToken, resDomain)),
+					Raw:          []byte(token),
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", email, token, domain)),
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
 						"version":        fmt.Sprintf("%d", s.Version()),
@@ -81,9 +78,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					client := s.getClient()
-					isVerified, verificationErr := verifyJiratoken(ctx, client, resEmail, resDomain, resToken)
+					isVerified, verificationErr := verifyJiratoken(ctx, client, email, domain, token)
 					s1.Verified = isVerified
-					s1.SetVerificationError(verificationErr, resToken)
+					s1.SetVerificationError(verificationErr, token)
 				}
 
 				results = append(results, s1)
