@@ -8,29 +8,53 @@ import (
 
 func TestEmbeddedEndpointSetter(t *testing.T) {
 	type Scanner struct{ EndpointSetter }
+
 	var s Scanner
-	// set useFoundEndpoints to true to add the "baz" in endpoints
-	s.useFoundEndpoints = true
-	assert.Equal(t, []string{"baz"}, s.Endpoints("baz"))
-	// setting "foo" and "bar" as configured endpoint
-	assert.NoError(t, s.SetConfiguredEndpoints("foo", "bar"))
-	// return error as no endpoints are passed
-	assert.Error(t, s.SetConfiguredEndpoints())
-	// as useFoundEndpoints is true, "baz" will be added in the endpoints list
-	assert.Equal(t, []string{"foo", "bar", "baz"}, s.Endpoints("baz"))
-	// setting cloudEndpoint along with setting useCloudEndpoint as true
-	s.useCloudEndpoint = true
-	// cloudEndpoint must be set in order to be added in the list along with useCloudEndpoint as true
-	s.cloudEndpoint = "test"
-	// reason for "foo" and "bar" here is that they are already configured
-	assert.Equal(t, []string{"foo", "bar", "test"}, s.Endpoints())
-	// set useFoundEndpoints and useCloudEndpoint to false
-	s.useFoundEndpoints = false
-	s.useCloudEndpoint = false
-	// as both useFoundEndpoints and useCloudEndpoint are set to false, passing any endpoint to Endpoints() will not be added
-	assert.Equal(t, []string{"foo", "bar"}, s.Endpoints("test"))
-	// set any new endpoint as cloudEndpoint
-	s.cloudEndpoint = "new"
-	// this time it will not be added in list because useCloudEndpoint is set to false
-	assert.Equal(t, []string{"foo", "bar"}, s.Endpoints())
+
+	t.Run("useFoundEndpoints is true", func(t *testing.T) {
+		s.useFoundEndpoints = true
+
+		// "baz" is passed to Endpoints, should appear in the result
+		assert.Equal(t, []string{"baz"}, s.Endpoints("baz"))
+	})
+
+	t.Run("setting configured endpoints", func(t *testing.T) {
+		// Setting "foo" and "bar"
+		assert.NoError(t, s.SetConfiguredEndpoints("foo", "bar"))
+
+		// Returning error because no endpoints are passed
+		assert.Error(t, s.SetConfiguredEndpoints())
+	})
+
+	// "foo" and "bar" are added as configured endpoint
+
+	t.Run("useFoundEndpoints adds new endpoints", func(t *testing.T) {
+		// "baz" is added because useFoundEndpoints is true
+		assert.Equal(t, []string{"foo", "bar", "baz"}, s.Endpoints("baz"))
+	})
+
+	t.Run("useCloudEndpoint is true", func(t *testing.T) {
+		s.useCloudEndpoint = true
+		s.cloudEndpoint = "test"
+
+		// "test" is added because useCloudEndpoint is true and cloudEndpoint is set
+		assert.Equal(t, []string{"foo", "bar", "test"}, s.Endpoints())
+	})
+
+	t.Run("disable both foundEndpoints and cloudEndpoint", func(t *testing.T) {
+		// now disable both useFoundEndpoints and useCloudEndpoint
+		s.useFoundEndpoints = false
+		s.useCloudEndpoint = false
+
+		// "test" won't be added
+		assert.Equal(t, []string{"foo", "bar"}, s.Endpoints("test"))
+	})
+
+	t.Run("cloudEndpoint not added when useCloudEndpoint is false", func(t *testing.T) {
+		s.cloudEndpoint = "new"
+
+		// "new" is not added because useCloudEndpoint is false
+		assert.Equal(t, []string{"foo", "bar"}, s.Endpoints())
+	})
+
 }
