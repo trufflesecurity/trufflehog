@@ -85,7 +85,7 @@ func TestArchiveHandler(t *testing.T) {
 
 			handler := newArchiveHandler()
 
-			newReader, err := newFileReader(resp.Body)
+			newReader, err := newFileReader(context.Background(), resp.Body)
 			if err != nil {
 				t.Errorf("error creating reusable reader: %s", err)
 			}
@@ -119,7 +119,7 @@ func TestOpenInvalidArchive(t *testing.T) {
 	ctx := logContext.AddLogger(context.Background())
 	handler := archiveHandler{}
 
-	rdr, err := newFileReader(io.NopCloser(reader))
+	rdr, err := newFileReader(ctx, io.NopCloser(reader))
 	assert.NoError(t, err)
 	defer rdr.Close()
 

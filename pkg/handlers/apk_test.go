@@ -39,7 +39,7 @@ func TestAPKHandler(t *testing.T) {
 
 			handler := newAPKHandler()
 
-			newReader, err := newFileReader(resp.Body)
+			newReader, err := newFileReader(context.Background(), resp.Body)
 			if err != nil {
 				t.Errorf("error creating reusable reader: %s", err)
 			}
@@ -75,7 +75,7 @@ func TestOpenInvalidAPK(t *testing.T) {
 	ctx := logContext.AddLogger(context.Background())
 	handler := apkHandler{}
 
-	rdr, err := newFileReader(io.NopCloser(reader))
+	rdr, err := newFileReader(ctx, io.NopCloser(reader))
 	assert.NoError(t, err)
 	defer rdr.Close()
 
@@ -96,7 +96,7 @@ func TestOpenValidZipInvalidAPK(t *testing.T) {
 
 	handler := newAPKHandler()
 
-	newReader, err := newFileReader(resp.Body)
+	newReader, err := newFileReader(context.Background(), resp.Body)
 	if err != nil {
 		t.Errorf("error creating reusable reader: %s", err)
 	}
