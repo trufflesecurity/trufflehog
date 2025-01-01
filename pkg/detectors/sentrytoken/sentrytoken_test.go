@@ -12,9 +12,13 @@ import (
 )
 
 var (
-	validPattern   = "ad00eba0e2b5b057146e1b2b9373f86dbb0e712d106529111d97cb13f081de20"
-	invalidPattern = "ad00e?a0e2b5b057146e1b2b9373f86dbb0e712d106529111d97cb13f081de20"
-	keyword        = "sentrytoken"
+	validPattern = `
+	sentry_token := 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
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sentry_token))
+	`
+	invalidPattern = "sntryu_822255ea24285a3f8f863dee3g1720fff21628cf331fbde22a16f27bef9cd7a6"
+	keyword        = "sentry"
+	token          = "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"
 )
 
 func TestSentryToken_Pattern(t *testing.T) {
@@ -27,18 +31,13 @@ func TestSentryToken_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern - with keyword sentrytoken",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			input: validPattern,
+			want:  []string{token},
 		},
 		{
 			name:  "valid pattern - ignore duplicate",
 			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
-			want:  []string{validPattern},
-		},
-		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
-			want:  []string{},
+			want:  []string{token},
 		},
 		{
 			name:  "invalid pattern",

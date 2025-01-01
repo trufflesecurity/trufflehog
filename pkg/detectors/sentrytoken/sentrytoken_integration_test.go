@@ -20,7 +20,7 @@ import (
 func TestSentryToken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -52,6 +52,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SentryToken,
 					Verified:     true,
+					ExtraData:    map[string]string{"orginzation_4508567357947904": "Truffle Security"},
 				},
 			},
 			wantErr: false,
@@ -68,6 +69,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SentryToken,
 					Verified:     false,
+					ExtraData:    map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -84,6 +86,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SentryToken,
 					Verified:     false,
+					ExtraData:    map[string]string{},
 				},
 			},
 			wantErr:             false,
@@ -101,56 +104,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SentryToken,
 					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, good key but wrong scope",
-			s:    Scanner{client: common.ConstantResponseHttpClient(403, responseBody403)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, account deactivated",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, responseAccountDeactivated)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, account deactivated",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, responseEmpty)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
-					Verified:     false,
+					ExtraData:    map[string]string{},
 				},
 			},
 			wantErr:             false,

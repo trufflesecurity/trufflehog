@@ -3,12 +3,12 @@ package sentrytoken
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -19,6 +19,13 @@ type Scanner struct {
 	client *http.Client
 }
 
+type Response []Organization
+
+type Organization struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
@@ -26,44 +33,51 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sentry"}) + `\b([a-f0-9]{64})\b`)
+	keyPat = regexp.MustCompile(`\b(sntryu_[a-f0-9]{64})\b`)
 
-	errUnauthorized = fmt.Errorf("token unauthorized")
+	forbiddenError = "You do not have permission to perform this action."
 )
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+
+	return defaultClient
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sentry"}
+	return []string{"sentry", "sntryu"}
 }
 
 // FromData will find and optionally verify SentryToken secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	// find all unique auth tokens
+	var uniqueAuthTokens = make(map[string]struct{})
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	for _, authToken := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueAuthTokens[authToken[1]] = struct{}{}
+	}
+
+	for authToken := range uniqueAuthTokens {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SentryToken,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(authToken),
+			ExtraData:    make(map[string]string),
 		}
 
 		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-			isVerified, verificationErr := verifyToken(ctx, client, resMatch)
+			client := s.getClient()
+			extraData, isVerified, verificationErr := verifyToken(ctx, client, authToken)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, authToken)
 
-			switch {
-			case errors.Is(verificationErr, errUnauthorized):
-				s1.Verified = false
-			case isVerified:
-				s1.Verified = true
-			default:
-				s1.SetVerificationError(verificationErr, resMatch)
+			for key, value := range extraData {
+				s1.ExtraData[key] = value
 			}
 		}
 
@@ -73,54 +87,59 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-type Response []Project
-
-type Project struct {
-	Organization Organization `json:"organization"`
-}
-
-type Organization struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-func verifyToken(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://sentry.io/api/0/projects/", nil)
+func verifyToken(ctx context.Context, client *http.Client, token string) (map[string]string, bool, error) {
+	// api docs: https://docs.sentry.io/api/organizations/
+	// this api will return 200 for user auth tokens with scope of org:<>
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://sentry.io/api/0/organizations/", nil)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 
-	res, err := client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	var isVerified bool
-	switch res.StatusCode {
-	case http.StatusOK, http.StatusForbidden:
-		isVerified = true
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, false, err
+	}
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var resp Response
+		if err = json.Unmarshal(bytes, &resp); err != nil {
+			return nil, false, err
+		}
+
+		var extraData = make(map[string]string)
+		for _, org := range resp {
+			extraData[fmt.Sprintf("orginzation_%s", org.ID)] = org.Name
+		}
+
+		return extraData, true, nil
+	case http.StatusForbidden:
+		var responseBody interface{}
+		if err := json.Unmarshal(bytes, &responseBody); err != nil {
+			return nil, false, err
+		}
+
+		// if response contain the forbiddenError message it means the token is active but does not have the right scope for this API call
+		if strings.Contains(fmt.Sprintf("%v", responseBody), forbiddenError) {
+			return nil, true, nil
+		}
+
+		return nil, false, nil
 	case http.StatusUnauthorized:
-		return false, errUnauthorized
+		return nil, false, nil
 	default:
-		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return nil, false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
 	}
-
-	bytes, readErr := io.ReadAll(res.Body)
-	if readErr != nil {
-		return false, readErr
-	}
-
-	var resp Response
-	if err = json.Unmarshal(bytes, &resp); err != nil {
-		return false, err
-	}
-	if len(resp) == 0 {
-		return false, fmt.Errorf("unexpected response body: %s", string(bytes))
-	}
-
-	return isVerified, err
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
