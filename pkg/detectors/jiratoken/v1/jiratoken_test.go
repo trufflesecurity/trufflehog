@@ -16,7 +16,7 @@ var (
 	invalidTokenPattern  = "Z7VoI?J0K4rF#LBfkhO&LAWX"
 	validDomainPattern   = "hereisavalidsubdomain.heresalongdomain.com"
 	invalidDomainPattern = "?y4r3fs1ewqec12v1e3tl.5Hcsrcehic89saXd.ro@"
-	validEmailPattern    = "xfKF_BZq7@grum.com"
+	validEmailPattern    = "xfkf_bz7@grum.com"
 	invalidEmailPattern  = "xfKF_BZq7/grum.com"
 	keyword              = "jira"
 )
