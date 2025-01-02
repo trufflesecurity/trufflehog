@@ -93,32 +93,27 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (map[st
 		_ = resp.Body.Close()
 	}()
 
-	bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, false, err
-	}
-
 	switch resp.StatusCode {
 	case http.StatusOK:
-		var resp Response
-		if err = json.Unmarshal(bytes, &resp); err != nil {
+		var APIResp Response
+		if err = json.NewDecoder(resp.Body).Decode(&APIResp); err != nil {
 			return nil, false, err
 		}
 
 		var extraData = make(map[string]string)
-		for _, org := range resp {
+		for _, org := range APIResp {
 			extraData[fmt.Sprintf("orginzation_%s", org.ID)] = org.Name
 		}
 
 		return extraData, true, nil
 	case http.StatusForbidden:
-		var responseBody interface{}
-		if err := json.Unmarshal(bytes, &responseBody); err != nil {
+		var APIResp interface{}
+		if err = json.NewDecoder(resp.Body).Decode(&APIResp); err != nil {
 			return nil, false, err
 		}
 
 		// if response contain the forbiddenError message it means the token is active but does not have the right scope for this API call
-		if strings.Contains(fmt.Sprintf("%v", responseBody), forbiddenError) {
+		if strings.Contains(fmt.Sprintf("%v", APIResp), forbiddenError) {
 			return nil, true, nil
 		}
 
