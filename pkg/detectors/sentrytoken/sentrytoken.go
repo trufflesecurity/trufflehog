@@ -19,8 +19,6 @@ type Scanner struct {
 	client *http.Client
 }
 
-type Response []Organization
-
 type Organization struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -95,13 +93,13 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (map[st
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		var APIResp Response
-		if err = json.NewDecoder(resp.Body).Decode(&APIResp); err != nil {
+		var organizations []Organization
+		if err = json.NewDecoder(resp.Body).Decode(&organizations); err != nil {
 			return nil, false, err
 		}
 
 		var extraData = make(map[string]string)
-		for _, org := range APIResp {
+		for _, org := range organizations {
 			extraData[fmt.Sprintf("orginzation_%s", org.ID)] = org.Name
 		}
 
