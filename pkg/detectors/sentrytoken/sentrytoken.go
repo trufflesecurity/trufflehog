@@ -30,21 +30,11 @@ type Organization struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
-
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(sntryu_[a-f0-9]{64})\b`)
 
 	forbiddenError = "You do not have permission to perform this action."
 )
-
-func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
-	}
-
-	return defaultClient
-}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -67,20 +57,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_SentryToken,
 			Raw:          []byte(authToken),
-			ExtraData:    make(map[string]string),
 		}
 
 		if verify {
 			if s.client == nil {
 				s.client = common.SaneHttpClient()
 			}
-			extraData, isVerified, verificationErr := verifyToken(ctx, client, authToken)
+			extraData, isVerified, verificationErr := verifyToken(ctx, s.client, authToken)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, authToken)
-
-			for key, value := range extraData {
-				s1.ExtraData[key] = value
-			}
+			s1.ExtraData = extraData
 		}
 
 		results = append(results, s1)

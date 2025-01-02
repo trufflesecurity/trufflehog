@@ -69,7 +69,6 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SentryToken,
 					Verified:     false,
-					ExtraData:    map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -86,7 +85,6 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SentryToken,
 					Verified:     false,
-					ExtraData:    map[string]string{},
 				},
 			},
 			wantErr:             false,
@@ -104,7 +102,6 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SentryToken,
 					Verified:     false,
-					ExtraData:    map[string]string{},
 				},
 			},
 			wantErr:             false,
