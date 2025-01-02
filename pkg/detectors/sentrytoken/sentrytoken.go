@@ -71,7 +71,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			client := s.getClient()
+			if s.client == nil {
+				s.client = common.SaneHttpClient()
+			}
 			extraData, isVerified, verificationErr := verifyToken(ctx, client, authToken)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, authToken)
