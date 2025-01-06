@@ -10,7 +10,6 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
-
 enum SourceType {
   SOURCE_TYPE_AZURE_STORAGE = 0;
   SOURCE_TYPE_BITBUCKET = 1;
@@ -54,15 +53,17 @@ enum SourceType {
 }
 
 message LocalSource {
-  string type = 1 ;
-  string name = 2 ;
-  // DEPRECATED: scan_interval is deprecated and can be removed when we no longer depend on the name.
-  // Deprecating in favor of scan_period due to the fact that scan_interval is a duration
-  // which is a fixed-length span of time represented as a count of seconds and fractions of seconds
-  // at nanosecond resolution. Most of the time, we want to be able to specify a scan interval in
-  // human-readable format (e.g. 45s, 30m, 12h, etc.) which is not possible with a duration.
+  string type = 1;
+  string name = 2;
+  // DEPRECATED: scan_interval is deprecated and can be removed when we no
+  // longer depend on the name. Deprecating in favor of scan_period due to the
+  // fact that scan_interval is a duration which is a fixed-length span of time
+  // represented as a count of seconds and fractions of seconds at nanosecond
+  // resolution. Most of the time, we want to be able to specify a scan interval
+  // in human-readable format (e.g. 45s, 30m, 12h, etc.) which is not possible
+  // with a duration.
   // https://protobuf.dev/reference/protobuf/google.protobuf/#duration
-  google.protobuf.Duration scan_interval = 3 [deprecated = true];
+  google.protobuf.Duration scan_interval = 3 [ deprecated = true ];
   bool verify = 4;
   google.protobuf.Any connection = 5;
   string scan_period = 6;
@@ -70,7 +71,7 @@ message LocalSource {
 
 // https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-RetrieveFolderorRepositoryArchive
 message Artifactory {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
     string access_token = 3;
@@ -92,12 +93,11 @@ message AzureStorage {
 }
 
 message Bitbucket {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     string token = 2;
     credentials.Oauth2 oauth = 3;
     credentials.BasicAuth basic_auth = 4;
-
   }
   repeated string repositories = 5;
   repeated string ignore_repos = 6;
@@ -106,21 +106,17 @@ message Bitbucket {
 }
 
 message CircleCI {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
-  oneof credential {
-    string token = 2;
-  }
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
+  oneof credential { string token = 2; }
 }
 
 message TravisCI {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
-  oneof credential {
-    string token = 2;
-  }
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
+  oneof credential { string token = 2; }
 }
 
 message Confluence {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     credentials.Unauthenticated unauthenticated = 2;
     credentials.BasicAuth basic_auth = 3;
@@ -152,9 +148,7 @@ message Docker {
 }
 
 message ECR {
-  oneof credential {
-    credentials.KeySecret access_key = 1;
-  }
+  oneof credential { credentials.KeySecret access_key = 1; }
   repeated string registries = 2;
 }
 
@@ -163,8 +157,10 @@ message Filesystem {
   // paths when we no longer depend on the name in enterprise configs.
   repeated string directories = 1;
   repeated string paths = 2;
-  string include_paths_file = 3; // path to file containing newline separated list of paths
-  string exclude_paths_file = 4; // path to file containing newline separated list of paths
+  string include_paths_file =
+      3; // path to file containing newline separated list of paths
+  string exclude_paths_file =
+      4; // path to file containing newline separated list of paths
 }
 
 message GCS {
@@ -195,21 +191,24 @@ message Git {
   string head = 6;
   string base = 7;
   bool bare = 8;
-  string include_paths_file = 9; // path to file containing newline separated list of paths
-  string exclude_paths_file = 10; // path to file containing newline separated list of paths
+  string include_paths_file =
+      9; // path to file containing newline separated list of paths
+  string exclude_paths_file =
+      10; // path to file containing newline separated list of paths
   string exclude_globs = 11; // comma separated list of globs
-  int64  max_depth = 12;
-  // This field is generally used by the CLI or within CI/CD systems to specify a single repository,
-  // whereas the repositories field is used by the enterprise config to specify multiple repositories.
-  // Passing a single repository via the uri field also allows for additional options to be specified
-  // like head, base, bare, etc.
+  int64 max_depth = 12;
+  // This field is generally used by the CLI or within CI/CD systems to specify
+  // a single repository, whereas the repositories field is used by the
+  // enterprise config to specify multiple repositories. Passing a single
+  // repository via the uri field also allows for additional options to be
+  // specified like head, base, bare, etc.
   string uri = 13; // repository URL. https://, file://, or ssh://
   bool skip_binaries = 14;
   bool skip_archives = 15;
 }
 
 message GitLab {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     string token = 2;
     credentials.Oauth2 oauth = 3;
@@ -224,7 +223,7 @@ message GitLab {
 }
 
 message GitHub {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     credentials.GitHubApp github_app = 2;
     string token = 3;
@@ -250,22 +249,18 @@ message GitHub {
 
 message GitHubExperimental {
   string repository = 1;
-  oneof credential {
-    string token = 2;
-  }
+  oneof credential { string token = 2; }
   bool object_discovery = 3;
   int64 collision_threshold = 4;
   bool delete_cached_data = 5;
 }
 
 message GoogleDrive {
-  oneof credential {
-    string refresh_token = 1;
-  }
+  oneof credential { string refresh_token = 1; }
 }
 
 message Huggingface {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     string token = 2;
     credentials.Unauthenticated unauthenticated = 3;
@@ -281,15 +276,15 @@ message Huggingface {
   repeated string include_spaces = 10;
   repeated string ignore_datasets = 13;
   repeated string include_datasets = 14;
-  bool  skip_all_models = 16;
-  bool  skip_all_spaces = 17;
-  bool  skip_all_datasets = 18;
+  bool skip_all_models = 16;
+  bool skip_all_spaces = 17;
+  bool skip_all_datasets = 18;
   bool include_discussions = 11;
   bool include_prs = 19;
 }
 
 message JIRA {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
     credentials.Unauthenticated unauthenticated = 3;
@@ -302,15 +297,11 @@ message JIRA {
 }
 
 message NPMUnauthenticatedPackage {
-  oneof credential {
-    credentials.Unauthenticated unauthenticated = 1;
-  }
+  oneof credential { credentials.Unauthenticated unauthenticated = 1; }
 }
 
 message PyPIUnauthenticatedPackage {
-  oneof credential {
-    credentials.Unauthenticated unauthenticated = 1;
-  }
+  oneof credential { credentials.Unauthenticated unauthenticated = 1; }
 }
 
 message S3 {
@@ -324,11 +315,11 @@ message S3 {
   int64 max_object_size = 6;
   repeated string roles = 7;
   repeated string ignore_buckets = 8;
-  bool enable_resumption = 9;
+  bool enable_resumption = 9 [ deprecated = true ];
 }
 
 message Slack {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     string token = 2;
     credentials.SlackTokens tokens = 5;
@@ -337,16 +328,14 @@ message Slack {
   repeated string ignore_list = 4;
 }
 
-message Test{}
+message Test {}
 
 message Buildkite {
-  oneof credential {
-    string token = 1;
-  }
+  oneof credential { string token = 1; }
 }
 
 message Gerrit {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
     credentials.Unauthenticated unauthenticated = 3;
@@ -357,7 +346,7 @@ message Gerrit {
 }
 
 message Jenkins {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     credentials.BasicAuth basic_auth = 2;
     credentials.Header header = 3;
@@ -367,7 +356,7 @@ message Jenkins {
 }
 
 message Teams {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     string token = 2;
     credentials.ClientCredentials authenticated = 3;
@@ -387,29 +376,23 @@ message Syslog {
 }
 
 message Forager {
-  oneof credential {
-    credentials.Unauthenticated unauthenticated = 1;
-  }
+  oneof credential { credentials.Unauthenticated unauthenticated = 1; }
   repeated string domains = 2;
   int64 max_depth = 3;
   google.protobuf.Timestamp since = 4;
 }
 
 message SlackRealtime {
-  oneof credential {
-    credentials.SlackTokens tokens = 1;
-  }
+  oneof credential { credentials.SlackTokens tokens = 1; }
 }
 
 message Sharepoint {
-  oneof credential {
-    credentials.Oauth2 oauth = 1;
-  }
+  oneof credential { credentials.Oauth2 oauth = 1; }
   string site_url = 2;
 }
 
 message AzureRepos {
-  string endpoint = 1 [(validate.rules).string.uri_ref = true];
+  string endpoint = 1 [ (validate.rules).string.uri_ref = true ];
   oneof credential {
     string token = 2;
     credentials.Oauth2 oauth = 3;
@@ -445,10 +428,8 @@ message Postman {
 }
 
 message Webhook {
-  string listen_address = 1 [(validate.rules).string.hostname = true];
-  oneof credential {
-    credentials.Header header = 2;
-  }
+  string listen_address = 1 [ (validate.rules).string.hostname = true ];
+  oneof credential { credentials.Header header = 2; }
 }
 
 message Elasticsearch {
