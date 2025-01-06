@@ -238,13 +238,11 @@ type LocalSource struct {
 
 	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	// DEPRECATED: scan_interval is deprecated and can be removed when we no
-	// longer depend on the name. Deprecating in favor of scan_period due to the
-	// fact that scan_interval is a duration which is a fixed-length span of time
-	// represented as a count of seconds and fractions of seconds at nanosecond
-	// resolution. Most of the time, we want to be able to specify a scan interval
-	// in human-readable format (e.g. 45s, 30m, 12h, etc.) which is not possible
-	// with a duration.
+	// DEPRECATED: scan_interval is deprecated and can be removed when we no longer depend on the name.
+	// Deprecating in favor of scan_period due to the fact that scan_interval is a duration
+	// which is a fixed-length span of time represented as a count of seconds and fractions of seconds
+	// at nanosecond resolution. Most of the time, we want to be able to specify a scan interval in
+	// human-readable format (e.g. 45s, 30m, 12h, etc.) which is not possible with a duration.
 	// https://protobuf.dev/reference/protobuf/google.protobuf/#duration
 	//
 	// Deprecated: Marked as deprecated in sources.proto.
@@ -1480,11 +1478,10 @@ type Git struct {
 	ExcludePathsFile string           `protobuf:"bytes,10,opt,name=exclude_paths_file,json=excludePathsFile,proto3" json:"exclude_paths_file,omitempty"` // path to file containing newline separated list of paths
 	ExcludeGlobs     string           `protobuf:"bytes,11,opt,name=exclude_globs,json=excludeGlobs,proto3" json:"exclude_globs,omitempty"`               // comma separated list of globs
 	MaxDepth         int64            `protobuf:"varint,12,opt,name=max_depth,json=maxDepth,proto3" json:"max_depth,omitempty"`
-	// This field is generally used by the CLI or within CI/CD systems to specify
-	// a single repository, whereas the repositories field is used by the
-	// enterprise config to specify multiple repositories. Passing a single
-	// repository via the uri field also allows for additional options to be
-	// specified like head, base, bare, etc.
+	// This field is generally used by the CLI or within CI/CD systems to specify a single repository,
+	// whereas the repositories field is used by the enterprise config to specify multiple repositories.
+	// Passing a single repository via the uri field also allows for additional options to be specified
+	// like head, base, bare, etc.
 	Uri          string `protobuf:"bytes,13,opt,name=uri,proto3" json:"uri,omitempty"` // repository URL. https://, file://, or ssh://
 	SkipBinaries bool   `protobuf:"varint,14,opt,name=skip_binaries,json=skipBinaries,proto3" json:"skip_binaries,omitempty"`
 	SkipArchives bool   `protobuf:"varint,15,opt,name=skip_archives,json=skipArchives,proto3" json:"skip_archives,omitempty"`
