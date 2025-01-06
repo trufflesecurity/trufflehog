@@ -134,10 +134,9 @@ func TestGetResumePoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
-			tracker := NewCheckpointer(ctx, tt.progress)
+			tracker := &Checkpointer{ progress: tt.progress}
 
-			resumePoint, err := tracker.ResumePoint(ctx)
+			resumePoint, err := tracker.ResumePoint(context.Background())
 			if tt.expectError {
 				assert.Error(t, err, "Expected an error decoding resume info")
 			} else {
