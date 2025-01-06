@@ -94,7 +94,7 @@ func (s *Source) Init(
 	}
 	s.conn = &conn
 
-	s.checkpointer = NewCheckpointer(ctx, conn.GetEnableResumption(), &s.Progress)
+	s.checkpointer = NewCheckpointer(ctx, &s.Progress)
 	s.metricsCollector = metricsInstance
 
 	s.setMaxObjectSize(conn.GetMaxObjectSize())

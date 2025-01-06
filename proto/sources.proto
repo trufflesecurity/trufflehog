@@ -324,7 +324,7 @@ message S3 {
   int64 max_object_size = 6;
   repeated string roles = 7;
   repeated string ignore_buckets = 8;
-  bool enable_resumption = 9;
+  bool enable_resumption = 9 [deprecated = true];
 }
 
 message Slack {

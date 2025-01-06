@@ -18,7 +18,7 @@ func TestCheckpointerResumption(t *testing.T) {
 
 	// First scan - process 6 objects then interrupt.
 	initialProgress := &sources.Progress{}
-	tracker := NewCheckpointer(ctx, true, initialProgress)
+	tracker := NewCheckpointer(ctx, initialProgress)
 
 	firstPage := &s3.ListObjectsV2Output{
 		Contents: make([]*s3.Object, 12), // Total of 12 objects
@@ -41,7 +41,7 @@ func TestCheckpointerResumption(t *testing.T) {
 	assert.Equal(t, "key-5", resumeInfo.StartAfter)
 
 	// Resume scan with existing progress.
-	resumeTracker := NewCheckpointer(ctx, true, initialProgress)
+	resumeTracker := NewCheckpointer(ctx, initialProgress)
 
 	resumePage := &s3.ListObjectsV2Output{
 		Contents: firstPage.Contents[6:], // Remaining 6 objects
@@ -62,11 +62,9 @@ func TestCheckpointerResumption(t *testing.T) {
 
 func TestCheckpointerReset(t *testing.T) {
 	tests := []struct {
-		name    string
-		enabled bool
+		name string
 	}{
-		{name: "reset with enabled tracker", enabled: true},
-		{name: "reset with disabled tracker", enabled: false},
+		{name: "reset with enabled tracker"},
 	}
 
 	for _, tt := range tests {
@@ -75,7 +73,7 @@ func TestCheckpointerReset(t *testing.T) {
 
 			ctx := context.Background()
 			progress := new(sources.Progress)
-			tracker := NewCheckpointer(ctx, tt.enabled, progress)
+			tracker := NewCheckpointer(ctx, progress)
 
 			tracker.completedObjects[1] = true
 			tracker.completedObjects[2] = true
@@ -85,17 +83,15 @@ func TestCheckpointerReset(t *testing.T) {
 			assert.Equal(t, defaultMaxObjectsPerPage, len(tracker.completedObjects),
 				"Reset changed the length of completed objects")
 
-			if tt.enabled {
-				// All values should be false after reset.
-				for i, isCompleted := range tracker.completedObjects {
-					assert.False(t, isCompleted,
-						"Reset did not clear completed object at index %d", i)
-				}
-
-				// Completion order should be empty.
-				assert.Equal(t, 0, len(tracker.completionOrder),
-					"Reset did not clear completion order")
+			// All values should be false after reset.
+			for i, isCompleted := range tracker.completedObjects {
+				assert.False(t, isCompleted,
+					"Reset did not clear completed object at index %d", i)
 			}
+
+			// Completion order should be empty.
+			assert.Equal(t, 0, len(tracker.completionOrder),
+				"Reset did not clear completion order")
 		})
 	}
 }
@@ -103,41 +99,29 @@ func TestCheckpointerReset(t *testing.T) {
 func TestGetResumePoint(t *testing.T) {
 	tests := []struct {
 		name               string
-		enabled            bool
 		progress           *sources.Progress
 		expectedResumeInfo ResumeInfo
 		expectError        bool
 	}{
 		{
-			name:    "valid resume info",
-			enabled: true,
+			name: "valid resume info",
 			progress: &sources.Progress{
 				EncodedResumeInfo: `{"current_bucket":"test-bucket","start_after":"test-key"}`,
 			},
 			expectedResumeInfo: ResumeInfo{CurrentBucket: "test-bucket", StartAfter: "test-key"},
 		},
 		{
-			name:    "progress disabled",
-			enabled: false,
-			progress: &sources.Progress{
-				EncodedResumeInfo: `{"current_bucket":"test-bucket","start_after":"test-key"}`,
-			},
-		},
-		{
 			name:     "empty encoded resume info",
-			enabled:  true,
 			progress: &sources.Progress{EncodedResumeInfo: ""},
 		},
 		{
-			name:    "empty current bucket",
-			enabled: true,
+			name: "empty current bucket",
 			progress: &sources.Progress{
 				EncodedResumeInfo: `{"current_bucket":"","start_after":"test-key"}`,
 			},
 		},
 		{
-			name:    "unmarshal error",
-			enabled: true,
+			name: "unmarshal error",
 			progress: &sources.Progress{
 				EncodedResumeInfo: `{"current_bucket":123,"start_after":"test-key"}`, // Invalid JSON
 			},
@@ -150,7 +134,7 @@ func TestGetResumePoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tracker := &Checkpointer{enabled: tt.enabled, progress: tt.progress}
+			tracker := &Checkpointer{ progress: tt.progress}
 
 			resumePoint, err := tracker.ResumePoint(context.Background())
 			if tt.expectError {
@@ -233,7 +217,6 @@ func TestCheckpointerUpdate(t *testing.T) {
 			ctx := context.Background()
 			progress := new(sources.Progress)
 			tracker := &Checkpointer{
-				enabled:             true,
 				progress:            progress,
 				completedObjects:    make([]bool, tt.pageSize),
 				completionOrder:     make([]int, 0, tt.pageSize),
@@ -277,7 +260,6 @@ func TestCheckpointerUpdate(t *testing.T) {
 func TestComplete(t *testing.T) {
 	tests := []struct {
 		name         string
-		enabled      bool
 		initialState struct {
 			resumeInfo string
 			message    string
@@ -289,8 +271,7 @@ func TestComplete(t *testing.T) {
 		}
 	}{
 		{
-			name:    "marks completion with existing resume info",
-			enabled: true,
+			name: "marks completion with existing resume info",
 			initialState: struct {
 				resumeInfo string
 				message    string
@@ -308,8 +289,7 @@ func TestComplete(t *testing.T) {
 			},
 		},
 		{
-			name:    "disabled tracker",
-			enabled: false,
+			name: "disabled tracker",
 			initialState: struct {
 				resumeInfo string
 				message    string
@@ -337,7 +317,7 @@ func TestComplete(t *testing.T) {
 				EncodedResumeInfo: tt.initialState.resumeInfo,
 				Message:           tt.initialState.message,
 			}
-			tracker := NewCheckpointer(ctx, tt.enabled, progress)
+			tracker := NewCheckpointer(ctx, progress)
 
 			err := tracker.Complete(ctx, tt.completeMessage)
 			assert.NoError(t, err)
