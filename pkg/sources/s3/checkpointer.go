@@ -44,8 +44,6 @@ import (
 // - Does NOT support concurrent page processing
 // - Must be Reset() between pages
 type Checkpointer struct {
-	enabled bool
-
 	// completedObjects tracks which indices in the current page have been processed.
 	mu               sync.Mutex // protects concurrent access to completion state.
 	completedObjects []bool
@@ -63,16 +61,14 @@ type Checkpointer struct {
 const defaultMaxObjectsPerPage = 1000
 
 // NewCheckpointer creates a new checkpointer for S3 scanning operations.
-// The enabled parameter determines if checkpointing is active, and progress
-// provides the underlying mechanism for persisting scan state.
-func NewCheckpointer(ctx context.Context, enabled bool, progress *sources.Progress) *Checkpointer {
+// The progress provides the underlying mechanism for persisting scan state.
+func NewCheckpointer(ctx context.Context, progress *sources.Progress) *Checkpointer {
 	ctx.Logger().Info("Creating checkpointer")
 
 	return &Checkpointer{
 		// We are resuming if we have completed objects from a previous scan.
 		completedObjects: make([]bool, defaultMaxObjectsPerPage),
 		completionOrder:  make([]int, 0, defaultMaxObjectsPerPage),
-		enabled:          enabled,
 		progress:         progress,
 	}
 }
@@ -80,10 +76,6 @@ func NewCheckpointer(ctx context.Context, enabled bool, progress *sources.Progre
 // Reset prepares the tracker for a new page of objects by clearing the completion state.
 // Must be called before processing each new page of objects.
 func (p *Checkpointer) Reset() {
-	if !p.enabled {
-		return
-	}
-
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	// Store the current completed count before moving to next page.
@@ -101,13 +93,13 @@ type ResumeInfo struct {
 }
 
 // ResumePoint retrieves the last saved checkpoint state if one exists.
-// It returns nil if progress tracking is disabled or no resume state exists.
+// It returns nil if no resume state exists.
 // This method decodes the stored resume information and validates it contains
 // the minimum required data to enable resumption.
 func (p *Checkpointer) ResumePoint(ctx context.Context) (ResumeInfo, error) {
 	resume := ResumeInfo{}
 
-	if !p.enabled || p.progress.EncodedResumeInfo == "" {
+	if p.progress.EncodedResumeInfo == "" {
 		return resume, nil
 	}
 
@@ -163,10 +155,6 @@ func (p *Checkpointer) UpdateObjectCompletion(
 	bucket string,
 	pageContents []*s3.Object,
 ) error {
-	if !p.enabled {
-		return nil
-	}
-
 	ctx = context.WithValues(ctx, "bucket", bucket, "completedIdx", completedIdx)
 	ctx.Logger().V(5).Info("Updating progress")
 
