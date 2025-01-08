@@ -98,7 +98,7 @@ type SourceUnitEnumerator interface {
 	// synchronous but can be called in a goroutine to support concurrent
 	// enumeration and chunking. An error should only be returned from this
 	// method in the case of context cancellation, fatal source errors, or
-	// errors returned by the reporter All other errors related to unit
+	// errors returned by the reporter. All other errors related to unit
 	// enumeration are tracked by the UnitReporter.
 	Enumerate(ctx context.Context, reporter UnitReporter) error
 }
@@ -106,7 +106,7 @@ type SourceUnitEnumerator interface {
 // BaseUnitReporter is a helper struct that implements the UnitReporter interface
 // and includes a JobProgress reference.
 type baseUnitReporter struct {
-	child       UnitReporter
+	child    UnitReporter
 	progress *JobProgress
 }
 
@@ -125,7 +125,6 @@ func (b baseUnitReporter) UnitErr(ctx context.Context, err error) error {
 	}
 	return nil
 }
-
 
 // UnitReporter defines the interface a source will use to report whether a
 // unit was found during enumeration. Either method may be called any number of
