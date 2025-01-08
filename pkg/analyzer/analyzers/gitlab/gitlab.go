@@ -48,7 +48,6 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerTypeGitLab,
 		Metadata: map[string]any{
-			"version":    info.Metadata.Version,
 			"enterprise": info.Metadata.Enterprise,
 		},
 		Bindings: []analyzers.Binding{},
