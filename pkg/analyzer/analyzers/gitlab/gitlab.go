@@ -32,8 +32,12 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	if !ok {
 		return nil, errors.New("key not found in credentialInfo")
 	}
+	host, ok := credInfo["host"]
+	if !ok {
+		host = "https://gitlab.com"
+	}
 
-	info, err := AnalyzePermissions(a.Cfg, key)
+	info, err := AnalyzePermissions(a.Cfg, key, host)
 	if err != nil {
 		return nil, err
 	}
@@ -133,11 +137,11 @@ type MetadataJSON struct {
 	Enterprise bool   `json:"enterprise"`
 }
 
-func getPersonalAccessToken(cfg *config.Config, key string) (AccessTokenJSON, int, error) {
+func getPersonalAccessToken(cfg *config.Config, key, host string) (AccessTokenJSON, int, error) {
 	var tokens AccessTokenJSON
 
 	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/personal_access_tokens/self", nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v4/personal_access_tokens/self", host), nil)
 	if err != nil {
 		return tokens, -1, err
 	}
@@ -155,11 +159,11 @@ func getPersonalAccessToken(cfg *config.Config, key string) (AccessTokenJSON, in
 	return tokens, resp.StatusCode, nil
 }
 
-func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, error) {
+func getAccessibleProjects(cfg *config.Config, key, host string) ([]ProjectsJSON, error) {
 	var projects []ProjectsJSON
 
 	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/projects", nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v4/projects", host), nil)
 	if err != nil {
 		return projects, err
 	}
@@ -197,11 +201,11 @@ func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, erro
 	return projects, nil
 }
 
-func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
+func getMetadata(cfg *config.Config, key, host string) (MetadataJSON, error) {
 	var metadata MetadataJSON
 
 	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/metadata", nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v4/metadata", host), nil)
 	if err != nil {
 		return metadata, err
 	}
@@ -244,9 +248,9 @@ type SecretInfo struct {
 	Projects    []ProjectsJSON
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+func AnalyzePermissions(cfg *config.Config, key string, host string) (*SecretInfo, error) {
 	// get personal_access_tokens accessible
-	token, statusCode, err := getPersonalAccessToken(cfg, key)
+	token, statusCode, err := getPersonalAccessToken(cfg, key, host)
 	if err != nil {
 		return nil, err
 	}
@@ -254,12 +258,12 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 		return nil, fmt.Errorf("Invalid GitLab Access Token")
 	}
 
-	meta, err := getMetadata(cfg, key)
+	meta, err := getMetadata(cfg, key, host)
 	if err != nil {
 		return nil, err
 	}
 
-	projects, err := getAccessibleProjects(cfg, key)
+	projects, err := getAccessibleProjects(cfg, key, host)
 	if err != nil {
 		return nil, err
 	}
@@ -271,8 +275,8 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}, nil
 }
 
-func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-	info, err := AnalyzePermissions(cfg, key)
+func AnalyzeAndPrintPermissions(cfg *config.Config, key, host string) {
+	info, err := AnalyzePermissions(cfg, key, host)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
 		return
