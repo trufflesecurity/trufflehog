@@ -21,6 +21,10 @@ import (
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
 
+const (
+	DefaultGitLabHost = "https://gitlab.com"
+)
+
 type Analyzer struct {
 	Cfg *config.Config
 }
@@ -34,7 +38,7 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	}
 	host, ok := credInfo["host"]
 	if !ok {
-		host = "https://gitlab.com"
+		host = DefaultGitLabHost
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, key, host)
@@ -274,8 +278,8 @@ func AnalyzePermissions(cfg *config.Config, key string, host string) (*SecretInf
 	}, nil
 }
 
-func AnalyzeAndPrintPermissions(cfg *config.Config, key, host string) {
-	info, err := AnalyzePermissions(cfg, key, host)
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	info, err := AnalyzePermissions(cfg, key, DefaultGitLabHost)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
 		return

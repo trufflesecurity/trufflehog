@@ -59,17 +59,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, extraData, host, verificationErr := s.verifyGitlab(ctx, resMatch)
+			isVerified, extraData, analysisInfo, verificationErr := s.verifyGitlab(ctx, resMatch)
 			s1.Verified = isVerified
 			for key, value := range extraData {
 				s1.ExtraData[key] = value
 			}
 
 			s1.SetVerificationError(verificationErr, resMatch)
-			s1.AnalysisInfo = map[string]string{
-				"key":  resMatch,
-				"host": host,
-			}
+			s1.AnalysisInfo = analysisInfo
 		}
 
 		results = append(results, s1)
@@ -78,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, map[string]string, string, error) {
+func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, map[string]string, map[string]string, error) {
 	// there are 4 read 'scopes' for a gitlab token: api, read_user, read_repo, and read_registry
 	// they all grant access to different parts of the API. I couldn't find an endpoint that every
 	// one of these scopes has access to, so we just check an example endpoint for each scope. If any
@@ -97,13 +94,18 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, map[s
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
 		res, err := client.Do(req)
 		if err != nil {
-			return false, nil, baseURL, err
+			return false, nil, nil, err
 		}
 		defer res.Body.Close()
 
 		bodyBytes, err := io.ReadAll(res.Body)
 		if err != nil {
-			return false, nil, baseURL, err
+			return false, nil, nil, err
+		}
+
+		analysisInfo := map[string]string{
+			"key":  resMatch,
+			"host": baseURL,
 		}
 
 		// 200 means good key and has `read_user` scope
@@ -111,27 +113,27 @@ func (s Scanner) verifyGitlab(ctx context.Context, resMatch string) (bool, map[s
 		// 401 is bad key
 		switch res.StatusCode {
 		case http.StatusOK:
-			return true, nil, baseURL, nil
+			return true, nil, analysisInfo, nil
 		case http.StatusForbidden:
 			// check if the user account is blocked or not
 			stringBody := string(bodyBytes)
 			if strings.Contains(stringBody, v1.BlockedUserMessage) {
 				return true, map[string]string{
 					"blocked": "True",
-				}, baseURL, nil
+				}, analysisInfo, nil
 			}
 
 			// Good key but not the right scope
-			return true, nil, baseURL, nil
+			return true, nil, analysisInfo, nil
 		case http.StatusUnauthorized:
 			// Nothing to do; zero values are the ones we want
-			return false, nil, baseURL, nil
+			return false, nil, nil, nil
 		default:
-			return false, nil, baseURL, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+			return false, nil, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 		}
 
 	}
-	return false, nil, "", nil
+	return false, nil, nil, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

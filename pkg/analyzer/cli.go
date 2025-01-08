@@ -83,7 +83,7 @@ func Run(cmd string) {
 	case "stripe":
 		stripe.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "gitlab":
-		gitlab.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"], "https://gitlab.com")
+		gitlab.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "mailchimp":
 		mailchimp.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "postman":
