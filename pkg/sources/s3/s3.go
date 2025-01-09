@@ -457,7 +457,7 @@ func (s *Source) pageChunker(
 
 		// Ignore large files.
 		if *obj.Size > s.maxObjectSize {
-			ctx.Logger().V(5).Info("Skipping large file", "key", *obj.Key, "size", *obj.Size, "max_object_size", s.maxObjectSize)
+			ctx.Logger().V(5).Info("Skipping large file", "max_object_size", s.maxObjectSize)
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "size_limit", float64(*obj.Size))
 			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for large file")
