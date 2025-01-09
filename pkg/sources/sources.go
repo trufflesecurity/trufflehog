@@ -103,6 +103,30 @@ type SourceUnitEnumerator interface {
 	Enumerate(ctx context.Context, reporter UnitReporter) error
 }
 
+// BaseUnitReporter is a helper struct that implements the UnitReporter interface
+// and includes a JobProgress reference.
+type baseUnitReporter struct {
+	child       UnitReporter
+	progress *JobProgress
+}
+
+func (b baseUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
+	b.progress.ReportUnit(unit)
+	if b.child != nil {
+		return b.child.UnitOk(ctx, unit)
+	}
+	return nil
+}
+
+func (b baseUnitReporter) UnitErr(ctx context.Context, err error) error {
+	b.progress.ReportError(err)
+	if b.child != nil {
+		return b.child.UnitErr(ctx, err)
+	}
+	return nil
+}
+
+
 // UnitReporter defines the interface a source will use to report whether a
 // unit was found during enumeration. Either method may be called any number of
 // times. Implementors of this interface should allow for concurrent calls.
@@ -236,6 +260,8 @@ type GithubConfig struct {
 	SkipBinaries bool
 	// IncludeWikis indicates whether to include repository wikis in the scan.
 	IncludeWikis bool
+	// CommentsTimeframeDays indicates how many days of comments to include in the scan.
+	CommentsTimeframeDays uint32
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.
@@ -264,6 +290,10 @@ type GitlabConfig struct {
 	Filter *common.Filter
 	// SkipBinaries allows skipping binary files from the scan.
 	SkipBinaries bool
+	// IncludeRepos is a list of repositories to include in the scan.
+	IncludeRepos []string
+	// ExcludeRepos is a list of repositories to exclude from the scan.
+	ExcludeRepos []string
 }
 
 // FilesystemConfig defines the optional configuration for a filesystem source.

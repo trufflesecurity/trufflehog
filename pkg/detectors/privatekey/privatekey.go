@@ -3,13 +3,13 @@ package privatekey
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
 	regexp "github.com/wasilibs/go-re2"
 	"golang.org/x/crypto/ssh"
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -229,6 +230,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
               ],
               "UnboundedResources": null,
               "Metadata": {
+                "owner": "sirdetectsalot",
                 "expiration": "2025-08-05T00:00:00-07:00",
                 "type": "Fine-Grained GitHub Personal Access Token"
               }
@@ -276,6 +278,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
               ],
               "UnboundedResources": null,
               "Metadata": {
+                "owner": "truffle-sandbox",
                 "expiration": "0001-01-01T00:00:00Z",
                 "type": "Classic GitHub Personal Access Token"
               }
@@ -293,7 +296,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			}
 
 			// Marshal the actual result to JSON
-			gotJSON, err := json.Marshal(got)
+			gotJSON, err := json.MarshalIndent(got, "", "  ")
 			if err != nil {
 				t.Fatalf("could not marshal got to JSON: %s", err)
 			}
@@ -304,25 +307,16 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				t.Fatalf("could not unmarshal want JSON string: %s", err)
 			}
 
-			// Marshal the expected result to JSON (to normalize)
-			wantJSON, err := json.Marshal(wantObj)
+			// Marshal the expected result to JSON with indentation
+			wantJSON, err := json.MarshalIndent(wantObj, "", "  ")
 			if err != nil {
 				t.Fatalf("could not marshal want to JSON: %s", err)
 			}
 
-			// Compare the JSON strings
+			// Compare the JSON strings and show diff if they don't match
 			if string(gotJSON) != string(wantJSON) {
-				// Pretty-print both JSON strings for easier comparison
-				var gotIndented, wantIndented []byte
-				gotIndented, err = json.MarshalIndent(got, "", "  ")
-				if err != nil {
-					t.Fatalf("could not marshal got to indented JSON: %s", err)
-				}
-				wantIndented, err = json.MarshalIndent(wantObj, "", "  ")
-				if err != nil {
-					t.Fatalf("could not marshal want to indented JSON: %s", err)
-				}
-				t.Errorf("Analyzer.Analyze() = %s, want %s", gotIndented, wantIndented)
+				diff := cmp.Diff(string(wantJSON), string(gotJSON))
+				t.Errorf("Analyzer.Analyze() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

@@ -2,11 +2,11 @@ package tickettailor
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
-	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tickettailor"}) + `\b(sk[a-fA-Z0-9_]{45})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"tickettailor"}) + `\b(sk_[0-9]{4}_[0-9]{6}_[a-f0-9]{32})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -35,35 +35,22 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueKeyMatches := make(map[string]struct{})
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeyMatches[match[1]] = struct{}{}
+	}
 
+	for key := range uniqueKeyMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Tickettailor,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(key),
 		}
 
 		if verify {
-			data := fmt.Sprintf("%s:", resMatch)
-			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.tickettailor.com/v1/orders", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Accept", "application/vnd.tickettailor+json; version=3")
-			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyTicketTailor(ctx, client, key)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
 		}
 
 		results = append(results, s1)
@@ -78,4 +65,33 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Tickettailor is an online ticketing platform that allows event organizers to sell tickets. Tickettailor API keys can be used to manage events, orders, and tickets programmatically."
+}
+
+func verifyTicketTailor(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.tickettailor.com/v1/orders", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Accept", "application/json")
+	// as per API docs we only need to use apiKey as username in basic auth and leave password as empty: https://developers.tickettailor.com/#authentication
+	req.SetBasicAuth(apiKey, "")
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, nil
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

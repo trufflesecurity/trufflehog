@@ -13,20 +13,19 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/gobwas/glob"
-	"github.com/google/go-github/v63/github"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"github.com/google/go-github/v67/github"
 	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
@@ -67,9 +66,10 @@ type Source struct {
 	resumeInfoSlice []string
 	connector       connector
 
-	includePRComments    bool
-	includeIssueComments bool
-	includeGistComments  bool
+	includePRComments     bool
+	includeIssueComments  bool
+	includeGistComments   bool
+	commentsTimeframeDays uint32
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
@@ -231,14 +231,14 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.connector = connector
 
-	s.orgsCache = memory.New[string]()
+	s.orgsCache = simple.NewCache[string]()
 	for _, org := range s.conn.Organizations {
 		s.orgsCache.Set(org, org)
 	}
 	s.memberCache = make(map[string]struct{})
 
 	s.filteredRepoCache = s.newFilteredRepoCache(aCtx,
-		memory.New[string](),
+		simple.NewCache[string](),
 		append(s.conn.GetRepositories(), s.conn.GetIncludeRepos()...),
 		s.conn.GetIgnoreRepos(),
 	)
@@ -256,6 +256,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	s.includeIssueComments = s.conn.IncludeIssueComments
 	s.includePRComments = s.conn.IncludePullRequestComments
 	s.includeGistComments = s.conn.IncludeGistComments
+	s.commentsTimeframeDays = s.conn.CommentsTimeframeDays
 
 	// Head or base should only be used with incoming webhooks
 	if (len(s.conn.Head) > 0 || len(s.conn.Base) > 0) && len(s.repos) != 1 {
@@ -628,7 +629,6 @@ func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error
 	s.repos = reposToScan
 
 	for i, repoURL := range s.repos {
-		i, repoURL := i, repoURL
 		s.jobPool.Go(func() error {
 			if common.IsDone(ctx) {
 				return nil
@@ -725,15 +725,6 @@ func (s *Source) cloneAndScanRepo(ctx context.Context, repoURL string, repoInfo 
 
 	// TODO: Can this be set once or does it need to be set on every iteration? Is |s.scanOptions| set every clone?
 	s.setScanOptions(s.conn.Base, s.conn.Head)
-
-	// Repo size is not collected for wikis.
-	var logger logr.Logger
-	if !strings.HasSuffix(repoURL, ".wiki.git") && repoInfo.size > 0 {
-		logger = ctx.Logger().WithValues("repo_size_kb", repoInfo.size)
-	} else {
-		logger = ctx.Logger()
-	}
-	logger.V(2).Info("scanning repo")
 
 	start := time.Now()
 	if err = s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter); err != nil {
@@ -967,8 +958,11 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 		if s.handleRateLimit(ctx, err) {
 			continue
 		}
-		if err != nil || len(members) == 0 {
-			return fmt.Errorf("could not list organization members: account may not have access to list organization members %w", err)
+		if err != nil {
+			return fmt.Errorf("could not list organization (%q) members: account may not have access to list organization members: %w", org, err)
+		}
+		if len(members) == 0 {
+			return fmt.Errorf("organization (%q) had 0 members: account may not have access to list organization members", org)
 		}
 
 		logger.V(2).Info("Listed members", "page", opts.Page, "last_page", res.LastPage)
@@ -1011,10 +1005,17 @@ func (s *Source) scanComments(ctx context.Context, repoPath string, repoInfo rep
 		return err
 	}
 
+	var cutoffTime *time.Time
+	if s.commentsTimeframeDays > 0 {
+		daysToFilter := int(s.commentsTimeframeDays)
+		t := time.Now().AddDate(0, 0, -daysToFilter)
+		cutoffTime = &t
+	}
+
 	if s.includeGistComments && isGistUrl(urlParts) {
-		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter)
+		return s.processGistComments(ctx, urlString, urlParts, repoInfo, reporter, cutoffTime)
 	} else if s.includeIssueComments || s.includePRComments {
-		return s.processRepoComments(ctx, repoInfo, reporter)
+		return s.processRepoComments(ctx, repoInfo, reporter, cutoffTime)
 	}
 	return nil
 }
@@ -1074,7 +1075,7 @@ func getRepoURLParts(repoURLString string) (string, []string, error) {
 
 const initialPage = 1 // page to start listing from
 
-func (s *Source) processGistComments(ctx context.Context, gistURL string, urlParts []string, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processGistComments(ctx context.Context, gistURL string, urlParts []string, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	ctx.Logger().V(2).Info("Scanning GitHub Gist comments")
 
 	// GitHub Gist URL.
@@ -1093,7 +1094,7 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 			return err
 		}
 
-		if err = s.chunkGistComments(ctx, gistURL, repoInfo, comments, reporter); err != nil {
+		if err = s.chunkGistComments(ctx, gistURL, repoInfo, comments, reporter, cutoffTime); err != nil {
 			return err
 		}
 
@@ -1113,8 +1114,13 @@ func isGistUrl(urlParts []string) bool {
 	return strings.EqualFold(urlParts[0], "gist.github.com") || (len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist"))
 }
 
-func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter) error {
+func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
+		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
+		if cutoffTime != nil && comment.GetCreatedAt().Before(*cutoffTime) {
+			break
+		}
+
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
@@ -1147,10 +1153,10 @@ func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo
 // Note: these can't be consts because the address is needed when using with the GitHub library.
 var (
 	// sortType defines the criteria for sorting comments.
-	// By default, comments are sorted by their creation date.
-	sortType = "created"
+	// By setting this to "updated" we can use this to reliably manage the comment timeframe filtering below
+	sortType = "updated"
 	// directionType defines the direction of sorting.
-	// "desc" means comments will be sorted in descending order, showing the latest comments first.
+	// "desc" means comments will be sorted in descending order, showing the latest comments first, which is critical for managing the comment timeframe filtering
 	directionType = "desc"
 	// allComments is a placeholder for specifying the comment ID to start listing from.
 	// A value of 0 means that all comments will be listed.
@@ -1159,13 +1165,13 @@ var (
 	state = "all"
 )
 
-func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	if s.includeIssueComments {
 		ctx.Logger().V(2).Info("Scanning issues")
 		if err := s.processIssues(ctx, repoInfo, reporter); err != nil {
 			return err
 		}
-		if err := s.processIssueComments(ctx, repoInfo, reporter); err != nil {
+		if err := s.processIssueComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
@@ -1175,7 +1181,7 @@ func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, rep
 		if err := s.processPRs(ctx, repoInfo, reporter); err != nil {
 			return err
 		}
-		if err := s.processPRComments(ctx, repoInfo, reporter); err != nil {
+		if err := s.processPRComments(ctx, repoInfo, reporter, cutoffTime); err != nil {
 			return err
 		}
 	}
@@ -1220,7 +1226,6 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter 
 
 func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*github.Issue, reporter sources.ChunkReporter) error {
 	for _, issue := range issues {
-
 		// Skip pull requests since covered by processPRs.
 		if issue.IsPullRequest() {
 			continue
@@ -1255,7 +1260,7 @@ func (s *Source) chunkIssues(ctx context.Context, repoInfo repoInfo, issues []*g
 	return nil
 }
 
-func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	issueOpts := &github.IssueListCommentsOptions{
 		Sort:      &sortType,
 		Direction: &directionType,
@@ -1274,7 +1279,7 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 			return err
 		}
 
-		if err = s.chunkIssueComments(ctx, repoInfo, issueComments, reporter); err != nil {
+		if err = s.chunkIssueComments(ctx, repoInfo, issueComments, reporter, cutoffTime); err != nil {
 			return err
 		}
 
@@ -1286,8 +1291,13 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 	return nil
 }
 
-func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter) error {
+func (s *Source) chunkIssueComments(ctx context.Context, repoInfo repoInfo, comments []*github.IssueComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
+		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
+		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
+			continue
+		}
+
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
@@ -1350,7 +1360,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sou
 	return nil
 }
 
-func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
+func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	prOpts := &github.PullRequestListCommentsOptions{
 		Sort:      sortType,
 		Direction: directionType,
@@ -1369,7 +1379,7 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, repor
 			return err
 		}
 
-		if err = s.chunkPullRequestComments(ctx, repoInfo, prComments, reporter); err != nil {
+		if err = s.chunkPullRequestComments(ctx, repoInfo, prComments, reporter, cutoffTime); err != nil {
 			return err
 		}
 
@@ -1413,14 +1423,19 @@ func (s *Source) chunkPullRequests(ctx context.Context, repoInfo repoInfo, prs [
 	return nil
 }
 
-func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter) error {
+func (s *Source) chunkPullRequestComments(ctx context.Context, repoInfo repoInfo, comments []*github.PullRequestComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
 	for _, comment := range comments {
+		// Stop processing comments as soon as one created before the cutoff time is detected, as these are sorted
+		if cutoffTime != nil && comment.GetUpdatedAt().Before(*cutoffTime) {
+			continue
+		}
+
 		// Create chunk and send it to the channel.
 		chunk := sources.Chunk{
 			SourceName: s.name,
 			SourceID:   s.SourceID(),
-			SourceType: s.Type(),
 			JobID:      s.JobID(),
+			SourceType: s.Type(),
 			SourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Github{
 					Github: &source_metadatapb.Github{
@@ -1502,8 +1517,10 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Github{Github: meta},
 		},
-		Verify: s.verify}
-	return handlers.HandleFile(ctx, readCloser, &chunkSkel, reporter)
+		Verify: s.verify,
+	}
+	fileCtx := context.WithValues(ctx, "path", meta.GetFile())
+	return handlers.HandleFile(fileCtx, readCloser, &chunkSkel, reporter)
 }
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {

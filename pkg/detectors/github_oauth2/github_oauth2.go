@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
-
 	"golang.org/x/oauth2/clientcredentials"
 	"golang.org/x/oauth2/github"
 
@@ -14,7 +13,6 @@ import (
 )
 
 type Scanner struct {
-	detectors.EndpointSetter
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -23,7 +21,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	// Oauth2 client ID and secret
-	oauth2ClientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-f0-9]{20})\b`)
+	oauth2ClientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-zA-Z0-9]{20})\b`)
 	oauth2ClientSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"github"}) + `\b([a-f0-9]{40})\b`)
 )
 
@@ -70,7 +68,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 			if verify {
 				_, err := config.Token(ctx)
+				// if client id and client secret is correct, it will return bad verification code error as we do not pass any verification code
+				// docs: https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors#bad-verification-code
 				if err != nil && strings.Contains(err.Error(), githubBadVerificationCodeError) {
+					// mark result as verified only in case of bad verification code error, for any other error the result will be unverified
 					s1.Verified = true
 				}
 			}

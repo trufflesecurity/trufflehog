@@ -2,12 +2,13 @@ package rabbitmq
 
 import (
 	"context"
+	"net"
 	"net/url"
 	"strings"
-
-	regexp "github.com/wasilibs/go-re2"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -32,12 +33,19 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueMatches = make(map[string]string)
+	for _, matches := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueMatches[matches[0]] = matches[1]
+	}
 
-	for _, match := range matches {
-		urlMatch := match[0]
-		password := match[1]
-
+	for urlMatch, password := range uniqueMatches {
+		// Skip common test hosts.
+		if strings.Contains(urlMatch, "127.0.0.1") ||
+			strings.Contains(urlMatch, "localhost") ||
+			strings.Contains(urlMatch, "contoso.com") ||
+			strings.Contains(urlMatch, "example.com") {
+			continue
+		}
 		// Skip findings where the password only has "*" characters, this is a redacted password
 		if strings.Trim(password, "*") == "" {
 			continue
@@ -51,35 +59,47 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			continue
 		}
 
-		redact := strings.TrimSpace(strings.Replace(parsedURL.String(), password, "********", -1))
-
-		s := detectors.Result{
+		r := detectors.Result{
 			DetectorType: detectorspb.DetectorType_RabbitMQ,
 			Raw:          []byte(urlMatch),
-			Redacted:     redact,
+			Redacted:     strings.TrimSpace(strings.Replace(parsedURL.String(), password, "********", -1)),
 		}
 
 		if verify {
-			conn, err := amqp.Dial(urlMatch)
-			if err == nil {
-				s.Verified = true
-			}
-			if conn != nil {
-				conn.Close()
+			isVerified, verificationErr := s.verify(urlMatch)
+			r.Verified = isVerified
+			if verificationErr != nil {
+				r.SetVerificationError(verificationErr, urlMatch)
 			}
 		}
 
-		if !s.Verified {
+		if !r.Verified {
 			// Skip unverified findings where the password starts with a `$` - it's almost certainly a variable.
 			if strings.HasPrefix(password, "$") {
 				continue
 			}
 		}
 
-		results = append(results, s)
+		results = append(results, r)
 	}
 
 	return results, nil
+}
+
+func (s Scanner) verify(url string) (bool, error) {
+	// Add a timeout.
+	// https://github.com/rabbitmq/amqp091-go/blob/dc67c21576c230f589636319f05b7262915313e6/examples_test.go#L22
+	conn, err := amqp.DialConfig(url, amqp.Config{
+		Dial: func(network, addr string) (net.Conn, error) {
+			return net.DialTimeout(network, addr, 10*time.Second)
+		},
+	})
+	defer func() {
+		if conn != nil {
+			_ = conn.Close()
+		}
+	}()
+	return err == nil, err
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
