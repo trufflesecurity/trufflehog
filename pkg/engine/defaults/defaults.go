@@ -1,11 +1,6 @@
 package defaults
 
 import (
-	"bytes"
-	"strings"
-	"sync"
-
-	ahocorasick "github.com/BobuSumisu/aho-corasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
@@ -63,18 +58,20 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autopilot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/avazapersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aviationstack"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
-	awssessionkey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
+	aws_access_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/access_keys"
+	aws_session_keys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/session_keys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/axonaut"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurebatch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_batch"
+	azure_serviceprincipal_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v1"
+	azure_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_openai"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_storage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurestorage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
@@ -90,7 +87,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitmex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blazemeter"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blitapp"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blocknative"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/blogger"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bombbomb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boostnote"
@@ -106,8 +102,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/budibase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugherd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bugsnag"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkitev2"
+	buildKitev1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite/v1"
+	buildKitev2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buildkite/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulbul"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bulksms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/buttercms"
@@ -272,6 +268,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fixerio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flatio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fleetbase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flexport"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flickr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flightlabs"
@@ -318,6 +315,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/glassnode"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocanvas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gocardless"
+	godaddyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v1"
+	godaddyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
@@ -343,7 +342,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/honeycomb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/host"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/html2pdf"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspotapikey"
+	hubspot_apikey_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspot_apikey/v1"
+	hubspot_apikey_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hubspot_apikey/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/humanity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hunter"
@@ -582,7 +582,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replicate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/replyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/requestfinance"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackhtmltopdfapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/restpackscreenshotapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/revampcrm"
@@ -591,7 +590,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roaring"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/robinhoodcrypto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rocketreach"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rockset"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roninapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/route4me"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
@@ -603,6 +601,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesflare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesmate"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sanity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterprojectkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterwritekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/saucelabs"
@@ -736,13 +735,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/trufflehogenterprise"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twelvedata"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twilio"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twilioapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitchaccesstoken"
 	twitterv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter/v1"
 	twitterv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitter/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/twitterconsumerkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tyntec"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform"
+	typeformv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform/v1"
+	typeformv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typeform/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/typetalk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ubidots"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uclassify"
@@ -811,6 +813,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipbooks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodeapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zipcodebase"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zohocrm"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zonkafeedback"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/zulipchat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -881,19 +884,21 @@ func buildDetectorList() []detectors.Detector {
 		&autopilot.Scanner{},
 		&avazapersonalaccesstoken.Scanner{},
 		&aviationstack.Scanner{},
-		aws.New(),
-		awssessionkey.New(),
+		aws_access_keys.New(),
+		aws_session_keys.New(),
 		&axonaut.Scanner{},
 		&aylien.Scanner{},
 		&ayrshare.Scanner{},
-		&azure.Scanner{},
-		&azurebatch.Scanner{},
+		&azure_serviceprincipal_v1.Scanner{},
+		&azure_serviceprincipal_v2.Scanner{},
+		&azure_batch.Scanner{},
 		&azurecontainerregistry.Scanner{},
 		&azuredevopspersonalaccesstoken.Scanner{},
 		// &azurefunctionkey.Scanner{}, // detector is throwing some FPs
+		&azure_openai.Scanner{},
 		&azuresearchadminkey.Scanner{},
 		&azuresearchquerykey.Scanner{},
-		&azurestorage.Scanner{},
+		&azure_storage.Scanner{},
 		&bannerbear.Scanner{},
 		&baremetrics.Scanner{},
 		&beamer.Scanner{},
@@ -909,7 +914,7 @@ func buildDetectorList() []detectors.Detector {
 		&bitmex.Scanner{},
 		&blazemeter.Scanner{},
 		&blitapp.Scanner{},
-		&blocknative.Scanner{},
+		// &blocknative.Scanner{}, // temporary disabled due to API issue
 		&blogger.Scanner{},
 		&bombbomb.Scanner{},
 		&boostnote.Scanner{},
@@ -925,8 +930,8 @@ func buildDetectorList() []detectors.Detector {
 		&budibase.Scanner{},
 		&bugherd.Scanner{},
 		&bugsnag.Scanner{},
-		&buildkite.Scanner{},
-		&buildkitev2.Scanner{},
+		&buildKitev1.Scanner{},
+		&buildKitev2.Scanner{},
 		&bulbul.Scanner{},
 		&bulksms.Scanner{},
 		&buttercms.Scanner{},
@@ -1093,6 +1098,7 @@ func buildDetectorList() []detectors.Detector {
 		&fixerio.Scanner{},
 		&flatio.Scanner{},
 		&fleetbase.Scanner{},
+		&flexport.Scanner{},
 		&flickr.Scanner{},
 		&flightapi.Scanner{},
 		&flightlabs.Scanner{},
@@ -1142,6 +1148,8 @@ func buildDetectorList() []detectors.Detector {
 		&glassnode.Scanner{},
 		&gocanvas.Scanner{},
 		&gocardless.Scanner{},
+		&godaddyv1.Scanner{},
+		&godaddyv2.Scanner{},
 		&goodday.Scanner{},
 		&googleoauth2.Scanner{},
 		&grafana.Scanner{},
@@ -1168,7 +1176,8 @@ func buildDetectorList() []detectors.Detector {
 		&honeycomb.Scanner{},
 		&host.Scanner{},
 		&html2pdf.Scanner{},
-		&hubspotapikey.Scanner{},
+		&hubspot_apikey_v1.Scanner{},
+		&hubspot_apikey_v2.Scanner{},
 		&huggingface.Scanner{},
 		&humanity.Scanner{},
 		&hunter.Scanner{},
@@ -1415,7 +1424,7 @@ func buildDetectorList() []detectors.Detector {
 		&replicate.Scanner{},
 		&replyio.Scanner{},
 		&requestfinance.Scanner{},
-		&restpack.Scanner{},
+		// &restpack.Scanner{},
 		&restpackhtmltopdfapi.Scanner{},
 		&restpackscreenshotapi.Scanner{},
 		&revampcrm.Scanner{},
@@ -1424,7 +1433,7 @@ func buildDetectorList() []detectors.Detector {
 		&roaring.Scanner{},
 		&robinhoodcrypto.Scanner{},
 		&rocketreach.Scanner{},
-		&rockset.Scanner{},
+		// &rockset.Scanner{},
 		&roninapp.Scanner{},
 		&route4me.Scanner{},
 		&rownd.Scanner{},
@@ -1436,6 +1445,7 @@ func buildDetectorList() []detectors.Detector {
 		&salesflare.Scanner{},
 		&salesforce.Scanner{},
 		&salesmate.Scanner{},
+		&sanity.Scanner{},
 		&satismeterprojectkey.Scanner{},
 		&satismeterwritekey.Scanner{},
 		&saucelabs.Scanner{},
@@ -1572,13 +1582,16 @@ func buildDetectorList() []detectors.Detector {
 		&trufflehogenterprise.Scanner{},
 		&twelvedata.Scanner{},
 		&twilio.Scanner{},
+		&twilioapikey.Scanner{},
 		&twist.Scanner{},
 		&twitch.Scanner{},
+		&twitchaccesstoken.Scanner{},
 		&twitterconsumerkey.Scanner{},
 		&twitterv1.Scanner{},
 		&twitterv2.Scanner{},
 		&tyntec.Scanner{},
-		&typeform.Scanner{},
+		&typeformv1.Scanner{},
+		&typeformv2.Scanner{},
 		&typetalk.Scanner{},
 		&ubidots.Scanner{},
 		&uclassify.Scanner{},
@@ -1649,6 +1662,7 @@ func buildDetectorList() []detectors.Detector {
 		&zipbooks.Scanner{},
 		&zipcodeapi.Scanner{},
 		&zipcodebase.Scanner{},
+		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
 	}
@@ -1683,61 +1697,4 @@ func DefaultDetectorTypesImplementing[T any]() map[detectorspb.DetectorType]stru
 		}
 	}
 	return out
-}
-
-func defaultDetectorKeywords() []string {
-	allDetectors := buildDetectorList()
-
-	// Remove keywords that cause lots of false positives.
-	var exclusions = []string{
-		"AKIA", "SG.", "pat", "token", "gh", "github", "sql", "database", "http", "key", "api-", "sdk-", "float", "-us", "gh", "pat", "token", "sid", "http", "private", "key", "segment", "close", "protocols", "verifier", "box", "privacy", "dm", "sl.", "vf", "flat",
-	}
-
-	var keywords []string
-	exclusionSet := make(map[string]struct{})
-	for _, excl := range exclusions {
-		exclusionSet[strings.ToLower(excl)] = struct{}{}
-	}
-
-	// Aggregate all keywords from detectors.
-	for _, detector := range allDetectors {
-		for _, kw := range detector.Keywords() {
-			kwLower := strings.ToLower(kw)
-			if _, excluded := exclusionSet[kwLower]; !excluded {
-				keywords = append(keywords, kwLower)
-			}
-		}
-	}
-	return keywords
-}
-
-// DefaultDetectorKeywordMatcher encapsulates the Aho-Corasick trie for keyword matching.
-type DefaultDetectorKeywordMatcher struct {
-	mu   sync.RWMutex
-	trie *ahocorasick.Trie
-}
-
-// NewDefaultDetectorKeywordMatcher creates a new DefaultDetectorKeywordMatcher.
-func NewDefaultDetectorKeywordMatcher() *DefaultDetectorKeywordMatcher {
-	keywords := defaultDetectorKeywords()
-	return &DefaultDetectorKeywordMatcher{trie: ahocorasick.NewTrieBuilder().AddStrings(keywords).Build()}
-}
-
-// FindKeywords scans the input text and returns a slice of matched keywords.
-func (km *DefaultDetectorKeywordMatcher) FindKeywords(text []byte) []string {
-	km.mu.RLock()
-	defer km.mu.RUnlock()
-
-	matches := km.trie.Match(bytes.ToLower(text))
-	found := make([]string, 0, len(matches))
-	seen := make(map[string]struct{}) // To avoid duplicate entries
-
-	for _, match := range matches {
-		keyword := match.MatchString()
-		if _, exists := seen[keyword]; !exists {
-			found = append(found, keyword)
-			seen[keyword] = struct{}{}
-		}
-	}
-	return found
 }

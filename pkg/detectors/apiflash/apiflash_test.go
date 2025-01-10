@@ -14,7 +14,6 @@ import (
 var (
 	validPattern = `
 	apiflash_key: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-	apiflash_url: abc123XYZ456def789ghijklm
 	`
 	invalidPattern = "0123456789Gbcde^0123456789abcdef"
 )
@@ -31,7 +30,7 @@ func TestApiFlash_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: fmt.Sprintf("apiflash credentials: %s", validPattern),
-			want:  []string{"a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6abc123XYZ456def789ghijklm"},
+			want:  []string{"a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"},
 		},
 		{
 			name:  "invalid pattern",

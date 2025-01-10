@@ -234,7 +234,7 @@ func (c *Client) NewRequest(urlStr string, headers map[string]string) (*http.Req
 	return req, nil
 }
 
-// checkResponse checks the API response for errors and returns them if present.
+// checkResponseStatus checks the API response for errors and returns them if present.
 // A Response is considered an error if it has a status code outside the 2XX range.
 func checkResponseStatus(r *http.Response) error {
 	if c := r.StatusCode; 200 <= c && c <= 299 {

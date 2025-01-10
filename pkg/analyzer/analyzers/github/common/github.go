@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	gh "github.com/google/go-github/v66/github"
+	gh "github.com/google/go-github/v67/github"
 	"github.com/jedib0t/go-pretty/table"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
@@ -81,8 +81,6 @@ func GetTokenMetadata(token string, client *gh.Client) (*TokenMetadata, error) {
 		return nil, err
 	}
 
-	expiration, _ := time.Parse("2006-01-02 15:04:05 -0700", resp.Header.Get("github-authentication-token-expiration"))
-
 	var oauthScopes []analyzers.Permission
 	for _, scope := range resp.Header.Values("X-OAuth-Scopes") {
 		for _, scope := range strings.Split(scope, ", ") {
@@ -90,6 +88,15 @@ func GetTokenMetadata(token string, client *gh.Client) (*TokenMetadata, error) {
 		}
 	}
 	tokenType, fineGrained := checkFineGrained(token, oauthScopes)
+
+	var expiration time.Time
+	if tokenType == TokenTypeClassicPAT {
+		// for classic tokens, github return token expiration time in header in UTC format.
+		expiration, _ = time.Parse("2006-01-02 15:04:05 UTC", resp.Header.Get("github-authentication-token-expiration"))
+	} else {
+		expiration, _ = time.Parse("2006-01-02 15:04:05 -0700", resp.Header.Get("github-authentication-token-expiration"))
+	}
+
 	return &TokenMetadata{
 		Type:        tokenType,
 		FineGrained: fineGrained,

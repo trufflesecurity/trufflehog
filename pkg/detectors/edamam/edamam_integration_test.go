@@ -96,6 +96,10 @@ func TestEdamam_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no raw v2 secret present: \n %+v", got[i])
+				}
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Edamam.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

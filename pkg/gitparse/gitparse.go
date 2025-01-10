@@ -25,10 +25,10 @@ const (
 	defaultDateFormat = "Mon Jan 2 15:04:05 2006 -0700"
 
 	// defaultMaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
-	defaultMaxDiffSize = 2 * 1024 * 1024 * 1024 // 2GB
+	defaultMaxDiffSize int64 = 2 * 1024 * 1024 * 1024 // 2GB
 
 	// defaultMaxCommitSize is the maximum size for a commit. Larger commits will be cut off.
-	defaultMaxCommitSize = 2 * 1024 * 1024 * 1024 // 2GB
+	defaultMaxCommitSize int64 = 2 * 1024 * 1024 * 1024 // 2GB
 )
 
 // contentWriter defines a common interface for writing, reading, and managing diff content.
@@ -120,8 +120,8 @@ type Commit struct {
 
 // Parser sets values used in GitParse.
 type Parser struct {
-	maxDiffSize   int
-	maxCommitSize int
+	maxDiffSize   int64
+	maxCommitSize int64
 	dateFormat    string
 
 	useCustomContentWriter bool
@@ -188,7 +188,7 @@ func UseCustomContentWriter() Option {
 
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
 // be truncated.
-func WithMaxDiffSize(maxDiffSize int) Option {
+func WithMaxDiffSize(maxDiffSize int64) Option {
 	return func(parser *Parser) {
 		parser.maxDiffSize = maxDiffSize
 	}
@@ -197,7 +197,7 @@ func WithMaxDiffSize(maxDiffSize int) Option {
 // WithMaxCommitSize sets maxCommitSize option. Commits larger than maxCommitSize
 // will be put in the commit channel and additional diffs will be added to a
 // new commit.
-func WithMaxCommitSize(maxCommitSize int) Option {
+func WithMaxCommitSize(maxCommitSize int64) Option {
 	return func(parser *Parser) {
 		parser.maxCommitSize = maxCommitSize
 	}
@@ -572,7 +572,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			latestState = ParseFailure
 		}
 
-		if currentDiff.Len() > c.maxDiffSize {
+		if int64(currentDiff.Len()) > c.maxDiffSize {
 			ctx.Logger().V(2).Info(fmt.Sprintf(
 				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
 			))

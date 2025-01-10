@@ -10,11 +10,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
+	ahocorasick "github.com/BobuSumisu/aho-corasick"
+	"github.com/avast/apkparser"
 	dextk "github.com/csnewman/dextk"
 
-	"github.com/avast/apkparser"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/iobuf"
@@ -28,6 +30,80 @@ import (
 
 // ToDo: Scan nested APKs (aka XAPK files). ATM the archive.go file will skip over them.
 // ToDo: Provide file location information to secret output.
+
+var (
+	keywordMatcherOnce sync.Once
+	keywordMatcher     *detectorKeywordMatcher
+)
+
+func defaultDetectorKeywords() []string {
+	allDetectors := defaults.DefaultDetectors()
+
+	// Remove keywords that cause lots of false positives.
+	var exclusions = []string{
+		"AKIA", "SG.", "pat", "token", "gh", "github", "sql", "database", "http", "key", "api-", "sdk-", "float", "-us", "gh", "pat", "token", "sid", "http", "private", "key", "segment", "close", "protocols", "verifier", "box", "privacy", "dm", "sl.", "vf", "flat",
+	}
+
+	var keywords []string
+	exclusionSet := make(map[string]struct{})
+	for _, excl := range exclusions {
+		exclusionSet[strings.ToLower(excl)] = struct{}{}
+	}
+
+	// Aggregate all keywords from detectors.
+	for _, detector := range allDetectors {
+		for _, kw := range detector.Keywords() {
+			kwLower := strings.ToLower(kw)
+			if _, excluded := exclusionSet[kwLower]; !excluded {
+				keywords = append(keywords, kwLower)
+			}
+		}
+	}
+	return keywords
+}
+
+// detectorKeywordMatcher encapsulates the Aho-Corasick trie for efficient keyword matching.
+// It is used to scan APK file contents for keywords associated with our credential detectors.
+// By only processing files/sections that contain these keywords, we can efficiently filter
+// out irrelevant data and focus on content that is more likely to contain credentials.
+// The Aho-Corasick algorithm provides fast, simultaneous matching of multiple patterns in
+// a single pass through the text, which is crucial for performance when scanning large APK files.
+type detectorKeywordMatcher struct{ trie *ahocorasick.Trie }
+
+// getDefaultDetectorKeywordMatcher creates or returns the singleton detectorKeywordMatcher.
+// This is implemented as a singleton for several important reasons:
+// 1. Building the Aho-Corasick trie is computationally expensive and should only be done once.
+// 2. The trie is immutable after construction and can be safely shared across goroutines.
+// 3. The keyword list from the detectors is static for a given program execution.
+// 4. Memory efficiency - we avoid duplicating the trie structure for each handler instance.
+func getDefaultDetectorKeywordMatcher() *detectorKeywordMatcher {
+	keywordMatcherOnce.Do(func() {
+		keywords := defaultDetectorKeywords()
+		keywordMatcher = &detectorKeywordMatcher{
+			trie: ahocorasick.NewTrieBuilder().AddStrings(keywords).Build(),
+		}
+	})
+	return keywordMatcher
+}
+
+// FindKeywords scans the input text and returns a slice of matched keywords.
+// The method is thread-safe and uses a read lock since the trie is immutable.
+// It returns unique matches only, eliminating duplicates that may occur when
+// the same keyword appears multiple times in the input text.
+func (km *detectorKeywordMatcher) FindKeywords(text []byte) []string {
+	matches := km.trie.Match(bytes.ToLower(text))
+	found := make([]string, 0, len(matches))
+	seen := make(map[string]struct{}) // To avoid duplicate entries
+
+	for _, match := range matches {
+		keyword := match.MatchString()
+		if _, exists := seen[keyword]; !exists {
+			found = append(found, keyword)
+			seen[keyword] = struct{}{}
+		}
+	}
+	return found
+}
 
 var (
 	stringInstructionType  = "const-string"
@@ -53,58 +129,63 @@ var (
 
 // apkHandler handles apk archive formats.
 type apkHandler struct {
-	keywordMatcher *defaults.DefaultDetectorKeywordMatcher
+	keywordMatcher *detectorKeywordMatcher
 	*defaultHandler
 }
 
-// newapkHandler creates an apkHandler.
+// newAPKHandler creates an apkHandler.
 func newAPKHandler() *apkHandler {
 	return &apkHandler{
 		defaultHandler: newDefaultHandler(apkHandlerType),
-		keywordMatcher: defaults.NewDefaultDetectorKeywordMatcher(),
+		keywordMatcher: getDefaultDetectorKeywordMatcher(),
 	}
 }
 
 // HandleFile processes apk formatted files.
-func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) (chan []byte, error) {
-	apkChan := make(chan []byte, defaultBufferSize)
+// Fatal errors that will stop processing:
+// - Unable to create ZIP reader from input
+// - Unable to parse resources.arsc file
+// - Panics during processing (recovered but returned as errors)
+//
+// Non-fatal errors that will be logged and continue processing:
+// - Failed to process individual files within the APK
+// - Failed to process resources.arsc contents
+// - Failed to process individual dex classes
+// - Failed to decode specific XML files
+func (h *apkHandler) HandleFile(ctx logContext.Context, input fileReader) chan DataOrErr {
+	apkChan := make(chan DataOrErr, defaultBufferSize)
 
 	go func() {
-		ctx, cancel := logContext.WithTimeout(ctx, maxTimeout)
-		defer cancel()
 		defer close(apkChan)
-
-		// Update the metrics for the file processing.
-		start := time.Now()
-		var err error
-		defer func() {
-			h.measureLatencyAndHandleErrors(start, err)
-			h.metrics.incFilesProcessed()
-		}()
 
 		// Defer a panic recovery to handle any panics that occur during the APK processing.
 		defer func() {
 			if r := recover(); r != nil {
 				// Return the panic as an error.
+				var panicErr error
 				if e, ok := r.(error); ok {
-					err = e
+					panicErr = e
 				} else {
-					err = fmt.Errorf("panic occurred: %v", r)
+					panicErr = fmt.Errorf("panic occurred: %v", r)
 				}
-				ctx.Logger().Error(err, "Panic occurred when reading apk archive")
+				ctx.Logger().Error(panicErr, "Panic occurred when reading apk archive")
 			}
 		}()
 
-		if err = h.processAPK(ctx, input, apkChan); err != nil {
-			ctx.Logger().Error(err, "error processing apk content")
+		start := time.Now()
+		err := h.processAPK(ctx, input, apkChan)
+		if err == nil {
+			h.metrics.incFilesProcessed()
 		}
+
+		h.measureLatencyAndHandleErrors(ctx, start, err, apkChan)
 	}()
-	return apkChan, nil
+
+	return apkChan
 }
 
 // processAPK processes the apk file and sends the extracted data to the provided channel.
-func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkChan chan []byte) error {
-
+func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkChan chan DataOrErr) error {
 	// Create a ZIP reader from the input fileReader
 	zipReader, err := createZipReader(input)
 	if err != nil {
@@ -132,7 +213,7 @@ func (h *apkHandler) processAPK(ctx logContext.Context, input fileReader, apkCha
 }
 
 // processResources processes the resources.arsc file and sends the extracted data to the provided channel.
-func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparser.ResourceTable, apkChan chan []byte) error {
+func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparser.ResourceTable, apkChan chan DataOrErr) error {
 	if resTable == nil {
 		return errors.New("ResourceTable is nil")
 	}
@@ -144,17 +225,25 @@ func (h *apkHandler) processResources(ctx logContext.Context, resTable *apkparse
 }
 
 // processFile processes the file and sends the extracted data to the provided channel.
-func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTable *apkparser.ResourceTable, apkChan chan []byte) error {
+func (h *apkHandler) processFile(
+	ctx logContext.Context,
+	file *zip.File,
+	resTable *apkparser.ResourceTable,
+	apkChan chan DataOrErr,
+) error {
 	// check if the file is empty
 	if file.UncompressedSize64 == 0 {
 		return nil
 	}
 
 	// Open the file from the zip archive
-	rdr, err := openFile(file)
+	f, err := openFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", file.Name, err)
 	}
+	defer f.Close()
+
+	rdr := iobuf.NewBufferedReaderSeeker(f)
 	defer rdr.Close()
 
 	var contentReader io.Reader
@@ -166,7 +255,7 @@ func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTabl
 			return fmt.Errorf("failed to decode xml file %s: %w", file.Name, err)
 		}
 	case ".dex":
-		contentReader, err = h.processDexFile(ctx, iobuf.NewBufferedReaderSeeker(rdr))
+		contentReader, err = h.processDexFile(ctx, rdr)
 		if err != nil {
 			return fmt.Errorf("failed to decode dex file %s: %w", file.Name, err)
 		}
@@ -177,7 +266,12 @@ func (h *apkHandler) processFile(ctx logContext.Context, file *zip.File, resTabl
 }
 
 // handleAPKFileContent sends the extracted data to the provided channel via the handleNonArchiveContent function.
-func (h *apkHandler) handleAPKFileContent(ctx logContext.Context, rdr io.Reader, fileName string, apkChan chan []byte) error {
+func (h *apkHandler) handleAPKFileContent(
+	ctx logContext.Context,
+	rdr io.Reader,
+	fileName string,
+	apkChan chan DataOrErr,
+) error {
 	mimeReader, err := newMimeTypeReader(rdr)
 	if err != nil {
 		return fmt.Errorf("failed to create mimeTypeReader for file %s: %w", fileName, err)
@@ -287,8 +381,12 @@ func (h *apkHandler) processDexFile(ctx logContext.Context, rdr io.ReaderAt) (io
 }
 
 // processDexClass processes a single class node's methods
-func (h *apkHandler) processDexClass(ctx logContext.Context, dexReader *dextk.Reader, node dextk.ClassNode, dexOutput *bytes.Buffer) {
-
+func (h *apkHandler) processDexClass(
+	ctx logContext.Context,
+	dexReader *dextk.Reader,
+	node dextk.ClassNode,
+	dexOutput *bytes.Buffer,
+) {
 	var classOutput bytes.Buffer
 	methodValues := make(map[string]struct{})
 
@@ -313,7 +411,13 @@ func (h *apkHandler) processDexClass(ctx logContext.Context, dexReader *dextk.Re
 
 // processDexMethod iterates over a slice of methods, processes each method,
 // handles errors, and writes the output to dexOutput.
-func processDexMethod(ctx logContext.Context, dexReader *dextk.Reader, methods []dextk.MethodNode, classOutput *bytes.Buffer, methodValues map[string]struct{}) {
+func processDexMethod(
+	ctx logContext.Context,
+	dexReader *dextk.Reader,
+	methods []dextk.MethodNode,
+	classOutput *bytes.Buffer,
+	methodValues map[string]struct{},
+) {
 	for _, method := range methods {
 		s, err := parseDexInstructions(dexReader, method, methodValues)
 		if err != nil {
@@ -380,26 +484,24 @@ func formatAndFilterInstruction(line string) string {
 	return ""
 }
 
-func decodeXML(rdr io.ReadCloser, resTable *apkparser.ResourceTable) (io.Reader, error) {
-	//Convert rdr to BufferedReadSeeker to support rewinding
-	bufRdr := iobuf.NewBufferedReaderSeeker(rdr)
-
+func decodeXML(rdr io.ReadSeeker, resTable *apkparser.ResourceTable) (io.Reader, error) {
 	// Create a buffer to store the formatted XML data
 	// Note: in the future, consider a custom writer that spills to disk if the buffer gets too large
 	var buf bytes.Buffer
 	enc := xml.NewEncoder(&buf)
 
 	// Parse the XML data using the apkparser library + resource table
-	err := apkparser.ParseXml(bufRdr, enc, resTable)
-	if err != nil {
-		// If the error is due to plaintext XML, return the plaintext XML
-		if errors.Is(err, apkparser.ErrPlainTextManifest) {
-			if _, err := bufRdr.Seek(0, io.SeekStart); err != nil {
-				return bufRdr, fmt.Errorf("error resetting reader after XML parsing error: %w", err)
-			}
-			return bufRdr, nil
-		}
-		return nil, err
+	err := apkparser.ParseXml(rdr, enc, resTable)
+	if err == nil {
+		return &buf, nil
 	}
-	return &buf, nil
+
+	// If the error is due to plaintext XML, return the plaintext XML.
+	if errors.Is(err, apkparser.ErrPlainTextManifest) {
+		if _, err := rdr.Seek(0, io.SeekStart); err != nil {
+			return rdr, fmt.Errorf("error resetting reader after XML parsing error: %w", err)
+		}
+		return rdr, nil
+	}
+	return nil, err
 }

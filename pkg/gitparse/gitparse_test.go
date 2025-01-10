@@ -1452,7 +1452,7 @@ func TestMaxDiffSize(t *testing.T) {
 	builder.WriteString(singleCommitSingleDiff)
 
 	// Generate a diff that is larger than the maxDiffSize.
-	for i := 0; i <= parser.maxDiffSize/1024+10; i++ {
+	for i := int64(0); i <= parser.maxDiffSize/1024+10; i++ {
 		builder.WriteString("+" + strings.Repeat("0", 1024) + "\n")
 	}
 	bigReader := strings.NewReader(builder.String())
@@ -1467,7 +1467,7 @@ func TestMaxDiffSize(t *testing.T) {
 
 	select {
 	case diff := <-diffChan:
-		if diff.Len() > parser.maxDiffSize+1024 {
+		if int64(diff.Len()) > parser.maxDiffSize+1024 {
 			t.Errorf("diff did not match MaxDiffSize. Got: %d, expected (max): %d", diff.Len(), parser.maxDiffSize+1024)
 		}
 	case <-ctx.Done():

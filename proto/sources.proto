@@ -220,6 +220,7 @@ message GitLab {
   bool skip_binaries = 7;
   bool skip_archives = 8;
   repeated string include_repos = 9;
+  bool exclude_projects_shared_into_groups = 10;
 }
 
 message GitHub {
@@ -323,7 +324,7 @@ message S3 {
   int64 max_object_size = 6;
   repeated string roles = 7;
   repeated string ignore_buckets = 8;
-  bool enable_resumption = 9;
+  bool enable_resumption = 9 [deprecated = true];
 }
 
 message Slack {

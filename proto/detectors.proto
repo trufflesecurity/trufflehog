@@ -567,7 +567,7 @@ enum DetectorType {
   Gitter = 555;
   Host = 556;
   Iexcloud = 557;
-  Restpack = 558;
+  Restpack = 558 [deprecated = true];
   ScraperBox = 559;
   ScrapingAnt = 560;
   SerpStack = 561;
@@ -681,7 +681,7 @@ enum DetectorType {
   Moderation = 669;
   Opendatasoft = 670;
   Podio = 671;
-  Rockset = 672;
+  Rockset = 672 [deprecated = true];
   Rownd = 673;
   Shotstack = 674;
   Swiftype = 675;
@@ -1015,6 +1015,13 @@ enum DetectorType {
   BoxOauth = 1003;
   ApiMetrics = 1004;
   WeightsAndBiases = 1005;
+  ZohoCRM = 1006;
+  AzureOpenAI = 1007;
+  GoDaddy = 1008;
+  Flexport = 1009;
+  TwitchAccessToken = 1010;
+  TwilioApiKey = 1011;
+  Sanity = 1012;
 }
 
 message Result {

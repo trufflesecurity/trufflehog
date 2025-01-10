@@ -3,11 +3,12 @@ package twitch
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -117,5 +118,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Twitch is a live streaming service. Twitch API keys can be used to access and modify data on the Twitch platform."
+	return "Twitch is a live streaming service. Twitch client credentials can be used to access and modify data on the Twitch platform."
 }

@@ -16,7 +16,7 @@ import (
 )
 
 // ScanGitLab scans GitLab with the provided configuration.
-func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
+func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (sources.JobProgressRef, error) {
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),
@@ -32,7 +32,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 			Token: c.Token,
 		}
 	default:
-		return fmt.Errorf("must provide token")
+		return sources.JobProgressRef{}, fmt.Errorf("must provide token")
 	}
 
 	if len(c.Endpoint) > 0 {
@@ -55,7 +55,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal gitlab connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - gitlab"
@@ -63,9 +63,8 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 
 	gitlabSource := &gitlab.Source{}
 	if err := gitlabSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
 	gitlabSource.WithScanOptions(scanOptions)
-	_, err = e.sourceManager.Run(ctx, sourceName, gitlabSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gitlabSource)
 }

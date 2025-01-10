@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v67/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
@@ -30,7 +30,7 @@ func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(co
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	httpClient.Transport = &oauth2.Transport{
 		Base:   httpClient.Transport,
-		Source: oauth2.ReuseTokenSource(nil, tokenSource),
+		Source: tokenSource,
 	}
 
 	apiClient, err := createGitHubClient(httpClient, apiEndpoint)
