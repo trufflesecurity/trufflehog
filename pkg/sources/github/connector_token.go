@@ -30,7 +30,7 @@ func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(co
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	httpClient.Transport = &oauth2.Transport{
 		Base:   httpClient.Transport,
-		Source: oauth2.ReuseTokenSource(nil, tokenSource),
+		Source: tokenSource,
 	}
 
 	apiClient, err := createGitHubClient(httpClient, apiEndpoint)
