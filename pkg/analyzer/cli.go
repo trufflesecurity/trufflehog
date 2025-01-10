@@ -1,11 +1,9 @@
 package analyzer
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airbrake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/asana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
@@ -29,31 +27,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 )
 
-var (
-	// TODO: Add list of supported key types.
-	analyzeKeyType *string
-)
-
 type SecretInfo struct {
 	Parts map[string]string
 	Cfg   *config.Config
 }
 
 func Command(app *kingpin.Application) *kingpin.CmdClause {
-	cli := app.Command("analyze", "Analyze API keys for fine-grained permissions information.")
-
-	keyTypeHelp := fmt.Sprintf(
-		"Type of key to analyze. Omit to interactively choose. Available key types: %s",
-		strings.Join(analyzers.AvailableAnalyzers(), ", "),
-	)
-	// Lowercase the available analyzers.
-	availableAnalyzers := make([]string, len(analyzers.AvailableAnalyzers()))
-	for i, a := range analyzers.AvailableAnalyzers() {
-		availableAnalyzers[i] = strings.ToLower(a)
-	}
-	analyzeKeyType = cli.Arg("key-type", keyTypeHelp).Enum(availableAnalyzers...)
-
-	return cli
+	return app.Command("analyze", "Analyze API keys for fine-grained permissions information.")
 }
 
 func Run(keyType string, secretInfo SecretInfo) {
