@@ -601,6 +601,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesflare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesmate"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sanity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterprojectkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterwritekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/saucelabs"
@@ -1444,6 +1445,7 @@ func buildDetectorList() []detectors.Detector {
 		&salesflare.Scanner{},
 		&salesforce.Scanner{},
 		&salesmate.Scanner{},
+		&sanity.Scanner{},
 		&satismeterprojectkey.Scanner{},
 		&satismeterwritekey.Scanner{},
 		&saucelabs.Scanner{},

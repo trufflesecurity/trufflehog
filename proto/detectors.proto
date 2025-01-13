@@ -1021,6 +1021,7 @@ enum DetectorType {
   Flexport = 1009;
   TwitchAccessToken = 1010;
   TwilioApiKey = 1011;
+  Sanity = 1012;
 }
 
 message Result {
