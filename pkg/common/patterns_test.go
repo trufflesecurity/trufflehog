@@ -31,11 +31,13 @@ func TestEmailRegexCheck(t *testing.T) {
 		dot email          = test.email@my-email-service.xyz
 		special char email = special@characters.com
 		support email      = support@customer-service.org
+		insenstive email   = ADMIN@example.com
+		insenstive domain  = ADMIN@COMPANY.COM
+		mix email          = USER123xyz@local-Server.local
 
 		// negative cases
 		not an email       = abc.123@z
 		looks like email   = test@user <- no domain
-		email but not      = user12@service.COM <- capital letters not supported for domain
 		random text        = here's some information about local-user@edu user
 	`
 
@@ -45,6 +47,7 @@ func TestEmailRegexCheck(t *testing.T) {
 		"info@my-site.net", "contact@web-service.io", "example_user@domain.info",
 		"first.last@department.company.edu", "user1234@domain.co", "admin@local-server.local",
 		"test.email@my-email-service.xyz", "special@characters.com", "support@customer-service.org",
+		"ADMIN@example.com", "ADMIN@COMPANY.COM", "USER123xyz@local-Server.local",
 	}
 
 	emailRegex := regexp.MustCompile(EmailPattern)
