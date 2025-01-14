@@ -37,7 +37,7 @@ func TestAWS_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{"ABIAS9L8MS5IPHTZPPUQv2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63"},
+			want:  []string{"ABIAS9L8MS5IPHTZPPUQ:v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63"},
 		},
 		{
 			name:  "invalid pattern",
