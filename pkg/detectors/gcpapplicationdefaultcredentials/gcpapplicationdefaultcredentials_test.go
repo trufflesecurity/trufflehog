@@ -2,10 +2,12 @@ package gcpapplicationdefaultcredentials
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"testing"
 )
 
 func TestGcpapplicationdefaultcredentials_Pattern(t *testing.T) {
@@ -24,7 +26,9 @@ func TestGcpapplicationdefaultcredentials_Pattern(t *testing.T) {
 					"refresh_token": "1//0_joijgor3i4ut98579862709342j3kjJOIE02834jijfewoifjowiejfhghyzznfoiwejfwnvuhewiufnwinciwu_-o2i3jjfcc",
 					"type": "authorized_user"
 				}`,
-			want: []string{"191375729402-oiuj2498ry3497gjveoierj8294jfj41"},
+			want: []string{
+				"191375729402-oiuj2498ry3497gjveoierj8294jfj411//0_joijgor3i4ut98579862709342j3kjJOIE02834jijfewoifjowiejfhghyzznfoiwejfwnvuhewiufnwinciwu_-o2i3jjfcc",
+			},
 		},
 	}
 

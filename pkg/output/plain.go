@@ -22,6 +22,7 @@ var (
 	boldGreenPrinter = color.New(color.Bold, color.FgHiGreen)
 	whitePrinter     = color.New(color.FgWhite)
 	boldWhitePrinter = color.New(color.Bold, color.FgWhite)
+	cyanPrinter      = color.New(color.FgCyan)
 )
 
 // PlainPrinter is a printer that prints results in plain text format.
@@ -29,12 +30,13 @@ type PlainPrinter struct{ mu sync.Mutex }
 
 func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := outputFormat{
-		DetectorType:      r.Result.DetectorType.String(),
-		DecoderType:       r.Result.DecoderType.String(),
-		Verified:          r.Result.Verified,
-		VerificationError: r.Result.VerificationError(),
-		MetaData:          r.SourceMetadata,
-		Raw:               strings.TrimSpace(string(r.Result.Raw)),
+		DetectorType:        r.Result.DetectorType.String(),
+		DecoderType:         r.DecoderType.String(),
+		Verified:            r.Result.Verified,
+		VerificationError:   r.Result.VerificationError(),
+		MetaData:            r.SourceMetadata,
+		Raw:                 strings.TrimSpace(string(r.Result.Raw)),
+		DetectorDescription: r.DetectorDescription,
 	}
 
 	meta, err := structToMap(out.MetaData.Data)
@@ -54,6 +56,9 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 		if out.VerificationError != nil {
 			yellowPrinter.Printf("Verification issue: %s\n", out.VerificationError)
 		}
+	}
+	if r.VerificationFromCache {
+		cyanPrinter.Print("(Verification info cached)\n")
 	}
 	printer.Printf("Detector Type: %s\n", out.DetectorType)
 	printer.Printf("Decoder Type: %s\n", out.DecoderType)
@@ -115,4 +120,5 @@ type outputFormat struct {
 	VerificationError error
 	Raw               string
 	*source_metadatapb.MetaData
+	DetectorDescription string
 }

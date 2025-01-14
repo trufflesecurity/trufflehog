@@ -1,125 +1,114 @@
-//go:build detectors
-// +build detectors
-
 package auth0managementapitoken
 
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/google/go-cmp/cmp"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestAuth0ManagementApiToken_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
+var (
+	// TODO(kashif): Refactor the fake token generation if possible
+	validPattern   = generateRandomString() // this has the exact token string only which can be used in want too
+	validDomain    = "QHHPu7VPj.sI.auth0.com"
+	invalidPattern = `
+		auth0_credentials:
+			apiToken: eywT2nGMZwOcbsUVBwfiRPEl8P_wnmo6XfdUoGVwxDfOSjNyqhYqFdi.KojZZOM8Ox
+			domain: QHHPu7VPj.sI.auth0.com
+	`
+)
 
-	// use 2592000 for 30 days, this is the maximum allowed
-	managementApiToken := testSecrets.MustGetField("AUTH0_MANAGEMENT_APITOKEN")
-	inactiveManagementApiToken := testSecrets.MustGetField("AUTH0_MANAGEMENT_APITOKEN_INACTIVE")
-	domain := testSecrets.MustGetField("AUTH0_MANAGEMENT_DOMAIN")
+func TestAuth0ManagementApitToken_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a auth0 secret %s domain %s", managementApiToken, domain)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
-					Redacted:     domain,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern",
+			input: makeFakeTokenString(validPattern, validDomain),
+			want:  []string{validPattern + validDomain},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a auth0 secret %s domain https://%s/oauth/token within but not valid", inactiveManagementApiToken, domain)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
-					Redacted:     domain,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name:  "invalid pattern",
+			input: invalidPattern,
+			want:  nil,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Auth0ManagementApiToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
+
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Auth0ManagementApiToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}
 }
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
-				}
-			}
-		})
+// makeFakeTokenString take a string token as parameter and make a string that looks like a token for testing
+func makeFakeTokenString(token, domain string) string {
+	return fmt.Sprintf("auth0:\n apiToken: %s \n domain: %s", token, domain)
+}
+
+// generateRandomString generates exactly 2001 char string for a fake token to by pass the check in detector for testing
+func generateRandomString() string {
+	const length = 2001
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	var builder strings.Builder
+	builder.Grow(length)
+
+	for i := 0; i < length; i++ {
+		randomChar := charset[random.Intn(len(charset))]
+		builder.WriteByte(randomChar)
 	}
+
+	// append ey in start as the token must start with 'ey'
+	return fmt.Sprintf("ey%s", builder.String())
 }

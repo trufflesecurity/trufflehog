@@ -13,7 +13,7 @@ import (
 )
 
 // ScanDocker scans a given docker connection.
-func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) error {
+func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Docker{Images: c.Images}
 
 	switch {
@@ -29,7 +29,7 @@ func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) error {
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal gitlab connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - docker"
@@ -37,8 +37,7 @@ func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) error {
 
 	dockerSource := &docker.Source{}
 	if err := dockerSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, dockerSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, dockerSource)
 }

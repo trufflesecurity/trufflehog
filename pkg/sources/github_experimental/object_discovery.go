@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v67/github"
 	"github.com/k0kubun/go-ansi"
 	"github.com/schollz/progressbar/v3"
 	"golang.org/x/oauth2"
@@ -39,7 +39,7 @@ const startingCharLen = 4
 // Max character length (6 is the default maximum)
 // 6 chars == 16M possibilities --> which will take 18k-55k queries.
 // that's really the max that's tolerable since it will take a long time to run.
-// If you increase this to accomdate a MASSIVE repository, it will take a long time to run.
+// If you increase this to accommodate a MASSIVE repository, it will take a long time to run.
 const maxCharLen = 6
 
 // Starting GraphQL query chunk size.

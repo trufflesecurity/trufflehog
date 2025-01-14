@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	gh "github.com/google/go-github/v66/github"
+	gh "github.com/google/go-github/v67/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/classic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/finegrained"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -23,7 +22,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_GitHub }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeGitHub }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
@@ -39,6 +38,7 @@ func secretInfoToAnalyzerResult(info *common.SecretInfo) *analyzers.AnalyzerResu
 	}
 	result := &analyzers.AnalyzerResult{
 		Metadata: map[string]any{
+			"owner":      info.Metadata.User.Login,
 			"type":       info.Metadata.Type,
 			"expiration": info.Metadata.Expiration,
 		},

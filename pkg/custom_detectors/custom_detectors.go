@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -31,6 +32,7 @@ type CustomRegexWebhook struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*CustomRegexWebhook)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*CustomRegexWebhook)(nil)
+var _ detectors.MaxSecretSizeProvider = (*CustomRegexWebhook)(nil)
 
 // NewWebhookCustomRegex initializes and validates a CustomRegexWebhook. An
 // unexported type is intentionally returned here to ensure the values have
@@ -90,7 +92,6 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	// Create result object and test for verification.
 	resultsCh := make(chan detectors.Result, maxTotalMatches)
 	for _, match := range matches {
-		match := match
 		g.Go(func() error {
 			return c.createResults(ctx, match, verify, resultsCh)
 		})
@@ -101,10 +102,10 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	close(resultsCh)
 
 	for result := range resultsCh {
-		// NOTE: I don't believe this is being set anywhere else, hence the map assignment.
-		result.ExtraData = map[string]string{
-			"name": c.GetName(),
+		if result.ExtraData != nil {
+			result.ExtraData["name"] = c.GetName()
 		}
+
 		results = append(results, result)
 	}
 
@@ -113,6 +114,11 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 
 func (c *CustomRegexWebhook) IsFalsePositive(_ detectors.Result) (bool, string) {
 	return false, ""
+}
+
+// custom max size for custom detector
+func (c *CustomRegexWebhook) MaxSecretSize() int64 {
+	return 1000
 }
 
 func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string][]string, verify bool, results chan<- detectors.Result) error {
@@ -129,6 +135,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		DetectorType: detectorspb.DetectorType_CustomRegex,
 		DetectorName: c.GetName(),
 		Raw:          []byte(raw),
+		ExtraData:    map[string]string{},
 	}
 
 	if !verify {
@@ -166,14 +173,34 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			}
 			req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
 		}
-		res, err := httpClient.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			continue
 		}
-		// TODO: Read response body.
-		res.Body.Close()
-		if res.StatusCode == http.StatusOK {
+		defer func() {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}()
+
+		if resp.StatusCode == http.StatusOK {
+			// mark the result as verified
 			result.Verified = true
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				continue
+			}
+
+			// TODO: handle different content-type responses seperatly when implement custom detector configurations
+			responseStr := string(body)
+			// truncate to 200 characters if response length exceeds 200
+			if len(responseStr) > 200 {
+				responseStr = responseStr[:200]
+			}
+
+			// store the processed response in ExtraData
+			result.ExtraData["response"] = responseStr
+
 			break
 		}
 	}
