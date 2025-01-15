@@ -70,9 +70,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 		// First match is entire regex, second is the first group.
-		if len(match) != 2 {
-			continue
-		}
 
 		token := match[1]
 

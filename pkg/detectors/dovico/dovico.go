@@ -42,14 +42,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	userMatches := userPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, user := range userMatches {
-			if len(user) != 2 {
-				continue
-			}
 			resUser := strings.TrimSpace(user[1])
 
 			s1 := detectors.Result{
