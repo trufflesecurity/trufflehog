@@ -28,12 +28,12 @@ func TestNgrok_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword ngrok",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{},
+			want:  []string{"2WIRSIHOQyHSVklZnoz2k6bTYdH_0E7z0Ta9QEyR1fZvQ0KU9"},
 		},
 		{
 			name:  "valid pattern - ignore duplicate",
 			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
-			want:  []string{},
+			want:  []string{"2WIRSIHOQyHSVklZnoz2k6bTYdH_0E7z0Ta9QEyR1fZvQ0KU9"},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
