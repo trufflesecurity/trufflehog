@@ -34,7 +34,7 @@ jobs:
           mkdir -p tmp/test-results
       - name: Test
         run: |
-          CGO_ENABLED=1 gotestsum --junitfile tmp/test-results/test.xml --raw-command -- go test -json -tags=sources $(go list ./... | grep -v /vendor/ | grep -v pkg/detectors | grep -v pkg/analyzer/analyzers)
+          CGO_ENABLED=1 gotestsum --junitfile tmp/test-results/test.xml --raw-command -- go test -json -tags=sources $(go list ./... | grep -v /vendor/ | grep -v pkg/analyzer/analyzers)
         if: ${{ success() || failure() }} # always run this step, even if there were previous errors
       - name: Upload test results to BuildPulse for flaky test detection
         if: ${{ !cancelled() }} # Run this step even when the tests fail. Skip if the workflow is cancelled.
