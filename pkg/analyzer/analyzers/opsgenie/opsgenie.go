@@ -132,7 +132,7 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 	}
 
 	// Create new HTTP request
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	req, err := http.NewRequest(h.Method, h.Endpoint, data)
 	if err != nil {
 		return false, err

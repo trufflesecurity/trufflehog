@@ -28,9 +28,26 @@ func CreateLogFileName(baseName string) string {
 	return logFileName
 }
 
+// This returns a client that is restricted and filters out unsafe requests returning a success status code.
 func NewAnalyzeClient(cfg *config.Config) *http.Client {
 	client := &http.Client{
 		Transport: AnalyzerRoundTripper{parent: http.DefaultTransport},
+	}
+	if cfg == nil || !cfg.LoggingEnabled {
+		return client
+	}
+	return &http.Client{
+		Transport: LoggingRoundTripper{
+			parent:  client.Transport,
+			logFile: cfg.LogFile,
+		},
+	}
+}
+
+// This returns a client that is unrestricted and does not filter out unsafe requests returning a success status code.
+func NewAnalyzeClientUnrestricted(cfg *config.Config) *http.Client {
+	client := &http.Client{
+		Transport: http.DefaultTransport,
 	}
 	if cfg == nil || !cfg.LoggingEnabled {
 		return client
