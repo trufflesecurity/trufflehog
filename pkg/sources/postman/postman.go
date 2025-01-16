@@ -251,21 +251,6 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		Type:          "workspace",
 	}
 
-	// scan global variables
-	ctx.Logger().V(2).Info("starting scanning global variables")
-	globalVars, err := s.client.GetGlobalVariables(workspace.ID)
-	if err != nil {
-		// NOTE: global endpoint is finicky
-		ctx.Logger().V(2).Error(err, "skipping global variables")
-	}
-
-	metadata.Type = GLOBAL_TYPE
-	metadata.Link = LINK_BASE_URL + "workspace/" + workspace.ID + "/" + GLOBAL_TYPE
-	metadata.FullID = workspace.CreatedBy + "-" + globalVars.ID
-
-	s.scanVariableData(ctx, chunksChan, metadata, globalVars)
-	ctx.Logger().V(2).Info("finished scanning global variables")
-
 	// gather and scan environment variables
 	for _, envID := range workspace.Environments {
 		envVars, err := s.client.GetEnvironmentVariables(envID.UUID)
@@ -293,7 +278,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// scan all the collections in the workspace.
 	// at this point we have all the possible
-	// substitutions from Global and Environment variables
+	// substitutions from Environment variables
 	for _, collectionID := range workspace.Collections {
 		if shouldSkip(collectionID.UUID, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
 			continue
