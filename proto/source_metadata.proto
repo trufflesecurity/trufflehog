@@ -311,6 +311,8 @@ message Postman {
   string field_type = 13;
   string field_name = 14;
   string variable_type = 15;
+  string variable_id = 16;
+  string variable_name = 17;
 }
 
 message Vector {

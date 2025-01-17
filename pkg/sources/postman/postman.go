@@ -264,6 +264,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		metadata.Type = ENVIRONMENT_TYPE
 		metadata.Link = LINK_BASE_URL + "environments/" + envID.UUID
 		metadata.FullID = envVars.ID
+		metadata.VariableName = envVars.Name
 		metadata.EnvironmentID = envID.UUID
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
@@ -631,6 +632,8 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					FolderName:      metadata.FolderName,
 					FieldType:       metadata.FieldType,
 					FieldName:       metadata.FieldName,
+					VariableId:      metadata.VariableID,
+					VariableName:    metadata.VariableName,
 					VariableType:    metadata.VarType,
 				},
 			},

@@ -75,6 +75,8 @@ type Metadata struct {
 	Link            string //direct link to the folder (could be .json file path)
 	Type            string //folder, request, etc.
 	EnvironmentName string
+	VariableID      string
+	VariableName    string
 	VarType         string
 	FieldName       string
 	FieldType       string

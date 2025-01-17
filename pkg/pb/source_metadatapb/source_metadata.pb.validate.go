@@ -3441,6 +3441,10 @@ func (m *Postman) validate(all bool) error {
 
 	// no validation rules for VariableType
 
+	// no validation rules for VariableId
+
+	// no validation rules for VariableName
+
 	if len(errors) > 0 {
 		return PostmanMultiError(errors)
 	}
