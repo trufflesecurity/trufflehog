@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/bitfinexcom/bitfinex-api-go/v2/rest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -47,9 +47,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	apiSecretMatches := apiSecretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, apiKeyMatch := range apiKeyMatches {
-		if len(apiKeyMatch) != 2 {
-			continue
-		}
 		apiKeyRes := strings.TrimSpace(apiKeyMatch[1])
 
 		s1 := detectors.Result{
@@ -58,9 +55,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		for _, apiSecretMatch := range apiSecretMatches {
-			if len(apiSecretMatch) != 2 {
-				continue
-			}
 			apiSecretRes := strings.TrimSpace(apiSecretMatch[1])
 
 			if apiKeyRes == apiSecretRes {

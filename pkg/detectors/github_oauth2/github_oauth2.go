@@ -44,13 +44,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	oauth2ClientSecretMatches := oauth2ClientSecretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, idMatch := range oauth2ClientIDMatches {
-		if len(idMatch) != 2 {
-			continue
-		}
 		for _, secretMatch := range oauth2ClientSecretMatches {
-			if len(secretMatch) != 2 {
-				continue
-			}
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_GitHubOauth2,

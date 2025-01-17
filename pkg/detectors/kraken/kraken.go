@@ -50,15 +50,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	privKeyMatches := privKeyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, privKeyMatch := range privKeyMatches {
-			if len(privKeyMatch) != 2 {
-				continue
-			}
 			resPrivKeyMatch := strings.TrimSpace(privKeyMatch[1])
 
 			s1 := detectors.Result{
