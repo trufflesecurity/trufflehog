@@ -51,7 +51,10 @@ func TestAlgoliaAdminKey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AlgoliaAdminKey,
 					Verified:     true,
-					RawV2:        []byte(fmt.Sprintf("%s%s", secret, id)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", id, secret)),
+					ExtraData: map[string]string{
+						"acl": "listIndexes,search,settings",
+					},
 				},
 			},
 			wantErr: false,
@@ -68,7 +71,7 @@ func TestAlgoliaAdminKey_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_AlgoliaAdminKey,
 					Verified:     false,
-					RawV2:        []byte(fmt.Sprintf("%s%s", inactiveSecret, id)),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", id, inactiveSecret)),
 				},
 			},
 			wantErr: false,

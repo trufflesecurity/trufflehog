@@ -123,7 +123,7 @@ func verifyMatch(ctx context.Context, appId, apiKey string) (bool, map[string]st
 				break
 			}
 		}
-		if !hasSensitivePerms {
+		if hasSensitivePerms {
 			return false, nil, nil
 		}
 
