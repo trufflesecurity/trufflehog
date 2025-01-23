@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 
@@ -57,7 +56,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	var secretInfo = &SecretInfo{}
 
-	// valide the key and get user information
+	// validate the key and get user information
 	secretInfo, valid, err := validateKey(client, key, secretInfo)
 	if err != nil {
 		return nil, err
@@ -65,6 +64,12 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	if !valid {
 		return nil, errors.New("key is not valid")
+	}
+
+	// Get resources
+	secretInfo, err = getResources(client, key, secretInfo)
+	if err != nil {
+		return nil, nil
 	}
 
 	return secretInfo, nil
@@ -77,21 +82,22 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		return
 	}
 
+	if info == nil {
+		color.Red("[x] Error : %s", "No information found")
+		return
+	}
+
 	if info.Valid {
 		color.Green("[!] Valid ElevenLabs API key\n\n")
-	}
-
-	// print user information
-	if info.Valid {
+		// print user information
 		printUser(info.User)
+		// print permissions
+		printPermissions(info.Permissions)
+		// print resources
+		printResources(info.Resources)
+
+		color.Yellow("\n[i] Expires: Never")
 	}
-
-	// print permissions
-	printPermissions(info.Permissions)
-	// print resources
-	printResources(info.Resources)
-	color.Yellow("\n[i] Expires: Never")
-
 }
 
 // secretInfoToAnalyzerResult translate secret info to Analyzer Result
@@ -180,9 +186,14 @@ func validateKey(client *http.Client, key string, secretInfo *SecretInfo) (*Secr
 	return nil, false, fmt.Errorf("unexpected status code: %d", statusCode)
 }
 
-// CaptureBindings gather permissions assigned to key and the resources it has access to
-func CaptureBindings(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
-	// history item ids
+// getResources gather resources the key can access
+func getResources(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
+	// history
+	var err error
+	secretInfo, err = getHistory(client, key, secretInfo)
+	if err != nil {
+		return secretInfo, err
+	}
 	// dubbings
 	// voices
 	// projects
@@ -194,41 +205,7 @@ func CaptureBindings(client *http.Client, key string, secretInfo *SecretInfo) (*
 	// voice changer
 	// audio isolation
 
-	return nil, nil
-}
-
-// makeGetRequest send the GET request to passed url with passed key as API Key and return response body and status code
-func makeGetRequest(client *http.Client, url, key string) ([]byte, int, error) {
-	// create request
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// add key in the header
-	req.Header.Add("xi-api-key", key)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	/*
-		the reason to translate body to byte and does not directly return http.Response
-		 is if we return http.Response we cannot close the body in defer. If we do we will get an error
-		 when reading body outside this function
-	*/
-	responseBodyByte, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return responseBodyByte, resp.StatusCode, nil
+	return secretInfo, nil
 }
 
 func printUser(user User) {
