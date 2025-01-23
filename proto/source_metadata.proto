@@ -317,20 +317,21 @@ message Postman {
 }
 
 enum PostmanLocation {
-  request_query_parameter = 0;
-  request_authorization = 1;
-  request_header = 2;
-  request_body = 3;
-  request_script = 4;
-  request_url = 5;
-  environment_variable = 6;
-  folder_authorization = 7;
-  folder_script = 8;
-  collection_script = 9;
-  collection_variable = 10;
-  collection_authorization = 11;
-  response_body = 12;
-  response_header = 13;
+  unknown_postman = 0;
+  request_query_parameter = 1;
+  request_authorization = 2;
+  request_header = 3;
+  request_body = 4;
+  request_script = 5;
+  request_url = 6;
+  environment_variable = 7;
+  folder_authorization = 8;
+  folder_script = 9;
+  collection_script = 10;
+  collection_variable = 11;
+  collection_authorization = 12;
+  response_body = 13;
+  response_header = 14;
 }
 
 message Vector {
