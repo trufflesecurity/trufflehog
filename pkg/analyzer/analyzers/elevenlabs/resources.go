@@ -8,33 +8,11 @@ type User struct {
 	SubscriptionStatus string
 }
 
-// Resources hold information about all the resources the key has access to
-type Resources struct {
-	HistoryItemsID              []string
-	Voices                      []Voice
-	Projects                    []Project
-	ProununciationDictionaiesID []string
-	Models                      []Models
-	Dubbings                    []Dubbing
-}
-
-type Voice struct {
-	ID            string
-	PublicOwnerID string // only for shared voices
-	Name          string
-}
-
-type Project struct {
-	ID   string
-	Name string
-}
-
-type Models struct {
-	ID   string
-	Name string
-}
-
-type Dubbing struct {
-	ID   string
-	Name string
+// Resources hold information about the resources the key has access
+type Resource struct {
+	ID         string
+	Name       string
+	Type       string
+	Metadata   map[string]string
+	Permission string
 }

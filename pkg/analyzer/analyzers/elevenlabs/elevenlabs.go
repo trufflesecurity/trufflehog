@@ -26,8 +26,8 @@ type SecretInfo struct {
 	User        User // the owner of key
 	Valid       bool
 	Reference   string
-	Permissions []string  // list of Permissions assigned to the key
-	Resources   Resources // list of resources the key has access to
+	Permissions []string   // list of Permissions assigned to the key
+	Resources   []Resource // list of resources the key has access to
 	Misc        map[string]string
 }
 
@@ -80,10 +80,16 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	if info.Valid {
 		color.Green("[!] Valid ElevenLabs API key\n\n")
 	}
-	printPermissions(info.Permissions)
+
+	// print user information
 	if info.Valid {
 		printUser(info.User)
 	}
+
+	// print permissions
+	printPermissions(info.Permissions)
+	// print resources
+	printResources(info.Resources)
 	color.Yellow("\n[i] Expires: Never")
 
 }
@@ -100,13 +106,26 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Bindings:     make([]analyzers.Binding, len(info.Permissions)),
 	}
 
-	for id, scope := range info.Permissions {
-		result.Bindings[id] = analyzers.Binding{
+	// extract information from resource to create bindings and append to result bindings
+	for _, resource := range info.Resources {
+		binding := analyzers.Binding{
+			Resource: analyzers.Resource{
+				Name:               resource.Name,
+				FullyQualifiedName: resource.ID,
+				Type:               resource.Type,
+			},
 			Permission: analyzers.Permission{
-				Value: scope,
+				Value: resource.Permission,
 			},
 		}
+
+		for key, value := range resource.Metadata {
+			binding.Resource.Metadata[key] = value
+		}
+
+		result.Bindings = append(result.Bindings, binding)
 	}
+
 	result.Metadata["Valid_Key"] = info.Valid
 
 	return &result
@@ -128,12 +147,21 @@ func validateKey(client *http.Client, key string, secretInfo *SecretInfo) (*Secr
 
 		// map info to secretInfo
 		secretInfo.Valid = true
-		secretInfo.User.ID = user.UserID
-		secretInfo.User.Name = user.FirstName
-		secretInfo.User.SubscriptionTier = user.Subscription.Tier
-		secretInfo.User.SubscriptionStatus = user.Subscription.Status
+		secretInfo.User = User{
+			ID:                 user.UserID,
+			Name:               user.FirstName,
+			SubscriptionTier:   user.Subscription.Tier,
+			SubscriptionStatus: user.Subscription.Status,
+		}
 		// add user read scope to secret info
 		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[UserRead])
+		// map resource to secret info
+		secretInfo.Resources = append(secretInfo.Resources, Resource{
+			ID:         user.UserID,
+			Name:       user.FirstName,
+			Type:       "User",
+			Permission: PermissionStrings[UserRead],
+		})
 
 		return secretInfo, true, nil
 	} else if statusCode >= http.StatusBadRequest && statusCode <= 499 {
@@ -203,6 +231,15 @@ func makeGetRequest(client *http.Client, url, key string) ([]byte, int, error) {
 	return responseBodyByte, resp.StatusCode, nil
 }
 
+func printUser(user User) {
+	color.Green("\n[i] User:")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"ID", "Name", "Subscription Tier", "Subscription Status"})
+	t.AppendRow(table.Row{color.GreenString(user.ID), color.GreenString(user.Name), color.GreenString(user.SubscriptionTier), color.GreenString(user.SubscriptionStatus)})
+	t.Render()
+}
+
 func printPermissions(permissions []string) {
 	color.Yellow("[i] Permissions:")
 	t := table.NewWriter()
@@ -214,11 +251,13 @@ func printPermissions(permissions []string) {
 	t.Render()
 }
 
-func printUser(user User) {
-	color.Green("\n[i] User:")
+func printResources(resources []Resource) {
+	color.Green("\n[i] Resources:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"ID", "Name", "Subscription Tier", "Subscription Status"})
-	t.AppendRow(table.Row{color.GreenString(user.ID), color.GreenString(user.Name), color.GreenString(user.SubscriptionTier), color.GreenString(user.SubscriptionStatus)})
+	t.AppendHeader(table.Row{"Resource Type", "Resource ID", "Resource Name", "Permission"})
+	for _, resource := range resources {
+		t.AppendRow(table.Row{color.GreenString(resource.Type), color.GreenString(resource.ID), color.GreenString(resource.Name), color.GreenString(resource.Permission)})
+	}
 	t.Render()
 }
