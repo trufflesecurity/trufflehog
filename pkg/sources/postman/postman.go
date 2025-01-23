@@ -264,7 +264,6 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		metadata.Type = ENVIRONMENT_TYPE
 		metadata.Link = LINK_BASE_URL + "environments/" + envID.UUID
 		metadata.FullID = envVars.ID
-		metadata.VariableName = envVars.Name
 		metadata.EnvironmentID = envID.UUID
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
@@ -379,12 +378,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 	// Prep direct links. Ignore updating link if it's a local JSON file
 	if !metadata.fromLocal {
-		metadata.Link = LINK_BASE_URL + metadata.Type + "/" + metadata.FullID
-		if event.Listen == "prerequest" {
-			metadata.Link += "?tab=pre-request-scripts"
-		} else {
-			metadata.Link += "?tab=tests"
-		}
+		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.FullID + "?tab=scripts"
 	}
 
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, data)), metadata)
@@ -598,17 +592,83 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 			continue
 		}
 		values = append(values, s.buildSubstitueSet(m, valStr)...)
+		m.FieldType = m.Type + " variables"
+		switch m.FieldType {
+		case "request > GET parameters (query) variables":
+			m.Link = m.Link + "?tab=params"
+		case "request > header variables":
+			m.Link = m.Link + "?tab=headers"
+		}
+
+		m.VariableName = kv.Key
+		s.scanData(ctx, chunksChan, kv.Value.(string), m)
+		//s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
 	}
 
-	m.FieldType = m.Type + " variables"
-	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
+	//m.FieldType = m.Type + " variables"
+	//s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
 }
 
 func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, data string, metadata Metadata) {
 	if data == "" {
 		return
 	}
-	metadata.FieldType = metadata.Type
+	if metadata.FieldType == "" {
+		metadata.FieldType = metadata.Type
+	}
+	if strings.Contains(metadata.FieldType, "environment") {
+		metadata.Location = source_metadatapb.PostmanLocation_environment_variable
+		metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_environment_variable)]
+	} else if strings.Contains(metadata.FieldType, "authorization") {
+		if metadata.RequestID != "" {
+			metadata.Location = source_metadatapb.PostmanLocation_request_authorization
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_authorization)]
+		} else if metadata.FolderID != "" {
+			metadata.Location = source_metadatapb.PostmanLocation_folder_authorization
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_folder_authorization)]
+		} else if metadata.CollectionInfo.UID != "" {
+			metadata.Location = source_metadatapb.PostmanLocation_collection_authorization
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_authorization)]
+		}
+	} else if strings.Contains(metadata.FieldType, "request") {
+		if strings.Contains(metadata.FieldType, "(query) variables") {
+			metadata.Location = source_metadatapb.PostmanLocation_request_query_parameter
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_query_parameter)]
+		} else if strings.Contains(metadata.FieldType, "header variables") {
+			metadata.Location = source_metadatapb.PostmanLocation_request_header
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_header)]
+		} else if strings.Contains(metadata.FieldType, "body") {
+			metadata.Location = source_metadatapb.PostmanLocation_request_body
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_body)]
+		} else if strings.Contains(metadata.FieldType, "event") {
+			metadata.Location = source_metadatapb.PostmanLocation_request_script
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_script)]
+		} else if strings.Contains(metadata.FieldType, "request URL (no query parameters)") {
+			metadata.Location = source_metadatapb.PostmanLocation_request_url
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_url)]
+		}
+	} else if strings.Contains(metadata.FieldType, "folder") {
+		if strings.Contains(metadata.FieldType, "event") {
+			metadata.Location = source_metadatapb.PostmanLocation_folder_script
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_folder_script)]
+		}
+	} else if strings.Contains(metadata.FieldType, "collection") {
+		if strings.Contains(metadata.FieldType, "event") {
+			metadata.Location = source_metadatapb.PostmanLocation_collection_script
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_script)]
+		} else if strings.Contains(metadata.FieldType, "variables") {
+			metadata.Location = source_metadatapb.PostmanLocation_collection_variable
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_variable)]
+		}
+	} else if strings.Contains(metadata.FieldType, "response") {
+		if strings.Contains(metadata.FieldType, "body") {
+			metadata.Location = source_metadatapb.PostmanLocation_response_body
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_response_body)]
+		} else if strings.Contains(metadata.FieldType, "header") {
+			metadata.Location = source_metadatapb.PostmanLocation_response_header
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_response_header)]
+		}
+	}
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
@@ -632,9 +692,10 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					FolderName:      metadata.FolderName,
 					FieldType:       metadata.FieldType,
 					FieldName:       metadata.FieldName,
-					VariableId:      metadata.VariableID,
 					VariableName:    metadata.VariableName,
 					VariableType:    metadata.VarType,
+					//Location:            metadata.Location,
+					LocationDescription: metadata.LocationDescription,
 				},
 			},
 		},

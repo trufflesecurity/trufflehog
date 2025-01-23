@@ -311,8 +311,26 @@ message Postman {
   string field_type = 13;
   string field_name = 14;
   string variable_type = 15;
-  string variable_id = 16;
-  string variable_name = 17;
+  string variable_name = 16;
+  PostmanLocation location = 17;
+  string location_description = 18;
+}
+
+enum PostmanLocation {
+  request_query_parameter = 0;
+  request_authorization = 1;
+  request_header = 2;
+  request_body = 3;
+  request_script = 4;
+  request_url = 5;
+  environment_variable = 6;
+  folder_authorization = 7;
+  folder_script = 8;
+  collection_script = 9;
+  collection_variable = 10;
+  collection_authorization = 11;
+  response_body = 12;
+  response_header = 13;
 }
 
 message Vector {

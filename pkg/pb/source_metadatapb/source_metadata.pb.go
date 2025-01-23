@@ -73,6 +73,88 @@ func (Visibility) EnumDescriptor() ([]byte, []int) {
 	return file_source_metadata_proto_rawDescGZIP(), []int{0}
 }
 
+type PostmanLocation int32
+
+const (
+	PostmanLocation_request_query_parameter  PostmanLocation = 0
+	PostmanLocation_request_authorization    PostmanLocation = 1
+	PostmanLocation_request_header           PostmanLocation = 2
+	PostmanLocation_request_body             PostmanLocation = 3
+	PostmanLocation_request_script           PostmanLocation = 4
+	PostmanLocation_request_url              PostmanLocation = 5
+	PostmanLocation_environment_variable     PostmanLocation = 6
+	PostmanLocation_folder_authorization     PostmanLocation = 7
+	PostmanLocation_folder_script            PostmanLocation = 8
+	PostmanLocation_collection_script        PostmanLocation = 9
+	PostmanLocation_collection_variable      PostmanLocation = 10
+	PostmanLocation_collection_authorization PostmanLocation = 11
+	PostmanLocation_response_body            PostmanLocation = 12
+	PostmanLocation_response_header          PostmanLocation = 13
+)
+
+// Enum value maps for PostmanLocation.
+var (
+	PostmanLocation_name = map[int32]string{
+		0:  "request_query_parameter",
+		1:  "request_authorization",
+		2:  "request_header",
+		3:  "request_body",
+		4:  "request_script",
+		5:  "request_url",
+		6:  "environment_variable",
+		7:  "folder_authorization",
+		8:  "folder_script",
+		9:  "collection_script",
+		10: "collection_variable",
+		11: "collection_authorization",
+		12: "response_body",
+		13: "response_header",
+	}
+	PostmanLocation_value = map[string]int32{
+		"request_query_parameter":  0,
+		"request_authorization":    1,
+		"request_header":           2,
+		"request_body":             3,
+		"request_script":           4,
+		"request_url":              5,
+		"environment_variable":     6,
+		"folder_authorization":     7,
+		"folder_script":            8,
+		"collection_script":        9,
+		"collection_variable":      10,
+		"collection_authorization": 11,
+		"response_body":            12,
+		"response_header":          13,
+	}
+)
+
+func (x PostmanLocation) Enum() *PostmanLocation {
+	p := new(PostmanLocation)
+	*p = x
+	return p
+}
+
+func (x PostmanLocation) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PostmanLocation) Descriptor() protoreflect.EnumDescriptor {
+	return file_source_metadata_proto_enumTypes[1].Descriptor()
+}
+
+func (PostmanLocation) Type() protoreflect.EnumType {
+	return &file_source_metadata_proto_enumTypes[1]
+}
+
+func (x PostmanLocation) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PostmanLocation.Descriptor instead.
+func (PostmanLocation) EnumDescriptor() ([]byte, []int) {
+	return file_source_metadata_proto_rawDescGZIP(), []int{1}
+}
+
 type Azure struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2770,23 +2852,24 @@ type Postman struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Link            string `protobuf:"bytes,1,opt,name=link,proto3" json:"link,omitempty"`
-	WorkspaceUuid   string `protobuf:"bytes,2,opt,name=workspace_uuid,json=workspaceUuid,proto3" json:"workspace_uuid,omitempty"`
-	WorkspaceName   string `protobuf:"bytes,3,opt,name=workspace_name,json=workspaceName,proto3" json:"workspace_name,omitempty"`
-	GlobalsId       string `protobuf:"bytes,4,opt,name=globals_id,json=globalsId,proto3" json:"globals_id,omitempty"`
-	CollectionId    string `protobuf:"bytes,5,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
-	CollectionName  string `protobuf:"bytes,6,opt,name=collection_name,json=collectionName,proto3" json:"collection_name,omitempty"`
-	EnvironmentId   string `protobuf:"bytes,7,opt,name=environment_id,json=environmentId,proto3" json:"environment_id,omitempty"`
-	EnvironmentName string `protobuf:"bytes,8,opt,name=environment_name,json=environmentName,proto3" json:"environment_name,omitempty"`
-	RequestId       string `protobuf:"bytes,9,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	RequestName     string `protobuf:"bytes,10,opt,name=request_name,json=requestName,proto3" json:"request_name,omitempty"`
-	FolderId        string `protobuf:"bytes,11,opt,name=folder_id,json=folderId,proto3" json:"folder_id,omitempty"`
-	FolderName      string `protobuf:"bytes,12,opt,name=folder_name,json=folderName,proto3" json:"folder_name,omitempty"`
-	FieldType       string `protobuf:"bytes,13,opt,name=field_type,json=fieldType,proto3" json:"field_type,omitempty"`
-	FieldName       string `protobuf:"bytes,14,opt,name=field_name,json=fieldName,proto3" json:"field_name,omitempty"`
-	VariableType    string `protobuf:"bytes,15,opt,name=variable_type,json=variableType,proto3" json:"variable_type,omitempty"`
-	VariableId      string `protobuf:"bytes,16,opt,name=variable_id,json=variableId,proto3" json:"variable_id,omitempty"`
-	VariableName    string `protobuf:"bytes,17,opt,name=variable_name,json=variableName,proto3" json:"variable_name,omitempty"`
+	Link                string          `protobuf:"bytes,1,opt,name=link,proto3" json:"link,omitempty"`
+	WorkspaceUuid       string          `protobuf:"bytes,2,opt,name=workspace_uuid,json=workspaceUuid,proto3" json:"workspace_uuid,omitempty"`
+	WorkspaceName       string          `protobuf:"bytes,3,opt,name=workspace_name,json=workspaceName,proto3" json:"workspace_name,omitempty"`
+	GlobalsId           string          `protobuf:"bytes,4,opt,name=globals_id,json=globalsId,proto3" json:"globals_id,omitempty"`
+	CollectionId        string          `protobuf:"bytes,5,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	CollectionName      string          `protobuf:"bytes,6,opt,name=collection_name,json=collectionName,proto3" json:"collection_name,omitempty"`
+	EnvironmentId       string          `protobuf:"bytes,7,opt,name=environment_id,json=environmentId,proto3" json:"environment_id,omitempty"`
+	EnvironmentName     string          `protobuf:"bytes,8,opt,name=environment_name,json=environmentName,proto3" json:"environment_name,omitempty"`
+	RequestId           string          `protobuf:"bytes,9,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	RequestName         string          `protobuf:"bytes,10,opt,name=request_name,json=requestName,proto3" json:"request_name,omitempty"`
+	FolderId            string          `protobuf:"bytes,11,opt,name=folder_id,json=folderId,proto3" json:"folder_id,omitempty"`
+	FolderName          string          `protobuf:"bytes,12,opt,name=folder_name,json=folderName,proto3" json:"folder_name,omitempty"`
+	FieldType           string          `protobuf:"bytes,13,opt,name=field_type,json=fieldType,proto3" json:"field_type,omitempty"`
+	FieldName           string          `protobuf:"bytes,14,opt,name=field_name,json=fieldName,proto3" json:"field_name,omitempty"`
+	VariableType        string          `protobuf:"bytes,15,opt,name=variable_type,json=variableType,proto3" json:"variable_type,omitempty"`
+	VariableName        string          `protobuf:"bytes,16,opt,name=variable_name,json=variableName,proto3" json:"variable_name,omitempty"`
+	Location            PostmanLocation `protobuf:"varint,17,opt,name=location,proto3,enum=source_metadata.PostmanLocation" json:"location,omitempty"`
+	LocationDescription string          `protobuf:"bytes,18,opt,name=location_description,json=locationDescription,proto3" json:"location_description,omitempty"`
 }
 
 func (x *Postman) Reset() {
@@ -2926,16 +3009,23 @@ func (x *Postman) GetVariableType() string {
 	return ""
 }
 
-func (x *Postman) GetVariableId() string {
+func (x *Postman) GetVariableName() string {
 	if x != nil {
-		return x.VariableId
+		return x.VariableName
 	}
 	return ""
 }
 
-func (x *Postman) GetVariableName() string {
+func (x *Postman) GetLocation() PostmanLocation {
 	if x != nil {
-		return x.VariableName
+		return x.Location
+	}
+	return PostmanLocation_request_query_parameter
+}
+
+func (x *Postman) GetLocationDescription() string {
+	if x != nil {
+		return x.LocationDescription
 	}
 	return ""
 }
@@ -4099,7 +4189,7 @@ var file_source_metadata_proto_rawDesc = []byte{
 	0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x18, 0x0a, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x70, 0x72,
 	0x6f, 0x6a, 0x65, 0x63, 0x74, 0x12, 0x22, 0x0a, 0x0c, 0x6f, 0x72, 0x67, 0x61, 0x6e, 0x69, 0x7a,
 	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x6f, 0x72, 0x67,
-	0x61, 0x6e, 0x69, 0x7a, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0xd3, 0x04, 0x0a, 0x07, 0x50, 0x6f,
+	0x61, 0x6e, 0x69, 0x7a, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0xa3, 0x05, 0x0a, 0x07, 0x50, 0x6f,
 	0x73, 0x74, 0x6d, 0x61, 0x6e, 0x12, 0x12, 0x0a, 0x04, 0x6c, 0x69, 0x6e, 0x6b, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x09, 0x52, 0x04, 0x6c, 0x69, 0x6e, 0x6b, 0x12, 0x25, 0x0a, 0x0e, 0x77, 0x6f, 0x72,
 	0x6b, 0x73, 0x70, 0x61, 0x63, 0x65, 0x5f, 0x75, 0x75, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28,
@@ -4132,11 +4222,16 @@ var file_source_metadata_proto_rawDesc = []byte{
 	0x61, 0x6d, 0x65, 0x18, 0x0e, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x66, 0x69, 0x65, 0x6c, 0x64,
 	0x4e, 0x61, 0x6d, 0x65, 0x12, 0x23, 0x0a, 0x0d, 0x76, 0x61, 0x72, 0x69, 0x61, 0x62, 0x6c, 0x65,
 	0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x0f, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x76, 0x61, 0x72,
-	0x69, 0x61, 0x62, 0x6c, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x1f, 0x0a, 0x0b, 0x76, 0x61, 0x72,
-	0x69, 0x61, 0x62, 0x6c, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x10, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a,
-	0x76, 0x61, 0x72, 0x69, 0x61, 0x62, 0x6c, 0x65, 0x49, 0x64, 0x12, 0x23, 0x0a, 0x0d, 0x76, 0x61,
-	0x72, 0x69, 0x61, 0x62, 0x6c, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x11, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x0c, 0x76, 0x61, 0x72, 0x69, 0x61, 0x62, 0x6c, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x22,
+	0x69, 0x61, 0x62, 0x6c, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x23, 0x0a, 0x0d, 0x76, 0x61, 0x72,
+	0x69, 0x61, 0x62, 0x6c, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x10, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x0c, 0x76, 0x61, 0x72, 0x69, 0x61, 0x62, 0x6c, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x3c,
+	0x0a, 0x08, 0x6c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x11, 0x20, 0x01, 0x28, 0x0e,
+	0x32, 0x20, 0x2e, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61,
+	0x74, 0x61, 0x2e, 0x50, 0x6f, 0x73, 0x74, 0x6d, 0x61, 0x6e, 0x4c, 0x6f, 0x63, 0x61, 0x74, 0x69,
+	0x6f, 0x6e, 0x52, 0x08, 0x6c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x31, 0x0a, 0x14,
+	0x6c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70,
+	0x74, 0x69, 0x6f, 0x6e, 0x18, 0x12, 0x20, 0x01, 0x28, 0x09, 0x52, 0x13, 0x6c, 0x6f, 0x63, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x44, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x22,
 	0x77, 0x0a, 0x06, 0x56, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x12, 0x38, 0x0a, 0x09, 0x74, 0x69, 0x6d,
 	0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67,
 	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54,
@@ -4291,12 +4386,33 @@ var file_source_metadata_proto_rawDesc = []byte{
 	0x69, 0x62, 0x69, 0x6c, 0x69, 0x74, 0x79, 0x12, 0x0a, 0x0a, 0x06, 0x70, 0x75, 0x62, 0x6c, 0x69,
 	0x63, 0x10, 0x00, 0x12, 0x0b, 0x0a, 0x07, 0x70, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65, 0x10, 0x01,
 	0x12, 0x0a, 0x0a, 0x06, 0x73, 0x68, 0x61, 0x72, 0x65, 0x64, 0x10, 0x02, 0x12, 0x0b, 0x0a, 0x07,
-	0x75, 0x6e, 0x6b, 0x6e, 0x6f, 0x77, 0x6e, 0x10, 0x03, 0x42, 0x43, 0x5a, 0x41, 0x67, 0x69, 0x74,
-	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x73,
-	0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f, 0x74, 0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x68,
-	0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x62, 0x2f, 0x73, 0x6f, 0x75,
-	0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x70, 0x62, 0x62, 0x06,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x75, 0x6e, 0x6b, 0x6e, 0x6f, 0x77, 0x6e, 0x10, 0x03, 0x2a, 0xd1, 0x02, 0x0a, 0x0f, 0x50, 0x6f,
+	0x73, 0x74, 0x6d, 0x61, 0x6e, 0x4c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x1b, 0x0a,
+	0x17, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x71, 0x75, 0x65, 0x72, 0x79, 0x5f, 0x70,
+	0x61, 0x72, 0x61, 0x6d, 0x65, 0x74, 0x65, 0x72, 0x10, 0x00, 0x12, 0x19, 0x0a, 0x15, 0x72, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x10, 0x01, 0x12, 0x12, 0x0a, 0x0e, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x5f, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x10, 0x02, 0x12, 0x10, 0x0a, 0x0c, 0x72, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x5f, 0x62, 0x6f, 0x64, 0x79, 0x10, 0x03, 0x12, 0x12, 0x0a, 0x0e, 0x72,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x10, 0x04, 0x12,
+	0x0f, 0x0a, 0x0b, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x75, 0x72, 0x6c, 0x10, 0x05,
+	0x12, 0x18, 0x0a, 0x14, 0x65, 0x6e, 0x76, 0x69, 0x72, 0x6f, 0x6e, 0x6d, 0x65, 0x6e, 0x74, 0x5f,
+	0x76, 0x61, 0x72, 0x69, 0x61, 0x62, 0x6c, 0x65, 0x10, 0x06, 0x12, 0x18, 0x0a, 0x14, 0x66, 0x6f,
+	0x6c, 0x64, 0x65, 0x72, 0x5f, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x61, 0x74, 0x69,
+	0x6f, 0x6e, 0x10, 0x07, 0x12, 0x11, 0x0a, 0x0d, 0x66, 0x6f, 0x6c, 0x64, 0x65, 0x72, 0x5f, 0x73,
+	0x63, 0x72, 0x69, 0x70, 0x74, 0x10, 0x08, 0x12, 0x15, 0x0a, 0x11, 0x63, 0x6f, 0x6c, 0x6c, 0x65,
+	0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x10, 0x09, 0x12, 0x17,
+	0x0a, 0x13, 0x63, 0x6f, 0x6c, 0x6c, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x76, 0x61, 0x72,
+	0x69, 0x61, 0x62, 0x6c, 0x65, 0x10, 0x0a, 0x12, 0x1c, 0x0a, 0x18, 0x63, 0x6f, 0x6c, 0x6c, 0x65,
+	0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x10, 0x0b, 0x12, 0x11, 0x0a, 0x0d, 0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x5f, 0x62, 0x6f, 0x64, 0x79, 0x10, 0x0c, 0x12, 0x13, 0x0a, 0x0f, 0x72, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x5f, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x10, 0x0d, 0x42, 0x43, 0x5a,
+	0x41, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x72, 0x75, 0x66,
+	0x66, 0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f, 0x74, 0x72, 0x75, 0x66,
+	0x66, 0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x62,
+	0x2f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61,
+	0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -4311,95 +4427,97 @@ func file_source_metadata_proto_rawDescGZIP() []byte {
 	return file_source_metadata_proto_rawDescData
 }
 
-var file_source_metadata_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_source_metadata_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_source_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_source_metadata_proto_goTypes = []interface{}{
 	(Visibility)(0),               // 0: source_metadata.Visibility
-	(*Azure)(nil),                 // 1: source_metadata.Azure
-	(*Bitbucket)(nil),             // 2: source_metadata.Bitbucket
-	(*Buildkite)(nil),             // 3: source_metadata.Buildkite
-	(*CircleCI)(nil),              // 4: source_metadata.CircleCI
-	(*TravisCI)(nil),              // 5: source_metadata.TravisCI
-	(*Confluence)(nil),            // 6: source_metadata.Confluence
-	(*Docker)(nil),                // 7: source_metadata.Docker
-	(*ECR)(nil),                   // 8: source_metadata.ECR
-	(*Filesystem)(nil),            // 9: source_metadata.Filesystem
-	(*Git)(nil),                   // 10: source_metadata.Git
-	(*Github)(nil),                // 11: source_metadata.Github
-	(*Gitlab)(nil),                // 12: source_metadata.Gitlab
-	(*GCS)(nil),                   // 13: source_metadata.GCS
-	(*Huggingface)(nil),           // 14: source_metadata.Huggingface
-	(*Jira)(nil),                  // 15: source_metadata.Jira
-	(*NPM)(nil),                   // 16: source_metadata.NPM
-	(*PyPi)(nil),                  // 17: source_metadata.PyPi
-	(*S3)(nil),                    // 18: source_metadata.S3
-	(*Slack)(nil),                 // 19: source_metadata.Slack
-	(*Gerrit)(nil),                // 20: source_metadata.Gerrit
-	(*Test)(nil),                  // 21: source_metadata.Test
-	(*Jenkins)(nil),               // 22: source_metadata.Jenkins
-	(*Teams)(nil),                 // 23: source_metadata.Teams
-	(*Artifactory)(nil),           // 24: source_metadata.Artifactory
-	(*Syslog)(nil),                // 25: source_metadata.Syslog
-	(*Forager)(nil),               // 26: source_metadata.Forager
-	(*SharePoint)(nil),            // 27: source_metadata.SharePoint
-	(*GoogleDrive)(nil),           // 28: source_metadata.GoogleDrive
-	(*AzureRepos)(nil),            // 29: source_metadata.AzureRepos
-	(*Postman)(nil),               // 30: source_metadata.Postman
-	(*Vector)(nil),                // 31: source_metadata.Vector
-	(*Webhook)(nil),               // 32: source_metadata.Webhook
-	(*Elasticsearch)(nil),         // 33: source_metadata.Elasticsearch
-	(*Sentry)(nil),                // 34: source_metadata.Sentry
-	(*MetaData)(nil),              // 35: source_metadata.MetaData
-	(*timestamppb.Timestamp)(nil), // 36: google.protobuf.Timestamp
+	(PostmanLocation)(0),          // 1: source_metadata.PostmanLocation
+	(*Azure)(nil),                 // 2: source_metadata.Azure
+	(*Bitbucket)(nil),             // 3: source_metadata.Bitbucket
+	(*Buildkite)(nil),             // 4: source_metadata.Buildkite
+	(*CircleCI)(nil),              // 5: source_metadata.CircleCI
+	(*TravisCI)(nil),              // 6: source_metadata.TravisCI
+	(*Confluence)(nil),            // 7: source_metadata.Confluence
+	(*Docker)(nil),                // 8: source_metadata.Docker
+	(*ECR)(nil),                   // 9: source_metadata.ECR
+	(*Filesystem)(nil),            // 10: source_metadata.Filesystem
+	(*Git)(nil),                   // 11: source_metadata.Git
+	(*Github)(nil),                // 12: source_metadata.Github
+	(*Gitlab)(nil),                // 13: source_metadata.Gitlab
+	(*GCS)(nil),                   // 14: source_metadata.GCS
+	(*Huggingface)(nil),           // 15: source_metadata.Huggingface
+	(*Jira)(nil),                  // 16: source_metadata.Jira
+	(*NPM)(nil),                   // 17: source_metadata.NPM
+	(*PyPi)(nil),                  // 18: source_metadata.PyPi
+	(*S3)(nil),                    // 19: source_metadata.S3
+	(*Slack)(nil),                 // 20: source_metadata.Slack
+	(*Gerrit)(nil),                // 21: source_metadata.Gerrit
+	(*Test)(nil),                  // 22: source_metadata.Test
+	(*Jenkins)(nil),               // 23: source_metadata.Jenkins
+	(*Teams)(nil),                 // 24: source_metadata.Teams
+	(*Artifactory)(nil),           // 25: source_metadata.Artifactory
+	(*Syslog)(nil),                // 26: source_metadata.Syslog
+	(*Forager)(nil),               // 27: source_metadata.Forager
+	(*SharePoint)(nil),            // 28: source_metadata.SharePoint
+	(*GoogleDrive)(nil),           // 29: source_metadata.GoogleDrive
+	(*AzureRepos)(nil),            // 30: source_metadata.AzureRepos
+	(*Postman)(nil),               // 31: source_metadata.Postman
+	(*Vector)(nil),                // 32: source_metadata.Vector
+	(*Webhook)(nil),               // 33: source_metadata.Webhook
+	(*Elasticsearch)(nil),         // 34: source_metadata.Elasticsearch
+	(*Sentry)(nil),                // 35: source_metadata.Sentry
+	(*MetaData)(nil),              // 36: source_metadata.MetaData
+	(*timestamppb.Timestamp)(nil), // 37: google.protobuf.Timestamp
 }
 var file_source_metadata_proto_depIdxs = []int32{
 	0,  // 0: source_metadata.Github.visibility:type_name -> source_metadata.Visibility
 	0,  // 1: source_metadata.Huggingface.visibility:type_name -> source_metadata.Visibility
 	0,  // 2: source_metadata.Slack.visibility:type_name -> source_metadata.Visibility
-	11, // 3: source_metadata.Forager.github:type_name -> source_metadata.Github
-	16, // 4: source_metadata.Forager.npm:type_name -> source_metadata.NPM
-	17, // 5: source_metadata.Forager.pypi:type_name -> source_metadata.PyPi
+	12, // 3: source_metadata.Forager.github:type_name -> source_metadata.Github
+	17, // 4: source_metadata.Forager.npm:type_name -> source_metadata.NPM
+	18, // 5: source_metadata.Forager.pypi:type_name -> source_metadata.PyPi
 	0,  // 6: source_metadata.AzureRepos.visibility:type_name -> source_metadata.Visibility
-	36, // 7: source_metadata.Vector.timestamp:type_name -> google.protobuf.Timestamp
-	31, // 8: source_metadata.Webhook.vector:type_name -> source_metadata.Vector
-	1,  // 9: source_metadata.MetaData.azure:type_name -> source_metadata.Azure
-	2,  // 10: source_metadata.MetaData.bitbucket:type_name -> source_metadata.Bitbucket
-	4,  // 11: source_metadata.MetaData.circleci:type_name -> source_metadata.CircleCI
-	6,  // 12: source_metadata.MetaData.confluence:type_name -> source_metadata.Confluence
-	7,  // 13: source_metadata.MetaData.docker:type_name -> source_metadata.Docker
-	8,  // 14: source_metadata.MetaData.ecr:type_name -> source_metadata.ECR
-	13, // 15: source_metadata.MetaData.gcs:type_name -> source_metadata.GCS
-	11, // 16: source_metadata.MetaData.github:type_name -> source_metadata.Github
-	12, // 17: source_metadata.MetaData.gitlab:type_name -> source_metadata.Gitlab
-	15, // 18: source_metadata.MetaData.jira:type_name -> source_metadata.Jira
-	16, // 19: source_metadata.MetaData.npm:type_name -> source_metadata.NPM
-	17, // 20: source_metadata.MetaData.pypi:type_name -> source_metadata.PyPi
-	18, // 21: source_metadata.MetaData.s3:type_name -> source_metadata.S3
-	19, // 22: source_metadata.MetaData.slack:type_name -> source_metadata.Slack
-	9,  // 23: source_metadata.MetaData.filesystem:type_name -> source_metadata.Filesystem
-	10, // 24: source_metadata.MetaData.git:type_name -> source_metadata.Git
-	21, // 25: source_metadata.MetaData.test:type_name -> source_metadata.Test
-	3,  // 26: source_metadata.MetaData.buildkite:type_name -> source_metadata.Buildkite
-	20, // 27: source_metadata.MetaData.gerrit:type_name -> source_metadata.Gerrit
-	22, // 28: source_metadata.MetaData.jenkins:type_name -> source_metadata.Jenkins
-	23, // 29: source_metadata.MetaData.teams:type_name -> source_metadata.Teams
-	24, // 30: source_metadata.MetaData.artifactory:type_name -> source_metadata.Artifactory
-	25, // 31: source_metadata.MetaData.syslog:type_name -> source_metadata.Syslog
-	26, // 32: source_metadata.MetaData.forager:type_name -> source_metadata.Forager
-	27, // 33: source_metadata.MetaData.sharepoint:type_name -> source_metadata.SharePoint
-	28, // 34: source_metadata.MetaData.googleDrive:type_name -> source_metadata.GoogleDrive
-	29, // 35: source_metadata.MetaData.azureRepos:type_name -> source_metadata.AzureRepos
-	5,  // 36: source_metadata.MetaData.travisCI:type_name -> source_metadata.TravisCI
-	30, // 37: source_metadata.MetaData.postman:type_name -> source_metadata.Postman
-	32, // 38: source_metadata.MetaData.webhook:type_name -> source_metadata.Webhook
-	33, // 39: source_metadata.MetaData.elasticsearch:type_name -> source_metadata.Elasticsearch
-	14, // 40: source_metadata.MetaData.huggingface:type_name -> source_metadata.Huggingface
-	34, // 41: source_metadata.MetaData.sentry:type_name -> source_metadata.Sentry
-	42, // [42:42] is the sub-list for method output_type
-	42, // [42:42] is the sub-list for method input_type
-	42, // [42:42] is the sub-list for extension type_name
-	42, // [42:42] is the sub-list for extension extendee
-	0,  // [0:42] is the sub-list for field type_name
+	1,  // 7: source_metadata.Postman.location:type_name -> source_metadata.PostmanLocation
+	37, // 8: source_metadata.Vector.timestamp:type_name -> google.protobuf.Timestamp
+	32, // 9: source_metadata.Webhook.vector:type_name -> source_metadata.Vector
+	2,  // 10: source_metadata.MetaData.azure:type_name -> source_metadata.Azure
+	3,  // 11: source_metadata.MetaData.bitbucket:type_name -> source_metadata.Bitbucket
+	5,  // 12: source_metadata.MetaData.circleci:type_name -> source_metadata.CircleCI
+	7,  // 13: source_metadata.MetaData.confluence:type_name -> source_metadata.Confluence
+	8,  // 14: source_metadata.MetaData.docker:type_name -> source_metadata.Docker
+	9,  // 15: source_metadata.MetaData.ecr:type_name -> source_metadata.ECR
+	14, // 16: source_metadata.MetaData.gcs:type_name -> source_metadata.GCS
+	12, // 17: source_metadata.MetaData.github:type_name -> source_metadata.Github
+	13, // 18: source_metadata.MetaData.gitlab:type_name -> source_metadata.Gitlab
+	16, // 19: source_metadata.MetaData.jira:type_name -> source_metadata.Jira
+	17, // 20: source_metadata.MetaData.npm:type_name -> source_metadata.NPM
+	18, // 21: source_metadata.MetaData.pypi:type_name -> source_metadata.PyPi
+	19, // 22: source_metadata.MetaData.s3:type_name -> source_metadata.S3
+	20, // 23: source_metadata.MetaData.slack:type_name -> source_metadata.Slack
+	10, // 24: source_metadata.MetaData.filesystem:type_name -> source_metadata.Filesystem
+	11, // 25: source_metadata.MetaData.git:type_name -> source_metadata.Git
+	22, // 26: source_metadata.MetaData.test:type_name -> source_metadata.Test
+	4,  // 27: source_metadata.MetaData.buildkite:type_name -> source_metadata.Buildkite
+	21, // 28: source_metadata.MetaData.gerrit:type_name -> source_metadata.Gerrit
+	23, // 29: source_metadata.MetaData.jenkins:type_name -> source_metadata.Jenkins
+	24, // 30: source_metadata.MetaData.teams:type_name -> source_metadata.Teams
+	25, // 31: source_metadata.MetaData.artifactory:type_name -> source_metadata.Artifactory
+	26, // 32: source_metadata.MetaData.syslog:type_name -> source_metadata.Syslog
+	27, // 33: source_metadata.MetaData.forager:type_name -> source_metadata.Forager
+	28, // 34: source_metadata.MetaData.sharepoint:type_name -> source_metadata.SharePoint
+	29, // 35: source_metadata.MetaData.googleDrive:type_name -> source_metadata.GoogleDrive
+	30, // 36: source_metadata.MetaData.azureRepos:type_name -> source_metadata.AzureRepos
+	6,  // 37: source_metadata.MetaData.travisCI:type_name -> source_metadata.TravisCI
+	31, // 38: source_metadata.MetaData.postman:type_name -> source_metadata.Postman
+	33, // 39: source_metadata.MetaData.webhook:type_name -> source_metadata.Webhook
+	34, // 40: source_metadata.MetaData.elasticsearch:type_name -> source_metadata.Elasticsearch
+	15, // 41: source_metadata.MetaData.huggingface:type_name -> source_metadata.Huggingface
+	35, // 42: source_metadata.MetaData.sentry:type_name -> source_metadata.Sentry
+	43, // [43:43] is the sub-list for method output_type
+	43, // [43:43] is the sub-list for method input_type
+	43, // [43:43] is the sub-list for extension type_name
+	43, // [43:43] is the sub-list for extension extendee
+	0,  // [0:43] is the sub-list for field type_name
 }
 
 func init() { file_source_metadata_proto_init() }
@@ -4877,7 +4995,7 @@ func file_source_metadata_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_source_metadata_proto_rawDesc,
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   0,
