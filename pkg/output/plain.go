@@ -3,6 +3,7 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -110,6 +111,9 @@ func structToMap(obj any) (m map[string]map[string]any, err error) {
 		return
 	}
 	err = json.Unmarshal(data, &m)
+	if reflect.TypeOf(obj) == reflect.TypeOf(&source_metadatapb.MetaData_Postman{}) {
+		m["Postman"]["location"] = obj.(*source_metadatapb.MetaData_Postman).Postman.Location.String()
+	}
 	return
 }
 
