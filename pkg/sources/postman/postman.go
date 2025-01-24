@@ -312,6 +312,8 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	})
 
 	for _, event := range collection.Events {
+		metadata.Location = source_metadatapb.PostmanLocation_collection_script
+		//metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_script)]
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
 
@@ -616,59 +618,60 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 	if metadata.FieldType == "" {
 		metadata.FieldType = metadata.Type
 	}
-	if strings.Contains(metadata.FieldType, "environment") {
-		metadata.Location = source_metadatapb.PostmanLocation_environment_variable
-		metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_environment_variable)]
-	} else if strings.Contains(metadata.FieldType, "authorization") {
-		if metadata.RequestID != "" {
-			metadata.Location = source_metadatapb.PostmanLocation_request_authorization
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_authorization)]
-		} else if metadata.FolderID != "" {
-			metadata.Location = source_metadatapb.PostmanLocation_folder_authorization
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_folder_authorization)]
-		} else if metadata.CollectionInfo.UID != "" {
-			metadata.Location = source_metadatapb.PostmanLocation_collection_authorization
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_authorization)]
-		}
-	} else if strings.Contains(metadata.FieldType, "request") {
-		if strings.Contains(metadata.FieldType, "(query) variables") {
-			metadata.Location = source_metadatapb.PostmanLocation_request_query_parameter
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_query_parameter)]
-		} else if strings.Contains(metadata.FieldType, "header variables") {
-			metadata.Location = source_metadatapb.PostmanLocation_request_header
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_header)]
-		} else if strings.Contains(metadata.FieldType, "body") {
-			metadata.Location = source_metadatapb.PostmanLocation_request_body
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_body)]
-		} else if strings.Contains(metadata.FieldType, "event") {
-			metadata.Location = source_metadatapb.PostmanLocation_request_script
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_script)]
-		} else if strings.Contains(metadata.FieldType, "request URL (no query parameters)") {
-			metadata.Location = source_metadatapb.PostmanLocation_request_url
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_url)]
-		}
-	} else if strings.Contains(metadata.FieldType, "folder") {
-		if strings.Contains(metadata.FieldType, "event") {
-			metadata.Location = source_metadatapb.PostmanLocation_folder_script
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_folder_script)]
-		}
-	} else if strings.Contains(metadata.FieldType, "collection") {
-		if strings.Contains(metadata.FieldType, "event") {
-			metadata.Location = source_metadatapb.PostmanLocation_collection_script
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_script)]
-		} else if strings.Contains(metadata.FieldType, "variables") {
-			metadata.Location = source_metadatapb.PostmanLocation_collection_variable
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_variable)]
-		}
-	} else if strings.Contains(metadata.FieldType, "response") {
-		if strings.Contains(metadata.FieldType, "body") {
-			metadata.Location = source_metadatapb.PostmanLocation_response_body
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_response_body)]
-		} else if strings.Contains(metadata.FieldType, "header") {
-			metadata.Location = source_metadatapb.PostmanLocation_response_header
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_response_header)]
-		}
-	}
+	/*
+		if strings.Contains(metadata.FieldType, "environment") {
+			metadata.Location = source_metadatapb.PostmanLocation_environment_variable
+			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_environment_variable)]
+		} else if strings.Contains(metadata.FieldType, "authorization") {
+			if metadata.RequestID != "" {
+				metadata.Location = source_metadatapb.PostmanLocation_request_authorization
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_authorization)]
+			} else if metadata.FolderID != "" {
+				metadata.Location = source_metadatapb.PostmanLocation_folder_authorization
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_folder_authorization)]
+			} else if metadata.CollectionInfo.UID != "" {
+				metadata.Location = source_metadatapb.PostmanLocation_collection_authorization
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_authorization)]
+			}
+		} else if strings.Contains(metadata.FieldType, "request") {
+			if strings.Contains(metadata.FieldType, "(query) variables") {
+				metadata.Location = source_metadatapb.PostmanLocation_request_query_parameter
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_query_parameter)]
+			} else if strings.Contains(metadata.FieldType, "header variables") {
+				metadata.Location = source_metadatapb.PostmanLocation_request_header
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_header)]
+			} else if strings.Contains(metadata.FieldType, "body") {
+				metadata.Location = source_metadatapb.PostmanLocation_request_body
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_body)]
+			} else if strings.Contains(metadata.FieldType, "event") {
+				metadata.Location = source_metadatapb.PostmanLocation_request_script
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_script)]
+			} else if strings.Contains(metadata.FieldType, "request URL (no query parameters)") {
+				metadata.Location = source_metadatapb.PostmanLocation_request_url
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_url)]
+			}
+		} else if strings.Contains(metadata.FieldType, "folder") {
+			if strings.Contains(metadata.FieldType, "event") {
+				metadata.Location = source_metadatapb.PostmanLocation_folder_script
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_folder_script)]
+			}
+		} else if strings.Contains(metadata.FieldType, "collection") {
+			if strings.Contains(metadata.FieldType, "event") {
+				metadata.Location = source_metadatapb.PostmanLocation_collection_script
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_script)]
+			} else if strings.Contains(metadata.FieldType, "variables") {
+				metadata.Location = source_metadatapb.PostmanLocation_collection_variable
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_variable)]
+			}
+		} else if strings.Contains(metadata.FieldType, "response") {
+			if strings.Contains(metadata.FieldType, "body") {
+				metadata.Location = source_metadatapb.PostmanLocation_response_body
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_response_body)]
+			} else if strings.Contains(metadata.FieldType, "header") {
+				metadata.Location = source_metadatapb.PostmanLocation_response_header
+				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_response_header)]
+			}
+		} */
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
@@ -691,9 +694,9 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					FolderId:            metadata.FolderID,
 					FolderName:          metadata.FolderName,
 					FieldType:           metadata.FieldType,
-					FieldName:           metadata.FieldName,
+					FieldName:           metadata.FieldName, //ask Joe if needed
 					VariableName:        metadata.VariableName,
-					VariableType:        metadata.VarType,
+					VariableType:        metadata.VarType, //ask Joe if needed
 					Location:            metadata.Location,
 					LocationDescription: metadata.LocationDescription,
 				},
