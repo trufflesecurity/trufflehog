@@ -30,6 +30,23 @@ type SecretInfo struct {
 	Misc        map[string]string
 }
 
+// User hold the information about user to whom the key belongs to
+type User struct {
+	ID                 string
+	Name               string
+	SubscriptionTier   string
+	SubscriptionStatus string
+}
+
+// Resources hold information about the resources the key has access
+type Resource struct {
+	ID         string
+	Name       string
+	Type       string
+	Metadata   map[string]string
+	Permission string
+}
+
 func (a Analyzer) Type() analyzers.AnalyzerType {
 	return analyzers.AnalyzerTypeElevenLabs
 }
@@ -194,6 +211,11 @@ func getResources(client *http.Client, key string, secretInfo *SecretInfo) (*Sec
 	if err != nil {
 		return secretInfo, err
 	}
+
+	secretInfo, err = deleteHistory(client, key, secretInfo)
+	if err != nil {
+		return secretInfo, err
+	}
 	// dubbings
 	// voices
 	// projects
@@ -208,6 +230,7 @@ func getResources(client *http.Client, key string, secretInfo *SecretInfo) (*Sec
 	return secretInfo, nil
 }
 
+// cli print functions
 func printUser(user User) {
 	color.Green("\n[i] User:")
 	t := table.NewWriter()

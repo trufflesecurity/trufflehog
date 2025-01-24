@@ -2,12 +2,15 @@ package elevenlabs
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
+	"strings"
 )
 
 // permissionToAPIMap contain the API endpoints for each scope/permission
+// api docs: https://elevenlabs.io/docs/api-reference/introduction
 var permissionToAPIMap = map[Permission]string{
 	TextToSpeech:                   "https://api.elevenlabs.io/v1/text-to-speech/%s", // require voice id
 	SpeechToSpeech:                 "",
@@ -31,9 +34,12 @@ var permissionToAPIMap = map[Permission]string{
 }
 
 var (
+	// not exist key
+	fakeID = "_thou_shalt_not_exist_"
 	// error statuses
-	NotVerifiable = "api_key_not_verifiable"
-	InvalidAPIKey = "invalid_api_key"
+	NotVerifiable      = "api_key_not_verifiable"
+	InvalidAPIKey      = "invalid_api_key"
+	MissingPermissions = "missing_permissions"
 )
 
 // ErrorResponse is the error response for all APIs
@@ -62,34 +68,14 @@ type HistoryResponse struct {
 	} `json:"history"`
 }
 
-// getHistory get history item using the key passed and add them to secret info
-func getHistory(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
-	historyResponse, statusCode, err := makeGetRequest(client, permissionToAPIMap[SpeechHistoryRead], key)
-	if err != nil {
-		return nil, err
+// getAPIUrl return the API Url mapped to the permission
+func getAPIUrl(permission Permission) string {
+	apiUrl := permissionToAPIMap[permission]
+	if strings.Contains(apiUrl, "%s") {
+		return fmt.Sprintf(apiUrl, fakeID)
 	}
 
-	if statusCode == http.StatusOK {
-		var history HistoryResponse
-
-		if err := json.Unmarshal(historyResponse, &history); err != nil {
-			return nil, err
-		}
-
-		// add history read scope to secret info
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[SpeechHistoryRead])
-		// map resource to secret info
-		for _, historyItem := range history.History {
-			secretInfo.Resources = append(secretInfo.Resources, Resource{
-				ID:         historyItem.HistoryItemID,
-				Name:       "", // no name
-				Type:       "History",
-				Permission: PermissionStrings[SpeechHistoryRead],
-			})
-		}
-	}
-
-	return secretInfo, nil
+	return apiUrl
 }
 
 // makeGetRequest send the GET request to passed url with passed key as API Key and return response body and status code
@@ -124,6 +110,62 @@ func makeGetRequest(client *http.Client, url, key string) ([]byte, int, error) {
 	}
 
 	return responseBodyByte, resp.StatusCode, nil
+}
+
+// getHistory get history item using the key passed and add them to secret info
+func getHistory(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
+	response, statusCode, err := makeGetRequest(client, getAPIUrl(SpeechHistoryRead), key)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusOK {
+		var history HistoryResponse
+
+		if err := json.Unmarshal(response, &history); err != nil {
+			return nil, err
+		}
+
+		// add history read scope to secret info
+		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[SpeechHistoryRead])
+		// map resource to secret info
+		for _, historyItem := range history.History {
+			secretInfo.Resources = append(secretInfo.Resources, Resource{
+				ID:         historyItem.HistoryItemID,
+				Name:       "", // no name
+				Type:       "History",
+				Permission: PermissionStrings[SpeechHistoryRead],
+			})
+		}
+	}
+
+	return secretInfo, nil
+}
+
+// deleteHistory try to delete a history item. The item must not exist.
+func deleteHistory(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
+	response, statusCode, err := makeGetRequest(client, getAPIUrl(SpeechHistoryWrite), key)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode >= http.StatusBadRequest && statusCode <= 499 {
+		// check if status in response is not missing permissions
+		ok, err := checkErrorStatus(response, MissingPermissions)
+		if err != nil {
+			return nil, err
+		}
+
+		// if it's missing permissions return
+		if ok {
+			return secretInfo, nil
+		}
+	}
+
+	// add history write scope to secret info
+	secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[SpeechHistoryWrite])
+
+	return secretInfo, nil
 }
 
 // checkErrorStatus check if any of expected error status exist in actual API error response
