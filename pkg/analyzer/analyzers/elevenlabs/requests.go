@@ -78,10 +78,10 @@ func getAPIUrl(permission Permission) string {
 	return apiUrl
 }
 
-// makeGetRequest send the GET request to passed url with passed key as API Key and return response body and status code
-func makeGetRequest(client *http.Client, url, key string) ([]byte, int, error) {
+// makeElevenLabsRequest send the API request to passed url with passed key as API Key and return response body and status code
+func makeElevenLabsRequest(client *http.Client, url, method, key string) ([]byte, int, error) {
 	// create request
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -114,7 +114,7 @@ func makeGetRequest(client *http.Client, url, key string) ([]byte, int, error) {
 
 // getHistory get history item using the key passed and add them to secret info
 func getHistory(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
-	response, statusCode, err := makeGetRequest(client, getAPIUrl(SpeechHistoryRead), key)
+	response, statusCode, err := makeElevenLabsRequest(client, getAPIUrl(SpeechHistoryRead), http.MethodGet, key)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func getHistory(client *http.Client, key string, secretInfo *SecretInfo) (*Secre
 
 // deleteHistory try to delete a history item. The item must not exist.
 func deleteHistory(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
-	response, statusCode, err := makeGetRequest(client, getAPIUrl(SpeechHistoryWrite), key)
+	response, statusCode, err := makeElevenLabsRequest(client, getAPIUrl(SpeechHistoryWrite), http.MethodDelete, key)
 	if err != nil {
 		return nil, err
 	}

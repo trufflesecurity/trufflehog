@@ -156,7 +156,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 // validateKey check if the key is valid and get the user information if it's valid
 func validateKey(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, bool, error) {
-	response, statusCode, err := makeGetRequest(client, permissionToAPIMap[UserRead], key)
+	response, statusCode, err := makeElevenLabsRequest(client, permissionToAPIMap[UserRead], http.MethodGet, key)
 	if err != nil {
 		return nil, false, err
 	}
