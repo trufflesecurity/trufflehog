@@ -114,7 +114,7 @@ func AnalyzePermissions(ctx context.Context, cfg *config.Config, key string) (*S
 	}()
 	wg.Wait()
 
-	if len(verificationErrors.Errors) > 0 {
+	if len(verificationErrors.Errors) == 3 {
 		return nil, fmt.Errorf("verification failures: %s", strings.Join(verificationErrors.Errors, ", "))
 	}
 
@@ -241,27 +241,29 @@ func bakeTLSResources(result *privatekey.DriftwoodResult) ([]analyzers.Binding, 
 
 	// iterate result.CertificateResults
 	for _, cert := range result.CertificateResults {
+		if cert.SubjectName == "" && cert.SubjectKeyID == "" {
+			continue
+		}
 		resource := &analyzers.Resource{
 			Name:               cert.SubjectName,
 			FullyQualifiedName: fmt.Sprintf("%s/%s", cert.SubjectKeyID, cert.SubjectName),
 			Type:               "certificate",
 		}
 		certPermissions := append(cert.KeyUsages, cert.ExtendedKeyUsages...)
-
-		if len(certPermissions) > 0 {
-			// bind all permissions with resources
-			permissions := make([]analyzers.Permission, 0, len(certPermissions))
-			for _, perm := range certPermissions {
-				perm, ok := StringToPermission[perm]
-				if !ok {
-					continue
-				}
-				permissions = append(permissions, analyzers.Permission{
-					Value:  PermissionStrings[perm],
-					Parent: nil,
-				})
+		permissions := make([]analyzers.Permission, 0, len(certPermissions))
+		for _, perm := range certPermissions {
+			perm, ok := StringToPermission[perm]
+			if !ok {
+				continue
 			}
+			permissions = append(permissions, analyzers.Permission{
+				Value:  PermissionStrings[perm],
+				Parent: nil,
+			})
+		}
 
+		if len(permissions) > 0 {
+			// bind all permissions with resources
 			boundedResources = append(boundedResources, analyzers.BindAllPermissions(*resource, permissions...)...)
 		} else {
 			unboundedResources = append(unboundedResources, *resource)

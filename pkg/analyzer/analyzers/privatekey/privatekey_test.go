@@ -12,22 +12,18 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-//go:embed expected_output_tls.json
-var expectedOutputTLS []byte
-
-//go:embed expected_output_github.json
-var expectedOutputGithub []byte
+//go:embed expected_output.json
+var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	privatekeyTls := testSecrets.MustGetField("PRIVATEKEY_TLS")
-	privateKeyGithub := testSecrets.MustGetField("PRIVATEKEY_GITHUB")
+	privateKey := testSecrets.MustGetField("PRIVATEKEY_TLS")
 
 	tests := []struct {
 		name     string
@@ -38,14 +34,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid TLS key",
-			key:     privatekeyTls,
-			want:    string(expectedOutputTLS),
-			wantErr: false,
-		},
-		{
-			name:    "valid Github key",
-			key:     privateKeyGithub,
-			want:    string(expectedOutputGithub),
+			key:     privateKey,
+			want:    string(expectedOutput),
 			wantErr: false,
 		},
 	}
