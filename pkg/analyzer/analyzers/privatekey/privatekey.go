@@ -5,9 +5,13 @@ package privatekey
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/fatih/color"
+	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -118,13 +122,57 @@ func AnalyzePermissions(ctx context.Context, cfg *config.Config, key string) (*S
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-	info, err := AnalyzePermissions(context.Background(), cfg, key)
-	if err != nil {
-		fmt.Println(err)
+	if cfg.LoggingEnabled {
+		color.Red("[x] Logging is not supported for this analyzer.")
 		return
 	}
 
-	fmt.Println(info)
+	info, err := AnalyzePermissions(context.Background(), cfg, key)
+	if err != nil {
+		color.Red("[x] Error: %s", err.Error())
+		return
+	}
+
+	color.Green("[!] Valid Private Key\n\n")
+
+	if info.GithubUsername != nil {
+		color.Yellow("[i] GitHub Details:")
+		printUserInfo(*info.GithubUsername)
+	}
+	if info.GitlabUsername != nil {
+		color.Yellow("[i] GitLab Details:")
+		printUserInfo(*info.GitlabUsername)
+	}
+	if info.TLSCertificateResult != nil {
+		printTLSCertificateResult(info.TLSCertificateResult)
+	}
+
+}
+
+func printUserInfo(username string) {
+	color.Yellow("[i] Username: %s", username)
+	color.Yellow("[i] Permissions: %s\n\n", color.GreenString("Clone/Push"))
+}
+
+func printTLSCertificateResult(result *privatekey.DriftwoodResult) {
+	color.Yellow("[i] TLS Certificate Details:")
+	fmt.Print("\n")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(
+		table.Row{"Subject Key ID", "Subject Name", "Subject Organization", "Permissions", "Expiration Date", "Domains"})
+	green := color.New(color.FgGreen).SprintFunc()
+	for _, certificateResult := range result.CertificateResults {
+		t.AppendRow([]interface{}{
+			green(certificateResult.SubjectKeyID),
+			green(certificateResult.SubjectName),
+			green(strings.Join(certificateResult.SubjectOrganization, ", ")),
+			green(strings.Join(append(certificateResult.KeyUsages, certificateResult.ExtendedKeyUsages...), ", ")),
+			green(certificateResult.ExpirationTimestamp.Format(time.RFC3339)),
+			green(strings.Join(certificateResult.Domains, ", ")),
+		})
+	}
+	t.Render()
 }
 
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
