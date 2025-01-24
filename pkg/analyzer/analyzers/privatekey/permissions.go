@@ -18,6 +18,10 @@ const (
     Decipheronly Permission = iota
     Serverauth Permission = iota
     Clientauth Permission = iota
+    Codesigning Permission = iota
+    Emailprotection Permission = iota
+    Timestamping Permission = iota
+    Ocspsigning Permission = iota
     Clone Permission = iota
     Push Permission = iota
 )
@@ -35,6 +39,10 @@ var (
         Decipheronly: "DecipherOnly",
         Serverauth: "ServerAuth",
         Clientauth: "ClientAuth",
+        Codesigning: "CodeSigning",
+        Emailprotection: "EmailProtection",
+        Timestamping: "TimeStamping",
+        Ocspsigning: "OCSPSigning",
         Clone: "Clone",
         Push: "Push",
     }
@@ -51,6 +59,10 @@ var (
         "DecipherOnly": Decipheronly,
         "ServerAuth": Serverauth,
         "ClientAuth": Clientauth,
+        "CodeSigning": Codesigning,
+        "EmailProtection": Emailprotection,
+        "TimeStamping": Timestamping,
+        "OCSPSigning": Ocspsigning,
         "Clone": Clone,
         "Push": Push,
     }
@@ -67,8 +79,12 @@ var (
         Decipheronly: 9,
         Serverauth: 10,
         Clientauth: 11,
-        Clone: 12,
-        Push: 13,
+        Codesigning: 12,
+        Emailprotection: 13,
+        Timestamping: 14,
+        Ocspsigning: 15,
+        Clone: 16,
+        Push: 17,
     }
 
     IdToPermission = map[int]Permission{
@@ -83,8 +99,12 @@ var (
         9: Decipheronly,
         10: Serverauth,
         11: Clientauth,
-        12: Clone,
-        13: Push,
+        12: Codesigning,
+        13: Emailprotection,
+        14: Timestamping,
+        15: Ocspsigning,
+        16: Clone,
+        17: Push,
     }
 )
 

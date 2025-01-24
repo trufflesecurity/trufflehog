@@ -183,9 +183,91 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
 		AnalyzerType:       analyzers.AnalyzerTypePrivateKey,
 		Metadata:           nil,
-		Bindings:           nil,
-		UnboundedResources: nil,
+		Bindings:           []analyzers.Binding{},
+		UnboundedResources: []analyzers.Resource{},
+	}
+
+	if info.TLSCertificateResult != nil {
+		bounded, unbounded := bakeTLSResources(info.TLSCertificateResult)
+		result.Bindings = append(result.Bindings, bounded...)
+		result.UnboundedResources = append(result.UnboundedResources, unbounded...)
+	}
+
+	if info.GithubUsername != nil {
+		result.Bindings = append(result.Bindings, bakeGithubResources(info.GithubUsername)...)
+	}
+
+	if info.GitlabUsername != nil {
+		result.Bindings = append(result.Bindings, bakeGitlabResources(info.GitlabUsername)...)
 	}
 
 	return &result
+}
+
+func bakeGithubResources(username *string) []analyzers.Binding {
+	resource := &analyzers.Resource{
+		Name:               *username,
+		FullyQualifiedName: fmt.Sprintf("github.com/user/%s", *username),
+		Type:               "user", // always user ???
+	}
+
+	permissions := []analyzers.Permission{
+		{Value: PermissionStrings[Clone], Parent: nil},
+		{Value: PermissionStrings[Push], Parent: nil},
+	}
+
+	return analyzers.BindAllPermissions(*resource, permissions...)
+}
+
+func bakeGitlabResources(username *string) []analyzers.Binding {
+	resource := &analyzers.Resource{
+		Name:               *username,
+		FullyQualifiedName: fmt.Sprintf("gitlab.com/user/%s", *username),
+		Type:               "user", // always user ???
+	}
+
+	permissions := []analyzers.Permission{
+		{Value: PermissionStrings[Clone], Parent: nil},
+		{Value: PermissionStrings[Push], Parent: nil},
+	}
+
+	return analyzers.BindAllPermissions(*resource, permissions...)
+}
+
+func bakeTLSResources(result *privatekey.DriftwoodResult) ([]analyzers.Binding, []analyzers.Resource) {
+
+	unboundedResources := make([]analyzers.Resource, 0, len(result.CertificateResults))
+	boundedResources := make([]analyzers.Binding, 0, len(result.CertificateResults))
+
+	// iterate result.CertificateResults
+	for _, cert := range result.CertificateResults {
+		resource := &analyzers.Resource{
+			Name:               cert.SubjectName,
+			FullyQualifiedName: fmt.Sprintf("%s/%s", cert.SubjectKeyID, cert.SubjectName),
+			Type:               "certificate",
+		}
+		certPermissions := append(cert.KeyUsages, cert.ExtendedKeyUsages...)
+
+		if len(certPermissions) > 0 {
+			// bind all permissions with resources
+			permissions := make([]analyzers.Permission, 0, len(certPermissions))
+			for _, perm := range certPermissions {
+				perm, ok := StringToPermission[perm]
+				if !ok {
+					continue
+				}
+				permissions = append(permissions, analyzers.Permission{
+					Value:  PermissionStrings[perm],
+					Parent: nil,
+				})
+			}
+
+			boundedResources = append(boundedResources, analyzers.BindAllPermissions(*resource, permissions...)...)
+		} else {
+			unboundedResources = append(unboundedResources, *resource)
+		}
+
+	}
+
+	return boundedResources, unboundedResources
 }
