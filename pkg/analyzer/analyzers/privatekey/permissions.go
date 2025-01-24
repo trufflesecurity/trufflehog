@@ -16,8 +16,8 @@ const (
     Crlsigning Permission = iota
     Encipheronly Permission = iota
     Decipheronly Permission = iota
-    Tlswebserverauthentication Permission = iota
-    Tlswebclientauthentication Permission = iota
+    Serverauth Permission = iota
+    Clientauth Permission = iota
     Clone Permission = iota
     Push Permission = iota
 )
@@ -33,8 +33,8 @@ var (
         Crlsigning: "CRLSigning",
         Encipheronly: "EncipherOnly",
         Decipheronly: "DecipherOnly",
-        Tlswebserverauthentication: "TlsWebServerAuthentication",
-        Tlswebclientauthentication: "TlsWebClientAuthentication",
+        Serverauth: "ServerAuth",
+        Clientauth: "ClientAuth",
         Clone: "Clone",
         Push: "Push",
     }
@@ -49,8 +49,8 @@ var (
         "CRLSigning": Crlsigning,
         "EncipherOnly": Encipheronly,
         "DecipherOnly": Decipheronly,
-        "TlsWebServerAuthentication": Tlswebserverauthentication,
-        "TlsWebClientAuthentication": Tlswebclientauthentication,
+        "ServerAuth": Serverauth,
+        "ClientAuth": Clientauth,
         "Clone": Clone,
         "Push": Push,
     }
@@ -65,8 +65,8 @@ var (
         Crlsigning: 7,
         Encipheronly: 8,
         Decipheronly: 9,
-        Tlswebserverauthentication: 10,
-        Tlswebclientauthentication: 11,
+        Serverauth: 10,
+        Clientauth: 11,
         Clone: 12,
         Push: 13,
     }
@@ -81,8 +81,8 @@ var (
         7: Crlsigning,
         8: Encipheronly,
         9: Decipheronly,
-        10: Tlswebserverauthentication,
-        11: Tlswebclientauthentication,
+        10: Serverauth,
+        11: Clientauth,
         12: Clone,
         13: Push,
     }

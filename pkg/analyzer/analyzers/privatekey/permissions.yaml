@@ -9,8 +9,8 @@ permissions:
 - CRLSigning
 - EncipherOnly
 - DecipherOnly
-- TlsWebServerAuthentication
-- TlsWebClientAuthentication
+- ServerAuth
+- ClientAuth
 # Github/Gitlab
 - Clone
 - Push
