@@ -16,8 +16,8 @@ var permissionToAPIMap = map[Permission]string{
 	SpeechToSpeech:                 "",
 	SoundGeneration:                "",
 	AudioIsolation:                 "",
-	DubbingRead:                    "",
-	DubbingWrite:                   "",
+	DubbingRead:                    "https://api.elevenlabs.io/v1/dubbing/%s", // require dubbing id
+	DubbingWrite:                   "https://api.elevenlabs.io/v1/dubbing/%s", // require dubbing id
 	ProjectsRead:                   "",
 	ProjectsWrite:                  "",
 	AudioNativeRead:                "",
@@ -113,17 +113,17 @@ func makeElevenLabsRequest(client *http.Client, url, method, key string) ([]byte
 }
 
 // getHistory get history item using the key passed and add them to secret info
-func getHistory(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
+func getHistory(client *http.Client, key string, secretInfo *SecretInfo) error {
 	response, statusCode, err := makeElevenLabsRequest(client, getAPIUrl(SpeechHistoryRead), http.MethodGet, key)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if statusCode == http.StatusOK {
 		var history HistoryResponse
 
 		if err := json.Unmarshal(response, &history); err != nil {
-			return nil, err
+			return err
 		}
 
 		// add history read scope to secret info
@@ -139,33 +139,60 @@ func getHistory(client *http.Client, key string, secretInfo *SecretInfo) (*Secre
 		}
 	}
 
-	return secretInfo, nil
+	return nil
 }
 
 // deleteHistory try to delete a history item. The item must not exist.
-func deleteHistory(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
+func deleteHistory(client *http.Client, key string, secretInfo *SecretInfo) error {
 	response, statusCode, err := makeElevenLabsRequest(client, getAPIUrl(SpeechHistoryWrite), http.MethodDelete, key)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if statusCode >= http.StatusBadRequest && statusCode <= 499 {
 		// check if status in response is not missing permissions
 		ok, err := checkErrorStatus(response, MissingPermissions)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// if it's missing permissions return
 		if ok {
-			return secretInfo, nil
+			return nil
 		}
 	}
 
 	// add history write scope to secret info
 	secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[SpeechHistoryWrite])
 
-	return secretInfo, nil
+	return nil
+}
+
+// deleteDubbing try to delete a dubbing. The item must not exist.
+func deleteDubbing(client *http.Client, key string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeElevenLabsRequest(client, getAPIUrl(DubbingWrite), http.MethodDelete, key)
+	if err != nil {
+		return err
+	}
+
+	if statusCode >= http.StatusBadRequest && statusCode <= 499 {
+		// check if status in response is not missing permissions
+		ok, err := checkErrorStatus(response, MissingPermissions)
+		if err != nil {
+			return err
+		}
+
+		// if it's missing permissions return
+		if ok {
+			return nil
+		}
+	}
+
+	// add history write and write scope to secret info
+	secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[DubbingWrite])
+	secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[DubbingRead])
+
+	return nil
 }
 
 // checkErrorStatus check if any of expected error status exist in actual API error response

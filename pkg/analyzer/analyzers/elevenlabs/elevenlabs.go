@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -74,7 +76,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	var secretInfo = &SecretInfo{}
 
 	// validate the key and get user information
-	secretInfo, valid, err := validateKey(client, key, secretInfo)
+	valid, err := validateKey(client, key, secretInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +86,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}
 
 	// Get resources
-	secretInfo, err = getResources(client, key, secretInfo)
-	if err != nil {
+	if err := getResources(client, key, secretInfo); err != nil {
 		return nil, nil
 	}
 
@@ -155,17 +156,17 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 }
 
 // validateKey check if the key is valid and get the user information if it's valid
-func validateKey(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, bool, error) {
+func validateKey(client *http.Client, key string, secretInfo *SecretInfo) (bool, error) {
 	response, statusCode, err := makeElevenLabsRequest(client, permissionToAPIMap[UserRead], http.MethodGet, key)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 
 	if statusCode == http.StatusOK {
 		var user UserResponse
 
 		if err := json.Unmarshal(response, &user); err != nil {
-			return nil, false, err
+			return false, err
 		}
 
 		// map info to secretInfo
@@ -186,37 +187,47 @@ func validateKey(client *http.Client, key string, secretInfo *SecretInfo) (*Secr
 			Permission: PermissionStrings[UserRead],
 		})
 
-		return secretInfo, true, nil
+		return true, nil
 	} else if statusCode >= http.StatusBadRequest && statusCode <= 499 {
 		// check if api key is invalid or not verifiable, return false
 		ok, err := checkErrorStatus(response, InvalidAPIKey, NotVerifiable)
 		if err != nil {
-			return nil, false, err
+			return false, err
 		}
 
 		if ok {
-			return nil, false, nil
+			return false, nil
 		}
 	}
 
 	// if no expected status code was detected
-	return nil, false, fmt.Errorf("unexpected status code: %d", statusCode)
+	return false, fmt.Errorf("unexpected status code: %d", statusCode)
 }
 
-// getResources gather resources the key can access
-func getResources(client *http.Client, key string, secretInfo *SecretInfo) (*SecretInfo, error) {
+/*
+getResources gather resources the key can access
+
+Note: The permissions in eleven labs is either Read or Read and Write. There is not separate permission for Write.
+If a particular write permission exist that means the read also exist.
+So for API calls that does not return any resource data, we make the write permissions API calls first
+and if they were as expected we skip the read API calls and add read permission directly.
+If write permission API calls was not as expected than only we make read permission API calls
+This we only do for those API calls which does not add any resources to secretInfo
+*/
+func getResources(client *http.Client, key string, secretInfo *SecretInfo) error {
 	// history
-	var err error
-	secretInfo, err = getHistory(client, key, secretInfo)
-	if err != nil {
-		return secretInfo, err
+	if err := getHistory(client, key, secretInfo); err != nil {
+		return err
 	}
 
-	secretInfo, err = deleteHistory(client, key, secretInfo)
-	if err != nil {
-		return secretInfo, err
+	if err := deleteHistory(client, key, secretInfo); err != nil {
+		return err
 	}
+
 	// dubbings
+	if err := deleteDubbing(client, key, secretInfo); err != nil {
+		return err
+	}
 	// voices
 	// projects
 	// samples
@@ -227,7 +238,14 @@ func getResources(client *http.Client, key string, secretInfo *SecretInfo) (*Sec
 	// voice changer
 	// audio isolation
 
-	return secretInfo, nil
+	return nil
+}
+
+// permissionExist returns if particular permission exist in the list
+func permissionExist(permissionsList []string, permission Permission) bool {
+	permissionString, _ := permission.ToString()
+
+	return slices.Contains(permissionsList, permissionString)
 }
 
 // cli print functions
