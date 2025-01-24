@@ -228,6 +228,13 @@ func getResources(client *http.Client, key string, secretInfo *SecretInfo) error
 	if err := deleteDubbing(client, key, secretInfo); err != nil {
 		return err
 	}
+
+	// if dubbing write permission was not added
+	if !permissionExist(secretInfo.Permissions, DubbingWrite) {
+		if err := getDebugging(client, key, secretInfo); err != nil {
+			return err
+		}
+	}
 	// voices
 	// projects
 	// samples

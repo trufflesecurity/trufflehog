@@ -40,6 +40,7 @@ var (
 	NotVerifiable      = "api_key_not_verifiable"
 	InvalidAPIKey      = "invalid_api_key"
 	MissingPermissions = "missing_permissions"
+	DubbingNotFound    = "dubbing_not_found"
 )
 
 // ErrorResponse is the error response for all APIs
@@ -188,8 +189,34 @@ func deleteDubbing(client *http.Client, key string, secretInfo *SecretInfo) erro
 		}
 	}
 
-	// add history write and write scope to secret info
+	// add dubbing read and write scope to secret info
 	secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[DubbingWrite])
+	secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[DubbingRead])
+
+	return nil
+}
+
+// getDebugging try to delete a dubbing. The item must not exist.
+func getDebugging(client *http.Client, key string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeElevenLabsRequest(client, getAPIUrl(DubbingRead), http.MethodGet, key)
+	if err != nil {
+		return err
+	}
+
+	if statusCode >= http.StatusBadRequest && statusCode <= 499 {
+		// check if status in response is not missing permissions
+		ok, err := checkErrorStatus(response, MissingPermissions)
+		if err != nil {
+			return err
+		}
+
+		// if it's missing permissions return
+		if ok {
+			return nil
+		}
+	}
+
+	// add dubbing read scope to secret info
 	secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[DubbingRead])
 
 	return nil
