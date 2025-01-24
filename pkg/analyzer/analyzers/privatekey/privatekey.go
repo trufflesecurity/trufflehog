@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go privatekey
+
 package privatekey
 
 import (

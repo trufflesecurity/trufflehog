@@ -1,0 +1,16 @@
+permissions:
+# TLS
+- DigitalSignature
+- NonRepudiation
+- KeyEncipherment
+- DataEncipherment
+- KeyAgreement
+- CertificateSigning
+- CRLSigning
+- EncipherOnly
+- DecipherOnly
+- TlsWebServerAuthentication
+- TlsWebClientAuthentication
+# Github/Gitlab
+- Clone
+- Push
