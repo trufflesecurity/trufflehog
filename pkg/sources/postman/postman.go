@@ -147,7 +147,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err = json.Unmarshal(contents, &env); err != nil {
 			return err
 		}
-		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentName: env.ID, fromLocal: true, Link: envPath}, env)
+		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentName: env.ID, fromLocal: true, Link: envPath, Location: source_metadatapb.PostmanLocation_ENVIRONMENT_VARIABLE}, env)
 	}
 
 	// Scan local workspaces
@@ -230,7 +230,9 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 
 	for _, environment := range workspace.EnvironmentsRaw {
 		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/environments/" + environment.ID + ".json"
+		metadata.Location = source_metadatapb.PostmanLocation_ENVIRONMENT_VARIABLE
 		s.scanVariableData(ctx, chunksChan, metadata, environment)
+		metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	}
 	for _, collection := range workspace.CollectionsRaw {
 		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/collections/" + collection.Info.PostmanID + ".json"
@@ -270,8 +272,9 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		for _, word := range strings.Split(envVars.Name, " ") {
 			s.attemptToAddKeyword(word)
 		}
-
+		metadata.Location = source_metadatapb.PostmanLocation_ENVIRONMENT_VARIABLE
 		s.scanVariableData(ctx, chunksChan, metadata, envVars)
+		metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", metadata.FullID)
 	}
 	ctx.Logger().V(2).Info("finished scanning environments")
@@ -305,15 +308,15 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
 	}
 
+	metadata.Location = source_metadatapb.PostmanLocation_COLLECTION_VARIABLE
 	// variables must be scanned first before drilling down into the folders and events
 	// because we need to pick up the substitutions from the top level collection variables
 	s.scanVariableData(ctx, chunksChan, metadata, VariableData{
 		KeyValues: collection.Variables,
 	})
+	metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 
 	for _, event := range collection.Events {
-		metadata.Location = source_metadatapb.PostmanLocation_collection_script
-		//metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_script)]
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
 
@@ -367,11 +370,25 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	}
 
 	for _, event := range item.Events {
+		/*if strings.Contains(metadata.FieldType, "folder") {
+			metadata.Location = source_metadatapb.PostmanLocation_FOLDER_SCRIPT
+		} else if strings.Contains(metadata.FieldType, "request") {
+			metadata.Location = source_metadatapb.PostmanLocation_REQUEST_SCRIPT
+		}*/
 		s.scanEvent(ctx, chunksChan, metadata, event)
+		//metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	}
 
+	if metadata.RequestID != "" {
+		metadata.Location = source_metadatapb.PostmanLocation_REQUEST_AUTHORIZATION
+	} else if metadata.FolderID != "" {
+		metadata.Location = source_metadatapb.PostmanLocation_FOLDER_AUTHORIZATION
+	} else if metadata.CollectionInfo.UID != "" {
+		metadata.Location = source_metadatapb.PostmanLocation_COLLECTION_AUTHORIZATION
+	}
 	// an auth all by its lonesome could be inherited to subfolders and requests
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
+	metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 }
 
 func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, event Event) {
@@ -383,7 +400,16 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.FullID + "?tab=scripts"
 	}
 
+	if strings.Contains(metadata.Type, REQUEST_TYPE) {
+		metadata.Location = source_metadatapb.PostmanLocation_REQUEST_SCRIPT
+	} else if strings.Contains(metadata.Type, FOLDER_TYPE) {
+		metadata.Location = source_metadatapb.PostmanLocation_FOLDER_SCRIPT
+	} else if strings.Contains(metadata.Type, COLLECTION_TYPE) {
+		metadata.Location = source_metadatapb.PostmanLocation_COLLECTION_SCRIPT
+	}
+
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, data)), metadata)
+	metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 }
 
 func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, auth Auth, u URL) {
@@ -468,7 +494,16 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	s.attemptToAddKeyword(authData)
 
 	m.FieldType = AUTH_TYPE
+
+	if strings.Contains(m.Type, REQUEST_TYPE) {
+		m.Location = source_metadatapb.PostmanLocation_REQUEST_AUTHORIZATION
+	} else if strings.Contains(m.Type, FOLDER_TYPE) {
+		m.Location = source_metadatapb.PostmanLocation_FOLDER_AUTHORIZATION
+	} else if strings.Contains(m.Type, COLLECTION_TYPE) {
+		m.Location = source_metadatapb.PostmanLocation_COLLECTION_AUTHORIZATION
+	}
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, authData)), m)
+	m.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
@@ -481,14 +516,18 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 			KeyValues: r.Header,
 		}
 		metadata.Type = originalType + " > header"
+		metadata.Location = source_metadatapb.PostmanLocation_REQUEST_HEADER
 		s.scanVariableData(ctx, chunksChan, metadata, vars)
+		metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	}
 
 	if r.URL.Raw != "" {
 		metadata.Type = originalType + " > request URL (no query parameters)"
 		// Note: query parameters are handled separately
 		u := fmt.Sprintf("%s://%s/%s", r.URL.Protocol, strings.Join(r.URL.Host, "."), strings.Join(r.URL.Path, "/"))
+		metadata.Location = source_metadatapb.PostmanLocation_REQUEST_URL
 		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, u)), metadata)
+		metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	}
 
 	if len(r.URL.Query) > 0 {
@@ -496,7 +535,9 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 			KeyValues: r.URL.Query,
 		}
 		metadata.Type = originalType + " > GET parameters (query)"
+		metadata.Location = source_metadatapb.PostmanLocation_REQUEST_QUERY_PARAMETER
 		s.scanVariableData(ctx, chunksChan, metadata, vars)
+		metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	}
 
 	if r.Auth.Type != "" {
@@ -521,23 +562,30 @@ func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m
 		vars := VariableData{
 			KeyValues: b.FormData,
 		}
+		m.Location = source_metadatapb.PostmanLocation_REQUEST_BODY_FORM_DATA
 		s.scanVariableData(ctx, chunksChan, m, vars)
+		m.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	case "urlencoded":
 		m.Type = originalType + " > url encoded"
 		vars := VariableData{
 			KeyValues: b.URLEncoded,
 		}
+		m.Location = source_metadatapb.PostmanLocation_REQUEST_BODY_URL_ENCODED
 		s.scanVariableData(ctx, chunksChan, m, vars)
+		m.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	case "raw", "graphql":
 		data := b.Raw
 		if b.Mode == "graphql" {
 			m.Type = originalType + " > graphql"
 			data = b.GraphQL.Query + " " + b.GraphQL.Variables
+			m.Location = source_metadatapb.PostmanLocation_REQUEST_BODY_GRAPHQL
 		}
 		if b.Mode == "raw" {
 			m.Type = originalType + " > raw"
+			m.Location = source_metadatapb.PostmanLocation_REQUEST_BODY_RAW
 		}
 		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
+		m.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	default:
 		break
 	}
@@ -555,13 +603,17 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 			KeyValues: response.Header,
 		}
 		m.Type = originalType + " > response header"
+		m.Location = source_metadatapb.PostmanLocation_RESPONSE_HEADER
 		s.scanVariableData(ctx, chunksChan, m, vars)
+		m.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	}
 
 	// Body in a response is just a string
 	if response.Body != "" {
 		m.Type = originalType + " > response body"
+		m.Location = source_metadatapb.PostmanLocation_RESPONSE_BODY
 		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, response.Body)), m)
+		m.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	}
 
 	if response.OriginalRequest.Method != "" {
@@ -618,60 +670,6 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 	if metadata.FieldType == "" {
 		metadata.FieldType = metadata.Type
 	}
-	/*
-		if strings.Contains(metadata.FieldType, "environment") {
-			metadata.Location = source_metadatapb.PostmanLocation_environment_variable
-			metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_environment_variable)]
-		} else if strings.Contains(metadata.FieldType, "authorization") {
-			if metadata.RequestID != "" {
-				metadata.Location = source_metadatapb.PostmanLocation_request_authorization
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_authorization)]
-			} else if metadata.FolderID != "" {
-				metadata.Location = source_metadatapb.PostmanLocation_folder_authorization
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_folder_authorization)]
-			} else if metadata.CollectionInfo.UID != "" {
-				metadata.Location = source_metadatapb.PostmanLocation_collection_authorization
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_authorization)]
-			}
-		} else if strings.Contains(metadata.FieldType, "request") {
-			if strings.Contains(metadata.FieldType, "(query) variables") {
-				metadata.Location = source_metadatapb.PostmanLocation_request_query_parameter
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_query_parameter)]
-			} else if strings.Contains(metadata.FieldType, "header variables") {
-				metadata.Location = source_metadatapb.PostmanLocation_request_header
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_header)]
-			} else if strings.Contains(metadata.FieldType, "body") {
-				metadata.Location = source_metadatapb.PostmanLocation_request_body
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_body)]
-			} else if strings.Contains(metadata.FieldType, "event") {
-				metadata.Location = source_metadatapb.PostmanLocation_request_script
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_script)]
-			} else if strings.Contains(metadata.FieldType, "request URL (no query parameters)") {
-				metadata.Location = source_metadatapb.PostmanLocation_request_url
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_request_url)]
-			}
-		} else if strings.Contains(metadata.FieldType, "folder") {
-			if strings.Contains(metadata.FieldType, "event") {
-				metadata.Location = source_metadatapb.PostmanLocation_folder_script
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_folder_script)]
-			}
-		} else if strings.Contains(metadata.FieldType, "collection") {
-			if strings.Contains(metadata.FieldType, "event") {
-				metadata.Location = source_metadatapb.PostmanLocation_collection_script
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_script)]
-			} else if strings.Contains(metadata.FieldType, "variables") {
-				metadata.Location = source_metadatapb.PostmanLocation_collection_variable
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_collection_variable)]
-			}
-		} else if strings.Contains(metadata.FieldType, "response") {
-			if strings.Contains(metadata.FieldType, "body") {
-				metadata.Location = source_metadatapb.PostmanLocation_response_body
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_response_body)]
-			} else if strings.Contains(metadata.FieldType, "header") {
-				metadata.Location = source_metadatapb.PostmanLocation_response_header
-				metadata.LocationDescription = source_metadatapb.PostmanLocation_name[int32(source_metadatapb.PostmanLocation_response_header)]
-			}
-		} */
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
@@ -682,23 +680,20 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 		SourceMetadata: &source_metadatapb.MetaData{
 			Data: &source_metadatapb.MetaData_Postman{
 				Postman: &source_metadatapb.Postman{
-					Link:                metadata.Link,
-					WorkspaceUuid:       metadata.WorkspaceUUID,
-					WorkspaceName:       metadata.WorkspaceName,
-					CollectionId:        metadata.CollectionInfo.UID,
-					CollectionName:      metadata.CollectionInfo.Name,
-					EnvironmentId:       metadata.EnvironmentID,
-					EnvironmentName:     metadata.EnvironmentName,
-					RequestId:           metadata.RequestID,
-					RequestName:         metadata.RequestName,
-					FolderId:            metadata.FolderID,
-					FolderName:          metadata.FolderName,
-					FieldType:           metadata.FieldType,
-					FieldName:           metadata.FieldName, //ask Joe if needed
-					VariableName:        metadata.VariableName,
-					VariableType:        metadata.VarType, //ask Joe if needed
-					Location:            metadata.Location,
-					LocationDescription: metadata.LocationDescription,
+					Link:            metadata.Link,
+					WorkspaceUuid:   metadata.WorkspaceUUID,
+					WorkspaceName:   metadata.WorkspaceName,
+					CollectionId:    metadata.CollectionInfo.UID,
+					CollectionName:  metadata.CollectionInfo.Name,
+					EnvironmentId:   metadata.EnvironmentID,
+					EnvironmentName: metadata.EnvironmentName,
+					RequestId:       metadata.RequestID,
+					RequestName:     metadata.RequestName,
+					FolderId:        metadata.FolderID,
+					FolderName:      metadata.FolderName,
+					FieldType:       metadata.FieldType,
+					VariableName:    metadata.VariableName,
+					Location:        metadata.Location,
 				},
 			},
 		},

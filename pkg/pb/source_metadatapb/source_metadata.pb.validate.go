@@ -3445,8 +3445,6 @@ func (m *Postman) validate(all bool) error {
 
 	// no validation rules for Location
 
-	// no validation rules for LocationDescription
-
 	if len(errors) > 0 {
 		return PostmanMultiError(errors)
 	}

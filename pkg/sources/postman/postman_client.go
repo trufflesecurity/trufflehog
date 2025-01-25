@@ -64,26 +64,25 @@ type Environment struct {
 }
 
 type Metadata struct {
-	WorkspaceUUID       string
-	WorkspaceName       string
-	CreatedBy           string
-	EnvironmentID       string
-	CollectionInfo      Info
-	FolderID            string // UUID of the folder (but not full ID)
-	FolderName          string
-	RequestID           string // UUID of the request (but not full ID)
-	RequestName         string
-	FullID              string //full ID of the reference item (created_by + ID) OR just the UUID
-	Link                string //direct link to the folder (could be .json file path)
-	Type                string //folder, request, etc.
-	EnvironmentName     string
-	VariableName        string
-	VarType             string
-	FieldName           string
-	FieldType           string
-	fromLocal           bool
-	Location            source_metadatapb.PostmanLocation
-	LocationDescription string
+	WorkspaceUUID   string
+	WorkspaceName   string
+	CreatedBy       string
+	EnvironmentID   string
+	CollectionInfo  Info
+	FolderID        string // UUID of the folder (but not full ID)
+	FolderName      string
+	RequestID       string // UUID of the request (but not full ID)
+	RequestName     string
+	FullID          string //full ID of the reference item (created_by + ID) OR just the UUID
+	Link            string //direct link to the folder (could be .json file path)
+	Type            string //folder, request, etc.
+	EnvironmentName string
+	VariableName    string
+	VarType         string
+	FieldName       string
+	FieldType       string
+	fromLocal       bool
+	Location        source_metadatapb.PostmanLocation
 }
 
 type Collection struct {
