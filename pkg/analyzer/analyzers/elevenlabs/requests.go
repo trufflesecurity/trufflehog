@@ -14,10 +14,9 @@ import (
 // permissionToAPIMap contain the API endpoints for each scope/permission
 // api docs: https://elevenlabs.io/docs/api-reference/introduction
 var permissionToAPIMap = map[Permission]string{
-	TextToSpeech:                   "https://api.elevenlabs.io/v1/text-to-speech/%s", // require voice id
-	SpeechToSpeech:                 "",
-	SoundGeneration:                "",
-	AudioIsolation:                 "",
+	TextToSpeech:                   "https://api.elevenlabs.io/v1/text-to-speech/%s",   // require voice id
+	SpeechToSpeech:                 "https://api.elevenlabs.io/v1/speech-to-speech/%s", // require voice id
+	AudioIsolation:                 "https://api.elevenlabs.io/v1/audio-isolation",
 	DubbingRead:                    "https://api.elevenlabs.io/v1/dubbing/%s", // require dubbing id
 	DubbingWrite:                   "https://api.elevenlabs.io/v1/dubbing/%s", // require dubbing id
 	ProjectsRead:                   "https://api.elevenlabs.io/v1/projects",
@@ -43,11 +42,14 @@ var (
 	MissingPermissions              = "missing_permissions"
 	DubbingNotFound                 = "dubbing_not_found"
 	ProjectNotFound                 = "project_not_found"
-	VoiceNotFound                   = "voice_does_not_exist"
+	VoiceDoesNotExist               = "voice_does_not_exist"
 	InvalidSubscription             = "invalid_subscription"
 	PronunciationDictionaryNotFound = "pronunciation_dictionary_not_found"
 	InternalServerError             = "internal_server_error"
 	InvalidProjectID                = "invalid_project_id"
+	ModelNotFound                   = "model_not_found"
+	VoiceNotFound                   = "voice_not_found"
+	InvalidContent                  = "invalid_content"
 )
 
 // ErrorResponse is the error response for all APIs
@@ -105,6 +107,22 @@ type ModelsResponse struct {
 	Name string `json:"name"`
 }
 
+type AgentsResponse struct {
+	Agents []struct {
+		ID          string `json:"agent_id"`
+		Name        string `json:"name"`
+		AccessLevel string `json:"access_level"`
+	} `json:"agents"`
+}
+
+type ConversationResponse struct {
+	Conversations []struct {
+		AgentID string `json:"agent_id"`
+		ID      string `json:"conversation_id"`
+		Status  string `json:"status"`
+	}
+}
+
 // getAPIUrl return the API Url mapped to the permission
 func getAPIUrl(permission Permission) string {
 	apiUrl := permissionToAPIMap[permission]
@@ -118,7 +136,7 @@ func getAPIUrl(permission Permission) string {
 // makeElevenLabsRequest send the API request to passed url with passed key as API Key and return response body and status code
 func makeElevenLabsRequest(client *http.Client, url, method, key string) ([]byte, int, error) {
 	// create request
-	req, err := http.NewRequest(method, url, nil)
+	req, err := http.NewRequest(method, url, http.NoBody)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -151,9 +169,9 @@ func makeElevenLabsRequest(client *http.Client, url, method, key string) ([]byte
 
 // makeElevenLabsRequestWithPayload sends a POST/PATCH API request to the passed URL with the given key as the API Key
 // and an optional payload. It returns the response body and status code.
-func makeElevenLabsRequestWithPayload(client *http.Client, url, contentType, key string, payload []byte) ([]byte, int, error) {
+func makeElevenLabsRequestWithPayload(client *http.Client, url, method, contentType, key string, payload []byte) ([]byte, int, error) {
 	// Create request with payload
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -328,7 +346,7 @@ func deleteVoice(client *http.Client, key string, secretInfo *SecretInfo) error 
 	switch statusCode {
 	case http.StatusBadRequest:
 		// if permission was assigned to scope we should get 400 error with voice not found status
-		return handleErrorStatus(response, PermissionStrings[VoicesWrite], secretInfo, VoiceNotFound)
+		return handleErrorStatus(response, PermissionStrings[VoicesWrite], secretInfo, VoiceDoesNotExist)
 	case http.StatusUnauthorized:
 		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
 	default:
@@ -442,7 +460,8 @@ func removePronunciationDictionariesRule(client *http.Client, key string, secret
 	}
 
 	payloadBytes, _ := json.Marshal(payload)
-	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(PronunciationDictionariesWrite), "application/json", key, payloadBytes)
+	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(PronunciationDictionariesWrite), http.MethodPost,
+		"application/json", key, payloadBytes)
 	if err != nil {
 		return err
 	}
@@ -505,7 +524,8 @@ func updateAudioNativeProject(client *http.Client, key string, secretInfo *Secre
 	// close the writer
 	_ = writer.Close()
 
-	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(AudioNativeWrite), writer.FormDataContentType(), key, body.Bytes())
+	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(AudioNativeWrite), http.MethodPost,
+		writer.FormDataContentType(), key, body.Bytes())
 	if err != nil {
 		return err
 	}
@@ -535,7 +555,8 @@ func deleteInviteFromWorkspace(client *http.Client, key string, secretInfo *Secr
 	}
 
 	payloadBytes, _ := json.Marshal(payload)
-	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(PronunciationDictionariesWrite), "application/json", key, payloadBytes)
+	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(WorkspaceWrite), http.MethodDelete,
+		"application/json", key, payloadBytes)
 	if err != nil {
 		return err
 	}
@@ -554,6 +575,168 @@ func deleteInviteFromWorkspace(client *http.Client, key string, secretInfo *Secr
 		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
 	default:
 		return fmt.Errorf("unexpected status code: %d while checking workspace write scope", statusCode)
+	}
+}
+
+// textToSpeech try to convert text to speech. The model id and voice id is fake so it actually never happens.
+func textToSpeech(client *http.Client, key string, secretInfo *SecretInfo) error {
+	// send fake model id in payload
+	payload := map[string]interface{}{
+		"text":     "This is trufflehog trying to check text to speech permission of the token",
+		"model_id": fakeID,
+	}
+
+	payloadBytes, _ := json.Marshal(payload)
+	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(TextToSpeech), http.MethodPost,
+		"application/json", key, payloadBytes)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusBadRequest:
+		// if permission is assigned to token, error status will be either model not found or voice not found as we sent both fake ;)
+		return handleErrorStatus(response, PermissionStrings[TextToSpeech], secretInfo, ModelNotFound, VoiceNotFound)
+	case http.StatusUnauthorized:
+		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking text to speech scope", statusCode)
+	}
+}
+
+// speechToSpeech try to change a voice in speech. The model id and voice id is fake so it actually never happens.
+func speechToSpeech(client *http.Client, key string, secretInfo *SecretInfo) error {
+	// create a buffer to hold the multipart form data
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// add required fields to multipart form body
+	_ = writer.WriteField("model_id", fakeID)
+	_ = writer.WriteField("seed", "1")
+	_ = writer.WriteField("remove_background_noise", "false")
+	audio, _ := writer.CreateFormFile("audio", "")
+	audio.Write([]byte("This is example fake audio for api call"))
+	// close the writer
+	_ = writer.Close()
+
+	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(SpeechToSpeech), http.MethodPost,
+		writer.FormDataContentType(), key, body.Bytes())
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusBadRequest:
+		return handleErrorStatus(response, PermissionStrings[SpeechToSpeech], secretInfo, InvalidContent)
+	case http.StatusUnauthorized:
+		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking speech to speech scope", statusCode)
+	}
+}
+
+// audioIsolation try to remove background noise from a voice. The file will be corrupted so it should return an error.
+func audioIsolation(client *http.Client, key string, secretInfo *SecretInfo) error {
+	// create a buffer to hold the multipart form data
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	audio, _ := writer.CreateFormFile("audio", "")
+	audio.Write([]byte("This is example fake audio for api call"))
+	// close the writer
+	_ = writer.Close()
+
+	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(AudioIsolation), http.MethodPost,
+		writer.FormDataContentType(), key, body.Bytes())
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusBadRequest:
+		return handleErrorStatus(response, PermissionStrings[AudioIsolation], secretInfo, InvalidContent)
+	case http.StatusUnauthorized:
+		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking audio isolation speech scope", statusCode)
+	}
+}
+
+/*
+getAgents get all user agents which are not bound with any permission
+call APIs in pattern: agents->conversation
+*/
+func getAgents(client *http.Client, key string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeElevenLabsRequest(client, "https://api.elevenlabs.io/v1/convai/agents", http.MethodGet, key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var agents AgentsResponse
+
+		if err := json.Unmarshal(response, &agents); err != nil {
+			return err
+		}
+
+		// map resource to secret info
+		for _, agent := range agents.Agents {
+			resource := Resource{
+				ID:         agent.ID,
+				Name:       agent.Name,
+				Type:       "Agent",
+				Permission: "", // not binded with any permission
+				Metadata: map[string]string{
+					"access level": agent.AccessLevel,
+				},
+			}
+			secretInfo.Resources = append(secretInfo.Resources, resource)
+			// get agent conversations
+			if err := getConversation(client, key, agent.ID, &resource, secretInfo); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking models read scope", statusCode)
+	}
+}
+
+// getConversation list all agent conversations using the key and agentID passed and add them to secret info
+func getConversation(client *http.Client, key, agentID string, parent *Resource, secretInfo *SecretInfo) error {
+	apiUrl := fmt.Sprintf("https://api.elevenlabs.io/v1/convai/conversations?agent_id=%s", agentID)
+	response, statusCode, err := makeElevenLabsRequest(client, apiUrl, http.MethodGet, key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var conversations ConversationResponse
+
+		if err := json.Unmarshal(response, &conversations); err != nil {
+			return err
+		}
+
+		// map resource to secret info
+		for _, conversation := range conversations.Conversations {
+			secretInfo.Resources = append(secretInfo.Resources, Resource{
+				ID:         conversation.ID,
+				Name:       "", // no name
+				Type:       "Conversation",
+				Permission: "", // not binded with any permission
+				Metadata: map[string]string{
+					"status": conversation.Status,
+				},
+				Parent: parent,
+			})
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking models read scope", statusCode)
 	}
 }
 

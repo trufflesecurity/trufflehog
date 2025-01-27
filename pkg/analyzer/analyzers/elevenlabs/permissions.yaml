@@ -1,7 +1,7 @@
 permissions:
   - text_to_speech
   - speech_to_speech
-  - sound_generation
+  # - sound_generation
   - audio_isolation
   # - voice_generation
   - dubbing_read

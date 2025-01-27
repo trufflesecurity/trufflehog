@@ -47,6 +47,7 @@ type Resource struct {
 	Type       string
 	Metadata   map[string]string
 	Permission string
+	Parent     *Resource
 }
 
 func (a Analyzer) Type() analyzers.AnalyzerType {
@@ -76,18 +77,19 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	var secretInfo = &SecretInfo{}
 
 	// validate the key and get user information
-	valid, err := validateKey(client, key, secretInfo)
-	if err != nil {
+	if err := validateKey(client, key, secretInfo); err != nil {
 		return nil, err
 	}
 
-	if !valid {
-		return nil, errors.New("key is not valid")
+	if secretInfo.Valid {
+		// Get resources
+		if err := getResources(client, key, secretInfo); err != nil {
+			return nil, err
+		}
 	}
 
-	// Get resources
-	if err := getResources(client, key, secretInfo); err != nil {
-		return nil, nil
+	if err := getUnboundedResources(client, key, secretInfo); err != nil {
+		return nil, err
 	}
 
 	return secretInfo, nil
@@ -132,22 +134,46 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 	// extract information from resource to create bindings and append to result bindings
 	for _, resource := range info.Resources {
-		binding := analyzers.Binding{
-			Resource: analyzers.Resource{
+		// if resource has permission it is binded resource
+		if resource.Permission != "" {
+			binding := analyzers.Binding{
+				Resource: analyzers.Resource{
+					Name:               resource.Name,
+					FullyQualifiedName: resource.ID,
+					Type:               resource.Type,
+				},
+				Permission: analyzers.Permission{
+					Value: resource.Permission,
+				},
+			}
+
+			for key, value := range resource.Metadata {
+				binding.Resource.Metadata[key] = value
+			}
+
+			result.Bindings = append(result.Bindings, binding)
+		} else {
+			// if resource is missing permission it is an unbounded resource
+			unboundedResource := analyzers.Resource{
 				Name:               resource.Name,
 				FullyQualifiedName: resource.ID,
 				Type:               resource.Type,
-			},
-			Permission: analyzers.Permission{
-				Value: resource.Permission,
-			},
-		}
+			}
 
-		for key, value := range resource.Metadata {
-			binding.Resource.Metadata[key] = value
-		}
+			for key, value := range resource.Metadata {
+				unboundedResource.Metadata[key] = value
+			}
 
-		result.Bindings = append(result.Bindings, binding)
+			if resource.Parent != nil {
+				unboundedResource.Parent = &analyzers.Resource{
+					Name:               resource.Parent.Name,
+					FullyQualifiedName: resource.Parent.ID,
+					Type:               resource.Parent.Type,
+				}
+			}
+
+			result.UnboundedResources = append(result.UnboundedResources, unboundedResource)
+		}
 	}
 
 	result.Metadata["Valid_Key"] = info.Valid
@@ -156,17 +182,18 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 }
 
 // validateKey check if the key is valid and get the user information if it's valid
-func validateKey(client *http.Client, key string, secretInfo *SecretInfo) (bool, error) {
+func validateKey(client *http.Client, key string, secretInfo *SecretInfo) error {
 	response, statusCode, err := makeElevenLabsRequest(client, permissionToAPIMap[UserRead], http.MethodGet, key)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	if statusCode == http.StatusOK {
+	switch statusCode {
+	case http.StatusOK:
 		var user UserResponse
 
 		if err := json.Unmarshal(response, &user); err != nil {
-			return false, err
+			return err
 		}
 
 		// map info to secretInfo
@@ -187,21 +214,26 @@ func validateKey(client *http.Client, key string, secretInfo *SecretInfo) (bool,
 			Permission: PermissionStrings[UserRead],
 		})
 
-		return true, nil
-	} else if statusCode >= http.StatusBadRequest && statusCode <= 499 {
-		// check if api key is invalid or not verifiable, return false
-		ok, err := checkErrorStatus(response, InvalidAPIKey, NotVerifiable)
-		if err != nil {
-			return false, err
+		return nil
+	case http.StatusUnauthorized:
+		var errorResp ErrorResponse
+
+		if err := json.Unmarshal(response, &errorResp); err != nil {
+			return err
 		}
 
-		if ok {
-			return false, nil
+		if errorResp.Detail.Status == InvalidAPIKey || errorResp.Detail.Status == NotVerifiable {
+			return errors.New("invalid api key")
+		} else if errorResp.Detail.Status == MissingPermissions {
+			// key is missing user read permissions but is valid
+			secretInfo.Valid = true
+			color.Yellow("\n[!] API Key missing user read permissions")
 		}
+
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
 	}
-
-	// if no expected status code was detected
-	return false, fmt.Errorf("unexpected status code: %d", statusCode)
 }
 
 /*
@@ -279,8 +311,29 @@ func getResources(client *http.Client, key string, secretInfo *SecretInfo) error
 	}
 
 	// text to speech
+	if err := textToSpeech(client, key, secretInfo); err != nil {
+		return err
+	}
+
 	// voice changer
+	if err := speechToSpeech(client, key, secretInfo); err != nil {
+		return err
+	}
+
 	// audio isolation
+	if err := audioIsolation(client, key, secretInfo); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// getUnboundedResources gather resources which can be accessed without any permission
+func getUnboundedResources(client *http.Client, key string, secretInfo *SecretInfo) error {
+	// each agent can have a conversations which we get inside this function
+	if err := getAgents(client, key, secretInfo); err != nil {
+		return err
+	}
 
 	return nil
 }
