@@ -363,7 +363,7 @@ func getProjects(client *http.Client, key string, secretInfo *SecretInfo) error 
 
 		return nil
 	case http.StatusForbidden:
-		// if token has the permission but trail is free, projects are not accessable
+		// if token has the permission but trail is free, projects are not accessible
 		return handleErrorStatus(response, PermissionStrings[ProjectsRead], secretInfo, InvalidSubscription)
 	case http.StatusUnauthorized:
 		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
@@ -384,7 +384,7 @@ func deleteProject(client *http.Client, key string, secretInfo *SecretInfo) erro
 		// if permission was assigned to token we should get 400 error with project not found status
 		return handleErrorStatus(response, PermissionStrings[ProjectsWrite], secretInfo, ProjectNotFound)
 	case http.StatusForbidden:
-		// if token has the permission but trail is free, projects are not accessable
+		// if token has the permission but trail is free, projects are not accessible
 		return handleErrorStatus(response, PermissionStrings[ProjectsWrite], secretInfo, InvalidSubscription)
 	case http.StatusUnauthorized:
 		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
@@ -453,7 +453,7 @@ func removePronunciationDictionariesRule(client *http.Client, key string, secret
 }
 
 // handleErrorStatus handle error response, check if expected error status is in the response and add require permission to secret info
-// this is used in case where we expect error respones with specific status mostly in write calls
+// this is used in case where we expect error response with specific status mostly in write calls
 func handleErrorStatus(response []byte, permissionToAdd string, secretInfo *SecretInfo, expectedErrStatuses ...string) error {
 	// check if status in response is what is expected to be
 	ok, err := checkErrorStatus(response, expectedErrStatuses...)
