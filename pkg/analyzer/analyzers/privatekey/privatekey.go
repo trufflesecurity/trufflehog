@@ -138,6 +138,11 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 
 	color.Green("[!] Valid Private Key\n\n")
 
+	if info.GithubUsername == nil && info.GitlabUsername == nil && info.TLSCertificateResult == nil {
+		color.Yellow("[i] Insufficient information returned from fingerprint analysis. No permissions found.")
+		return
+	}
+
 	if info.GithubUsername != nil {
 		color.Yellow("[i] GitHub Details:")
 		printUserInfo(*info.GithubUsername)
@@ -278,7 +283,15 @@ func bakeTLSResources(result *privatekey.DriftwoodResult) ([]analyzers.Binding, 
 }
 
 func analyzeFingerprint(ctx context.Context, fingerprint string) (*privatekey.DriftwoodResult, error) {
-	return privatekey.LookupFingerprint(ctx, fingerprint)
+
+	result, err := privatekey.LookupFingerprint(ctx, fingerprint)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.CertificateResults) == 0 {
+		return nil, nil
+	}
+	return result, nil
 }
 
 func analyzeGithubUser(ctx context.Context, parsedKey any) (*string, error) {
