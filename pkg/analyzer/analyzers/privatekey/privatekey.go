@@ -28,13 +28,13 @@ type Analyzer struct {
 func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePrivateKey }
 
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	// key will be already normalized by the time it reaches here
-	key, ok := credInfo["key"]
+	// token will be already normalized by the time it reaches here
+	token, ok := credInfo["token"]
 	if !ok {
-		return nil, errors.New("key not found in credInfo")
+		return nil, errors.New("token not found in credInfo")
 	}
 
-	info, err := AnalyzePermissions(ctx, a.Cfg, key)
+	info, err := AnalyzePermissions(ctx, a.Cfg, token)
 	if err != nil {
 		return nil, err
 	}
