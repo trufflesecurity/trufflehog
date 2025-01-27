@@ -28,6 +28,7 @@ type Analyzer struct {
 func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePrivateKey }
 
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	// key will be already normalized by the time it reaches here
 	key, ok := credInfo["key"]
 	if !ok {
 		return nil, errors.New("key not found in credInfo")
