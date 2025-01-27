@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"slices"
 	"strings"
@@ -20,18 +21,17 @@ var permissionToAPIMap = map[Permission]string{
 	DubbingRead:                    "https://api.elevenlabs.io/v1/dubbing/%s", // require dubbing id
 	DubbingWrite:                   "https://api.elevenlabs.io/v1/dubbing/%s", // require dubbing id
 	ProjectsRead:                   "https://api.elevenlabs.io/v1/projects",
-	ProjectsWrite:                  "https://api.elevenlabs.io/v1/projects/%s", // require project id
-	AudioNativeRead:                "",
-	AudioNativeWrite:               "",
+	ProjectsWrite:                  "https://api.elevenlabs.io/v1/projects/%s",             // require project id
+	AudioNativeWrite:               "https://api.elevenlabs.io/v1/audio-native/%s/content", // require project id
 	PronunciationDictionariesRead:  "https://api.elevenlabs.io/v1/pronunciation-dictionaries",
 	PronunciationDictionariesWrite: "https://api.elevenlabs.io/v1/pronunciation-dictionaries/%s/remove-rules", // require pronunciation dictionary id
 	VoicesRead:                     "https://api.elevenlabs.io/v1/voices",
 	VoicesWrite:                    "https://api.elevenlabs.io/v1/voices/%s", // require voice id
-	ModelsRead:                     "",
+	ModelsRead:                     "https://api.elevenlabs.io/v1/models",
 	SpeechHistoryRead:              "https://api.elevenlabs.io/v1/history",
 	SpeechHistoryWrite:             "https://api.elevenlabs.io/v1/history/%s", // require history item id
 	UserRead:                       "https://api.elevenlabs.io/v1/user",
-	WorkspaceWrite:                 "",
+	WorkspaceWrite:                 "https://api.elevenlabs.io/v1/workspace/invites",
 }
 
 var (
@@ -47,6 +47,7 @@ var (
 	InvalidSubscription             = "invalid_subscription"
 	PronunciationDictionaryNotFound = "pronunciation_dictionary_not_found"
 	InternalServerError             = "internal_server_error"
+	InvalidProjectID                = "invalid_project_id"
 )
 
 // ErrorResponse is the error response for all APIs
@@ -99,6 +100,11 @@ type PronunciationDictionariesResponse struct {
 	} `json:"pronunciation_dictionaries"`
 }
 
+type ModelsResponse struct {
+	ID   string `json:"model_id"`
+	Name string `json:"name"`
+}
+
 // getAPIUrl return the API Url mapped to the permission
 func getAPIUrl(permission Permission) string {
 	apiUrl := permissionToAPIMap[permission]
@@ -143,9 +149,9 @@ func makeElevenLabsRequest(client *http.Client, url, method, key string) ([]byte
 	return responseBodyByte, resp.StatusCode, nil
 }
 
-// makeElevenLabsPostRequest sends a POST API request to the passed URL with the given key as the API Key
+// makeElevenLabsRequestWithPayload sends a POST/PATCH API request to the passed URL with the given key as the API Key
 // and an optional payload. It returns the response body and status code.
-func makeElevenLabsPostRequest(client *http.Client, url, key string, payload []byte) ([]byte, int, error) {
+func makeElevenLabsRequestWithPayload(client *http.Client, url, contentType, key string, payload []byte) ([]byte, int, error) {
 	// Create request with payload
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
 	if err != nil {
@@ -154,7 +160,7 @@ func makeElevenLabsPostRequest(client *http.Client, url, key string, payload []b
 
 	// Add headers
 	req.Header.Add("xi-api-key", key)
-	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Content-Type", contentType)
 
 	// Send the request
 	resp, err := client.Do(req)
@@ -436,7 +442,7 @@ func removePronunciationDictionariesRule(client *http.Client, key string, secret
 	}
 
 	payloadBytes, _ := json.Marshal(payload)
-	response, statusCode, err := makeElevenLabsPostRequest(client, getAPIUrl(PronunciationDictionariesWrite), key, payloadBytes)
+	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(PronunciationDictionariesWrite), "application/json", key, payloadBytes)
 	if err != nil {
 		return err
 	}
@@ -449,6 +455,105 @@ func removePronunciationDictionariesRule(client *http.Client, key string, secret
 		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
 	default:
 		return fmt.Errorf("unexpected status code: %d while checking pronunciation dictionary write scope", statusCode)
+	}
+}
+
+// getModels list models using the key passed and add them to secret info
+func getModels(client *http.Client, key string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeElevenLabsRequest(client, getAPIUrl(ModelsRead), http.MethodGet, key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var models []ModelsResponse
+
+		if err := json.Unmarshal(response, &models); err != nil {
+			return err
+		}
+
+		// add models read scope to secret info
+		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[ModelsRead])
+		// map resource to secret info
+		for _, model := range models {
+			secretInfo.Resources = append(secretInfo.Resources, Resource{
+				ID:         model.ID,
+				Name:       model.Name,
+				Type:       "Model",
+				Permission: PermissionStrings[ModelsRead],
+			})
+		}
+
+		return nil
+	case http.StatusUnauthorized:
+		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking models read scope", statusCode)
+	}
+}
+
+// updateAudioNativeProject try to update a project content. The item must not exist.
+func updateAudioNativeProject(client *http.Client, key string, secretInfo *SecretInfo) error {
+	// create a buffer to hold the multipart form data
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// add required fields to multipart form body
+	_ = writer.WriteField("auto_convert", "false")
+	_ = writer.WriteField("auto_publish", "false")
+	// close the writer
+	_ = writer.Close()
+
+	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(AudioNativeWrite), writer.FormDataContentType(), key, body.Bytes())
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusBadRequest:
+		// if the permission is assigned to token, the api should return 400 with invalid project id
+		if err := handleErrorStatus(response, PermissionStrings[AudioNativeWrite], secretInfo, InvalidProjectID); err != nil {
+			return err
+		}
+
+		// add read permission as no separate API exist to check read audio native permission
+		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[AudioNativeRead])
+		return nil
+	case http.StatusUnauthorized:
+		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking audio native write scope", statusCode)
+	}
+}
+
+// deleteInviteFromWorkspace try to remove a invite from workspace. The item must not exist.
+func deleteInviteFromWorkspace(client *http.Client, key string, secretInfo *SecretInfo) error {
+	// send fake email in payload
+	payload := map[string]interface{}{
+		"email": fakeID + "@example.com",
+	}
+
+	payloadBytes, _ := json.Marshal(payload)
+	response, statusCode, err := makeElevenLabsRequestWithPayload(client, getAPIUrl(PronunciationDictionariesWrite), "application/json", key, payloadBytes)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusInternalServerError:
+		// for some reason if we send fake email and token has the permission, the workspace invite api return 500 error instead of 404
+		if err := handleErrorStatus(response, PermissionStrings[WorkspaceWrite], secretInfo, InternalServerError); err != nil {
+			return err
+		}
+
+		// add read permission as no separate API exist to check workspace read permission
+		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[WorkspaceRead])
+		return nil
+	case http.StatusUnauthorized:
+		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking workspace write scope", statusCode)
 	}
 }
 

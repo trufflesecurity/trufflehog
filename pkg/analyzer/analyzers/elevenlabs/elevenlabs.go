@@ -244,6 +244,7 @@ func getResources(client *http.Client, key string, secretInfo *SecretInfo) error
 	if err := deleteVoice(client, key, secretInfo); err != nil {
 		return err
 	}
+
 	// projects
 	if err := getProjects(client, key, secretInfo); err != nil {
 		return err
@@ -252,6 +253,7 @@ func getResources(client *http.Client, key string, secretInfo *SecretInfo) error
 	if err := deleteProject(client, key, secretInfo); err != nil {
 		return err
 	}
+
 	// pronunciation dictionaries
 	if err := getPronunciationDictionaries(client, key, secretInfo); err != nil {
 		return err
@@ -260,8 +262,22 @@ func getResources(client *http.Client, key string, secretInfo *SecretInfo) error
 	if err := removePronunciationDictionariesRule(client, key, secretInfo); err != nil {
 		return err
 	}
+
 	// models
+	if err := getModels(client, key, secretInfo); err != nil {
+		return err
+	}
+
 	// audio native
+	if err := updateAudioNativeProject(client, key, secretInfo); err != nil {
+		return err
+	}
+
+	// workspace
+	if err := deleteInviteFromWorkspace(client, key, secretInfo); err != nil {
+		return err
+	}
+
 	// text to speech
 	// voice changer
 	// audio isolation

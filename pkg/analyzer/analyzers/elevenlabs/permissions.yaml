@@ -20,5 +20,5 @@ permissions:
   - speech_history_write
   - user_read
   # - user_write
-  # - workspace_read
+  - workspace_read
   - workspace_write

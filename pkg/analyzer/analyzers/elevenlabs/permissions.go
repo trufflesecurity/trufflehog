@@ -25,6 +25,7 @@ const (
     SpeechHistoryRead Permission = iota
     SpeechHistoryWrite Permission = iota
     UserRead Permission = iota
+    WorkspaceRead Permission = iota
     WorkspaceWrite Permission = iota
 )
 
@@ -48,6 +49,7 @@ var (
         SpeechHistoryRead: "speech_history_read",
         SpeechHistoryWrite: "speech_history_write",
         UserRead: "user_read",
+        WorkspaceRead: "workspace_read",
         WorkspaceWrite: "workspace_write",
     }
 
@@ -70,6 +72,7 @@ var (
         "speech_history_read": SpeechHistoryRead,
         "speech_history_write": SpeechHistoryWrite,
         "user_read": UserRead,
+        "workspace_read": WorkspaceRead,
         "workspace_write": WorkspaceWrite,
     }
 
@@ -92,7 +95,8 @@ var (
         SpeechHistoryRead: 16,
         SpeechHistoryWrite: 17,
         UserRead: 18,
-        WorkspaceWrite: 19,
+        WorkspaceRead: 19,
+        WorkspaceWrite: 20,
     }
 
     IdToPermission = map[int]Permission{
@@ -114,7 +118,8 @@ var (
         16: SpeechHistoryRead,
         17: SpeechHistoryWrite,
         18: UserRead,
-        19: WorkspaceWrite,
+        19: WorkspaceRead,
+        20: WorkspaceWrite,
     }
 )
 
