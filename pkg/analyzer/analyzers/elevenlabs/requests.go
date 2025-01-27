@@ -615,7 +615,7 @@ func speechToSpeech(client *http.Client, key string, secretInfo *SecretInfo) err
 	_ = writer.WriteField("seed", "1")
 	_ = writer.WriteField("remove_background_noise", "false")
 	audio, _ := writer.CreateFormFile("audio", "")
-	audio.Write([]byte("This is example fake audio for api call"))
+	_, _ = audio.Write([]byte("This is example fake audio for api call"))
 	// close the writer
 	_ = writer.Close()
 
@@ -642,7 +642,7 @@ func audioIsolation(client *http.Client, key string, secretInfo *SecretInfo) err
 	writer := multipart.NewWriter(body)
 
 	audio, _ := writer.CreateFormFile("audio", "")
-	audio.Write([]byte("This is example fake audio for api call"))
+	_, _ = audio.Write([]byte("This is example fake audio for api call"))
 	// close the writer
 	_ = writer.Close()
 
