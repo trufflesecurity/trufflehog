@@ -252,8 +252,14 @@ func getResources(client *http.Client, key string, secretInfo *SecretInfo) error
 	if err := deleteProject(client, key, secretInfo); err != nil {
 		return err
 	}
-	// samples
 	// pronunciation dictionaries
+	if err := getPronunciationDictionaries(client, key, secretInfo); err != nil {
+		return err
+	}
+
+	if err := removePronunciationDictionariesRule(client, key, secretInfo); err != nil {
+		return err
+	}
 	// models
 	// audio native
 	// text to speech

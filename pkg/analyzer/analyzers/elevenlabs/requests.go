@@ -1,6 +1,7 @@
 package elevenlabs
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,8 +23,8 @@ var permissionToAPIMap = map[Permission]string{
 	ProjectsWrite:                  "https://api.elevenlabs.io/v1/projects/%s", // require project id
 	AudioNativeRead:                "",
 	AudioNativeWrite:               "",
-	PronunciationDictionariesRead:  "",
-	PronunciationDictionariesWrite: "",
+	PronunciationDictionariesRead:  "https://api.elevenlabs.io/v1/pronunciation-dictionaries",
+	PronunciationDictionariesWrite: "https://api.elevenlabs.io/v1/pronunciation-dictionaries/%s/remove-rules", // require pronunciation dictionary id
 	VoicesRead:                     "https://api.elevenlabs.io/v1/voices",
 	VoicesWrite:                    "https://api.elevenlabs.io/v1/voices/%s", // require voice id
 	ModelsRead:                     "",
@@ -37,14 +38,15 @@ var (
 	// not exist key
 	fakeID = "_thou_shalt_not_exist_"
 	// error statuses
-	NotVerifiable       = "api_key_not_verifiable"
-	InvalidAPIKey       = "invalid_api_key"
-	MissingPermissions  = "missing_permissions"
-	DubbingNotFound     = "dubbing_not_found"
-	ProjectNotFound     = "project_not_found"
-	VoiceNotFound       = "voice_does_not_exist"
-	InvalidSubscription = "invalid_subscription"
-	InternalServerError = "internal_server_error"
+	NotVerifiable                   = "api_key_not_verifiable"
+	InvalidAPIKey                   = "invalid_api_key"
+	MissingPermissions              = "missing_permissions"
+	DubbingNotFound                 = "dubbing_not_found"
+	ProjectNotFound                 = "project_not_found"
+	VoiceNotFound                   = "voice_does_not_exist"
+	InvalidSubscription             = "invalid_subscription"
+	PronunciationDictionaryNotFound = "pronunciation_dictionary_not_found"
+	InternalServerError             = "internal_server_error"
 )
 
 // ErrorResponse is the error response for all APIs
@@ -90,6 +92,13 @@ type ProjectsResponse struct {
 	} `json:"projects"`
 }
 
+type PronunciationDictionariesResponse struct {
+	PronunciationDictionaries []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"pronunciation_dictionaries"`
+}
+
 // getAPIUrl return the API Url mapped to the permission
 func getAPIUrl(permission Permission) string {
 	apiUrl := permissionToAPIMap[permission]
@@ -126,6 +135,40 @@ func makeElevenLabsRequest(client *http.Client, url, method, key string) ([]byte
 		 is if we return http.Response we cannot close the body in defer. If we do we will get an error
 		 when reading body outside this function
 	*/
+	responseBodyByte, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return responseBodyByte, resp.StatusCode, nil
+}
+
+// makeElevenLabsPostRequest sends a POST API request to the passed URL with the given key as the API Key
+// and an optional payload. It returns the response body and status code.
+func makeElevenLabsPostRequest(client *http.Client, url, key string, payload []byte) ([]byte, int, error) {
+	// Create request with payload
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Add headers
+	req.Header.Add("xi-api-key", key)
+	req.Header.Add("Content-Type", "application/json")
+
+	// Send the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// ensure the response body is properly closed
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	// read the response body
 	responseBodyByte, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, 0, err
@@ -347,6 +390,65 @@ func deleteProject(client *http.Client, key string, secretInfo *SecretInfo) erro
 		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
 	default:
 		return fmt.Errorf("unexpected status code: %d while checking project write scope", statusCode)
+	}
+}
+
+// getPronunciationDictionaries get list of pronunciation dictionaries using the key passed and add them to secret info
+func getPronunciationDictionaries(client *http.Client, key string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeElevenLabsRequest(client, getAPIUrl(PronunciationDictionariesRead), http.MethodGet, key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var PDs PronunciationDictionariesResponse
+
+		if err := json.Unmarshal(response, &PDs); err != nil {
+			return err
+		}
+
+		// add voices read scope to secret info
+		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[PronunciationDictionariesRead])
+		// map resource to secret info
+		for _, pd := range PDs.PronunciationDictionaries {
+			secretInfo.Resources = append(secretInfo.Resources, Resource{
+				ID:         pd.ID,
+				Name:       pd.Name,
+				Type:       "Pronunciation Dictionary",
+				Permission: PermissionStrings[PronunciationDictionariesRead],
+			})
+		}
+
+		return nil
+	case http.StatusUnauthorized:
+		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking pronunciation dictionaries read scope", statusCode)
+	}
+}
+
+// removePronunciationDictionariesRule try to remove a rule from pronunciation dictionaries. The item must not exist.
+func removePronunciationDictionariesRule(client *http.Client, key string, secretInfo *SecretInfo) error {
+	// send empty list of rule strings
+	payload := map[string]interface{}{
+		"rule_strings": []string{""},
+	}
+
+	payloadBytes, _ := json.Marshal(payload)
+	response, statusCode, err := makeElevenLabsPostRequest(client, getAPIUrl(PronunciationDictionariesWrite), key, payloadBytes)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusNotFound:
+		// if permission was assigned to token we should get 404 error with pronunciation_dictionary_not_found status
+		return handleErrorStatus(response, PermissionStrings[PronunciationDictionariesWrite], secretInfo, PronunciationDictionaryNotFound)
+	case http.StatusUnauthorized:
+		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
+	default:
+		return fmt.Errorf("unexpected status code: %d while checking pronunciation dictionary write scope", statusCode)
 	}
 }
 
