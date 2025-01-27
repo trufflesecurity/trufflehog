@@ -199,13 +199,13 @@ func TestDetector(t *testing.T) {
 		// "password" is normally flagged as a false positive, but CustomRegex
 		// should allow the user to decide and report it as a result.
 		Keywords: []string{"password"},
-		Regex:    map[string]string{"regex": "password=.*"},
+		Regex:    map[string]string{"regex": "password=\"(.*)\""},
 	})
 	assert.NoError(t, err)
 	results, err := detector.FromData(context.Background(), false, []byte(`password="123456"`))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
-	assert.Equal(t, results[0].Raw, []byte(`password="123456"`))
+	assert.Equal(t, results[0].Raw, []byte(`123456`))
 }
 
 func BenchmarkProductIndices(b *testing.B) {
