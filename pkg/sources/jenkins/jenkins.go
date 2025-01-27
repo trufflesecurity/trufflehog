@@ -123,7 +123,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	case *sourcespb.Jenkins_Unauthenticated:
 		unparsedURL = conn.Endpoint
 	default:
-		return errors.Errorf("Invalid configuration given for source. Name: %s, Type: %s", name, s.Type())
+		return errors.Errorf("unknown or unspecified authentication method provided for Jenkins source %q (unauthenticated scans must be explicitly configured)", name)
 	}
 
 	s.url, err = url.Parse(unparsedURL)
