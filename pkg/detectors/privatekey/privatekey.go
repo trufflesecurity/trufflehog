@@ -140,7 +140,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				// enabled th
 				s1.AnalysisInfo = map[string]string{
-					"key": match,
+					"key": token,
 				}
 			} else {
 				s1.ExtraData = nil

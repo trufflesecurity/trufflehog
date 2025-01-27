@@ -47,18 +47,14 @@ type SecretInfo struct {
 	GitlabUsername       *string
 }
 
-func AnalyzePermissions(ctx context.Context, cfg *config.Config, key string) (*SecretInfo, error) {
-	token := privatekey.Normalize(key)
-	if len(token) < 64 {
-		return nil, fmt.Errorf("invalid token")
-	}
+func AnalyzePermissions(ctx context.Context, cfg *config.Config, token string) (*SecretInfo, error) {
 
 	var (
-		wg                 sync.WaitGroup
-		parsedKey          any
-		err                error
-		verificationErrors = privatekey.NewVerificationErrors(3)
-		info               = &SecretInfo{}
+		wg             sync.WaitGroup
+		parsedKey      any
+		err            error
+		analyzerErrors = privatekey.NewVerificationErrors(3)
+		info           = &SecretInfo{}
 	)
 
 	parsedKey, err = ssh.ParseRawPrivateKey([]byte(token))
@@ -81,9 +77,9 @@ func AnalyzePermissions(ctx context.Context, cfg *config.Config, key string) (*S
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		data, err := privatekey.LookupFingerprint(ctx, fingerprint)
+		data, err := analyzeFingerprint(ctx, fingerprint)
 		if err != nil {
-			verificationErrors.Add(err)
+			analyzerErrors.Add(err)
 		} else {
 			info.TLSCertificateResult = data
 		}
@@ -93,9 +89,9 @@ func AnalyzePermissions(ctx context.Context, cfg *config.Config, key string) (*S
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		user, err := privatekey.VerifyGitHubUser(ctx, parsedKey)
+		user, err := analyzeGithubUser(ctx, parsedKey)
 		if err != nil {
-			verificationErrors.Add(err)
+			analyzerErrors.Add(err)
 		} else if user != nil {
 			info.GithubUsername = user
 		}
@@ -105,17 +101,17 @@ func AnalyzePermissions(ctx context.Context, cfg *config.Config, key string) (*S
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		user, err := privatekey.VerifyGitLabUser(ctx, parsedKey)
+		user, err := analyzeGitlabUser(ctx, parsedKey)
 		if err != nil {
-			verificationErrors.Add(err)
+			analyzerErrors.Add(err)
 		} else if user != nil {
 			info.GitlabUsername = user
 		}
 	}()
 	wg.Wait()
 
-	if len(verificationErrors.Errors) == 3 {
-		return nil, fmt.Errorf("verification failures: %s", strings.Join(verificationErrors.Errors, ", "))
+	if len(analyzerErrors.Errors) == 3 {
+		return nil, fmt.Errorf("analyzer failures: %s", strings.Join(analyzerErrors.Errors, ", "))
 	}
 
 	return info, nil
@@ -127,7 +123,13 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		return
 	}
 
-	info, err := AnalyzePermissions(context.Background(), cfg, key)
+	token := privatekey.Normalize(key)
+	if len(token) < 64 {
+		color.Red("[x] Error: Invalid Private Key")
+		return
+	}
+
+	info, err := AnalyzePermissions(context.Background(), cfg, token)
 	if err != nil {
 		color.Red("[x] Error: %s", err.Error())
 		return
@@ -272,4 +274,16 @@ func bakeTLSResources(result *privatekey.DriftwoodResult) ([]analyzers.Binding, 
 	}
 
 	return boundedResources, unboundedResources
+}
+
+func analyzeFingerprint(ctx context.Context, fingerprint string) (*privatekey.DriftwoodResult, error) {
+	return privatekey.LookupFingerprint(ctx, fingerprint)
+}
+
+func analyzeGithubUser(ctx context.Context, parsedKey any) (*string, error) {
+	return privatekey.VerifyGitHubUser(ctx, parsedKey)
+}
+
+func analyzeGitlabUser(ctx context.Context, parsedKey any) (*string, error) {
+	return privatekey.VerifyGitLabUser(ctx, parsedKey)
 }
