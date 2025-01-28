@@ -136,7 +136,7 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 
 	// Non-safe Opsgenie APIs are asynchronous and always return 202 if credential has the permission.
 	// For Safe API Methods, use the restricted client
-	if analyzers.MethodIsSafe(h.Method) {
+	if analyzers.IsMethodSafe(h.Method) {
 		client = analyzers.NewAnalyzeClient(cfg)
 	} else {
 		client = analyzers.NewAnalyzeClientUnrestricted(cfg)

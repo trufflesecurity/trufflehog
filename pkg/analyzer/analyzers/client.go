@@ -114,7 +114,7 @@ type AnalyzerRoundTripper struct {
 
 func (r AnalyzerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := r.parent.RoundTrip(req)
-	if err != nil || MethodIsSafe(req.Method) {
+	if err != nil || IsMethodSafe(req.Method) {
 		return resp, err
 	}
 	// Check that unsafe methods did NOT return a valid status code.
@@ -126,7 +126,7 @@ func (r AnalyzerRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 // methodIsSafe is a helper method to check whether the HTTP method is safe according to MDN Web Docs.
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods#safe_idempotent_and_cacheable_request_methods
-func MethodIsSafe(method string) bool {
+func IsMethodSafe(method string) bool {
 	switch strings.ToUpper(method) {
 	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace:
 		return true
