@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -37,10 +37,16 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Auth0oauth secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
 	clientIdMatches := clientIdPat.FindAllStringSubmatch(dataStr, -1)
 	clientSecretMatches := clientSecretPat.FindAllStringSubmatch(dataStr, -1)
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueDomainMatches := make(map[string]struct{})
+	for _, m := range domainMatches {
+		if len(m) > 1 {
+			uniqueDomainMatches[strings.TrimSpace(m[1])] = struct{}{}
+		}
+
+	}
 
 	for _, clientIdMatch := range clientIdMatches {
 		clientIdRes := strings.TrimSpace(clientIdMatch[1])
@@ -48,9 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, clientSecretMatch := range clientSecretMatches {
 			clientSecretRes := strings.TrimSpace(clientSecretMatch[1])
 
-			for _, domainMatch := range domainMatches {
-				domainRes := strings.TrimSpace(domainMatch[1])
-
+			for domainRes := range uniqueDomainMatches {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Auth0oauth,
 					Redacted:     clientIdRes,
