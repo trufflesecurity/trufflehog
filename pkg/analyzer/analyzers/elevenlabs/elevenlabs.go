@@ -1,3 +1,4 @@
+//go:generate generate_permissions permissions.yaml permissions.go elevenlabs
 package elevenlabs
 
 import (
