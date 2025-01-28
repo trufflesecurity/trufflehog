@@ -147,7 +147,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err = json.Unmarshal(contents, &env); err != nil {
 			return err
 		}
-		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentName: env.ID, fromLocal: true, Link: envPath, Location: source_metadatapb.PostmanLocation_ENVIRONMENT_VARIABLE}, env)
+		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentID: env.ID, EnvironmentName: env.Name, fromLocal: true, Link: envPath, Location: source_metadatapb.PostmanLocation_ENVIRONMENT_VARIABLE}, env)
 	}
 
 	// Scan local workspaces
@@ -267,6 +267,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		metadata.Link = LINK_BASE_URL + "environments/" + envID.UUID
 		metadata.FullID = envVars.ID
 		metadata.EnvironmentID = envID.UUID
+		metadata.EnvironmentName = envVars.Name
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
 		for _, word := range strings.Split(envVars.Name, " ") {
@@ -276,6 +277,11 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		s.scanVariableData(ctx, chunksChan, metadata, envVars)
 		metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", metadata.FullID)
+		metadata.Type = ""
+		metadata.Link = ""
+		metadata.FullID = ""
+		metadata.EnvironmentID = ""
+		metadata.EnvironmentName = ""
 	}
 	ctx.Logger().V(2).Info("finished scanning environments")
 
@@ -370,13 +376,7 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	}
 
 	for _, event := range item.Events {
-		/*if strings.Contains(metadata.FieldType, "folder") {
-			metadata.Location = source_metadatapb.PostmanLocation_FOLDER_SCRIPT
-		} else if strings.Contains(metadata.FieldType, "request") {
-			metadata.Location = source_metadatapb.PostmanLocation_REQUEST_SCRIPT
-		}*/
 		s.scanEvent(ctx, chunksChan, metadata, event)
-		//metadata.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
 	}
 
 	if metadata.RequestID != "" {
@@ -646,21 +646,32 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 			continue
 		}
 		values = append(values, s.buildSubstitueSet(m, valStr)...)
-		m.FieldType = m.Type + " variables"
-		switch m.FieldType {
-		case "request > GET parameters (query) variables":
-			m.Link = m.Link + "?tab=params"
-		case "request > header variables":
-			m.Link = m.Link + "?tab=headers"
-		}
+		// m.FieldType = m.Type + " variables"
+		// switch m.FieldType {
+		// case "request > GET parameters (query) variables":
+		// 	m.Link = m.Link + "?tab=params"
+		// case "request > header variables":
+		// 	m.Link = m.Link + "?tab=headers"
+		// }
 
-		m.VariableName = kv.Key
-		s.scanData(ctx, chunksChan, kv.Value.(string), m)
+		//m.VariableName = kv.Key
+		//s.scanData(ctx, chunksChan, kv.Value.(string), m)
 		//s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
 	}
 
-	//m.FieldType = m.Type + " variables"
-	//s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
+	//for _, kv := range variableData.KeyValues {
+	// m.FieldType = m.Type + " variables"
+	switch m.FieldType {
+	case "request > GET parameters (query) variables":
+		m.Link = m.Link + "?tab=params"
+	case "request > header variables":
+		m.Link = m.Link + "?tab=headers"
+	}
+	// m.VariableName = variableData.KeyValues[0].Key
+	//fmt.Println(s.formatAndInjectKeywords(values))
+	m.FieldType = m.Type + " variables"
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
+	//}
 }
 
 func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, data string, metadata Metadata) {
@@ -692,7 +703,6 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					FolderId:        metadata.FolderID,
 					FolderName:      metadata.FolderName,
 					FieldType:       metadata.FieldType,
-					VariableName:    metadata.VariableName,
 					Location:        metadata.Location,
 				},
 			},
