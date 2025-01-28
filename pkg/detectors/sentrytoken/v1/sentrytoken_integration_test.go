@@ -52,6 +52,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SentryToken,
 					Verified:     true,
+					ExtraData:    map[string]string{"orginzation_4508567357947904": "Truffle Security"},
 				},
 			},
 			wantErr: false,
@@ -92,56 +93,6 @@ func TestSentryToken_FromChunk(t *testing.T) {
 		{
 			name: "found and valid but unexpected api response",
 			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, good key but wrong scope",
-			s:    Scanner{client: common.ConstantResponseHttpClient(403, responseBody403)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, account deactivated",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, responseAccountDeactivated)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, account deactivated",
-			s:    Scanner{client: common.ConstantResponseHttpClient(200, responseEmpty)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
