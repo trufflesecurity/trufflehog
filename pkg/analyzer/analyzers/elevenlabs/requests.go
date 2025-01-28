@@ -78,6 +78,7 @@ type HistoryResponse struct {
 	} `json:"history"`
 }
 
+// VoiceResponse is the /voices API response
 type VoicesResponse struct {
 	Voices []struct {
 		ID       string `json:"voice_id"`
@@ -86,6 +87,7 @@ type VoicesResponse struct {
 	} `json:"voices"`
 }
 
+// ProjectsResponse is the /projects API response
 type ProjectsResponse struct {
 	Projects []struct {
 		ID          string `json:"project_id"`
@@ -95,6 +97,7 @@ type ProjectsResponse struct {
 	} `json:"projects"`
 }
 
+// PronunciationDictionaries is the /pronunciation-dictionaries API response
 type PronunciationDictionariesResponse struct {
 	PronunciationDictionaries []struct {
 		ID   string `json:"id"`
@@ -102,11 +105,13 @@ type PronunciationDictionariesResponse struct {
 	} `json:"pronunciation_dictionaries"`
 }
 
+// Models is the /models API response
 type ModelsResponse struct {
 	ID   string `json:"model_id"`
 	Name string `json:"name"`
 }
 
+// AgentsResponse is the /agents API response
 type AgentsResponse struct {
 	Agents []struct {
 		ID          string `json:"agent_id"`
@@ -115,6 +120,7 @@ type AgentsResponse struct {
 	} `json:"agents"`
 }
 
+// ConversationResponse is the /conversation API response
 type ConversationResponse struct {
 	Conversations []struct {
 		AgentID string `json:"agent_id"`
@@ -693,7 +699,7 @@ func getAgents(client *http.Client, key string, secretInfo *SecretInfo) error {
 			}
 			secretInfo.Resources = append(secretInfo.Resources, resource)
 			// get agent conversations
-			if err := getConversation(client, key, agent.ID, &resource, secretInfo); err != nil {
+			if err := getConversation(client, key, agent.ID, secretInfo); err != nil {
 				return err
 			}
 		}
@@ -705,7 +711,7 @@ func getAgents(client *http.Client, key string, secretInfo *SecretInfo) error {
 }
 
 // getConversation list all agent conversations using the key and agentID passed and add them to secret info
-func getConversation(client *http.Client, key, agentID string, parent *Resource, secretInfo *SecretInfo) error {
+func getConversation(client *http.Client, key, agentID string, secretInfo *SecretInfo) error {
 	apiUrl := fmt.Sprintf("https://api.elevenlabs.io/v1/convai/conversations?agent_id=%s", agentID)
 	response, statusCode, err := makeElevenLabsRequest(client, apiUrl, http.MethodGet, key)
 	if err != nil {
@@ -730,7 +736,6 @@ func getConversation(client *http.Client, key, agentID string, parent *Resource,
 				Metadata: map[string]string{
 					"status": conversation.Status,
 				},
-				Parent: parent,
 			})
 		}
 

@@ -129,11 +129,15 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerTypeElevenLabs,
 		Metadata:     map[string]any{},
-		Bindings:     make([]analyzers.Binding, len(info.Permissions)),
+		Bindings:     make([]analyzers.Binding, 0),
 	}
 
 	// extract information from resource to create bindings and append to result bindings
 	for _, resource := range info.Resources {
+		// if unique identifier is empty do not map the resource to analyzer result
+		if resource.ID == "" {
+			continue
+		}
 		// if resource has permission it is binded resource
 		if resource.Permission != "" {
 			binding := analyzers.Binding{
@@ -141,6 +145,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 					Name:               resource.Name,
 					FullyQualifiedName: resource.ID,
 					Type:               resource.Type,
+					Metadata:           map[string]any{}, // to avoid panic
 				},
 				Permission: analyzers.Permission{
 					Value: resource.Permission,
@@ -158,18 +163,11 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 				Name:               resource.Name,
 				FullyQualifiedName: resource.ID,
 				Type:               resource.Type,
+				Metadata:           map[string]any{},
 			}
 
 			for key, value := range resource.Metadata {
 				unboundedResource.Metadata[key] = value
-			}
-
-			if resource.Parent != nil {
-				unboundedResource.Parent = &analyzers.Resource{
-					Name:               resource.Parent.Name,
-					FullyQualifiedName: resource.Parent.ID,
-					Type:               resource.Parent.Type,
-				}
 			}
 
 			result.UnboundedResources = append(result.UnboundedResources, unboundedResource)
