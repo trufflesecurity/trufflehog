@@ -226,7 +226,7 @@ func getHistory(client *http.Client, key string, secretInfo *SecretInfo) error {
 		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[SpeechHistoryRead])
 		// map resource to secret info
 		for _, historyItem := range history.History {
-			secretInfo.Resources = append(secretInfo.Resources, Resource{
+			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
 				ID:         historyItem.ID,
 				Name:       "", // no name
 				Type:       "History",
@@ -323,7 +323,7 @@ func getVoices(client *http.Client, key string, secretInfo *SecretInfo) error {
 		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[VoicesRead])
 		// map resource to secret info
 		for _, voice := range voices.Voices {
-			secretInfo.Resources = append(secretInfo.Resources, Resource{
+			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
 				ID:         voice.ID,
 				Name:       voice.Name,
 				Type:       "Voice",
@@ -379,7 +379,7 @@ func getProjects(client *http.Client, key string, secretInfo *SecretInfo) error 
 		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[ProjectsRead])
 		// map resource to secret info
 		for _, project := range projects.Projects {
-			secretInfo.Resources = append(secretInfo.Resources, Resource{
+			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
 				ID:         project.ID,
 				Name:       project.Name,
 				Type:       "Project",
@@ -442,7 +442,7 @@ func getPronunciationDictionaries(client *http.Client, key string, secretInfo *S
 		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[PronunciationDictionariesRead])
 		// map resource to secret info
 		for _, pd := range PDs.PronunciationDictionaries {
-			secretInfo.Resources = append(secretInfo.Resources, Resource{
+			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
 				ID:         pd.ID,
 				Name:       pd.Name,
 				Type:       "Pronunciation Dictionary",
@@ -502,7 +502,7 @@ func getModels(client *http.Client, key string, secretInfo *SecretInfo) error {
 		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[ModelsRead])
 		// map resource to secret info
 		for _, model := range models {
-			secretInfo.Resources = append(secretInfo.Resources, Resource{
+			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
 				ID:         model.ID,
 				Name:       model.Name,
 				Type:       "Model",
@@ -688,7 +688,7 @@ func getAgents(client *http.Client, key string, secretInfo *SecretInfo) error {
 
 		// map resource to secret info
 		for _, agent := range agents.Agents {
-			resource := Resource{
+			resource := ElevenLabsResource{
 				ID:         agent.ID,
 				Name:       agent.Name,
 				Type:       "Agent",
@@ -697,7 +697,7 @@ func getAgents(client *http.Client, key string, secretInfo *SecretInfo) error {
 					"access level": agent.AccessLevel,
 				},
 			}
-			secretInfo.Resources = append(secretInfo.Resources, resource)
+			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, resource)
 			// get agent conversations
 			if err := getConversation(client, key, agent.ID, secretInfo); err != nil {
 				return err
@@ -728,7 +728,7 @@ func getConversation(client *http.Client, key, agentID string, secretInfo *Secre
 
 		// map resource to secret info
 		for _, conversation := range conversations.Conversations {
-			secretInfo.Resources = append(secretInfo.Resources, Resource{
+			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
 				ID:         conversation.ID,
 				Name:       "", // no name
 				Type:       "Conversation",

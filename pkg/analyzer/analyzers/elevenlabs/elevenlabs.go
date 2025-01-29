@@ -8,8 +8,11 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strings"
+	"sync"
 
 	"github.com/fatih/color"
+	"github.com/google/uuid"
 	"github.com/jedib0t/go-pretty/table"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
@@ -25,12 +28,12 @@ type Analyzer struct {
 
 // SecretInfo hold information about key
 type SecretInfo struct {
-	User        User // the owner of key
-	Valid       bool
-	Reference   string
-	Permissions []string   // list of Permissions assigned to the key
-	Resources   []Resource // list of resources the key has access to
-	Misc        map[string]string
+	User                User // the owner of key
+	Valid               bool
+	Reference           string
+	Permissions         []string             // list of Permissions assigned to the key
+	ElevenLabsResources []ElevenLabsResource // list of resources the key has access to
+	Misc                map[string]string
 }
 
 // User hold the information about user to whom the key belongs to
@@ -41,14 +44,13 @@ type User struct {
 	SubscriptionStatus string
 }
 
-// Resources hold information about the resources the key has access
-type Resource struct {
+// ElevenLabsResource hold information about the elevenlabs resource the key has access
+type ElevenLabsResource struct {
 	ID         string
 	Name       string
 	Type       string
 	Metadata   map[string]string
 	Permission string
-	Parent     *Resource
 }
 
 func (a Analyzer) Type() analyzers.AnalyzerType {
@@ -77,19 +79,22 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	var secretInfo = &SecretInfo{}
 
-	// validate the key and get user information
-	if err := validateKey(client, key, secretInfo); err != nil {
+	// fetch user information using the key
+	user, err := fetchUser(client, key)
+	if err != nil {
 		return nil, err
 	}
 
-	if secretInfo.Valid {
-		// Get resources
-		if err := getResources(client, key, secretInfo); err != nil {
-			return nil, err
-		}
+	secretInfo.Valid = true
+
+	// if user is not nil, that means the key has user read permission. Set the user information in secret info user
+	// user can only be nil when the key is valid but it does not have a user read permission
+	if user != nil {
+		elevenLabsUserToSecretInfoUser(*user, secretInfo)
 	}
 
-	if err := getUnboundedResources(client, key, secretInfo); err != nil {
+	// get elevenlabs resources with permissions
+	if err := getElevenLabsResources(client, key, secretInfo); err != nil {
 		return nil, err
 	}
 
@@ -99,8 +104,8 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
+		// just print the error in cli and continue as a partial success
 		color.Red("[x] Error : %s", err.Error())
-		return
 	}
 
 	if info == nil {
@@ -115,7 +120,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		// print permissions
 		printPermissions(info.Permissions)
 		// print resources
-		printResources(info.Resources)
+		printElevenLabsResources(info.ElevenLabsResources)
 
 		color.Yellow("\n[i] Expires: Never")
 	}
@@ -133,18 +138,20 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Bindings:     make([]analyzers.Binding, 0),
 	}
 
+	// for resources to be uniquely identified, we need a unique id to be appended in resource fully qualified name
+	uniqueId := info.User.ID
+	if uniqueId == "" {
+		uniqueId = uuid.NewString()
+	}
+
 	// extract information from resource to create bindings and append to result bindings
-	for _, resource := range info.Resources {
-		// if unique identifier is empty do not map the resource to analyzer result
-		if resource.ID == "" {
-			continue
-		}
+	for _, resource := range info.ElevenLabsResources {
 		// if resource has permission it is binded resource
 		if resource.Permission != "" {
 			binding := analyzers.Binding{
 				Resource: analyzers.Resource{
 					Name:               resource.Name,
-					FullyQualifiedName: resource.ID,
+					FullyQualifiedName: fmt.Sprintf("%s/%s/%s", uniqueId, resource.Type, resource.ID), // e.g: <user_id>/Model/eleven_flash_v2_5
 					Type:               resource.Type,
 					Metadata:           map[string]any{}, // to avoid panic
 				},
@@ -162,7 +169,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			// if resource is missing permission it is an unbounded resource
 			unboundedResource := analyzers.Resource{
 				Name:               resource.Name,
-				FullyQualifiedName: resource.ID,
+				FullyQualifiedName: fmt.Sprintf("%s/%s/%s", uniqueId, resource.Type, resource.ID),
 				Type:               resource.Type,
 				Metadata:           map[string]any{},
 			}
@@ -180,11 +187,11 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	return &result
 }
 
-// validateKey check if the key is valid and get the user information if it's valid
-func validateKey(client *http.Client, key string, secretInfo *SecretInfo) error {
+// fetchUser fetch elevenlabs user information associated with the key
+func fetchUser(client *http.Client, key string) (*User, error) {
 	response, statusCode, err := makeElevenLabsRequest(client, permissionToAPIMap[UserRead], http.MethodGet, key)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	switch statusCode {
@@ -192,146 +199,201 @@ func validateKey(client *http.Client, key string, secretInfo *SecretInfo) error 
 		var user UserResponse
 
 		if err := json.Unmarshal(response, &user); err != nil {
-			return err
+			return nil, err
 		}
 
-		// map info to secretInfo
-		secretInfo.Valid = true
-		secretInfo.User = User{
+		return &User{
 			ID:                 user.UserID,
 			Name:               user.FirstName,
 			SubscriptionTier:   user.Subscription.Tier,
 			SubscriptionStatus: user.Subscription.Status,
-		}
-		// add user read scope to secret info
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[UserRead])
-		// map resource to secret info
-		secretInfo.Resources = append(secretInfo.Resources, Resource{
-			ID:         user.UserID,
-			Name:       user.FirstName,
-			Type:       "User",
-			Permission: PermissionStrings[UserRead],
-		})
-
-		return nil
+		}, nil
 	case http.StatusUnauthorized:
 		var errorResp ErrorResponse
 
 		if err := json.Unmarshal(response, &errorResp); err != nil {
-			return err
+			return nil, err
 		}
 
 		if errorResp.Detail.Status == InvalidAPIKey || errorResp.Detail.Status == NotVerifiable {
-			return errors.New("invalid api key")
+			return nil, errors.New("invalid api key")
 		} else if errorResp.Detail.Status == MissingPermissions {
 			// key is missing user read permissions but is valid
-			secretInfo.Valid = true
-			color.Yellow("\n[!] API Key missing user read permissions")
+			return nil, nil
 		}
 
-		return nil
+		return nil, nil
 	default:
-		return fmt.Errorf("unexpected status code: %d", statusCode)
+		return nil, fmt.Errorf("unexpected status code: %d", statusCode)
 	}
+}
+
+// elevenLabsUserToSecretInfoUser set the elevenlabs user information to secretInfo user
+func elevenLabsUserToSecretInfoUser(user User, secretInfo *SecretInfo) {
+	secretInfo.User = user
+	// add user read scope to secret info
+	secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[UserRead])
+	// map resource to secret info
+	// as user is accessable through a specific permission and has a unique id it is also a resource
+	secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
+		ID:         user.ID,
+		Name:       user.Name,
+		Type:       "User",
+		Permission: PermissionStrings[UserRead],
+	})
 }
 
 /*
-getResources gather resources the key can access
+getElevenLabsResources gather resources the key can access
 
 Note: The permissions in eleven labs is either Read or Read and Write. There is not separate permission for Write.
-If a particular write permission exist that means the read also exist.
-So for API calls that does not return any resource data, we make the write permissions API calls first
-and if they were as expected we skip the read API calls and add read permission directly.
-If write permission API calls was not as expected than only we make read permission API calls
-This we only do for those API calls which does not add any resources to secretInfo
 */
-func getResources(client *http.Client, key string, secretInfo *SecretInfo) error {
-	// history
-	if err := getHistory(client, key, secretInfo); err != nil {
-		return err
-	}
+func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretInfo) error {
+	var (
+		aggregatedErrs = make([]string, 0)
+		errChan        = make(chan error, 17) // buffer for 17 errors - one per API call
+		wg             sync.WaitGroup
+	)
 
-	if err := deleteHistory(client, key, secretInfo); err != nil {
-		return err
-	}
+	// history
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := getHistory(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+
+		if err := deleteHistory(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
 
 	// dubbings
-	if err := deleteDubbing(client, key, secretInfo); err != nil {
-		return err
-	}
-
-	// if dubbing write permission was not added
-	if !permissionExist(secretInfo.Permissions, DubbingWrite) {
-		if err := getDebugging(client, key, secretInfo); err != nil {
-			return err
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := deleteDubbing(client, key, secretInfo); err != nil {
+			errChan <- err
 		}
-	}
+
+		// if dubbing write permission was not added
+		if !permissionExist(secretInfo.Permissions, DubbingWrite) {
+			if err := getDebugging(client, key, secretInfo); err != nil {
+				errChan <- err
+			}
+		}
+	}()
 
 	// voices
-	if err := getVoices(client, key, secretInfo); err != nil {
-		return err
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := getVoices(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
 
-	if err := deleteVoice(client, key, secretInfo); err != nil {
-		return err
-	}
+		if err := deleteVoice(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
 
 	// projects
-	if err := getProjects(client, key, secretInfo); err != nil {
-		return err
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := getProjects(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
 
-	if err := deleteProject(client, key, secretInfo); err != nil {
-		return err
-	}
+		if err := deleteProject(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
 
 	// pronunciation dictionaries
-	if err := getPronunciationDictionaries(client, key, secretInfo); err != nil {
-		return err
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := getPronunciationDictionaries(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
 
-	if err := removePronunciationDictionariesRule(client, key, secretInfo); err != nil {
-		return err
-	}
+		if err := removePronunciationDictionariesRule(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
 
 	// models
-	if err := getModels(client, key, secretInfo); err != nil {
-		return err
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := getModels(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
 
 	// audio native
-	if err := updateAudioNativeProject(client, key, secretInfo); err != nil {
-		return err
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := updateAudioNativeProject(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
 
 	// workspace
-	if err := deleteInviteFromWorkspace(client, key, secretInfo); err != nil {
-		return err
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := deleteInviteFromWorkspace(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
 
-	// text to speech
-	if err := textToSpeech(client, key, secretInfo); err != nil {
-		return err
-	}
+	// speech
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := textToSpeech(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
 
-	// voice changer
-	if err := speechToSpeech(client, key, secretInfo); err != nil {
-		return err
-	}
+		// voice changer
+		if err := speechToSpeech(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
 
 	// audio isolation
-	if err := audioIsolation(client, key, secretInfo); err != nil {
-		return err
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := audioIsolation(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
+
+	// agent
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// each agent can have a conversations which we get inside this function
+		if err := getAgents(client, key, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
+
+	// wait for all API calls to finish
+	wg.Wait()
+	close(errChan)
+
+	// collect all errors
+	for err := range errChan {
+		aggregatedErrs = append(aggregatedErrs, err.Error())
 	}
 
-	return nil
-}
-
-// getUnboundedResources gather resources which can be accessed without any permission
-func getUnboundedResources(client *http.Client, key string, secretInfo *SecretInfo) error {
-	// each agent can have a conversations which we get inside this function
-	if err := getAgents(client, key, secretInfo); err != nil {
-		return err
+	if len(aggregatedErrs) > 0 {
+		return errors.New(strings.Join(aggregatedErrs, ", "))
 	}
 
 	return nil
@@ -365,7 +427,7 @@ func printPermissions(permissions []string) {
 	t.Render()
 }
 
-func printResources(resources []Resource) {
+func printElevenLabsResources(resources []ElevenLabsResource) {
 	color.Green("\n[i] Resources:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
