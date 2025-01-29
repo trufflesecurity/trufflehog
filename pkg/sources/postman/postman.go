@@ -545,10 +545,10 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		s.scanAuth(ctx, chunksChan, metadata, r.Auth, r.URL)
 	}
 
-	if r.Body.Mode != "" {
+	/*if r.Body.Mode != "" {
 		metadata.Type = originalType + " > body"
 		s.scanBody(ctx, chunksChan, metadata, r.Body)
-	}
+	}*/
 }
 
 func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
@@ -646,32 +646,16 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 			continue
 		}
 		values = append(values, s.buildSubstitueSet(m, valStr)...)
-		// m.FieldType = m.Type + " variables"
-		// switch m.FieldType {
-		// case "request > GET parameters (query) variables":
-		// 	m.Link = m.Link + "?tab=params"
-		// case "request > header variables":
-		// 	m.Link = m.Link + "?tab=headers"
-		// }
-
-		//m.VariableName = kv.Key
-		//s.scanData(ctx, chunksChan, kv.Value.(string), m)
-		//s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
 	}
 
-	//for _, kv := range variableData.KeyValues {
-	// m.FieldType = m.Type + " variables"
+	m.FieldType = m.Type + " variables"
 	switch m.FieldType {
 	case "request > GET parameters (query) variables":
 		m.Link = m.Link + "?tab=params"
 	case "request > header variables":
 		m.Link = m.Link + "?tab=headers"
 	}
-	// m.VariableName = variableData.KeyValues[0].Key
-	//fmt.Println(s.formatAndInjectKeywords(values))
-	m.FieldType = m.Type + " variables"
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
-	//}
 }
 
 func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, data string, metadata Metadata) {
