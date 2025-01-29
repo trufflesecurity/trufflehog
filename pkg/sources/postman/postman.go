@@ -397,7 +397,12 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 	// Prep direct links. Ignore updating link if it's a local JSON file
 	if !metadata.fromLocal {
-		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.FullID + "?tab=scripts"
+		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.FullID
+		if event.Listen == "prerequest" {
+			metadata.Link += "?tab=pre-request-scripts"
+		} else {
+			metadata.Link += "?tab=tests"
+		}
 	}
 
 	if strings.Contains(metadata.Type, REQUEST_TYPE) {
