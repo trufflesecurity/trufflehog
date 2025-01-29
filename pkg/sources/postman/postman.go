@@ -549,50 +549,9 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		s.scanAuth(ctx, chunksChan, metadata, r.Auth, r.URL)
 	}
 
-	/*if r.Body.Mode != "" {
-		metadata.Type = originalType + " > body"
-		s.scanBody(ctx, chunksChan, metadata, r.Body)
-	}*/
-}
-
-func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
-	if !m.fromLocal {
-		m.Link = m.Link + "?tab=body"
-	}
-	originalType := m.Type
-	switch b.Mode {
-	case "formdata":
-		m.Type = originalType + " > form data"
-		vars := VariableData{
-			KeyValues: b.FormData,
-		}
-		m.Location = source_metadatapb.PostmanLocation_REQUEST_BODY_FORM_DATA
-		s.scanVariableData(ctx, chunksChan, m, vars)
-		m.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
-	case "urlencoded":
-		m.Type = originalType + " > url encoded"
-		vars := VariableData{
-			KeyValues: b.URLEncoded,
-		}
-		m.Location = source_metadatapb.PostmanLocation_REQUEST_BODY_URL_ENCODED
-		s.scanVariableData(ctx, chunksChan, m, vars)
-		m.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
-	case "raw", "graphql":
-		data := b.Raw
-		if b.Mode == "graphql" {
-			m.Type = originalType + " > graphql"
-			data = b.GraphQL.Query + " " + b.GraphQL.Variables
-			m.Location = source_metadatapb.PostmanLocation_REQUEST_BODY_GRAPHQL
-		}
-		if b.Mode == "raw" {
-			m.Type = originalType + " > raw"
-			m.Location = source_metadatapb.PostmanLocation_REQUEST_BODY_RAW
-		}
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
-		m.Location = source_metadatapb.PostmanLocation_UNKNOWN_POSTMAN
-	default:
-		break
-	}
+	// We would scan the body, but currently the body has different radio buttons that can be scanned but only the selected one is scanned. The unselected radio button options can still
+	// have secrets in them but will not be scanned. The selction of the radio button will also change the secret metadata for that particular scanning pass and can create confusion for
+	// the user as to the status of a secret. We will reimplement at some point.
 }
 
 func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, response Response) {
