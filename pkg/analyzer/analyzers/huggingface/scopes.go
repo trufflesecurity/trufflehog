@@ -48,7 +48,7 @@ var user_scopes = map[string]map[string]string{
 		"user.billing.read": "Read access to user's billing usage",
 	},
 	"Collections": {
-		"collection.read":  "Read access to all ollections under user's namespace",
+		"collection.read":  "Read access to all collections under user's namespace",
 		"collection.write": "Write access to all collections under user's namespace",
 	},
 	"Discussions & Posts": {

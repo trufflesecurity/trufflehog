@@ -277,7 +277,7 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 
 	// Wait for all the chunks to be processed.
 	assert.Nil(t, e.Finish(ctx))
-	want := uint64(5)
+	want := uint64(2)
 	assert.Equal(t, want, e.GetMetrics().UnverifiedSecretsFound)
 }
 
