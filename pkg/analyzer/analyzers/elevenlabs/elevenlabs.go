@@ -234,7 +234,7 @@ func elevenLabsUserToSecretInfoUser(user User, secretInfo *SecretInfo) {
 	// add user read scope to secret info
 	secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[UserRead])
 	// map resource to secret info
-	// as user is accessable through a specific permission and has a unique id it is also a resource
+	// as user is accessible through a specific permission and has a unique id it is also a resource
 	secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
 		ID:         user.ID,
 		Name:       user.Name,
