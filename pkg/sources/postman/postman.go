@@ -27,7 +27,6 @@ import (
 const (
 	SourceType       = sourcespb.SourceType_SOURCE_TYPE_POSTMAN
 	LINK_BASE_URL    = "https://go.postman.co/"
-	GLOBAL_TYPE      = "globals"
 	ENVIRONMENT_TYPE = "environment"
 	AUTH_TYPE        = "authorization"
 	REQUEST_TYPE     = "request"
