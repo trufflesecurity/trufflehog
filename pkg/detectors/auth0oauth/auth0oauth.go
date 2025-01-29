@@ -42,9 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 	uniqueDomainMatches := make(map[string]struct{})
 	for _, m := range domainMatches {
-		if len(m) > 1 {
-			uniqueDomainMatches[strings.TrimSpace(m[1])] = struct{}{}
-		}
+	uniqueDomainMatches[m[1]] = struct{}{}
 
 	}
 
