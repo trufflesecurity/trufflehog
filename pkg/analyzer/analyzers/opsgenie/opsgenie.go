@@ -132,7 +132,16 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 	}
 
 	// Create new HTTP request
-	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
+	var client *http.Client
+
+	// Non-safe Opsgenie APIs are asynchronous and always return 202 if credential has the permission.
+	// For Safe API Methods, use the restricted client
+	if analyzers.IsMethodSafe(h.Method) {
+		client = analyzers.NewAnalyzeClient(cfg)
+	} else {
+		client = analyzers.NewAnalyzeClientUnrestricted(cfg)
+	}
+
 	req, err := http.NewRequest(h.Method, h.Endpoint, data)
 	if err != nil {
 		return false, err
