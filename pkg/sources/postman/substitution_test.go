@@ -66,14 +66,14 @@ func TestSource_BuildSubstituteSet(t *testing.T) {
 	s := &Source{
 		sub: NewSubstitution(),
 	}
-	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "var1", "value1")
-	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "var2", "value2")
-	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "", "value2")
-	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "continuation_token", "'{{continuation_token}}'")     // this caused an infinite loop in the original implementation
-	s.sub.add(Metadata{Type: GLOBAL_TYPE}, "continuation_token2", "'{{{continuation_token2}}}'") // this caused an infinite loop in the original implementation
+	s.sub.add(Metadata{Type: ENVIRONMENT_TYPE}, "var1", "value1")
+	s.sub.add(Metadata{Type: ENVIRONMENT_TYPE}, "var2", "value2")
+	s.sub.add(Metadata{Type: ENVIRONMENT_TYPE}, "", "value2")
+	s.sub.add(Metadata{Type: ENVIRONMENT_TYPE}, "continuation_token", "'{{continuation_token}}'")     // this caused an infinite loop in the original implementation
+	s.sub.add(Metadata{Type: ENVIRONMENT_TYPE}, "continuation_token2", "'{{{continuation_token2}}}'") // this caused an infinite loop in the original implementation
 
 	metadata := Metadata{
-		Type: GLOBAL_TYPE,
+		Type: ENVIRONMENT_TYPE,
 	}
 
 	testCases := []struct {
