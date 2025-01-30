@@ -129,9 +129,9 @@ MatchLoop:
 				continue MatchLoop
 			}
 
-			// check stopwords
-			for _, stopword := range c.GetStopwords() {
-				if strings.Contains(secret, stopword) {
+			// check for exclude words
+			for _, excludeWord := range c.GetExcludeWords() {
+				if strings.Contains(strings.ToLower(secret), excludeWord) {
 					continue MatchLoop
 				}
 			}

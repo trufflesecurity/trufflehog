@@ -17,7 +17,7 @@ message CustomRegex {
   repeated VerifierConfig verify = 4;
   string description = 5;
   repeated string exclude_regexes_capture = 6;
-  repeated string stopwords = 7;
+  repeated string exclude_words = 7;
   float entropy = 8;
   repeated string exclude_regexes_match = 9;
 }
