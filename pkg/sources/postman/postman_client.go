@@ -70,16 +70,16 @@ type Metadata struct {
 	EnvironmentID   string
 	CollectionInfo  Info
 	FolderID        string // UUID of the folder (but not full ID)
-	FolderName      string
+	FolderName      string // Folder path if the item is nested under one or more folders
 	RequestID       string // UUID of the request (but not full ID)
 	RequestName     string
 	FullID          string //full ID of the reference item (created_by + ID) OR just the UUID
 	Link            string //direct link to the folder (could be .json file path)
 	Type            string //folder, request, etc.
 	EnvironmentName string
-	FieldType       string
+	FieldType       string // Path of the item type
 	fromLocal       bool
-	Location        source_metadatapb.PostmanLocation
+	LocationType    source_metadatapb.PostmanLocationType // The distinct Postman location type that the item falls under
 }
 
 type Collection struct {

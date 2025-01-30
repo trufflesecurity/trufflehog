@@ -296,22 +296,24 @@ message AzureRepos {
 }
 
 message Postman {
+  reserved 4, 14, 15;
+  reserved "globals_id", "field_name", "variable_type";
   string link = 1;
   string workspace_uuid = 2;
   string workspace_name = 3;
-  string collection_id = 4;
-  string collection_name = 5;
-  string environment_id = 6;
-  string environment_name = 7;
-  string request_id =  8;
-  string request_name = 9;
-  string folder_id = 10;
-  string folder_name = 11;
-  string field_type = 12;
-  PostmanLocation location = 13;
+  string collection_id = 5;
+  string collection_name = 6;
+  string environment_id = 7;
+  string environment_name = 8;
+  string request_id =  9;
+  string request_name = 10;
+  string folder_id = 11;
+  string folder_name = 12;
+  string field_type = 13; // Do not use this field for transport. It is only used for output to STDOUT.
+  PostmanLocationType location_type = 16;
 }
 
-enum PostmanLocation {
+enum PostmanLocationType {
   UNKNOWN_POSTMAN = 0;
   REQUEST_QUERY_PARAMETER = 1;
   REQUEST_AUTHORIZATION = 2;
