@@ -81,6 +81,7 @@ const (
 	AnalyzerTypeStripe
 	AnalyzerTypeTwilio
 	AnalyzerTypePrivateKey
+	AnalyzerTypeNotion
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -108,6 +109,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeStripe:      "Stripe",
 	AnalyzerTypeTwilio:      "Twilio",
 	AnalyzerTypePrivateKey:  "PrivateKey",
+	AnalyzerTypeNotion:      "Notion",
 	// Add new mappings here
 }
 

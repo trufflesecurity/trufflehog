@@ -60,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// Notion returns 401 for all non-valid keys, thus 403 indicates it has fine-tuned permissions,
 					// /v1/search, /v1/databases/*, etc. may work.
 					s1.Verified = true
+					s1.AnalysisInfo = map[string]string{"key": resMatch}
 
 				}
 			} else {
