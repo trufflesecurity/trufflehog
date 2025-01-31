@@ -420,6 +420,9 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		repo, err := s.ensureRepoInfoCache(ctx, repo)
 		if err != nil {
 			ctx.Logger().Error(err, "error caching repo info")
+			if err := dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err)); err != nil {
+				ctx.Logger().Error(err, "failed to report unit error")
+			}
 		}
 		s.repos = append(s.repos, repo)
 	}
