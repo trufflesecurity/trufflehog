@@ -494,7 +494,7 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitRe
 		// TODO: This modifies s.memberCache but it doesn't look like
 		// we do anything with it.
 		if userType == organization && s.conn.ScanUsers {
-			if err := s.addMembersByOrg(ctx, org); err != nil {
+			if err := s.addMembersByOrg(ctx, org, reporter); err != nil {
 				orgCtx.Logger().Error(err, "Unable to add members by org")
 			}
 		}
@@ -549,11 +549,11 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 		}
 
 		if isGithubEnterprise {
-			s.addAllVisibleOrgs(ctx)
+			s.addAllVisibleOrgs(ctx, reporter)
 		} else {
 			// Scan for orgs is default with a token.
 			// GitHub App enumerates the repos that were assigned to it in GitHub App settings.
-			s.addOrgsByUser(ctx, ghUser.GetLogin())
+			s.addOrgsByUser(ctx, ghUser.GetLogin(), reporter)
 		}
 	}
 
@@ -567,7 +567,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 			}
 
 			if userType == organization && s.conn.ScanUsers {
-				if err := s.addMembersByOrg(ctx, org); err != nil {
+				if err := s.addMembersByOrg(ctx, org, reporter); err != nil {
 					orgCtx.Logger().Error(err, "Unable to add members for org")
 				}
 			}
@@ -591,7 +591,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, installationClient *githu
 
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
-			err := s.addMembersByApp(ctx, installationClient)
+			err := s.addMembersByApp(ctx, installationClient, reporter)
 			if err != nil {
 				return err
 			}
@@ -840,6 +840,11 @@ func (s *Source) handleRateLimitWithUnitReporter(ctx context.Context, reporter s
 	return s.handleRateLimit(ctx, errIn, &unitErrorReporter{reporter: reporter})
 }
 
+// handleRateLimitWithChunkReporter is a wrapper around handleRateLimit that includes chunk reporting
+func (s *Source) handleRateLimitWithChunkReporter(ctx context.Context, reporter sources.ChunkReporter, errIn error) bool {
+	return s.handleRateLimit(ctx, errIn, &chunkErrorReporter{reporter: reporter})
+}
+
 func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
 	ctx.Logger().Info("Fetching repos from members", "members", len(s.memberCache))
 	for member := range s.memberCache {
@@ -884,7 +889,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 	return nil
 }
 
-func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client) error {
+func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client, reporter sources.UnitReporter) error {
 	opts := &github.ListOptions{
 		PerPage: membersAppPagination,
 	}
@@ -899,7 +904,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 		if org.Account.GetType() != "Organization" {
 			continue
 		}
-		if err := s.addMembersByOrg(ctx, *org.Account.Login); err != nil {
+		if err := s.addMembersByOrg(ctx, *org.Account.Login, reporter); err != nil {
 			return err
 		}
 	}
@@ -907,7 +912,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 	return nil
 }
 
-func (s *Source) addAllVisibleOrgs(ctx context.Context) {
+func (s *Source) addAllVisibleOrgs(ctx context.Context, reporter sources.UnitReporter) {
 	ctx.Logger().V(2).Info("enumerating all visible organizations on GHE")
 	// Enumeration on this endpoint does not use pages it uses a since ID.
 	// The endpoint will return organizations with an ID greater than the given since ID.
@@ -920,7 +925,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 	}
 	for {
 		orgs, _, err := s.connector.APIClient().Organizations.ListAll(ctx, orgOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -952,14 +957,14 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 	}
 }
 
-func (s *Source) addOrgsByUser(ctx context.Context, user string) {
+func (s *Source) addOrgsByUser(ctx context.Context, user string, reporter sources.UnitReporter) {
 	orgOpts := &github.ListOptions{
 		PerPage: defaultPagination,
 	}
 	logger := ctx.Logger().WithValues("user", user)
 	for {
 		orgs, resp, err := s.connector.APIClient().Organizations.List(ctx, "", orgOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -981,7 +986,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	}
 }
 
-func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
+func (s *Source) addMembersByOrg(ctx context.Context, org string, reporter sources.UnitReporter) error {
 	opts := &github.ListMembersOptions{
 		PublicOnly: false,
 		ListOptions: github.ListOptions{
@@ -992,7 +997,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 	logger := ctx.Logger().WithValues("org", org)
 	for {
 		members, res, err := s.connector.APIClient().Organizations.ListMembers(ctx, org, opts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1124,7 +1129,7 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 	}
 	for {
 		comments, _, err := s.connector.APIClient().Gists.ListComments(ctx, gistID, options)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1239,7 +1244,7 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter 
 
 	for {
 		issues, _, err := s.connector.APIClient().Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 
@@ -1308,7 +1313,7 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 
 	for {
 		issueComments, _, err := s.connector.APIClient().Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1376,7 +1381,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sou
 
 	for {
 		prs, _, err := s.connector.APIClient().PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1408,7 +1413,7 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, repor
 
 	for {
 		prComments, _, err := s.connector.APIClient().PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
