@@ -181,6 +181,7 @@ func isGitHub404Error(err error) bool {
 	return ghErr.Response.StatusCode == http.StatusNotFound
 }
 
+// processRepos is the main function for getting repositories from a source.
 func (s *Source) processRepos(ctx context.Context, target string, reporter sources.UnitReporter, listRepos repoLister, listOpts repoListOptions) error {
 	logger := ctx.Logger().WithValues("target", target)
 	opts := listOpts.getListOptions()
@@ -192,7 +193,7 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
