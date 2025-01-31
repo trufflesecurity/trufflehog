@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -37,20 +37,22 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Auth0oauth secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
+	uniqueDomainMatches := make(map[string]struct{})
+	uniqueClientIDs := make(map[string]struct{})
+	uniqueSecrets := make(map[string]struct{})
+	for _, m := range domainPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueDomainMatches[strings.TrimSpace(m[1])] = struct{}{}
+	}
+	for _, m := range clientIdPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueClientIDs[strings.TrimSpace(m[1])] = struct{}{}
+	}
+	for _, m := range clientSecretPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueSecrets[strings.TrimSpace(m[1])] = struct{}{}
+	}
 
-	clientIdMatches := clientIdPat.FindAllStringSubmatch(dataStr, -1)
-	clientSecretMatches := clientSecretPat.FindAllStringSubmatch(dataStr, -1)
-	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
-
-	for _, clientIdMatch := range clientIdMatches {
-		clientIdRes := strings.TrimSpace(clientIdMatch[1])
-
-		for _, clientSecretMatch := range clientSecretMatches {
-			clientSecretRes := strings.TrimSpace(clientSecretMatch[1])
-
-			for _, domainMatch := range domainMatches {
-				domainRes := strings.TrimSpace(domainMatch[1])
-
+	for clientIdRes := range uniqueClientIDs {
+		for clientSecretRes := range uniqueSecrets {
+			for domainRes := range uniqueDomainMatches {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Auth0oauth,
 					Redacted:     clientIdRes,
