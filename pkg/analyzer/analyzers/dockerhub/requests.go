@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// LoginResponse is the successfull response from the /login API
+// LoginResponse is the successful response from the /login API
 type LoginResponse struct {
 	Token string `json:"token"`
 }
@@ -31,7 +31,7 @@ type RepositoriesResponse struct {
 	} `json:"results"`
 }
 
-// login call the /login api with username and jwt token and if successfull retrieve the token string and return
+// login call the /login api with username and jwt token and if successful retrieve the token string and return
 func login(client *http.Client, username, pat string) (string, error) {
 	payload := strings.NewReader(fmt.Sprintf(`{"username": "%s", "password": "%s"}`, username, pat))
 
