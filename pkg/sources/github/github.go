@@ -381,7 +381,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
 	for _, name := range s.filteredRepoCache.Keys() {
 		url, _ := s.filteredRepoCache.Get(name)
-		url, err := s.ensureRepoInfoCache(ctx, url, reporter)
+		url, err := s.ensureRepoInfoCache(ctx, url, &unitErrorReporter{reporter})
 		if err != nil {
 			if err := dedupeReporter.UnitErr(ctx, err); err != nil {
 				return err
@@ -417,7 +417,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	for _, repo := range s.filteredRepoCache.Values() {
 		ctx := context.WithValue(ctx, "repo", repo)
 
-		repo, err := s.ensureRepoInfoCache(ctx, repo, reporter)
+		repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
 		if err != nil {
 			ctx.Logger().Error(err, "error caching repo info")
 			if err := dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err)); err != nil {
