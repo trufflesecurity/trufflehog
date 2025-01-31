@@ -381,7 +381,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
 	for _, name := range s.filteredRepoCache.Keys() {
 		url, _ := s.filteredRepoCache.Get(name)
-		url, err := s.ensureRepoInfoCache(ctx, url)
+		url, err := s.ensureRepoInfoCache(ctx, url, reporter)
 		if err != nil {
 			if err := dedupeReporter.UnitErr(ctx, err); err != nil {
 				return err
@@ -417,7 +417,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	for _, repo := range s.filteredRepoCache.Values() {
 		ctx := context.WithValue(ctx, "repo", repo)
 
-		repo, err := s.ensureRepoInfoCache(ctx, repo)
+		repo, err := s.ensureRepoInfoCache(ctx, repo, reporter)
 		if err != nil {
 			ctx.Logger().Error(err, "error caching repo info")
 			if err := dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err)); err != nil {
@@ -437,7 +437,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 // provided repository URL. If not, it fetches and stores the metadata for the
 // repository. In some cases, the gist URL needs to be normalized, which is
 // returned by this function.
-func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string) (string, error) {
+func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter errorReporter) (string, error) {
 	if _, ok := s.repoInfoCache.get(repo); ok {
 		return repo, nil
 	}
@@ -453,15 +453,15 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string) (string, 
 		for {
 			gistID := extractGistID(urlParts)
 			gist, _, err := s.connector.APIClient().Gists.Get(ctx, gistID)
-			// Normalize the URL to the Gist's pull URL.
-			// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
-			repo = gist.GetGitPullURL()
-			if s.handleRateLimit(ctx, err) {
+			if s.handleRateLimit(ctx, err, reporter) {
 				continue
 			}
 			if err != nil {
 				return repo, fmt.Errorf("failed to fetch gist")
 			}
+			// Normalize the URL to the Gist's pull URL.
+			// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
+			repo = gist.GetGitPullURL()
 			s.cacheGistInfo(gist)
 			break
 		}
@@ -469,7 +469,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string) (string, 
 		// Cache repository info.
 		for {
 			ghRepo, _, err := s.connector.APIClient().Repositories.Get(ctx, urlParts[1], urlParts[2])
-			if s.handleRateLimit(ctx, err) {
+			if s.handleRateLimit(ctx, err, reporter) {
 				continue
 			}
 			if err != nil {
@@ -529,7 +529,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	var err error
 	for {
 		ghUser, _, err = s.connector.APIClient().Users.Get(ctx, "")
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -742,14 +742,37 @@ var (
 	rateLimitResumeTime time.Time
 )
 
-// handleRateLimit handles GitHub API rate limiting with an optional reporter for unit errors.
+// errorReporter is an interface that captures just the error reporting functionality
+type errorReporter interface {
+	Err(ctx context.Context, err error) error
+}
+
+// wrapper to adapt UnitReporter to errorReporter
+type unitErrorReporter struct {
+	reporter sources.UnitReporter
+}
+
+func (u unitErrorReporter) Err(ctx context.Context, err error) error {
+	return u.reporter.UnitErr(ctx, err)
+}
+
+// wrapper to adapt ChunkReporter to errorReporter
+type chunkErrorReporter struct {
+	reporter sources.ChunkReporter
+}
+
+func (c chunkErrorReporter) Err(ctx context.Context, err error) error {
+	return c.reporter.ChunkErr(ctx, err)
+}
+
+// handleRateLimit handles GitHub API rate limiting with an optional error reporter.
 // Returns true if a rate limit was handled.
 //
 // Unauthenticated users have a rate limit of 60 requests per hour.
 // Authenticated users have a rate limit of 5,000 requests per hour,
 // however, certain actions are subject to a stricter "secondary" limit.
 // https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
-func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporter ...sources.UnitReporter) bool {
+func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporter ...errorReporter) bool {
 	if errIn == nil {
 		return false
 	}
@@ -790,7 +813,7 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporter ...s
 			ctx.Logger().Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 			// Only report the error if a reporter was provided
 			if len(reporter) > 0 {
-				if err := reporter[0].UnitErr(ctx, fmt.Errorf("exceeded %s rate limit", limitType)); err != nil {
+				if err := reporter[0].Err(ctx, fmt.Errorf("exceeded %s rate limit", limitType)); err != nil {
 					ctx.Logger().Error(err, "failed to report rate limit error")
 				}
 			}
@@ -814,7 +837,7 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporter ...s
 
 // handleRateLimitWithUnitReporter is a wrapper around handleRateLimit that includes unit reporting
 func (s *Source) handleRateLimitWithUnitReporter(ctx context.Context, reporter sources.UnitReporter, errIn error) bool {
-	return s.handleRateLimit(ctx, errIn, reporter)
+	return s.handleRateLimit(ctx, errIn, &unitErrorReporter{reporter: reporter})
 }
 
 func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
@@ -837,7 +860,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 
 	for {
 		gists, res, err := s.connector.APIClient().Gists.List(ctx, user, gistOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1201,7 +1224,6 @@ func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, rep
 	}
 
 	return nil
-
 }
 
 func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
@@ -1542,7 +1564,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	ctx = context.WithValue(ctx, "repo", repoURL)
 	// ChunkUnit is not guaranteed to be called from Enumerate, so we must
 	// check and fetch the repoInfoCache for this repo.
-	repoURL, err := s.ensureRepoInfoCache(ctx, repoURL)
+	repoURL, err := s.ensureRepoInfoCache(ctx, repoURL, &chunkErrorReporter{reporter: reporter})
 	if err != nil {
 		return err
 	}
