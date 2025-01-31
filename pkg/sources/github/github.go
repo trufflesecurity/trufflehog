@@ -739,13 +739,14 @@ var (
 	rateLimitResumeTime time.Time
 )
 
-// handleRateLimit returns true if a rate limit was handled
+// handleRateLimit handles GitHub API rate limiting with an optional reporter for unit errors.
+// Returns true if a rate limit was handled.
 //
 // Unauthenticated users have a rate limit of 60 requests per hour.
 // Authenticated users have a rate limit of 5,000 requests per hour,
 // however, certain actions are subject to a stricter "secondary" limit.
 // https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
-func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
+func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporter ...sources.UnitReporter) bool {
 	if errIn == nil {
 		return false
 	}
@@ -757,7 +758,6 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
 	var retryAfter time.Duration
 	if resumeTime.IsZero() || time.Now().After(resumeTime) {
 		rateLimitMu.Lock()
-
 		var (
 			now = time.Now()
 
@@ -785,6 +785,12 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
 			retryAfter = retryAfter + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
 			ctx.Logger().Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
+			// Only report the error if a reporter was provided
+			if len(reporter) > 0 {
+				if err := reporter[0].UnitErr(ctx, fmt.Errorf("exceeded %s rate limit", limitType)); err != nil {
+					ctx.Logger().Error(err, "failed to report rate limit error")
+				}
+			}
 		} else {
 			retryAfter = (5 * time.Minute) + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
@@ -801,6 +807,11 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
 	time.Sleep(retryAfter)
 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
 	return true
+}
+
+// handleRateLimitWithUnitReporter is a wrapper around handleRateLimit that includes unit reporting
+func (s *Source) handleRateLimitWithUnitReporter(ctx context.Context, reporter sources.UnitReporter, errIn error) bool {
+	return s.handleRateLimit(ctx, errIn, reporter)
 }
 
 func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
