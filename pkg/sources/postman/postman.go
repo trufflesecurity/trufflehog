@@ -27,7 +27,6 @@ import (
 const (
 	SourceType       = sourcespb.SourceType_SOURCE_TYPE_POSTMAN
 	LINK_BASE_URL    = "https://go.postman.co/"
-	GLOBAL_TYPE      = "globals"
 	ENVIRONMENT_TYPE = "environment"
 	AUTH_TYPE        = "authorization"
 	REQUEST_TYPE     = "request"
@@ -147,7 +146,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err = json.Unmarshal(contents, &env); err != nil {
 			return err
 		}
-		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentName: env.ID, fromLocal: true, Link: envPath}, env)
+		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentID: env.ID, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE}, env)
 	}
 
 	// Scan local workspaces
@@ -230,7 +229,9 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 
 	for _, environment := range workspace.EnvironmentsRaw {
 		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/environments/" + environment.ID + ".json"
+		metadata.LocationType = source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE
 		s.scanVariableData(ctx, chunksChan, metadata, environment)
+		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 	for _, collection := range workspace.CollectionsRaw {
 		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/collections/" + collection.Info.PostmanID + ".json"
@@ -265,13 +266,20 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		metadata.Link = LINK_BASE_URL + "environments/" + envID.UUID
 		metadata.FullID = envVars.ID
 		metadata.EnvironmentID = envID.UUID
+		metadata.EnvironmentName = envVars.Name
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
 		for _, word := range strings.Split(envVars.Name, " ") {
 			s.attemptToAddKeyword(word)
 		}
-
+		metadata.LocationType = source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE
 		s.scanVariableData(ctx, chunksChan, metadata, envVars)
+		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
+		metadata.Type = ""
+		metadata.Link = ""
+		metadata.FullID = ""
+		metadata.EnvironmentID = ""
+		metadata.EnvironmentName = ""
 		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", metadata.FullID)
 	}
 	ctx.Logger().V(2).Info("finished scanning environments")
@@ -305,11 +313,13 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
 	}
 
+	metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_VARIABLE
 	// variables must be scanned first before drilling down into the folders and events
 	// because we need to pick up the substitutions from the top level collection variables
 	s.scanVariableData(ctx, chunksChan, metadata, VariableData{
 		KeyValues: collection.Variables,
 	})
+	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 
 	for _, event := range collection.Events {
 		s.scanEvent(ctx, chunksChan, metadata, event)
@@ -345,6 +355,7 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 
 	// check if there are any requests in the folder
 	if item.Request.Method != "" {
+		metadata.FolderName = strings.Replace(metadata.FolderName, (" > " + item.Name), "", -1)
 		metadata.RequestID = item.ID
 		metadata.RequestName = item.Name
 		metadata.Type = REQUEST_TYPE
@@ -368,8 +379,16 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
 
+	if metadata.RequestID != "" {
+		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_AUTHORIZATION
+	} else if metadata.FolderID != "" {
+		metadata.LocationType = source_metadatapb.PostmanLocationType_FOLDER_AUTHORIZATION
+	} else if metadata.CollectionInfo.UID != "" {
+		metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_AUTHORIZATION
+	}
 	// an auth all by its lonesome could be inherited to subfolders and requests
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
+	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
 func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, event Event) {
@@ -378,7 +397,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 	// Prep direct links. Ignore updating link if it's a local JSON file
 	if !metadata.fromLocal {
-		metadata.Link = LINK_BASE_URL + metadata.Type + "/" + metadata.FullID
+		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.FullID
 		if event.Listen == "prerequest" {
 			metadata.Link += "?tab=pre-request-scripts"
 		} else {
@@ -386,7 +405,16 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		}
 	}
 
+	if strings.Contains(metadata.Type, REQUEST_TYPE) {
+		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_SCRIPT
+	} else if strings.Contains(metadata.Type, FOLDER_TYPE) {
+		metadata.LocationType = source_metadatapb.PostmanLocationType_FOLDER_SCRIPT
+	} else if strings.Contains(metadata.Type, COLLECTION_TYPE) {
+		metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_SCRIPT
+	}
+
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, data)), metadata)
+	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
 func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, auth Auth, u URL) {
@@ -471,7 +499,16 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	s.attemptToAddKeyword(authData)
 
 	m.FieldType = AUTH_TYPE
+
+	if strings.Contains(m.Type, REQUEST_TYPE) {
+		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_AUTHORIZATION
+	} else if strings.Contains(m.Type, FOLDER_TYPE) {
+		m.LocationType = source_metadatapb.PostmanLocationType_FOLDER_AUTHORIZATION
+	} else if strings.Contains(m.Type, COLLECTION_TYPE) {
+		m.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_AUTHORIZATION
+	}
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, authData)), m)
+	m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
@@ -484,14 +521,18 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 			KeyValues: r.Header,
 		}
 		metadata.Type = originalType + " > header"
+		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_HEADER
 		s.scanVariableData(ctx, chunksChan, metadata, vars)
+		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
 	if r.URL.Raw != "" {
 		metadata.Type = originalType + " > request URL (no query parameters)"
 		// Note: query parameters are handled separately
 		u := fmt.Sprintf("%s://%s/%s", r.URL.Protocol, strings.Join(r.URL.Host, "."), strings.Join(r.URL.Path, "/"))
+		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_URL
 		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, u)), metadata)
+		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
 	if len(r.URL.Query) > 0 {
@@ -499,7 +540,9 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 			KeyValues: r.URL.Query,
 		}
 		metadata.Type = originalType + " > GET parameters (query)"
+		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_QUERY_PARAMETER
 		s.scanVariableData(ctx, chunksChan, metadata, vars)
+		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
 	if r.Auth.Type != "" {
@@ -507,43 +550,9 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		s.scanAuth(ctx, chunksChan, metadata, r.Auth, r.URL)
 	}
 
-	if r.Body.Mode != "" {
-		metadata.Type = originalType + " > body"
-		s.scanBody(ctx, chunksChan, metadata, r.Body)
-	}
-}
-
-func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
-	if !m.fromLocal {
-		m.Link = m.Link + "?tab=body"
-	}
-	originalType := m.Type
-	switch b.Mode {
-	case "formdata":
-		m.Type = originalType + " > form data"
-		vars := VariableData{
-			KeyValues: b.FormData,
-		}
-		s.scanVariableData(ctx, chunksChan, m, vars)
-	case "urlencoded":
-		m.Type = originalType + " > url encoded"
-		vars := VariableData{
-			KeyValues: b.URLEncoded,
-		}
-		s.scanVariableData(ctx, chunksChan, m, vars)
-	case "raw", "graphql":
-		data := b.Raw
-		if b.Mode == "graphql" {
-			m.Type = originalType + " > graphql"
-			data = b.GraphQL.Query + " " + b.GraphQL.Variables
-		}
-		if b.Mode == "raw" {
-			m.Type = originalType + " > raw"
-		}
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
-	default:
-		break
-	}
+	// We would scan the body, but currently the body has different radio buttons that can be scanned but only the selected one is scanned. The unselected radio button options can still
+	// have secrets in them but will not be scanned. The selction of the radio button will also change the secret metadata for that particular scanning pass and can create confusion for
+	// the user as to the status of a secret. We will reimplement at some point.
 }
 
 func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, response Response) {
@@ -558,13 +567,17 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 			KeyValues: response.Header,
 		}
 		m.Type = originalType + " > response header"
+		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_HEADER
 		s.scanVariableData(ctx, chunksChan, m, vars)
+		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
 	// Body in a response is just a string
 	if response.Body != "" {
 		m.Type = originalType + " > response body"
+		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_BODY
 		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, response.Body)), m)
+		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
 	if response.OriginalRequest.Method != "" {
@@ -600,6 +613,12 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 	}
 
 	m.FieldType = m.Type + " variables"
+	switch m.FieldType {
+	case "request > GET parameters (query) variables":
+		m.Link = m.Link + "?tab=params"
+	case "request > header variables":
+		m.Link = m.Link + "?tab=headers"
+	}
 	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(values), m)
 }
 
@@ -607,7 +626,9 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 	if data == "" {
 		return
 	}
-	metadata.FieldType = metadata.Type
+	if metadata.FieldType == "" {
+		metadata.FieldType = metadata.Type
+	}
 
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
@@ -630,8 +651,7 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					FolderId:        metadata.FolderID,
 					FolderName:      metadata.FolderName,
 					FieldType:       metadata.FieldType,
-					FieldName:       metadata.FieldName,
-					VariableType:    metadata.VarType,
+					LocationType:    metadata.LocationType,
 				},
 			},
 		},
