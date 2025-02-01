@@ -35,7 +35,7 @@ runs:
       BASE: ${{ inputs.base }}
       HEAD: ${{ inputs.head }}
       ARGS: ${{ inputs.extra_args }}
-      COMMITS: ${{ toJson(github.event.commits) }}
+      COMMITS: ${{ toJson(github.event.commits.*.id) }}
       VERSION: ${{ inputs.version }}
     run: |
       ##########################################
