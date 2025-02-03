@@ -453,15 +453,18 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 		for {
 			gistID := extractGistID(urlParts)
 			gist, _, err := s.connector.APIClient().Gists.Get(ctx, gistID)
-			if s.handleRateLimit(ctx, err, reporter) {
-				continue
-			}
-			if err != nil {
-				return repo, fmt.Errorf("failed to fetch gist")
-			}
 			// Normalize the URL to the Gist's pull URL.
 			// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
 			repo = gist.GetGitPullURL()
+
+			if s.handleRateLimit(ctx, err, reporter) {
+				continue
+			}
+
+			if err != nil {
+				return repo, fmt.Errorf("failed to fetch gist")
+			}
+
 			s.cacheGistInfo(gist)
 			break
 		}
