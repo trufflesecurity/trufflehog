@@ -24,7 +24,8 @@ var (
 	// https://learn.microsoft.com/en-us/microsoft-365/admin/setup/domains-faq?view=o365-worldwide#why-do-i-have-an--onmicrosoft-com--domain
 	tenantIdPat = regexp.MustCompile(fmt.Sprintf(
 		//language=regexp
-		`(?i)(?:(?:login\.microsoftonline\.com/|(?:login|sts)\.windows\.net/|(?:t[ae]n[ae]nt(?:[ ._-]?id)?|\btid)(?:.|\s){0,60}?)(%s)|https?://(%s)|X-AnchorMailbox(?:.|\s){0,60}?@(%s))`,
+		`(?i)(?:(?:login\.microsoftonline\.com/|(?:login|sts)\.windows\.net/|(?:t[ae]n[ae]nt(?:[ ._-]?id)?|\btid)(?:.|\s){0,60}?)(%s)|https?://(%s)|X-AnchorMailbox(?:.|\s){0,60}?@(%s)|/(%s)/(?:oauth2/v2\.0|B2C_1\w+|common|discovery|federationmetadata|kerberos|login|openid/|reprocess|resume|saml2|token|uxlogout|v2\.0|wsfed))`,
+		uuidStr,
 		uuidStr,
 		uuidStr,
 		uuidStr,
@@ -47,8 +48,12 @@ func FindTenantIdMatches(data string) map[string]struct{} {
 			m = strings.ToLower(match[2])
 		} else if match[3] != "" {
 			m = strings.ToLower(match[3])
+		} else if match[4] != "" {
+			m = strings.ToLower(match[4])
 		}
 		if _, ok := detectors.UuidFalsePositives[detectors.FalsePositive(m)]; ok {
+			continue
+		} else if detectors.StringShannonEntropy(m) < 3 {
 			continue
 		}
 		uniqueMatches[m] = struct{}{}
@@ -65,6 +70,8 @@ func FindClientIdMatches(data string) map[string]struct{} {
 	for _, match := range clientIdPat.FindAllStringSubmatch(data, -1) {
 		m := strings.ToLower(match[1])
 		if _, ok := detectors.UuidFalsePositives[detectors.FalsePositive(m)]; ok {
+			continue
+		} else if detectors.StringShannonEntropy(m) < 3 {
 			continue
 		}
 		uniqueMatches[m] = struct{}{}
