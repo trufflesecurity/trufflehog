@@ -420,7 +420,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
 		if err != nil {
 			ctx.Logger().Error(err, "error caching repo info")
-			dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
+			_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
 		}
 		s.repos = append(s.repos, repo)
 	}
@@ -814,7 +814,7 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...
 			ctx.Logger().Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 			// Only report the error if a reporter was provided
 			for _, reporter := range reporters {
-				reporter.Err(ctx, fmt.Errorf("exceeded %s rate limit", limitType))
+				_ = reporter.Err(ctx, fmt.Errorf("exceeded %s rate limit", limitType))
 			}
 		} else {
 			retryAfter = (5 * time.Minute) + jitter
