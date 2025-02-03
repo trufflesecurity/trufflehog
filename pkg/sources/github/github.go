@@ -815,8 +815,8 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporter ...e
 			rateLimitResumeTime = now.Add(retryAfter)
 			ctx.Logger().Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 			// Only report the error if a reporter was provided
-			if len(reporter) > 0 {
-				if err := reporter[0].Err(ctx, fmt.Errorf("exceeded %s rate limit", limitType)); err != nil {
+			for _, reporter := range reporter {
+				if err := reporter.Err(ctx, fmt.Errorf("exceeded %s rate limit", limitType)); err != nil {
 					ctx.Logger().Error(err, "failed to report rate limit error")
 				}
 			}
