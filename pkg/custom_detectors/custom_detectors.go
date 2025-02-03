@@ -65,6 +65,28 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	dataStr := string(data)
 	regexMatches := make(map[string][][]string, len(c.GetRegex()))
 
+	// Compile exclude regexes targeting the capture group
+	excludeRegexesCapture := make([]*regexp.Regexp, 0, len(c.GetExcludeRegexesCapture()))
+	for _, exclude := range c.GetExcludeRegexesCapture() {
+		regex, err := regexp.Compile(exclude)
+		if err != nil {
+			// This will only happen if the regex is invalid.
+			return nil, err
+		}
+		excludeRegexesCapture = append(excludeRegexesCapture, regex)
+	}
+
+	// Compile exclude regexes targeting the entire match
+	excludeRegexes := make([]*regexp.Regexp, 0, len(c.GetExcludeRegexesMatch()))
+	for _, exclude := range c.GetExcludeRegexesMatch() {
+		regex, err := regexp.Compile(exclude)
+		if err != nil {
+			// This will only happen if the regex is invalid.
+			return nil, err
+		}
+		excludeRegexes = append(excludeRegexes, regex)
+	}
+
 	// Find all submatches for each regex.
 	for name, regex := range c.GetRegex() {
 		regex, err := regexp.Compile(regex)
@@ -91,7 +113,45 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 
 	// Create result object and test for verification.
 	resultsCh := make(chan detectors.Result, maxTotalMatches)
+
+MatchLoop:
 	for _, match := range matches {
+		for _, values := range match {
+			// attempt to use capture group
+			secret := values[0]
+			if len(values) > 1 {
+				secret = values[1]
+			}
+
+			// check entropy
+			entropy := c.GetEntropy()
+			if entropy > 0.0 && detectors.StringShannonEntropy(secret) < float64(entropy) {
+				continue MatchLoop
+			}
+
+			// check for exclude words
+			for _, excludeWord := range c.GetExcludeWords() {
+				if strings.Contains(strings.ToLower(secret), excludeWord) {
+					continue MatchLoop
+				}
+			}
+
+			// exclude checks
+			for _, excludeMatch := range excludeRegexes {
+				if excludeMatch.MatchString(values[0]) {
+					continue MatchLoop
+				}
+			}
+
+			// exclude secret (capture group), or if no capture group is set,
+			// check against entire match.
+			for _, excludeSecret := range excludeRegexesCapture {
+				if excludeSecret.MatchString(secret) {
+					continue MatchLoop
+				}
+			}
+		}
+
 		g.Go(func() error {
 			return c.createResults(ctx, match, verify, resultsCh)
 		})
