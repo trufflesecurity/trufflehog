@@ -105,6 +105,6 @@ func Run(keyType string, secretInfo SecretInfo) {
 	case "elevenlabs":
 		elevenlabs.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "planetscale":
-		planetscale.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["id"], secretInfo.Parts["key"])
+		planetscale.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["id"], secretInfo.Parts["token"])
 	}
 }
