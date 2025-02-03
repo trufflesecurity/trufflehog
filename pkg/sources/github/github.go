@@ -773,7 +773,7 @@ func (c chunkErrorReporter) Err(ctx context.Context, err error) error {
 // Authenticated users have a rate limit of 5,000 requests per hour,
 // however, certain actions are subject to a stricter "secondary" limit.
 // https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
-func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporter ...errorReporter) bool {
+func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...errorReporter) bool {
 	if errIn == nil {
 		return false
 	}
@@ -813,7 +813,7 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporter ...e
 			rateLimitResumeTime = now.Add(retryAfter)
 			ctx.Logger().Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
 			// Only report the error if a reporter was provided
-			for _, reporter := range reporter {
+			for _, reporter := range reporters {
 				if err := reporter.Err(ctx, fmt.Errorf("exceeded %s rate limit", limitType)); err != nil {
 					ctx.Logger().Error(err, "failed to report rate limit error")
 				}
