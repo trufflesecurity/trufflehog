@@ -48,6 +48,7 @@ func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
+	var verifcationErrs error
 	matches := keyPat.FindAllString(dataStr, -1)
 	for _, match := range matches {
 		token := normalize(match)
@@ -89,6 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				wg                 sync.WaitGroup
 				extraData          = newExtraData()
 				verificationErrors = newVerificationErrors()
+				errChan            = make(chan error, 3)
 			)
 
 			// Look up certificate information.
@@ -102,6 +104,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					}
 				} else {
 					verificationErrors.Add(err)
+					errChan <- err
 				}
 			}()
 
@@ -112,6 +115,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				user, err := verifyGitHubUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
+					errChan <- err
 				}
 				if user != nil {
 					extraData.Add("github_user", *user)
@@ -125,6 +129,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				user, err := verifyGitLabUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
+					errChan <- err
 				}
 				if user != nil {
 					extraData.Add("gitlab_user", *user)
@@ -132,6 +137,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}()
 
 			wg.Wait()
+			close(errChan)
+
+			for err := range errChan {
+				verifcationErrs = errors.Join(verifcationErrs, err)
+			}
+
 			if len(extraData.data) > 0 {
 				s1.Verified = true
 				for k, v := range extraData.data {
@@ -148,7 +159,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return results, verifcationErrs
 }
 
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
