@@ -154,6 +154,7 @@ func TestPrivatekey_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].AnalysisInfo = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("PrivatekeyCI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
@@ -203,7 +204,7 @@ func Test_lookupFingerprint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotFingerprints, err := lookupFingerprint(context.TODO(), tt.publicKeyFingerprintInHex, tt.includeExpired)
+			gotFingerprints, err := lookupFingerprintCertificateUrls(context.TODO(), tt.publicKeyFingerprintInHex, tt.includeExpired)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("lookupFingerprint() error = %v, wantErr %v", err, tt.wantErr)
 				return
