@@ -47,13 +47,16 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		AnalyzerType:       analyzers.AnalyzerTypeNotion,
 		Metadata:           nil,
 		Bindings:           make([]analyzers.Binding, len(info.Permissions)),
-		UnboundedResources: make([]analyzers.Resource, len(info.Users)),
+		UnboundedResources: make([]analyzers.Resource, len(info.WorkspaceUsers)),
 	}
 
 	resource := analyzers.Resource{
-		Name:               info.Workspace,
-		FullyQualifiedName: "notion.so/workspace/" + info.Workspace,
-		Type:               "Workspace",
+		Name:               info.Bot.Name,
+		FullyQualifiedName: "notion.so/bot/" + info.Bot.Id,
+		Type:               info.Bot.Type,
+		Metadata: map[string]interface{}{
+			"workspace": info.Bot.GetWorkspaceName(),
+		},
 	}
 
 	for idx, permission := range info.Permissions {
@@ -68,10 +71,10 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	// We can find list of users in the current workspace
 	// if the API key has read_user permission, so these can be
 	// unbounded resources
-	for idx, user := range info.Users {
+	for idx, user := range info.WorkspaceUsers {
 		result.UnboundedResources[idx] = analyzers.Resource{
 			Name:               user.Name,
-			FullyQualifiedName: user.Id,
+			FullyQualifiedName: fmt.Sprintf("notion.so/%s/%s", user.Type, user.Id),
 			Type:               user.Type, // person or bot
 		}
 		if user.Person.Email != "" {
@@ -165,7 +168,7 @@ func getPermissions(cfg *config.Config, key string) ([]string, error) {
 		return nil, fmt.Errorf("reading in scopes: %w", err)
 	}
 
-	permissions := make([]string, 0)
+	permissions := make([]string, 0, len(scopes))
 	for _, scope := range scopes {
 		status, err := scope.HttpTest.RunTest(cfg, map[string]string{"Authorization": "Bearer " + key, "Notion-Version": "2022-06-28"})
 		if err != nil {
@@ -180,9 +183,41 @@ func getPermissions(cfg *config.Config, key string) ([]string, error) {
 }
 
 type SecretInfo struct {
-	Workspace   string
-	Permissions []string
-	Users       []User
+	Bot            *bot
+	WorkspaceUsers []user
+	Permissions    []string
+}
+
+type user struct {
+	Id     string `json:"id"`
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Person struct {
+		Email string `json:"email"`
+	}
+}
+
+type bot struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+	Bot  struct {
+		Owner *struct {
+			Type string `json:"type"`
+		}
+		WorkspaceName string `json:"workspace_name"`
+	} `json:"bot"`
+}
+
+func (b *bot) GetWorkspaceName() string {
+	return b.Bot.WorkspaceName
+}
+
+func (b *bot) OwnedBy() string {
+	if b.Bot.Owner != nil {
+		return b.Bot.Owner.Type
+	}
+	return "N/A"
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
@@ -194,39 +229,56 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 
 	color.Green("[!] Valid Notion API key\n\n")
 
-	color.Green("[i] Workspace: %s\n\n", info.Workspace)
+	color.Green("[i] Bot: %s (%s)\n", info.Bot.Name, info.Bot.Id)
+	color.Green("[i] Bot Owned By: %s\n", info.Bot.OwnedBy())
+
+	if info.Bot.GetWorkspaceName() != "" {
+		color.Green("[i] Workspace: %s\n\n", info.Bot.GetWorkspaceName())
+	}
 
 	printPermissions(info.Permissions)
-	if len(info.Users) > 0 {
-		printUsers(info.Users)
+	if len(info.WorkspaceUsers) > 0 {
+		printUsers(info.WorkspaceUsers)
 	}
 	color.Yellow("\n[i] Expires: Never")
 
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
-	workspace, err := getWorkspace(cfg, key)
+	permissions := make([]string, 0)
+
+	bot, err := getBotInfo(cfg, key)
 	if err != nil {
-		return nil, fmt.Errorf("error getting workspace: %s", err.Error())
+		return nil, err
 	}
 
-	permissions, err := getPermissions(cfg, key)
+	credPermissions, err := getPermissions(cfg, key)
 	if err != nil {
-		return nil, fmt.Errorf("error getting permissions: %s", err.Error())
+		return nil, err
 	}
 
-	readUserPermission, users, err := getUsersPermission(cfg, key)
+	permissions = append(permissions, credPermissions...)
+
+	users, err := getWorkspaceUsers(cfg, key)
 	if err != nil {
 		return nil, fmt.Errorf("error getting user permission: %s", err.Error())
 	}
-	if readUserPermission != "" {
-		permissions = append(permissions, readUserPermission)
-	}
 
+	// check if email is returned in users to determine permission
+	for _, user := range users {
+		if user.Type == "person" {
+			if user.Person.Email == "" {
+				permissions = append(permissions, PermissionStrings[ReadUsersWithoutEmail])
+			} else {
+				permissions = append(permissions, PermissionStrings[ReadUsersWithEmail])
+			}
+			break
+		}
+	}
 	return &SecretInfo{
-		Workspace:   workspace,
-		Permissions: permissions,
-		Users:       users,
+		Bot:            bot,
+		Permissions:    permissions,
+		WorkspaceUsers: users,
 	}, nil
 }
 
@@ -241,7 +293,7 @@ func printPermissions(permissions []string) {
 	t.Render()
 }
 
-func printUsers(users []User) {
+func printUsers(users []user) {
 	color.Yellow("\n[i] Users:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -252,12 +304,12 @@ func printUsers(users []User) {
 	t.Render()
 }
 
-func getWorkspace(cfg *config.Config, key string) (string, error) {
+func getBotInfo(cfg *config.Config, key string) (*bot, error) {
 	// Create new HTTP request
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://api.notion.com/v1/users/me", nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Add custom headers if provided
@@ -267,40 +319,36 @@ func getWorkspace(cfg *config.Config, key string) (string, error) {
 	// Execute HTTP Request
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	// Decode response body
-	type meResponse struct {
-		Bot struct {
-			WorkspaceName string `json:"workspace_name"`
-		} `json:"bot"`
-	}
-	me := &meResponse{}
-	err = json.NewDecoder(resp.Body).Decode(me)
-	if err != nil {
-		return "", err
-	}
-
-	return me.Bot.WorkspaceName, nil
-}
-
-type User struct {
-	Id     string `json:"id"`
-	Name   string `json:"name"`
-	Type   string `json:"type"`
-	Person struct {
-		Email string `json:"email"`
+	switch resp.StatusCode {
+	case http.StatusOK:
+		me := &bot{}
+		err = json.NewDecoder(resp.Body).Decode(me)
+		if err != nil {
+			return nil, err
+		}
+		return me, nil
+	case http.StatusUnauthorized:
+		return nil, errors.New("invalid API key")
+	default:
+		return nil, errors.New("error getting bot info")
 	}
 }
 
-func getUsersPermission(cfg *config.Config, key string) (string, []User, error) {
+// Decode response body
+type usersResponse struct {
+	Results []user `json:"results"`
+}
+
+func getWorkspaceUsers(cfg *config.Config, key string) ([]user, error) {
 	// Create new HTTP request
 	client := analyzers.NewAnalyzeClient(cfg)
 	req, err := http.NewRequest("GET", "https://api.notion.com/v1/users", nil)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	// Add custom headers if provided
@@ -310,38 +358,26 @@ func getUsersPermission(cfg *config.Config, key string) (string, []User, error) 
 	// Execute HTTP Request
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusForbidden {
-		return "", nil, nil // no permission
-	} else if resp.StatusCode != http.StatusOK {
-		return "", nil, errors.New("error checking user permissions")
-	}
-
-	// Decode response body
-	type usersResponse struct {
-		Results []User `json:"results"`
-	}
-	response := &usersResponse{}
-	err = json.NewDecoder(resp.Body).Decode(response)
-	if err != nil {
-		return "", nil, err
-	}
-
-	// check if email is returned to determine permission
-	readUserPermission := ""
-	for _, user := range response.Results {
-		if user.Type == "person" {
-			if user.Person.Email == "" {
-				readUserPermission, _ = ReadUsersWithoutEmail.ToString()
-			} else {
-				readUserPermission, _ = ReadUsersWithEmail.ToString()
-			}
-			break
+	switch resp.StatusCode {
+	case http.StatusOK:
+		response := &usersResponse{}
+		err = json.NewDecoder(resp.Body).Decode(response)
+		if err != nil {
+			return nil, err
 		}
+		return response.Results, nil
+	case http.StatusUnauthorized:
+		return nil, errors.New("invalid API key")
+	case http.StatusForbidden:
+		return nil, nil // no permission
+	case http.StatusNotFound:
+		return nil, errors.New("workspace not found")
+	default:
+		return nil, errors.New("error checking user permissions")
 	}
 
-	return readUserPermission, response.Results, nil
 }
