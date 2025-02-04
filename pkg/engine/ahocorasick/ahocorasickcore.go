@@ -103,7 +103,7 @@ func (m *adjustableSpanCalculator) calculateSpan(params spanCalculationParams) m
 	// In rare cases where the calculated start index exceeds the end index (possibly due to
 	// detector-provided offsets), we reset the start index to 0 to maintain a valid span range
 	// and avoid runtime panics. This is a temporary fix until the root cause is identified.
-	if startIdx > endIdx {
+	if startIdx >= endIdx {
 		startIdx = 0
 	}
 
