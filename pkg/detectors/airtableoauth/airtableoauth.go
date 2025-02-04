@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`\b(oaa[[:alnum:]]+\.v1\.[a-zA-Z0-9_-]+\.[a-f0-9]+)\b`)
+	keyPat        = regexp.MustCompile(`\b([[:alnum:]]+\.v1\.[a-zA-Z0-9_-]+\.[a-f0-9]+)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
