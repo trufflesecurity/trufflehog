@@ -47,7 +47,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		AnalyzerType:       analyzers.AnalyzerTypeNotion,
 		Metadata:           nil,
 		Bindings:           make([]analyzers.Binding, len(info.Permissions)),
-		UnboundedResources: make([]analyzers.Resource, len(info.WorkspaceUsers)),
+		UnboundedResources: make([]analyzers.Resource, 0, len(info.WorkspaceUsers)),
 	}
 
 	resource := analyzers.Resource{
@@ -71,17 +71,23 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	// We can find list of users in the current workspace
 	// if the API key has read_user permission, so these can be
 	// unbounded resources
-	for idx, user := range info.WorkspaceUsers {
-		result.UnboundedResources[idx] = analyzers.Resource{
+	for _, user := range info.WorkspaceUsers {
+		if info.Bot.Id == user.Id {
+			// Skip the bot itself
+			continue
+		}
+		unboundresource := analyzers.Resource{
 			Name:               user.Name,
 			FullyQualifiedName: fmt.Sprintf("notion.so/%s/%s", user.Type, user.Id),
 			Type:               user.Type, // person or bot
 		}
 		if user.Person.Email != "" {
-			result.UnboundedResources[idx].Metadata = map[string]interface{}{
+			unboundresource.Metadata = map[string]interface{}{
 				"email": user.Person.Email,
 			}
 		}
+
+		result.UnboundedResources = append(result.UnboundedResources, unboundresource)
 	}
 
 	return &result
@@ -294,7 +300,7 @@ func printPermissions(permissions []string) {
 }
 
 func printUsers(users []user) {
-	color.Yellow("\n[i] Users:")
+	color.Yellow("\n[i] Workspace Users:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"ID", "Name", "Type", "Email"})
