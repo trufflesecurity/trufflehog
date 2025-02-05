@@ -303,8 +303,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 // scanCollection scans a collection and all its items, folders, and requests.
 // locally scoped Metadata is updated as we drill down into the collection.
 func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
-	ctx.Logger().V(2).Info("starting scanning collectionsss", collection.Info.Name, "uuid", collection.Info.UID)
-	ctx.Logger().V(2).Info("The workspace id is: ", metadata.WorkspaceUUID)
+	ctx.Logger().V(2).Info("starting scanning collection", "collection name", collection.Info.Name, "collection uuid", collection.Info.UID)
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
 	s.attemptToAddKeyword(collection.Info.Name)
@@ -589,7 +588,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, variableData VariableData) {
 	if len(variableData.KeyValues) == 0 {
-		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "uuid", m.FullID)
+		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "item uuid", m.FullID)
 		return
 	}
 
@@ -625,12 +624,14 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, data string, metadata Metadata) {
 	if data == "" {
+		ctx.Logger().V(5).Info("Data string is empty", "workspace ID", metadata.WorkspaceUUID)
 		return
 	}
 	if metadata.FieldType == "" {
 		metadata.FieldType = metadata.Type
 	}
 
+	ctx.Logger().V(5).Info("Generating chunk and passing it to the channel", "link", metadata.Link)
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,

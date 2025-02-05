@@ -41,7 +41,7 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sour
 
 	// Turn AhoCorasick keywordsToDetectors into a map of keywords
 	keywords := make(map[string]struct{})
-	for key := range e.ahoCorasickCore.KeywordsToDetectors() {
+	for key := range e.AhoCorasickCore.KeywordsToDetectors() {
 		keywords[key] = struct{}{}
 	}
 
