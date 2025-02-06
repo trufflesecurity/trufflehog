@@ -21,7 +21,7 @@ type Analyzer struct {
 // SecretInfo hold the information about the anthropic key
 type SecretInfo struct {
 	Valid              bool
-	Type               bool // key type - TODO: Handle Anthropic Admin Keys
+	Type               string // key type - TODO: Handle Anthropic Admin Keys
 	Reference          string
 	AnthropicResources []AnthropicResource
 	Permissions        string // always full_access
@@ -83,6 +83,8 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	client := analyzers.NewAnalyzeClient(cfg)
 
 	var secretInfo = &SecretInfo{}
+
+	secretInfo.Type = "API-Key" // TODO: implement Admin-Key type as well
 
 	if err := listModels(client, key, secretInfo); err != nil {
 		return nil, err
