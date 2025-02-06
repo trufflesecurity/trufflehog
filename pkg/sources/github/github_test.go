@@ -197,7 +197,7 @@ func TestAddMembersByOrg(t *testing.T) {
 		})
 
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
-	err := s.addMembersByOrg(context.Background(), "org1")
+	err := s.addMembersByOrg(context.Background(), "org1", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(s.memberCache))
 	_, ok := s.memberCache["testman1"]
@@ -221,7 +221,7 @@ func TestAddMembersByOrg_AuthFailure(t *testing.T) {
 		}})
 
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
-	err := s.addMembersByOrg(context.Background(), "org1")
+	err := s.addMembersByOrg(context.Background(), "org1", noopReporter())
 	assert.True(t, strings.HasPrefix(err.Error(), "could not list organization"))
 	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
@@ -236,7 +236,7 @@ func TestAddMembersByOrg_NoMembers(t *testing.T) {
 		JSON([]map[string]string{})
 
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
-	err := s.addMembersByOrg(context.Background(), "org1")
+	err := s.addMembersByOrg(context.Background(), "org1", noopReporter())
 
 	assert.Equal(t, fmt.Sprintf("organization (%q) had 0 members: account may not have access to list organization members", "org1"), err.Error())
 	assert.False(t, gock.HasUnmatchedRequest())
@@ -276,7 +276,7 @@ func TestAddMembersByApp(t *testing.T) {
 				AppId:          "4141",
 			},
 		}})
-	err := s.addMembersByApp(context.Background(), s.connector.(*appConnector).InstallationClient())
+	err := s.addMembersByApp(context.Background(), s.connector.(*appConnector).InstallationClient(), noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(s.memberCache))
 	_, ok := s.memberCache["ssm1"]
@@ -327,7 +327,7 @@ func TestAddOrgsByUser(t *testing.T) {
 		})
 
 	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
-	s.addOrgsByUser(context.Background(), "super-secret-user")
+	s.addOrgsByUser(context.Background(), "super-secret-user", noopReporter())
 	assert.Equal(t, 1, s.orgsCache.Count())
 	ok := s.orgsCache.Exists("sso2")
 	assert.True(t, ok)
