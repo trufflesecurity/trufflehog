@@ -22,7 +22,10 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`\b([[:alnum:]]+\.v1\.[a-zA-Z0-9_-]+\.[a-f0-9]+)\b`)
+	// The detector will attempt to match access tokens generated through the Airtable OAuth flow
+	// Airtable OAuth does not support generating access tokens using client ID and key
+	// Reference: https://airtable.com/developers/web/api/oauth-reference
+	tokenPat = regexp.MustCompile(`\b([[:alnum:]]+\.v1\.[a-zA-Z0-9_-]+\.[a-f0-9]+)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -36,7 +39,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	uniqueMatches := make(map[string]struct{})
-	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+	for _, match := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueMatches[match[1]] = struct{}{}
 	}
 
