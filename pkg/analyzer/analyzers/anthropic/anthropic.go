@@ -2,6 +2,10 @@ package anthropic
 
 import (
 	"errors"
+	"os"
+
+	"github.com/fatih/color"
+	"github.com/jedib0t/go-pretty/table"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
@@ -11,7 +15,7 @@ import (
 var _ analyzers.Analyzer = (*Analyzer)(nil)
 
 type Analyzer struct {
-	Cfg config.Config
+	Cfg *config.Config
 }
 
 // SecretInfo hold the information about the anthropic key
@@ -42,14 +46,113 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 		return nil, errors.New("key not found in credentials info")
 	}
 
-	return nil, nil
+	secretInfo, err := AnalyzePermissions(a.Cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return secretInfoToAnalyzerResult(secretInfo), nil
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		// just print the error in cli and continue as a partial success
+		color.Red("[x] Error : %s", err.Error())
+	}
+
+	if info == nil {
+		color.Red("[x] Error : %s", "No information found")
+		return
+	}
+
+	if info.Valid {
+		color.Green("[!] Valid Anthropic API key\n\n")
+		// no user information
+		// print full access permission
+		printPermission(info.Permissions)
+		// print resources
+		printAnthropicResources(info.AnthropicResources)
+
+		color.Yellow("\n[i] Expires: Never")
+	}
 }
 
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// create a HTTP client
 	client := analyzers.NewAnalyzeClient(cfg)
 
-	var secret = &SecretInfo{}
+	var secretInfo = &SecretInfo{}
 
-	return nil, nil
+	if err := listModels(client, key, secretInfo); err != nil {
+		return nil, err
+	}
+
+	if err := listMessageBatches(client, key, secretInfo); err != nil {
+		return nil, err
+	}
+
+	// anthropic key has full access only
+	secretInfo.Permissions = PermissionStrings[FullAccess]
+	secretInfo.Valid = true
+
+	return secretInfo, nil
+}
+
+// secretInfoToAnalyzerResult translate secret info to Analyzer Result
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerAnthropic,
+		Metadata:     map[string]any{},
+		Bindings:     make([]analyzers.Binding, 0),
+	}
+
+	// extract information to create bindings and append to result bindings
+	for _, Anthropicresource := range info.AnthropicResources {
+		binding := analyzers.Binding{
+			Resource: analyzers.Resource{
+				Name:               Anthropicresource.Name,
+				FullyQualifiedName: Anthropicresource.ID,
+				Type:               Anthropicresource.Type,
+				Metadata:           map[string]any{},
+			},
+			Permission: analyzers.Permission{
+				Value: info.Permissions,
+			},
+		}
+
+		for key, value := range Anthropicresource.Metadata {
+			binding.Resource.Metadata[key] = value
+		}
+
+		result.Bindings = append(result.Bindings, binding)
+	}
+
+	result.Metadata["Valid_Key"] = info.Valid
+
+	return &result
+}
+
+func printPermission(permission string) {
+	color.Yellow("[i] Permissions:")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Permission"})
+	t.AppendRow(table.Row{color.GreenString(permission)})
+	t.Render()
+}
+
+func printAnthropicResources(resources []AnthropicResource) {
+	color.Green("\n[i] Resources:")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Resource Type", "Resource ID", "Resource Name"})
+	for _, resource := range resources {
+		t.AppendRow(table.Row{color.GreenString(resource.Type), color.GreenString(resource.ID), color.GreenString(resource.Name)})
+	}
+	t.Render()
 }
