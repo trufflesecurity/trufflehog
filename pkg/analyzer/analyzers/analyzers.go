@@ -61,6 +61,7 @@ const (
 const (
 	AnalyzerTypeInvalid AnalyzerType = iota
 	AnalyzerTypeAirbrake
+	AnalyzerAnthropic
 	AnalyzerTypeAsana
 	AnalyzerTypeBitbucket
 	AnalyzerTypeGitHub
@@ -87,6 +88,7 @@ const (
 var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeInvalid:     "Invalid",
 	AnalyzerTypeAirbrake:    "Airbrake",
+	AnalyzerAnthropic:       "Anthropic",
 	AnalyzerTypeAsana:       "Asana",
 	AnalyzerTypeBitbucket:   "Bitbucket",
 	AnalyzerTypeGitHub:      "GitHub",
