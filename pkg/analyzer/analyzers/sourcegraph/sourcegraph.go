@@ -98,7 +98,7 @@ type SecretInfo struct {
 func getUserInfo(cfg *config.Config, key string) (UserInfoJSON, error) {
 	var userInfo UserInfoJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	payload := "{\"query\":\"query { currentUser { username, email, siteAdmin, createdAt } }\"}"
 	req, err := http.NewRequest("POST", "https://sourcegraph.com/.api/graphql", strings.NewReader(payload))
 	if err != nil {
@@ -132,7 +132,7 @@ func checkSiteAdmin(cfg *config.Config, key string) (bool, error) {
 	    }
 	}`
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	req, err := http.NewRequest("POST", "https://sourcegraph.com/.api/graphql", strings.NewReader(query))
 	if err != nil {
 		return false, err
