@@ -39,12 +39,17 @@ jobs:
           go-version: "1.23"
       - name: Cosign install
         uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+      - name: Install UPX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y upx
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          distribution: goreleaser
+          distribution: goreleaser-pro
           version: latest
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}

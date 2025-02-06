@@ -20,6 +20,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/opsgenie"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postgres"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postman"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/sendgrid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/shopify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/slack"
@@ -103,7 +104,9 @@ func Run(cmd string) {
 		shopify.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"], secretInfo.Parts["url"])
 	case "opsgenie":
 		opsgenie.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
-	case "elevenlabs":
+	case "privatekey":
+		privatekey.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+  case "elevenlabs":
 		elevenlabs.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }
