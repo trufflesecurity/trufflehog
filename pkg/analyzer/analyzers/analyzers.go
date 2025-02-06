@@ -81,6 +81,7 @@ const (
 	AnalyzerTypeStripe
 	AnalyzerTypeTwilio
 	AnalyzerTypePrivateKey
+	AnalyzerTypeAirtable
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -88,6 +89,7 @@ const (
 var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeInvalid:     "Invalid",
 	AnalyzerTypeAirbrake:    "Airbrake",
+	AnalyzerTypeAirtable:    "Airtable",
 	AnalyzerTypeAsana:       "Asana",
 	AnalyzerTypeBitbucket:   "Bitbucket",
 	AnalyzerTypeGitHub:      "GitHub",
