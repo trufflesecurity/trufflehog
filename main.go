@@ -803,23 +803,6 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err = eng.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan TravisCI: %v", err)
 		}
-	case gcsScan.FullCommand():
-		cfg := sources.GCSConfig{
-			ProjectID:      *gcsProjectID,
-			CloudCred:      *gcsCloudEnv,
-			ServiceAccount: *gcsServiceAccount,
-			WithoutAuth:    *gcsWithoutAuth,
-			ApiKey:         *gcsAPIKey,
-			IncludeBuckets: commaSeparatedToSlice(*gcsIncludeBuckets),
-			ExcludeBuckets: commaSeparatedToSlice(*gcsExcludeBuckets),
-			IncludeObjects: commaSeparatedToSlice(*gcsIncludeObjects),
-			ExcludeObjects: commaSeparatedToSlice(*gcsExcludeObjects),
-			Concurrency:    *concurrency,
-			MaxObjectSize:  int64(*gcsMaxObjectSize),
-		}
-		if ref, err = eng.ScanGCS(ctx, cfg); err != nil {
-			return scanMetrics, fmt.Errorf("failed to scan GCS: %v", err)
-		}
 	case dockerScan.FullCommand():
 		cfg := sources.DockerConfig{
 			BearerToken:       *dockerScanToken,
