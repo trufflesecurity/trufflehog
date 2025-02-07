@@ -83,8 +83,12 @@ const (
 	AnalyzerTypeStripe
 	AnalyzerTypeTwilio
 	AnalyzerTypePrivateKey
+<<<<<<< HEAD
 	AnalyzerTypeNotion
 	AnalyzerTypeAirtable
+=======
+	AnalyzerTypeDigitalOcean
+>>>>>>> ec0639dc (digitalocean analyzer implementation)
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -116,6 +120,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeTwilio:      "Twilio",
 	AnalyzerTypePrivateKey:  "PrivateKey",
 	AnalyzerTypeNotion:      "Notion",
+	AnalyzerTypeDigitalOcean: "DigitalOcean",
 	// Add new mappings here
 }
 
