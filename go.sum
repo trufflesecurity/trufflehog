@@ -711,6 +711,8 @@ github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOf
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/tailscale/depaware v0.0.0-20241028160002-3d7f3b30ed0e h1:Hb50wYyy5VblH5zpKkoy49TrJy3pxVWOaRSOEdzTWKA=
 github.com/tailscale/depaware v0.0.0-20241028160002-3d7f3b30ed0e/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
+github.com/tailscale/depaware v0.0.0-20250112153213-b748de04d81b h1:ewWb4cA+YO9/3X+v5UhdV+eKFsNBOPcGRh39Glshx/4=
+github.com/tailscale/depaware v0.0.0-20250112153213-b748de04d81b/go.mod h1:p9lPsd+cx33L3H9nNoecRRxPssFKUwwI50I3pZ0yT+8=
 github.com/testcontainers/testcontainers-go v0.34.0 h1:5fbgF0vIN5u+nD3IWabQwRybuB4GY8G2HHgCkbMzMHo=
 github.com/testcontainers/testcontainers-go v0.34.0/go.mod h1:6P/kMkQe8yqPHfPWNulFGdFHTD8HB2vLq/231xY2iPQ=
 github.com/testcontainers/testcontainers-go/modules/elasticsearch v0.34.0 h1:BBwJUs9xBpt1uOfO+yAr2pYW75MsyzuO/o70HTPnhe4=
