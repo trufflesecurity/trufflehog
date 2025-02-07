@@ -228,6 +228,7 @@ func (c *Parser) RepoPath(
 	abbreviatedLog bool,
 	excludedGlobs []string,
 	isBare bool,
+	additionalArgs ...string,
 ) (chan *Diff, error) {
 	args := []string{
 		"-C", source,
@@ -249,6 +250,7 @@ func (c *Parser) RepoPath(
 	for _, glob := range excludedGlobs {
 		args = append(args, "--", ".", ":(exclude)"+glob)
 	}
+	args = append(args, additionalArgs...)
 
 	cmd := exec.Command("git", args...)
 	absPath, err := filepath.Abs(source)
