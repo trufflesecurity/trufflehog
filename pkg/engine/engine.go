@@ -181,7 +181,7 @@ type Engine struct {
 	scanEntireChunk bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
-	ahoCorasickCore *ahocorasick.Core
+	AhoCorasickCore *ahocorasick.Core
 
 	// Engine synchronization primitives.
 	sourceManager                 *sources.SourceManager
@@ -524,7 +524,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 	}
 
 	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
+	e.AhoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
@@ -789,7 +789,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 				continue
 			}
 
-			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
