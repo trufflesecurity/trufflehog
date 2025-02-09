@@ -47,7 +47,7 @@ require (
 	github.com/getsentry/sentry-go v0.30.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.13.2
-	github.com/go-ldap/ldap/v3 v3.4.9
+	github.com/go-ldap/ldap/v3 v3.4.10
 	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/zapr v1.3.0
 	github.com/go-redis/redis v6.15.9+incompatible
