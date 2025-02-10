@@ -14,6 +14,11 @@ import (
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
 
+const (
+	// Key Types
+	APIKey = "API-Key"
+)
+
 type Analyzer struct {
 	Cfg *config.Config
 }
@@ -82,9 +87,9 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// create a HTTP client
 	client := analyzers.NewAnalyzeClient(cfg)
 
-	var secretInfo = &SecretInfo{}
-
-	secretInfo.Type = "API-Key" // TODO: implement Admin-Key type as well
+	var secretInfo = &SecretInfo{
+		Type: APIKey, // TODO: implement Admin-Key type as well
+	}
 
 	if err := listModels(client, key, secretInfo); err != nil {
 		return nil, err
@@ -109,8 +114,8 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerAnthropic,
-		Metadata:     map[string]any{},
-		Bindings:     make([]analyzers.Binding, 0),
+		Metadata:     map[string]any{"Valid_Key": info.Valid},
+		Bindings:     make([]analyzers.Binding, len(info.AnthropicResources)),
 	}
 
 	// extract information to create bindings and append to result bindings
@@ -133,8 +138,6 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 		result.Bindings = append(result.Bindings, binding)
 	}
-
-	result.Metadata["Valid_Key"] = info.Valid
 
 	return &result
 }
