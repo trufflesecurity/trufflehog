@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 
+	"github.com/fatih/color"
+	"github.com/jedib0t/go-pretty/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -50,6 +53,23 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	}
 
 	return mapToAnalyzerResult(userInfo, basesInfo), nil
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
+	userInfo, err := fetchAirtableUserInfo(token)
+	if err != nil {
+		color.Red("[x] Error : %s", err.Error())
+		return
+	}
+
+	color.Green("[!] Valid Airtable OAuth2 Access Token\n\n")
+	printUserAndPermissions(userInfo)
+
+	if hasScope(userInfo.Scopes, PermissionStrings[SchemaBasesRead]) {
+		var basesInfo *AirtableBases
+		basesInfo, _ = fetchAirtableBases(token)
+		printBases(basesInfo)
+	}
 }
 
 func fetchAirtableUserInfo(token string) (*AirtableUserInfo, error) {
@@ -150,4 +170,49 @@ func mapToAnalyzerResult(userInfo *AirtableUserInfo, basesInfo *AirtableBases) *
 	}
 
 	return &result
+}
+
+func printUserAndPermissions(info *AirtableUserInfo) {
+	color.Yellow("[i] User:")
+	t1 := table.NewWriter()
+	email := "N/A"
+	if info.Email != nil {
+		email = *info.Email
+	}
+	t1.SetOutputMirror(os.Stdout)
+	t1.AppendHeader(table.Row{"ID", "Email"})
+	t1.AppendRow(table.Row{color.GreenString(info.ID), color.GreenString(email)})
+	t1.SetOutputMirror(os.Stdout)
+	t1.Render()
+
+	color.Yellow("\n[i] Scopes:")
+	t2 := table.NewWriter()
+	t2.SetOutputMirror(os.Stdout)
+	t2.AppendHeader(table.Row{"Scope", "Permission"})
+	for _, scope := range info.Scopes {
+		for i, permission := range scope_mapping[scope] {
+			scope_string := ""
+			if i == 0 {
+				scope_string = scope
+			}
+			t2.AppendRow(table.Row{color.GreenString(scope_string), color.GreenString(permission)})
+		}
+	}
+	t2.Render()
+	fmt.Printf("%s: https://airtable.com/developers/web/api/scopes\n", color.GreenString("Ref"))
+}
+
+func printBases(bases *AirtableBases) {
+	color.Yellow("\n[i] Bases:")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	if len(bases.Bases) > 0 {
+		t.AppendHeader(table.Row{"ID", "Name"})
+		for _, base := range bases.Bases {
+			t.AppendRow(table.Row{color.GreenString(base.ID), color.GreenString(base.Name)})
+		}
+	} else {
+		fmt.Printf("%s\n", color.GreenString("No bases associated with token"))
+	}
+	t.Render()
 }
