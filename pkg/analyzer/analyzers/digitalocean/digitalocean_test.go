@@ -17,7 +17,7 @@ import (
 var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/table"
@@ -20,6 +21,8 @@ import (
 )
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+const MAX_CONCURRENT_TESTS = 10
 
 type Analyzer struct {
 	Cfg *config.Config
@@ -152,15 +155,48 @@ func checkPermissions(cfg *config.Config, key string) ([]string, error) {
 		return nil, fmt.Errorf("reading in scopes: %w", err)
 	}
 
-	permissions := make([]string, 0)
+	var (
+		permissions = make([]string, 0, len(scopes))
+		mu          sync.Mutex
+		wg          sync.WaitGroup
+		slots       = make(chan struct{}, MAX_CONCURRENT_TESTS)
+		errCh       = make(chan error, 1)
+	)
+
 	for _, scope := range scopes {
-		status, err := scope.HttpTest.RunTest(cfg, map[string]string{"Authorization": "Bearer " + key})
-		if err != nil {
-			return nil, fmt.Errorf("running test: %w", err)
-		}
-		if status {
-			permissions = append(permissions, scope.Name)
-		}
+		wg.Add(1)
+		go func(scope Scope) {
+			defer wg.Done()
+
+			// acquire a slot
+			slots <- struct{}{}
+			defer func() { <-slots }()
+
+			status, err := scope.HttpTest.RunTest(cfg, map[string]string{"Authorization": "Bearer " + key})
+			if err != nil {
+				// send first error and ignore the rest
+				select {
+				case errCh <- fmt.Errorf("Scope %s: %w", scope.Name, err):
+				default:
+				}
+				return
+			}
+			if status {
+				mu.Lock()
+				permissions = append(permissions, scope.Name)
+				mu.Unlock()
+			}
+		}(scope)
+	}
+
+	// wait for all goroutines to finish or an error to occur
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	if err := <-errCh; err != nil {
+		return nil, err
 	}
 
 	return permissions, nil
