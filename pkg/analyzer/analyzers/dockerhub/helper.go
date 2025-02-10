@@ -9,8 +9,22 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// permission hierarchy
+// permission hierarchy - always keep from highest permission to lowest
 var permissionHierarchy = []string{"repo:admin", "repo:write", "repo:read", "repo:public_read"}
+
+// precompute a ranking map for the ranking approach.
+// lower index means higher permission.
+var permissionRank = func() map[string]int {
+	rank := make(map[string]int, len(permissionHierarchy))
+	// loop over permissions hierarchy to assign index to each permission
+	// as hierarchy start from highest to lowest, the 0 index will be assigned to highest possible permission and n will be lowest possible permission
+	for i, perm := range permissionHierarchy {
+		rank[perm] = i
+	}
+
+	// return the rank map with indexed permissions
+	return rank
+}()
 
 // decodeTokenToSecretInfo decode the jwt token and add the information to secret info
 func decodeTokenToSecretInfo(jwtToken string, secretInfo *SecretInfo) error {
@@ -101,21 +115,25 @@ func sortRepositories(repos *RepositoriesResponse) {
 
 // assignHighestPermission selects the highest available permission
 func assignHighestPermission(permissions []string) string {
-	// create a map to quickly check assigned permissions
-	available := make(map[string]bool)
+	bestRank := len(permissionHierarchy)
+	bestPerm := ""
 	for _, perm := range permissions {
-		available[perm] = true
-	}
+		// check in indexes permissions
+		if rank, ok := permissionRank[perm]; ok {
+			// early exit if highest permission is found.
+			if rank == 0 {
+				return perm
+			}
 
-	// assign the highest available permission
-	for _, perm := range permissionHierarchy {
-		if available[perm] {
-			return perm
+			if rank < bestRank {
+				bestRank = rank
+				bestPerm = perm
+			}
 		}
 	}
 
-	// return empty if no valid permission is found
-	return ""
+	return bestPerm
+
 }
 
 // humandReadableTime converts seconds to days, hours, minutes, or seconds based on the value

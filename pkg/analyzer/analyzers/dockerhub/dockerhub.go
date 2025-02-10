@@ -73,7 +73,7 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 // AnalyzePermissions will collect all the scopes assigned to token along with resource it can access
 func AnalyzePermissions(cfg *config.Config, username, pat string) (*SecretInfo, error) {
 	// create the http client
-	client := analyzers.NewAnalyzeClientUnrestricted(cfg) // /user/login is a non-safe request
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg) // `/user/login` is a non-safe request
 
 	var secretInfo = &SecretInfo{}
 
@@ -129,8 +129,8 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerTypeDockerHub,
-		Metadata:     map[string]any{},
-		Bindings:     make([]analyzers.Binding, 0),
+		Metadata:     map[string]any{"Valid_Key": info.Valid},
+		Bindings:     make([]analyzers.Binding, len(info.Repositories)),
 	}
 
 	// extract information to create bindings and append to result bindings
@@ -154,8 +154,6 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 		result.Bindings = append(result.Bindings, binding)
 	}
-
-	result.Metadata["Valid_Key"] = info.Valid
 
 	return &result
 }
