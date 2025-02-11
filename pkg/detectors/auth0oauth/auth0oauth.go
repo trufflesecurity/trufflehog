@@ -121,13 +121,13 @@ func verifyTuple(ctx context.Context, client *http.Client, domainRes, clientId, 
 	case http.StatusUnauthorized:
 		return false, nil
 	case http.StatusForbidden:
-		// cross check about 'invalid_grant' in response body
+		// cross check about 'invalid_grant' or 'unauthorized_client' in response body
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return false, err
 		}
 		bodyStr := string(bodyBytes)
-		if strings.Contains(bodyStr, "invalid_grant") {
+		if strings.Contains(bodyStr, "invalid_grant") || strings.Contains(bodyStr, "unauthorized_client") {
 			return true, nil
 		}
 		return false, nil
