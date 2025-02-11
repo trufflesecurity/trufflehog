@@ -253,7 +253,9 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	permissions := make([]string, 0)
 
-	bot, err := getBotInfo(cfg, key)
+	client := analyzers.NewAnalyzeClient(cfg)
+
+	bot, err := getBotInfo(client, key)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +267,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	permissions = append(permissions, credPermissions...)
 
-	users, err := getWorkspaceUsers(cfg, key)
+	users, err := getWorkspaceUsers(client, key)
 	if err != nil {
 		return nil, fmt.Errorf("error getting user permission: %s", err.Error())
 	}
@@ -310,10 +312,9 @@ func printUsers(users []user) {
 	t.Render()
 }
 
-func getBotInfo(cfg *config.Config, key string) (*bot, error) {
+func getBotInfo(client *http.Client, key string) (*bot, error) {
 	// Create new HTTP request
-	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://api.notion.com/v1/users/me", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://api.notion.com/v1/users/me", http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -349,10 +350,9 @@ type usersResponse struct {
 	Results []user `json:"results"`
 }
 
-func getWorkspaceUsers(cfg *config.Config, key string) ([]user, error) {
+func getWorkspaceUsers(client *http.Client, key string) ([]user, error) {
 	// Create new HTTP request
-	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://api.notion.com/v1/users", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://api.notion.com/v1/users", http.NoBody)
 	if err != nil {
 		return nil, err
 	}
