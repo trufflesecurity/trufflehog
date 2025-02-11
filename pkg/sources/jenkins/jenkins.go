@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
-	"github.com/go-logr/logr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -37,7 +36,6 @@ type Source struct {
 	user     string
 	token    string
 	header   *header
-	log      logr.Logger
 	client   *http.Client
 	sources.Progress
 }
@@ -66,8 +64,6 @@ func (s *Source) JobID() sources.JobID {
 
 // Init returns an initialized Jenkins source.
 func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, _ int) error {
-	s.log = aCtx.Logger()
-
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -89,7 +85,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 	const retryDelay = time.Second * 30
 	opts = append(opts,
-		roundtripper.WithLogger(s.log),
+		roundtripper.WithLogger(aCtx.Logger()),
 		roundtripper.WithLogging(),
 		roundtripper.WithRetryable(
 			roundtripper.WithShouldRetry5XXDuration(retryDelay),
@@ -309,7 +305,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		parsedUrl, err := url.Parse(project.Url)
 		if err != nil {
-			s.log.Error(err, "Failed to parse Jenkins project URL, skipping project", "url", project.Url, "project", project.Name)
+			ctx.Logger().Error(err, "Failed to parse Jenkins project URL, skipping project", "url", project.Url, "project", project.Name)
 			continue
 		}
 		projectURL := *s.url
@@ -317,7 +313,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		builds, err := s.GetJenkinsBuilds(ctx, projectURL.Path)
 		if err != nil {
-			s.log.Error(err, "Failed to get Jenkins build response, skipping project", "project", project.Name)
+			ctx.Logger().Error(err, "Failed to get Jenkins build response, skipping project", "project", project.Name)
 			continue
 		}
 
@@ -336,16 +332,15 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 // chunkBuild takes build information and sends it to the chunksChan.
 // It also logs all errors that occur and does not return them, as the parent context expects to continue running.
-func (s *Source) chunkBuild(_ context.Context, build JenkinsBuild, projectName string, chunksChan chan *sources.Chunk) {
-	// Setup a logger to identify the build and project.
-	chunkBuildLog := s.log.WithValues(
+func (s *Source) chunkBuild(ctx context.Context, build JenkinsBuild, projectName string, chunksChan chan *sources.Chunk) {
+	ctx = context.WithValues(ctx,
 		"build", build.Number,
 		"project", projectName,
 	)
 
 	parsedUrl, err := url.Parse(build.Url)
 	if err != nil {
-		chunkBuildLog.Error(err, "Failed to parse Jenkins build URL, skipping build", "url", build.Url)
+		ctx.Logger().Error(err, "Failed to parse Jenkins build URL, skipping build", "url", build.Url)
 		return
 	}
 	buildLogURL := *s.url
@@ -353,25 +348,25 @@ func (s *Source) chunkBuild(_ context.Context, build JenkinsBuild, projectName s
 
 	req, err := s.NewRequest(http.MethodGet, buildLogURL.String(), nil)
 	if err != nil {
-		chunkBuildLog.Error(err, "Failed to create new request to Jenkins, skipping build")
+		ctx.Logger().Error(err, "Failed to create new request to Jenkins, skipping build")
 		return
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		chunkBuildLog.Error(err, "Failed to get build log in Jenkins chunks, skipping build")
+		ctx.Logger().Error(err, "Failed to get build log in Jenkins chunks, skipping build")
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		chunkBuildLog.Error(err, "Status Code from build was unexpected, skipping build", "status_code", resp.StatusCode)
+		ctx.Logger().Error(err, "Status Code from build was unexpected, skipping build", "status_code", resp.StatusCode)
 		return
 	}
 
 	buildLog, err := io.ReadAll(resp.Body)
 	if err != nil {
-		chunkBuildLog.Error(err, "Failed to read body from the build log response, skipping build")
+		ctx.Logger().Error(err, "Failed to read body from the build log response, skipping build")
 		return
 	}
 
