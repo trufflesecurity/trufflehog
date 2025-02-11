@@ -63,6 +63,7 @@ const (
 	AnalyzerTypeAirbrake
 	AnalyzerTypeAsana
 	AnalyzerTypeBitbucket
+	AnalyzerTypeDockerHub
 	AnalyzerTypeGitHub
 	AnalyzerTypeGitLab
 	AnalyzerTypeHuggingFace
@@ -91,6 +92,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeAirbrake:    "Airbrake",
 	AnalyzerTypeAsana:       "Asana",
 	AnalyzerTypeBitbucket:   "Bitbucket",
+	AnalyzerTypeDockerHub:   "DockerHub",
 	AnalyzerTypeGitHub:      "GitHub",
 	AnalyzerTypeGitLab:      "GitLab",
 	AnalyzerTypeHuggingFace: "HuggingFace",

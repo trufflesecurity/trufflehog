@@ -4,9 +4,11 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kingpin/v2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airbrake"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/asana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/dockerhub"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/gitlab"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/huggingface"
@@ -87,5 +89,7 @@ func Run(keyType string, secretInfo SecretInfo) {
 		privatekey.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "notion":
 		notion.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "dockerhub":
+		dockerhub.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["username"], secretInfo.Parts["pat"])
 	}
 }
