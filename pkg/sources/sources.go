@@ -110,20 +110,18 @@ type baseUnitReporter struct {
 	progress *JobProgress
 }
 
-func (b baseUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) error {
+func (b baseUnitReporter) UnitOk(ctx context.Context, unit SourceUnit) {
 	b.progress.ReportUnit(unit)
 	if b.child != nil {
-		return b.child.UnitOk(ctx, unit)
+		b.child.UnitOk(ctx, unit)
 	}
-	return nil
 }
 
-func (b baseUnitReporter) UnitErr(ctx context.Context, err error) error {
+func (b baseUnitReporter) UnitErr(ctx context.Context, err error) {
 	b.progress.ReportError(err)
 	if b.child != nil {
-		return b.child.UnitErr(ctx, err)
+		b.child.UnitErr(ctx, err)
 	}
-	return nil
 }
 
 // UnitReporter defines the interface a source will use to report whether a
