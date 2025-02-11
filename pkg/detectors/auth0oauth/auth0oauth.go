@@ -92,10 +92,6 @@ func verifyTuple(ctx context.Context, client *http.Client, domainRes, clientId, 
 	     --data 'grant_type=authorization_code&client_id=W44JmL3qD6LxHeEJyKe9lMuhcwvPOaOq&client_secret=YOUR_CLIENT_SECRET&code=AUTHORIZATION_CODE&redirect_uri=undefined'
 	*/
 
-	fmt.Println("domainRes: ", domainRes)
-	fmt.Println("clientId: ", clientId)
-	fmt.Println("clientSecret: ", clientSecret)
-
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("client_id", clientId)
@@ -136,7 +132,7 @@ func verifyTuple(ctx context.Context, client *http.Client, domainRes, clientId, 
 		}
 		return false, nil
 	case http.StatusNotFound:
-		// domain is invalid
+		// domain does not exists - 404 not found
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
