@@ -299,7 +299,7 @@ func (s *Source) scanRepo(ctx context.Context, repoURI string, reporter sources.
 		return s.git.ScanRepo(ctx, repo, path, s.scanOptions, reporter)
 	}()
 	if err != nil {
-		return reporter.ChunkErr(ctx, err)
+		reporter.ChunkErr(ctx, err)
 	}
 	return nil
 }
@@ -330,7 +330,8 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 	// try paths instead of url
 	repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
 	if err != nil {
-		return reporter.ChunkErr(ctx, err)
+		reporter.ChunkErr(ctx, err)
+		return nil
 	}
 
 	err = func() error {
@@ -341,7 +342,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		return s.git.ScanRepo(ctx, repo, gitDir, s.scanOptions, reporter)
 	}()
 	if err != nil {
-		return reporter.ChunkErr(ctx, err)
+		reporter.ChunkErr(ctx, err)
 	}
 	return nil
 }
@@ -626,9 +627,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				Data:           []byte(sb.String()),
 				Verify:         s.verify,
 			}
-			if err := reporter.ChunkOk(ctx, chunk); err != nil {
-				return err
-			}
+			reporter.ChunkOk(ctx, chunk)
 		}
 
 		fileName := diff.PathB
@@ -701,7 +700,8 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				Data:           data,
 				Verify:         s.verify,
 			}
-			return reporter.ChunkOk(ctx, chunk)
+			reporter.ChunkOk(ctx, chunk)
+			return nil
 		}
 		if err := chunkData(diff); err != nil {
 			return err
@@ -739,10 +739,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					Data:           append([]byte{}, newChunkBuffer.Bytes()...),
 					Verify:         s.verify,
 				}
-				if err := reporter.ChunkOk(ctx, chunk); err != nil {
-					// TODO: Return error.
-					return
-				}
+				reporter.ChunkOk(ctx, chunk)
 
 				newChunkBuffer.Reset()
 				lastOffset = offset
@@ -759,10 +756,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 					Data:           line,
 					Verify:         s.verify,
 				}
-				if err := reporter.ChunkOk(ctx, chunk); err != nil {
-					// TODO: Return error.
-					return
-				}
+				reporter.ChunkOk(ctx, chunk)
 				continue
 			}
 		}
@@ -783,10 +777,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 			Data:           append([]byte{}, newChunkBuffer.Bytes()...),
 			Verify:         s.verify,
 		}
-		if err := reporter.ChunkOk(ctx, chunk); err != nil {
-			// TODO: Return error.
-			return
-		}
+		reporter.ChunkOk(ctx, chunk)
 	}
 }
 
@@ -903,7 +894,8 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				Data:           data,
 				Verify:         s.verify,
 			}
-			return reporter.ChunkOk(ctx, chunk)
+			reporter.ChunkOk(ctx, chunk)
+			return nil
 		}
 		if err := chunkData(diff); err != nil {
 			return err
@@ -1302,18 +1294,14 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			continue
 		}
 		unit := SourceUnit{ID: repo, Kind: UnitDir}
-		if err := reporter.UnitOk(ctx, unit); err != nil {
-			return err
-		}
+		reporter.UnitOk(ctx, unit)
 	}
 	for _, repo := range s.conn.GetRepositories() {
 		if repo == "" {
 			continue
 		}
 		unit := SourceUnit{ID: repo, Kind: UnitRepo}
-		if err := reporter.UnitOk(ctx, unit); err != nil {
-			return err
-		}
+		reporter.UnitOk(ctx, unit)
 	}
 	return nil
 }
