@@ -97,9 +97,9 @@ type SourceUnitEnumerator interface {
 	// reporting them or any errors to the UnitReporter. This method is
 	// synchronous but can be called in a goroutine to support concurrent
 	// enumeration and chunking. An error should only be returned from this
-	// method in the case of context cancellation, fatal source errors, or
-	// errors returned by the reporter. All other errors related to unit
-	// enumeration are tracked by the UnitReporter.
+	// method in the case of context cancellation or fatal source errors
+	// All other errors related to unit enumeration are tracked by the
+	// UnitReporter.
 	Enumerate(ctx context.Context, reporter UnitReporter) error
 }
 
@@ -130,8 +130,8 @@ func (b baseUnitReporter) UnitErr(ctx context.Context, err error) error {
 // unit was found during enumeration. Either method may be called any number of
 // times. Implementors of this interface should allow for concurrent calls.
 type UnitReporter interface {
-	UnitOk(ctx context.Context, unit SourceUnit) error
-	UnitErr(ctx context.Context, err error) error
+	UnitOk(ctx context.Context, unit SourceUnit)
+	UnitErr(ctx context.Context, err error)
 }
 
 // SourceUnitChunker defines an optional interface a Source can implement to
@@ -139,9 +139,9 @@ type UnitReporter interface {
 type SourceUnitChunker interface {
 	// ChunkUnit creates 0 or more chunks from a unit, reporting them or
 	// any errors to the ChunkReporter. An error should only be returned
-	// from this method in the case of context cancellation, fatal source
-	// errors, or errors returned by the reporter. All other errors related
-	// to unit chunking are tracked by the ChunkReporter.
+	// from this method in the case of context cancellation or fatal source
+	// errors. All other errors related to unit chunking are tracked by the
+	// ChunkReporter.
 	ChunkUnit(ctx context.Context, unit SourceUnit, reporter ChunkReporter) error
 }
 
@@ -149,8 +149,8 @@ type SourceUnitChunker interface {
 // chunk was found during unit chunking. Either method may be called any number
 // of times. Implementors of this interface should allow for concurrent calls.
 type ChunkReporter interface {
-	ChunkOk(ctx context.Context, chunk Chunk) error
-	ChunkErr(ctx context.Context, err error) error
+	ChunkOk(ctx context.Context, chunk Chunk)
+	ChunkErr(ctx context.Context, err error)
 }
 
 type SourceUnitKind string
