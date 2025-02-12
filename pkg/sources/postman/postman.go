@@ -578,21 +578,18 @@ func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.C
 		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_URL_ENCODED
 		s.scanVariableData(ctx, chunksChan, m, vars)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
-	case "raw", "graphql":
+	case "raw":
+		m.Type = originalType + " > raw"
 		data := b.Raw
-		if b.Mode == "graphql" {
-			m.Type = originalType + " > graphql"
-			data = b.GraphQL.Query + " " + b.GraphQL.Variables
-			m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_GRAPHQL
-		}
-		if b.Mode == "raw" {
-			m.Type = originalType + " > raw"
-			m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_RAW
-		}
+		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_RAW
 		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
-	default:
-		break
+	case "graphql":
+		m.Type = originalType + " > graphql"
+		data := b.GraphQL.Query + " " + b.GraphQL.Variables
+		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_GRAPHQL
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
+		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 }
 
