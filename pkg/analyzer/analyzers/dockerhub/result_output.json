@@ -1,0 +1,43 @@
+{
+    "AnalyzerType": 4,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "test-private",
+                "FullyQualifiedName": "truffledockerman/repo/image/test-private",
+                "Type": "image",
+                "Metadata": {
+                    "is_private": true,
+                    "pull_count": 0,
+                    "star_count": 0
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "repo:admin",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "test",
+                "FullyQualifiedName": "truffledockerman/repo/image/test",
+                "Type": "image",
+                "Metadata": {
+                    "is_private": false,
+                    "pull_count": 0,
+                    "star_count": 0
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "repo:admin",
+                "Parent": null
+            }
+        }
+    ],
+    "UnboundedResources": null,
+    "Metadata": {
+        "Valid_Key": true
+    }
+}

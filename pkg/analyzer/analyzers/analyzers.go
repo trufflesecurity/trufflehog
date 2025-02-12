@@ -63,6 +63,7 @@ const (
 	AnalyzerTypeAirbrake
 	AnalyzerTypeAsana
 	AnalyzerTypeBitbucket
+	AnalyzerTypeDockerHub
 	AnalyzerTypeGitHub
 	AnalyzerTypeGitLab
 	AnalyzerTypeHuggingFace
@@ -81,6 +82,7 @@ const (
 	AnalyzerTypeStripe
 	AnalyzerTypeTwilio
 	AnalyzerTypePrivateKey
+	AnalyzerTypeNotion
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -90,6 +92,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeAirbrake:    "Airbrake",
 	AnalyzerTypeAsana:       "Asana",
 	AnalyzerTypeBitbucket:   "Bitbucket",
+	AnalyzerTypeDockerHub:   "DockerHub",
 	AnalyzerTypeGitHub:      "GitHub",
 	AnalyzerTypeGitLab:      "GitLab",
 	AnalyzerTypeHuggingFace: "HuggingFace",
@@ -108,6 +111,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeStripe:      "Stripe",
 	AnalyzerTypeTwilio:      "Twilio",
 	AnalyzerTypePrivateKey:  "PrivateKey",
+	AnalyzerTypeNotion:      "Notion",
 	// Add new mappings here
 }
 
