@@ -193,7 +193,7 @@ func (s *Source) GetJenkinsJobs(ctx context.Context) (JenkinsJobResponse, error)
 
 func (s *Source) RecursivelyGetJenkinsObjectsForPath(ctx context.Context, absolutePath string) (JenkinsJobResponse, error) {
 	ctx.Logger().V(3).Info("getting objects",
-		"absolute_path", absolutePath)
+		"path", absolutePath)
 
 	jobs := JenkinsJobResponse{}
 	objects, err := s.GetJenkinsObjectsForPath(ctx, absolutePath)
@@ -201,7 +201,7 @@ func (s *Source) RecursivelyGetJenkinsObjectsForPath(ctx context.Context, absolu
 		return jobs, err
 	}
 	ctx.Logger().V(3).Info("got objects",
-		"absolute_path", absolutePath,
+		"path", absolutePath,
 		"count", len(objects.Jobs))
 
 	for _, job := range objects.Jobs {
