@@ -131,7 +131,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, result)
 	}
 
-	return results, nil
+	return
 }
 
 func verifyMatch(ctx context.Context, credBytes []byte) (bool, error) {
