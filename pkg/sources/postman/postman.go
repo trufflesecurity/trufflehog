@@ -552,11 +552,11 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 
 	if r.Body.Mode != "" {
 		metadata.Type = originalType + " > body"
-		s.scanBody(ctx, chunksChan, metadata, r.Body)
+		s.scanRequestBody(ctx, chunksChan, metadata, r.Body)
 	}
 }
 
-func (s *Source) scanBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
+func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
 	if !m.fromLocal {
 		m.Link = m.Link + "?tab=body"
 	}
