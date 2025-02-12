@@ -57,6 +57,17 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Key:      "url",
 			Required: true,
 		}}
+	case "dockerhub":
+		inputs = []textinputs.InputConfig{{
+			Label:    "Username",
+			Key:      "username",
+			Required: true,
+		}, {
+			Label:       "Token(PAT)",
+			Key:         "pat",
+			Required:    true,
+			RedactInput: true,
+		}}
 	default:
 		inputs = []textinputs.InputConfig{{
 			Label:       "Secret",

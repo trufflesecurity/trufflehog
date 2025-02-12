@@ -554,22 +554,6 @@ func run(state overseer.State) {
 		logger.V(2).Info("exiting with code 183 because results were found")
 		os.Exit(183)
 	}
-
-	// Print results.
-	logger.Info("finished scanning",
-		"chunks", metrics.ChunksScanned,
-		"bytes", metrics.BytesScanned,
-		"verified_secrets", metrics.VerifiedSecretsFound,
-		"unverified_secrets", metrics.UnverifiedSecretsFound,
-		"scan_duration", metrics.ScanDuration.String(),
-		"trufflehog_version", version.BuildVersion,
-	)
-
-	if metrics.hasFoundResults && *fail {
-		logger.V(2).Info("exiting with code 183 because results were found")
-		os.Exit(183)
-	}
-
 }
 
 func compareScans(ctx context.Context, cmd string, cfg engine.Config) error {
