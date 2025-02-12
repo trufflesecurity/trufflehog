@@ -430,6 +430,8 @@ func (s *Source) chunkBuild(
 		Data:   buildLog,
 		Verify: s.verify,
 	}
+
+	return nil
 }
 
 type JenkinsJobResponse struct {
