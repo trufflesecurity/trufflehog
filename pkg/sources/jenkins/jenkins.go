@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
-	"github.com/go-logr/logr"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -37,7 +36,6 @@ type Source struct {
 	user     string
 	token    string
 	header   *header
-	log      logr.Logger
 	client   *http.Client
 	sources.Progress
 }
@@ -66,8 +64,6 @@ func (s *Source) JobID() sources.JobID {
 
 // Init returns an initialized Jenkins source.
 func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, _ int) error {
-	s.log = aCtx.Logger()
-
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -89,7 +85,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 
 	const retryDelay = time.Second * 30
 	opts = append(opts,
-		roundtripper.WithLogger(s.log),
+		roundtripper.WithLogger(aCtx.Logger()),
 		roundtripper.WithLogging(),
 		roundtripper.WithRetryable(
 			roundtripper.WithShouldRetry5XXDuration(retryDelay),
@@ -104,6 +100,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	s.client = client
 
 	var unparsedURL string
+	var authMethod string
 	switch cred := conn.GetCredential().(type) {
 	case *sourcespb.Jenkins_BasicAuth:
 		unparsedURL = conn.Endpoint
@@ -113,6 +110,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 			return errors.Errorf("Jenkins source basic auth credential requires 'password' to be specified")
 		}
 		log.RedactGlobally(s.token)
+		authMethod = "basic"
 	case *sourcespb.Jenkins_Header:
 		unparsedURL = conn.Endpoint
 		s.header = &header{
@@ -120,8 +118,10 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 			value: cred.Header.Value,
 		}
 		log.RedactGlobally(cred.Header.GetValue())
+		authMethod = "header"
 	case *sourcespb.Jenkins_Unauthenticated:
 		unparsedURL = conn.Endpoint
+		authMethod = "none"
 	default:
 		return errors.Errorf("unknown or unspecified authentication method provided for Jenkins source %q (unauthenticated scans must be explicitly configured)", name)
 	}
@@ -130,6 +130,11 @@ func (s *Source) Init(aCtx context.Context, name string, jobId sources.JobID, so
 	if err != nil || unparsedURL == "" {
 		return errors.WrapPrefix(err, fmt.Sprintf("Invalid endpoint URL given for Jenkins source: %s", unparsedURL), 0)
 	}
+
+	aCtx.Logger().V(1).Info("initialized Jenkins source",
+		"auth_method", authMethod,
+		"url_raw", unparsedURL,
+		"url_parsed", s.url.String())
 
 	return nil
 }
@@ -187,13 +192,24 @@ func (s *Source) GetJenkinsJobs(ctx context.Context) (JenkinsJobResponse, error)
 }
 
 func (s *Source) RecursivelyGetJenkinsObjectsForPath(ctx context.Context, absolutePath string) (JenkinsJobResponse, error) {
+	ctx.Logger().V(3).Info("getting objects",
+		"path", absolutePath)
+
 	jobs := JenkinsJobResponse{}
 	objects, err := s.GetJenkinsObjectsForPath(ctx, absolutePath)
 	if err != nil {
 		return jobs, err
 	}
+	ctx.Logger().V(3).Info("got objects",
+		"path", absolutePath,
+		"count", len(objects.Jobs))
 
 	for _, job := range objects.Jobs {
+		ctx.Logger().V(3).Info("processing object",
+			"object_name", job.Name,
+			"object_class", job.Class,
+			"object_url", job.Url)
+
 		if job.Class == "com.cloudbees.hudson.plugins.folder.Folder" {
 			u, err := url.Parse(job.Url)
 			if err != nil {
@@ -221,6 +237,7 @@ func (s *Source) GetJenkinsObjectsForPath(ctx context.Context, absolutePath stri
 		baseUrl.Path = path.Join(absolutePath, "api/json")
 		baseUrl.RawQuery = fmt.Sprintf("tree=jobs[name,url]{%d,%d}", i, i+100)
 
+		ctx.Logger().V(4).Info("executing query", "query_url", baseUrl.String())
 		req, err := s.NewRequest(http.MethodGet, baseUrl.String(), nil)
 		if err != nil {
 			return res, errors.WrapPrefix(err, "Failed to create new request to get jenkins jobs", 0)
@@ -255,6 +272,11 @@ func (s *Source) GetJenkinsObjectsForPath(ctx context.Context, absolutePath stri
 }
 
 func (s *Source) GetJenkinsBuilds(ctx context.Context, jobAbsolutePath string) (JenkinsBuildResponse, error) {
+	ctx = context.WithValues(ctx,
+		"job_path", jobAbsolutePath)
+
+	ctx.Logger().V(2).Info("getting builds")
+
 	builds := JenkinsBuildResponse{}
 	buildsUrl := *s.url
 	for i := 0; true; i += 100 {
@@ -265,6 +287,7 @@ func (s *Source) GetJenkinsBuilds(ctx context.Context, jobAbsolutePath string) (
 			return builds, errors.WrapPrefix(err, "Failed to create new request to get jenkins builds", 0)
 		}
 
+		ctx.Logger().V(4).Info("executing query", "query_url", req.URL.String())
 		resp, err := s.client.Do(req)
 		if err != nil {
 			return builds, errors.WrapPrefix(err, "Failed to do get jenkins builds request", 0)
@@ -299,17 +322,23 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	if err != nil {
 		return errors.WrapPrefix(err, "Failed to get Jenkins job response", 0)
 	}
+	ctx.Logger().V(1).Info("got jobs", "count", len(jobs.Jobs))
 
 	for i, project := range jobs.Jobs {
 		if common.IsDone(ctx) {
 			return nil
 		}
 
+		ctx := context.WithValues(ctx,
+			"job_name", project.Name,
+			"job_class", project.Class,
+			"job_url", project.Url)
+
 		s.SetProgressComplete(i, len(jobs.Jobs), fmt.Sprintf("Project: %s", project.Name), "")
 
 		parsedUrl, err := url.Parse(project.Url)
 		if err != nil {
-			s.log.Error(err, "Failed to parse Jenkins project URL, skipping project", "url", project.Url, "project", project.Name)
+			ctx.Logger().Error(err, "failed to parse job URL; skipping job")
 			continue
 		}
 		projectURL := *s.url
@@ -317,16 +346,24 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		builds, err := s.GetJenkinsBuilds(ctx, projectURL.Path)
 		if err != nil {
-			s.log.Error(err, "Failed to get Jenkins build response, skipping project", "project", project.Name)
+			ctx.Logger().Error(err, "failed to get builds; skipping job")
 			continue
 		}
+		ctx.Logger().V(2).Info("got builds",
+			"count", len(builds.Builds))
 
 		for _, build := range builds.Builds {
 			if common.IsDone(ctx) {
 				return nil
 			}
 
-			s.chunkBuild(ctx, build, project.Name, chunksChan)
+			ctx := context.WithValues(ctx,
+				"build_number", build.Number,
+				"build_url", build.Url)
+
+			if err := s.chunkBuild(ctx, build, project.Name, chunksChan); err != nil {
+				ctx.Logger().Error(err, "error scanning build log")
+			}
 		}
 	}
 
@@ -336,45 +373,46 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 // chunkBuild takes build information and sends it to the chunksChan.
 // It also logs all errors that occur and does not return them, as the parent context expects to continue running.
-func (s *Source) chunkBuild(_ context.Context, build JenkinsBuild, projectName string, chunksChan chan *sources.Chunk) {
-	// Setup a logger to identify the build and project.
-	chunkBuildLog := s.log.WithValues(
-		"build", build.Number,
-		"project", projectName,
-	)
+func (s *Source) chunkBuild(
+	ctx context.Context,
+	build JenkinsBuild,
+	projectName string,
+	chunksChan chan *sources.Chunk,
+) error {
+	ctx.Logger().V(2).Info("chunking build")
 
 	parsedUrl, err := url.Parse(build.Url)
 	if err != nil {
-		chunkBuildLog.Error(err, "Failed to parse Jenkins build URL, skipping build", "url", build.Url)
-		return
+		return fmt.Errorf("failed to parse build URL %q: %w", build.Url, err)
 	}
 	buildLogURL := *s.url
 	buildLogURL.Path = path.Join(parsedUrl.Path, "consoleText")
+	ctx = context.WithValues(ctx,
+		"build_log_url", buildLogURL.String())
 
 	req, err := s.NewRequest(http.MethodGet, buildLogURL.String(), nil)
 	if err != nil {
-		chunkBuildLog.Error(err, "Failed to create new request to Jenkins, skipping build")
-		return
+		return fmt.Errorf("failed to create HTTP request to %q: %w", buildLogURL.String(), err)
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		chunkBuildLog.Error(err, "Failed to get build log in Jenkins chunks, skipping build")
-		return
+		return fmt.Errorf("could not retrieve build log from %q: %w", buildLogURL.String(), err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		chunkBuildLog.Error(err, "Status Code from build was unexpected, skipping build", "status_code", resp.StatusCode)
-		return
+		return fmt.Errorf("got unexpected HTTP status code %v when trying to retrieve build log from %q",
+			resp.StatusCode,
+			buildLogURL.String())
 	}
 
 	buildLog, err := io.ReadAll(resp.Body)
 	if err != nil {
-		chunkBuildLog.Error(err, "Failed to read body from the build log response, skipping build")
-		return
+		return fmt.Errorf("error reading build log response body from %q: %w", buildLogURL.String(), err)
 	}
 
+	ctx.Logger().V(4).Info("scanning build log")
 	chunksChan <- &sources.Chunk{
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
@@ -392,6 +430,8 @@ func (s *Source) chunkBuild(_ context.Context, build JenkinsBuild, projectName s
 		Data:   buildLog,
 		Verify: s.verify,
 	}
+
+	return nil
 }
 
 type JenkinsJobResponse struct {
