@@ -247,10 +247,10 @@ func (c *Parser) RepoPath(
 	} else {
 		args = append(args, "--all")
 	}
+	args = append(args, additionalArgs...) // These need to come before --
 	for _, glob := range excludedGlobs {
 		args = append(args, "--", ".", ":(exclude)"+glob)
 	}
-	args = append(args, additionalArgs...)
 
 	cmd := exec.Command("git", args...)
 	absPath, err := filepath.Abs(source)
