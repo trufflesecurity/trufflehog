@@ -11,7 +11,16 @@ import (
 )
 
 var (
-	validPattern   = "sk-ant-api03-abc123xyz-456def789ghij-klmnopqrstuvwx-3456yza789bcde-1234fghijklmnopby56aaaogaopaaaabc123xyzAA"
+	validPattern = `
+	System Log - Authentication Token Issued
+	Date: 2025-02-04 14:32:10 UTC
+	Server: api-secure-03.internal
+	Service: Anthropic API Gateway
+	API Key: sk-ant-api03-abc123xyz-456def789ghij-klmnopqrstuvwx-3456yza789bcde-1234fghijklmnopby56aaaogaopaaaabc123xyzAA
+
+	Log Entry:
+	A new API key has been generated for service authentication. Please ensure that this key remains confidential and is not exposed in any public repositories or logs.
+	`
 	invalidPattern = "sk-ant-api03-abc123xyz-456de-klMnopqrstuvwx-3456yza789bcde-1234fghijklmnopAA"
 )
 
@@ -27,7 +36,7 @@ func TestAnthropic_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{validPattern},
+			want:  []string{"sk-ant-api03-abc123xyz-456def789ghij-klmnopqrstuvwx-3456yza789bcde-1234fghijklmnopby56aaaogaopaaaabc123xyzAA"},
 		},
 		{
 			name:  "invalid pattern",

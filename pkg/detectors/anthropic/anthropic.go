@@ -1,9 +1,7 @@
 package anthropic
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -56,6 +54,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, err := verifyToken(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, resMatch)
+			if s1.Verified {
+				s1.AnalysisInfo = map[string]string{
+					"key": resMatch,
+				}
+			}
 		}
 
 		results = append(results, s1)
@@ -64,31 +67,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-type response struct {
-	Error struct {
-		Message string `json:"message"`
-	} `json:"error"`
-}
-
 func verifyToken(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
-	body := map[string]any{
-		"model":      "claude-3-opus-20240229",
-		"max_tokens": 1024,
-		"messages": []map[string]string{
-			{"role": "user", "content": "Hello, world"},
-		},
-	}
-
-	bodyBytes, err := json.Marshal(body)
+	// https://docs.anthropic.com/en/api/models-list
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.anthropic.com/v1/models", http.NoBody)
 	if err != nil {
 		return false, nil
 	}
 
-	// https://docs.anthropic.com/claude/reference/messages_post
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(bodyBytes))
-	if err != nil {
-		return false, nil
-	}
 	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -103,14 +88,8 @@ func verifyToken(ctx context.Context, client *http.Client, apiKey string) (bool,
 	case http.StatusOK:
 		return true, nil
 
-	case http.StatusBadRequest:
-		var resp response
-		if err = json.NewDecoder(res.Body).Decode(&resp); err != nil {
-			return false, fmt.Errorf("unexpected HTTP response body: %w", err)
-		}
-		return true, nil
-
-	case http.StatusUnauthorized:
+	case http.StatusNotFound, http.StatusUnauthorized:
+		// 404 is returned if api key is disabled or not found
 		return false, nil
 
 	default:

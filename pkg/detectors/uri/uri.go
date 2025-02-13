@@ -30,7 +30,7 @@ var _ interface {
 } = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\b(?:https?:)?\/\/[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
+	keyPat = regexp.MustCompile(`\bhttps?:\/\/[\w!#$%&()*+,\-./;<=>?@[\\\]^_{|}~]{0,50}:([\w!#$%&()*+,\-./:;<=>?[\\\]^_{|}~]{3,50})@[a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,})?(?::\d{1,5})?[\w/]+\b`)
 
 	// TODO: make local addr opt-out
 	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
@@ -131,6 +131,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				continue
 			}
 		}
+
 		results = append(results, r)
 	}
 

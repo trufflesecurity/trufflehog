@@ -54,6 +54,7 @@ import (
 	atlassianv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/audd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0oauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autodesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autoklose"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autopilot"
@@ -882,7 +883,7 @@ func buildDetectorList() []detectors.Detector {
 		&atlassianv2.Scanner{},
 		&audd.Scanner{},
 		&auth0managementapitoken.Scanner{},
-		// &auth0oauth.Scanner{},
+		&auth0oauth.Scanner{},
 		&autodesk.Scanner{},
 		&autoklose.Scanner{},
 		&autopilot.Scanner{},
