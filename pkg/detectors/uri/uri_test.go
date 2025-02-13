@@ -13,6 +13,7 @@ import (
 
 var (
 	validPattern   = "https://kaNydBSAodo87dsm9asuiSAFtsd7.com:1234@qYY3SylY7fHP"
+	validPattern2  = `<p><a href="http://username:password@127.0.0.1">http://username:password@127.0.0.1</a></p>`
 	invalidPattern = "https://kaNydBSAodo87dsm9asuiSAFtsd7.com.1234@qYY3SylY7fHP"
 	keyword        = "uri"
 )
@@ -29,6 +30,11 @@ func TestURI_Pattern(t *testing.T) {
 			name:  "valid pattern - with keyword uri",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
 			want:  []string{validPattern},
+		},
+		{
+			name:  "valid pattern - do not process duplicate",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern2),
+			want:  []string{"http://username:password@127.0.0.1"},
 		},
 		{
 			name:  "invalid pattern",
