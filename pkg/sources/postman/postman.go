@@ -338,7 +338,11 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	s.attemptToAddKeyword(item.Name)
 
 	// override the base collection metadata with item-specific metadata
-	metadata.FolderID = parentItemId
+	if parentItemId != "" {
+		metadata.FolderID = parentItemId
+	} else {
+		metadata.FolderID = item.UID
+	}
 	metadata.Type = FOLDER_TYPE
 	if metadata.FolderName != "" {
 		// keep track of the folder hierarchy
@@ -353,7 +357,7 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	}
 	// recurse through the folders
 	for _, subItem := range item.Items {
-		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.ID)
+		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.UID)
 	}
 
 	// check if there are any requests in the folder
@@ -361,8 +365,9 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		metadata.FolderName = strings.Replace(metadata.FolderName, (" > " + item.Name), "", -1)
 		if metadata.FolderName == item.Name {
 			metadata.FolderName = ""
+			metadata.FolderID = ""
 		}
-		metadata.RequestID = item.ID
+		metadata.RequestID = item.UID
 		metadata.RequestName = item.Name
 		metadata.Type = REQUEST_TYPE
 		if item.UID != "" {
