@@ -109,7 +109,7 @@ type Item struct {
 	Request     Request    `json:"request,omitempty"`
 	Response    []Response `json:"response,omitempty"`
 	Description string     `json:"description,omitempty"`
-	UID         string     `json:"uid,omitempty"` //Need to use this to get the collection via API
+	UID         string     `json:"uid,omitempty"` //Need to use this to get the collection via API. The UID is a concatenation of the ID and the user ID of whoever created the item.
 }
 
 type Auth struct {
