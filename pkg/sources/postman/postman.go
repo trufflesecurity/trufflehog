@@ -355,6 +355,10 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.UID)
 	}
 
+	// The assignment of the folder ID to be the current item UID is due to wanting to assume that your current item is a folder unless you have request data inside of your item.
+	// If your current item is a folder, you will want the folder ID to match the UID of the current item.
+	// If your current item is a request, you will want the folder ID to match the UID of the parent folder.
+	// If the request is at the root of a collection and has no parent folder, the folder ID will be empty.
 	metadata.FolderID = item.UID
 	// check if there are any requests in the folder
 	if item.Request.Method != "" {
