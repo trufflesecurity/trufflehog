@@ -321,6 +321,9 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	})
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 
+	// collections don't have URLs in the Postman API, but we can scan the Authorization section without it.
+	s.scanAuth(ctx, chunksChan, metadata, collection.Auth, URL{})
+
 	for _, event := range collection.Events {
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
@@ -492,7 +495,11 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	}
 
 	if !m.fromLocal {
-		m.Link += "?tab=auth"
+		if strings.Contains(m.Type, REQUEST_TYPE) {
+			m.Link += "?tab=auth"
+		} else {
+			m.Link += "?tab=authorization"
+		}
 		m.Type += " > authorization"
 	}
 
