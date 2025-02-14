@@ -338,6 +338,7 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	s.attemptToAddKeyword(item.Name)
 
 	// override the base collection metadata with item-specific metadata
+	metadata.FolderID = parentItemId
 	metadata.Type = FOLDER_TYPE
 	if metadata.FolderName != "" {
 		// keep track of the folder hierarchy
