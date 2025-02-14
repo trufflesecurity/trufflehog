@@ -94,7 +94,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 AUTH_HEADER = 'super secret authorization header'
 
-
 class Verifier(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(405)
@@ -107,23 +106,22 @@ class Verifier(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # read the body
             length = int(self.headers['Content-Length'])
             request = json.loads(self.rfile.read(length))
             self.log_message("%s", request)
 
-            # check the match, you'll need to implement validateToken, which takes an array of ID's and Secrets
-            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']):
+            if not validateTokens(request['CustomTokenDetector']['token']):
                 self.send_response(200)
                 self.end_headers()
             else:
-                # any other response besides 200
-                self.send_response(406)
+                self.send_response(403)
                 self.end_headers()
         except Exception:
             self.send_response(400)
             self.end_headers()
 
+def validateTokens(token):
+    return False  # Implement actual validation logic
 
 with HTTPServer(('', 8000), Verifier) as server:
     try:
@@ -146,19 +144,16 @@ import (
 
 const authHeader = "super secret authorization header"
 
-type HogTokenDetector struct {
-	HogID     string `json:"hogID"`
-	HogSecret string `json:"hogSecret"`
+type CustomTokenDetector struct {
+	Token string `json:"token"`
 }
 
 type RequestBody struct {
-	HogTokenDetector HogTokenDetector `json:"HogTokenDetector"`
+	CustomTokenDetector CustomTokenDetector `json:"CustomTokenDetector"`
 }
 
-// Implement your own validation logic
-func validateTokens(hogID, hogSecret string) bool {
-	// Example logic: reject empty values (update as needed)
-	return hogID == "" || hogSecret == ""
+func validateTokens(token string) bool {
+	return false // Implement actual validation logic
 }
 
 func verifierHandler(w http.ResponseWriter, r *http.Request) {
@@ -187,7 +182,7 @@ func verifierHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Received Request: %+v", requestBody)
 
-	if validateTokens(requestBody.HogTokenDetector.HogID, requestBody.HogTokenDetector.HogSecret) {
+	if validateTokens(requestBody.CustomTokenDetector.Token) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -195,10 +190,9 @@ func verifierHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	http.HandleFunc("/", verifierHandler)
 	serverAddr := ":8000"
 	fmt.Printf("Starting server on %s...\n", serverAddr)
-	http.HandleFunc("/", verifierHandler)
-
 	if err := http.ListenAndServe(serverAddr, nil); err != nil {
 		log.Fatalf("Server failed: %s", err)
 	}
