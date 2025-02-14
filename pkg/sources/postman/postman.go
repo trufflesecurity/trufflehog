@@ -338,7 +338,6 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	s.attemptToAddKeyword(item.Name)
 
 	// override the base collection metadata with item-specific metadata
-	metadata.FolderID = parentItemId
 	metadata.Type = FOLDER_TYPE
 	if metadata.FolderName != "" {
 		// keep track of the folder hierarchy
@@ -356,16 +355,16 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.UID)
 	}
 
+	metadata.FolderID = item.UID
 	// check if there are any requests in the folder
 	if item.Request.Method != "" {
 		metadata.FolderName = strings.Replace(metadata.FolderName, (" > " + item.Name), "", -1)
-		if parentItemId == "" {
+		metadata.FolderID = parentItemId
+		if metadata.FolderID == "" {
 			metadata.FolderName = ""
-			metadata.FolderID = ""
 		}
 		metadata.RequestID = item.UID
 		metadata.RequestName = item.Name
-		metadata.FolderID = parentItemId
 		metadata.Type = REQUEST_TYPE
 		if item.UID != "" {
 			// Route to API endpoint
@@ -376,30 +375,19 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 			metadata.FullID = item.ID
 		}
 		s.scanHTTPRequest(ctx, chunksChan, metadata, item.Request)
-		metadata.FolderID = ""
 	}
 
 	// check if there are any responses in the folder
-	metadata.FolderID = parentItemId
 	for _, response := range item.Response {
 		s.scanHTTPResponse(ctx, chunksChan, metadata, response)
 	}
-	metadata.FolderID = ""
 
-	if strings.Contains(metadata.Type, REQUEST_TYPE) {
-		metadata.FolderID = parentItemId
-	} else if strings.Contains(metadata.Type, FOLDER_TYPE) {
-		metadata.FolderID = item.UID
-	} else if strings.Contains(metadata.Type, COLLECTION_TYPE) {
-		metadata.FolderID = ""
-	}
 	for _, event := range item.Events {
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
 	// an auth all by its lonesome could be inherited to subfolders and requests
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
-	metadata.FolderID = ""
 }
 
 func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, event Event) {
