@@ -338,7 +338,6 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	s.attemptToAddKeyword(item.Name)
 
 	// override the base collection metadata with item-specific metadata
-	metadata.FolderID = parentItemId
 	metadata.Type = FOLDER_TYPE
 	if metadata.FolderName != "" {
 		// keep track of the folder hierarchy
@@ -350,10 +349,10 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	if item.UID != "" {
 		metadata.FullID = item.UID
 		metadata.Link = LINK_BASE_URL + FOLDER_TYPE + "/" + metadata.FullID
-		metadata.FolderID = item.UID
 	}
 	// recurse through the folders
 	for _, subItem := range item.Items {
+		metadata.FolderID = item.UID
 		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.UID)
 	}
 
