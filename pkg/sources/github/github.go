@@ -3,6 +3,7 @@ package github
 import (
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v67/github"
-	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -807,7 +807,7 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...
 			return false
 		}
 
-		jitter := time.Duration(rand.Intn(10)+1) * time.Second
+		jitter := time.Duration(rand.IntN(10)+1) * time.Second
 		if retryAfter > 0 {
 			retryAfter = retryAfter + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
