@@ -182,6 +182,20 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		UnboundedResources: []analyzers.Resource{},
 	}
 
+	// add profile information to analyzer result
+	if info.User.ID != 0 && info.User.FirstName != "" {
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource: analyzers.Resource{
+				Name:               info.User.FirstName + " " + info.User.LastName,
+				FullyQualifiedName: fmt.Sprintf("%d", info.User.ID),
+				Type:               "User",
+			},
+			Permission: analyzers.Permission{
+				Value: "full_access", // if token has all permissions than we can get user information
+			},
+		})
+	}
+
 	for _, scope := range info.Scopes {
 		resource := getCategoryResource(scope)
 
