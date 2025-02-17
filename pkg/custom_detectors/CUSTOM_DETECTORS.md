@@ -17,11 +17,11 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
    ```yaml
    # config.yaml
    detectors:
-     - name: CustomTokenDetector
+     - name: HogTokenDetector
        keywords:
-         - custom
+         - hog
        regex:
-         token: 'token-[a-zA-Z0-9]{16}'
+         token: '[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}'
        verify:
          - endpoint: http://localhost:8000/
            # 'unsafe' must be set to true if the endpoint uses HTTP
@@ -33,8 +33,17 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
    **Explanation**:
    - **`name`**: A unique identifier for your custom detector.
    - **`keywords`**: An array of strings that, when found, trigger the regex search. If multiple keywords are specified, the presence of any one of them will initiate the regex search.
-   - **`regex`**: Defines the patterns to identify potential secrets. You can specify one or more named regular expressions. For a detection to be successful, each named regex must find a match.
+   - **`regex`**: Defines the patterns to identify potential secrets. You can specify one or more named regular expressions. For a detection to be successful, each named regex must find a match. Capture groups `()` within these regular expressions are used to extract specific portions of the matched text, enabling the detector to process and report on particular segments of the identified patterns.
+
    - **`verify`**: An optional section to validate detected secrets. If you want to verify or unverify detected secrets, this section needs to be configured. If not configured, all detected secrets will be marked as unverified. Read [verification server examples](#verification-server-examples)
+
+   **Other allowed parameters:**
+   - **`exclude_regexes_capture`**: This parameter allows you to define regex patterns to exclude specific parts of a detected secret. If a match is found within the detected secret, the portion matching this regex is excluded from the result.
+   - **`exclude_regexes_match`**: This parameter enables you to define regex patterns to exclude entire matches from being reported as secrets.
+   - **`entropy`**: This parameter is used to assess the randomness of detected strings. High entropy often indicates that a string is a potential secret, such as an API key or password, due to its complexity and unpredictability. It helps in filtering false-positives. While an entropy threshold of `3` can be a starting point, it's essential to adjust this value based on your project's specific requirements and the nature of the data you have.
+   - **`exclude_words`**: This parameter allows you to specify a list of words that, if present in a detected string, will cause TruffleHog to ignore that string.
+
+    [Here](/examples/generic_with_filters.yml) is an example of a custom detector using these parameters. 
 
 3. **Run TruffleHog with the Custom Detector**:
    - Execute TruffleHog, specifying your configuration file:
@@ -55,11 +64,11 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
    ```text
    // this is a custom example
    this file has some random text and maybe a secret
-   custom secret: token-JD44PMWmX4wBjqxE
+   hog token: pOIAj9x47WT5qElx5JrI3e7O714HgaAIz2ck9sVn
    // end of file
    ```
 
-   In this file, the keyword `custom` exists, which will trigger the regex search. The string `token-JD44PMWmX4wBjqxE` matches the regex pattern, so it should be detected.
+   In this file, the keyword `hog` exists, which will trigger the regex search. The string `pOIAj9x47WT5qElx5JrI3e7O714HgaAIz2ck9sVn` matches the regex pattern, so it should be detected.
 
    Run the following command:
 
@@ -75,7 +84,7 @@ This guide will walk you through setting up a custom detector in TruffleHog to i
    Found verified result 🐷🔑
    Detector Type: CustomRegex
    Decoder Type: PLAIN
-   Raw result: token-JD44PMWmX4wBjqxE
+   Raw result: pOIAj9x47WT5qElx5JrI3e7O714HgaAIz2ck9sVn
    File: /tmp/data.txt
    Line: 3
    ```
