@@ -3,6 +3,7 @@ package sendgrid
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -54,6 +55,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			if err != nil {
 				t.Fatalf("could not marshal got to JSON: %s", err)
 			}
+
+			fmt.Println(string(gotJSON))
 
 			// Parse the expected JSON string
 			var wantObj analyzers.AnalyzerResult

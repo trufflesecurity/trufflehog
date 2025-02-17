@@ -1,5 +1,5 @@
 {
-    "AnalyzerType": 15,
+    "AnalyzerType": 16,
     "Bindings": [
         {
             "Resource": {
@@ -1421,6 +1421,19 @@
             },
             "Permission": {
                 "Value": "whitelabel.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Source Integration",
+                "FullyQualifiedName": "37006899",
+                "Type": "User",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
                 "Parent": null
             }
         },
