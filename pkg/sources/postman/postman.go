@@ -321,21 +321,23 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	})
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 
+	// collections don't have URLs in the Postman API, but we can scan the Authorization section without it.
+	s.scanAuth(ctx, chunksChan, metadata, collection.Auth, URL{})
+
 	for _, event := range collection.Events {
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
 
 	for _, item := range collection.Items {
-		s.scanItem(ctx, chunksChan, collection, metadata, item)
+		s.scanItem(ctx, chunksChan, collection, metadata, item, "")
 	}
 
 }
 
-func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item) {
+func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item, parentItemId string) {
 	s.attemptToAddKeyword(item.Name)
 
 	// override the base collection metadata with item-specific metadata
-	metadata.FolderID = item.ID
 	metadata.Type = FOLDER_TYPE
 	if metadata.FolderName != "" {
 		// keep track of the folder hierarchy
@@ -350,13 +352,22 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	}
 	// recurse through the folders
 	for _, subItem := range item.Items {
-		s.scanItem(ctx, chunksChan, collection, metadata, subItem)
+		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.UID)
 	}
 
+	// The assignment of the folder ID to be the current item UID is due to wanting to assume that your current item is a folder unless you have request data inside of your item.
+	// If your current item is a folder, you will want the folder ID to match the UID of the current item.
+	// If your current item is a request, you will want the folder ID to match the UID of the parent folder.
+	// If the request is at the root of a collection and has no parent folder, the folder ID will be empty.
+	metadata.FolderID = item.UID
 	// check if there are any requests in the folder
 	if item.Request.Method != "" {
 		metadata.FolderName = strings.Replace(metadata.FolderName, (" > " + item.Name), "", -1)
-		metadata.RequestID = item.ID
+		metadata.FolderID = parentItemId
+		if metadata.FolderID == "" {
+			metadata.FolderName = ""
+		}
+		metadata.RequestID = item.UID
 		metadata.RequestName = item.Name
 		metadata.Type = REQUEST_TYPE
 		if item.UID != "" {
@@ -377,14 +388,6 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 
 	for _, event := range item.Events {
 		s.scanEvent(ctx, chunksChan, metadata, event)
-	}
-
-	if metadata.RequestID != "" {
-		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_AUTHORIZATION
-	} else if metadata.FolderID != "" {
-		metadata.LocationType = source_metadatapb.PostmanLocationType_FOLDER_AUTHORIZATION
-	} else if metadata.CollectionInfo.UID != "" {
-		metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_AUTHORIZATION
 	}
 	// an auth all by its lonesome could be inherited to subfolders and requests
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
@@ -492,7 +495,11 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	}
 
 	if !m.fromLocal {
-		m.Link += "?tab=auth"
+		if strings.Contains(m.Type, REQUEST_TYPE) {
+			m.Link += "?tab=auth"
+		} else {
+			m.Link += "?tab=authorization"
+		}
 		m.Type += " > authorization"
 	}
 
@@ -550,9 +557,47 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		s.scanAuth(ctx, chunksChan, metadata, r.Auth, r.URL)
 	}
 
-	// We would scan the body, but currently the body has different radio buttons that can be scanned but only the selected one is scanned. The unselected radio button options can still
-	// have secrets in them but will not be scanned. The selction of the radio button will also change the secret metadata for that particular scanning pass and can create confusion for
-	// the user as to the status of a secret. We will reimplement at some point.
+	if r.Body.Mode != "" {
+		metadata.Type = originalType + " > body"
+		s.scanRequestBody(ctx, chunksChan, metadata, r.Body)
+	}
+}
+
+func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
+	if !m.fromLocal {
+		m.Link = m.Link + "?tab=body"
+	}
+	originalType := m.Type
+	switch b.Mode {
+	case "formdata":
+		m.Type = originalType + " > form data"
+		vars := VariableData{
+			KeyValues: b.FormData,
+		}
+		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_FORM_DATA
+		s.scanVariableData(ctx, chunksChan, m, vars)
+		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
+	case "urlencoded":
+		m.Type = originalType + " > url encoded"
+		vars := VariableData{
+			KeyValues: b.URLEncoded,
+		}
+		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_URL_ENCODED
+		s.scanVariableData(ctx, chunksChan, m, vars)
+		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
+	case "raw":
+		m.Type = originalType + " > raw"
+		data := b.Raw
+		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_RAW
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
+		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
+	case "graphql":
+		m.Type = originalType + " > graphql"
+		data := b.GraphQL.Query + " " + b.GraphQL.Variables
+		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_GRAPHQL
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
+		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
+	}
 }
 
 func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, response Response) {

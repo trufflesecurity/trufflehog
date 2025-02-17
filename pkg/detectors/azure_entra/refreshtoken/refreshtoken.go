@@ -134,16 +134,18 @@ TokenLoop:
 							continue
 						} else if errors.Is(verificationErr, ErrTokenExpired) {
 							continue TokenLoop
+						} else {
+							// Received an unexpected/unhandled error type.
+							r = createResult(token, clientId, tenantId, isVerified, extraData, verificationErr)
+							break ClientLoop
 						}
 					}
 
 					// The result is verified or there's only one associated client and tenant.
 					if isVerified {
-						r = createResult(tenantId, clientId, token, isVerified, extraData, verificationErr)
+						r = createResult(token, clientId, tenantId, isVerified, extraData, verificationErr)
 						break ClientLoop
 					}
-
-					// The result may be valid for another client/tenant.
 				}
 			}
 		}
@@ -244,9 +246,12 @@ func verifyMatch(ctx context.Context, client *http.Client, refreshToken string, 
 		// https://login.microsoftonline.com/error?code=9002313
 		d := errResp.Description
 		switch {
-		case strings.HasPrefix(d, "AADSTS70008:"), strings.HasPrefix(d, "AADSTS700082:"):
+		case strings.HasPrefix(d, "AADSTS70008:"),
+			strings.HasPrefix(d, "AADSTS700082:"),
+			strings.HasPrefix(d, "AADSTS70043:"):
 			// https://login.microsoftonline.com/error?code=70008
 			// https://login.microsoftonline.com/error?code=700082
+			// https://login.microsoftonline.com/error?code=70043
 			return false, nil, ErrTokenExpired
 		case strings.HasPrefix(d, "AADSTS700016:"):
 			// https://login.microsoftonline.com/error?code=700016
@@ -254,7 +259,7 @@ func verifyMatch(ctx context.Context, client *http.Client, refreshToken string, 
 		case strings.HasPrefix(d, "AADSTS90002:"):
 			// https://login.microsoftonline.com/error?code=90002
 			return false, nil, ErrTenantNotFound
-		case strings.HasPrefix(d, "AADSTS9002313"):
+		case strings.HasPrefix(d, "AADSTS9002313:"):
 			// This seems to be a generic "invalid token" error code.
 			// 'invalid_grant': AADSTS9002313: Invalid request. Request is malformed or invalid.
 			return false, nil, nil

@@ -1,0 +1,5 @@
+permissions:
+- repo:read
+- repo:write
+- repo:admin
+- repo:public_read
