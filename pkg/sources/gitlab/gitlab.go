@@ -4,16 +4,14 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
@@ -23,7 +21,7 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/gobwas/glob"
 	"github.com/xanzy/go-gitlab"
-	"golang.org/x/exp/slices"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -691,7 +689,7 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 	// Add the repoURL to the resume info slice.
 	s.resumeInfoSlice = append(s.resumeInfoSlice, repoURL)
-	sort.Strings(s.resumeInfoSlice)
+	slices.Sort(s.resumeInfoSlice)
 
 	// Make the resume info string from the slice.
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
