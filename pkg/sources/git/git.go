@@ -543,7 +543,7 @@ func getGitDir(path string, options *ScanOptions) string {
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the remote URL for reporting (may be empty)
-	remoteURL := getSafeRemoteURL(repo, "origin")
+	remoteURL := GetSafeRemoteURL(repo, "origin")
 	var repoCtx context.Context
 
 	if ctx.Value("repo") == nil {
@@ -801,7 +801,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 // ScanStaged chunks staged changes.
 func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the URL metadata for reporting (may be empty).
-	urlMetadata := getSafeRemoteURL(repo, "origin")
+	urlMetadata := GetSafeRemoteURL(repo, "origin")
 
 	diffChan, err := s.parser.Staged(ctx, path)
 	if err != nil {
@@ -954,7 +954,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		remotes, _ := repo.Remotes()
 		repoURL := "Could not get remote for repo"
 		if len(remotes) != 0 {
-			repoURL = getSafeRemoteURL(repo, remotes[0].Config().Name)
+			repoURL = GetSafeRemoteURL(repo, remotes[0].Config().Name)
 		}
 		logger = logger.WithValues("repo", repoURL)
 	}
@@ -1206,10 +1206,10 @@ func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 	return path, remote, nil
 }
 
-// getSafeRemoteURL is a helper function that will attempt to get a safe URL first
+// GetSafeRemoteURL is a helper function that will attempt to get a safe URL first
 // from the preferred remote name, falling back to the first remote name
 // available, or an empty string if there are no remotes.
-func getSafeRemoteURL(repo *git.Repository, preferred string) string {
+func GetSafeRemoteURL(repo *git.Repository, preferred string) string {
 	remote, err := repo.Remote(preferred)
 	if err != nil {
 		var remotes []*git.Remote
