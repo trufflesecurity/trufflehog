@@ -661,7 +661,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				Verify:         s.verify,
 			}
 
-			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(
 					err,
 					"error handling binary file",
@@ -889,7 +889,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				SourceMetadata: metadata,
 				Verify:         s.verify,
 			}
-			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(err, "error handling binary file")
 			}
 			continue
@@ -1236,6 +1236,7 @@ func (s *Git) handleBinary(
 	chunkSkel *sources.Chunk,
 	commitHash plumbing.Hash,
 	path string,
+	skipArchives bool,
 ) (err error) {
 	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
 	fileCtx.Logger().V(5).Info("handling binary file")
@@ -1304,7 +1305,7 @@ func (s *Git) handleBinary(
 		err = errors.Join(err, copyErr, waitErr)
 	}()
 
-	return handlers.HandleFile(catFileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	return handlers.HandleFile(catFileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
