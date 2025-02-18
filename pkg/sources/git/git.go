@@ -642,6 +642,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 		// Handle binary files by reading the entire file rather than using the diff.
 		if diff.IsBinary {
+			commitHash := plumbing.NewHash(fullHash)
+
+			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
+				logger.V(5).Info("skipping binary file",
+					"commit", commitHash.String()[:7],
+					"path", path)
+				continue
+			}
+
 			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, 0)
 			chunkSkel := &sources.Chunk{
 				SourceName:     s.sourceName,
@@ -652,7 +661,6 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				Verify:         s.verify,
 			}
 
-			commitHash := plumbing.NewHash(fullHash)
 			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
 				logger.Error(
 					err,
@@ -864,6 +872,14 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		// Handle binary files by reading the entire file rather than using the diff.
 		if diff.IsBinary {
 			commitHash := plumbing.NewHash(fullHash)
+
+			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
+				logger.V(5).Info("skipping binary file",
+					"commit", commitHash.String()[:7],
+					"path", path)
+				continue
+			}
+
 			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, 0)
 			chunkSkel := &sources.Chunk{
 				SourceName:     s.sourceName,
@@ -1226,11 +1242,6 @@ func (s *Git) handleBinary(
 
 	if common.SkipFile(path) {
 		fileCtx.Logger().V(5).Info("file contains ignored extension")
-		return nil
-	}
-
-	if s.skipBinaries || feature.ForceSkipBinaries.Load() {
-		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
 		return nil
 	}
 
