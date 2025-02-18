@@ -661,7 +661,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				Verify:         s.verify,
 			}
 
-			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
+			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(
 					err,
 					"error handling binary file",
@@ -889,7 +889,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				SourceMetadata: metadata,
 				Verify:         s.verify,
 			}
-			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
+			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(err, "error handling binary file")
 			}
 			continue
@@ -1229,7 +1229,7 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func (s *Git) handleBinary(
+func HandleBinary(
 	ctx context.Context,
 	gitDir string,
 	reporter sources.ChunkReporter,
