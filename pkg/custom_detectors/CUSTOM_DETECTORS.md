@@ -119,7 +119,7 @@ class Verifier(BaseHTTPRequestHandler):
             request = json.loads(self.rfile.read(length))
             self.log_message("%s", request)
 
-            if not validateTokens(request['CustomTokenDetector']['token']):
+            if not validateTokens(request['HogTokenDetector']['token']):
                 self.send_response(200)
                 self.end_headers()
             else:
@@ -153,12 +153,12 @@ import (
 
 const authHeader = "super secret authorization header"
 
-type CustomTokenDetector struct {
+type HogTokenDetector struct {
 	Token string `json:"token"`
 }
 
 type RequestBody struct {
-	CustomTokenDetector CustomTokenDetector `json:"CustomTokenDetector"`
+	HogTokenDetector HogTokenDetector `json:"HogTokenDetector"`
 }
 
 func validateTokens(token string) bool {
@@ -191,7 +191,7 @@ func verifierHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Received Request: %+v", requestBody)
 
-	if validateTokens(requestBody.CustomTokenDetector.Token) {
+	if validateTokens(requestBody.HogTokenDetector.Token) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 	} else {
 		w.WriteHeader(http.StatusOK)
