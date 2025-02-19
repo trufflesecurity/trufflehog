@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/mholt/archives"
@@ -321,11 +320,6 @@ func selectHandler(mimeT mimeType, isGenericArchive bool) FileHandler {
 		return newDefaultHandler(defaultHandlerType)
 	}
 }
-
-var maxTimeout = time.Duration(60) * time.Second
-
-// SetArchiveMaxTimeout sets the maximum timeout for the archive handler.
-func SetArchiveMaxTimeout(timeout time.Duration) { maxTimeout = timeout }
 
 // HandleFile orchestrates the complete file handling process for a given file.
 // It determines the MIME type of the file,
