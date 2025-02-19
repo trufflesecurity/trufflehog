@@ -419,7 +419,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/luno"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/madkudu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/magicbell"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/magnetic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailboxlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailchimp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailerlite"
@@ -1259,7 +1258,7 @@ func buildDetectorList() []detectors.Detector {
 		// &m3o.Scanner{},
 		&madkudu.Scanner{},
 		&magicbell.Scanner{},
-		&magnetic.Scanner{},
+		// &magnetic.Scanner{},
 		&mailboxlayer.Scanner{},
 		&mailchimp.Scanner{},
 		&mailerlite.Scanner{},
