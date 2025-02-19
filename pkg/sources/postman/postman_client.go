@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
 
@@ -250,6 +252,7 @@ func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Res
 // EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
 // Consider adding additional flags to support filtering.
 func (c *Client) EnumerateWorkspaces() ([]Workspace, error) {
+	context.Background().Logger().Info("Enumerating workspaces")
 	var workspaces []Workspace
 	workspacesObj := struct {
 		Workspaces []Workspace `json:"workspaces"`
