@@ -1,0 +1,39 @@
+{
+    "AnalyzerType": 22,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "usraS0CjAASH3XMpU",
+                "FullyQualifiedName": "usraS0CjAASH3XMpU",
+                "Type": "user",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "data.records:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "usraS0CjAASH3XMpU",
+                "FullyQualifiedName": "usraS0CjAASH3XMpU",
+                "Type": "user",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "schema.bases:read",
+                "Parent": null
+            }
+        }
+    ],
+    "UnboundedResources": [
+        {
+            "Name": "Client Leads and Sales Management",
+            "FullyQualifiedName": "appzRyj5Q9R9kK6cF",
+            "Type": "base",
+            "Parent": null
+        }
+    ]
+}
