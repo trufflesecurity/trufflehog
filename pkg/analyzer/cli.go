@@ -98,7 +98,7 @@ func Run(keyType string, secretInfo SecretInfo) {
 		anthropic.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "airtable":
 		airtable.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
-  case "elevenlabs":
+	case "elevenlabs":
 		elevenlabs.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }
