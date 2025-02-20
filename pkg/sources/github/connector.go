@@ -13,6 +13,7 @@ import (
 
 const cloudEndpoint = "https://api.github.com"
 
+// Connector abstracts over the authenticated ways that TruffleHog can interact with GitHub: cloning and using the API.
 type Connector interface {
 	// APIClient returns a configured GitHub client that can be used for GitHub API operations.
 	APIClient() *github.Client
@@ -22,10 +23,13 @@ type Connector interface {
 
 type Token string
 
+// Credential is an interface used to constrain the generic creation of Connector objects.
 type Credential interface {
 	*credentialspb.GitHubApp | *credentialspb.BasicAuth | Token | *credentialspb.Unauthenticated
 }
 
+// NewConnector creates a new Connector using the provided credential, API endpoint, and rate limit handler. The type
+// of connector is determined from the type of the provided credential.
 func NewConnector[C Credential](
 	cred C,
 	apiEndpoint string,
