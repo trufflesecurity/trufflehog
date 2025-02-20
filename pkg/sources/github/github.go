@@ -225,7 +225,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	connector, err := newConnector(s)
+	connector, err := newConnectorFromSource(s)
 	if err != nil {
 		return fmt.Errorf("could not create connector: %w", err)
 	}

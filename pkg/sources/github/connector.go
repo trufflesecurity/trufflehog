@@ -20,7 +20,7 @@ type connector interface {
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
 }
 
-func newConnector(source *Source) (connector, error) {
+func newConnectorFromSource(source *Source) (connector, error) {
 	apiEndpoint := source.conn.Endpoint
 	if apiEndpoint == "" || endsWithGithub.MatchString(apiEndpoint) {
 		apiEndpoint = cloudEndpoint
