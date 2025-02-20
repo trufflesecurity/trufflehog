@@ -15,7 +15,7 @@ type unauthenticatedConnector struct {
 	apiClient *github.Client
 }
 
-var _ Connector = (*unauthenticatedConnector)(nil)
+var _ connector = (*unauthenticatedConnector)(nil)
 
 func newUnauthenticatedConnector(apiEndpoint string) (*unauthenticatedConnector, error) {
 	const httpTimeoutSeconds = 60
