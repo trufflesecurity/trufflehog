@@ -252,7 +252,7 @@ func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Res
 // EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
 // Consider adding additional flags to support filtering.
 func (c *Client) EnumerateWorkspaces() ([]Workspace, error) {
-	context.Background().Logger().Info("Enumerating workspaces")
+	context.Background().Logger().V(2).Info("enumerating workspaces")
 	var workspaces []Workspace
 	workspacesObj := struct {
 		Workspaces []Workspace `json:"workspaces"`
@@ -282,7 +282,7 @@ func (c *Client) EnumerateWorkspaces() ([]Workspace, error) {
 			err = fmt.Errorf("could not get workspace during enumeration: %s (%s)", workspace.Name, workspace.ID)
 			return workspaces, err
 		}
-		context.Background().Logger().V(4).Info("individual workspace getting added to the array", "workspace", workspacesObj.Workspaces[i])
+		context.Background().Logger().V(3).Info("individual workspace getting added to the array", "workspace", workspacesObj.Workspaces[i])
 	}
 
 	return workspacesObj.Workspaces, nil
