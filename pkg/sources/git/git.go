@@ -543,7 +543,7 @@ func getGitDir(path string, options *ScanOptions) string {
 
 func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the remote URL for reporting (may be empty)
-	remoteURL := getSafeRemoteURL(repo, "origin")
+	remoteURL := GetSafeRemoteURL(repo, "origin")
 	var repoCtx context.Context
 
 	if ctx.Value("repo") == nil {
@@ -642,6 +642,15 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 
 		// Handle binary files by reading the entire file rather than using the diff.
 		if diff.IsBinary {
+			commitHash := plumbing.NewHash(fullHash)
+
+			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
+				logger.V(5).Info("skipping binary file",
+					"commit", commitHash.String()[:7],
+					"path", path)
+				continue
+			}
+
 			metadata := s.sourceMetadataFunc(fileName, email, fullHash, when, remoteURL, 0)
 			chunkSkel := &sources.Chunk{
 				SourceName:     s.sourceName,
@@ -652,8 +661,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 				Verify:         s.verify,
 			}
 
-			commitHash := plumbing.NewHash(fullHash)
-			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(
 					err,
 					"error handling binary file",
@@ -793,7 +801,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 // ScanStaged chunks staged changes.
 func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string, scanOptions *ScanOptions, reporter sources.ChunkReporter) error {
 	// Get the URL metadata for reporting (may be empty).
-	urlMetadata := getSafeRemoteURL(repo, "origin")
+	urlMetadata := GetSafeRemoteURL(repo, "origin")
 
 	diffChan, err := s.parser.Staged(ctx, path)
 	if err != nil {
@@ -864,6 +872,14 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 		// Handle binary files by reading the entire file rather than using the diff.
 		if diff.IsBinary {
 			commitHash := plumbing.NewHash(fullHash)
+
+			if s.skipBinaries || feature.ForceSkipBinaries.Load() {
+				logger.V(5).Info("skipping binary file",
+					"commit", commitHash.String()[:7],
+					"path", path)
+				continue
+			}
+
 			metadata := s.sourceMetadataFunc(fileName, email, "Staged", when, urlMetadata, 0)
 			chunkSkel := &sources.Chunk{
 				SourceName:     s.sourceName,
@@ -873,7 +889,7 @@ func (s *Git) ScanStaged(ctx context.Context, repo *git.Repository, path string,
 				SourceMetadata: metadata,
 				Verify:         s.verify,
 			}
-			if err := s.handleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName); err != nil {
+			if err := HandleBinary(ctx, gitDir, reporter, chunkSkel, commitHash, fileName, s.skipArchives); err != nil {
 				logger.Error(err, "error handling binary file")
 			}
 			continue
@@ -938,7 +954,7 @@ func (s *Git) ScanRepo(ctx context.Context, repo *git.Repository, repoPath strin
 		remotes, _ := repo.Remotes()
 		repoURL := "Could not get remote for repo"
 		if len(remotes) != 0 {
-			repoURL = getSafeRemoteURL(repo, remotes[0].Config().Name)
+			repoURL = GetSafeRemoteURL(repo, remotes[0].Config().Name)
 		}
 		logger = logger.WithValues("repo", repoURL)
 	}
@@ -1190,10 +1206,10 @@ func PrepareRepo(ctx context.Context, uriString string) (string, bool, error) {
 	return path, remote, nil
 }
 
-// getSafeRemoteURL is a helper function that will attempt to get a safe URL first
+// GetSafeRemoteURL is a helper function that will attempt to get a safe URL first
 // from the preferred remote name, falling back to the first remote name
 // available, or an empty string if there are no remotes.
-func getSafeRemoteURL(repo *git.Repository, preferred string) string {
+func GetSafeRemoteURL(repo *git.Repository, preferred string) string {
 	remote, err := repo.Remote(preferred)
 	if err != nil {
 		var remotes []*git.Remote
@@ -1213,24 +1229,20 @@ func getSafeRemoteURL(repo *git.Repository, preferred string) string {
 	return safeURL
 }
 
-func (s *Git) handleBinary(
+func HandleBinary(
 	ctx context.Context,
 	gitDir string,
 	reporter sources.ChunkReporter,
 	chunkSkel *sources.Chunk,
 	commitHash plumbing.Hash,
 	path string,
+	skipArchives bool,
 ) (err error) {
 	fileCtx := context.WithValues(ctx, "commit", commitHash.String()[:7], "path", path)
 	fileCtx.Logger().V(5).Info("handling binary file")
 
 	if common.SkipFile(path) {
 		fileCtx.Logger().V(5).Info("file contains ignored extension")
-		return nil
-	}
-
-	if s.skipBinaries || feature.ForceSkipBinaries.Load() {
-		fileCtx.Logger().V(5).Info("skipping binary file", "path", path)
 		return nil
 	}
 
@@ -1293,7 +1305,7 @@ func (s *Git) handleBinary(
 		err = errors.Join(err, copyErr, waitErr)
 	}()
 
-	return handlers.HandleFile(catFileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(s.skipArchives))
+	return handlers.HandleFile(catFileCtx, stdout, chunkSkel, reporter, handlers.WithSkipArchives(skipArchives))
 }
 
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {

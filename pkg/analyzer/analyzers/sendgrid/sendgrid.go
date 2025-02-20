@@ -24,6 +24,24 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
+type ScopesJSON struct {
+	Scopes []string `json:"scopes"`
+}
+
+type Profile struct {
+	ID        int    `json:"userid"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Company   string `json:"company"`
+	Website   string `json:"website"`
+	Country   string `json:"country"`
+}
+type SecretInfo struct {
+	User      Profile
+	RawScopes []string
+	Scopes    []SendgridScope
+}
+
 func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSendgrid }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
@@ -36,6 +54,108 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 		return nil, err
 	}
 	return secretInfoToAnalyzerResult(info), nil
+}
+
+func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
+	info, err := AnalyzePermissions(cfg, key)
+	if err != nil {
+		color.Red("[!] Error: %v", err)
+		return
+	}
+
+	color.Green("[!] Valid Sendgrid API Key\n\n")
+
+	if slices.Contains(info.RawScopes, "user.email.read") {
+		color.Green("[*] Sendgrid Key Type: Full Access Key")
+	} else if slices.Contains(info.RawScopes, "billing.read") {
+		color.Yellow("[*] Sendgrid Key Type: Billing Access Key")
+	} else {
+		color.Yellow("[*] Sendgrid Key Type: Restricted Access Key")
+	}
+
+	if slices.Contains(info.RawScopes, "2fa_required") {
+		color.Yellow("[i] 2FA Required for this account")
+	}
+
+	if info.User.FirstName != "" {
+		printProfile(info.User)
+	}
+
+	printPermissions(info, cfg.ShowAll)
+}
+
+func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+	// Setup custom HTTP client so we can log requests.
+	sg.DefaultClient.HTTPClient = analyzers.NewAnalyzeClient(cfg)
+
+	// get scopes
+	rawScopes, err := getScopes(key)
+	if err != nil {
+		return nil, err
+	}
+
+	categoryScope := processPermissions(rawScopes)
+
+	var secretInfo = &SecretInfo{
+		RawScopes: rawScopes,
+		Scopes:    categoryScope,
+	}
+
+	if slices.Contains(rawScopes, "user.email.read") {
+		profile, err := getProfile(key)
+		if err != nil {
+			// if get profile fails return secretInfo with scopes for partial success
+			return secretInfo, nil
+		}
+
+		secretInfo.User = *profile
+	}
+
+	return secretInfo, nil
+}
+
+func getScopes(key string) ([]string, error) {
+	req := sg.GetRequest(key, "/v3/scopes", "https://api.sendgrid.com")
+	req.Method = "GET"
+	resp, err := sg.API(req)
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return nil, fmt.Errorf("invalid api key")
+	} else if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("%v", resp.StatusCode)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the JSON response into a struct
+	var jsonScopes ScopesJSON
+	if err := json.Unmarshal([]byte(resp.Body), &jsonScopes); err != nil {
+		return nil, err
+	}
+
+	return jsonScopes.Scopes, nil
+}
+
+func getProfile(key string) (*Profile, error) {
+	req := sg.GetRequest(key, "/v3/user/profile", "https://api.sendgrid.com")
+	req.Method = "GET"
+	resp, err := sg.API(req)
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return nil, fmt.Errorf("invalid api key")
+	} else if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("%v", resp.StatusCode)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the JSON response into a struct
+	var profile Profile
+	if err := json.Unmarshal([]byte(resp.Body), &profile); err != nil {
+		return nil, err
+	}
+
+	return &profile, nil
 }
 
 func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
@@ -60,6 +180,20 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		},
 		Bindings:           []analyzers.Binding{},
 		UnboundedResources: []analyzers.Resource{},
+	}
+
+	// add profile information to analyzer result
+	if info.User.ID != 0 && info.User.FirstName != "" {
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource: analyzers.Resource{
+				Name:               info.User.FirstName + " " + info.User.LastName,
+				FullyQualifiedName: fmt.Sprintf("%d", info.User.ID),
+				Type:               "User",
+			},
+			Permission: analyzers.Permission{
+				Value: "full_access", // if token has all permissions than we can get user information
+			},
+		})
 	}
 
 	for _, scope := range info.Scopes {
@@ -102,37 +236,6 @@ func getCategoryResource(scope SendgridScope) *analyzers.Resource {
 	}
 
 	return categoryResource
-}
-
-type ScopesJSON struct {
-	Scopes []string `json:"scopes"`
-}
-
-type SecretInfo struct {
-	RawScopes []string
-	Scopes    []SendgridScope
-}
-
-func printPermissions(info *SecretInfo, show_all bool) {
-	fmt.Print("\n\n")
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	if show_all {
-		t.AppendHeader(table.Row{"Scope", "Sub-Scope", "Access", "Permissions"})
-	} else {
-		t.AppendHeader(table.Row{"Scope", "Sub-Scope", "Access"})
-	}
-	// Print the scopes
-	for _, s := range info.Scopes {
-		writer := analyzers.GetWriterFromStatus(s.PermissionType)
-		if show_all {
-			t.AppendRow([]interface{}{writer(s.Category), writer(s.SubCategory), writer(s.PermissionType), writer(strings.Join(s.Permissions, "\n"))})
-		} else if s.PermissionType != analyzers.NONE {
-			t.AppendRow([]interface{}{writer(s.Category), writer(s.SubCategory), writer(s.PermissionType)})
-		}
-	}
-	t.Render()
-	fmt.Print("\n\n")
 }
 
 // getCategoryFromScope returns the category for a given scope.
@@ -186,59 +289,34 @@ func processPermissions(rawScopes []string) []SendgridScope {
 	return categoryPermissions
 }
 
-func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-	info, err := AnalyzePermissions(cfg, key)
-	if err != nil {
-		color.Red("[!] Error: %v", err)
-		return
-	}
+func printProfile(profile Profile) {
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
 
-	color.Green("[!] Valid Sendgrid API Key\n\n")
+	t.AppendHeader(table.Row{"UserID", "Name", "Company", "Website", "Country"})
+	t.AppendRow(table.Row{profile.ID, profile.FirstName + " " + profile.LastName, profile.Company, profile.Website, profile.Country})
 
-	if slices.Contains(info.RawScopes, "user.email.read") {
-		color.Green("[*] Sendgrid Key Type: Full Access Key")
-	} else if slices.Contains(info.RawScopes, "billing.read") {
-		color.Yellow("[*] Sendgrid Key Type: Billing Access Key")
-	} else {
-		color.Yellow("[*] Sendgrid Key Type: Restricted Access Key")
-	}
-
-	if slices.Contains(info.RawScopes, "2fa_required") {
-		color.Yellow("[i] 2FA Required for this account")
-	}
-
-	printPermissions(info, cfg.ShowAll)
+	t.Render()
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
-	// Setup custom HTTP client so we can log requests.
-	sg.DefaultClient.HTTPClient = analyzers.NewAnalyzeClient(cfg)
-
-	req := sg.GetRequest(key, "/v3/scopes", "https://api.sendgrid.com")
-	req.Method = "GET"
-	resp, err := sg.API(req)
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return nil, fmt.Errorf("Invalid API Key")
-	} else if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%v", resp.StatusCode)
+func printPermissions(info *SecretInfo, show_all bool) {
+	fmt.Print("\n\n")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	if show_all {
+		t.AppendHeader(table.Row{"Scope", "Sub-Scope", "Access", "Permissions"})
+	} else {
+		t.AppendHeader(table.Row{"Scope", "Sub-Scope", "Access"})
 	}
-	if err != nil {
-		return nil, err
+	// Print the scopes
+	for _, s := range info.Scopes {
+		writer := analyzers.GetWriterFromStatus(s.PermissionType)
+		if show_all {
+			t.AppendRow([]interface{}{writer(s.Category), writer(s.SubCategory), writer(s.PermissionType), writer(strings.Join(s.Permissions, "\n"))})
+		} else if s.PermissionType != analyzers.NONE {
+			t.AppendRow([]interface{}{writer(s.Category), writer(s.SubCategory), writer(s.PermissionType)})
+		}
 	}
-
-	// Unmarshal the JSON response into a struct
-	var jsonScopes ScopesJSON
-	if err := json.Unmarshal([]byte(resp.Body), &jsonScopes); err != nil {
-		return nil, err
-	}
-
-	// Now you can access the scopes
-	rawScopes := jsonScopes.Scopes
-
-	categoryScope := processPermissions(rawScopes)
-
-	return &SecretInfo{
-		RawScopes: rawScopes,
-		Scopes:    categoryScope,
-	}, nil
+	t.Render()
+	fmt.Print("\n\n")
 }
