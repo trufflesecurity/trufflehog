@@ -276,6 +276,15 @@ func (c *Client) EnumerateWorkspaces() ([]Workspace, error) {
 		return workspaces, err
 	}
 
+	for i, workspace := range workspacesObj.Workspaces {
+		workspacesObj.Workspaces[i], err = c.GetWorkspace(workspace.ID)
+		if err != nil {
+			err = fmt.Errorf("could not get workspace during enumeration: %s (%s)", workspace.Name, workspace.ID)
+			return workspaces, err
+		}
+		context.Background().Logger().V(4).Info("individual workspace getting added to the array", "workspace", workspacesObj.Workspaces[i])
+	}
+
 	return workspacesObj.Workspaces, nil
 }
 

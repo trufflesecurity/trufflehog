@@ -185,6 +185,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			return fmt.Errorf("error getting workspace %s: %w", workspaceID, err)
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspaceID), "")
+		ctx.Logger().V(3).Info("Scanning workspace from workspaces given", "workspace", workspaceID)
 		if err = s.scanWorkspace(ctx, chunksChan, w); err != nil {
 			return fmt.Errorf("error scanning workspace %s: %w", workspaceID, err)
 		}
@@ -210,7 +211,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err != nil {
 			return fmt.Errorf("error enumerating postman workspaces: %w", err)
 		}
-		ctx.Logger().Info("Enumerated workspaces", "count", len(workspaces))
+		ctx.Logger().V(3).Info("enumerated workspaces", "workspaces", workspaces)
 		for _, workspace := range workspaces {
 			s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspace.ID), "")
 			if err = s.scanWorkspace(ctx, chunksChan, workspace); err != nil {
