@@ -39,6 +39,6 @@ func NewConnector(
 	case *sourcespb.GitHub_Unauthenticated:
 		return newUnauthenticatedConnector(apiEndpoint)
 	default:
-		return nil, fmt.Errorf("unknown connection type")
+		return nil, fmt.Errorf("unknown GitHub credential type %T", cred)
 	}
 }
