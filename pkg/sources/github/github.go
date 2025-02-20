@@ -229,9 +229,24 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	if apiEndpoint == "" || endsWithGithub.MatchString(apiEndpoint) {
 		apiEndpoint = cloudEndpoint
 	}
-	connector, err := NewConnector(s.conn.GetCredential(), apiEndpoint, s.handleRateLimit)
+
+	var cred any
+	switch gitHubCred := s.conn.GetCredential().(type) {
+	case *sourcespb.GitHub_GithubApp:
+		cred = gitHubCred.GithubApp
+	case *sourcespb.GitHub_BasicAuth:
+		cred = gitHubCred.BasicAuth
+	case *sourcespb.GitHub_Token:
+		cred = gitHubCred.Token
+	case *sourcespb.GitHub_Unauthenticated:
+		cred = gitHubCred.Unauthenticated
+	default:
+		return fmt.Errorf("unknown GitHub credential type %T", s.conn.GetCredential())
+	}
+
+	connector, err := NewConnector(cred, apiEndpoint, s.handleRateLimit)
 	if err != nil {
-		return fmt.Errorf("could not create Connector: %w", err)
+		return fmt.Errorf("could not create connector: %w", err)
 	}
 	s.connector = connector
 

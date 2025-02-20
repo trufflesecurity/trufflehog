@@ -6,9 +6,9 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
 const cloudEndpoint = "https://api.github.com"
@@ -27,18 +27,18 @@ func NewConnector(
 ) (Connector, error) {
 
 	switch cred := cred.(type) {
-	case *sourcespb.GitHub_GithubApp:
-		log.RedactGlobally(cred.GithubApp.GetPrivateKey())
-		return newAppConnector(apiEndpoint, cred.GithubApp)
-	case *sourcespb.GitHub_BasicAuth:
-		log.RedactGlobally(cred.BasicAuth.GetPassword())
-		return newBasicAuthConnector(apiEndpoint, cred.BasicAuth)
-	case *sourcespb.GitHub_Token:
-		log.RedactGlobally(cred.Token)
-		return newTokenConnector(apiEndpoint, cred.Token, handleRateLimit)
-	case *sourcespb.GitHub_Unauthenticated:
+	case *credentialspb.GitHubApp:
+		log.RedactGlobally(cred.GetPrivateKey())
+		return newAppConnector(apiEndpoint, cred)
+	case *credentialspb.BasicAuth:
+		log.RedactGlobally(cred.GetPassword())
+		return newBasicAuthConnector(apiEndpoint, cred)
+	case string: // Token
+		log.RedactGlobally(cred)
+		return newTokenConnector(apiEndpoint, cred, handleRateLimit)
+	case *credentialspb.Unauthenticated:
 		return newUnauthenticatedConnector(apiEndpoint)
 	default:
-		return nil, fmt.Errorf("unknown GitHub credential type %T", cred)
+		return nil, fmt.Errorf("unknown credential type %T", cred)
 	}
 }
