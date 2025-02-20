@@ -1,10 +1,10 @@
 {
-    "AnalyzerType": 4,
+    "AnalyzerType": 6,
     "Bindings": [
         {
             "Resource": {
-                "Name": "Trufflesecurity",
-                "FullyQualifiedName": "WKPePc2TgwawiHdwLf3AlvYQ7uF3",
+                "Name": "Ahmed",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/User/b9Rou9mHDmTYd8cdWkg2Yk4P2lq1",
                 "Type": "User",
                 "Metadata": {},
                 "Parent": null
@@ -16,356 +16,23 @@
         },
         {
             "Resource": {
-                "Name": "",
-                "FullyQualifiedName": "6CyAEZuVefy2XTPpDUPw",
-                "Type": "History",
-                "Metadata": {},
+                "Name": "Alice",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/Xb7hH8MSUJpSbSDYk0k2",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
                 "Parent": null
             },
             "Permission": {
-                "Value": "speech_history_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "",
-                "FullyQualifiedName": "eQrOq95SxEE2Giqwge3t",
-                "Type": "History",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "speech_history_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "",
-                "FullyQualifiedName": "0GY75sDfmOo3d99VCbrr",
-                "Type": "History",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "speech_history_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "",
-                "FullyQualifiedName": "Q1gHSXi5FFkVdvuRe6L0",
-                "Type": "History",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "speech_history_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "",
-                "FullyQualifiedName": "rUREhM2RHdoGVlBAnba2",
-                "Type": "History",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "speech_history_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "",
-                "FullyQualifiedName": "6ET44QjuCvNa0RdTLxqT",
-                "Type": "History",
-                "Metadata": {},
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "speech_history_read",
+                "Value": "voices_read",
                 "Parent": null
             }
         },
         {
             "Resource": {
                 "Name": "Aria",
-                "FullyQualifiedName": "9BWtsMINqrJLrRacOk9x",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Roger",
-                "FullyQualifiedName": "CwhRBWXzGAHq8TQ4Fs17",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Sarah",
-                "FullyQualifiedName": "EXAVITQu4vr4xnSDxMaL",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Laura",
-                "FullyQualifiedName": "FGY2WhTYpPnrIDTdsKH5",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Charlie",
-                "FullyQualifiedName": "IKne3meq5aSn9XLyUdCD",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "George",
-                "FullyQualifiedName": "JBFqnCBsd6RMkjVDRZzb",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Callum",
-                "FullyQualifiedName": "N2lVS1w4EtoT3dr4eOWO",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "River",
-                "FullyQualifiedName": "SAz9YHcvj6GT2YYXdXww",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Liam",
-                "FullyQualifiedName": "TX3LPaxmHKxFdv7VOQHJ",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Charlotte",
-                "FullyQualifiedName": "XB0fDUnXU5powFXDhCwa",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Alice",
-                "FullyQualifiedName": "Xb7hH8MSUJpSbSDYk0k2",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Matilda",
-                "FullyQualifiedName": "XrExE9yKIg1WjnnlVkGX",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Will",
-                "FullyQualifiedName": "bIHbv24MWmeRgasZH58o",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Jessica",
-                "FullyQualifiedName": "cgSgspJ2msm6clMCkdW9",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Eric",
-                "FullyQualifiedName": "cjVigY5qzO86Huf0OWal",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Chris",
-                "FullyQualifiedName": "iP95p4xoKVk53GoZ742B",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Brian",
-                "FullyQualifiedName": "nPczCjzI2devNBz1zQrb",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Daniel",
-                "FullyQualifiedName": "onwK4e9ZLuTAKqWW03F9",
-                "Type": "Voice",
-                "Metadata": {
-                    "category": "premade"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "voices_read",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "Lily",
-                "FullyQualifiedName": "pFZP5JQG7iQjIQuC4Bku",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/9BWtsMINqrJLrRacOk9x",
                 "Type": "Voice",
                 "Metadata": {
                     "category": "premade"
@@ -380,7 +47,7 @@
         {
             "Resource": {
                 "Name": "Bill",
-                "FullyQualifiedName": "pqHfZKP75CvOlQylNhV4",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/pqHfZKP75CvOlQylNhV4",
                 "Type": "Voice",
                 "Metadata": {
                     "category": "premade"
@@ -394,73 +61,98 @@
         },
         {
             "Resource": {
-                "Name": "Eleven Multilingual v2",
-                "FullyQualifiedName": "eleven_multilingual_v2",
-                "Type": "Model",
-                "Metadata": {},
+                "Name": "Brian",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/nPczCjzI2devNBz1zQrb",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
                 "Parent": null
             },
             "Permission": {
-                "Value": "models_read",
+                "Value": "voices_read",
                 "Parent": null
             }
         },
         {
             "Resource": {
-                "Name": "Eleven Flash v2.5",
-                "FullyQualifiedName": "eleven_flash_v2_5",
-                "Type": "Model",
-                "Metadata": {},
+                "Name": "Callum",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/N2lVS1w4EtoT3dr4eOWO",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
                 "Parent": null
             },
             "Permission": {
-                "Value": "models_read",
+                "Value": "voices_read",
                 "Parent": null
             }
         },
         {
             "Resource": {
-                "Name": "Eleven Turbo v2.5",
-                "FullyQualifiedName": "eleven_turbo_v2_5",
-                "Type": "Model",
-                "Metadata": {},
+                "Name": "Charlie",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/IKne3meq5aSn9XLyUdCD",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
                 "Parent": null
             },
             "Permission": {
-                "Value": "models_read",
+                "Value": "voices_read",
                 "Parent": null
             }
         },
         {
             "Resource": {
-                "Name": "Eleven Turbo v2",
-                "FullyQualifiedName": "eleven_turbo_v2",
-                "Type": "Model",
-                "Metadata": {},
+                "Name": "Charlotte",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/XB0fDUnXU5powFXDhCwa",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
                 "Parent": null
             },
             "Permission": {
-                "Value": "models_read",
+                "Value": "voices_read",
                 "Parent": null
             }
         },
         {
             "Resource": {
-                "Name": "Eleven Flash v2",
-                "FullyQualifiedName": "eleven_flash_v2",
-                "Type": "Model",
-                "Metadata": {},
+                "Name": "Chris",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/iP95p4xoKVk53GoZ742B",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
                 "Parent": null
             },
             "Permission": {
-                "Value": "models_read",
+                "Value": "voices_read",
                 "Parent": null
             }
         },
         {
             "Resource": {
-                "Name": "Eleven Multilingual v2",
-                "FullyQualifiedName": "eleven_multilingual_sts_v2",
+                "Name": "Daniel",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/onwK4e9ZLuTAKqWW03F9",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Eleven English v1",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Model/eleven_monolingual_v1",
                 "Type": "Model",
                 "Metadata": {},
                 "Parent": null
@@ -473,7 +165,33 @@
         {
             "Resource": {
                 "Name": "Eleven English v2",
-                "FullyQualifiedName": "eleven_english_sts_v2",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Model/eleven_english_sts_v2",
+                "Type": "Model",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "models_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Eleven Flash v2",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Model/eleven_flash_v2",
+                "Type": "Model",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "models_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Eleven Flash v2.5",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Model/eleven_flash_v2_5",
                 "Type": "Model",
                 "Metadata": {},
                 "Parent": null
@@ -486,7 +204,7 @@
         {
             "Resource": {
                 "Name": "Eleven Multilingual v1",
-                "FullyQualifiedName": "eleven_multilingual_v1",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Model/eleven_multilingual_v1",
                 "Type": "Model",
                 "Metadata": {},
                 "Parent": null
@@ -498,8 +216,8 @@
         },
         {
             "Resource": {
-                "Name": "Eleven English v1",
-                "FullyQualifiedName": "eleven_monolingual_v1",
+                "Name": "Eleven Multilingual v2",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Model/eleven_multilingual_v2",
                 "Type": "Model",
                 "Metadata": {},
                 "Parent": null
@@ -508,19 +226,213 @@
                 "Value": "models_read",
                 "Parent": null
             }
-        }
-    ],
-    "UnboundedResources": [
+        },
         {
-            "Name": "Support agent",
-            "FullyQualifiedName": "sBXUBEfy1ghoGEWWAzIJ",
-            "Type": "Agent",
-            "Metadata": {
-                "access level": "admin"
+            "Resource": {
+                "Name": "Eleven Multilingual v2",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Model/eleven_multilingual_sts_v2",
+                "Type": "Model",
+                "Metadata": {},
+                "Parent": null
             },
-            "Parent": null
+            "Permission": {
+                "Value": "models_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Eleven Turbo v2",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Model/eleven_turbo_v2",
+                "Type": "Model",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "models_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Eleven Turbo v2.5",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Model/eleven_turbo_v2_5",
+                "Type": "Model",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "models_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Eric",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/cjVigY5qzO86Huf0OWal",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "George",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/JBFqnCBsd6RMkjVDRZzb",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Jessica",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/cgSgspJ2msm6clMCkdW9",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Laura",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/FGY2WhTYpPnrIDTdsKH5",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Liam",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/TX3LPaxmHKxFdv7VOQHJ",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Lily",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/pFZP5JQG7iQjIQuC4Bku",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Matilda",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/XrExE9yKIg1WjnnlVkGX",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "River",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/SAz9YHcvj6GT2YYXdXww",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Roger",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/CwhRBWXzGAHq8TQ4Fs17",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Sarah",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/EXAVITQu4vr4xnSDxMaL",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Will",
+                "FullyQualifiedName": "b9Rou9mHDmTYd8cdWkg2Yk4P2lq1/Voice/bIHbv24MWmeRgasZH58o",
+                "Type": "Voice",
+                "Metadata": {
+                    "category": "premade"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "voices_read",
+                "Parent": null
+            }
         }
     ],
+    "UnboundedResources": null,
     "Metadata": {
         "Valid_Key": true
     }

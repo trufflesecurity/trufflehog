@@ -1,4 +1,3 @@
-//go:generate generate_permissions permissions.yaml permissions.go elevenlabs
 package elevenlabs
 
 import (
@@ -253,12 +252,17 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 		aggregatedErrs = make([]string, 0)
 		errChan        = make(chan error, 17) // buffer for 17 errors - one per API call
 		wg             sync.WaitGroup
+		mu             sync.RWMutex
 	)
 
 	// history
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := getHistory(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -272,6 +276,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := deleteDubbing(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -288,6 +296,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := getVoices(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -301,6 +313,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := getProjects(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -314,6 +330,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := getPronunciationDictionaries(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -327,6 +347,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := getModels(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -336,6 +360,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := updateAudioNativeProject(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -345,6 +373,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := deleteInviteFromWorkspace(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -354,6 +386,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := textToSpeech(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -368,6 +404,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := audioIsolation(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -377,6 +417,10 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		mu.Lock()
+		defer mu.Unlock()
+
 		// each agent can have a conversations which we get inside this function
 		if err := getAgents(client, key, secretInfo); err != nil {
 			errChan <- err
