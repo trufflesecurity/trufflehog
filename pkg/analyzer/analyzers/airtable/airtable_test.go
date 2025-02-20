@@ -1,9 +1,8 @@
-package sendgrid
+package airtable
 
 import (
 	_ "embed"
 	"encoding/json"
-	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -14,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
-//go:embed result_output.json
+//go:embed expected_output.json
 var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
@@ -27,14 +26,14 @@ func TestAnalyzer_Analyze(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		key     string
-		want    []byte // JSON string
+		token   string
+		want    string // JSON string
 		wantErr bool
 	}{
 		{
-			name:    "Valid Sendgrid key",
-			key:     testSecrets.MustGetField("SENDGRID"),
-			want:    expectedOutput,
+			token:   testSecrets.MustGetField("AIRTABLEOAUTH_TOKEN"),
+			name:    "valid Airtable OAuth Token",
+			want:    string(expectedOutput),
 			wantErr: false,
 		},
 	}
@@ -42,12 +41,13 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{Cfg: &config.Config{}}
-			got, err := a.Analyze(ctx, map[string]string{"key": tt.key})
+			got, err := a.Analyze(ctx, map[string]string{"token": tt.token})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
+			// bindings need to be in the same order to be comparable
 			sortBindings(got.Bindings)
 
 			// Marshal the actual result to JSON
@@ -56,14 +56,13 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				t.Fatalf("could not marshal got to JSON: %s", err)
 			}
 
-			fmt.Println(string(gotJSON))
-
 			// Parse the expected JSON string
 			var wantObj analyzers.AnalyzerResult
 			if err := json.Unmarshal([]byte(tt.want), &wantObj); err != nil {
 				t.Fatalf("could not unmarshal want JSON string: %s", err)
 			}
 
+			// bindings need to be in the same order to be comparable
 			sortBindings(wantObj.Bindings)
 
 			// Marshal the expected result to JSON (to normalize)
