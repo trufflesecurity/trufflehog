@@ -20,22 +20,28 @@ type Connector interface {
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
 }
 
-func NewConnector(
-	cred any,
+type Token string
+
+type Credential interface {
+	*credentialspb.GitHubApp | *credentialspb.BasicAuth | Token | *credentialspb.Unauthenticated
+}
+
+func NewConnector[C Credential](
+	cred C,
 	apiEndpoint string,
 	handleRateLimit func(ctx context.Context, errIn error, reporters ...errorReporter) bool,
 ) (Connector, error) {
 
-	switch cred := cred.(type) {
+	switch cred := any(cred).(type) {
 	case *credentialspb.GitHubApp:
 		log.RedactGlobally(cred.GetPrivateKey())
 		return newAppConnector(apiEndpoint, cred)
 	case *credentialspb.BasicAuth:
 		log.RedactGlobally(cred.GetPassword())
 		return newBasicAuthConnector(apiEndpoint, cred)
-	case string: // Token
-		log.RedactGlobally(cred)
-		return newTokenConnector(apiEndpoint, cred, handleRateLimit)
+	case Token:
+		log.RedactGlobally(string(cred))
+		return newTokenConnector(apiEndpoint, string(cred), handleRateLimit)
 	case *credentialspb.Unauthenticated:
 		return newUnauthenticatedConnector(apiEndpoint)
 	default:
