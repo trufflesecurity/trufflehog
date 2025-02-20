@@ -19,7 +19,7 @@ type appConnector struct {
 	installationID     int64
 }
 
-var _ connector = (*appConnector)(nil)
+var _ Connector = (*appConnector)(nil)
 
 func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConnector, error) {
 	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)

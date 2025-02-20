@@ -13,18 +13,18 @@ import (
 
 const cloudEndpoint = "https://api.github.com"
 
-type connector interface {
+type Connector interface {
 	// APIClient returns a configured GitHub client that can be used for GitHub API operations.
 	APIClient() *github.Client
 	// Clone clones a repository using the configured authentication information.
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
 }
 
-func newConnector(
+func NewConnector(
 	cred any,
 	apiEndpoint string,
 	handleRateLimit func(ctx context.Context, errIn error, reporters ...errorReporter) bool,
-) (connector, error) {
+) (Connector, error) {
 
 	switch cred := cred.(type) {
 	case *sourcespb.GitHub_GithubApp:

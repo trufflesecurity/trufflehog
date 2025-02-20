@@ -22,7 +22,7 @@ type tokenConnector struct {
 	userMu             sync.Mutex
 }
 
-var _ connector = (*tokenConnector)(nil)
+var _ Connector = (*tokenConnector)(nil)
 
 func newTokenConnector(apiEndpoint string, token string, handleRateLimit func(context.Context, error, ...errorReporter) bool) (*tokenConnector, error) {
 	const httpTimeoutSeconds = 60
