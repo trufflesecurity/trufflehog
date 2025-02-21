@@ -17,7 +17,7 @@ type basicAuthConnector struct {
 	password  string
 }
 
-var _ Connector = (*basicAuthConnector)(nil)
+var _ connector = (*basicAuthConnector)(nil)
 
 func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*basicAuthConnector, error) {
 	const httpTimeoutSeconds = 60

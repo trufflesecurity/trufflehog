@@ -64,7 +64,7 @@ type Source struct {
 	jobPool         *errgroup.Group
 	resumeInfoMutex sync.Mutex
 	resumeInfoSlice []string
-	connector       Connector
+	connector       connector
 
 	includePRComments     bool
 	includeIssueComments  bool
@@ -225,7 +225,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	connector, err := newConnectorFromSource(s)
+	connector, err := newConnector(s)
 	if err != nil {
 		return fmt.Errorf("could not create connector: %w", err)
 	}
@@ -392,7 +392,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		}
 	}
 
-	// I'm not wild about switching on the connector type here (as opposed to dispatching to the Connector itself) but
+	// I'm not wild about switching on the connector type here (as opposed to dispatching to the connector itself) but
 	// this felt like a compromise that allowed me to isolate connection logic without rewriting the entire source.
 	switch c := s.connector.(type) {
 	case *appConnector:
