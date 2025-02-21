@@ -14,7 +14,7 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -22,6 +22,7 @@ import (
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
 
+// to avoid rate limiting
 const MAX_CONCURRENT_TESTS = 10
 
 type Analyzer struct {
