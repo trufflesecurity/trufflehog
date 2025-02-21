@@ -17,14 +17,14 @@ type tokenConnector struct {
 	apiClient          *github.Client
 	token              string
 	isGitHubEnterprise bool
-	handleRateLimit    func(context.Context, error, ...errorReporter) bool
+	handleRateLimit    func(context.Context, error) bool
 	user               string
 	userMu             sync.Mutex
 }
 
 var _ Connector = (*tokenConnector)(nil)
 
-func NewTokenConnector(apiEndpoint string, token string, handleRateLimit func(context.Context, error, ...errorReporter) bool) (Connector, error) {
+func NewTokenConnector(apiEndpoint string, token string, handleRateLimit func(context.Context, error) bool) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})

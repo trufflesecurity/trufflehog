@@ -1591,7 +1591,9 @@ func newConnector(source *Source) (Connector, error) {
 		return NewBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		log.RedactGlobally(cred.Token)
-		return NewTokenConnector(apiEndpoint, cred.Token, source.handleRateLimit)
+		return NewTokenConnector(apiEndpoint, cred.Token, func(c context.Context, err error) bool {
+			return source.handleRateLimit(c, err)
+		})
 	case *sourcespb.GitHub_Unauthenticated:
 		return NewUnauthenticatedConnector(apiEndpoint)
 	default:
