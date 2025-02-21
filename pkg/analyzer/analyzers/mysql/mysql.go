@@ -11,8 +11,8 @@ import (
 
 	"github.com/dustin/go-humanize"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jedib0t/go-pretty/text"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/xo/dburl"
 
 	"github.com/fatih/color"
