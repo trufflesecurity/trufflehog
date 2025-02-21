@@ -78,7 +78,7 @@ func (c *appConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 
-func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
+func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
 	// TODO: Check rate limit for this call.
 	token, _, err := c.installationClient.Apps.CreateInstallationToken(
 		ctx,
@@ -88,7 +88,7 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogi
 		return "", nil, fmt.Errorf("could not create installation token: %w", err)
 	}
 
-	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token")
+	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token", args...)
 }
 
 func (c *appConnector) InstallationClient() *github.Client {

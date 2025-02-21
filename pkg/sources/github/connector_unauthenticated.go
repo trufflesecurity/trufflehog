@@ -33,6 +33,6 @@ func (c *unauthenticatedConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 
-func (c *unauthenticatedConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
-	return git.CloneRepoUsingUnauthenticated(ctx, repoURL)
+func (c *unauthenticatedConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
+	return git.CloneRepoUsingUnauthenticated(ctx, repoURL, args...)
 }

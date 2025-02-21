@@ -50,11 +50,11 @@ func (c *tokenConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 
-func (c *tokenConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
+func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
 	if err := c.setUserIfUnset(ctx); err != nil {
 		return "", nil, err
 	}
-	return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.user)
+	return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.user, args...)
 }
 
 func (c *tokenConnector) IsGithubEnterprise() bool {
