@@ -278,12 +278,11 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 	for i, workspace := range workspacesObj.Workspaces {
 		tempWorkspace, err := c.GetWorkspace(ctx, workspace.ID)
 		if err != nil {
-			err = fmt.Errorf("could not get workspace during enumeration: %s (%s)", workspace.Name, workspace.ID)
-			return nil, err
-		} else {
-			workspacesObj.Workspaces[i] = tempWorkspace
+			return nil, fmt.Errorf("could not get workspace %q (%s) during enumeration: %w", workspace.Name, workspace.ID, err)
 		}
-		ctx.Logger().V(3).Info("individual workspace getting added to the array", "workspace", workspacesObj.Workspaces[i])
+		workspacesObj.Workspaces[i] = tempWorkspace
+
+		ctx.Logger().V(3).Info("individual workspace getting added to the slice", "workspace", workspacesObj.Workspaces[i])
 	}
 
 	return workspacesObj.Workspaces, nil
