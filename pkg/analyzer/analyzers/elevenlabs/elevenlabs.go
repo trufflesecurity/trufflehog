@@ -32,7 +32,6 @@ type SecretInfo struct {
 	Reference           string
 	Permissions         []string             // list of Permissions assigned to the key
 	ElevenLabsResources []ElevenLabsResource // list of resources the key has access to
-	Misc                map[string]string
 }
 
 // User hold the information about user to whom the key belongs to
