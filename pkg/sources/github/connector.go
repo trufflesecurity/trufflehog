@@ -8,6 +8,7 @@ import (
 
 const cloudEndpoint = "https://api.github.com"
 
+// Connector abstracts over the authenticated ways to interact with GitHub: cloning and API operations.
 type Connector interface {
 	// APIClient returns a configured GitHub client that can be used for GitHub API operations.
 	APIClient() *github.Client
