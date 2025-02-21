@@ -180,7 +180,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Scan workspaces
 	for _, workspaceID := range s.conn.Workspaces {
-		w, err := s.client.GetWorkspace(workspaceID)
+		w, err := s.client.GetWorkspace(ctx, workspaceID)
 		if err != nil {
 			return fmt.Errorf("error getting workspace %s: %w", workspaceID, err)
 		}

@@ -253,7 +253,6 @@ func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Res
 // Consider adding additional flags to support filtering.
 func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 	ctx.Logger().V(2).Info("enumerating workspaces")
-	var workspaces []Workspace
 	workspacesObj := struct {
 		Workspaces []Workspace `json:"workspaces"`
 	}{}
@@ -261,26 +260,28 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 	r, err := c.getPostmanReq("https://api.getpostman.com/workspaces", nil)
 	if err != nil {
 		err = fmt.Errorf("could not get workspaces")
-		return workspaces, err
+		return nil, err
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("could not read response body for workspaces")
-		return workspaces, err
+		return nil, err
 	}
 	r.Body.Close()
 
 	if err := json.Unmarshal([]byte(body), &workspacesObj); err != nil {
 		err = fmt.Errorf("could not unmarshal workspaces JSON")
-		return workspaces, err
+		return nil, err
 	}
 
 	for i, workspace := range workspacesObj.Workspaces {
-		workspacesObj.Workspaces[i], err = c.GetWorkspace(workspace.ID)
+		tempWorkspace, err := c.GetWorkspace(ctx, workspace.ID)
 		if err != nil {
 			err = fmt.Errorf("could not get workspace during enumeration: %s (%s)", workspace.Name, workspace.ID)
-			return workspaces, err
+			return nil, err
+		} else {
+			workspacesObj.Workspaces[i] = tempWorkspace
 		}
 		ctx.Logger().V(3).Info("individual workspace getting added to the array", "workspace", workspacesObj.Workspaces[i])
 	}
@@ -289,8 +290,8 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 }
 
 // GetWorkspace returns the workspace for a given workspace
-func (c *Client) GetWorkspace(workspaceUUID string) (Workspace, error) {
-	var workspace Workspace
+func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Workspace, error) {
+	ctx.Logger().V(2).Info("getting workspace", "workspace", workspaceUUID)
 	obj := struct {
 		Workspace Workspace `json:"workspace"`
 	}{}
@@ -299,19 +300,19 @@ func (c *Client) GetWorkspace(workspaceUUID string) (Workspace, error) {
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
 		err = fmt.Errorf("could not get workspace: %s", workspaceUUID)
-		return workspace, err
+		return Workspace{}, err
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("could not read response body for workspace: %s", workspaceUUID)
-		return workspace, err
+		return Workspace{}, err
 	}
 	r.Body.Close()
 
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		err = fmt.Errorf("could not unmarshal workspace JSON for workspace: %s", workspaceUUID)
-		return workspace, err
+		return Workspace{}, err
 	}
 
 	return obj.Workspace, nil
