@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
 
 const (
@@ -68,17 +70,16 @@ type Metadata struct {
 	EnvironmentID   string
 	CollectionInfo  Info
 	FolderID        string // UUID of the folder (but not full ID)
-	FolderName      string
+	FolderName      string // Folder path if the item is nested under one or more folders
 	RequestID       string // UUID of the request (but not full ID)
 	RequestName     string
 	FullID          string //full ID of the reference item (created_by + ID) OR just the UUID
 	Link            string //direct link to the folder (could be .json file path)
 	Type            string //folder, request, etc.
 	EnvironmentName string
-	VarType         string
-	FieldName       string
-	FieldType       string
+	FieldType       string // Path of the item type
 	fromLocal       bool
+	LocationType    source_metadatapb.PostmanLocationType // The distinct Postman location type that the item falls under
 }
 
 type Collection struct {
@@ -108,7 +109,7 @@ type Item struct {
 	Request     Request    `json:"request,omitempty"`
 	Response    []Response `json:"response,omitempty"`
 	Description string     `json:"description,omitempty"`
-	UID         string     `json:"uid,omitempty"` //Need to use this to get the collection via API
+	UID         string     `json:"uid,omitempty"` //Need to use this to get the collection via API. The UID is a concatenation of the ID and the user ID of whoever created the item.
 }
 
 type Auth struct {

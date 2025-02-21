@@ -1022,6 +1022,8 @@ enum DetectorType {
   TwitchAccessToken = 1010;
   TwilioApiKey = 1011;
   Sanity = 1012;
+  AzureRefreshToken = 1013;
+  AirtableOAuth = 1014;
 }
 
 message Result {

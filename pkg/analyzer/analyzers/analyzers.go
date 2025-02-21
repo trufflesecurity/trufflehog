@@ -61,8 +61,10 @@ const (
 const (
 	AnalyzerTypeInvalid AnalyzerType = iota
 	AnalyzerTypeAirbrake
+	AnalyzerAnthropic
 	AnalyzerTypeAsana
 	AnalyzerTypeBitbucket
+	AnalyzerTypeDockerHub
 	AnalyzerTypeGitHub
 	AnalyzerTypeGitLab
 	AnalyzerTypeHuggingFace
@@ -80,6 +82,9 @@ const (
 	AnalyzerTypeSquare
 	AnalyzerTypeStripe
 	AnalyzerTypeTwilio
+	AnalyzerTypePrivateKey
+	AnalyzerTypeNotion
+	AnalyzerTypeAirtable
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -87,8 +92,11 @@ const (
 var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeInvalid:     "Invalid",
 	AnalyzerTypeAirbrake:    "Airbrake",
+	AnalyzerTypeAirtable:    "Airtable",
+	AnalyzerAnthropic:       "Anthropic",
 	AnalyzerTypeAsana:       "Asana",
 	AnalyzerTypeBitbucket:   "Bitbucket",
+	AnalyzerTypeDockerHub:   "DockerHub",
 	AnalyzerTypeGitHub:      "GitHub",
 	AnalyzerTypeGitLab:      "GitLab",
 	AnalyzerTypeHuggingFace: "HuggingFace",
@@ -106,6 +114,8 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeSquare:      "Square",
 	AnalyzerTypeStripe:      "Stripe",
 	AnalyzerTypeTwilio:      "Twilio",
+	AnalyzerTypePrivateKey:  "PrivateKey",
+	AnalyzerTypeNotion:      "Notion",
 	// Add new mappings here
 }
 

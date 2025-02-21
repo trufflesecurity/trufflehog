@@ -110,6 +110,16 @@ func structToMap(obj any) (m map[string]map[string]any, err error) {
 		return
 	}
 	err = json.Unmarshal(data, &m)
+	// Due to PostmanLocationType protobuf field being an enum, we want to be able to assign the string value of the enum to the field without needing to create another Protobuf field.
+	// To have the "UNKNOWN_POSTMAN = 0" value be assigned correctly to the field, we need to check if the Postman workspace ID is filled since every secret in the Postman source
+	// should have a valid workspace ID and the 0 value is considered nil for integers.
+	if m["Postman"]["workspace_uuid"] != nil {
+		if m["Postman"]["location_type"] == nil {
+			m["Postman"]["location_type"] = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN.String()
+		} else {
+			m["Postman"]["location_type"] = obj.(*source_metadatapb.MetaData_Postman).Postman.LocationType.String()
+		}
+	}
 	return
 }
 

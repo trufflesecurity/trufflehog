@@ -14,6 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airbrakeuserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airship"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airtableapikey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airtableoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aiven"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/alchemy"
@@ -53,6 +54,7 @@ import (
 	atlassianv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/audd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0oauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autodesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autoklose"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/autopilot"
@@ -64,8 +66,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_batch"
-	azure_serviceprincipal_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v1"
-	azure_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
+	azure_entra_refreshtoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/refreshtoken"
+	azure_entra_serviceprincipal_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v1"
+	azure_entra_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_storage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
@@ -416,7 +419,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/luno"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/madkudu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/magicbell"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/magnetic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailboxlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailchimp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailerlite"
@@ -836,6 +838,7 @@ func buildDetectorList() []detectors.Detector {
 		&airbrakeuserkey.Scanner{},
 		&airship.Scanner{},
 		&airtableapikey.Scanner{},
+		&airtableoauth.Scanner{},
 		&airvisual.Scanner{},
 		&aiven.Scanner{},
 		&alchemy.Scanner{},
@@ -879,7 +882,7 @@ func buildDetectorList() []detectors.Detector {
 		&atlassianv2.Scanner{},
 		&audd.Scanner{},
 		&auth0managementapitoken.Scanner{},
-		// &auth0oauth.Scanner{},
+		&auth0oauth.Scanner{},
 		&autodesk.Scanner{},
 		&autoklose.Scanner{},
 		&autopilot.Scanner{},
@@ -890,8 +893,9 @@ func buildDetectorList() []detectors.Detector {
 		&axonaut.Scanner{},
 		&aylien.Scanner{},
 		&ayrshare.Scanner{},
-		&azure_serviceprincipal_v1.Scanner{},
-		&azure_serviceprincipal_v2.Scanner{},
+		&azure_entra_refreshtoken.Scanner{},
+		&azure_entra_serviceprincipal_v1.Scanner{},
+		&azure_entra_serviceprincipal_v2.Scanner{},
 		&azure_batch.Scanner{},
 		&azurecontainerregistry.Scanner{},
 		&azuredevopspersonalaccesstoken.Scanner{},
@@ -1254,7 +1258,7 @@ func buildDetectorList() []detectors.Detector {
 		// &m3o.Scanner{},
 		&madkudu.Scanner{},
 		&magicbell.Scanner{},
-		&magnetic.Scanner{},
+		// &magnetic.Scanner{},
 		&mailboxlayer.Scanner{},
 		&mailchimp.Scanner{},
 		&mailerlite.Scanner{},

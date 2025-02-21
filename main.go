@@ -269,8 +269,8 @@ func init() {
 	// Support -h for help
 	cli.HelpFlag.Short('h')
 
-	if len(os.Args) <= 1 && isatty.IsTerminal(os.Stdout.Fd()) {
-		args := tui.Run()
+	if isatty.IsTerminal(os.Stdout.Fd()) && (len(os.Args) <= 1 || os.Args[1] == analyzeCmd.FullCommand()) {
+		args := tui.Run(os.Args[1:])
 		if len(args) == 0 {
 			os.Exit(0)
 		}
@@ -520,45 +520,39 @@ func run(state overseer.State) {
 		return
 	}
 
-	topLevelSubCommand, _, _ := strings.Cut(cmd, " ")
-	switch topLevelSubCommand {
-	case analyzeCmd.FullCommand():
-		analyzer.Run(cmd)
-	default:
-		metrics, err := runSingleScan(ctx, cmd, engConf)
-		if err != nil {
-			logFatal(err, "error running scan")
-		}
+	metrics, err := runSingleScan(ctx, cmd, engConf)
+	if err != nil {
+		logFatal(err, "error running scan")
+	}
 
-		verificationCacheMetrics := struct {
-			Hits                    int32
-			Misses                  int32
-			HitsWasted              int32
-			AttemptsSaved           int32
-			VerificationTimeSpentMS int64
-		}{
-			Hits:                    verificationCacheMetrics.ResultCacheHits.Load(),
-			Misses:                  verificationCacheMetrics.ResultCacheMisses.Load(),
-			HitsWasted:              verificationCacheMetrics.ResultCacheHitsWasted.Load(),
-			AttemptsSaved:           verificationCacheMetrics.CredentialVerificationsSaved.Load(),
-			VerificationTimeSpentMS: verificationCacheMetrics.FromDataVerifyTimeSpentMS.Load(),
-		}
+	verificationCacheMetricsSnapshot := struct {
+		Hits                    int32
+		Misses                  int32
+		HitsWasted              int32
+		AttemptsSaved           int32
+		VerificationTimeSpentMS int64
+	}{
+		Hits:                    verificationCacheMetrics.ResultCacheHits.Load(),
+		Misses:                  verificationCacheMetrics.ResultCacheMisses.Load(),
+		HitsWasted:              verificationCacheMetrics.ResultCacheHitsWasted.Load(),
+		AttemptsSaved:           verificationCacheMetrics.CredentialVerificationsSaved.Load(),
+		VerificationTimeSpentMS: verificationCacheMetrics.FromDataVerifyTimeSpentMS.Load(),
+	}
 
-		// Print results.
-		logger.Info("finished scanning",
-			"chunks", metrics.ChunksScanned,
-			"bytes", metrics.BytesScanned,
-			"verified_secrets", metrics.VerifiedSecretsFound,
-			"unverified_secrets", metrics.UnverifiedSecretsFound,
-			"scan_duration", metrics.ScanDuration.String(),
-			"trufflehog_version", version.BuildVersion,
-			"verification_caching", verificationCacheMetrics,
-		)
+	// Print results.
+	logger.Info("finished scanning",
+		"chunks", metrics.ChunksScanned,
+		"bytes", metrics.BytesScanned,
+		"verified_secrets", metrics.VerifiedSecretsFound,
+		"unverified_secrets", metrics.UnverifiedSecretsFound,
+		"scan_duration", metrics.ScanDuration.String(),
+		"trufflehog_version", version.BuildVersion,
+		"verification_caching", verificationCacheMetricsSnapshot,
+	)
 
-		if metrics.hasFoundResults && *fail {
-			logger.V(2).Info("exiting with code 183 because results were found")
-			os.Exit(183)
-		}
+	if metrics.hasFoundResults && *fail {
+		logger.V(2).Info("exiting with code 183 because results were found")
+		os.Exit(183)
 	}
 }
 

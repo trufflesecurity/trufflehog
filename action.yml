@@ -35,7 +35,7 @@ runs:
       BASE: ${{ inputs.base }}
       HEAD: ${{ inputs.head }}
       ARGS: ${{ inputs.extra_args }}
-      COMMITS: ${{ toJson(github.event.commits) }}
+      COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
       VERSION: ${{ inputs.version }}
     run: |
       ##########################################
@@ -64,14 +64,14 @@ runs:
       ##########################################
       else
         if [ "${{ github.event_name }}" == "push" ]; then
-          COMMIT_LENGTH=$(printenv COMMITS | jq length)
+          COMMIT_LENGTH=$(printenv COMMIT_IDS | jq length)
           if [ $COMMIT_LENGTH == "0" ]; then
             echo "No commits to scan"
             exit 0
           fi
           HEAD=${{ github.event.after }}
           if [ ${{ github.event.before }} == "0000000000000000000000000000000000000000" ]; then
-            BASE=$(git rev-parse $HEAD~$COMMIT_LENGTH)
+            BASE=""
           else
             BASE=${{ github.event.before }}
           fi

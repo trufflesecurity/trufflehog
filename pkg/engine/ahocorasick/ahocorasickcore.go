@@ -99,6 +99,14 @@ func (m *adjustableSpanCalculator) calculateSpan(params spanCalculationParams) m
 	startIdx := max(startOffset, 0)
 	endIdx := min(maxSize, int64(len(params.chunkData)))
 
+	// Ensure the start index is not greater than the end index to prevent invalid spans.
+	// In rare cases where the calculated start index exceeds the end index (possibly due to
+	// detector-provided offsets), we reset the start index to 0 to maintain a valid span range
+	// and avoid runtime panics. This is a temporary fix until the root cause is identified.
+	if startIdx >= endIdx {
+		startIdx = 0
+	}
+
 	return matchSpan{startOffset: startIdx, endOffset: endIdx}
 }
 

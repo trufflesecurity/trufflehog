@@ -1,24 +1,28 @@
 package analyzer
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airbrake"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airtable"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/asana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/dockerhub"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/gitlab"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/huggingface"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailchimp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailgun"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mysql"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/notion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/opsgenie"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postgres"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postman"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/sendgrid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/shopify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/slack"
@@ -27,37 +31,18 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/stripe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/twilio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/tui"
 )
 
-var (
-	// TODO: Add list of supported key types.
-	analyzeKeyType *string
-)
-
-func Command(app *kingpin.Application) *kingpin.CmdClause {
-	cli := app.Command("analyze", "Analyze API keys for fine-grained permissions information.")
-
-	keyTypeHelp := fmt.Sprintf(
-		"Type of key to analyze. Omit to interactively choose. Available key types: %s",
-		strings.Join(analyzers.AvailableAnalyzers(), ", "),
-	)
-	// Lowercase the available analyzers.
-	availableAnalyzers := make([]string, len(analyzers.AvailableAnalyzers()))
-	for i, a := range analyzers.AvailableAnalyzers() {
-		availableAnalyzers[i] = strings.ToLower(a)
-	}
-	analyzeKeyType = cli.Arg("key-type", keyTypeHelp).Enum(availableAnalyzers...)
-
-	return cli
+type SecretInfo struct {
+	Parts map[string]string
+	Cfg   *config.Config
 }
 
-func Run(cmd string) {
-	keyType, secretInfo, err := tui.Run(*analyzeKeyType)
-	if err != nil {
-		// TODO: Log error.
-		return
-	}
+func Command(app *kingpin.Application) *kingpin.CmdClause {
+	return app.Command("analyze", "Analyze API keys for fine-grained permissions information.")
+}
+
+func Run(keyType string, secretInfo SecretInfo) {
 	if secretInfo.Cfg == nil {
 		secretInfo.Cfg = &config.Config{}
 	}
@@ -102,5 +87,15 @@ func Run(cmd string) {
 		shopify.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"], secretInfo.Parts["url"])
 	case "opsgenie":
 		opsgenie.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "privatekey":
+		privatekey.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "notion":
+		notion.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "dockerhub":
+		dockerhub.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["username"], secretInfo.Parts["pat"])
+  case "anthropic":
+		anthropic.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "airtable":
+		airtable.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }

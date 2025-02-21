@@ -51,6 +51,7 @@ enum SourceType {
   SOURCE_TYPE_HUGGINGFACE = 36;
   SOURCE_TYPE_GITHUB_EXPERIMENTAL = 37;
   SOURCE_TYPE_SENTRY = 38;
+  SOURCE_TYPE_GITHUB_REALTIME = 39;
 }
 
 message LocalSource {
@@ -256,6 +257,11 @@ message GitHubExperimental {
   bool object_discovery = 3;
   int64 collision_threshold = 4;
   bool delete_cached_data = 5;
+}
+
+message GitHubRealtime {
+  uint32 listener_port = 1;
+  string webhook_secret = 2;
 }
 
 message GoogleDrive {

@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/lib/pq"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"

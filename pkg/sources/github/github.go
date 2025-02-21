@@ -3,6 +3,7 @@ package github
 import (
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/google/go-github/v67/github"
-	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -381,7 +381,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	// See: https://github.com/trufflesecurity/trufflehog/pull/2379#discussion_r1487454788
 	for _, name := range s.filteredRepoCache.Keys() {
 		url, _ := s.filteredRepoCache.Get(name)
-		url, err := s.ensureRepoInfoCache(ctx, url)
+		url, err := s.ensureRepoInfoCache(ctx, url, &unitErrorReporter{reporter})
 		if err != nil {
 			if err := dedupeReporter.UnitErr(ctx, err); err != nil {
 				return err
@@ -417,9 +417,10 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 	for _, repo := range s.filteredRepoCache.Values() {
 		ctx := context.WithValue(ctx, "repo", repo)
 
-		repo, err := s.ensureRepoInfoCache(ctx, repo)
+		repo, err := s.ensureRepoInfoCache(ctx, repo, &unitErrorReporter{reporter})
 		if err != nil {
 			ctx.Logger().Error(err, "error caching repo info")
+			_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
 		}
 		s.repos = append(s.repos, repo)
 	}
@@ -434,7 +435,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 // provided repository URL. If not, it fetches and stores the metadata for the
 // repository. In some cases, the gist URL needs to be normalized, which is
 // returned by this function.
-func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string) (string, error) {
+func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter errorReporter) (string, error) {
 	if _, ok := s.repoInfoCache.get(repo); ok {
 		return repo, nil
 	}
@@ -453,12 +454,15 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string) (string, 
 			// Normalize the URL to the Gist's pull URL.
 			// See https://github.com/trufflesecurity/trufflehog/pull/2625#issuecomment-2025507937
 			repo = gist.GetGitPullURL()
-			if s.handleRateLimit(ctx, err) {
+
+			if s.handleRateLimit(ctx, err, reporter) {
 				continue
 			}
+
 			if err != nil {
 				return repo, fmt.Errorf("failed to fetch gist")
 			}
+
 			s.cacheGistInfo(gist)
 			break
 		}
@@ -466,7 +470,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string) (string, 
 		// Cache repository info.
 		for {
 			ghRepo, _, err := s.connector.APIClient().Repositories.Get(ctx, urlParts[1], urlParts[2])
-			if s.handleRateLimit(ctx, err) {
+			if s.handleRateLimit(ctx, err, reporter) {
 				continue
 			}
 			if err != nil {
@@ -491,7 +495,7 @@ func (s *Source) enumerateBasicAuth(ctx context.Context, reporter sources.UnitRe
 		// TODO: This modifies s.memberCache but it doesn't look like
 		// we do anything with it.
 		if userType == organization && s.conn.ScanUsers {
-			if err := s.addMembersByOrg(ctx, org); err != nil {
+			if err := s.addMembersByOrg(ctx, org, reporter); err != nil {
 				orgCtx.Logger().Error(err, "Unable to add members by org")
 			}
 		}
@@ -526,7 +530,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 	var err error
 	for {
 		ghUser, _, err = s.connector.APIClient().Users.Get(ctx, "")
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -546,11 +550,11 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 		}
 
 		if isGithubEnterprise {
-			s.addAllVisibleOrgs(ctx)
+			s.addAllVisibleOrgs(ctx, reporter)
 		} else {
 			// Scan for orgs is default with a token.
 			// GitHub App enumerates the repos that were assigned to it in GitHub App settings.
-			s.addOrgsByUser(ctx, ghUser.GetLogin())
+			s.addOrgsByUser(ctx, ghUser.GetLogin(), reporter)
 		}
 	}
 
@@ -564,7 +568,7 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 			}
 
 			if userType == organization && s.conn.ScanUsers {
-				if err := s.addMembersByOrg(ctx, org); err != nil {
+				if err := s.addMembersByOrg(ctx, org, reporter); err != nil {
 					orgCtx.Logger().Error(err, "Unable to add members for org")
 				}
 			}
@@ -588,7 +592,7 @@ func (s *Source) enumerateWithApp(ctx context.Context, installationClient *githu
 
 		// Check if we need to find user repos.
 		if s.conn.ScanUsers {
-			err := s.addMembersByApp(ctx, installationClient)
+			err := s.addMembersByApp(ctx, installationClient, reporter)
 			if err != nil {
 				return err
 			}
@@ -739,13 +743,37 @@ var (
 	rateLimitResumeTime time.Time
 )
 
-// handleRateLimit returns true if a rate limit was handled
+// errorReporter is an interface that captures just the error reporting functionality
+type errorReporter interface {
+	Err(ctx context.Context, err error) error
+}
+
+// wrapper to adapt UnitReporter to errorReporter
+type unitErrorReporter struct {
+	reporter sources.UnitReporter
+}
+
+func (u unitErrorReporter) Err(ctx context.Context, err error) error {
+	return u.reporter.UnitErr(ctx, err)
+}
+
+// wrapper to adapt ChunkReporter to errorReporter
+type chunkErrorReporter struct {
+	reporter sources.ChunkReporter
+}
+
+func (c chunkErrorReporter) Err(ctx context.Context, err error) error {
+	return c.reporter.ChunkErr(ctx, err)
+}
+
+// handleRateLimit handles GitHub API rate limiting with an optional error reporter.
+// Returns true if a rate limit was handled.
 //
 // Unauthenticated users have a rate limit of 60 requests per hour.
 // Authenticated users have a rate limit of 5,000 requests per hour,
 // however, certain actions are subject to a stricter "secondary" limit.
 // https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
-func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
+func (s *Source) handleRateLimit(ctx context.Context, errIn error, reporters ...errorReporter) bool {
 	if errIn == nil {
 		return false
 	}
@@ -757,7 +785,6 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
 	var retryAfter time.Duration
 	if resumeTime.IsZero() || time.Now().After(resumeTime) {
 		rateLimitMu.Lock()
-
 		var (
 			now = time.Now()
 
@@ -780,11 +807,15 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
 			return false
 		}
 
-		jitter := time.Duration(rand.Intn(10)+1) * time.Second
+		jitter := time.Duration(rand.IntN(10)+1) * time.Second
 		if retryAfter > 0 {
 			retryAfter = retryAfter + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
 			ctx.Logger().Info(fmt.Sprintf("exceeded %s rate limit", limitType), "retry_after", retryAfter.String(), "resume_time", rateLimitResumeTime.Format(time.RFC3339))
+			// Only report the error if a reporter was provided
+			for _, reporter := range reporters {
+				_ = reporter.Err(ctx, fmt.Errorf("exceeded %s rate limit", limitType))
+			}
 		} else {
 			retryAfter = (5 * time.Minute) + jitter
 			rateLimitResumeTime = now.Add(retryAfter)
@@ -801,6 +832,16 @@ func (s *Source) handleRateLimit(ctx context.Context, errIn error) bool {
 	time.Sleep(retryAfter)
 	githubSecondsSpentRateLimited.WithLabelValues(s.name).Add(retryAfter.Seconds())
 	return true
+}
+
+// handleRateLimitWithUnitReporter is a wrapper around handleRateLimit that includes unit reporting
+func (s *Source) handleRateLimitWithUnitReporter(ctx context.Context, reporter sources.UnitReporter, errIn error) bool {
+	return s.handleRateLimit(ctx, errIn, &unitErrorReporter{reporter: reporter})
+}
+
+// handleRateLimitWithChunkReporter is a wrapper around handleRateLimit that includes chunk reporting
+func (s *Source) handleRateLimitWithChunkReporter(ctx context.Context, reporter sources.ChunkReporter, errIn error) bool {
+	return s.handleRateLimit(ctx, errIn, &chunkErrorReporter{reporter: reporter})
 }
 
 func (s *Source) addReposForMembers(ctx context.Context, reporter sources.UnitReporter) {
@@ -823,7 +864,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 
 	for {
 		gists, res, err := s.connector.APIClient().Gists.List(ctx, user, gistOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -847,7 +888,7 @@ func (s *Source) addUserGistsToCache(ctx context.Context, user string, reporter 
 	return nil
 }
 
-func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client) error {
+func (s *Source) addMembersByApp(ctx context.Context, installationClient *github.Client, reporter sources.UnitReporter) error {
 	opts := &github.ListOptions{
 		PerPage: membersAppPagination,
 	}
@@ -862,7 +903,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 		if org.Account.GetType() != "Organization" {
 			continue
 		}
-		if err := s.addMembersByOrg(ctx, *org.Account.Login); err != nil {
+		if err := s.addMembersByOrg(ctx, *org.Account.Login, reporter); err != nil {
 			return err
 		}
 	}
@@ -870,7 +911,7 @@ func (s *Source) addMembersByApp(ctx context.Context, installationClient *github
 	return nil
 }
 
-func (s *Source) addAllVisibleOrgs(ctx context.Context) {
+func (s *Source) addAllVisibleOrgs(ctx context.Context, reporter sources.UnitReporter) {
 	ctx.Logger().V(2).Info("enumerating all visible organizations on GHE")
 	// Enumeration on this endpoint does not use pages it uses a since ID.
 	// The endpoint will return organizations with an ID greater than the given since ID.
@@ -883,7 +924,7 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 	}
 	for {
 		orgs, _, err := s.connector.APIClient().Organizations.ListAll(ctx, orgOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -915,14 +956,14 @@ func (s *Source) addAllVisibleOrgs(ctx context.Context) {
 	}
 }
 
-func (s *Source) addOrgsByUser(ctx context.Context, user string) {
+func (s *Source) addOrgsByUser(ctx context.Context, user string, reporter sources.UnitReporter) {
 	orgOpts := &github.ListOptions{
 		PerPage: defaultPagination,
 	}
 	logger := ctx.Logger().WithValues("user", user)
 	for {
 		orgs, resp, err := s.connector.APIClient().Organizations.List(ctx, "", orgOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -944,7 +985,7 @@ func (s *Source) addOrgsByUser(ctx context.Context, user string) {
 	}
 }
 
-func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
+func (s *Source) addMembersByOrg(ctx context.Context, org string, reporter sources.UnitReporter) error {
 	opts := &github.ListMembersOptions{
 		PublicOnly: false,
 		ListOptions: github.ListOptions{
@@ -955,7 +996,7 @@ func (s *Source) addMembersByOrg(ctx context.Context, org string) error {
 	logger := ctx.Logger().WithValues("org", org)
 	for {
 		members, res, err := s.connector.APIClient().Organizations.ListMembers(ctx, org, opts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1087,7 +1128,7 @@ func (s *Source) processGistComments(ctx context.Context, gistURL string, urlPar
 	}
 	for {
 		comments, _, err := s.connector.APIClient().Gists.ListComments(ctx, gistID, options)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1187,7 +1228,6 @@ func (s *Source) processRepoComments(ctx context.Context, repoInfo repoInfo, rep
 	}
 
 	return nil
-
 }
 
 func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter sources.ChunkReporter) error {
@@ -1203,7 +1243,7 @@ func (s *Source) processIssues(ctx context.Context, repoInfo repoInfo, reporter 
 
 	for {
 		issues, _, err := s.connector.APIClient().Issues.ListByRepo(ctx, repoInfo.owner, repoInfo.name, bodyTextsOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 
@@ -1272,7 +1312,7 @@ func (s *Source) processIssueComments(ctx context.Context, repoInfo repoInfo, re
 
 	for {
 		issueComments, _, err := s.connector.APIClient().Issues.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, issueOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1340,7 +1380,7 @@ func (s *Source) processPRs(ctx context.Context, repoInfo repoInfo, reporter sou
 
 	for {
 		prs, _, err := s.connector.APIClient().PullRequests.List(ctx, repoInfo.owner, repoInfo.name, prOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1372,7 +1412,7 @@ func (s *Source) processPRComments(ctx context.Context, repoInfo repoInfo, repor
 
 	for {
 		prComments, _, err := s.connector.APIClient().PullRequests.ListComments(ctx, repoInfo.owner, repoInfo.name, allComments, prOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithChunkReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {
@@ -1528,7 +1568,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	ctx = context.WithValue(ctx, "repo", repoURL)
 	// ChunkUnit is not guaranteed to be called from Enumerate, so we must
 	// check and fetch the repoInfoCache for this repo.
-	repoURL, err := s.ensureRepoInfoCache(ctx, repoURL)
+	repoURL, err := s.ensureRepoInfoCache(ctx, repoURL, &chunkErrorReporter{reporter: reporter})
 	if err != nil {
 		return err
 	}
