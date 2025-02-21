@@ -21,7 +21,7 @@ type appConnector struct {
 
 var _ Connector = (*appConnector)(nil)
 
-func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConnector, error) {
+func NewAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (Connector, error) {
 	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse app installation ID %q: %w", app.InstallationId, err)

@@ -19,7 +19,7 @@ type basicAuthConnector struct {
 
 var _ Connector = (*basicAuthConnector)(nil)
 
-func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*basicAuthConnector, error) {
+func NewBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	httpClient.Transport = &github.BasicAuthTransport{

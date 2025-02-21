@@ -17,7 +17,7 @@ type unauthenticatedConnector struct {
 
 var _ Connector = (*unauthenticatedConnector)(nil)
 
-func newUnauthenticatedConnector(apiEndpoint string) (*unauthenticatedConnector, error) {
+func NewUnauthenticatedConnector(apiEndpoint string) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	apiClient, err := createGitHubClient(httpClient, apiEndpoint)

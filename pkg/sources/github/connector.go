@@ -29,15 +29,15 @@ func newConnector(source *Source) (Connector, error) {
 	switch cred := source.conn.GetCredential().(type) {
 	case *sourcespb.GitHub_GithubApp:
 		log.RedactGlobally(cred.GithubApp.GetPrivateKey())
-		return newAppConnector(apiEndpoint, cred.GithubApp)
+		return NewAppConnector(apiEndpoint, cred.GithubApp)
 	case *sourcespb.GitHub_BasicAuth:
 		log.RedactGlobally(cred.BasicAuth.GetPassword())
-		return newBasicAuthConnector(apiEndpoint, cred.BasicAuth)
+		return NewBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		log.RedactGlobally(cred.Token)
-		return newTokenConnector(apiEndpoint, cred.Token, source.handleRateLimit)
+		return NewTokenConnector(apiEndpoint, cred.Token, source.handleRateLimit)
 	case *sourcespb.GitHub_Unauthenticated:
-		return newUnauthenticatedConnector(apiEndpoint)
+		return NewUnauthenticatedConnector(apiEndpoint)
 	default:
 		return nil, fmt.Errorf("unknown connection type")
 	}
