@@ -1,14 +1,9 @@
 package github
 
 import (
-	"fmt"
-
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 )
 
 const cloudEndpoint = "https://api.github.com"
@@ -18,27 +13,4 @@ type Connector interface {
 	APIClient() *github.Client
 	// Clone clones a repository using the configured authentication information.
 	Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error)
-}
-
-func newConnector(source *Source) (Connector, error) {
-	apiEndpoint := source.conn.Endpoint
-	if apiEndpoint == "" || endsWithGithub.MatchString(apiEndpoint) {
-		apiEndpoint = cloudEndpoint
-	}
-
-	switch cred := source.conn.GetCredential().(type) {
-	case *sourcespb.GitHub_GithubApp:
-		log.RedactGlobally(cred.GithubApp.GetPrivateKey())
-		return NewAppConnector(apiEndpoint, cred.GithubApp)
-	case *sourcespb.GitHub_BasicAuth:
-		log.RedactGlobally(cred.BasicAuth.GetPassword())
-		return NewBasicAuthConnector(apiEndpoint, cred.BasicAuth)
-	case *sourcespb.GitHub_Token:
-		log.RedactGlobally(cred.Token)
-		return NewTokenConnector(apiEndpoint, cred.Token, source.handleRateLimit)
-	case *sourcespb.GitHub_Unauthenticated:
-		return NewUnauthenticatedConnector(apiEndpoint)
-	default:
-		return nil, fmt.Errorf("unknown connection type")
-	}
 }
