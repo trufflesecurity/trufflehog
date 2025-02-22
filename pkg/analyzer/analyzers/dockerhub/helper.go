@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // permission hierarchy - always keep from highest permission to lowest
