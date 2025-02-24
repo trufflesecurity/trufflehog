@@ -9,7 +9,7 @@ import (
 
 	"github.com/fatih/color"
 	gh "github.com/google/go-github/v67/github"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 )
