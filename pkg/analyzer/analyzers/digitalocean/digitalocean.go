@@ -203,15 +203,6 @@ func checkPermissions(cfg *config.Config, key string) ([]string, error) {
 	return permissions, nil
 }
 
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
 type user struct {
 	Email  string `json:"email"`
 	Name   string `json:"name"`
