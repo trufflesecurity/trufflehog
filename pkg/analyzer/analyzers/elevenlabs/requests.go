@@ -3,6 +3,7 @@ package elevenlabs
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -223,10 +224,10 @@ func getHistory(client *http.Client, key string, secretInfo *SecretInfo) error {
 		}
 
 		// add history read scope to secret info
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[SpeechHistoryRead])
+		secretInfo.AppendPermission(PermissionStrings[SpeechHistoryRead])
 		// map resource to secret info
 		for _, historyItem := range history.History {
-			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
+			secretInfo.AppendResource(ElevenLabsResource{
 				ID:         historyItem.ID,
 				Name:       "", // no name
 				Type:       "History",
@@ -276,7 +277,7 @@ func deleteDubbing(client *http.Client, key string, secretInfo *SecretInfo) erro
 		}
 
 		// add read scope of dubbing to avoid get dubbing api call
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[DubbingRead])
+		secretInfo.AppendPermission(PermissionStrings[DubbingRead])
 
 		return nil
 	case http.StatusUnauthorized:
@@ -320,10 +321,10 @@ func getVoices(client *http.Client, key string, secretInfo *SecretInfo) error {
 		}
 
 		// add voices read scope to secret info
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[VoicesRead])
+		secretInfo.AppendPermission(PermissionStrings[VoicesRead])
 		// map resource to secret info
 		for _, voice := range voices.Voices {
-			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
+			secretInfo.AppendResource(ElevenLabsResource{
 				ID:         voice.ID,
 				Name:       voice.Name,
 				Type:       "Voice",
@@ -376,10 +377,10 @@ func getProjects(client *http.Client, key string, secretInfo *SecretInfo) error 
 		}
 
 		// add project read scope to secret info
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[ProjectsRead])
+		secretInfo.AppendPermission(PermissionStrings[ProjectsRead])
 		// map resource to secret info
 		for _, project := range projects.Projects {
-			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
+			secretInfo.AppendResource(ElevenLabsResource{
 				ID:         project.ID,
 				Name:       project.Name,
 				Type:       "Project",
@@ -439,10 +440,10 @@ func getPronunciationDictionaries(client *http.Client, key string, secretInfo *S
 		}
 
 		// add voices read scope to secret info
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[PronunciationDictionariesRead])
+		secretInfo.AppendPermission(PermissionStrings[PronunciationDictionariesRead])
 		// map resource to secret info
 		for _, pd := range PDs.PronunciationDictionaries {
-			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
+			secretInfo.AppendResource(ElevenLabsResource{
 				ID:         pd.ID,
 				Name:       pd.Name,
 				Type:       "Pronunciation Dictionary",
@@ -499,10 +500,10 @@ func getModels(client *http.Client, key string, secretInfo *SecretInfo) error {
 		}
 
 		// add models read scope to secret info
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[ModelsRead])
+		secretInfo.AppendPermission(PermissionStrings[ModelsRead])
 		// map resource to secret info
 		for _, model := range models {
-			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
+			secretInfo.AppendResource(ElevenLabsResource{
 				ID:         model.ID,
 				Name:       model.Name,
 				Type:       "Model",
@@ -544,7 +545,7 @@ func updateAudioNativeProject(client *http.Client, key string, secretInfo *Secre
 		}
 
 		// add read permission as no separate API exist to check read audio native permission
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[AudioNativeRead])
+		secretInfo.AppendPermission(PermissionStrings[AudioNativeRead])
 		return nil
 	case http.StatusUnauthorized:
 		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
@@ -575,7 +576,7 @@ func deleteInviteFromWorkspace(client *http.Client, key string, secretInfo *Secr
 		}
 
 		// add read permission as no separate API exist to check workspace read permission
-		secretInfo.Permissions = append(secretInfo.Permissions, PermissionStrings[WorkspaceRead])
+		secretInfo.AppendPermission(PermissionStrings[WorkspaceRead])
 		return nil
 	case http.StatusUnauthorized:
 		return handleErrorStatus(response, "", secretInfo, MissingPermissions)
@@ -697,7 +698,7 @@ func getAgents(client *http.Client, key string, secretInfo *SecretInfo) error {
 					"access level": agent.AccessLevel,
 				},
 			}
-			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, resource)
+			secretInfo.AppendResource(resource)
 			// get agent conversations
 			if err := getConversation(client, key, agent.ID, secretInfo); err != nil {
 				return err
@@ -728,7 +729,7 @@ func getConversation(client *http.Client, key, agentID string, secretInfo *Secre
 
 		// map resource to secret info
 		for _, conversation := range conversations.Conversations {
-			secretInfo.ElevenLabsResources = append(secretInfo.ElevenLabsResources, ElevenLabsResource{
+			secretInfo.AppendResource(ElevenLabsResource{
 				ID:         conversation.ID,
 				Name:       "", // no name
 				Type:       "Conversation",
@@ -756,7 +757,10 @@ func handleErrorStatus(response []byte, permissionToAdd string, secretInfo *Secr
 
 	// if permission to add was passed and it was expected error status add the permission
 	if permissionToAdd != "" && ok {
-		secretInfo.Permissions = append(secretInfo.Permissions, permissionToAdd)
+		secretInfo.AppendPermission(permissionToAdd)
+	} else if permissionToAdd != "" && !ok {
+		// if permission to add was passed and it was unexpected error status - return error
+		return errors.New("unexpected error response")
 	}
 
 	return nil

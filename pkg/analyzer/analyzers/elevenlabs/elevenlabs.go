@@ -32,6 +32,33 @@ type SecretInfo struct {
 	Reference           string
 	Permissions         []string             // list of Permissions assigned to the key
 	ElevenLabsResources []ElevenLabsResource // list of resources the key has access to
+	mu                  sync.RWMutex
+}
+
+// AppendPermissions safely append new permission to secret info permissions list.
+func (s *SecretInfo) AppendPermission(perm string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.Permissions = append(s.Permissions, perm)
+}
+
+// HasPermission safely read secret info permission list to check if passed permission exist in the list.
+func (s *SecretInfo) HasPermission(perm Permission) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	permissionString, _ := perm.ToString()
+
+	return slices.Contains(s.Permissions, permissionString)
+}
+
+// AppendResource safely append new resource to secret info elevenlabs resource list.
+func (s *SecretInfo) AppendResource(resource ElevenLabsResource) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.ElevenLabsResources = append(s.ElevenLabsResources, resource)
 }
 
 // User hold the information about user to whom the key belongs to
@@ -251,16 +278,12 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 		aggregatedErrs = make([]string, 0)
 		errChan        = make(chan error, 17) // buffer for 17 errors - one per API call
 		wg             sync.WaitGroup
-		mu             sync.RWMutex
 	)
 
 	// history
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		mu.Lock()
-		defer mu.Unlock()
 
 		if err := getHistory(client, key, secretInfo); err != nil {
 			errChan <- err
@@ -276,15 +299,12 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	go func() {
 		defer wg.Done()
 
-		mu.Lock()
-		defer mu.Unlock()
-
 		if err := deleteDubbing(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
 
 		// if dubbing write permission was not added
-		if !permissionExist(secretInfo.Permissions, DubbingWrite) {
+		if !secretInfo.HasPermission(DubbingWrite) {
 			if err := getDebugging(client, key, secretInfo); err != nil {
 				errChan <- err
 			}
@@ -295,9 +315,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		mu.Lock()
-		defer mu.Unlock()
 
 		if err := getVoices(client, key, secretInfo); err != nil {
 			errChan <- err
@@ -313,9 +330,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	go func() {
 		defer wg.Done()
 
-		mu.Lock()
-		defer mu.Unlock()
-
 		if err := getProjects(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -329,9 +343,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		mu.Lock()
-		defer mu.Unlock()
 
 		if err := getPronunciationDictionaries(client, key, secretInfo); err != nil {
 			errChan <- err
@@ -347,9 +358,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	go func() {
 		defer wg.Done()
 
-		mu.Lock()
-		defer mu.Unlock()
-
 		if err := getModels(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -359,9 +367,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		mu.Lock()
-		defer mu.Unlock()
 
 		if err := updateAudioNativeProject(client, key, secretInfo); err != nil {
 			errChan <- err
@@ -373,9 +378,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	go func() {
 		defer wg.Done()
 
-		mu.Lock()
-		defer mu.Unlock()
-
 		if err := deleteInviteFromWorkspace(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -385,9 +387,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		mu.Lock()
-		defer mu.Unlock()
 
 		if err := textToSpeech(client, key, secretInfo); err != nil {
 			errChan <- err
@@ -404,9 +403,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	go func() {
 		defer wg.Done()
 
-		mu.Lock()
-		defer mu.Unlock()
-
 		if err := audioIsolation(client, key, secretInfo); err != nil {
 			errChan <- err
 		}
@@ -416,9 +412,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		mu.Lock()
-		defer mu.Unlock()
 
 		// each agent can have a conversations which we get inside this function
 		if err := getAgents(client, key, secretInfo); err != nil {
@@ -440,13 +433,6 @@ func getElevenLabsResources(client *http.Client, key string, secretInfo *SecretI
 	}
 
 	return nil
-}
-
-// permissionExist returns if particular permission exist in the list
-func permissionExist(permissionsList []string, permission Permission) bool {
-	permissionString, _ := permission.ToString()
-
-	return slices.Contains(permissionsList, permissionString)
 }
 
 // cli print functions
