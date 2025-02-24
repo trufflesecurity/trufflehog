@@ -180,11 +180,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Scan workspaces
 	for _, workspaceID := range s.conn.Workspaces {
-		w, err := s.client.GetWorkspace(workspaceID)
+		w, err := s.client.GetWorkspace(ctx, workspaceID)
 		if err != nil {
 			return fmt.Errorf("error getting workspace %s: %w", workspaceID, err)
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspaceID), "")
+		ctx.Logger().V(2).Info("scanning workspace from workspaces given", "workspace", workspaceID)
 		if err = s.scanWorkspace(ctx, chunksChan, w); err != nil {
 			return fmt.Errorf("error scanning workspace %s: %w", workspaceID, err)
 		}
@@ -206,10 +207,11 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Scan personal workspaces (from API token)
 	if s.conn.Workspaces == nil && s.conn.Collections == nil && s.conn.Environments == nil && s.conn.GetToken() != "" {
-		workspaces, err := s.client.EnumerateWorkspaces()
+		workspaces, err := s.client.EnumerateWorkspaces(ctx)
 		if err != nil {
 			return fmt.Errorf("error enumerating postman workspaces: %w", err)
 		}
+		ctx.Logger().V(2).Info("enumerated workspaces", "workspaces", workspaces)
 		for _, workspace := range workspaces {
 			s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspace.ID), "")
 			if err = s.scanWorkspace(ctx, chunksChan, workspace); err != nil {
@@ -307,7 +309,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 // scanCollection scans a collection and all its items, folders, and requests.
 // locally scoped Metadata is updated as we drill down into the collection.
 func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
-	ctx.Logger().V(2).Info("starting scanning collection", collection.Info.Name, "uuid", collection.Info.UID)
+	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Info.Name, "collection_uuid", collection.Info.UID)
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
 	s.attemptToAddKeyword(collection.Info.Name)
@@ -637,7 +639,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, variableData VariableData) {
 	if len(variableData.KeyValues) == 0 {
-		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "uuid", m.FullID)
+		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "item_uuid", m.FullID)
 		return
 	}
 
@@ -673,12 +675,14 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, data string, metadata Metadata) {
 	if data == "" {
+		ctx.Logger().V(3).Info("Data string is empty", "workspace_id", metadata.WorkspaceUUID)
 		return
 	}
 	if metadata.FieldType == "" {
 		metadata.FieldType = metadata.Type
 	}
 
+	ctx.Logger().V(3).Info("Generating chunk and passing it to the channel", "link", metadata.Link)
 	chunksChan <- &sources.Chunk{
 		SourceType: s.Type(),
 		SourceName: s.name,

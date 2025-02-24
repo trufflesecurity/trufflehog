@@ -17,15 +17,18 @@ type CallerIdentity struct {
 	Name      string
 	Role      string // role of caller
 	Email     string
-	Token     struct {
-		ID             string       // id of the token
-		Name           string       // name of the token
-		CustomRoles    []CustomRole // custom roles assigned to the token
-		InlineRole     []Policy     // any policy statements maybe used in place of a built-in custom role
-		Role           string       // role of token
-		IsServiceToken bool         // is a service token or not
-		APIVersion     int          // default api version assigned to the token
-	}
+	Token     Token
+}
+
+// Token is the token details
+type Token struct {
+	ID             string       // id of the token
+	Name           string       // name of the token
+	CustomRoles    []CustomRole // custom roles assigned to the token
+	InlineRole     []Policy     // any policy statements maybe used in place of a built-in custom role
+	Role           string       // role of token
+	IsServiceToken bool         // is a service token or not
+	APIVersion     int          // default api version assigned to the token
 }
 
 // CustomRole is a flexible policies providing fine-grained access control to everything in launch darkly
