@@ -28,9 +28,8 @@ var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	urlPat = regexp.MustCompile(`https://([a-zA-Z0-9-]{0,50})\.management\.azure-api\.net`) // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
-	keyPat = regexp.MustCompile(`([a-zA-Z0-9+\/-]{86,88}={0,2})`)                           // Base64-encoded key
+	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`) // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
+	keyPat        = regexp.MustCompile(`([a-zA-Z0-9+\/-]{86,88}={0,2})`)                                        // Base64-encoded key
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
