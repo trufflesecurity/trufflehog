@@ -112,6 +112,7 @@ func (s Scanner) Description() string {
 	return "The Azure Management API is a RESTful interface for managing Azure resources programmatically through Azure Resource Manager (ARM), supporting automation with tools like Azure CLI and PowerShell. An Azure Management Direct Access API Key enables secure, non-interactive authentication, allowing direct access to manage resources via Azure Active Directory (AAD)."
 }
 
+// https://learn.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication
 func generateAccessToken(key, expiry string) (string, error) {
 	// Construct the string-to-sign
 	stringToSign := fmt.Sprintf("integration\n%s", expiry)
