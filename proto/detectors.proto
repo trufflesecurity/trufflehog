@@ -126,7 +126,7 @@ enum DetectorType {
   ElasticEmail = 112;
   FigmaPersonalAccessToken = 113;
   MicrosoftTeamsWebhook = 114;
-  GitHubOld = 115;
+  GitHubOld = 115 [deprecated = true];
   VultrApiKey = 116;
   Pepipost = 117;
   Postman = 118;
