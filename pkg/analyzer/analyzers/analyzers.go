@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fatih/color"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -86,6 +87,7 @@ const (
 	AnalyzerTypePrivateKey
 	AnalyzerTypeNotion
 	AnalyzerTypeAirtable
+	AnalyzerTypeDigitalOcean
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -97,6 +99,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerAnthropic:        "Anthropic",
 	AnalyzerTypeAsana:        "Asana",
 	AnalyzerTypeBitbucket:    "Bitbucket",
+	AnalyzerTypeDigitalOcean: "DigitalOcean",
 	AnalyzerTypeDockerHub:    "DockerHub",
 	AnalyzerTypeGitHub:       "GitHub",
 	AnalyzerTypeGitLab:       "GitLab",

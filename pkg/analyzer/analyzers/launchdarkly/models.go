@@ -3,15 +3,15 @@ package launchdarkly
 import "sync"
 
 type SecretInfo struct {
-	CallerIdentity CallerIdentity
-	Permissions    []string
-	Resources      []Resource
+	User        User
+	Permissions []string
+	Resources   []Resource
 	// to concurrently read and write
 	mu sync.RWMutex
 }
 
-// CallerIdentity is the information about the token
-type CallerIdentity struct {
+// User is the information about the user to whom the token belongs
+type User struct {
 	AccountID string // account id. It is the owner id of token as well
 	MemberID  string
 	Name      string
@@ -91,13 +91,13 @@ func (s *SecretInfo) appendResource(resource Resource) {
 }
 
 // hasCustomRoles check if token has any custom roles assigned
-func (c CallerIdentity) hasCustomRoles() bool {
-	return len(c.Token.CustomRoles) > 0
+func (t Token) hasCustomRoles() bool {
+	return len(t.CustomRoles) > 0
 }
 
 // hasInlineRole check if token has any inline roles
-func (c CallerIdentity) hasInlineRole() bool {
-	return len(c.Token.InlineRole) > 0
+func (t Token) hasInlineRole() bool {
+	return len(t.InlineRole) > 0
 }
 
 // isAllowed check if policy allow the statement

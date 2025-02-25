@@ -1,17 +1,18 @@
 /*
-callerIdentity.go file is all related to calling APIs to get caller and token information and formatting them to secretInfo CallerIdentity.
+user.go file is all related to calling APIs to get user and token information and formatting them to secretInfo User.
 
 It calls 3 APIs:
   - /v2/caller-identity
   - /v2/tokens/<id> (with token id from previous api response)
   - /v2/roles/<role_id> (if custom role id is present in tokens) (more than one role can be assigned to token as well)
 
-it formats all these responses into one CallerIdentity struct for secretInfo.
+it formats all these responses into one User struct for secretInfo.
 */
 package launchdarkly
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -27,14 +28,14 @@ type callerIdentityResponse struct {
 
 // tokenResponse is the /v2/tokens/<id> API response
 type tokenResponse struct {
-	OwnerID           string              `json:"ownerId"`
-	Member            tokenMemberResponse `json:"_member"`
-	Name              string              `json:"name"`
-	CustomRoleIDs     []string            `json:"customRoleIds"`
-	InlineRole        tokenPolicyResponse `json:"inlineRole"`
-	Role              string              `json:"role"`
-	ServiceToken      bool                `json:"serviceToken"`
-	DefaultAPIVersion int                 `json:"defaultApiVersion"`
+	OwnerID           string                `json:"ownerId"`
+	Member            tokenMemberResponse   `json:"_member"`
+	Name              string                `json:"name"`
+	CustomRoleIDs     []string              `json:"customRoleIds,omitempty"`
+	InlineRole        []tokenPolicyResponse `json:"inlineRole,omitempty"`
+	Role              string                `json:"role"`
+	ServiceToken      bool                  `json:"serviceToken"`
+	DefaultAPIVersion int                   `json:"defaultApiVersion"`
 }
 
 // _member object in token response
@@ -47,11 +48,11 @@ type tokenMemberResponse struct {
 
 // inlineRole object in token response
 type tokenPolicyResponse struct {
-	Effect       string   `json:"effect"`
-	Resources    []string `json:"resources"`
-	NotResources []string `json:"notResources"`
-	Actions      []string `json:"actions"`
-	NotActions   []string `json:"notActions"`
+	Effect       string   `json:"effect,omitempty"`
+	Resources    []string `json:"resources,omitempty"`
+	NotResources []string `json:"notResources,omitempty"`
+	Actions      []string `json:"actions,omitempty"`
+	NotActions   []string `json:"notActions,omitempty"`
 }
 
 // customRoleResponse is the /v2/roles/<role_id> API response
@@ -68,14 +69,36 @@ type customRoleResponse struct {
 }
 
 /*
-fetchCallerDetails call following three APIs:
+FetchUserInformation call following three APIs:
   - /v2/caller-identity
   - /v2/tokens/<token_id> (token_id from previous API response)
   - /v2/roles/<role_id> (roles_id from previous API response if exist)
 
-It format all responses into one secret info CallerIdentity
+It format all responses into one secret info User
 */
-func fetchCallerDetails(client *http.Client, token string) (*CallerIdentity, error) {
+func FetchUserInformation(client *http.Client, token string, secretInfo *SecretInfo) error {
+	caller, err := getCallerIdentity(client, token)
+	if err != nil {
+		return err
+	}
+
+	tokenDetails, err := getToken(client, caller.TokenID, token)
+	if err != nil {
+		return err
+	}
+
+	customRoles, err := getCustomRole(client, tokenDetails.CustomRoleIDs, token)
+	if err != nil {
+		return err
+	}
+
+	addUserToSecretInfo(caller, tokenDetails, customRoles, secretInfo)
+
+	return nil
+}
+
+// getCallerIdentity call /v2/caller-identity API and return response
+func getCallerIdentity(client *http.Client, token string) (*callerIdentityResponse, error) {
 	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints["callerIdentity"], token)
 	if err != nil {
 		return nil, err
@@ -83,25 +106,15 @@ func fetchCallerDetails(client *http.Client, token string) (*CallerIdentity, err
 
 	switch statusCode {
 	case http.StatusOK:
-		var caller callerIdentityResponse
+		var caller = &callerIdentityResponse{}
 
-		if err := json.Unmarshal(response, &caller); err != nil {
-			return nil, err
+		if err := json.Unmarshal(response, caller); err != nil {
+			return caller, err
 		}
 
-		tokenDetails, err := getToken(client, caller.TokenID, token)
-		if err != nil {
-			return nil, err
-		}
-
-		customRoles, err := getCustomRole(client, tokenDetails.CustomRoleIDs, token)
-		if err != nil {
-			return nil, err
-		}
-
-		return makeCallerIdentity(caller, *tokenDetails, customRoles), nil
+		return caller, nil
 	case http.StatusUnauthorized:
-		return nil, nil
+		return nil, errors.New("invalid token; failed to get caller information")
 	default:
 		return nil, fmt.Errorf("unexpected status code: %d", statusCode)
 	}
@@ -124,7 +137,7 @@ func getToken(client *http.Client, tokenID, token string) (*tokenResponse, error
 
 		return &token, nil
 	case http.StatusUnauthorized:
-		return nil, nil
+		return nil, errors.New("invalid token; failed to get token information")
 	default:
 		return nil, fmt.Errorf("unexpected status code: %d", statusCode)
 	}
@@ -160,8 +173,8 @@ func getCustomRole(client *http.Client, customRoleIDs []string, token string) ([
 }
 
 // makeCallerIdentity take caller, tokenDetails, and customRoles and return secret info CallerIdentity
-func makeCallerIdentity(caller callerIdentityResponse, tokenDetails tokenResponse, customRoles []customRoleResponse) *CallerIdentity {
-	return &CallerIdentity{
+func addUserToSecretInfo(caller *callerIdentityResponse, tokenDetails *tokenResponse, customRoles []customRoleResponse, secretInfo *SecretInfo) {
+	user := User{
 		AccountID: caller.AccountID,
 		MemberID:  caller.MemberID,
 		Name:      tokenDetails.Member.FirstName + " " + tokenDetails.Member.LastName,
@@ -177,11 +190,14 @@ func makeCallerIdentity(caller callerIdentityResponse, tokenDetails tokenRespons
 			CustomRoles:    toCustomRoles(customRoles),
 		},
 	}
+
+	secretInfo.User = user
 }
 
 // toPolicy convert inlinePolicy from token response to secret info caller identity policy
-func toPolicy(inlinePolices ...tokenPolicyResponse) []Policy {
-	var policies = make([]Policy, len(inlinePolices))
+func toPolicy(inlinePolices []tokenPolicyResponse) []Policy {
+	var policies = make([]Policy, 0)
+
 	for _, inlinePolicy := range inlinePolices {
 		policies = append(policies, Policy{
 			Resources:    inlinePolicy.Resources,
@@ -197,13 +213,13 @@ func toPolicy(inlinePolices ...tokenPolicyResponse) []Policy {
 
 // toCustomRoles convert customRole from token response to secret info caller identity custom role
 func toCustomRoles(roles []customRoleResponse) []CustomRole {
-	var customRoles = make([]CustomRole, len(roles))
+	var customRoles = make([]CustomRole, 0)
 	for _, role := range roles {
 		customRoles = append(customRoles, CustomRole{
 			ID:                role.ID,
 			Key:               role.Key,
 			Name:              role.Name,
-			Polices:           toPolicy(role.Policy...),
+			Polices:           toPolicy(role.Policy),
 			BasePermission:    role.BasePermission,
 			AssignedToMembers: role.AssignedTo.MembersCount,
 			AssignedToTeams:   role.AssignedTo.TeamsCount,
