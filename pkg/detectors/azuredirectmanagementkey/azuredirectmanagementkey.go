@@ -12,6 +12,7 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -26,7 +27,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	urlPat = regexp.MustCompile(`https://([a-zA-Z0-9-]{0,50})\.management\.azure-api\.net`) // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
 	keyPat = regexp.MustCompile(`([a-zA-Z0-9+\/-]{86,88}={0,2})`)                           // Base64-encoded key
