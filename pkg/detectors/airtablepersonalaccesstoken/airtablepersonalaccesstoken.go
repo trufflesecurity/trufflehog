@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	tokenPat      = regexp.MustCompile(`\b(pat[[:alnum:]]{14}\.[a-f0-9]{64})\b`)
+	tokenPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"airtable"}) + `\b(pat[[:alnum:]]{14}\.[a-f0-9]{64})\b`)
 )
 
 func (s Scanner) Keywords() []string {
