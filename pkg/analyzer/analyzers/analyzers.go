@@ -65,6 +65,7 @@ const (
 	AnalyzerTypeAsana
 	AnalyzerTypeBitbucket
 	AnalyzerTypeDockerHub
+	AnalyzerTypeElevenLabs
 	AnalyzerTypeGitHub
 	AnalyzerTypeGitLab
 	AnalyzerTypeHuggingFace
@@ -97,7 +98,9 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerAnthropic:        "Anthropic",
 	AnalyzerTypeAsana:        "Asana",
 	AnalyzerTypeBitbucket:    "Bitbucket",
+	AnalyzerTypeDigitalOcean: "DigitalOcean",
 	AnalyzerTypeDockerHub:    "DockerHub",
+	AnalyzerTypeElevenLabs:   "ElevenLabs",
 	AnalyzerTypeGitHub:       "GitHub",
 	AnalyzerTypeGitLab:       "GitLab",
 	AnalyzerTypeHuggingFace:  "HuggingFace",
@@ -117,7 +120,6 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeTwilio:       "Twilio",
 	AnalyzerTypePrivateKey:   "PrivateKey",
 	AnalyzerTypeNotion:       "Notion",
-	AnalyzerTypeDigitalOcean: "DigitalOcean",
 	// Add new mappings here
 }
 
