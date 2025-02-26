@@ -25,9 +25,9 @@ func TestAzureDirectManagementAPIKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	url := testSecrets.MustGetField("AZUREMANAGEMENTAPI_URL")
-	secret := testSecrets.MustGetField("AZUREMANAGEMENTAPI_KEY")
-	inactiveSecret := testSecrets.MustGetField("AZUREMANAGEMENTAPI_KEY_INACTIVE")
+	url := testSecrets.MustGetField("AZUREDIRECTMANAGEMENTAPI_URL")
+	secret := testSecrets.MustGetField("AZUREDIRECTMANAGEMENTAPI_KEY")
+	inactiveSecret := testSecrets.MustGetField("AZUREDIRECTMANAGEMENTAPI_KEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -104,8 +104,7 @@ func TestAzureDirectManagementAPIKey_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "Redacted", "verificationError")
-
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "Redacted", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("AzureDirectManagementAPIKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
