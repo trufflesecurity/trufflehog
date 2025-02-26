@@ -85,41 +85,43 @@ const (
 	AnalyzerTypeTwilio
 	AnalyzerTypePrivateKey
 	AnalyzerTypeNotion
-	AnalyzerTypeAirtable
 	AnalyzerTypeDigitalOcean
+	AnalyzerTypeAirtableOAuth
+	AnalyzerTypeAirtablePat
 	// Add new items here with AnalyzerType prefix
 )
 
 // analyzerTypeStrings maps the enum to its string representation.
 var analyzerTypeStrings = map[AnalyzerType]string{
-	AnalyzerTypeInvalid:      "Invalid",
-	AnalyzerTypeAirbrake:     "Airbrake",
-	AnalyzerTypeAirtable:     "Airtable",
-	AnalyzerAnthropic:        "Anthropic",
-	AnalyzerTypeAsana:        "Asana",
-	AnalyzerTypeBitbucket:    "Bitbucket",
-	AnalyzerTypeDigitalOcean: "DigitalOcean",
-	AnalyzerTypeDockerHub:    "DockerHub",
-	AnalyzerTypeElevenLabs:   "ElevenLabs",
-	AnalyzerTypeGitHub:       "GitHub",
-	AnalyzerTypeGitLab:       "GitLab",
-	AnalyzerTypeHuggingFace:  "HuggingFace",
-	AnalyzerTypeMailchimp:    "Mailchimp",
-	AnalyzerTypeMailgun:      "Mailgun",
-	AnalyzerTypeMySQL:        "MySQL",
-	AnalyzerTypeOpenAI:       "OpenAI",
-	AnalyzerTypeOpsgenie:     "Opsgenie",
-	AnalyzerTypePostgres:     "Postgres",
-	AnalyzerTypePostman:      "Postman",
-	AnalyzerTypeSendgrid:     "Sendgrid",
-	AnalyzerTypeShopify:      "Shopify",
-	AnalyzerTypeSlack:        "Slack",
-	AnalyzerTypeSourcegraph:  "Sourcegraph",
-	AnalyzerTypeSquare:       "Square",
-	AnalyzerTypeStripe:       "Stripe",
-	AnalyzerTypeTwilio:       "Twilio",
-	AnalyzerTypePrivateKey:   "PrivateKey",
-	AnalyzerTypeNotion:       "Notion",
+	AnalyzerTypeInvalid:       "Invalid",
+	AnalyzerTypeAirbrake:      "Airbrake",
+	AnalyzerTypeAirtableOAuth: "AirtableOAuth",
+	AnalyzerTypeAirtablePat:   "AirtablePat",
+	AnalyzerAnthropic:         "Anthropic",
+	AnalyzerTypeAsana:         "Asana",
+	AnalyzerTypeBitbucket:     "Bitbucket",
+	AnalyzerTypeDigitalOcean:  "DigitalOcean",
+	AnalyzerTypeDockerHub:     "DockerHub",
+	AnalyzerTypeElevenLabs:    "ElevenLabs",
+	AnalyzerTypeGitHub:        "GitHub",
+	AnalyzerTypeGitLab:        "GitLab",
+	AnalyzerTypeHuggingFace:   "HuggingFace",
+	AnalyzerTypeMailchimp:     "Mailchimp",
+	AnalyzerTypeMailgun:       "Mailgun",
+	AnalyzerTypeMySQL:         "MySQL",
+	AnalyzerTypeOpenAI:        "OpenAI",
+	AnalyzerTypeOpsgenie:      "Opsgenie",
+	AnalyzerTypePostgres:      "Postgres",
+	AnalyzerTypePostman:       "Postman",
+	AnalyzerTypeSendgrid:      "Sendgrid",
+	AnalyzerTypeShopify:       "Shopify",
+	AnalyzerTypeSlack:         "Slack",
+	AnalyzerTypeSourcegraph:   "Sourcegraph",
+	AnalyzerTypeSquare:        "Square",
+	AnalyzerTypeStripe:        "Stripe",
+	AnalyzerTypeTwilio:        "Twilio",
+	AnalyzerTypePrivateKey:    "PrivateKey",
+	AnalyzerTypeNotion:        "Notion",
 	// Add new mappings here
 }
 

@@ -1,4 +1,4 @@
-package airtable
+package airtablepat
 
 import (
 	_ "embed"
@@ -32,7 +32,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			token:   testSecrets.MustGetField("AIRTABLEOAUTH_TOKEN"),
-			name:    "valid Airtable OAuth Token",
+			name:    "valid Airtable Personal Access Token",
 			want:    string(expectedOutput),
 			wantErr: false,
 		},
