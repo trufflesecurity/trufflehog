@@ -12,14 +12,12 @@ import (
 
 var (
 	validPattern = `
-	API_KEY=UJh1Wn7txjls2GPK1YxO9+3tpqQffSfxb+97PmT8j3cSQoXvGa74lCKpBqPeppTHCharbaMeKqKs/H4gA/go1w==
-	MANAGEMENT_API_URL=https://trufflesecuritytest.management.azure-api.net
-	SUBSCRIPTION_ID=4b9c0a0b-c862-472a-bca9-3027f18008bc
+	AZURE_MANGEMENT_API_KEY=UJh1Wn7txjls2GPK1YxO9+3tpqQffSfxb+97PmT8j3cSQoXvGa74lCKpBqPeppTHCharbaMeKqKs/H4gA/go1w==
+	AZURE_MANAGEMENT_API_URL=https://trufflesecuritytest.management.azure-api.net
 	`
 	invalidPattern = `
-	API_KEY=UJh1Wn7txjls2GPK1YxO9+3tpqQffSfxb+97PmT8j3cSQoXvGa74lCKp
-	MANAGEMENT_API_URL=https://trufflesecuritytest.management.azure-api.net
-	SUBSCRIPTION_ID=4b9c0a0b-c862-472a-bca9-3027f18008bc
+	AZURE_MANGEMENT_API_KEY=UJh1Wn7txjls2GPK1YxO9+3tpqQffSfxb+97PmT8j3cSQoXvGa74lCKp
+	AZURE_MANAGEMENT_API_URL=https://trufflesecuritytest.management.azure-api.net
 	`
 )
 
