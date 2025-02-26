@@ -1,0 +1,84 @@
+{
+    "scopes": {
+        "schema.bases:read": {
+            "permission": "schema.bases:read",
+            "endpoint": "https://api.airtable.com/v0/meta/bases",
+            "method": "GET",
+            "required_ids": [],
+            "expected_error": {
+                "type": "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND"
+            }
+        },
+        "schema.bases:write": {
+            "permission": "schema.bases:write",
+            "endpoint": "https://api.airtable.com/v0/meta/bases/{baseId}/tables/{tableId}",
+            "method": "PATCH",
+            "required_ids": [
+                "baseId",
+                "tableId"
+            ],
+            "expected_error": {
+                "type": "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND"
+            }
+        },
+        "webhook:manage": {
+            "permission": "webhook:manage",
+            "endpoint": "https://api.airtable.com/v0/bases/{baseId}/webhooks",
+            "method": "GET",
+            "required_ids": [
+                "baseId"
+            ],
+            "expected_error": {
+                "type": "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND"
+            }
+        },
+        "block:manage": {
+            "permission": "block:manage",
+            "endpoint": "https://api.airtable.com/v0/meta/bases/{baseId}/blockInstallations",
+            "method": "GET",
+            "required_ids": [
+                "baseId"
+            ],
+            "expected_error": {
+                "type": "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND"
+            }
+        },
+        "data.records:read": {
+            "permission": "data.records:read",
+            "endpoint": "https://api.airtable.com/v0/{baseId}/{tableId}",
+            "method": "GET",
+            "required_ids": [
+                "baseId",
+                "tableId"
+            ],
+            "expected_error": {
+                "type": "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND"
+            }
+        },
+        "data.records:write": {
+            "permission": "data.records:write",
+            "endpoint": "https://api.airtable.com/v0/{baseId}/{tableId}",
+            "method": "POST",
+            "required_ids": [
+                "baseId",
+                "tableId"
+            ],
+            "expected_error": {
+                "type": "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND"
+            }
+        },
+        "data.recordComments:read": {
+            "permission": "data.recordComments:read",
+            "endpoint": "https://api.airtable.com/v0/{baseId}/{tableId}/{recordId}/comments",
+            "method": "GET",
+            "required_ids": [
+                "baseId",
+                "tableId",
+                "recordID"
+            ],
+            "expected_error": {
+                "type": "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND"
+            }
+        }
+    }
+}

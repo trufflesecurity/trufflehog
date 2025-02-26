@@ -1,4 +1,4 @@
-package airtable
+package airtableoauth
 
 var scope_mapping = map[string][]string{
 	// Basic Scopes

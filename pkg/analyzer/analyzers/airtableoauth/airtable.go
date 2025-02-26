@@ -1,5 +1,5 @@
 //go:generate generate_permissions permissions.yaml permissions.go airtable
-package airtable
+package airtableoauth
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeAirtable }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeAirtableOAuth }
 
 type AirtableUserInfo struct {
 	ID     string   `json:"id"`
@@ -139,7 +139,7 @@ func mapToAnalyzerResult(userInfo *AirtableUserInfo, basesInfo *AirtableBases) *
 	}
 
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzers.AnalyzerTypeAirtable,
+		AnalyzerType: analyzers.AnalyzerTypeAirtableOAuth,
 	}
 	var permissions []analyzers.Permission
 	for _, scope := range userInfo.Scopes {
