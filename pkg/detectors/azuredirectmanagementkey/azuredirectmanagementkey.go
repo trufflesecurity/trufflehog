@@ -17,6 +17,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+const RFC3339WithoutMicroseconds = "2006-01-02T15:04:05"
+
 type Scanner struct {
 	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
@@ -28,7 +30,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`)         // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([a-zA-Z0-9+\/-]{86,88}\b={0,2})`) // Base64-encoded primary key
+	primaryKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([a-zA-Z0-9+\/-]{86,88}\b={0,2})`) // Base64-encoded primary key
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -41,30 +43,21 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	urlMatches := urlPat.FindAllStringSubmatch(dataStr, -1)
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	urlMatchesUnique := make(map[string]string)
-	for _, urlMatch := range urlMatches {
-		urlMatchesUnique[urlMatch[0]] = urlMatch[1]
+	for _, urlMatch := range urlPat.FindAllStringSubmatch(dataStr, -1) {
+		urlMatchesUnique[urlMatch[0]] = urlMatch[1] // urlMatch[0] is the full url, urlMatch[1] is the service name
 	}
-	keyMatchesUnique := make(map[string]struct{})
-	for _, keyMatch := range keyMatches {
-		keyMatchesUnique[keyMatch[1]] = struct{}{}
+	primaryKeyMatchesUnique := make(map[string]struct{})
+	for _, keyMatch := range primaryKeyPat.FindAllStringSubmatch(dataStr, -1) {
+		primaryKeyMatchesUnique[strings.TrimSpace(keyMatch[1])] = struct{}{}
 	}
 
 	for baseUrl, serviceName := range urlMatchesUnique {
-		for key, _ := range keyMatchesUnique {
-			resMatch := strings.TrimSpace(key)
-			url := fmt.Sprintf(
-				"%s/subscriptions/default/resourceGroups/default/providers/Microsoft.ApiManagement/service/%s/apis?api-version=2024-05-01",
-				baseUrl, serviceName,
-			)
+		for primaryKey := range primaryKeyMatchesUnique {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureDirectManagementKey,
 				Raw:          []byte(baseUrl),
-				RawV2:        []byte(baseUrl + resMatch),
-				Redacted:     baseUrl,
+				RawV2:        []byte(baseUrl + primaryKey),
 			}
 
 			if verify {
@@ -73,9 +66,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				isVerified, verificationErr := s.verifyMatch(ctx, client, url, resMatch)
+				isVerified, verificationErr := s.verifyMatch(ctx, client, baseUrl, serviceName, primaryKey)
 				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr, resMatch)
+				s1.SetVerificationError(verificationErr, primaryKey)
 			}
 
 			results = append(results, s1)
@@ -88,19 +81,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
-	return false, ""
-}
-
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureDirectManagementKey
 }
 
 func (s Scanner) Description() string {
-	return "The Azure Management API is a RESTful interface for managing Azure resources programmatically through Azure Resource Manager (ARM), supporting automation with tools like Azure CLI and PowerShell. An Azure Management Direct Access API Key enables secure, non-interactive authentication, allowing direct access to manage resources via Azure Active Directory (AAD)."
+	return "Azure API Management provides a direct management REST API for performing operations on selected entities, such as users, groups, products, and subscriptions."
 }
 
-func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, url, key string) (bool, error) {
+func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, baseUrl, serviceName, key string) (bool, error) {
+	url := fmt.Sprintf(
+		"%s/subscriptions/default/resourceGroups/default/providers/Microsoft.ApiManagement/service/%s/apis?api-version=2024-05-01",
+		baseUrl, serviceName,
+	)
 	accessToken, err := generateAccessToken(key)
 	if err != nil {
 		return false, err
@@ -129,8 +122,8 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, url, key 
 
 // https://learn.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication
 func generateAccessToken(key string) (string, error) {
-	expiry := time.Now().UTC().Add(time.Minute).Format(time.RFC3339Nano)
-	expiry = expiry[:27] + "Z" // 7 decimals precision for miliseconds
+	expiry := time.Now().UTC().Add(5 * time.Second).Format(RFC3339WithoutMicroseconds) // expires in 5 seconds
+	expiry = expiry + ".0000000Z"                                                      // 7 decimals microsecond's precision is must for access token
 
 	// Construct the string-to-sign
 	stringToSign := fmt.Sprintf("integration\n%s", expiry)
