@@ -28,8 +28,8 @@ var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`) // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
-	keyPat        = regexp.MustCompile(`([a-zA-Z0-9+\/-]{86,88}={0,2})`)                                        // Base64-encoded key
+	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`)         // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([a-zA-Z0-9+\/-]{86,88}\b={0,2})`) // Base64-encoded key
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -48,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, urlMatch := range urlMatches {
 		serviceName := urlMatch[1]
 		for _, keyMatch := range keyMatches {
-			resMatch := strings.TrimSpace(keyMatch[0])
+			resMatch := strings.TrimSpace(keyMatch[1])
 			url := fmt.Sprintf(
 				"%s/subscriptions/default/resourceGroups/default/providers/Microsoft.ApiManagement/service/%s/apis?api-version=2024-05-01",
 				urlMatch[0], serviceName,
