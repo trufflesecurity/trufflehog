@@ -1,3 +1,4 @@
+//go:generate generate_permissions permissions.yaml permissions.go launchdarkly
 package launchdarkly
 
 import (
@@ -41,6 +42,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
 	color.Green("[i] Valid LaunchDarkly Token\n")
 	printUser(info.User)
 	printPermissionsType(info.User.Token)
+	printResources(info.Resources)
 
 	color.Yellow("\n[!] Expires: Never")
 }
@@ -52,8 +54,13 @@ func AnalyzePermissions(cfg *config.Config, token string) (*SecretInfo, error) {
 
 	var secretInfo = &SecretInfo{}
 
-	// get caller identity
-	if err := FetchUserInformation(client, token, secretInfo); err != nil {
+	// capture user information in secretInfo
+	if err := CaptureUserInformation(client, token, secretInfo); err != nil {
+		return nil, fmt.Errorf("failed to fetch caller identity: %v", err)
+	}
+
+	// capture resources in secretInfo
+	if err := CaptureResources(client, token, secretInfo); err != nil {
 		return nil, fmt.Errorf("failed to fetch caller identity: %v", err)
 	}
 
@@ -102,7 +109,7 @@ func printUser(user User) {
 	}
 }
 
-// printPermissionType print type of permission token has
+// printPermissionsType print permissions type token has
 func printPermissionsType(token Token) {
 	// print permission type. It can be either admin, writer, reader or has inline policy or any custom roles assigned
 	permission := ""
@@ -116,67 +123,17 @@ func printPermissionsType(token Token) {
 	}
 
 	color.Green("\n[i] Permission Type: %s", permission)
-	policesTable := table.NewWriter()
-	policesTable.SetOutputMirror(os.Stdout)
-	policesTable.AppendHeader(table.Row{"Resource (* means all)", "Action", "Effect"})
-	permissions := GetTokenPermissions(token)
-	for resource, actions := range permissions {
-		for action, effect := range actions {
-			if effect == "allow" {
-				policesTable.AppendRow(table.Row{color.GreenString(resource), color.GreenString(action), color.GreenString(effect)})
-			} else {
-				policesTable.AppendRow(table.Row{color.YellowString(resource), color.YellowString(action), color.YellowString(effect)})
-			}
-		}
-	}
-
-	policesTable.Render()
 }
 
-// GetTokenPermissions returns a mapping of allowed and denied actions with resources and effects.
-func GetTokenPermissions(token Token) map[string]map[string]string {
-	permissions := make(map[string]map[string]string)
-
-	// Process Inline Role
-	for _, policy := range token.InlineRole {
-		processPolicy(policy, permissions)
+func printResources(resources []Resource) {
+	// print resources
+	color.Green("\n[i] Resources:")
+	callerTable := table.NewWriter()
+	callerTable.SetOutputMirror(os.Stdout)
+	callerTable.AppendHeader(table.Row{"ID", "Name", "Type"})
+	for _, resource := range resources {
+		callerTable.AppendRow(table.Row{color.GreenString(resource.ID), color.GreenString(resource.Name),
+			color.GreenString(resource.Type)})
 	}
-
-	// Process Custom Roles
-	for _, role := range token.CustomRoles {
-		for _, policy := range role.Polices {
-			processPolicy(policy, permissions)
-		}
-	}
-
-	return permissions
-}
-
-// processPolicy updates the permissions map with policy details
-func processPolicy(policy Policy, permissions map[string]map[string]string) {
-	// Handle allowed actions
-	for _, resource := range policy.Resources {
-		if _, exists := permissions[resource]; !exists {
-			permissions[resource] = make(map[string]string)
-		}
-		for _, action := range policy.Actions {
-			permissions[resource][action] = policy.Effect
-		}
-		for _, action := range policy.NotActions {
-			permissions[resource][action] = policy.Effect
-		}
-	}
-
-	// Handle denied actions
-	for _, resource := range policy.NotResources {
-		if _, exists := permissions[resource]; !exists {
-			permissions[resource] = make(map[string]string)
-		}
-		for _, action := range policy.Actions {
-			permissions[resource][action] = policy.Effect
-		}
-		for _, action := range policy.NotActions {
-			permissions[resource][action] = policy.Effect
-		}
-	}
+	callerTable.Render()
 }

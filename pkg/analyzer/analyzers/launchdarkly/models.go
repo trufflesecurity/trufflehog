@@ -2,6 +2,17 @@ package launchdarkly
 
 import "sync"
 
+var (
+	MetadataKey = "key"
+
+	// resource types
+	applicationType = "Application"
+	repositoryType  = "Repository"
+	projectType     = "Project"
+	environmentType = "Environment"
+	experimentType  = "Expirement"
+)
+
 type SecretInfo struct {
 	User        User
 	Permissions []string
@@ -42,7 +53,16 @@ type CustomRole struct {
 	AssignedToTeams   int
 }
 
-// policy is a set of statements
+/*
+policy is a set of statements
+
+Jargon:
+  - Resource: List of resources
+  - NotResources: Except this list of resources
+  - Actions: List of actions
+  - NotActions: Except this list of actions
+  - Effect: Allowed or Denied
+*/
 type Policy struct {
 	Resources    []string
 	NotResources []string
@@ -70,8 +90,8 @@ func (s *SecretInfo) addPermission(perm string) {
 
 // hasPermission checks if a particular permission exist in secret info permissions list.
 func (s *SecretInfo) hasPermission(perm string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	for _, permission := range s.Permissions {
 		if permission == perm {
@@ -88,6 +108,37 @@ func (s *SecretInfo) appendResource(resource Resource) {
 	defer s.mu.Unlock()
 
 	s.Resources = append(s.Resources, resource)
+}
+
+// listResourceByType returns a list of resources matching the given type.
+func (s *SecretInfo) listResourceByType(resourceType string) []Resource {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	resources := make([]Resource, 0, len(s.Resources))
+	for _, resource := range s.Resources {
+		if resource.Type == resourceType {
+			resources = append(resources, resource)
+		}
+	}
+
+	return resources
+}
+
+// getResourceByID returns a copy of the resource matching the given ID, or nil if not found.
+func (s *SecretInfo) getResourceByID(id string) *Resource {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, resource := range s.Resources {
+		if resource.ID == id {
+			// return a copy of the resource to avoid accidently making changes in the actual resource
+			copyResource := resource
+			return &copyResource
+		}
+	}
+
+	return nil
 }
 
 // hasCustomRoles check if token has any custom roles assigned

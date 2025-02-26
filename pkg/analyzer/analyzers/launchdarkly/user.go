@@ -69,14 +69,14 @@ type customRoleResponse struct {
 }
 
 /*
-FetchUserInformation call following three APIs:
+CaptureUserInformation call following three APIs:
   - /v2/caller-identity
   - /v2/tokens/<token_id> (token_id from previous API response)
   - /v2/roles/<role_id> (roles_id from previous API response if exist)
 
 It format all responses into one secret info User
 */
-func FetchUserInformation(client *http.Client, token string, secretInfo *SecretInfo) error {
+func CaptureUserInformation(client *http.Client, token string, secretInfo *SecretInfo) error {
 	caller, err := getCallerIdentity(client, token)
 	if err != nil {
 		return err
