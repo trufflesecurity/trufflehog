@@ -26,8 +26,8 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`Endpoint=(https:\/\/[a-zA-Z0-9-]+\.azconfig\.io);Id=([a-zA-Z0-9+\/=]+);Secret=([a-zA-Z0-9+\/=]+)`)
+	defaultClient       = common.SaneHttpClient()
+	connectionStringPat = regexp.MustCompile(`Endpoint=(https:\/\/[a-zA-Z0-9-]+\.azconfig\.io);Id=([a-zA-Z0-9+\/=]+);Secret=([a-zA-Z0-9+\/=]+)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -40,23 +40,19 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	keyMatchesUnique := make(map[string][]string)
-	for _, keyMatch := range keyMatches {
-		keyMatchesUnique[keyMatch[0]] = keyMatch
+	for _, keyMatch := range connectionStringPat.FindAllStringSubmatch(dataStr, -1) {
+		keyMatchesUnique[strings.TrimSpace(keyMatch[0])] = keyMatch // keep all the matched groups for verification
 	}
 
-	for _, keyMatch := range keyMatchesUnique {
-		resMatch := strings.TrimSpace(keyMatch[0])
-		endpoint := keyMatch[1]
-		id := keyMatch[2]
-		secret := keyMatch[3]
+	for connectionString, connectionInfo := range keyMatchesUnique {
+		endpoint := connectionInfo[1] // Endpoint
+		id := connectionInfo[2]       //	Id
+		secret := connectionInfo[3]   // Secret
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_AzureAppConfigConnectionString,
-			Raw:          []byte(endpoint + id),
-			RawV2:        []byte(resMatch),
-			Redacted:     endpoint + id,
+			Raw:          []byte(id),
+			RawV2:        []byte(connectionString),
 		}
 
 		if verify {
@@ -67,20 +63,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			isVerified, verificationErr := s.verifyMatch(ctx, client, endpoint, id, secret)
 			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr, resMatch)
+
+			if verificationErr != nil && !strings.Contains(verificationErr.Error(), "no such host") { // ignore no such host errors
+				s1.SetVerificationError(verificationErr, connectionString)
+			}
 		}
 
 		results = append(results, s1)
-		if s1.Verified {
-			break
-		}
 	}
 
 	return results, nil
-}
-
-func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
-	return false, ""
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
@@ -91,8 +83,8 @@ func (s Scanner) Description() string {
 	return "Azure App Configuration is a managed service that centralizes application settings and feature flags, enabling dynamic updates without redeploying applications. Its connection string, which includes the endpoint URL and an access key, securely connects applications to the configuration store."
 }
 
-// GenerateHMACSignature creates the HMAC-SHA256 signature
-func GenerateHMACSignature(secret, stringToSign string) (string, error) {
+// generateHMACSignature creates the HMAC-SHA256 signature
+func generateHMACSignature(secret, stringToSign string) (string, error) {
 	decodedSecret, err := base64.StdEncoding.DecodeString(secret)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode secret: %w", err)
@@ -138,7 +130,7 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, endpoint,
 	)
 
 	// Generate the HMAC signature
-	signature, err := GenerateHMACSignature(secret, stringToSign)
+	signature, err := generateHMACSignature(secret, stringToSign)
 	if err != nil {
 		return false, fmt.Errorf("failed to generate HMAC signature: %w", err)
 	}
