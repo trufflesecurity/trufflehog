@@ -14,6 +14,7 @@ import (
 var DetectorHttpClientWithNoLocalAddresses *http.Client
 var DetectorHttpClientWithLocalAddresses *http.Client
 
+// DefaultResponseTimeout is the default timeout for HTTP requests.
 const DefaultResponseTimeout = 10 * time.Second
 
 func userAgent() string {
