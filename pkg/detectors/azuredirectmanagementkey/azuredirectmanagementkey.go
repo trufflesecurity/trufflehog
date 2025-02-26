@@ -24,12 +24,11 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
 	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`)         // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([a-zA-Z0-9+\/-]{86,88}\b={0,2})`) // Base64-encoded key
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([a-zA-Z0-9+\/-]{86,88}\b={0,2})`) // Base64-encoded primary key
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -45,19 +44,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	urlMatches := urlPat.FindAllStringSubmatch(dataStr, -1)
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
+	urlMatchesUnique := make(map[string]string)
 	for _, urlMatch := range urlMatches {
-		serviceName := urlMatch[1]
-		for _, keyMatch := range keyMatches {
-			resMatch := strings.TrimSpace(keyMatch[1])
+		urlMatchesUnique[urlMatch[0]] = urlMatch[1]
+	}
+	keyMatchesUnique := make(map[string]struct{})
+	for _, keyMatch := range keyMatches {
+		keyMatchesUnique[keyMatch[1]] = struct{}{}
+	}
+
+	for baseUrl, serviceName := range urlMatchesUnique {
+		for key, _ := range keyMatchesUnique {
+			resMatch := strings.TrimSpace(key)
 			url := fmt.Sprintf(
 				"%s/subscriptions/default/resourceGroups/default/providers/Microsoft.ApiManagement/service/%s/apis?api-version=2024-05-01",
-				urlMatch[0], serviceName,
+				baseUrl, serviceName,
 			)
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureDirectManagementKey,
-				Raw:          []byte(urlMatch[0]),
-				RawV2:        []byte(urlMatch[0] + resMatch),
-				Redacted:     url,
+				Raw:          []byte(baseUrl),
+				RawV2:        []byte(baseUrl + resMatch),
+				Redacted:     baseUrl,
 			}
 
 			if verify {
@@ -66,28 +73,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				expiry := time.Now().UTC().Add(time.Minute).Format(time.RFC3339Nano)
-				expiry = expiry[:27] + "Z" // 7 decimals precision for miliseconds
-				accessToken, err := generateAccessToken(resMatch, expiry)
-				if err != nil {
-					continue
-				}
-				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Set("Content-Type", "application/json")
-				req.Header.Set("Authorization", fmt.Sprintf("SharedAccessSignature %s", accessToken))
-				resp, err := client.Do(req)
-				if err != nil {
-					continue
-				}
-				defer resp.Body.Close()
-
-				if resp.StatusCode == http.StatusOK {
-					s1.Verified = true
-				}
-
+				isVerified, verificationErr := s.verifyMatch(ctx, client, url, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			results = append(results, s1)
@@ -112,8 +100,38 @@ func (s Scanner) Description() string {
 	return "The Azure Management API is a RESTful interface for managing Azure resources programmatically through Azure Resource Manager (ARM), supporting automation with tools like Azure CLI and PowerShell. An Azure Management Direct Access API Key enables secure, non-interactive authentication, allowing direct access to manage resources via Azure Active Directory (AAD)."
 }
 
+func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, url, key string) (bool, error) {
+	accessToken, err := generateAccessToken(key)
+	if err != nil {
+		return false, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("SharedAccessSignature %s", accessToken))
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, nil
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
+	}
+}
+
 // https://learn.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication
-func generateAccessToken(key, expiry string) (string, error) {
+func generateAccessToken(key string) (string, error) {
+	expiry := time.Now().UTC().Add(time.Minute).Format(time.RFC3339Nano)
+	expiry = expiry[:27] + "Z" // 7 decimals precision for miliseconds
+
 	// Construct the string-to-sign
 	stringToSign := fmt.Sprintf("integration\n%s", expiry)
 
