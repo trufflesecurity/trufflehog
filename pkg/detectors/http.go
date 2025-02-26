@@ -14,7 +14,7 @@ import (
 var DetectorHttpClientWithNoLocalAddresses *http.Client
 var DetectorHttpClientWithLocalAddresses *http.Client
 
-const DefaultResponseTimeout = 5 * time.Second
+const DefaultResponseTimeout = 10 * time.Second
 
 func userAgent() string {
 	if len(feature.UserAgentSuffix.Load()) > 0 {
