@@ -12,6 +12,7 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -23,10 +24,9 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
+	defaultClient = common.SaneHttpClient()
 	keyPat        = regexp.MustCompile(`Endpoint=(https:\/\/[a-zA-Z0-9-]+\.azconfig\.io);Id=([a-zA-Z0-9+\/=]+);Secret=([a-zA-Z0-9+\/=]+)`)
 )
 
@@ -42,7 +42,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
+	keyMatchesUnique := make(map[string][]string)
 	for _, keyMatch := range keyMatches {
+		keyMatchesUnique[keyMatch[0]] = keyMatch
+	}
+
+	for _, keyMatch := range keyMatchesUnique {
 		resMatch := strings.TrimSpace(keyMatch[0])
 		endpoint := keyMatch[1]
 		id := keyMatch[2]
@@ -83,7 +88,7 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "The Azure Management API is a RESTful interface for managing Azure resources programmatically through Azure Resource Manager (ARM), supporting automation with tools like Azure CLI and PowerShell. An Azure Management Direct Access API Key enables secure, non-interactive authentication, allowing direct access to manage resources via Azure Active Directory (AAD)."
+	return "Azure App Configuration is a managed service that centralizes application settings and feature flags, enabling dynamic updates without redeploying applications. Its connection string, which includes the endpoint URL and an access key, securely connects applications to the configuration store."
 }
 
 // GenerateHMACSignature creates the HMAC-SHA256 signature
