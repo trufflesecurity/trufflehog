@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -18,11 +19,14 @@ var (
 		"callerIdentity": "/v2/caller-identity",
 		"getToken":       "/v2/tokens/%s", // require token id
 		"getRole":        "/v2/roles/%s",  // require role id
-		applicationType:  "/v2/applications",
-		repositoryType:   "/v2/code-refs/repositories",
-		projectType:      "/v2/projects",
-		environmentType:  "/v2/projects/%s/environments",                // require project key
-		experimentType:   "/v2/projects/%s/environments/%s/experiments", // require project key and env key
+		applicationKey:   "/v2/applications",
+		repositoryKey:    "/v2/code-refs/repositories",
+		projectKey:       "/v2/projects",
+		environmentKey:   "/v2/projects/%s/environments",                // require project key
+		experimentKey:    "/v2/projects/%s/environments/%s/experiments", // require project key and env key
+		holdoutsKey:      "/v2/projects/%s/environments/%s/holdouts",    // require project key and env key
+		membersKey:       "/v2/members",
+		destinationsKey:  "/v2/destinations",
 	}
 )
 
@@ -77,6 +81,35 @@ type experimentResponse struct {
 	} `json:"items"`
 }
 
+// membersResponse is the response of /v2/members API
+type membersResponse struct {
+	Items []struct {
+		ID        string `json:"_id"`
+		Role      string `json:"role"`
+		Email     string `json:"email"`
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+	} `json:"items"`
+}
+
+type holdoutsResponse struct {
+	Items []struct {
+		ID     string `json:"_id"`
+		Name   string `json:"name"`
+		Key    string `json:"key"`
+		Status string `json:"status"`
+	} `json:"items"`
+}
+
+type destinationsResponse struct {
+	Items []struct {
+		ID      string `json:"_id"`
+		Name    string `json:"name"`
+		Kind    string `json:"kind"`
+		Version int    `json:"version"`
+	} `json:"items"`
+}
+
 // makeLaunchDarklyRequest send the HTTP GET API request to passed url with passed token and return response body and status code
 func makeLaunchDarklyRequest(client *http.Client, endpoint, token string) ([]byte, int, error) {
 	// create request
@@ -110,7 +143,7 @@ func makeLaunchDarklyRequest(client *http.Client, endpoint, token string) ([]byt
 func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo) error {
 	var (
 		wg             sync.WaitGroup
-		errChan        = make(chan error, 5)
+		errChan        = make(chan error, 10)
 		aggregatedErrs = make([]string, 0)
 	)
 
@@ -141,20 +174,34 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		}
 
 		// for each project capture it's environments
-		for _, project := range secretInfo.listResourceByType(projectType) {
-			if err := captureProjectEnv(client, token, project, secretInfo); err != nil {
-				errChan <- err
-			}
-
-			// for each environment capture it's experiments
-			for _, env := range secretInfo.listResourceByType(environmentType) {
-				fmt.Println("here afer getting list resource by env type")
-				if err := captureProjectEnvExperiments(client, token, project.MetaData[MetadataKey], env, secretInfo); err != nil {
+		projects := secretInfo.listResourceByType(projectKey)
+		for _, project := range projects {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if err := captureProjectEnv(client, token, project, secretInfo); err != nil {
 					errChan <- err
 				}
-			}
+			}()
 		}
+	}()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := captureMembers(client, token, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := captureDestinations(client, token, secretInfo); err != nil {
+			errChan <- err
+		}
 	}()
 
 	wg.Wait()
@@ -174,7 +221,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 
 // docs: https://launchdarkly.com/docs/api/applications-beta/get-applications
 func captureApplications(client *http.Client, token string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[applicationType], token)
+	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[applicationKey], token)
 	if err != nil {
 		return err
 	}
@@ -191,13 +238,12 @@ func captureApplications(client *http.Client, token string, secretInfo *SecretIn
 			resource := Resource{
 				ID:   fmt.Sprintf("launchdarkly/app/%s", application.Key),
 				Name: application.Name,
-				Type: applicationType,
-				MetaData: map[string]string{
-					"Maintainer Email": application.Maintainer.Email,
-					"Kind":             application.Kind,
-					MetadataKey:        application.Key,
-				},
+				Type: applicationKey,
 			}
+
+			resource.updateResourceMetadata("Maintainer Email", application.Maintainer.Email)
+			resource.updateResourceMetadata("Kind", application.Kind)
+			resource.updateResourceMetadata(MetadataKey, application.Key)
 
 			secretInfo.appendResource(resource)
 		}
@@ -212,7 +258,7 @@ func captureApplications(client *http.Client, token string, secretInfo *SecretIn
 
 // docs: https://launchdarkly.com/docs/api/code-references/get-repositories
 func captureRepositories(client *http.Client, token string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[repositoryType], token)
+	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[repositoryKey], token)
 	if err != nil {
 		return err
 	}
@@ -229,13 +275,12 @@ func captureRepositories(client *http.Client, token string, secretInfo *SecretIn
 			resource := Resource{
 				ID:   fmt.Sprintf("%s/repo/%s/%d", repository.Type, repository.Name, repository.Version), // no unique id exist, so we make one
 				Name: repository.Name,
-				Type: repositoryType,
-				MetaData: map[string]string{
-					"Default branch": repository.DefaultBranch,
-					"Version":        fmt.Sprintf("%d", repository.Version),
-					"Source link":    repository.SourceLink,
-				},
+				Type: repositoryKey,
 			}
+
+			resource.updateResourceMetadata("Default branch", repository.DefaultBranch)
+			resource.updateResourceMetadata("Version", fmt.Sprintf("%d", repository.Version))
+			resource.updateResourceMetadata("Source link", repository.SourceLink)
 
 			secretInfo.appendResource(resource)
 		}
@@ -250,7 +295,7 @@ func captureRepositories(client *http.Client, token string, secretInfo *SecretIn
 
 // docs: https://launchdarkly.com/docs/api/projects/get-projects
 func captureProjects(client *http.Client, token string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[projectType], token)
+	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[projectKey], token)
 	if err != nil {
 		return err
 	}
@@ -267,7 +312,7 @@ func captureProjects(client *http.Client, token string, secretInfo *SecretInfo) 
 			secretInfo.appendResource(Resource{
 				ID:   fmt.Sprintf("launchdarkly/proj/%s", project.ID),
 				Name: project.Name,
-				Type: projectType,
+				Type: projectKey,
 				MetaData: map[string]string{
 					MetadataKey: project.Key,
 				},
@@ -289,7 +334,7 @@ func captureProjectEnv(client *http.Client, token string, parent Resource, secre
 		return errors.New("project key not found")
 	}
 
-	response, statusCode, err := makeLaunchDarklyRequest(client, fmt.Sprintf(endpoints[environmentType], projectKey), token)
+	response, statusCode, err := makeLaunchDarklyRequest(client, fmt.Sprintf(endpoints[environmentKey], projectKey), token)
 	if err != nil {
 		return err
 	}
@@ -303,15 +348,27 @@ func captureProjectEnv(client *http.Client, token string, parent Resource, secre
 		}
 
 		for _, env := range envs.Items {
-			secretInfo.appendResource(Resource{
+			resource := Resource{
 				ID:   fmt.Sprintf("launchdarkly/%s/env/%s", projectKey, env.ID),
 				Name: env.Name,
-				Type: environmentType,
+				Type: environmentKey,
 				MetaData: map[string]string{
 					MetadataKey: env.Key,
 				},
-				ParentResource: &parent,
-			})
+			}
+
+			resource.setParentResource(&resource, &parent)
+
+			secretInfo.appendResource(resource)
+
+			// capture project env child resources
+			if err := captureProjectEnvExperiments(client, token, projectKey, resource, secretInfo); err != nil {
+				return err
+			}
+
+			if err := captureProjectHoldouts(client, token, projectKey, resource, secretInfo); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -326,10 +383,10 @@ func captureProjectEnv(client *http.Client, token string, parent Resource, secre
 func captureProjectEnvExperiments(client *http.Client, token string, projectKey string, parent Resource, secretInfo *SecretInfo) error {
 	envKey, exist := parent.MetaData[MetadataKey]
 	if !exist {
-		return errors.New("project key not found")
+		return errors.New("env key not found")
 	}
 
-	response, statusCode, err := makeLaunchDarklyRequest(client, fmt.Sprintf(endpoints[experimentType], projectKey, envKey), token)
+	response, statusCode, err := makeLaunchDarklyRequest(client, fmt.Sprintf(endpoints[experimentKey], projectKey, envKey), token)
 	if err != nil {
 		return err
 	}
@@ -343,16 +400,138 @@ func captureProjectEnvExperiments(client *http.Client, token string, projectKey 
 		}
 
 		for _, exp := range exps.Items {
-			secretInfo.appendResource(Resource{
+			resource := Resource{
 				ID:   fmt.Sprintf("launchdarkly/%s/env/%s/exp/%s", projectKey, envKey, exp.ID),
 				Name: exp.Name,
-				Type: experimentType,
+				Type: experimentKey,
 				MetaData: map[string]string{
-					MetadataKey:     exp.Key,
-					"Maintainer ID": exp.MaintainerID,
+					MetadataKey: exp.Key,
 				},
-				ParentResource: &parent,
-			})
+			}
+
+			resource.updateResourceMetadata(MetadataKey, exp.Key)
+			resource.updateResourceMetadata("Maintainer ID", exp.MaintainerID)
+
+			resource.setParentResource(&resource, &parent)
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+		return nil
+	case http.StatusTooManyRequests:
+		time.Sleep(1 * time.Second)
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// docs: https://launchdarkly.com/docs/api/holdouts-beta/get-all-holdouts
+func captureProjectHoldouts(client *http.Client, token string, projectKey string, parent Resource, secretInfo *SecretInfo) error {
+	envKey, exist := parent.MetaData[MetadataKey]
+	if !exist {
+		return errors.New("env key not found")
+	}
+
+	response, statusCode, err := makeLaunchDarklyRequest(client, fmt.Sprintf(endpoints[holdoutsKey], projectKey, envKey), token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var holdouts = holdoutsResponse{}
+
+		if err := json.Unmarshal(response, &holdouts); err != nil {
+			return err
+		}
+
+		for _, holdout := range holdouts.Items {
+			resource := Resource{
+				ID:   fmt.Sprintf("launchdarkly/%s/env/%s/holdout/%s", projectKey, envKey, holdout.ID),
+				Name: holdout.Name,
+				Type: holdoutsKey,
+			}
+
+			resource.updateResourceMetadata("Status", holdout.Status)
+			resource.updateResourceMetadata(holdoutsKey, holdout.Key)
+
+			resource.setParentResource(&resource, &parent)
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// docs: https://launchdarkly.com/docs/api/account-members/get-members
+func captureMembers(client *http.Client, token string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[membersKey], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var members = membersResponse{}
+
+		if err := json.Unmarshal(response, &members); err != nil {
+			return err
+		}
+
+		for _, member := range members.Items {
+			resource := Resource{
+				ID:   fmt.Sprintf("launchdarkly/member/%s", member.ID),
+				Name: member.FirstName + " " + member.LastName,
+				Type: membersKey,
+			}
+
+			resource.updateResourceMetadata("Role", member.Role)
+			resource.updateResourceMetadata("Email", member.Email)
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// docs: https://launchdarkly.com/docs/api/data-export-destinations/get-destinations
+func captureDestinations(client *http.Client, token string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[destinationsKey], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var destinations = destinationsResponse{}
+
+		if err := json.Unmarshal(response, &destinations); err != nil {
+			return err
+		}
+
+		for _, destination := range destinations.Items {
+			resource := Resource{
+				ID:   fmt.Sprintf("launchdarkly/destination/%s", destination.ID),
+				Name: destination.Name,
+				Type: destinationsKey,
+			}
+
+			resource.updateResourceMetadata("Kind", destination.Kind)
+			resource.updateResourceMetadata("Version", fmt.Sprintf("%d", destination.Version))
+
+			secretInfo.appendResource(resource)
 		}
 
 		return nil

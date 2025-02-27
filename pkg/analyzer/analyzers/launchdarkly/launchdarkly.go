@@ -2,6 +2,7 @@
 package launchdarkly
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -24,7 +25,18 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	return nil, nil
+	// check if the `key` exist in the credentials info
+	key, exist := credInfo["key"]
+	if !exist {
+		return nil, errors.New("key not found in credentials info")
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return secretInfoToAnalyzerResult(info), nil
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
@@ -61,10 +73,71 @@ func AnalyzePermissions(cfg *config.Config, token string) (*SecretInfo, error) {
 
 	// capture resources in secretInfo
 	if err := CaptureResources(client, token, secretInfo); err != nil {
-		return nil, fmt.Errorf("failed to fetch caller identity: %v", err)
+		return nil, fmt.Errorf("failed to fetch resources: %v", err)
 	}
 
 	return secretInfo, nil
+}
+
+// secretInfoToAnalyzerResult translate secret info to Analyzer Result
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeElevenLabs,
+		Metadata:     map[string]any{},
+		Bindings:     make([]analyzers.Binding, 0),
+	}
+
+	// extract information from resource to create bindings and append to result bindings
+	for _, resource := range info.Resources {
+		binding := analyzers.Binding{
+			Resource: *secretInforesourceToAnalyzerResource(resource),
+			Permission: analyzers.Permission{
+				Value: getPermissionType(info.User.Token),
+			},
+		}
+
+		binding.Resource.Parent = secretInforesourceToAnalyzerResource(*resource.ParentResource)
+
+		result.Bindings = append(result.Bindings, binding)
+
+	}
+
+	return &result
+}
+
+// secretInforesourceToAnalyzerResource translate secret info resource to analyzer resource for binding
+func secretInforesourceToAnalyzerResource(resource Resource) *analyzers.Resource {
+	analyzerRes := analyzers.Resource{
+		FullyQualifiedName: resource.ID,
+		Name:               resource.Name,
+		Type:               resource.Type,
+		Metadata:           map[string]any{},
+	}
+
+	for key, value := range resource.MetaData {
+		analyzerRes.Metadata[key] = value
+	}
+
+	return &analyzerRes
+}
+
+// getPermissionType return what type of permission is assigned to token
+func getPermissionType(token Token) string {
+	permission := ""
+
+	if token.Role != "" {
+		permission = token.Role
+	} else if token.hasInlineRole() {
+		permission = "Inline Policy"
+	} else if token.hasCustomRoles() {
+		permission = "Custom Roles"
+	}
+
+	return permission
 }
 
 // printUser print User information from secret info to cli
@@ -112,17 +185,7 @@ func printUser(user User) {
 // printPermissionsType print permissions type token has
 func printPermissionsType(token Token) {
 	// print permission type. It can be either admin, writer, reader or has inline policy or any custom roles assigned
-	permission := ""
-
-	if token.Role != "" {
-		permission = token.Role
-	} else if token.hasInlineRole() {
-		permission = "Inline Policy"
-	} else if token.hasCustomRoles() {
-		permission = "Custom Roles"
-	}
-
-	color.Green("\n[i] Permission Type: %s", permission)
+	color.Green("\n[i] Permission Type: %s", getPermissionType(token))
 }
 
 func printResources(resources []Resource) {
