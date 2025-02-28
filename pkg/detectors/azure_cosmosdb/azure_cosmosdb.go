@@ -29,11 +29,11 @@ var (
 
 	dbKeyPattern = regexp.MustCompile(`([A-Za-z0-9+/]{86}==)`)
 	// account name can contain only lowercase letters, numbers and the `-` character, must be between 3 and 44 characters long.
-	accountUrlPattern = regexp.MustCompile(`([a-z0-9-]{3,44}.documents\.azure\.com:443)`)
+	accountUrlPattern = regexp.MustCompile(`([a-z0-9-]{3,44}.documents\.azure\.com)`)
 
 	invalidHosts = simple.NewCache[struct{}]()
 
-	noSuchHostErr = errors.New("no such host")
+	noHostErr = errors.New("no such host")
 )
 
 func (s Scanner) getClient() *http.Client {
@@ -56,7 +56,7 @@ func (s Scanner) Description() string {
 }
 
 func (s Scanner) Keywords() []string {
-	return []string{"cosmos", ".documents.azure.com"}
+	return []string{".documents.azure.com"}
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -89,7 +89,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				verified, verificationErr := verifyCosmosDB(s.getClient(), accountUrl, key)
 				s1.Verified = verified
 				if verificationErr != nil {
-					if errors.Is(verificationErr, noSuchHostErr) {
+					if errors.Is(verificationErr, noHostErr) {
 						invalidHosts.Set(accountUrl, struct{}{})
 						continue
 					}
@@ -113,7 +113,7 @@ func verifyCosmosDB(client *http.Client, accountUrl, key string) (bool, error) {
 		return false, fmt.Errorf("failed to decode key: %v", err)
 	}
 
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://%s/dbs", accountUrl), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://%s:443/dbs", accountUrl), nil)
 	if err != nil {
 		return false, fmt.Errorf("failed to create request: %v", err)
 	}
@@ -131,7 +131,7 @@ func verifyCosmosDB(client *http.Client, accountUrl, key string) (bool, error) {
 	if err != nil {
 		// lookup foo.documents.azure.com: no such host
 		if strings.Contains(err.Error(), "no such host") {
-			return false, noSuchHostErr
+			return false, noHostErr
 		}
 
 		return false, err
