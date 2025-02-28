@@ -57,7 +57,10 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 			return nil, err
 		}
 		// If bases are fetched, determine the token scopes
-		determineScopes(token, basesInfo)
+		err := determineScopes(token, basesInfo)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return mapToAnalyzerResult(userInfo, basesInfo), nil
@@ -80,7 +83,11 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
 			return
 		}
 		basesInfo, _ = common.FetchAirtableBases(token)
-		determineScopes(token, basesInfo)
+		err := determineScopes(token, basesInfo)
+		if err != nil {
+			color.Red("[x] Error : %s", err.Error())
+			return
+		}
 	}
 
 	color.Green("[!] Valid Airtable Personal Access Token\n\n")
