@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fatih/color"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -69,6 +70,7 @@ const (
 	AnalyzerTypeGitHub
 	AnalyzerTypeGitLab
 	AnalyzerTypeHuggingFace
+	AnalyzerTypeLaunchDarkly
 	AnalyzerTypeMailchimp
 	AnalyzerTypeMailgun
 	AnalyzerTypeMySQL
@@ -104,6 +106,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeGitHub:       "GitHub",
 	AnalyzerTypeGitLab:       "GitLab",
 	AnalyzerTypeHuggingFace:  "HuggingFace",
+	AnalyzerTypeLaunchDarkly: "LaunchDarkly",
 	AnalyzerTypeMailchimp:    "Mailchimp",
 	AnalyzerTypeMailgun:      "Mailgun",
 	AnalyzerTypeMySQL:        "MySQL",
