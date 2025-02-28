@@ -74,6 +74,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_storage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredirectmanagementkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
@@ -901,6 +902,7 @@ func buildDetectorList() []detectors.Detector {
 		&azure_batch.Scanner{},
 		&azurecontainerregistry.Scanner{},
 		&azuredevopspersonalaccesstoken.Scanner{},
+		&azuredirectmanagementkey.Scanner{},
 		// &azurefunctionkey.Scanner{}, // detector is throwing some FPs
 		&azure_openai.Scanner{},
 		&azuresearchadminkey.Scanner{},
