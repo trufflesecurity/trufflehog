@@ -29,7 +29,7 @@ var (
 
 	dbKeyPattern = regexp.MustCompile(`([A-Za-z0-9+/]{86}==)`)
 	// account name can contain only lowercase letters, numbers and the `-` character, must be between 3 and 44 characters long.
-	accountUrlPattern = regexp.MustCompile(`(https://[a-z0-9-]{3,44}.documents\.azure\.com:443)`)
+	accountUrlPattern = regexp.MustCompile(`([a-z0-9-]{3,44}.documents\.azure\.com:443)`)
 
 	invalidHosts = simple.NewCache[struct{}]()
 
@@ -113,7 +113,7 @@ func verifyCosmosDB(client *http.Client, accountUrl, key string) (bool, error) {
 		return false, fmt.Errorf("failed to decode key: %v", err)
 	}
 
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/dbs", accountUrl), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://%s/dbs", accountUrl), nil)
 	if err != nil {
 		return false, fmt.Errorf("failed to create request: %v", err)
 	}
