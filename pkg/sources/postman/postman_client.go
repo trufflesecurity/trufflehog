@@ -259,20 +259,17 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 
 	r, err := c.getPostmanReq("https://api.getpostman.com/workspaces", nil)
 	if err != nil {
-		err = fmt.Errorf("could not get workspaces")
-		return nil, err
+		return nil, fmt.Errorf("could not get workspaces during enumeration: %w", err)
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		err = fmt.Errorf("could not read response body for workspaces")
-		return nil, err
+		return nil, fmt.Errorf("could not read response body for workspaces during enumeration: %w", err)
 	}
 	r.Body.Close()
 
 	if err := json.Unmarshal([]byte(body), &workspacesObj); err != nil {
-		err = fmt.Errorf("could not unmarshal workspaces JSON")
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal workspaces JSON during enumeration: %w", err)
 	}
 
 	for i, workspace := range workspacesObj.Workspaces {
@@ -298,20 +295,17 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 	url := fmt.Sprintf(WORKSPACE_URL, workspaceUUID)
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
-		err = fmt.Errorf("could not get workspace: %s", workspaceUUID)
-		return Workspace{}, err
+		return Workspace{}, fmt.Errorf("could not get workspace (%s): %w", workspaceUUID, err)
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		err = fmt.Errorf("could not read response body for workspace: %s", workspaceUUID)
-		return Workspace{}, err
+		return Workspace{}, fmt.Errorf("could not read response body for workspace (%s): %w", workspaceUUID, err)
 	}
 	r.Body.Close()
 
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
-		err = fmt.Errorf("could not unmarshal workspace JSON for workspace: %s", workspaceUUID)
-		return Workspace{}, err
+		return Workspace{}, fmt.Errorf("could not unmarshal workspace JSON for workspace (%s): %w", workspaceUUID, err)
 	}
 
 	return obj.Workspace, nil
@@ -326,19 +320,16 @@ func (c *Client) GetEnvironmentVariables(environment_uuid string) (VariableData,
 	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
-		err = fmt.Errorf("could not get env variables for environment: %s", environment_uuid)
-		return VariableData{}, err
+		return VariableData{}, fmt.Errorf("could not get env variables for environment (%s): %w", environment_uuid, err)
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		err = fmt.Errorf("could not read env var response body for environment: %s", environment_uuid)
-		return VariableData{}, err
+		return VariableData{}, fmt.Errorf("could not read env var response body for environment (%s): %w", environment_uuid, err)
 	}
 	r.Body.Close()
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
-		err = fmt.Errorf("could not unmarshal env variables JSON for environment: %s", environment_uuid)
-		return VariableData{}, err
+		return VariableData{}, fmt.Errorf("could not unmarshal env variables JSON for environment (%s): %w", environment_uuid, err)
 	}
 
 	return obj.VariableData, nil
@@ -353,19 +344,16 @@ func (c *Client) GetCollection(collection_uuid string) (Collection, error) {
 	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
-		err = fmt.Errorf("could not get collection: %s", collection_uuid)
-		return Collection{}, err
+		return Collection{}, fmt.Errorf("could not get collection (%s): %w", collection_uuid, err)
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		err = fmt.Errorf("could not read response body for collection: %s", collection_uuid)
-		return Collection{}, err
+		return Collection{}, fmt.Errorf("could not read response body for collection (%s): %w", collection_uuid, err)
 	}
 	r.Body.Close()
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
-		err = fmt.Errorf("could not unmarshal JSON for collection: %s", collection_uuid)
-		return Collection{}, err
+		return Collection{}, fmt.Errorf("could not unmarshal JSON for collection (%s): %w", collection_uuid, err)
 	}
 
 	return obj.Collection, nil
