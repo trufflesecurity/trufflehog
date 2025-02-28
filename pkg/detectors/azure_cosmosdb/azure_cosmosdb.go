@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -28,6 +30,10 @@ var (
 	dbKeyPattern = regexp.MustCompile(`([A-Za-z0-9+/]{86}==)`)
 	// account name can contain only lowercase letters, numbers and the `-` character, must be between 3 and 44 characters long.
 	accountUrlPattern = regexp.MustCompile(`(https://[a-z0-9-]{3,44}.documents\.azure\.com:443)`)
+
+	invalidHosts = simple.NewCache[struct{}]()
+
+	noSuchHostErr = errors.New("no such host")
 )
 
 func (s Scanner) getClient() *http.Client {
@@ -68,6 +74,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for key := range uniqueKeyMatches {
 		for accountUrl := range uniqueAccountMatches {
+			if invalidHosts.Exists(accountUrl) {
+				delete(uniqueAccountMatches, accountUrl)
+				continue
+			}
+
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureCosmosDB,
 				Raw:          []byte(key),
@@ -77,7 +88,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				verified, verificationErr := verifyCosmosDB(s.getClient(), accountUrl, key)
 				s1.Verified = verified
-				s1.SetVerificationError(verificationErr)
+				if verificationErr != nil {
+					if errors.Is(verificationErr, noSuchHostErr) {
+						invalidHosts.Set(accountUrl, struct{}{})
+						continue
+					}
+
+					s1.SetVerificationError(verificationErr)
+				}
 			}
 
 			results = append(results, s1)
@@ -111,7 +129,12 @@ func verifyCosmosDB(client *http.Client, accountUrl, key string) (bool, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("request failed: %v", err)
+		// lookup foo.documents.azure.com: no such host
+		if strings.Contains(err.Error(), "no such host") {
+			return false, noSuchHostErr
+		}
+
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
