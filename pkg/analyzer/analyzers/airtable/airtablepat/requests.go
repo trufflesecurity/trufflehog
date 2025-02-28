@@ -13,27 +13,6 @@ type AirtableRecordsResponse struct {
 	Records []common.AirtableEntity `json:"records"`
 }
 
-func fetchBaseSchema(baseID, token string) (*common.Schema, error) {
-	endpoint := getEndpoint(common.GetBaseSchemaEndpoint)
-	url := strings.Replace(endpoint.URL, "{baseID}", baseID, -1)
-	resp, err := common.CallAirtableAPI(token, endpoint.Method, url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch schema for base %s, status: %d", baseID, resp.StatusCode)
-	}
-
-	var schema common.Schema
-	if err := json.NewDecoder(resp.Body).Decode(&schema); err != nil {
-		return nil, err
-	}
-
-	return &schema, nil
-}
-
 func fetchAirtableRecords(token string, baseID string, tableID string) ([]common.AirtableEntity, error) {
 	endpoint := getEndpoint(common.ListRecordsEndpoint)
 	url := strings.Replace(strings.Replace(endpoint.URL, "{baseID}", baseID, -1), "{tableID}", tableID, -1)

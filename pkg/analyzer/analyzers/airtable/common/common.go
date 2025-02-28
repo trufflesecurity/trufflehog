@@ -173,6 +173,7 @@ func PrintUserAndPermissions(info *AirtableUserInfo, scopeStatusMap map[string]b
 			t2.AppendRow(table.Row{color.GreenString(scopeString), color.GreenString(permission), color.GreenString(scopeStatus)})
 			scopeStatus = ""
 		}
+		t2.AppendSeparator()
 	}
 	t2.Render()
 	fmt.Printf("%s: https://airtable.com/developers/web/api/scopes\n", color.GreenString("Ref"))

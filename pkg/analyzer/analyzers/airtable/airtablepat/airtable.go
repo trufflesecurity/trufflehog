@@ -48,8 +48,14 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	scopeStatusMap[common.PermissionStrings[common.UserEmailRead]] = userInfo.Email != nil
 
 	var basesInfo *common.AirtableBases
-	if granted, _ := determineScope(token, common.SchemaBasesRead, nil); granted {
-		basesInfo, _ = common.FetchAirtableBases(token)
+	if granted, err := determineScope(token, common.SchemaBasesRead, nil); granted {
+		if err != nil {
+			return nil, err
+		}
+		basesInfo, err = common.FetchAirtableBases(token)
+		if err != nil {
+			return nil, err
+		}
 		// If bases are fetched, determine the token scopes
 		determineScopes(token, basesInfo)
 	}
@@ -124,7 +130,7 @@ func determineScope(token string, scope common.Permission, ids map[string]string
 	return true, nil
 }
 
-func determineScopes(token string, basesInfo *common.AirtableBases) {
+func determineScopes(token string, basesInfo *common.AirtableBases) error {
 	if basesInfo != nil && len(basesInfo.Bases) > 0 {
 		for _, base := range basesInfo.Bases {
 			if base.Schema != nil && len(base.Schema.Tables) > 0 {
@@ -132,27 +138,44 @@ func determineScopes(token string, basesInfo *common.AirtableBases) {
 				tableScopesDetermined := false
 
 				// Verify token "webhooks:manage" permission
-				determineScope(token, common.WebhookManage, ids)
+				_, err := determineScope(token, common.WebhookManage, ids)
+				if err != nil {
+					return err
+				}
 				// Verify token "block:manage" permission
-				determineScope(token, common.BlockManage, ids)
+				_, err = determineScope(token, common.BlockManage, ids)
+				if err != nil {
+					return err
+				}
 
 				// Verifying scopes that require an existing table
 				for _, table := range base.Schema.Tables {
 					ids["tableID"] = table.ID
 
 					if !tableScopesDetermined {
-						determineScope(token, common.SchemaBasesWrite, ids)
-						determineScope(token, common.DataRecordsWrite, ids)
+						_, err = determineScope(token, common.SchemaBasesWrite, ids)
+						if err != nil {
+							return err
+						}
+						_, err = determineScope(token, common.DataRecordsWrite, ids)
+						if err != nil {
+							return err
+						}
 						tableScopesDetermined = true
 					}
 
-					if granted, _ := determineScope(token, common.DataRecordsRead, ids); granted {
+					if granted, err := determineScope(token, common.DataRecordsRead, ids); err != nil {
+						return err
+					} else if granted {
 						// Verifying scopes that require an existing record and record read permission
 						records, err := fetchAirtableRecords(token, base.ID, table.ID)
 						if err != nil || len(records) > 0 {
 							for _, record := range records {
 								ids["recordID"] = record.ID
-								determineScope(token, common.DataRecordcommentsRead, ids)
+								_, err = determineScope(token, common.DataRecordcommentsRead, ids)
+								if err != nil {
+									return err
+								}
 								break
 							}
 							break
@@ -162,6 +185,7 @@ func determineScopes(token string, basesInfo *common.AirtableBases) {
 			}
 		}
 	}
+	return nil
 }
 
 func mapToAnalyzerResult(userInfo *common.AirtableUserInfo, basesInfo *common.AirtableBases) *analyzers.AnalyzerResult {
