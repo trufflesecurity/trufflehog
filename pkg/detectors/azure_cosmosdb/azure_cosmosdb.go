@@ -25,9 +25,9 @@ type Scanner struct {
 var (
 	defaultClient = common.SaneHttpClient()
 
-	dbKeyPattern = regexp.MustCompile(`([A-Za-z0-9+/=]{88})`)
+	dbKeyPattern = regexp.MustCompile(`([A-Za-z0-9+/]{86}==)`)
 	// account name can contain only lowercase letters, numbers and the `-` character, must be between 3 and 44 characters long.
-	accountUrlPattern = regexp.MustCompile(`(https://[a-z0-9-]{3,44}.documents\.azure\.com:[0-9]{3})`)
+	accountUrlPattern = regexp.MustCompile(`(https://[a-z0-9-]{3,44}.documents\.azure\.com:443)`)
 )
 
 func (s Scanner) getClient() *http.Client {

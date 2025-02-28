@@ -17,12 +17,12 @@ var (
 	The cluster name must not start or end in a hyphen.
 	// config
 	cosmosKey: FakeeP35zYGPXaEUfakeU7S8kcOY7NI7id8ddbHfakeAifake8Bbql1mXhMF2t0wQ0FAKEPQrwZZACDb3msoAg==
-	https://trufflesecurity-fake.documents.azure.com:341
+	https://trufflesecurity-fake.documents.azure.com:443
 	`
 
 	invalidPattern = `
 	FakeeP35zYGPXaEUfakeU7S8kcOY7I7id8ddbHfakeAifake8Bbql1mXhMF2t0wQ0FAKEPQrwZZACDb3msoAg==
-	https://not-a-host.documents.azure.com:445
+	https://not-a-host.documents.azure.com:443
 	`
 )
 
