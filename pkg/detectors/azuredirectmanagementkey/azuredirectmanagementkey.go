@@ -29,8 +29,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`)         // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
-	primaryKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([a-zA-Z0-9+\/-]{86,88}\b={0,2})`) // Base64-encoded primary key
+	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`)                                          // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", ".management.azure-api.net"}) + `\b([a-zA-Z0-9+\/]{83,85}[a-zA-Z0-9]==)`) // pattern for both Primary and secondary key
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,17 +47,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, urlMatch := range urlPat.FindAllStringSubmatch(dataStr, -1) {
 		urlMatchesUnique[urlMatch[0]] = urlMatch[1] // urlMatch[0] is the full url, urlMatch[1] is the service name
 	}
-	primaryKeyMatchesUnique := make(map[string]struct{})
-	for _, keyMatch := range primaryKeyPat.FindAllStringSubmatch(dataStr, -1) {
-		primaryKeyMatchesUnique[strings.TrimSpace(keyMatch[1])] = struct{}{}
+	keyMatchesUnique := make(map[string]struct{})
+	for _, keyMatch := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		keyMatchesUnique[strings.TrimSpace(keyMatch[1])] = struct{}{}
 	}
 
 	for baseUrl, serviceName := range urlMatchesUnique {
-		for primaryKey := range primaryKeyMatchesUnique {
+		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureDirectManagementKey,
 				Raw:          []byte(baseUrl),
-				RawV2:        []byte(baseUrl + primaryKey),
+				RawV2:        []byte(baseUrl + key),
 			}
 
 			if verify {
@@ -66,9 +66,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				isVerified, verificationErr := s.verifyMatch(ctx, client, baseUrl, serviceName, primaryKey)
+				isVerified, verificationErr := s.verifyMatch(ctx, client, baseUrl, serviceName, key)
 				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr, primaryKey)
+				s1.SetVerificationError(verificationErr, key)
 			}
 
 			results = append(results, s1)
@@ -122,7 +122,7 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, baseUrl, 
 
 // https://learn.microsoft.com/en-us/rest/api/apimanagement/apimanagementrest/azure-api-management-rest-api-authentication
 func generateAccessToken(key string) (string, error) {
-	expiry := time.Now().UTC().Add(5 * time.Second).Format(RFC3339WithoutMicroseconds) // expires in 5 seconds
+	expiry := time.Now().UTC().Add(5 * time.Second).Format(RFC3339WithoutMicroseconds) // expire in 5 seconds
 	expiry = expiry + ".0000000Z"                                                      // 7 decimals microsecond's precision is must for access token
 
 	// Construct the string-to-sign
