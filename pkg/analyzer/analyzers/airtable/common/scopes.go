@@ -1,6 +1,6 @@
-package airtableoauth
+package common
 
-var scope_mapping = map[string][]string{
+var ScopePermissions = map[string][]string{
 	// Basic Scopes
 	"data.records:read": {
 		"List records",
@@ -47,6 +47,7 @@ var scope_mapping = map[string][]string{
 	"user.email:read": {
 		"See the user's email address",
 	},
+
 	// Enterprise scopes
 	"enterprise.groups:read": {
 		"Get user group",
@@ -140,4 +141,14 @@ var scope_mapping = map[string][]string{
 		"Delete workspace",
 		"Move base",
 	},
+}
+
+var ScopeEndpointMap = map[string]Endpoint{
+	"schema.bases:read":        Endpoints[ListBasesEndpoint],
+	"schema.bases:write":       Endpoints[UpdateBaseEndpoint],
+	"webhook:manage":           Endpoints[ListWebhooksEndpoint],
+	"block:manage":             Endpoints[ListBlockInstallationsEndpoint],
+	"data.records:read":        Endpoints[ListRecordsEndpoint],
+	"data.records:write":       Endpoints[CreateRecordEndpoint],
+	"data.recordComments:read": Endpoints[ListRecordCommentsEndpoint],
 }

@@ -6,8 +6,8 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airbrake"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airtableoauth"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airtablepat"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airtable/airtableoauth"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airtable/airtablepat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/asana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
