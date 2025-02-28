@@ -95,8 +95,6 @@ const (
 var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeInvalid:       "Invalid",
 	AnalyzerTypeAirbrake:      "Airbrake",
-	AnalyzerTypeAirtableOAuth: "AirtableOAuth",
-	AnalyzerTypeAirtablePat:   "AirtablePat",
 	AnalyzerAnthropic:         "Anthropic",
 	AnalyzerTypeAsana:         "Asana",
 	AnalyzerTypeBitbucket:     "Bitbucket",
@@ -122,6 +120,8 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeTwilio:        "Twilio",
 	AnalyzerTypePrivateKey:    "PrivateKey",
 	AnalyzerTypeNotion:        "Notion",
+	AnalyzerTypeAirtableOAuth: "AirtableOAuth",
+	AnalyzerTypeAirtablePat:   "AirtablePat",
 	// Add new mappings here
 }
 
