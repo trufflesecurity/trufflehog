@@ -101,7 +101,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
 // determineScope checks whether the given token has the specified permission by making an API call.
 //
 // The function performs the following actions:
-//   - Determines the approprate API Endpoint based on the input scope/permission.
+//   - Determines the appropriate API Endpoint based on the input scope/permission.
 //   - Constructs an HTTP request using the endpoint's URL, method, and required IDs.
 //     If the URL contains path parameters (e.g., "{baseID}"), they must be replaced using `requiredIDs`.
 //   - Sends the request and analyzes the response to determine if the token has the requested permission.
