@@ -6,7 +6,8 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airbrake"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airtable"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airtable/airtableoauth"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/airtable/airtablepat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/asana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
@@ -98,13 +99,15 @@ func Run(keyType string, secretInfo SecretInfo) {
 		dockerhub.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["username"], secretInfo.Parts["pat"])
 	case "anthropic":
 		anthropic.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
-	case "airtable":
-		airtable.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "digitalocean":
 		digitalocean.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "elevenlabs":
 		elevenlabs.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "planetscale":
 		planetscale.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["id"], secretInfo.Parts["token"])
+	case "airtableoauth":
+		airtableoauth.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "airtablepat":
+		airtablepat.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }
