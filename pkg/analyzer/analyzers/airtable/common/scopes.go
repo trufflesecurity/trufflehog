@@ -1,6 +1,6 @@
 package common
 
-var ScopePermissions = map[string][]string{
+var scopeToPermissions = map[string][]string{
 	// Basic Scopes
 	"data.records:read": {
 		"List records",
@@ -143,12 +143,33 @@ var ScopePermissions = map[string][]string{
 	},
 }
 
-var ScopeEndpointMap = map[string]Endpoint{
-	"schema.bases:read":        Endpoints[ListBasesEndpoint],
-	"schema.bases:write":       Endpoints[UpdateBaseEndpoint],
-	"webhook:manage":           Endpoints[ListWebhooksEndpoint],
-	"block:manage":             Endpoints[ListBlockInstallationsEndpoint],
-	"data.records:read":        Endpoints[ListRecordsEndpoint],
-	"data.records:write":       Endpoints[CreateRecordEndpoint],
-	"data.recordComments:read": Endpoints[ListRecordCommentsEndpoint],
+var scopeToEndpointName = map[string]EndpointName{
+	"schema.bases:read":        ListBasesEndpoint,
+	"schema.bases:write":       UpdateBaseEndpoint,
+	"webhook:manage":           ListWebhooksEndpoint,
+	"block:manage":             ListBlockInstallationsEndpoint,
+	"data.records:read":        ListRecordsEndpoint,
+	"data.records:write":       CreateRecordEndpoint,
+	"data.recordComments:read": ListRecordCommentsEndpoint,
+}
+
+var scopeToEndpoint map[string]Endpoint
+
+func init() {
+	scopeToEndpoint = make(map[string]Endpoint)
+	for scope, endpointName := range scopeToEndpointName {
+		if endpoint, exists := GetEndpoint(endpointName); exists {
+			scopeToEndpoint[scope] = endpoint
+		}
+	}
+}
+
+func GetScopePermissions(scope string) ([]string, bool) {
+	permission, exists := scopeToPermissions[scope]
+	return permission, exists
+}
+
+func GetScopeEndpoint(scope string) (Endpoint, bool) {
+	endpoint, exists := scopeToEndpoint[scope]
+	return endpoint, exists
 }

@@ -14,7 +14,10 @@ type AirtableRecordsResponse struct {
 }
 
 func fetchAirtableRecords(token string, baseID string, tableID string) ([]common.AirtableEntity, error) {
-	endpoint := getEndpoint(common.ListRecordsEndpoint)
+	endpoint, exists := getEndpoint(common.ListRecordsEndpoint)
+	if !exists {
+		return nil, fmt.Errorf("endpoint for ListRecordsEndpoint does not exist")
+	}
 	url := strings.Replace(strings.Replace(endpoint.URL, "{baseID}", baseID, -1), "{tableID}", tableID, -1)
 	resp, err := common.CallAirtableAPI(token, "GET", url)
 	if err != nil {

@@ -30,7 +30,10 @@ func CallAirtableAPI(token string, method string, url string) (*http.Response, e
 }
 
 func FetchAirtableUserInfo(token string) (*AirtableUserInfo, error) {
-	endpoint := Endpoints[GetUserInfoEndpoint]
+	endpoint, exists := GetEndpoint(GetUserInfoEndpoint)
+	if !exists {
+		return nil, fmt.Errorf("endpoint for GetUserInfoEndpoint does not exist")
+	}
 	resp, err := CallAirtableAPI(token, endpoint.Method, endpoint.URL)
 	if err != nil {
 		return nil, err
@@ -50,7 +53,10 @@ func FetchAirtableUserInfo(token string) (*AirtableUserInfo, error) {
 }
 
 func FetchAirtableBases(token string) (*AirtableBases, error) {
-	endpoint := Endpoints[ListBasesEndpoint]
+	endpoint, exists := GetEndpoint(ListBasesEndpoint)
+	if !exists {
+		return nil, fmt.Errorf("endpoint for ListBasesEndpoint does not exist")
+	}
 	resp, err := CallAirtableAPI(token, endpoint.Method, endpoint.URL)
 	if err != nil {
 		return nil, err
@@ -80,7 +86,10 @@ func FetchAirtableBases(token string) (*AirtableBases, error) {
 }
 
 func fetchBaseSchema(token string, baseID string) (*Schema, error) {
-	endpoint := Endpoints[GetBaseSchemaEndpoint]
+	endpoint, exists := GetEndpoint(GetBaseSchemaEndpoint)
+	if !exists {
+		return nil, fmt.Errorf("endpoint for GetBaseSchemaEndpoint does not exist")
+	}
 	url := strings.Replace(endpoint.URL, "{baseID}", baseID, -1)
 	resp, err := CallAirtableAPI(token, endpoint.Method, url)
 	if err != nil {
@@ -165,7 +174,11 @@ func PrintUserAndPermissions(info *AirtableUserInfo, scopeStatusMap map[string]b
 				scopeStatus = "Denied"
 			}
 		}
-		for i, permission := range ScopePermissions[scope] {
+		permissions, ok := GetScopePermissions(scope)
+		if !ok {
+			continue
+		}
+		for i, permission := range permissions {
 			scopeString := ""
 			if i == 0 {
 				scopeString = scope

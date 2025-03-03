@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/fatih/color"
@@ -26,12 +25,12 @@ func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeAir
 
 var scopeStatusMap = make(map[string]bool)
 
-func getEndpoint(endpoint common.EndpointName) common.Endpoint {
-	return common.Endpoints[endpoint]
+func getEndpoint(endpointName common.EndpointName) (common.Endpoint, bool) {
+	return common.GetEndpoint(endpointName)
 }
 
-func getEndpointByPermission(scope string) common.Endpoint {
-	return common.ScopeEndpointMap[scope]
+func getScopeEndpoint(scope string) (common.Endpoint, bool) {
+	return common.GetScopeEndpoint(scope)
 }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
@@ -48,10 +47,11 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	scopeStatusMap[common.PermissionStrings[common.UserEmailRead]] = userInfo.Email != nil
 
 	var basesInfo *common.AirtableBases
-	if granted, err := determineScope(token, common.SchemaBasesRead, nil); granted {
-		if err != nil {
-			return nil, err
-		}
+	granted, err := determineScope(token, common.SchemaBasesRead, nil)
+	if err != nil {
+		return nil, err
+	}
+	if granted {
 		basesInfo, err = common.FetchAirtableBases(token)
 		if err != nil {
 			return nil, err
@@ -98,13 +98,27 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
 	}
 }
 
-func determineScope(token string, scope common.Permission, ids map[string]string) (bool, error) {
-	scopeString := common.PermissionStrings[scope]
-	endpoint := getEndpointByPermission(scopeString)
+// determineScope checks whether the given token has the specified permission by making an API call.
+//
+// The function performs the following actions:
+//   - Determines the approprate API Endpoint based on the input scope/permission.
+//   - Constructs an HTTP request using the endpoint's URL, method, and required IDs.
+//     If the URL contains path parameters (e.g., "{baseID}"), they must be replaced using `requiredIDs`.
+//   - Sends the request and analyzes the response to determine if the token has the requested permission.
+//
+// Returns `true` if the token has the permission, `false` otherwise.
+// If an error occurs, it returns false along with the encountered error.
+func determineScope(token string, perm common.Permission, requiredIDs map[string]string) (bool, error) {
+	scopeString := common.PermissionStrings[perm]
+	endpoint, exists := getScopeEndpoint(scopeString)
+	if !exists {
+		return false, nil
+	}
+
 	url := endpoint.URL
-	if ids != nil {
+	if requiredIDs != nil {
 		for _, key := range endpoint.RequiredIDs {
-			if value, ok := ids[key]; ok {
+			if value, ok := requiredIDs[key]; ok {
 				url = strings.Replace(url, fmt.Sprintf("{%s}", key), value, -1)
 			}
 		}
@@ -116,79 +130,100 @@ func determineScope(token string, scope common.Permission, ids map[string]string
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
+	if resp.StatusCode == endpoint.ExpectedSuccessStatus {
 		scopeStatusMap[scopeString] = true
 		return true, nil
-	} else if endpoint.ExpectedErrorResponse != nil {
-		var result map[string]interface{}
+	}
+
+	// If the response status is not 200 OK, we need to verify if the error is as expected
+	if endpoint.ExpectedErrorResponse != nil {
+		var result map[string]any
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			return false, err
 		}
 
-		if errorInfo, ok := result["error"].(map[string]interface{}); ok {
-			if errorType, ok := errorInfo["type"].(string); ok && errorType == endpoint.ExpectedErrorResponse.Type {
-				scopeStatusMap[scopeString] = false
-				return false, nil
-			}
+		errorInfo, ok := result["error"].(map[string]any)
+		if !ok {
+			// If no error is found in the response, the scope is unverified
+			return false, nil
 		}
+		errorType, ok := errorInfo["type"].(string)
+		if !ok || errorType != endpoint.ExpectedErrorResponse.Type {
+			// If "type" is missing from the error body, or mismatches the expected type, the scope is unverified
+			return false, nil
+		}
+
+		// The token lacks the scope/permission to fulfill the request
+		scopeStatusMap[scopeString] = false
+		return false, nil
 	}
 
-	scopeStatusMap[scopeString] = true
-	return true, nil
+	// Can not determine scope as the expected error is unknown
+	return false, nil
 }
 
 func determineScopes(token string, basesInfo *common.AirtableBases) error {
-	if basesInfo != nil && len(basesInfo.Bases) > 0 {
-		for _, base := range basesInfo.Bases {
-			if base.Schema != nil && len(base.Schema.Tables) > 0 {
-				ids := map[string]string{"baseID": base.ID}
-				tableScopesDetermined := false
+	if basesInfo == nil || len(basesInfo.Bases) == 0 {
+		return nil
+	}
 
-				// Verify token "webhooks:manage" permission
-				_, err := determineScope(token, common.WebhookManage, ids)
+	for _, base := range basesInfo.Bases {
+		requiredIDs := map[string]string{"baseID": base.ID}
+		tableScopesDetermined := false
+
+		// Verify token "webhooks:manage" permission
+		_, err := determineScope(token, common.WebhookManage, requiredIDs)
+		if err != nil {
+			return err
+		}
+		// Verify token "block:manage" permission
+		_, err = determineScope(token, common.BlockManage, requiredIDs)
+		if err != nil {
+			return err
+		}
+
+		if base.Schema == nil || len(base.Schema.Tables) == 0 {
+			return nil
+		}
+
+		// Verifying scopes that require an existing table
+		for _, table := range base.Schema.Tables {
+			requiredIDs["tableID"] = table.ID
+
+			if !tableScopesDetermined {
+				_, err = determineScope(token, common.SchemaBasesWrite, requiredIDs)
 				if err != nil {
 					return err
 				}
-				// Verify token "block:manage" permission
-				_, err = determineScope(token, common.BlockManage, ids)
+				_, err = determineScope(token, common.DataRecordsWrite, requiredIDs)
 				if err != nil {
 					return err
 				}
+				tableScopesDetermined = true
+			}
 
-				// Verifying scopes that require an existing table
-				for _, table := range base.Schema.Tables {
-					ids["tableID"] = table.ID
-
-					if !tableScopesDetermined {
-						_, err = determineScope(token, common.SchemaBasesWrite, ids)
-						if err != nil {
-							return err
-						}
-						_, err = determineScope(token, common.DataRecordsWrite, ids)
-						if err != nil {
-							return err
-						}
-						tableScopesDetermined = true
-					}
-
-					if granted, err := determineScope(token, common.DataRecordsRead, ids); err != nil {
-						return err
-					} else if granted {
-						// Verifying scopes that require an existing record and record read permission
-						records, err := fetchAirtableRecords(token, base.ID, table.ID)
-						if err != nil || len(records) > 0 {
-							for _, record := range records {
-								ids["recordID"] = record.ID
-								_, err = determineScope(token, common.DataRecordcommentsRead, ids)
-								if err != nil {
-									return err
-								}
-								break
-							}
-							break
-						}
-					}
+			granted, err := determineScope(token, common.DataRecordsRead, requiredIDs)
+			if err != nil {
+				return err
+			}
+			if !granted {
+				continue
+			}
+			// Verifying scopes that require an existing "record" and the "data records read" permission
+			records, err := fetchAirtableRecords(token, base.ID, table.ID)
+			if err != nil {
+				return err
+			}
+			for _, record := range records {
+				requiredIDs["recordID"] = record.ID
+				_, err = determineScope(token, common.DataRecordcommentsRead, requiredIDs)
+				if err != nil {
+					return err
 				}
+				break
+			}
+			if len(records) != 0 {
+				break
 			}
 		}
 	}
