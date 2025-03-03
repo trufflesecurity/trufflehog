@@ -29,7 +29,7 @@ var (
 
 	dbKeyPattern = regexp.MustCompile(`([A-Za-z0-9+/]{86}==)`)
 	// account name can contain only lowercase letters, numbers and the `-` character, must be between 3 and 44 characters long.
-	accountUrlPattern = regexp.MustCompile(`([a-z0-9-]{3,44}.documents\.azure\.com)`)
+	accountUrlPattern = regexp.MustCompile(`([a-z0-9-]{3,44}\.(?:documents|table\.cosmos)\.azure\.com)`)
 
 	invalidHosts = simple.NewCache[struct{}]()
 
@@ -56,7 +56,7 @@ func (s Scanner) Description() string {
 }
 
 func (s Scanner) Keywords() []string {
-	return []string{".documents.azure.com"}
+	return []string{".documents.azure.com", ".table.cosmos.azure.com"}
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -83,10 +83,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				DetectorType: detectorspb.DetectorType_AzureCosmosDBKeyIdentifiable,
 				Raw:          []byte(key),
 				RawV2:        []byte("key: " + key + " account_url: " + accountUrl), // key: <key> account_url: <account_url>
+				ExtraData:    map[string]string{},
 			}
 
 			if verify {
-				verified, verificationErr := verifyCosmosDB(s.getClient(), accountUrl, key)
+				var verified bool
+				var verificationErr error
+
+				client := s.getClient()
+
+				// perform verification based on db type
+				if strings.Contains(accountUrl, ".documents.azure.com") {
+					verified, verificationErr = verifyCosmosDocumentDB(client, accountUrl, key)
+					s1.ExtraData["DB Type"] = "Document"
+
+				} else if strings.Contains(accountUrl, ".table.cosmos.azure.com") {
+					verified, verificationErr = verifyCosmosTableDB(client, accountUrl, key)
+					s1.ExtraData["DB Type"] = "Table"
+				}
+
 				s1.Verified = verified
 				if verificationErr != nil {
 					if errors.Is(verificationErr, noHostErr) {
@@ -106,7 +121,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 // documentation: https://learn.microsoft.com/en-us/rest/api/cosmos-db/list-databases
-func verifyCosmosDB(client *http.Client, accountUrl, key string) (bool, error) {
+func verifyCosmosDocumentDB(client *http.Client, accountUrl, key string) (bool, error) {
 	// decode the base64 encoded key
 	decodedKey, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
@@ -119,7 +134,7 @@ func verifyCosmosDB(client *http.Client, accountUrl, key string) (bool, error) {
 	}
 
 	dateRFC1123 := time.Now().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT")
-	authHeader := fmt.Sprintf("type=master&ver=1.0&sig=%s", url.QueryEscape(createSignature(decodedKey, dateRFC1123)))
+	authHeader := fmt.Sprintf("type=master&ver=1.0&sig=%s", url.QueryEscape(createDocumentsSignature(decodedKey, dateRFC1123)))
 
 	// required headers
 	// docs: https://learn.microsoft.com/en-us/rest/api/cosmos-db/common-cosmosdb-rest-request-headers
@@ -152,7 +167,7 @@ func verifyCosmosDB(client *http.Client, accountUrl, key string) (bool, error) {
 	}
 }
 
-func createSignature(decodedKey []byte, dateRFC1123 string) string {
+func createDocumentsSignature(decodedKey []byte, dateRFC1123 string) string {
 	stringToSign := fmt.Sprintf(
 		"%s\n%s\n%s\n%s\n\n",
 		strings.ToLower(http.MethodGet),

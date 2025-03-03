@@ -12,13 +12,21 @@ import (
 )
 
 var (
-	validPattern = `
+	validDocumentDBPattern = `
 	Cluster name: Cluster name must be at least 3 characters and at most 40 characters.
 	Cluster name must only contain lowercase letters, numbers, and hyphens.
 	The cluster name must not start or end in a hyphen.
 	// config
 	cosmosKey: FakeeP35zYGPXaEUfakeU7S8kcOY7NI7id8ddbHfakeAifake8Bbql1mXhMF2t0wQ0FAKEPQrwZZACDb3msoAg==
 	https://trufflesecurity-fake.documents.azure.com:443
+	`
+	validTableDBPattern = `
+	Cluster name: Cluster name must be at least 3 characters and at most 40 characters.
+	Cluster name must only contain lowercase letters, numbers, and hyphens.
+	The cluster name must not start or end in a hyphen.
+	// config
+	cosmosKey: FakeeP35zYGPXaEUfakeU7S8kcOY7NI7id8ddbHfakeAifake8Bbql1mXhMF2t0wQ0FAKEPQrwZZACDb3msoAg==
+	https://trufflesecurity-fake.table.cosmos.azure.com:443
 	`
 
 	invalidPattern = `
@@ -37,9 +45,14 @@ func TestCosmosDB_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
+			name:  "valid document db pattern",
+			input: validDocumentDBPattern,
 			want:  []string{fmt.Sprintf("key: %s account_url: %s", "FakeeP35zYGPXaEUfakeU7S8kcOY7NI7id8ddbHfakeAifake8Bbql1mXhMF2t0wQ0FAKEPQrwZZACDb3msoAg==", "trufflesecurity-fake.documents.azure.com")},
+		},
+		{
+			name:  "valid table db pattern",
+			input: validTableDBPattern,
+			want:  []string{fmt.Sprintf("key: %s account_url: %s", "FakeeP35zYGPXaEUfakeU7S8kcOY7NI7id8ddbHfakeAifake8Bbql1mXhMF2t0wQ0FAKEPQrwZZACDb3msoAg==", "trufflesecurity-fake.table.cosmos.azure.com")},
 		},
 		{
 			name:  "invalid pattern",
