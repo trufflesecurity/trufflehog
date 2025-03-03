@@ -86,6 +86,7 @@ const (
 	AnalyzerTypePrivateKey
 	AnalyzerTypeNotion
 	AnalyzerTypeDigitalOcean
+	AnalyzerTypePlanetScale
 	AnalyzerTypeAirtableOAuth
 	AnalyzerTypeAirtablePat
 	// Add new items here with AnalyzerType prefix
@@ -120,6 +121,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeTwilio:        "Twilio",
 	AnalyzerTypePrivateKey:    "PrivateKey",
 	AnalyzerTypeNotion:        "Notion",
+	AnalyzerTypePlanetScale:   "PlanetScale",
 	AnalyzerTypeAirtableOAuth: "AirtableOAuth",
 	AnalyzerTypeAirtablePat:   "AirtablePat",
 	// Add new mappings here
