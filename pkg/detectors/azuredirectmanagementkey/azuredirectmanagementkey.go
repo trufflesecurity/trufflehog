@@ -29,8 +29,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`)                                          // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", ".management.azure-api.net"}) + `\b([a-zA-Z0-9+\/]{83,85}[a-zA-Z0-9]==)`) // pattern for both Primary and secondary key
+	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`)                                        // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", ".management.azure-api.net"}) + `([a-zA-Z0-9+\/]{83,85}[a-zA-Z0-9]==)`) // pattern for both Primary and secondary key
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
