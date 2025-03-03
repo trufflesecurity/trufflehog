@@ -2,6 +2,7 @@ package azure_cosmosdb
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -38,7 +39,7 @@ func TestCosmosDB_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{"FakeeP35zYGPXaEUfakeU7S8kcOY7NI7id8ddbHfakeAifake8Bbql1mXhMF2t0wQ0FAKEPQrwZZACDb3msoAg=="},
+			want:  []string{fmt.Sprintf("key: %s account_url: %s", "FakeeP35zYGPXaEUfakeU7S8kcOY7NI7id8ddbHfakeAifake8Bbql1mXhMF2t0wQ0FAKEPQrwZZACDb3msoAg==", "trufflesecurity-fake.documents.azure.com")},
 		},
 		{
 			name:  "invalid pattern",

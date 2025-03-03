@@ -48,7 +48,7 @@ func (s Scanner) getClient() *http.Client {
 var _ detectors.Detector = (*Scanner)(nil)
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_AzureCosmosDB
+	return detectorspb.DetectorType_AzureCosmosDBKeyIdentifiable
 }
 
 func (s Scanner) Description() string {
@@ -80,9 +80,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_AzureCosmosDB,
+				DetectorType: detectorspb.DetectorType_AzureCosmosDBKeyIdentifiable,
 				Raw:          []byte(key),
-				ExtraData:    make(map[string]string),
+				RawV2:        []byte("key: " + key + " account_url: " + accountUrl), // key: <key> account_url: <account_url>
 			}
 
 			if verify {
