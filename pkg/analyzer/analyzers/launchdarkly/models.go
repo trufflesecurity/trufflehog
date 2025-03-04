@@ -10,7 +10,7 @@ var (
 	repositoryKey   = "Repository"
 	projectKey      = "Project"
 	environmentKey  = "Environment"
-	experimentKey   = "Expirement"
+	experimentKey   = "Experiment"
 	holdoutsKey     = "Holdout"
 	membersKey      = "Member"
 	destinationsKey = "Destination"
@@ -118,11 +118,6 @@ func (t Token) hasCustomRoles() bool {
 // hasInlineRole check if token has any inline roles
 func (t Token) hasInlineRole() bool {
 	return len(t.InlineRole) > 0
-}
-
-// isAllowed check if policy allow the statement
-func (p Policy) isAllowed() bool {
-	return p.Effect == "allow"
 }
 
 // setParentResource set parent resource for a resource

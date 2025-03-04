@@ -94,13 +94,15 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	// extract information from resource to create bindings and append to result bindings
 	for _, resource := range info.Resources {
 		binding := analyzers.Binding{
-			Resource: *secretInforesourceToAnalyzerResource(resource),
+			Resource: *secretInfoResourceToAnalyzerResource(resource),
 			Permission: analyzers.Permission{
 				Value: getPermissionType(info.User.Token),
 			},
 		}
 
-		binding.Resource.Parent = secretInforesourceToAnalyzerResource(*resource.ParentResource)
+		if resource.ParentResource != nil {
+			binding.Resource.Parent = secretInfoResourceToAnalyzerResource(*resource.ParentResource)
+		}
 
 		result.Bindings = append(result.Bindings, binding)
 
@@ -109,8 +111,8 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	return &result
 }
 
-// secretInforesourceToAnalyzerResource translate secret info resource to analyzer resource for binding
-func secretInforesourceToAnalyzerResource(resource Resource) *analyzers.Resource {
+// secretInfoResourceToAnalyzerResource translate secret info resource to analyzer resource for binding
+func secretInfoResourceToAnalyzerResource(resource Resource) *analyzers.Resource {
 	analyzerRes := analyzers.Resource{
 		FullyQualifiedName: resource.ID,
 		Name:               resource.Name,
