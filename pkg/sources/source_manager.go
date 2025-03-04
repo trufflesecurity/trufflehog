@@ -181,14 +181,8 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 	}
 
 	// Create a JobProgress object for tracking progress.
-	sem := s.sem
 	ctx, cancel := context.WithCancelCause(ctx)
 	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
-	if err := sem.Acquire(ctx, 1); err != nil {
-		// Context cancelled.
-		progress.ReportError(Fatal{err})
-		return progress.Ref(), Fatal{err}
-	}
 
 	// Wrap the passed in reporter so we update the progress information.
 	reporter = baseUnitReporter{
@@ -200,7 +194,6 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 	go func() {
 		// Call Finish after the semaphore has been released.
 		defer progress.Finish()
-		defer sem.Release(1)
 		defer s.wg.Done()
 		ctx := context.WithValues(ctx,
 			"source_manager_worker_id", common.RandomID(5),
