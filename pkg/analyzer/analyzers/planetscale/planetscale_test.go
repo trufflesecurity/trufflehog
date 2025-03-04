@@ -1,4 +1,4 @@
-package airtable
+package planetscale
 
 import (
 	_ "embed"
@@ -17,7 +17,7 @@ import (
 var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
@@ -26,13 +26,15 @@ func TestAnalyzer_Analyze(t *testing.T) {
 
 	tests := []struct {
 		name    string
+		id      string
 		token   string
 		want    string // JSON string
 		wantErr bool
 	}{
 		{
-			token:   testSecrets.MustGetField("AIRTABLEOAUTH_TOKEN"),
-			name:    "valid Airtable OAuth Token",
+			name:    "valid planetscale id and key",
+			id:      testSecrets.MustGetField("PLANET_SCALE_ID"),
+			token:   testSecrets.MustGetField("PLANET_SCALE_TOKEN"),
 			want:    string(expectedOutput),
 			wantErr: false,
 		},
@@ -41,7 +43,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{Cfg: &config.Config{}}
-			got, err := a.Analyze(ctx, map[string]string{"token": tt.token})
+			got, err := a.Analyze(ctx, map[string]string{"id": tt.id, "token": tt.token})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
 				return
