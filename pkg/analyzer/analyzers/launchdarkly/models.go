@@ -14,6 +14,10 @@ var (
 	holdoutsKey     = "Holdout"
 	membersKey      = "Member"
 	destinationsKey = "Destination"
+	templatesKey    = "Templates"
+	teamsKey        = "Teams"
+	webhooksKey     = "Webhooks"
+	featureFlagsKey = "Feature Flags"
 )
 
 type SecretInfo struct {

@@ -23,10 +23,14 @@ var (
 		repositoryKey:    "/v2/code-refs/repositories",
 		projectKey:       "/v2/projects",
 		environmentKey:   "/v2/projects/%s/environments",                // require project key
+		featureFlagsKey:  "/v2/flags/%s",                                // require project key
 		experimentKey:    "/v2/projects/%s/environments/%s/experiments", // require project key and env key
 		holdoutsKey:      "/v2/projects/%s/environments/%s/holdouts",    // require project key and env key
 		membersKey:       "/v2/members",
 		destinationsKey:  "/v2/destinations",
+		templatesKey:     "/v2/templates",
+		teamsKey:         "/v2/teams",
+		webhooksKey:      "/v2/webhooks",
 	}
 )
 
@@ -62,6 +66,15 @@ type projectsResponse struct {
 	} `json:"items"`
 }
 
+// featureFlagsResponse is the response of /v2/flags/<project_id> API
+type featureFlagsResponse struct {
+	Items []struct {
+		Key  string `json:"key"`
+		Name string `json:"name"`
+		Kind string `json:"kind"`
+	} `json:"items"`
+}
+
 // environmentsResponse is the response of /v2/projects/<proj_key>/environments API
 type environmentsResponse struct {
 	Items []struct {
@@ -92,6 +105,7 @@ type membersResponse struct {
 	} `json:"items"`
 }
 
+// holdoutsResponse is the response of /v2/projects/<project_id>/environments/<env_id>/holdouts API
 type holdoutsResponse struct {
 	Items []struct {
 		ID     string `json:"_id"`
@@ -101,12 +115,48 @@ type holdoutsResponse struct {
 	} `json:"items"`
 }
 
+// destinationsResponse is the response of /v2/destinations API
 type destinationsResponse struct {
 	Items []struct {
 		ID      string `json:"_id"`
 		Name    string `json:"name"`
 		Kind    string `json:"kind"`
 		Version int    `json:"version"`
+	} `json:"items"`
+}
+
+// templatesResponse is the response of /v2/templates API
+type templatesResponse struct {
+	Items []struct {
+		ID   string `json:"_id"`
+		Key  string `json:"_key"`
+		Name string `json:"name"`
+	} `json:"items"`
+}
+
+// teamsResponse is the response of /v2/teams API
+type teamsResponse struct {
+	Items []struct {
+		Key   string `json:"key"`
+		Name  string `json:"name"`
+		Roles struct {
+			TotalCount int `json:"totalCount"`
+		} `json:"roles"`
+		Members struct {
+			TotalCount int `json:"totalCount"`
+		} `json:"members"`
+		Projects struct {
+			TotalCount int `json:"totalCount"`
+		} `json:"projects"`
+	} `json:"items"`
+}
+
+// webhooksResponse is the response of /v2/webhooks API
+type webhooksResponse struct {
+	Items []struct {
+		ID   string `json:"_id"`
+		Name string `json:"name"`
+		Url  string `json:"url"`
 	} `json:"items"`
 }
 
@@ -143,7 +193,7 @@ func makeLaunchDarklyRequest(client *http.Client, endpoint, token string) ([]byt
 func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo) error {
 	var (
 		wg             sync.WaitGroup
-		errChan        = make(chan error, 10)
+		errChan        = make(chan error)
 		aggregatedErrs = make([]string, 0)
 	)
 
@@ -173,9 +223,17 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 			errChan <- err
 		}
 
-		// for each project capture it's environments
+		// for each project capture it's flags, environments and other sub resources
 		projects := secretInfo.listResourceByType(projectKey)
 		for _, project := range projects {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if err := captureProjectFeatureFlags(client, token, project, secretInfo); err != nil {
+					errChan <- err
+				}
+			}()
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -200,6 +258,33 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		defer wg.Done()
 
 		if err := captureDestinations(client, token, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := captureTemplates(client, token, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := captureTeams(client, token, secretInfo); err != nil {
+			errChan <- err
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := captureWebhooks(client, token, secretInfo); err != nil {
 			errChan <- err
 		}
 	}()
@@ -315,6 +400,45 @@ func captureProjects(client *http.Client, token string, secretInfo *SecretInfo) 
 				Type: projectKey,
 				MetaData: map[string]string{
 					MetadataKey: project.Key,
+				},
+			})
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// docs: https://launchdarkly.com/docs/api/feature-flags/get-feature-flags
+func captureProjectFeatureFlags(client *http.Client, token string, parent Resource, secretInfo *SecretInfo) error {
+	projectKey, exist := parent.MetaData[MetadataKey]
+	if !exist {
+		return errors.New("project key not found")
+	}
+
+	response, statusCode, err := makeLaunchDarklyRequest(client, fmt.Sprintf(endpoints[featureFlagsKey], projectKey), token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var flags = featureFlagsResponse{}
+
+		if err := json.Unmarshal(response, &flags); err != nil {
+			return err
+		}
+
+		for _, flag := range flags.Items {
+			secretInfo.appendResource(Resource{
+				ID:   fmt.Sprintf("launchdarkly/proj/%s/flag/%s", projectKey, flag.Key),
+				Name: flag.Name,
+				Type: featureFlagsKey,
+				MetaData: map[string]string{
+					"Kind": flag.Kind,
 				},
 			})
 		}
@@ -530,6 +654,109 @@ func captureDestinations(client *http.Client, token string, secretInfo *SecretIn
 
 			resource.updateResourceMetadata("Kind", destination.Kind)
 			resource.updateResourceMetadata("Version", fmt.Sprintf("%d", destination.Version))
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// docs: https://launchdarkly.com/docs/api/workflow-templates/get-workflow-templates
+func captureTemplates(client *http.Client, token string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[templatesKey], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var templates = templatesResponse{}
+
+		if err := json.Unmarshal(response, &templates); err != nil {
+			return err
+		}
+
+		for _, template := range templates.Items {
+			resource := Resource{
+				ID:   fmt.Sprintf("launchdarkly/templates/%s", template.ID),
+				Name: template.Name,
+				Type: templatesKey,
+			}
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// docs: https://launchdarkly.com/docs/api/teams/get-teams
+func captureTeams(client *http.Client, token string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[teamsKey], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var teams = teamsResponse{}
+
+		if err := json.Unmarshal(response, &teams); err != nil {
+			return err
+		}
+
+		for _, team := range teams.Items {
+			resource := Resource{
+				ID:   fmt.Sprintf("launchdarkly/teams/%s", team.Key),
+				Name: team.Name,
+				Type: teamsKey,
+			}
+
+			resource.updateResourceMetadata("Total Roles Count", fmt.Sprintf("%d", team.Roles.TotalCount))
+			resource.updateResourceMetadata("Total Members Count", fmt.Sprintf("%d", team.Members.TotalCount))
+			resource.updateResourceMetadata("Total Projects Count", fmt.Sprintf("%d", team.Projects.TotalCount))
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// docs: https://launchdarkly.com/docs/api/webhooks/get-all-webhooks
+func captureWebhooks(client *http.Client, token string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeLaunchDarklyRequest(client, endpoints[webhooksKey], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var webhooks = webhooksResponse{}
+
+		if err := json.Unmarshal(response, &webhooks); err != nil {
+			return err
+		}
+
+		for _, webhook := range webhooks.Items {
+			resource := Resource{
+				ID:   fmt.Sprintf("launchdarkly/webhooks/%s", webhook.ID),
+				Name: webhook.Name,
+				Type: webhooksKey,
+			}
 
 			secretInfo.appendResource(resource)
 		}
