@@ -80,10 +80,16 @@
                 "Name": "secretscanner",
                 "FullyQualifiedName": "launchdarkly/proj/default/flag/secretscanner",
                 "Type": "Feature Flags",
-                "Metadata": {
-                    "Kind": "boolean"
-                },
-                "Parent": null
+                "Metadata": {},
+                "Parent": {
+                    "Name": "secretscanner",
+                    "FullyQualifiedName": "launchdarkly/proj/61543c5956be60235562486e",
+                    "Type": "Project",
+                    "Metadata": {
+                        "key": "default"
+                    },
+                    "Parent": null
+                }
             },
             "Permission": {
                 "Value": "admin",

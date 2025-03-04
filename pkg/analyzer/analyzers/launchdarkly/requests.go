@@ -433,14 +433,16 @@ func captureProjectFeatureFlags(client *http.Client, token string, parent Resour
 		}
 
 		for _, flag := range flags.Items {
-			secretInfo.appendResource(Resource{
+			resource := Resource{
 				ID:   fmt.Sprintf("launchdarkly/proj/%s/flag/%s", projectKey, flag.Key),
 				Name: flag.Name,
 				Type: featureFlagsKey,
-				MetaData: map[string]string{
-					"Kind": flag.Kind,
-				},
-			})
+			}
+
+			resource.updateResourceMetadata("Kind", flag.Kind)
+			resource.setParentResource(&resource, &parent)
+
+			secretInfo.appendResource(resource)
 		}
 
 		return nil
