@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"golang.org/x/time/rate"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
@@ -185,6 +186,9 @@ type Client struct {
 
 	// Headers to attach to every requests made with the client.
 	Headers map[string]string
+
+	// Rate limiter needed for Postman API. 300 requests per minute. 10 calls in 10 seconds for GET /collections, GET /workspaces, and GET /workspaces/{id} endpoints.
+	RateLimiter *rate.Limiter
 }
 
 // NewClient returns a new Postman API client.
@@ -196,8 +200,9 @@ func NewClient(postmanToken string) *Client {
 	}
 
 	c := &Client{
-		HTTPClient: http.DefaultClient,
-		Headers:    bh,
+		HTTPClient:  http.DefaultClient,
+		Headers:     bh,
+		RateLimiter: rate.NewLimiter(rate.Every(time.Second), 1), // default to 1 request per second since the current rate limit implementation deals with workspace endpoints only.
 	}
 
 	return c
@@ -273,6 +278,9 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 	}
 
 	for i, workspace := range workspacesObj.Workspaces {
+		if err := c.RateLimiter.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("could not wait for rate limiter during workspace enumeration: %w", err)
+		}
 		tempWorkspace, err := c.GetWorkspace(ctx, workspace.ID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get workspace %q (%s) during enumeration: %w", workspace.Name, workspace.ID, err)
