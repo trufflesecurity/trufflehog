@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os/exec"
 	"strconv"
@@ -13,14 +12,12 @@ import (
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
-	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -28,7 +25,6 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	urlPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", "url"}) + `([a-z0-9][a-z0-9-]{0,48}[a-z0-9]\.scm\.azure-api\.net)`)
 	passwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", "password"}) + `\b(git&[0-9]{12}&[a-zA-Z0-9\/+]{85}[a-zA-Z0-9]==)`)
