@@ -195,10 +195,9 @@ func printResources(resources []Resource) {
 	color.Green("\n[i] Resources:")
 	callerTable := table.NewWriter()
 	callerTable.SetOutputMirror(os.Stdout)
-	callerTable.AppendHeader(table.Row{"ID", "Name", "Type"})
+	callerTable.AppendHeader(table.Row{"Name", "Type"})
 	for _, resource := range resources {
-		callerTable.AppendRow(table.Row{color.GreenString(resource.ID), color.GreenString(resource.Name),
-			color.GreenString(resource.Type)})
+		callerTable.AppendRow(table.Row{color.GreenString(resource.Name), color.GreenString(resource.Type)})
 	}
 	callerTable.Render()
 }
