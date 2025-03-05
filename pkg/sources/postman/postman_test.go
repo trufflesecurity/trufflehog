@@ -238,3 +238,6 @@ func TestSource_ScanVariableData(t *testing.T) {
 		})
 	}
 }
+
+func TestSource_ScanEnumerateRateLimit(t *testing.T) {
+}
