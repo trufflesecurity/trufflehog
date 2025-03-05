@@ -29,7 +29,7 @@ var (
 
 	keyPat = regexp.MustCompile(
 		detectors.PrefixRegex([]string{"azure", "sas", "token", "blob", ".blob.core.windows.net"}) +
-			`(sp=[racwdli]+&st=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z&se=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(&spr=https)?(?:,https)?&sv=\d{4}-\d{2}-\d{2}&sr=[bcfso]&sig=[a-zA-Z0-9%]{10,})`)
+			`(sp=[racwdli]+&st=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z&se=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(?:&sip=\d{1,3}(?:\.\d{1,3}){3}(?:-\d{1,3}(?:\.\d{1,3}){3})?)?(&spr=https)?(?:,https)?&sv=\d{4}-\d{2}-\d{2}&sr=[bcfso]&sig=[a-zA-Z0-9%]{10,})`)
 )
 
 func (s Scanner) Keywords() []string {
