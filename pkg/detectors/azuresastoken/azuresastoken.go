@@ -25,16 +25,17 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// microsoft storage resource naming rules: https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage:~:text=format%3A%0AVaultName_KeyName_KeyVersion.-,Microsoft.Storage,-Expand%20table
-	urlPat = regexp.MustCompile(`https:\/\/[a-z0-9]{3,24}\.blob\.core\.windows\.net\/[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?(?:\/[a-zA-Z0-9._-]+)*`)
+	urlPat = regexp.MustCompile(`https:\/\/[a-zA-Z0-9][a-z0-9_-]{1,22}[a-zA-Z0-9]\.blob\.core\.windows\.net\/[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?(?:\/[a-zA-Z0-9._-]+)*`)
 
 	keyPat = regexp.MustCompile(
-		detectors.PrefixRegex([]string{"azure", "sas", "token", "blob"}) +
-			`(sp=[rwdlcupfiax]*&st=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z&se=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z&spr=https?(?:,https)?&sv=\d{4}-\d{2}-\d{2}&sr=[bcfso]&sig=[a-zA-Z0-9%+_/=]+)`)
+		detectors.PrefixRegex([]string{"azure", "sas", "token", "blob", ".blob.core.windows.net"}) +
+			`(sp=[racwdli]+&st=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z&se=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(&spr=https)?(?:,https)?&sv=\d{4}-\d{2}-\d{2}&sr=[bcfso]&sig=[a-zA-Z0-9%]{10,})`)
 )
 
 func (s Scanner) Keywords() []string {
 	return []string{
-		"blob.core.windows.net",
+		"azure",
+		".blob.core.windows.net",
 	}
 }
 
@@ -49,18 +50,15 @@ func (s Scanner) Description() string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	urlMatches := urlPat.FindAllStringSubmatch(dataStr, -1)
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	// deduplicate urlMatches
 	urlMatchesUnique := make(map[string]struct{})
-	for _, urlMatch := range urlMatches {
+	for _, urlMatch := range urlPat.FindAllStringSubmatch(dataStr, -1) {
 		urlMatchesUnique[urlMatch[0]] = struct{}{}
 	}
 
 	// deduplicate keyMatches
 	keyMatchesUnique := make(map[string]struct{})
-	for _, keyMatch := range keyMatches {
+	for _, keyMatch := range keyPat.FindAllStringSubmatch(dataStr, -1) {
 		keyMatchesUnique[keyMatch[1]] = struct{}{}
 	}
 
@@ -68,7 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for url := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
-				DetectorType: s.Type(),
+				DetectorType: detectorspb.DetectorType_AzureSasToken,
 				Raw:          []byte(url),
 				RawV2:        []byte(url + key),
 			}
@@ -79,7 +77,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				isVerified, verificationErr := s.verifyMatch(ctx, client, url, key, true)
+				isVerified, verificationErr := verifyMatch(ctx, client, url, key, true)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, key)
 			}
@@ -91,8 +89,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, url, key string, retryOn403 bool) (bool, error) {
-
+func verifyMatch(ctx context.Context, client *http.Client, url, key string, retryOn403 bool) (bool, error) {
 	urlWithToken := url + "?" + key
 	fmt.Println(urlWithToken)
 
