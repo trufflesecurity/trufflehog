@@ -91,7 +91,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func verifyMatch(ctx context.Context, client *http.Client, url, key string, retryOn403 bool) (bool, error) {
 	urlWithToken := url + "?" + key
-	fmt.Println(urlWithToken)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlWithToken, nil)
 	if err != nil {
@@ -108,8 +107,6 @@ func verifyMatch(ctx context.Context, client *http.Client, url, key string, retr
 	if err != nil {
 		return false, err
 	}
-
-	fmt.Println(string(bodyBytes))
 
 	switch res.StatusCode {
 	case http.StatusOK:
