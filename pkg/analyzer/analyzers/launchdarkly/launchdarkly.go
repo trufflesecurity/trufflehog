@@ -169,19 +169,21 @@ func printUser(user User) {
 	tokenTable.Render()
 
 	// print custom roles information
-	if user.Token.hasCustomRoles() {
-		// print token information
-		color.Green("\n[i] Custom Roles Assigned to Token")
-		rolesTable := table.NewWriter()
-		rolesTable.SetOutputMirror(os.Stdout)
-		rolesTable.AppendHeader(table.Row{"ID", "Key", "Name", "Base Permission", "Assigned to members", "Assigned to teams"})
-		for _, customRole := range user.Token.CustomRoles {
-			rolesTable.AppendRow(table.Row{color.GreenString(customRole.ID), color.GreenString(customRole.Key), color.GreenString(customRole.Name),
-				color.GreenString(customRole.BasePermission), color.GreenString(fmt.Sprintf("%d", customRole.AssignedToMembers)),
-				color.GreenString(fmt.Sprintf("%d", customRole.AssignedToTeams))})
-		}
-		rolesTable.Render()
+	if !user.Token.hasCustomRoles() {
+		return
 	}
+
+	// print token information
+	color.Green("\n[i] Custom Roles Assigned to Token")
+	rolesTable := table.NewWriter()
+	rolesTable.SetOutputMirror(os.Stdout)
+	rolesTable.AppendHeader(table.Row{"ID", "Key", "Name", "Base Permission", "Assigned to members", "Assigned to teams"})
+	for _, customRole := range user.Token.CustomRoles {
+		rolesTable.AppendRow(table.Row{color.GreenString(customRole.ID), color.GreenString(customRole.Key), color.GreenString(customRole.Name),
+			color.GreenString(customRole.BasePermission), color.GreenString(fmt.Sprintf("%d", customRole.AssignedToMembers)),
+			color.GreenString(fmt.Sprintf("%d", customRole.AssignedToTeams))})
+	}
+	rolesTable.Render()
 }
 
 // printPermissionsType print permissions type token has
