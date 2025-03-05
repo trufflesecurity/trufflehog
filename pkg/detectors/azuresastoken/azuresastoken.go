@@ -118,7 +118,7 @@ func verifyMatch(ctx context.Context, client *http.Client, url, key string, retr
 		if retryOn403 && strings.Contains(string(bodyBytes), "Signature did not match") {
 			// need to add additional query paramters for container urls
 			// https://stackoverflow.com/questions/25038429/azure-shared-access-signature-signature-did-not-match
-			return s.verifyMatch(ctx, client, url, key+"&comp=list&restype=container", false)
+			return verifyMatch(ctx, client, url, key+"&comp=list&restype=container", false)
 		}
 		return false, nil
 	default:
