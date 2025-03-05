@@ -531,6 +531,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pipedrive"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pivotaltracker"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/pixabay"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/plaidkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/planetscale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/planetscaledb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/planviewleankit"
@@ -1375,7 +1376,7 @@ func buildDetectorList() []detectors.Detector {
 		&pipedrive.Scanner{},
 		&pivotaltracker.Scanner{},
 		&pixabay.Scanner{},
-		// &plaidkey.Scanner{},
+		&plaidkey.Scanner{},
 		&planetscale.Scanner{},
 		&planetscaledb.Scanner{},
 		&planviewleankit.Scanner{},
