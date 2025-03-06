@@ -20,12 +20,13 @@ type Scanner struct {
 }
 
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
 
 	// microsoft storage resource naming rules: https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage:~:text=format%3A%0AVaultName_KeyName_KeyVersion.-,Microsoft.Storage,-Expand%20table
-	urlPat = regexp.MustCompile(`https:\/\/[a-zA-Z0-9][a-z0-9_-]{1,22}[a-zA-Z0-9]\.blob\.core\.windows\.net\/[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?(?:\/[a-zA-Z0-9._-]+)*`)
+	urlPat = regexp.MustCompile(`https://[a-zA-Z0-9][a-z0-9_-]{1,22}[a-zA-Z0-9]\.blob\.core\.windows\.net/[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?(?:/[a-zA-Z0-9._-]+)*`)
 
 	keyPat = regexp.MustCompile(
 		detectors.PrefixRegex([]string{"azure", "sas", "token", "blob", ".blob.core.windows.net"}) +
@@ -87,6 +88,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, url, key string, retryOn403 bool) (bool, error) {
