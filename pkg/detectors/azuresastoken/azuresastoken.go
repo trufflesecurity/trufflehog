@@ -122,6 +122,9 @@ func verifyMatch(ctx context.Context, client *http.Client, url, key string, retr
 			// https://stackoverflow.com/questions/25038429/azure-shared-access-signature-signature-did-not-match
 			return verifyMatch(ctx, client, url, key+"&comp=list&restype=container", false)
 		}
+		if strings.Contains(string(bodyBytes), "AuthorizationFailure") && strings.Contains(key, "&sip=") {
+			return false, fmt.Errorf("SAS token is restricted to specific IP addresses")
+		}
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
