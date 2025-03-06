@@ -5,8 +5,10 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"gopkg.in/h2non/gock.v1"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -240,4 +242,43 @@ func TestSource_ScanVariableData(t *testing.T) {
 }
 
 func TestSource_ScanEnumerateRateLimit(t *testing.T) {
+	defer gock.Off()
+	// Mock the API response for workspaces
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces").
+		MatchHeader("X-Api-Key", "super-secret-token").
+		Reply(200).
+		JSON([]map[string]string{
+			{"id": "1", "name": "workspace-1", "type": "personal", "visibility": "personal", "createdBy": "123"},
+			{"id": "2", "name": "workspace-2", "type": "personal", "visibility": "personal", "createdBy": "123"},
+		})
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+
+	start := time.Now()
+
+	// Make multiple requests
+
+	workspaces, err := s.client.EnumerateWorkspaces(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	elapsed := time.Since(start)
+	ctx.Logger().Info("workspaces", "ws", workspaces)
+	// With 3 requests at 1 per second rate limit,
+	// elapsed time should be at least 2 seconds
+	if elapsed < 2*time.Second {
+		t.Errorf("Rate limiting not working as expected. Elapsed time: %v, expected at least 2 seconds", elapsed)
+	}
 }
