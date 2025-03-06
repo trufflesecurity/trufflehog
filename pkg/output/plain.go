@@ -100,6 +100,12 @@ func (p *PlainPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata)
 	for _, k := range aggregateDataKeys {
 		printer.Printf("%s: %v\n", cases.Title(language.AmericanEnglish).String(k), aggregateData[k])
 	}
+
+	// if analysis info is not nil, means the detector added key for analyzer and result is verified
+	if r.Result.AnalysisInfo != nil && r.Result.Verified {
+		printer.Printf("Analyze: Run `trufflehog analyze` to analyze this key's permissions\n")
+	}
+
 	fmt.Println("")
 	return nil
 }

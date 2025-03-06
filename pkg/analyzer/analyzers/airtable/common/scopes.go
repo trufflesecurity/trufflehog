@@ -1,6 +1,6 @@
-package airtable
+package common
 
-var scope_mapping = map[string][]string{
+var scopeToPermissions = map[string][]string{
 	// Basic Scopes
 	"data.records:read": {
 		"List records",
@@ -47,6 +47,7 @@ var scope_mapping = map[string][]string{
 	"user.email:read": {
 		"See the user's email address",
 	},
+
 	// Enterprise scopes
 	"enterprise.groups:read": {
 		"Get user group",
@@ -140,4 +141,35 @@ var scope_mapping = map[string][]string{
 		"Delete workspace",
 		"Move base",
 	},
+}
+
+var scopeToEndpointName = map[string]EndpointName{
+	"schema.bases:read":        ListBasesEndpoint,
+	"schema.bases:write":       UpdateBaseEndpoint,
+	"webhook:manage":           ListWebhooksEndpoint,
+	"block:manage":             ListBlockInstallationsEndpoint,
+	"data.records:read":        ListRecordsEndpoint,
+	"data.records:write":       CreateRecordEndpoint,
+	"data.recordComments:read": ListRecordCommentsEndpoint,
+}
+
+var scopeToEndpoint map[string]Endpoint
+
+func init() {
+	scopeToEndpoint = make(map[string]Endpoint)
+	for scope, endpointName := range scopeToEndpointName {
+		if endpoint, exists := GetEndpoint(endpointName); exists {
+			scopeToEndpoint[scope] = endpoint
+		}
+	}
+}
+
+func GetScopePermissions(scope string) ([]string, bool) {
+	permission, exists := scopeToPermissions[scope]
+	return permission, exists
+}
+
+func GetScopeEndpoint(scope string) (Endpoint, bool) {
+	endpoint, exists := scopeToEndpoint[scope]
+	return endpoint, exists
 }
