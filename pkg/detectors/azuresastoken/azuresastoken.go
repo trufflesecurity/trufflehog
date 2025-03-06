@@ -2,6 +2,7 @@ package azuresastoken
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,7 +10,9 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -26,11 +29,15 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// microsoft storage resource naming rules: https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage:~:text=format%3A%0AVaultName_KeyName_KeyVersion.-,Microsoft.Storage,-Expand%20table
-	urlPat = regexp.MustCompile(`https://[a-zA-Z0-9][a-z0-9_-]{1,22}[a-zA-Z0-9]\.blob\.core\.windows\.net/[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?(?:/[a-zA-Z0-9._-]+)*`)
+	urlPat = regexp.MustCompile(`https://([a-zA-Z0-9][a-z0-9_-]{1,22}[a-zA-Z0-9])\.blob\.core\.windows\.net/[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?(?:/[a-zA-Z0-9._-]+)*`)
 
 	keyPat = regexp.MustCompile(
 		detectors.PrefixRegex([]string{"azure", "sas", "token", "blob", ".blob.core.windows.net"}) +
 			`(sp=[racwdli]+&st=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z&se=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(?:&sip=\d{1,3}(?:\.\d{1,3}){3}(?:-\d{1,3}(?:\.\d{1,3}){3})?)?(&spr=https)?(?:,https)?&sv=\d{4}-\d{2}-\d{2}&sr=[bcfso]&sig=[a-zA-Z0-9%]{10,})`)
+
+	invalidStorageAccounts = simple.NewCache[struct{}]()
+
+	noSuchHostErr = errors.New("no such host")
 )
 
 func (s Scanner) Keywords() []string {
@@ -49,12 +56,14 @@ func (s Scanner) Description() string {
 }
 
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logger := logContext.AddLogger(ctx).Logger().WithName("azuresas")
+
 	dataStr := string(data)
 
 	// deduplicate urlMatches
-	urlMatchesUnique := make(map[string]struct{})
+	urlMatchesUnique := make(map[string]string)
 	for _, urlMatch := range urlPat.FindAllStringSubmatch(dataStr, -1) {
-		urlMatchesUnique[urlMatch[0]] = struct{}{}
+		urlMatchesUnique[urlMatch[0]] = urlMatch[1]
 	}
 
 	// deduplicate keyMatches
@@ -64,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	// Check results.
-	for url := range urlMatchesUnique {
+	for url, storageAccount := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureSasToken,
@@ -73,6 +82,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
+				if invalidStorageAccounts.Exists(storageAccount) {
+					logger.V(3).Info("Skipping invalid storage account", "storage account", storageAccount)
+					break
+				}
+
 				client := s.client
 				if client == nil {
 					client = defaultClient
@@ -81,6 +95,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := verifyMatch(ctx, client, url, key, true)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, key)
+				if verificationErr != nil && errors.Is(verificationErr, noSuchHostErr) {
+					invalidStorageAccounts.Set(storageAccount, struct{}{})
+					break
+				}
 			}
 
 			results = append(results, s1)
@@ -104,6 +122,9 @@ func verifyMatch(ctx context.Context, client *http.Client, url, key string, retr
 
 	res, err := client.Do(req)
 	if err != nil {
+		if strings.Contains(err.Error(), "no such host") {
+			return false, noSuchHostErr
+		}
 		return false, err
 	}
 	defer res.Body.Close()
