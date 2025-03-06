@@ -202,7 +202,7 @@ func NewClient(postmanToken string) *Client {
 	c := &Client{
 		HTTPClient:  http.DefaultClient,
 		Headers:     bh,
-		RateLimiter: rate.NewLimiter(rate.Every(time.Second), 0), // default to 1 request per second since the current rate limit implementation deals with workspace endpoints only.
+		RateLimiter: rate.NewLimiter(rate.Every(time.Second), 1), // default to 1 request per second since the current rate limit implementation deals with workspace endpoints only.
 	}
 
 	return c
