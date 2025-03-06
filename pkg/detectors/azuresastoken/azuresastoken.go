@@ -73,6 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	// Check results.
+UrlLoop:
 	for url, storageAccount := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
@@ -94,10 +95,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				isVerified, verificationErr := verifyMatch(ctx, client, url, key, true)
 				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr, key)
-				if verificationErr != nil && errors.Is(verificationErr, noSuchHostErr) {
-					invalidStorageAccounts.Set(storageAccount, struct{}{})
-					break
+
+				if verificationErr != nil {
+					if errors.Is(verificationErr, noSuchHostErr) {
+						invalidStorageAccounts.Set(storageAccount, struct{}{})
+						continue UrlLoop
+					}
+					s1.SetVerificationError(verificationErr, key)
 				}
 			}
 
