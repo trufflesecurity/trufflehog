@@ -143,7 +143,7 @@ func verifyMatch(ctx context.Context, client *http.Client, url, key string, retr
 		return true, nil
 	case http.StatusForbidden:
 		if retryOn403 && strings.Contains(string(bodyBytes), "Signature did not match") {
-			// need to add additional query paramters for container urls
+			// need to add additional query parameters for container urls
 			// https://stackoverflow.com/questions/25038429/azure-shared-access-signature-signature-did-not-match
 			return verifyMatch(ctx, client, url, key+"&comp=list&restype=container", false)
 		}
