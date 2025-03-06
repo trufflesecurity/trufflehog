@@ -182,7 +182,7 @@ func (s scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify && !isCanary {
-				isVerified, extraData, verificationErr := s.verifyMatch(ctx, idMatch, secretMatch)
+				isVerified, extraData, verificationErr := s.verifyMatch(ctx, idMatch, secretMatch, len(secretMatches) > 1)
 				s1.Verified = isVerified
 
 				// Log if the calculated ID does not match the ID value from verification.
@@ -226,7 +226,7 @@ const (
 	endpoint = "https://sts.amazonaws.com"
 )
 
-func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string) (bool, map[string]string, error) {
+func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch string, retryOn403 bool) (bool, map[string]string, error) {
 	// Prep AWS Creds for STS
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(region),
@@ -246,10 +246,25 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 	// Make the GetCallerIdentity API call
 	resp, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
-		if strings.Contains(err.Error(), "StatusCode: 403") || strings.Contains(err.Error(), "InvalidClientTokenId") {
+		// Experimentation has indicated that if you make multiple GetCallerIdentity requests within five seconds that
+		// share a key ID but are signed with different secrets the second one will be rejected with a 403 that
+		// carries a SignatureDoesNotMatch code in its body. This happens even if the second ID-secret pair is
+		// valid. Since this is exactly our access pattern, we need to work around it.
+		//
+		// Fortunately, experimentation has also revealed a workaround: simply resubmit the second request. The
+		// response to the resubmission will be as expected.
+		//
+		// We are clearly deep in the guts of AWS implementation details here, so this all might change with no
+		// notice. If you're here because something in this detector broke, you have my condolences.
+		if strings.Contains(err.Error(), "StatusCode: 403") {
+			if retryOn403 {
+				return s.verifyMatch(ctx, resIDMatch, resSecretMatch, false)
+			}
+			return false, nil, nil
+		} else if strings.Contains(err.Error(), "InvalidClientTokenId") {
 			return false, nil, nil
 		}
-		return false, nil, fmt.Errorf("request returned unexpected error: %s", err.Error())
+		return false, nil, fmt.Errorf("request returned unexpected error: %w", err)
 	}
 
 	extraData := map[string]string{
