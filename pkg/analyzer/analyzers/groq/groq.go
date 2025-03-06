@@ -86,7 +86,10 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	color.Green("[i] Valid Anthropic API key\n")
 	color.Yellow("\n[i] Permission: Full Access\n")
 
-	printGroqResources(info.GroqResources)
+	if len(info.GroqResources) > 0 {
+		printGroqResources(info.GroqResources)
+	}
+
 	color.Yellow("\n[!] Expires: Never")
 }
 
