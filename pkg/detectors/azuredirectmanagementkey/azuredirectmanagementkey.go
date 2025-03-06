@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,7 +13,9 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -26,11 +29,15 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
 	urlPat        = regexp.MustCompile(`https://([a-z0-9][a-z0-9-]{0,48}[a-z0-9])\.management\.azure-api\.net`)                                        // https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.APIM.Name/
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"azure", ".management.azure-api.net"}) + `([a-zA-Z0-9+\/]{83,85}[a-zA-Z0-9]==)`) // pattern for both Primary and secondary key
+
+	invalidHosts  = simple.NewCache[struct{}]()
+	noSuchHostErr = errors.New("no such host")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -41,6 +48,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Azure Management API keys in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logger := logContext.AddLogger(ctx).Logger().WithName("azuredirectmanagementkey")
 	dataStr := string(data)
 
 	urlMatchesUnique := make(map[string]string)
@@ -52,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		keyMatchesUnique[strings.TrimSpace(keyMatch[1])] = struct{}{}
 	}
 
+EndpointLoop:
 	for baseUrl, serviceName := range urlMatchesUnique {
 		for key := range keyMatchesUnique {
 			s1 := detectors.Result{
@@ -61,6 +70,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
+				if invalidHosts.Exists(baseUrl) {
+					logger.V(3).Info("Skipping invalid registry", "baseUrl", baseUrl)
+					continue EndpointLoop
+				}
+
 				client := s.client
 				if client == nil {
 					client = defaultClient
@@ -68,13 +82,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				isVerified, verificationErr := s.verifyMatch(ctx, client, baseUrl, serviceName, key)
 				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr, key)
+				if verificationErr != nil {
+					if errors.Is(verificationErr, noSuchHostErr) {
+						invalidHosts.Set(baseUrl, struct{}{})
+						continue EndpointLoop
+					}
+					s1.SetVerificationError(verificationErr, baseUrl)
+				}
 			}
 
 			results = append(results, s1)
-			if s1.Verified {
-				break
-			}
 		}
 	}
 
@@ -87,6 +104,10 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Azure API Management provides a direct management REST API for performing operations on selected entities, such as users, groups, products, and subscriptions."
+}
+
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, baseUrl, serviceName, key string) (bool, error) {
