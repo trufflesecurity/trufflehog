@@ -1,6 +1,7 @@
 package postman
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -244,14 +245,30 @@ func TestSource_ScanVariableData(t *testing.T) {
 func TestSource_ScanEnumerateRateLimit(t *testing.T) {
 	defer gock.Off()
 	// Mock the API response for workspaces
+	numWorkspaces := 3
+	workspaceBodyString := `{"workspaces":[`
+	for i := 0; i < numWorkspaces; i++ {
+		workspaceBodyString += fmt.Sprintf(`{"id": "%d", "name": "workspace-%d", "type": "personal", "visibility": "personal", "createdBy": "1234"}`, i, i)
+		if i == numWorkspaces-1 {
+			workspaceBodyString += `]}`
+		} else {
+			workspaceBodyString += `,`
+		}
+	}
 	gock.New("https://api.getpostman.com").
 		Get("/workspaces").
-		MatchHeader("X-Api-Key", "super-secret-token").
 		Reply(200).
-		JSON([]map[string]string{
-			{"id": "1", "name": "workspace-1", "type": "personal", "visibility": "personal", "createdBy": "123"},
-			{"id": "2", "name": "workspace-2", "type": "personal", "visibility": "personal", "createdBy": "123"},
-		})
+		BodyString(workspaceBodyString)
+	// Mock the API response for each individual workspace
+	for i := 0; i < numWorkspaces; i++ {
+		gock.New("https://api.getpostman.com").
+			Get(fmt.Sprintf("/workspaces/%d", i)).
+			Reply(200).
+			BodyString(fmt.Sprintf(`{"workspace":{"id":"%d","name":"workspace-%d","type":"personal","description":"Test workspace number %d",
+		"visibility":"personal","createdBy":"1234","updatedBy":"1234","createdAt":"2024-12-12T23:32:27.000Z","updatedAt":"2024-12-12T23:33:01.000Z",
+		"collections":[{"id":"abc%d","name":"test-collection-1","uid":"1234-abc%d"},{"id":"def%d","name":"test-collection-2","uid":"1234-def%d"}],
+		"environments":[{"id":"ghi%d","name":"test-environment-1","uid":"1234-ghi%d"},{"id":"jkl%d","name":"test-environment-2","uid":"1234-jkl%d"}]}}`, i, i, i, i, i, i, i, i, i, i, i))
+	}
 
 	ctx := context.Background()
 	s, conn := createTestSource(&sourcespb.Postman{
@@ -261,24 +278,19 @@ func TestSource_ScanEnumerateRateLimit(t *testing.T) {
 	})
 	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("init error: %v", err)
 	}
 	gock.InterceptClient(s.client.HTTPClient)
 
 	start := time.Now()
-
-	// Make multiple requests
-
-	workspaces, err := s.client.EnumerateWorkspaces(ctx)
+	_, err = s.client.EnumerateWorkspaces(ctx)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("enumeration error: %v", err)
 	}
-
 	elapsed := time.Since(start)
-	ctx.Logger().Info("workspaces", "ws", workspaces)
-	// With 3 requests at 1 per second rate limit,
-	// elapsed time should be at least 2 seconds
-	if elapsed < 2*time.Second {
-		t.Errorf("Rate limiting not working as expected. Elapsed time: %v, expected at least 2 seconds", elapsed)
+	// With <numWorkspaces> requests at 1 per second rate limit,
+	// elapsed time should be at least <numWorkspaces - 1> seconds
+	if elapsed < time.Duration(numWorkspaces-1)*time.Second {
+		t.Errorf("Rate limiting not working as expected. Elapsed time: %v, expected at least %d seconds", elapsed, numWorkspaces-1)
 	}
 }
