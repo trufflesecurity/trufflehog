@@ -129,17 +129,16 @@ func secretInfoResourceToAnalyzerResource(resource Resource) *analyzers.Resource
 
 // getPermissionType return what type of permission is assigned to token
 func getPermissionType(token Token) string {
-	permission := ""
-
-	if token.Role != "" {
-		permission = token.Role
-	} else if token.hasInlineRole() {
-		permission = "Inline Policy"
-	} else if token.hasCustomRoles() {
-		permission = "Custom Roles"
+	switch {
+	case token.Role != "":
+		return token.Role
+	case token.hasInlineRole():
+		return "Inline Policy"
+	case token.hasCustomRoles():
+		return "Custom Roles"
+	default:
+		return ""
 	}
-
-	return permission
 }
 
 // printUser print User information from secret info to cli

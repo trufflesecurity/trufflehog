@@ -23,9 +23,9 @@ var (
 type SecretInfo struct {
 	User        User
 	Permissions []string
-	Resources   []Resource
-	// to concurrently read and write
-	mu sync.RWMutex
+
+	mu        sync.RWMutex
+	Resources []Resource
 }
 
 // User is the information about the user to whom the token belongs
@@ -60,16 +60,7 @@ type CustomRole struct {
 	AssignedToTeams   int
 }
 
-/*
-policy is a set of statements
-
-Jargon:
-  - Resource: List of resources
-  - NotResources: Except this list of resources
-  - Actions: List of actions
-  - NotActions: Except this list of actions
-  - Effect: Allowed or Denied
-*/
+// policy is a set of statements
 type Policy struct {
 	Resources    []string
 	NotResources []string
