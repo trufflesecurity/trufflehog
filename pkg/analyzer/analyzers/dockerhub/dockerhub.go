@@ -1,4 +1,4 @@
-//go:generate generate_permissions permissions.yaml permissions.go elevenlabs
+//go:generate generate_permissions permissions.yaml permissions.go dockerhub
 package dockerhub
 
 import (
