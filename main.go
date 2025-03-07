@@ -269,15 +269,29 @@ func init() {
 	// Support -h for help
 	cli.HelpFlag.Short('h')
 
+	// Check if the TUI environment variable is set.
+	if ok, err := strconv.ParseBool(os.Getenv("TUI_PARENT")); err == nil {
+		usingTUI = ok
+	}
+
 	if isatty.IsTerminal(os.Stdout.Fd()) && (len(os.Args) <= 1 || os.Args[1] == analyzeCmd.FullCommand()) {
 		args := tui.Run(os.Args[1:])
 		if len(args) == 0 {
 			os.Exit(0)
 		}
 
+		binary, err := exec.LookPath("sh")
+		if err == nil {
+			// On success, this call will never return. On failure, fallthrough
+			// to overwriting os.Args.
+			cmd := strings.Join(append(os.Args[:1], args...), " ")
+			_ = syscall.Exec(binary, []string{"sh", "-c", cmd}, append(os.Environ(), "TUI_PARENT=true"))
+		}
+
 		// Overwrite the Args slice so overseer works properly.
 		os.Args = os.Args[:1]
 		os.Args = append(os.Args, args...)
+
 		usingTUI = true
 	}
 
