@@ -89,6 +89,7 @@ const (
 	AnalyzerTypePlanetScale
 	AnalyzerTypeAirtableOAuth
 	AnalyzerTypeAirtablePat
+	AnalyzerTypeGroq
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -124,6 +125,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypePlanetScale:   "PlanetScale",
 	AnalyzerTypeAirtableOAuth: "AirtableOAuth",
 	AnalyzerTypeAirtablePat:   "AirtablePat",
+	AnalyzerTypeGroq:          "Groq",
 	// Add new mappings here
 }
 
