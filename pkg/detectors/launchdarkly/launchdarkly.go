@@ -101,6 +101,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							}
 						}
 					}
+
+					s1.AnalysisInfo = map[string]string{
+						"key": resMatch,
+					}
+
 				} else if res.StatusCode == 401 {
 					// 401 is expected for an invalid token, so there is nothing to do here.
 				} else {
