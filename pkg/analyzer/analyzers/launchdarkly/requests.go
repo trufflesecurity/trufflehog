@@ -208,102 +208,59 @@ func makeLaunchDarklyRequest(client *http.Client, endpoint, token string) ([]byt
 func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo) error {
 	var (
 		wg             sync.WaitGroup
+		errAggWg       sync.WaitGroup
 		aggregatedErrs = make([]error, 0)
+		errChan        = make(chan error, 1)
 	)
 
-	wg.Add(1)
+	errAggWg.Add(1)
 	go func() {
-		defer wg.Done()
-
-		if err := captureApplications(client, token, secretInfo); err != nil {
+		defer errAggWg.Done()
+		for err := range errChan {
 			aggregatedErrs = append(aggregatedErrs, err)
 		}
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	// helper to launch tasks concurrently.
+	launchTask := func(task func() error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := task(); err != nil {
+				errChan <- err
+			}
+		}()
+	}
 
-		if err := captureRepositories(client, token, secretInfo); err != nil {
-			aggregatedErrs = append(aggregatedErrs, err)
-		}
-	}()
+	// capture top-level resources
+	launchTask(func() error { return captureApplications(client, token, secretInfo) })
+	launchTask(func() error { return captureRepositories(client, token, secretInfo) })
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
+	// capture projects
+	launchTask(func() error {
 		if err := captureProjects(client, token, secretInfo); err != nil {
-			aggregatedErrs = append(aggregatedErrs, err)
+			return err
 		}
 
-		// for each project capture it's flags, environments and other sub resources
+		// capture project sub resources
 		projects := secretInfo.listResourceByType(projectKey)
-		for _, project := range projects {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err := captureProjectFeatureFlags(client, token, project, secretInfo); err != nil {
-					aggregatedErrs = append(aggregatedErrs, err)
-				}
-			}()
-
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err := captureProjectEnv(client, token, project, secretInfo); err != nil {
-					aggregatedErrs = append(aggregatedErrs, err)
-				}
-			}()
+		for _, proj := range projects {
+			launchTask(func() error { return captureProjectFeatureFlags(client, token, proj, secretInfo) })
+			launchTask(func() error { return captureProjectEnv(client, token, proj, secretInfo) })
 		}
-	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+		return nil
+	})
 
-		if err := captureMembers(client, token, secretInfo); err != nil {
-			aggregatedErrs = append(aggregatedErrs, err)
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		if err := captureDestinations(client, token, secretInfo); err != nil {
-			aggregatedErrs = append(aggregatedErrs, err)
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		if err := captureTemplates(client, token, secretInfo); err != nil {
-			aggregatedErrs = append(aggregatedErrs, err)
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		if err := captureTeams(client, token, secretInfo); err != nil {
-			aggregatedErrs = append(aggregatedErrs, err)
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		if err := captureWebhooks(client, token, secretInfo); err != nil {
-			aggregatedErrs = append(aggregatedErrs, err)
-		}
-	}()
+	launchTask(func() error { return captureMembers(client, token, secretInfo) })
+	launchTask(func() error { return captureDestinations(client, token, secretInfo) })
+	launchTask(func() error { return captureTemplates(client, token, secretInfo) })
+	launchTask(func() error { return captureTeams(client, token, secretInfo) })
+	launchTask(func() error { return captureWebhooks(client, token, secretInfo) })
 
 	wg.Wait()
+	close(errChan)
+	errAggWg.Wait()
 
 	if len(aggregatedErrs) > 0 {
 		return errors.Join(aggregatedErrs...)
