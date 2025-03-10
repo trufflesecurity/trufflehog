@@ -15,9 +15,33 @@ var (
 	AZURE_BLOB_SAS_TOKEN=sp=r&st=2025-03-04T07:24:52Z&se=2025-04-04T15:24:52Z&spr=https&sv=2022-11-02&sr=c&sig=WSdF9YeZhvrbs%2B%2B1f8ZdDBzEe7fBJ%2BenuaXQ%2BJ9WOw0%3D
 	AZURE_BLOB_SAS_URL=https://trufflesecurity.blob.core.windows.net/trufflesecurity
 	`
+	validPatternWithIP = `
+	AZURE_BLOB_SAS_TOKEN=sp=rcwl&st=2025-03-10T06:58:25Z&se=2025-03-10T14:58:25Z&sip=168.1.6.50&spr=https&sv=2022-11-02&sr=c&sig=c%2BUXo%2FJwf%2FGHomqYaw6tyRykKMaAnyikkf8nS7btD3DYg%3D
+	AZURE_BLOB_SAS_URL=https://trufflesecurity.blob.core.windows.net/trufflesecurity
+	`
+	validPatternWithIPRange = `
+	AZURE_BLOB_SAS_TOKEN=sp=rcwl&st=2025-03-10T06:58:25Z&se=2025-03-10T14:58:25Z&sip=168.1.6.50-168.1.6.80&spr=https&sv=2022-11-02&sr=c&sig=RiA6rO2VwFNZ73trWyY6fsasg0ViUp0k3sDxcl6aA1Rtg%3D
+	AZURE_BLOB_SAS_URL=https://trufflesecurity.blob.core.windows.net/trufflesecurity
+	`
+	validPatternWithoutHTTPS = `
+	AZURE_BLOB_SAS_TOKEN=sp=rcwl&st=2025-03-10T06:58:25Z&se=2025-03-10T14:58:25Z&sv=2022-11-02&sr=c&sig=OYbYoPKW7vVGjFMBu2QDDW%2BlpoShcxawVHR91NQPosY8%3D
+	AZURE_BLOB_SAS_URL=https://trufflesecurity.blob.core.windows.net/trufflesecurity
+	`
+	validPatternWithBlobUrl = `
+	AZURE_BLOB_SAS_TOKEN=sp=r&st=2025-03-04T07:24:52Z&se=2025-04-04T15:24:52Z&spr=https&sv=2022-11-02&sr=c&sig=WSdF9YeZhvrbs%2B%2B1f8ZdDBzEe7fBJ%2BenuaXQ%2BJ9WOw0%3D
+	AZURE_BLOB_SAS_URL=https://trufflesecurity.blob.core.windows.net/trufflesecurity/test_blob.txt
+	`
 	invalidPattern = `
 	AZURE_BLOB_SAS_TOKEN=st=2025-03-04T07:24:52Z&se=2025-04-04T15:24:52Z&spr=https&sv=2022-11-02&sr=c
 	AZURE_BLOB_SAS_URL=https://trufflesecurity.blob.core.windows.net/12trufflesecurity
+	`
+	invalidPatternWithInvalidPermission = `
+	AZURE_BLOB_SAS_TOKEN=sp=rqx&st=2025-03-04T07:24:52Z&se=2025-04-04T15:24:52Z&spr=https&sv=2022-11-02&sr=c&sig=WSdF9YeZhvrbs%2B%2B1f8ZdDBzEe7fBJ%2BenuaXQ%2BJ9WOw0%3D
+	AZURE_BLOB_SAS_URL=https://trufflesecurity.blob.core.windows.net/12trufflesecurity
+	`
+	invalidPatternWithInvalidIp = `
+	AZURE_BLOB_SAS_TOKEN=sp=rcwl&st=2025-03-10T06:58:25Z&se=2025-03-10T14:58:25Z&sip=168.1.6&spr=https&sv=2022-11-02&sr=c&sig=c%2BUXo%2FJwf%2FGHomqYaw6tyRykKMaAnyikkf8nS7btD3DYg%3D
+	AZURE_BLOB_SAS_URL=https://trufflesecurity.blob.core.windows.net/trufflesecurity
 	`
 )
 
@@ -36,8 +60,38 @@ func TestAzureSASToken_Pattern(t *testing.T) {
 			want:  []string{"https://trufflesecurity.blob.core.windows.net/trufflesecuritysp=r&st=2025-03-04T07:24:52Z&se=2025-04-04T15:24:52Z&spr=https&sv=2022-11-02&sr=c&sig=WSdF9YeZhvrbs%2B%2B1f8ZdDBzEe7fBJ%2BenuaXQ%2BJ9WOw0%3D"},
 		},
 		{
+			name:  "valid pattern with ip",
+			input: validPatternWithIP,
+			want:  []string{"https://trufflesecurity.blob.core.windows.net/trufflesecuritysp=rcwl&st=2025-03-10T06:58:25Z&se=2025-03-10T14:58:25Z&sip=168.1.6.50&spr=https&sv=2022-11-02&sr=c&sig=c%2BUXo%2FJwf%2FGHomqYaw6tyRykKMaAnyikkf8nS7btD3DYg%3D"},
+		},
+		{
+			name:  "valid pattern with ip range",
+			input: validPatternWithIPRange,
+			want:  []string{"https://trufflesecurity.blob.core.windows.net/trufflesecuritysp=rcwl&st=2025-03-10T06:58:25Z&se=2025-03-10T14:58:25Z&sip=168.1.6.50-168.1.6.80&spr=https&sv=2022-11-02&sr=c&sig=RiA6rO2VwFNZ73trWyY6fsasg0ViUp0k3sDxcl6aA1Rtg%3D"},
+		},
+		{
+			name:  "valid pattern without https",
+			input: validPatternWithoutHTTPS,
+			want:  []string{"https://trufflesecurity.blob.core.windows.net/trufflesecuritysp=rcwl&st=2025-03-10T06:58:25Z&se=2025-03-10T14:58:25Z&sv=2022-11-02&sr=c&sig=OYbYoPKW7vVGjFMBu2QDDW%2BlpoShcxawVHR91NQPosY8%3D"},
+		},
+		{
+			name:  "valid pattern with blob url",
+			input: validPatternWithBlobUrl,
+			want:  []string{"https://trufflesecurity.blob.core.windows.net/trufflesecurity/test_blob.txtsp=r&st=2025-03-04T07:24:52Z&se=2025-04-04T15:24:52Z&spr=https&sv=2022-11-02&sr=c&sig=WSdF9YeZhvrbs%2B%2B1f8ZdDBzEe7fBJ%2BenuaXQ%2BJ9WOw0%3D"},
+		},
+		{
 			name:  "invalid pattern",
 			input: invalidPattern,
+			want:  nil,
+		},
+		{
+			name:  "invalid pattern with invalid permission",
+			input: invalidPatternWithInvalidPermission,
+			want:  nil,
+		},
+		{
+			name:  "invalid pattern with invalid ip",
+			input: invalidPatternWithInvalidIp,
 			want:  nil,
 		},
 	}
