@@ -110,17 +110,3 @@ func (t Token) hasCustomRoles() bool {
 func (t Token) hasInlineRole() bool {
 	return len(t.InlineRole) > 0
 }
-
-// setParentResource set parent resource for a resource
-func (r Resource) setParentResource(resource, parent *Resource) {
-	resource.ParentResource = parent
-}
-
-// updateResourceMetadata
-func (r Resource) updateResourceMetadata(key, value string) {
-	if r.MetaData == nil {
-		r.MetaData = make(map[string]string)
-	}
-
-	r.MetaData[key] = value
-}
