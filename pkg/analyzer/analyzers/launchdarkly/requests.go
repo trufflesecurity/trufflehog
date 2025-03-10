@@ -1,36 +1,41 @@
 package launchdarkly
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"strconv"
 	"sync"
 	"time"
 )
+
+const defaultTimeout = 5 * time.Second
 
 var (
 	baseURL = "https://app.launchdarkly.com/api"
 
 	endpoints = map[string]string{
+		// user information APIs
 		"callerIdentity": "/v2/caller-identity",
 		"getToken":       "/v2/tokens/%s", // require token id
 		"getRole":        "/v2/roles/%s",  // require role id
-		applicationKey:   "/v2/applications",
-		repositoryKey:    "/v2/code-refs/repositories",
-		projectKey:       "/v2/projects",
-		environmentKey:   "/v2/projects/%s/environments",                // require project key
-		featureFlagsKey:  "/v2/flags/%s",                                // require project key
-		experimentKey:    "/v2/projects/%s/environments/%s/experiments", // require project key and env key
-		holdoutsKey:      "/v2/projects/%s/environments/%s/holdouts",    // require project key and env key
-		membersKey:       "/v2/members",
-		destinationsKey:  "/v2/destinations",
-		templatesKey:     "/v2/templates",
-		teamsKey:         "/v2/teams",
-		webhooksKey:      "/v2/webhooks",
+		// resource APIs
+		applicationKey:  "/v2/applications",
+		repositoryKey:   "/v2/code-refs/repositories",
+		projectKey:      "/v2/projects",
+		environmentKey:  "/v2/projects/%s/environments",                // require project key
+		featureFlagsKey: "/v2/flags/%s",                                // require project key
+		experimentKey:   "/v2/projects/%s/environments/%s/experiments", // require project key and env key
+		holdoutsKey:     "/v2/projects/%s/environments/%s/holdouts",    // require project key and env key
+		membersKey:      "/v2/members",
+		destinationsKey: "/v2/destinations",
+		templatesKey:    "/v2/templates",
+		teamsKey:        "/v2/teams",
+		webhooksKey:     "/v2/webhooks",
 		/*
 			TODO:
 			release piplelines: https://launchdarkly.com/docs/api/release-pipelines-beta/get-all-release-pipelines (Beta)
@@ -169,8 +174,11 @@ type webhooksResponse struct {
 
 // makeLaunchDarklyRequest send the HTTP GET API request to passed url with passed token and return response body and status code
 func makeLaunchDarklyRequest(client *http.Client, endpoint, token string) ([]byte, int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
 	// create request
-	req, err := http.NewRequest(http.MethodGet, baseURL+endpoint, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+endpoint, http.NoBody)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -200,8 +208,7 @@ func makeLaunchDarklyRequest(client *http.Client, endpoint, token string) ([]byt
 func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo) error {
 	var (
 		wg             sync.WaitGroup
-		errChan        = make(chan error)
-		aggregatedErrs = make([]string, 0)
+		aggregatedErrs = make([]error, 0)
 	)
 
 	wg.Add(1)
@@ -209,7 +216,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		defer wg.Done()
 
 		if err := captureApplications(client, token, secretInfo); err != nil {
-			errChan <- err
+			aggregatedErrs = append(aggregatedErrs, err)
 		}
 	}()
 
@@ -218,7 +225,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		defer wg.Done()
 
 		if err := captureRepositories(client, token, secretInfo); err != nil {
-			errChan <- err
+			aggregatedErrs = append(aggregatedErrs, err)
 		}
 	}()
 
@@ -227,7 +234,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		defer wg.Done()
 
 		if err := captureProjects(client, token, secretInfo); err != nil {
-			errChan <- err
+			aggregatedErrs = append(aggregatedErrs, err)
 		}
 
 		// for each project capture it's flags, environments and other sub resources
@@ -237,7 +244,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 			go func() {
 				defer wg.Done()
 				if err := captureProjectFeatureFlags(client, token, project, secretInfo); err != nil {
-					errChan <- err
+					aggregatedErrs = append(aggregatedErrs, err)
 				}
 			}()
 
@@ -245,7 +252,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 			go func() {
 				defer wg.Done()
 				if err := captureProjectEnv(client, token, project, secretInfo); err != nil {
-					errChan <- err
+					aggregatedErrs = append(aggregatedErrs, err)
 				}
 			}()
 		}
@@ -256,7 +263,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		defer wg.Done()
 
 		if err := captureMembers(client, token, secretInfo); err != nil {
-			errChan <- err
+			aggregatedErrs = append(aggregatedErrs, err)
 		}
 	}()
 
@@ -265,7 +272,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		defer wg.Done()
 
 		if err := captureDestinations(client, token, secretInfo); err != nil {
-			errChan <- err
+			aggregatedErrs = append(aggregatedErrs, err)
 		}
 	}()
 
@@ -274,7 +281,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		defer wg.Done()
 
 		if err := captureTemplates(client, token, secretInfo); err != nil {
-			errChan <- err
+			aggregatedErrs = append(aggregatedErrs, err)
 		}
 	}()
 
@@ -283,7 +290,7 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		defer wg.Done()
 
 		if err := captureTeams(client, token, secretInfo); err != nil {
-			errChan <- err
+			aggregatedErrs = append(aggregatedErrs, err)
 		}
 	}()
 
@@ -292,20 +299,14 @@ func CaptureResources(client *http.Client, token string, secretInfo *SecretInfo)
 		defer wg.Done()
 
 		if err := captureWebhooks(client, token, secretInfo); err != nil {
-			errChan <- err
+			aggregatedErrs = append(aggregatedErrs, err)
 		}
 	}()
 
 	wg.Wait()
-	close(errChan)
-
-	// collect all errors
-	for err := range errChan {
-		aggregatedErrs = append(aggregatedErrs, err.Error())
-	}
 
 	if len(aggregatedErrs) > 0 {
-		return errors.New(strings.Join(aggregatedErrs, ", "))
+		return errors.Join(aggregatedErrs...)
 	}
 
 	return nil
@@ -331,11 +332,12 @@ func captureApplications(client *http.Client, token string, secretInfo *SecretIn
 				ID:   fmt.Sprintf("launchdarkly/app/%s", application.Key),
 				Name: application.Name,
 				Type: applicationKey,
+				MetaData: map[string]string{
+					"Maintainer Email": application.Maintainer.Email,
+					"Kind":             application.Kind,
+					MetadataKey:        application.Key,
+				},
 			}
-
-			resource.updateResourceMetadata("Maintainer Email", application.Maintainer.Email)
-			resource.updateResourceMetadata("Kind", application.Kind)
-			resource.updateResourceMetadata(MetadataKey, application.Key)
 
 			secretInfo.appendResource(resource)
 		}
@@ -368,11 +370,13 @@ func captureRepositories(client *http.Client, token string, secretInfo *SecretIn
 				ID:   fmt.Sprintf("%s/repo/%s/%d", repository.Type, repository.Name, repository.Version), // no unique id exist, so we make one
 				Name: repository.Name,
 				Type: repositoryKey,
+				MetaData: map[string]string{
+					"Default branch": repository.DefaultBranch,
+					"Version":        strconv.Itoa(repository.Version),
+					"Source link":    repository.SourceLink,
+					MetadataKey:      repositoryKey,
+				},
 			}
-
-			resource.updateResourceMetadata("Default branch", repository.DefaultBranch)
-			resource.updateResourceMetadata("Version", fmt.Sprintf("%d", repository.Version))
-			resource.updateResourceMetadata("Source link", repository.SourceLink)
 
 			secretInfo.appendResource(resource)
 		}
@@ -444,10 +448,11 @@ func captureProjectFeatureFlags(client *http.Client, token string, parent Resour
 				ID:   fmt.Sprintf("launchdarkly/proj/%s/flag/%s", projectKey, flag.Key),
 				Name: flag.Name,
 				Type: featureFlagsKey,
+				MetaData: map[string]string{
+					"Kind": flag.Kind,
+				},
+				ParentResource: &parent,
 			}
-
-			resource.updateResourceMetadata("Kind", flag.Kind)
-			resource.setParentResource(&resource, &parent)
 
 			secretInfo.appendResource(resource)
 		}
@@ -488,9 +493,8 @@ func captureProjectEnv(client *http.Client, token string, parent Resource, secre
 				MetaData: map[string]string{
 					MetadataKey: env.Key,
 				},
+				ParentResource: &parent,
 			}
-
-			resource.setParentResource(&resource, &parent)
 
 			secretInfo.appendResource(resource)
 
@@ -538,14 +542,12 @@ func captureProjectEnvExperiments(client *http.Client, token string, projectKey 
 				Name: exp.Name,
 				Type: experimentKey,
 				MetaData: map[string]string{
-					MetadataKey: exp.Key,
+					MetadataKey:    exp.Key,
+					"Maintiner ID": exp.MaintainerID,
 				},
+				ParentResource: &parent,
 			}
 
-			resource.updateResourceMetadata(MetadataKey, exp.Key)
-			resource.updateResourceMetadata("Maintainer ID", exp.MaintainerID)
-
-			resource.setParentResource(&resource, &parent)
 			secretInfo.appendResource(resource)
 		}
 
@@ -585,12 +587,12 @@ func captureProjectHoldouts(client *http.Client, token string, projectKey string
 				ID:   fmt.Sprintf("launchdarkly/%s/env/%s/holdout/%s", projectKey, envKey, holdout.ID),
 				Name: holdout.Name,
 				Type: holdoutsKey,
+				MetaData: map[string]string{
+					"Status":    holdout.Status,
+					holdoutsKey: holdout.Key,
+				},
+				ParentResource: &parent,
 			}
-
-			resource.updateResourceMetadata("Status", holdout.Status)
-			resource.updateResourceMetadata(holdoutsKey, holdout.Key)
-
-			resource.setParentResource(&resource, &parent)
 
 			secretInfo.appendResource(resource)
 		}
@@ -623,10 +625,11 @@ func captureMembers(client *http.Client, token string, secretInfo *SecretInfo) e
 				ID:   fmt.Sprintf("launchdarkly/member/%s", member.ID),
 				Name: member.FirstName + " " + member.LastName,
 				Type: membersKey,
+				MetaData: map[string]string{
+					"Role":  member.Role,
+					"Email": member.Email,
+				},
 			}
-
-			resource.updateResourceMetadata("Role", member.Role)
-			resource.updateResourceMetadata("Email", member.Email)
 
 			secretInfo.appendResource(resource)
 		}
@@ -659,10 +662,11 @@ func captureDestinations(client *http.Client, token string, secretInfo *SecretIn
 				ID:   fmt.Sprintf("launchdarkly/destination/%s", destination.ID),
 				Name: destination.Name,
 				Type: destinationsKey,
+				MetaData: map[string]string{
+					"Kind":    destination.Kind,
+					"Version": strconv.Itoa(destination.Version),
+				},
 			}
-
-			resource.updateResourceMetadata("Kind", destination.Kind)
-			resource.updateResourceMetadata("Version", fmt.Sprintf("%d", destination.Version))
 
 			secretInfo.appendResource(resource)
 		}
@@ -728,11 +732,12 @@ func captureTeams(client *http.Client, token string, secretInfo *SecretInfo) err
 				ID:   fmt.Sprintf("launchdarkly/teams/%s", team.Key),
 				Name: team.Name,
 				Type: teamsKey,
+				MetaData: map[string]string{
+					"Total Roles Count":    strconv.Itoa(team.Roles.TotalCount),
+					"Total Memvers Count":  strconv.Itoa(team.Members.TotalCount),
+					"Total Projects Count": strconv.Itoa(team.Projects.TotalCount),
+				},
 			}
-
-			resource.updateResourceMetadata("Total Roles Count", fmt.Sprintf("%d", team.Roles.TotalCount))
-			resource.updateResourceMetadata("Total Members Count", fmt.Sprintf("%d", team.Members.TotalCount))
-			resource.updateResourceMetadata("Total Projects Count", fmt.Sprintf("%d", team.Projects.TotalCount))
 
 			secretInfo.appendResource(resource)
 		}
