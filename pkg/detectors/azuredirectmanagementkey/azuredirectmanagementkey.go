@@ -66,7 +66,7 @@ EndpointLoop:
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AzureDirectManagementKey,
 				Raw:          []byte(baseUrl),
-				RawV2:        []byte(baseUrl + key),
+				RawV2:        []byte(baseUrl + ":" + key),
 			}
 
 			if verify {
