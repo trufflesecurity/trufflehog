@@ -33,7 +33,7 @@ func TestAzureDirectManagementAPIKey_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{"https://trufflesecuritytest.management.azure-api.netUJh1Wn7txjls2GPK1YxO9+3tpqQffSfxb+97PmT8j3cSQoXvGa74lCKpBqPeppTHCharbaMeKqKs/H4gA/go1w=="},
+			want:  []string{"https://trufflesecuritytest.management.azure-api.net:UJh1Wn7txjls2GPK1YxO9+3tpqQffSfxb+97PmT8j3cSQoXvGa74lCKpBqPeppTHCharbaMeKqKs/H4gA/go1w=="},
 		},
 		{
 			name:  "invalid pattern",
