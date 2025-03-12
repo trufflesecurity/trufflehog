@@ -1,0 +1,6 @@
+permissions:
+  - admin
+  - writer
+  - reader
+  - inlinepolicy
+  - customroles

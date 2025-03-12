@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fatih/color"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -89,6 +90,8 @@ const (
 	AnalyzerTypePlanetScale
 	AnalyzerTypeAirtableOAuth
 	AnalyzerTypeAirtablePat
+	AnalyzerTypeGroq
+	AnalyzerTypeLaunchDarkly
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -124,6 +127,8 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypePlanetScale:   "PlanetScale",
 	AnalyzerTypeAirtableOAuth: "AirtableOAuth",
 	AnalyzerTypeAirtablePat:   "AirtablePat",
+	AnalyzerTypeGroq:          "Groq",
+	AnalyzerTypeLaunchDarkly:  "LaunchDarkly",
 	// Add new mappings here
 }
 

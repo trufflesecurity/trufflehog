@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"golang.org/x/time/rate"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
@@ -185,6 +186,13 @@ type Client struct {
 
 	// Headers to attach to every requests made with the client.
 	Headers map[string]string
+
+	// Rate limiter needed for Postman API workspace and collection requests. Postman API rate limit
+	// is 10 calls in 10 seconds for GET /collections, GET /workspaces, and GET /workspaces/{id} endpoints.
+	WorkspaceAndCollectionRateLimiter *rate.Limiter
+
+	// Rate limiter needed for Postman API. General rate limit is 300 requests per minute.
+	GeneralRateLimiter *rate.Limiter
 }
 
 // NewClient returns a new Postman API client.
@@ -196,8 +204,10 @@ func NewClient(postmanToken string) *Client {
 	}
 
 	c := &Client{
-		HTTPClient: http.DefaultClient,
-		Headers:    bh,
+		HTTPClient:                        http.DefaultClient,
+		Headers:                           bh,
+		WorkspaceAndCollectionRateLimiter: rate.NewLimiter(rate.Every(time.Second), 1),
+		GeneralRateLimiter:                rate.NewLimiter(rate.Every(time.Second/5), 1),
 	}
 
 	return c
@@ -293,6 +303,9 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 	}{}
 
 	url := fmt.Sprintf(WORKSPACE_URL, workspaceUUID)
+	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
+		return Workspace{}, fmt.Errorf("could not wait for rate limiter during workspace getting: %w", err)
+	}
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
 		return Workspace{}, fmt.Errorf("could not get workspace (%s): %w", workspaceUUID, err)
@@ -312,12 +325,15 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 }
 
 // GetEnvironmentVariables returns the environment variables for a given environment
-func (c *Client) GetEnvironmentVariables(environment_uuid string) (VariableData, error) {
+func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid string) (VariableData, error) {
 	obj := struct {
 		VariableData VariableData `json:"environment"`
 	}{}
 
 	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
+	if err := c.GeneralRateLimiter.Wait(ctx); err != nil {
+		return VariableData{}, fmt.Errorf("could not wait for rate limiter during environment variable getting: %w", err)
+	}
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
 		return VariableData{}, fmt.Errorf("could not get env variables for environment (%s): %w", environment_uuid, err)
@@ -336,12 +352,15 @@ func (c *Client) GetEnvironmentVariables(environment_uuid string) (VariableData,
 }
 
 // GetCollection returns the collection for a given collection
-func (c *Client) GetCollection(collection_uuid string) (Collection, error) {
+func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Collection, error) {
 	obj := struct {
 		Collection Collection `json:"collection"`
 	}{}
 
 	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
+	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
+		return Collection{}, fmt.Errorf("could not wait for rate limiter during collection getting: %w", err)
+	}
 	r, err := c.getPostmanReq(url, nil)
 	if err != nil {
 		return Collection{}, fmt.Errorf("could not get collection (%s): %w", collection_uuid, err)
