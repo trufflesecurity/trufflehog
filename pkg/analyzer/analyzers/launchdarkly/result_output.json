@@ -1,0 +1,102 @@
+{
+    "AnalyzerType": 6,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "Production",
+                "FullyQualifiedName": "launchdarkly/default/env/61543c5956be602355624871",
+                "Type": "Environment",
+                "Metadata": {
+                    "key": "production"
+                },
+                "Parent": {
+                    "Name": "secretscanner",
+                    "FullyQualifiedName": "launchdarkly/proj/61543c5956be60235562486e",
+                    "Type": "Project",
+                    "Metadata": {
+                        "key": "default"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "admin",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Roxanne Tampus",
+                "FullyQualifiedName": "launchdarkly/member/61543c5956be60235562486f",
+                "Type": "Member",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "admin",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Test",
+                "FullyQualifiedName": "launchdarkly/default/env/61543c5956be602355624870",
+                "Type": "Environment",
+                "Metadata": {
+                    "key": "test"
+                },
+                "Parent": {
+                    "Name": "secretscanner",
+                    "FullyQualifiedName": "launchdarkly/proj/61543c5956be60235562486e",
+                    "Type": "Project",
+                    "Metadata": {
+                        "key": "default"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "admin",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "secretscanner",
+                "FullyQualifiedName": "launchdarkly/proj/61543c5956be60235562486e",
+                "Type": "Project",
+                "Metadata": {
+                    "key": "default"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "admin",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "secretscanner",
+                "FullyQualifiedName": "launchdarkly/proj/default/flag/secretscanner",
+                "Type": "Feature Flags",
+                "Metadata": {},
+                "Parent": {
+                    "Name": "secretscanner",
+                    "FullyQualifiedName": "launchdarkly/proj/61543c5956be60235562486e",
+                    "Type": "Project",
+                    "Metadata": {
+                        "key": "default"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "admin",
+                "Parent": null
+            }
+        }
+    ],
+    "UnboundedResources": null,
+    "Metadata": {}
+}

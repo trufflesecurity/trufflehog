@@ -18,6 +18,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/gitlab"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/groq"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/huggingface"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/launchdarkly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailchimp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailgun"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mysql"
@@ -112,5 +113,7 @@ func Run(keyType string, secretInfo SecretInfo) {
 		airtablepat.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "groq":
 		groq.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "launchdarkly":
+		launchdarkly.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }
