@@ -17,9 +17,10 @@ var (
 	Server: api-secure-03.internal
 	Service: Anthropic API Gateway
 	API Key: sk-ant-api03-abc123xyz-456def789ghij-klmnopqrstuvwx-3456yza789bcde-1234fghijklmnopby56aaaogaopaaaabc123xyzAA
+	Admin Key: sk-ant-admin01-abc12fake-456def789ghij-klmnopqrstuvwx-3456yza789bcde-12fakehijklmnopby56aaaogaopaaaabc123xyzAA
 
 	Log Entry:
-	A new API key has been generated for service authentication. Please ensure that this key remains confidential and is not exposed in any public repositories or logs.
+	A new API and Admin key has been generated for service authentication. Please ensure that this key remains confidential and is not exposed in any public repositories or logs.
 	`
 	invalidPattern = "sk-ant-api03-abc123xyz-456de-klMnopqrstuvwx-3456yza789bcde-1234fghijklmnopAA"
 )
@@ -36,7 +37,10 @@ func TestAnthropic_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{"sk-ant-api03-abc123xyz-456def789ghij-klmnopqrstuvwx-3456yza789bcde-1234fghijklmnopby56aaaogaopaaaabc123xyzAA"},
+			want: []string{
+				"sk-ant-api03-abc123xyz-456def789ghij-klmnopqrstuvwx-3456yza789bcde-1234fghijklmnopby56aaaogaopaaaabc123xyzAA",
+				"sk-ant-admin01-abc12fake-456def789ghij-klmnopqrstuvwx-3456yza789bcde-12fakehijklmnopby56aaaogaopaaaabc123xyzAA",
+			},
 		},
 		{
 			name:  "invalid pattern",

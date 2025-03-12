@@ -2,6 +2,7 @@ package anthropic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -23,27 +24,32 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(sk-ant-api03-[\w\-]{93}AA)\b`)
+	keyPat = regexp.MustCompile(`\b(sk-ant-(?:admin01|api03)-[\w\-]{93}AA)\b`)
+
+	// verification endpoints
+	apiKeyEndpoint   = "https://api.anthropic.com/v1/models"
+	adminKeyEndpoint = "https://api.anthropic.com/v1/organizations/api_keys"
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sk-ant-api03"}
+	return []string{"sk-ant-api03", "sk-ant-admin01"}
 }
 
 // FromData will find and optionally verify Anthropic secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	keys := keyPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	for _, key := range keys {
+		keyMatch := strings.TrimSpace(key[1])
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Anthropic,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(keyMatch),
+			ExtraData:    make(map[string]string),
 		}
 
 		if verify {
@@ -51,12 +57,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			isVerified, err := verifyToken(ctx, client, resMatch)
+
+			isAdminKey := isAdminKey(keyMatch)
+			var isVerified bool
+			var err error
+
+			if isAdminKey {
+				isVerified, err = verifyAnthropicKey(ctx, client, adminKeyEndpoint, keyMatch)
+				s1.ExtraData["Type"] = "Admin Key"
+			} else if !isAdminKey {
+				isVerified, err = verifyAnthropicKey(ctx, client, apiKeyEndpoint, keyMatch)
+				s1.ExtraData["Type"] = "API Key"
+			} else {
+				return nil, errors.New("unknown key type detected for anthropic")
+			}
+
 			s1.Verified = isVerified
-			s1.SetVerificationError(err, resMatch)
+			s1.SetVerificationError(err, keyMatch)
+
 			if s1.Verified {
 				s1.AnalysisInfo = map[string]string{
-					"key": resMatch,
+					"key": keyMatch,
 				}
 			}
 		}
@@ -67,14 +88,22 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyToken(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
-	// https://docs.anthropic.com/en/api/models-list
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.anthropic.com/v1/models", http.NoBody)
+/*
+verifyAnthropicKey verify the anthropic key passed against the endpoint
+
+Endpoints:
+
+  - For api keys: https://docs.anthropic.com/en/api/models-list
+
+  - For admin keys:  https://docs.anthropic.com/en/api/admin-api/apikeys/list-api-keys
+*/
+func verifyAnthropicKey(ctx context.Context, client *http.Client, endpoint, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		return false, nil
 	}
 
-	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("x-api-key", key)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("anthropic-version", "2023-06-01")
 
@@ -103,4 +132,8 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Anthropic is an AI research company. The API keys can be used to access their AI models and services."
+}
+
+func isAdminKey(key string) bool {
+	return strings.HasPrefix(key, "sk-ant-admin01")
 }

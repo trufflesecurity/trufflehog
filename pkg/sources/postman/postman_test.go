@@ -1,12 +1,15 @@
 package postman
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"gopkg.in/h2non/gock.v1"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -236,5 +239,97 @@ func TestSource_ScanVariableData(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSource_ScanEnumerateWorkspaceRateLimit(t *testing.T) {
+	defer gock.Off()
+	// Mock the API response for workspaces
+	numWorkspaces := 3
+	workspaceBodyString := `{"workspaces":[`
+	for i := 0; i < numWorkspaces; i++ {
+		workspaceBodyString += fmt.Sprintf(`{"id": "%d", "name": "workspace-%d", "type": "personal", "visibility": "personal", "createdBy": "1234"}`, i, i)
+		if i == numWorkspaces-1 {
+			workspaceBodyString += `]}`
+		} else {
+			workspaceBodyString += `,`
+		}
+	}
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces").
+		Reply(200).
+		BodyString(workspaceBodyString)
+	// Mock the API response for each individual workspace
+	for i := 0; i < numWorkspaces; i++ {
+		gock.New("https://api.getpostman.com").
+			Get(fmt.Sprintf("/workspaces/%d", i)).
+			Reply(200).
+			BodyString(fmt.Sprintf(`{"workspace":{"id":"%d","name":"workspace-%d","type":"personal","description":"Test workspace number %d",
+			"visibility":"personal","createdBy":"1234","updatedBy":"1234","createdAt":"2024-12-12T23:32:27.000Z","updatedAt":"2024-12-12T23:33:01.000Z",
+			"collections":[{"id":"abc%d","name":"test-collection-1","uid":"1234-abc%d"},{"id":"def%d","name":"test-collection-2","uid":"1234-def%d"}],
+			"environments":[{"id":"ghi%d","name":"test-environment-1","uid":"1234-ghi%d"},{"id":"jkl%d","name":"test-environment-2","uid":"1234-jkl%d"}]}}`, i, i, i, i, i, i, i, i, i, i, i))
+	}
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	start := time.Now()
+	_, err = s.client.EnumerateWorkspaces(ctx)
+	if err != nil {
+		t.Fatalf("enumeration error: %v", err)
+	}
+	elapsed := time.Since(start)
+	// With <numWorkspaces> requests at 1 per second rate limit,
+	// elapsed time should be at least <numWorkspaces - 1> seconds
+	if elapsed < time.Duration(numWorkspaces-1)*time.Second {
+		t.Errorf("Rate limiting not working as expected. Elapsed time: %v seconds, expected at least %d seconds", elapsed.Seconds(), numWorkspaces-1)
+	}
+}
+
+func TestSource_ScanGeneralRateLimit(t *testing.T) {
+	defer gock.Off()
+	// Mock the API response for a specific environment id
+	gock.New("https://api.getpostman.com").
+		Get("environments/abc").
+		Persist().
+		Reply(200).
+		BodyString(`{"environment":{"uid":"1234-abc","id":"abc","name":"test-environment","owner":"1234","createdAt":"2025-02-13T23:17:36.000Z",
+		"updatedAt":"2025-02-13T23:18:14.000Z","values":[{"key":"test-key","value":"a-secret-value","enabled":true,"type":"default"}],"isPublic":false}}`)
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	numRequests := 3
+	start := time.Now()
+	for i := 0; i < numRequests; i++ {
+		_, err = s.client.GetEnvironmentVariables(ctx, "abc")
+		if err != nil {
+			t.Fatalf("get environment variables error: %v", err)
+		}
+	}
+	elapsed := time.Since(start)
+	// With number of requests at 5 per second rate limit,
+	// elapsed time should be at least <(numRequests - 1)/5> seconds
+	if elapsed < time.Duration((numRequests-1)/5)*time.Second {
+		t.Errorf("Rate limiting not working as expected. Elapsed time: %v seconds, expected at least %v seconds", elapsed.Seconds(), (float64(numRequests)-1)/5)
 	}
 }

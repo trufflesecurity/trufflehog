@@ -107,8 +107,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// Open a connection to Snowflake
 					db, err := sql.Open("snowflake", uri) // Needs the snowflake driver from gosnowflake
 					if err != nil {
-						// sql.Open() only errors if unable to import the snowflake driver, in which case we should panic.
-						panic(err)
+						return nil, err
 					}
 					defer db.Close()
 

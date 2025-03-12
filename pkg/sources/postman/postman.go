@@ -197,7 +197,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			continue
 		}
 
-		collection, err := s.client.GetCollection(collectionID)
+		collection, err := s.client.GetCollection(ctx, collectionID)
 		if err != nil {
 			return fmt.Errorf("error getting collection %s: %w", collectionID, err)
 		}
@@ -260,7 +260,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// gather and scan environment variables
 	for _, envID := range workspace.Environments {
-		envVars, err := s.client.GetEnvironmentVariables(envID.UUID)
+		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.UUID)
 		if err != nil {
 			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.UUID)
 			continue
@@ -297,7 +297,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		if shouldSkip(collectionID.UUID, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
 			continue
 		}
-		collection, err := s.client.GetCollection(collectionID.UUID)
+		collection, err := s.client.GetCollection(ctx, collectionID.UUID)
 		if err != nil {
 			return err
 		}
