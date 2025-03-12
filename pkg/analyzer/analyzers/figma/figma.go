@@ -177,7 +177,8 @@ func cleanUpErrorResponseMessage(msg string) string {
 	result := strings.ReplaceAll(msg, "\\", "")
 	result = strings.ReplaceAll(msg, "\"", "")
 	result = strings.ReplaceAll(result, "[", "")
-	return strings.ReplaceAll(result, "]", "")
+	result = strings.ReplaceAll(result, "]", "")
+	return result
 }
 
 func MapToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
