@@ -5116,6 +5116,18 @@ func (m *Teams) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	if _, err := url.Parse(m.GetRedirectUri()); err != nil {
+		err = TeamsValidationError{
+			field:  "RedirectUri",
+			reason: "value must be a valid URI",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	switch v := m.Credential.(type) {
 	case *Teams_Token:
 		if v == nil {

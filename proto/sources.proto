@@ -389,6 +389,7 @@ message Teams {
   repeated string channels = 4;
   repeated string ignore_list = 5;
   repeated string team_ids = 6;
+  string redirect_uri = 8 [(validate.rules).string.uri_ref = true];
 }
 
 message Syslog {
