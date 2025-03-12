@@ -52,7 +52,7 @@ func TestCosmosDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Meraki,
+					DetectorType: detectorspb.DetectorType_AzureCosmosDBKeyIdentifiable,
 					Verified:     true,
 				},
 			},
@@ -69,7 +69,7 @@ func TestCosmosDB_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Meraki,
+					DetectorType: detectorspb.DetectorType_AzureCosmosDBKeyIdentifiable,
 					Verified:     false,
 				},
 			},
