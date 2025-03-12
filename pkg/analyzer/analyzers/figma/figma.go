@@ -175,10 +175,9 @@ func matchMessageWithExpectedMessage(msg string, expectedMsg string) ([]string, 
 // response message by removing the characters '"', '[', ']', '\', and '"'.
 func cleanUpErrorResponseMessage(msg string) string {
 	result := strings.ReplaceAll(msg, "\\", "")
-	result = strings.ReplaceAll(msg, "\"", "")
+	result = strings.ReplaceAll(result, "\"", "")
 	result = strings.ReplaceAll(result, "[", "")
-	result = strings.ReplaceAll(result, "]", "")
-	return result
+	return strings.ReplaceAll(result, "]", "")
 }
 
 func MapToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
