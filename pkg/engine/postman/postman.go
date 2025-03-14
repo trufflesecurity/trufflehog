@@ -1,4 +1,6 @@
-package engine
+//go:build !no_postman
+
+package postman
 
 import (
 	"errors"
@@ -7,13 +9,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/postman"
 )
 
-// ScanPostman scans Postman with the provided options.
-func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sources.JobProgressRef, error) {
+// Scan scans Postman with the provided options.
+func Scan(ctx context.Context, c sources.PostmanConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := sourcespb.Postman{
 		Workspaces:          c.Workspaces,
 		Collections:         c.Collections,
@@ -53,7 +56,7 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sour
 	}
 
 	sourceName := "trufflehog - postman"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, postman.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, postman.SourceType)
 
 	postmanSource := &postman.Source{
 		DetectorKeywords: keywords,
@@ -61,5 +64,5 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sour
 	if err := postmanSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, postmanSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, postmanSource)
 }

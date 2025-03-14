@@ -1,4 +1,6 @@
-package engine
+//go:build !no_git
+
+package git
 
 import (
 	"os"
@@ -10,6 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -71,16 +74,16 @@ func TestGitEngine(t *testing.T) {
 
 			sourceManager := sources.NewManager(opts...)
 
-			conf := Config{
+			conf := engine.Config{
 				Concurrency:   1,
 				Decoders:      decoders.DefaultDecoders(),
 				Detectors:     defaults.DefaultDetectors(),
 				Verify:        true,
 				SourceManager: sourceManager,
-				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+				Dispatcher:    engine.NewPrinterDispatcher(new(discardPrinter)),
 			}
 
-			e, err := NewEngine(ctx, &conf)
+			e, err := engine.NewEngine(ctx, &conf)
 			assert.NoError(t, err)
 
 			e.Start(ctx)
@@ -91,7 +94,7 @@ func TestGitEngine(t *testing.T) {
 				BaseRef:  tTest.base,
 				MaxDepth: tTest.maxDepth,
 			}
-			if _, err := e.ScanGit(ctx, cfg); err != nil {
+			if _, err := Scan(ctx, cfg, e); err != nil {
 				return
 			}
 
@@ -133,16 +136,16 @@ func BenchmarkGitEngine(b *testing.B) {
 
 	sourceManager := sources.NewManager(opts...)
 
-	conf := Config{
+	conf := engine.Config{
 		Concurrency:   runtime.NumCPU(),
 		Decoders:      decoders.DefaultDecoders(),
 		Detectors:     defaults.DefaultDetectors(),
 		Verify:        false,
 		SourceManager: sourceManager,
-		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+		Dispatcher:    engine.NewPrinterDispatcher(new(discardPrinter)),
 	}
 
-	e, err := NewEngine(ctx, &conf)
+	e, err := engine.NewEngine(ctx, &conf)
 	assert.NoError(b, err)
 
 	go func() {
@@ -155,7 +158,7 @@ func BenchmarkGitEngine(b *testing.B) {
 	cfg := sources.GitConfig{URI: repoUrl}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := e.ScanGit(ctx, cfg); err != nil {
+		if _, err := Scan(ctx, cfg, e); err != nil {
 			return
 		}
 	}

@@ -21,6 +21,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/filesystem"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/custom_detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -69,6 +70,13 @@ func (f fakeDetectorV2) Type() detectorspb.DetectorType { return detectorspb.Det
 func (f fakeDetectorV2) Version() int                   { return 2 }
 
 func (f fakeDetectorV2) Description() string { return "" }
+
+type discardPrinter struct{}
+
+func (p *discardPrinter) Print(context.Context, *detectors.ResultWithMetadata) error {
+	// This method intentionally does nothing.
+	return nil
+}
 
 func TestFragmentLineOffset(t *testing.T) {
 	tests := []struct {
@@ -271,7 +279,7 @@ func TestEngine_DuplicateSecrets(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := filesystem.Scan(ctx, cfg, e); err != nil {
 		return
 	}
 
@@ -372,7 +380,7 @@ even more`,
 			eng.Start(ctx)
 
 			cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-			_, err = eng.ScanFileSystem(ctx, cfg)
+			_, err = filesystem.Scan(ctx, cfg, eng)
 			assert.NoError(t, err)
 
 			assert.NoError(t, eng.Finish(ctx))
@@ -420,7 +428,7 @@ func TestEngine_VersionedDetectorsVerifiedSecrets(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := filesystem.Scan(ctx, cfg, e); err != nil {
 		return
 	}
 
@@ -490,7 +498,7 @@ func TestEngine_CustomDetectorsDetectorsVerifiedSecrets(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := filesystem.Scan(ctx, cfg, e); err != nil {
 		return
 	}
 
@@ -540,7 +548,7 @@ func TestVerificationOverlapChunk(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	if _, err := e.ScanFileSystem(ctx, cfg); err != nil {
+	if _, err := filesystem.Scan(ctx, cfg, e); err != nil {
 		return
 	}
 
@@ -630,7 +638,7 @@ func TestVerificationOverlapChunkFalsePositive(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	_, err = e.ScanFileSystem(ctx, cfg)
+	_, err = filesystem.Scan(ctx, cfg, e)
 	assert.NoError(t, err)
 
 	// Wait for all the chunks to be processed.
@@ -678,7 +686,7 @@ func TestRetainFalsePositives(t *testing.T) {
 	e.Start(ctx)
 
 	cfg := sources.FilesystemConfig{Paths: []string{absPath}}
-	_, err = e.ScanFileSystem(ctx, cfg)
+	_, err = filesystem.Scan(ctx, cfg, e)
 	assert.NoError(t, err)
 
 	// Wait for all the chunks to be processed.
@@ -1259,7 +1267,7 @@ def test_something():
 			eng.Start(ctx)
 
 			cfg := sources.FilesystemConfig{Paths: []string{tmpFile.Name()}}
-			_, err = eng.ScanFileSystem(ctx, cfg)
+			_, err = filesystem.Scan(ctx, cfg, eng)
 			assert.NoError(t, err)
 
 			assert.NoError(t, eng.Finish(ctx))

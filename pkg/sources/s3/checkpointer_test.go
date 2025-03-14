@@ -1,3 +1,5 @@
+//go:build !no_s3
+
 package s3
 
 import (
@@ -134,7 +136,7 @@ func TestGetResumePoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tracker := &Checkpointer{ progress: tt.progress}
+			tracker := &Checkpointer{progress: tt.progress}
 
 			resumePoint, err := tracker.ResumePoint(context.Background())
 			if tt.expectError {
