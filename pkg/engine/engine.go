@@ -36,9 +36,12 @@ import (
 
 var detectionTimeout = detectors.DefaultResponseTimeout
 
-var errOverlap = errors.New(
-	"More than one detector has found this result. For your safety, verification has been disabled." +
-		"You can override this behavior by using the --allow-verification-overlap flag.",
+var (
+	ErrSourceDisabled = errors.New("trufflehog was compiled without this source")
+	errOverlap        = errors.New(
+		"More than one detector has found this result. For your safety, verification has been disabled." +
+			"You can override this behavior by using the --allow-verification-overlap flag.",
+	)
 )
 
 // Metrics for the scan engine for external consumption.
@@ -220,6 +223,10 @@ type Engine struct {
 	notificationWorkerMultiplier int
 	// verificationOverlapWorkerMultiplier is used to calculate the number of verification overlap workers.
 	verificationOverlapWorkerMultiplier int
+}
+
+func (e *Engine) SourceManager() *sources.SourceManager {
+	return e.sourceManager
 }
 
 // NewEngine creates a new Engine instance with the provided configuration.

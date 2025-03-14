@@ -1,4 +1,6 @@
-package engine
+//go:build !no_elasticsearch
+
+package elasticsearch
 
 import (
 	"runtime"
@@ -7,13 +9,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/elasticsearch"
 )
 
-// ScanElasticsearch scans a Elasticsearch installation.
-func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchConfig) (sources.JobProgressRef, error) {
+// Scan scans a Elasticsearch installation.
+func Scan(ctx context.Context, c sources.ElasticsearchConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Elasticsearch{
 		Nodes:          c.Nodes,
 		Username:       c.Username,
@@ -35,11 +38,11 @@ func (e *Engine) ScanElasticsearch(ctx context.Context, c sources.ElasticsearchC
 	}
 
 	sourceName := "trufflehog - Elasticsearch"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, elasticsearch.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, elasticsearch.SourceType)
 
 	elasticsearchSource := &elasticsearch.Source{}
 	if err := elasticsearchSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, elasticsearchSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, elasticsearchSource)
 }

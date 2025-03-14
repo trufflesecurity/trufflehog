@@ -1,3 +1,5 @@
+//go:build !no_elasticsearch
+
 package elasticsearch
 
 import (
@@ -7,6 +9,10 @@ import (
 	es "github.com/elastic/go-elasticsearch/v8"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
@@ -14,9 +20,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_ELASTICSEARCH

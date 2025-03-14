@@ -1,3 +1,5 @@
+//go:build !no_travisci
+
 package travisci
 
 import (
@@ -6,13 +8,13 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/shuheiktgw/go-travis"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"

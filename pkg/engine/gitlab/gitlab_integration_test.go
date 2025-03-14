@@ -1,23 +1,25 @@
-//go:build integration
-// +build integration
+//go:build (!no_gitlab || !no_git) && integration
 
-package engine
+package gitlab
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
 func TestGitLab(t *testing.T) {
 	// Run the scan.
 	ctx := context.Background()
-	e, err := NewEngine(ctx, &Config{
-		Detectors:     DefaultDetectors(),
+	e, err := engine.NewEngine(ctx, &engine.Config{
+		Detectors:     defaults.DefaultDetectors(),
 		SourceManager: sources.NewManager(),
 		Verify:        false,
 	})
@@ -28,9 +30,9 @@ func TestGitLab(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	_, err = e.ScanGitLab(ctx, sources.GitlabConfig{
+	_, err = Scan(ctx, sources.GitlabConfig{
 		Token: secret.MustGetField("GITLAB_TOKEN"),
-	})
+	}, e)
 	assert.NoError(t, err)
 
 	err = e.Finish(ctx)

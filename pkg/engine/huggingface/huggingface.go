@@ -1,40 +1,20 @@
-package engine
+//go:build !no_huggingface && !no_git
+
+package huggingface
 
 import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/huggingface"
 )
 
-// HuggingFaceConfig represents the configuration for HuggingFace.
-type HuggingfaceConfig struct {
-	Endpoint           string
-	Models             []string
-	Spaces             []string
-	Datasets           []string
-	Organizations      []string
-	Users              []string
-	IncludeModels      []string
-	IgnoreModels       []string
-	IncludeSpaces      []string
-	IgnoreSpaces       []string
-	IncludeDatasets    []string
-	IgnoreDatasets     []string
-	SkipAllModels      bool
-	SkipAllSpaces      bool
-	SkipAllDatasets    bool
-	IncludeDiscussions bool
-	IncludePrs         bool
-	Token              string
-	Concurrency        int
-}
-
-// ScanGitHub scans HuggingFace with the provided options.
-func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) (sources.JobProgressRef, error) {
+// Scan scans HuggingFace with the provided options.
+func Scan(ctx context.Context, c sources.HuggingfaceConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := sourcespb.Huggingface{
 		Endpoint:           c.Endpoint,
 		Models:             c.Models,
@@ -70,11 +50,11 @@ func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) (sour
 	}
 
 	sourceName := "trufflehog - huggingface"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, sourcespb.SourceType_SOURCE_TYPE_HUGGINGFACE)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, sourcespb.SourceType_SOURCE_TYPE_HUGGINGFACE)
 
 	huggingfaceSource := &huggingface.Source{}
 	if err := huggingfaceSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, huggingfaceSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, huggingfaceSource)
 }

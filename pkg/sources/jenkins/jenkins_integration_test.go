@@ -1,5 +1,4 @@
-//go:build localInfra
-// +build localInfra
+//go:build localInfra && !no_jenkins
 
 package jenkins
 

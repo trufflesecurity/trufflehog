@@ -1,4 +1,6 @@
-package engine
+//go:build !no_jenkins
+
+package jenkins
 
 import (
 	"errors"
@@ -9,22 +11,15 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/jenkins"
 )
 
-type JenkinsConfig struct {
-	Endpoint              string
-	Username              string
-	Password              string
-	Header                string
-	InsecureSkipVerifyTLS bool
-}
-
-// ScanJenkins scans Jenkins logs.
-func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) (sources.JobProgressRef, error) {
+// Scan scans Jenkins logs.
+func Scan(ctx context.Context, jenkinsConfig sources.JenkinsConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	var connection *sourcespb.Jenkins
 	switch {
 	case jenkinsConfig.Username != "" && jenkinsConfig.Password != "":
@@ -71,11 +66,11 @@ func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) (
 	}
 
 	sourceName := "trufflehog - Jenkins"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, jenkins.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, jenkins.SourceType)
 
 	jenkinsSource := &jenkins.Source{}
 	if err := jenkinsSource.Init(ctx, "trufflehog - Jenkins", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, jenkinsSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, jenkinsSource)
 }

@@ -1,3 +1,5 @@
+//go:build !no_jenkins
+
 package jenkins
 
 import (

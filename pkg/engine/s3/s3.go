@@ -1,4 +1,6 @@
-package engine
+//go:build !no_s3
+
+package s3
 
 import (
 	"fmt"
@@ -8,14 +10,15 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/s3"
 )
 
-// ScanS3 scans S3 buckets.
-func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobProgressRef, error) {
+// Scan scans S3 buckets.
+func Scan(ctx context.Context, c sources.S3Config, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_Unauthenticated{},
 	}
@@ -62,11 +65,11 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobPro
 	}
 
 	sourceName := "trufflehog - s3"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, s3.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, s3.SourceType)
 
 	s3Source := &s3.Source{}
 	if err := s3Source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, s3Source)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, s3Source)
 }

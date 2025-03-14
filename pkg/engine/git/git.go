@@ -1,4 +1,6 @@
-package engine
+//go:build !no_git
+
+package git
 
 import (
 	"runtime"
@@ -7,13 +9,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
-// ScanGit scans any git source.
-func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) (sources.JobProgressRef, error) {
+// Scan scans any git source.
+func Scan(ctx context.Context, c sources.GitConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Git{
 		Head:             c.HeadRef,
 		Base:             c.BaseRef,
@@ -32,12 +35,12 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) (sources.JobP
 	}
 
 	sourceName := "trufflehog - git"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, git.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, git.SourceType)
 
 	gitSource := &git.Source{}
 	if err := gitSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
 
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gitSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, gitSource)
 }

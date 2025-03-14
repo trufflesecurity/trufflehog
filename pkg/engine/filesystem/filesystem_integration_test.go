@@ -1,7 +1,6 @@
-//go:build integration
-// +build integration
+//go:build !no_filesystem && integration
 
-package engine
+package filesystem
 
 import (
 	"os"
@@ -9,7 +8,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -61,17 +63,17 @@ func TestFilesystem(t *testing.T) {
 
 	// Run the scan.
 	ctx := context.Background()
-	e, err := NewEngine(ctx, &Config{
-		Detectors:     DefaultDetectors(),
+	e, err := engine.NewEngine(ctx, &engine.Config{
+		Detectors:     defaults.DefaultDetectors(),
 		SourceManager: sources.NewManager(),
 		Verify:        false,
 	})
 	assert.NoError(t, err)
 	e.Start(ctx)
-	_, err = e.ScanFileSystem(ctx, sources.FilesystemConfig{
+	_, err = Scan(ctx, sources.FilesystemConfig{
 		Paths:            []string{rootDir},
 		ExcludePathsFile: filepath.Join(configDir, "exclude"),
-	})
+	}, e)
 	assert.NoError(t, err)
 
 	err = e.Finish(ctx)

@@ -1,3 +1,5 @@
+//go:build !no_postman
+
 package postman
 
 import (

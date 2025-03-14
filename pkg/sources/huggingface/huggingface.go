@@ -1,3 +1,5 @@
+//go:build !no_huggingface && !no_git
+
 package huggingface
 
 import (

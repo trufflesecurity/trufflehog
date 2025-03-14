@@ -1,4 +1,6 @@
-package engine
+//go:build !no_gcs
+
+package gcs
 
 import (
 	"strings"
@@ -8,9 +10,18 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
+
+type discardPrinter struct{}
+
+func (p *discardPrinter) Print(context.Context, *detectors.ResultWithMetadata) error {
+	// This method intentionally does nothing.
+	return nil
+}
 
 func TestScanGCS(t *testing.T) {
 	tests := []struct {
@@ -70,16 +81,16 @@ func TestScanGCS(t *testing.T) {
 
 			sourceManager := sources.NewManager(opts...)
 
-			conf := Config{
+			conf := engine.Config{
 				Concurrency:   1,
 				Decoders:      decoders.DefaultDecoders(),
 				Detectors:     defaults.DefaultDetectors(),
 				Verify:        false,
 				SourceManager: sourceManager,
-				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+				Dispatcher:    engine.NewPrinterDispatcher(new(discardPrinter)),
 			}
 
-			e, err := NewEngine(ctx, &conf)
+			e, err := engine.NewEngine(ctx, &conf)
 			assert.NoError(t, err)
 
 			e.Start(ctx)
@@ -91,7 +102,7 @@ func TestScanGCS(t *testing.T) {
 				}
 			}()
 
-			_, err = e.ScanGCS(ctx, test.gcsConfig)
+			_, err = Scan(ctx, test.gcsConfig, e)
 			if err != nil && !test.wantErr && !strings.Contains(err.Error(), "googleapi: Error 400: Bad Request") {
 				t.Errorf("ScanGCS() got: %v, want: %v", err, nil)
 				return

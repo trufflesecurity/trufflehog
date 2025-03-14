@@ -1,3 +1,5 @@
+//go:build !no_elasticsearch
+
 package elasticsearch
 
 import (

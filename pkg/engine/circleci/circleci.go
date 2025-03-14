@@ -1,4 +1,6 @@
-package engine
+//go:build !no_circleci
+
+package circleci
 
 import (
 	"runtime"
@@ -7,13 +9,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/circleci"
 )
 
-// ScanCircleCI scans CircleCI logs.
-func (e *Engine) ScanCircleCI(ctx context.Context, token string) (sources.JobProgressRef, error) {
+// Scan scans CircleCI logs.
+func Scan(ctx context.Context, token string, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := &sourcespb.CircleCI{
 		Credential: &sourcespb.CircleCI_Token{
 			Token: token,
@@ -28,11 +31,11 @@ func (e *Engine) ScanCircleCI(ctx context.Context, token string) (sources.JobPro
 	}
 
 	sourceName := "trufflehog - Circle CI"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, circleci.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, circleci.SourceType)
 
 	circleSource := &circleci.Source{}
 	if err := circleSource.Init(ctx, "trufflehog - Circle CI", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, circleSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, circleSource)
 }

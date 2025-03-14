@@ -1,4 +1,6 @@
-package engine
+//go:build !no_github && !no_git
+
+package github
 
 import (
 	"fmt"
@@ -9,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
@@ -16,8 +19,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github_experimental"
 )
 
-// ScanGitHubExperimental scans GitHub using an experimental feature. Consider all functionality to be in an alpha release here.
-func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExperimentalConfig) (sources.JobProgressRef, error) {
+// ScanExperimental scans GitHub using an experimental feature. Consider all functionality to be in an alpha release here.
+func ScanExperimental(ctx context.Context, c sources.GitHubExperimentalConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := sourcespb.GitHubExperimental{
 		Repository:         c.Repository,
 		ObjectDiscovery:    c.ObjectDiscovery,
@@ -53,12 +56,12 @@ func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExp
 	scanOptions := git.NewScanOptions(opts...)
 
 	sourceName := "trufflehog - github experimental (alpha release)"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, github.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, github.SourceType)
 
 	githubExperimentalSource := &github_experimental.Source{}
 	if err := githubExperimentalSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
 	githubExperimentalSource.WithScanOptions(scanOptions)
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, githubExperimentalSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, githubExperimentalSource)
 }

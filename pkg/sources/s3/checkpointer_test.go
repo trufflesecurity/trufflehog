@@ -1,3 +1,5 @@
+//go:build !no_s3
+
 package s3
 
 import (

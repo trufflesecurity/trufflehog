@@ -1,8 +1,11 @@
+//go:build !no_github && !no_git
+
 package github
 
 import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 

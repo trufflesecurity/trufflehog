@@ -1,4 +1,6 @@
-package engine
+//go:build !no_travisci
+
+package travisci
 
 import (
 	"runtime"
@@ -7,13 +9,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/travisci"
 )
 
-// ScanTravisCI scans TravisCI logs.
-func (e *Engine) ScanTravisCI(ctx context.Context, token string) (sources.JobProgressRef, error) {
+// Scan scans TravisCI logs.
+func Scan(ctx context.Context, token string, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := &sourcespb.TravisCI{
 		Credential: &sourcespb.TravisCI_Token{
 			Token: token,
@@ -28,11 +31,11 @@ func (e *Engine) ScanTravisCI(ctx context.Context, token string) (sources.JobPro
 	}
 
 	sourceName := "trufflehog - Travis CI"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, travisci.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, travisci.SourceType)
 
 	travisSource := &travisci.Source{}
 	if err := travisSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, travisSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, travisSource)
 }

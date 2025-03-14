@@ -1,4 +1,6 @@
-package engine
+//go:build !no_gcs
+
+package gcs
 
 import (
 	"fmt"
@@ -7,13 +9,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/gcs"
 )
 
-// ScanGCS with the provided options.
-func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) (sources.JobProgressRef, error) {
+// Scan with the provided options.
+func Scan(ctx context.Context, c sources.GCSConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	// Project ID is required if using any authenticated access.
 	if c.ProjectID == "" && !c.WithoutAuth {
 		return sources.JobProgressRef{}, fmt.Errorf("project ID is required")
@@ -45,13 +48,13 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) (sources.JobP
 	}
 
 	sourceName := "trufflehog - gcs"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, gcs.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, gcs.SourceType)
 
 	gcsSource := &gcs.Source{}
 	if err := gcsSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, int(c.Concurrency)); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gcsSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, gcsSource)
 }
 
 func isAuthValid(ctx context.Context, c sources.GCSConfig, connection *sourcespb.GCS) bool {

@@ -1,3 +1,5 @@
+//go:build !no_git
+
 package git
 
 import (

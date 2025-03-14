@@ -1,3 +1,5 @@
+//go:build !no_gcs
+
 package gcs
 
 import (

@@ -1,3 +1,5 @@
+//go:build !no_syslog
+
 package syslog
 
 import (
