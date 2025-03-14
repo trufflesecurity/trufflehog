@@ -1,4 +1,6 @@
-package engine
+//go:build !no_gitlab && !no_git
+
+package gitlab
 
 import (
 	"fmt"
@@ -9,14 +11,15 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/gitlab"
 )
 
-// ScanGitLab scans GitLab with the provided configuration.
-func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (sources.JobProgressRef, error) {
+// Scan scans GitLab with the provided configuration.
+func Scan(ctx context.Context, c sources.GitlabConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),
@@ -59,12 +62,12 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 	}
 
 	sourceName := "trufflehog - gitlab"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, gitlab.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, gitlab.SourceType)
 
 	gitlabSource := &gitlab.Source{}
 	if err := gitlabSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
 	gitlabSource.WithScanOptions(scanOptions)
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gitlabSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, gitlabSource)
 }
