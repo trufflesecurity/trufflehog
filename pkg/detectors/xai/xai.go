@@ -74,6 +74,7 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
 	res, err := client.Do(req)
 	if err != nil {
 		return false, nil, err
