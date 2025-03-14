@@ -2,11 +2,13 @@ package ipquality
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,8 +24,19 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ipquality"}) + `\b([0-9a-z]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ipquality"}) + `\b([0-9a-zA-Z]{32})\b`)
 )
+
+const (
+	// response messages
+	invalidKeyMessage         = "Invalid or unauthorized key"
+	insufficientCreditMessage = "insufficient credits"
+)
+
+type apiResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -43,27 +56,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_IPQuality,
 			Raw:          []byte(resMatch),
+			ExtraData:    make(map[string]string),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.ipqualityscore.com/api/json/account/%s", resMatch), nil)
-			if err != nil {
-				continue
+			extraData, isVerified, verificationErr := verifyIPQualityAPIKey(ctx, client, resMatch)
+
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
+
+			for key, value := range extraData {
+				s1.ExtraData[key] = value
 			}
-			req.Header.Add("Content-Type", "application/json")
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-				validResponse := strings.Contains(body, "insufficient credits") || strings.Contains(body, `"success":true`)
-				if (res.StatusCode >= 200 && res.StatusCode < 300) && validResponse {
-					s1.Verified = true
-				}
-			}
+
 		}
 
 		results = append(results, s1)
@@ -78,4 +83,52 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "IPQualityScore provides tools to detect and prevent fraudulent activity. IPQualityScore API keys can be used to access their fraud prevention services."
+}
+
+func verifyIPQualityAPIKey(ctx context.Context, client *http.Client, apiKey string) (map[string]string, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.ipqualityscore.com/api/json/account/%s", apiKey), nil)
+	if err != nil {
+		return nil, false, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var response apiResponse
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, false, err
+		}
+
+		if err = json.Unmarshal(bodyBytes, &response); err != nil {
+			return nil, false, err
+		}
+
+		switch response.Success {
+		case true:
+			return nil, true, nil
+		case false:
+			if strings.Contains(response.Message, insufficientCreditMessage) {
+				return map[string]string{"Account Credit": "Insufficient"}, false, nil
+			} else if strings.Contains(response.Message, invalidKeyMessage) {
+				return nil, false, nil
+			}
+		}
+
+		return nil, false, nil
+	default:
+		return nil, false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

@@ -66,6 +66,9 @@ func TestIpquality_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_IPQuality,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"Account Credit": "Insufficient",
+					},
 				},
 			},
 			wantErr: false,
