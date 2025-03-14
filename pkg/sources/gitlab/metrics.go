@@ -1,3 +1,5 @@
+//go:build !no_gitlab && !no_git
+
 package gitlab
 
 import (

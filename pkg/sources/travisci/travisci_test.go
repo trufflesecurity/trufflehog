@@ -1,3 +1,5 @@
+//go:build !no_travisci
+
 package travisci
 
 import (

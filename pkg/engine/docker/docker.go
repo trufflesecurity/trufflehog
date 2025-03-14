@@ -1,4 +1,6 @@
-package engine
+//go:build !no_docker
+
+package docker
 
 import (
 	"runtime"
@@ -7,13 +9,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/docker"
 )
 
-// ScanDocker scans a given docker connection.
-func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) (sources.JobProgressRef, error) {
+// Scan scans a given docker connection.
+func Scan(ctx context.Context, c sources.DockerConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Docker{Images: c.Images}
 
 	switch {
@@ -33,11 +36,11 @@ func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) (source
 	}
 
 	sourceName := "trufflehog - docker"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, docker.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, docker.SourceType)
 
 	dockerSource := &docker.Source{}
 	if err := dockerSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
 		return sources.JobProgressRef{}, err
 	}
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, dockerSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, dockerSource)
 }

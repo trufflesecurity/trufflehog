@@ -1,3 +1,5 @@
+//go:build !no_github && !no_git
+
 package github
 
 import (
@@ -7,10 +9,11 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v67/github"
+	"golang.org/x/oauth2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
-	"golang.org/x/oauth2"
 )
 
 type tokenConnector struct {
