@@ -4,6 +4,7 @@ package anthropic
 import (
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -17,7 +18,8 @@ var _ analyzers.Analyzer = (*Analyzer)(nil)
 
 const (
 	// Key Types
-	APIKey = "API-Key"
+	APIKey   = "API-Key"
+	AdminKey = "Admin-Key"
 )
 
 type Analyzer struct {
@@ -28,7 +30,6 @@ type Analyzer struct {
 type SecretInfo struct {
 	Valid              bool
 	Type               string // key type - TODO: Handle Anthropic Admin Keys
-	Reference          string
 	AnthropicResources []AnthropicResource
 	Permissions        string // always full_access
 	Misc               map[string]string
@@ -39,6 +40,7 @@ type AnthropicResource struct {
 	ID       string
 	Name     string
 	Type     string
+	Parent   *AnthropicResource
 	Metadata map[string]string
 }
 
@@ -73,7 +75,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	}
 
 	if info.Valid {
-		color.Green("[!] Valid Anthropic API key\n\n")
+		color.Green("[!] Valid Anthropic %s\n\n", info.Type)
 		// no user information
 		// print full access permission
 		printPermission(info.Permissions)
@@ -88,16 +90,23 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// create a HTTP client
 	client := analyzers.NewAnalyzeClient(cfg)
 
+	keyType := getKeyType(key)
+
 	var secretInfo = &SecretInfo{
-		Type: APIKey, // TODO: implement Admin-Key type as well
+		Type: keyType,
 	}
 
-	if err := listModels(client, key, secretInfo); err != nil {
-		return nil, err
-	}
-
-	if err := listMessageBatches(client, key, secretInfo); err != nil {
-		return nil, err
+	switch keyType {
+	case APIKey:
+		if err := captureAPIKeyResources(client, key, secretInfo); err != nil {
+			return nil, err
+		}
+	case AdminKey:
+		if err := captureAdminKeyResources(client, key, secretInfo); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("unsupported key type")
 	}
 
 	// anthropic key has full access only
@@ -133,6 +142,14 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 			},
 		}
 
+		if Anthropicresource.Parent != nil {
+			binding.Resource.Parent = &analyzers.Resource{
+				Name:               Anthropicresource.Parent.Name,
+				FullyQualifiedName: Anthropicresource.Parent.ID,
+				Type:               Anthropicresource.Parent.Type,
+			}
+		}
+
 		for key, value := range Anthropicresource.Metadata {
 			binding.Resource.Metadata[key] = value
 		}
@@ -161,4 +178,15 @@ func printAnthropicResources(resources []AnthropicResource) {
 		t.AppendRow(table.Row{color.GreenString(resource.Type), color.GreenString(resource.ID), color.GreenString(resource.Name)})
 	}
 	t.Render()
+}
+
+// getKeyType return the type of key
+func getKeyType(key string) string {
+	if strings.Contains(key, "sk-ant-admin01") {
+		return AdminKey
+	} else if strings.Contains(key, "sk-ant-api03") {
+		return APIKey
+	}
+
+	return ""
 }
