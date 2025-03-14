@@ -202,6 +202,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepseek"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/delighted"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/demio"
 	denodeploy "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deno"
@@ -322,6 +323,7 @@ import (
 	godaddyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v1"
 	godaddyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
@@ -801,6 +803,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldcoinindex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wrike"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/xai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yandex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yelp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/youneedabudget"
@@ -1674,6 +1677,9 @@ func buildDetectorList() []detectors.Detector {
 		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
+		&deepseek.Scanner{},
+		&xai.Scanner{},
+		&googleai.Scanner{},
 	}
 }
 
