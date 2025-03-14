@@ -1,4 +1,6 @@
-package engine
+//go:build !no_github && !no_git
+
+package github
 
 import (
 	gogit "github.com/go-git/go-git/v5"
@@ -6,14 +8,15 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/github"
 )
 
-// ScanGitHub scans GitHub with the provided options.
-func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (sources.JobProgressRef, error) {
+// Scan scans GitHub with the provided options.
+func Scan(ctx context.Context, c sources.GithubConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := sourcespb.GitHub{
 		Endpoint:                   c.Endpoint,
 		Organizations:              c.Orgs,
@@ -52,12 +55,12 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 	scanOptions := git.NewScanOptions(opts...)
 
 	sourceName := "trufflehog - github"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, github.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, github.SourceType)
 
 	githubSource := &github.Source{}
 	if err := githubSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return sources.JobProgressRef{}, err
 	}
 	githubSource.WithScanOptions(scanOptions)
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, githubSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, githubSource)
 }
