@@ -1,4 +1,6 @@
-package engine
+//go:build !no_syslog
+
+package syslog
 
 import (
 	"os"
@@ -8,13 +10,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/syslog"
 )
 
-// ScanSyslog is a source that scans syslog files.
-func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) (sources.JobProgressRef, error) {
+// Scan is a source that scans syslog files.
+func Scan(ctx context.Context, c sources.SyslogConfig, e *engine.Engine) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Syslog{
 		Protocol:      c.Protocol,
 		ListenAddress: c.Address,
@@ -42,12 +45,12 @@ func (e *Engine) ScanSyslog(ctx context.Context, c sources.SyslogConfig) (source
 	}
 
 	sourceName := "trufflehog - syslog"
-	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, syslog.SourceType)
+	sourceID, jobID, _ := e.SourceManager().GetIDs(ctx, sourceName, syslog.SourceType)
 	syslogSource := &syslog.Source{}
 	if err := syslogSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return sources.JobProgressRef{}, err
 	}
 	syslogSource.InjectConnection(connection)
 
-	return e.sourceManager.EnumerateAndScan(ctx, sourceName, syslogSource)
+	return e.SourceManager().EnumerateAndScan(ctx, sourceName, syslogSource)
 }
