@@ -114,6 +114,14 @@ func TestDeepseek_FromChunk(t *testing.T) {
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
+				// Ignore Extra Data for comparison
+				if tt.want[i].Verified == true {
+					if got[i].ExtraData != nil {
+						got[i].ExtraData = nil
+					} else {
+						t.Fatalf("no extra data")
+					}
+				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
