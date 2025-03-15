@@ -323,7 +323,6 @@ import (
 	godaddyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v1"
 	godaddyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/godaddy/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/goodday"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/googleoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/grafanaserviceaccount"
@@ -803,7 +802,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldcoinindex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wrike"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/xai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yandex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yelp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/youneedabudget"
@@ -1039,6 +1037,7 @@ func buildDetectorList() []detectors.Detector {
 		// &debounce.Scanner{},
 		&deepai.Scanner{},
 		&deepgram.Scanner{},
+		&deepseek.Scanner{},
 		&delighted.Scanner{},
 		&demio.Scanner{},
 		&denodeploy.Scanner{},
@@ -1677,9 +1676,6 @@ func buildDetectorList() []detectors.Detector {
 		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
-		&deepseek.Scanner{},
-		&xai.Scanner{},
-		&googleai.Scanner{},
 	}
 }
 
