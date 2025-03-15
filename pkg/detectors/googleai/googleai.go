@@ -23,13 +23,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(`\b(AI[a-zA-Z0-9_-]{37})+\b`)
+	keyPat = regexp.MustCompile(`\b(AIzaSy[a-zA-Z0-9_-]{33})+\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"AI"}
+	return []string{"AIzaSy"}
 }
 
 // FromData will find and optionally verify DeepSeek secrets in a given set of bytes.
@@ -90,8 +90,8 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 		//}
 
 		return true, nil, nil
-	case 401:
-		// Invalid
+	case 403:
+		// Invalid (Forbidden)
 		return false, nil, nil
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
