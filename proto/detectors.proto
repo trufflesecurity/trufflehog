@@ -1026,8 +1026,6 @@ enum DetectorType {
   AirtableOAuth = 1014;
   AirtablePersonalAccessToken = 1015;
   DeepSeek = 1016;
-  Xai = 1017;
-  GoogleAI = 1018;
 }
 
 message Result {
