@@ -139,7 +139,7 @@ enum DetectorType {
   AirbrakeProjectKey = 125;
   AirbrakeUserKey = 126;
   PendoIntegrationKey = 127;
-  SplunkOberservabilityToken  = 128;
+  SplunkOberservabilityToken = 128;
   LokaliseToken = 129;
   Calendarific = 130;
   Jumpcloud = 131;
@@ -711,7 +711,7 @@ enum DetectorType {
   Paymoapp = 699;
   Mixmax = 700;
   Processst = 701;
-  Repairshopr  = 702;
+  Repairshopr = 702;
   Goshippo = 703;
   Sigopt = 704;
   Sugester = 705;
@@ -800,7 +800,7 @@ enum DetectorType {
   Apilayer = 788;
   Disqus = 789;
   Woopra = 790;
-  Paperform =791;
+  Paperform = 791;
   Gumroad = 792;
   Paydirtapp = 793;
   Detectify = 794;
@@ -1025,6 +1025,7 @@ enum DetectorType {
   AzureRefreshToken = 1013;
   AirtableOAuth = 1014;
   AirtablePersonalAccessToken = 1015;
+  DeepSeek = 1016;
 }
 
 message Result {
