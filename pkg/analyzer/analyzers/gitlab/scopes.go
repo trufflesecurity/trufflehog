@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package gitlab
 
 var gitlab_scopes = map[string]string{

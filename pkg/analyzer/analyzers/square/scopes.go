@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package square
 
 var permissions_slice = []map[string]map[string][]string{
