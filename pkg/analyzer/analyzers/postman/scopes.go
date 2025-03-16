@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package postman
 
 var roleDescriptions = map[string]string{

@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package keymap
 
 import "github.com/charmbracelet/bubbles/key"

@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package wizard_intro
 
 import (

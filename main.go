@@ -294,7 +294,11 @@ func init() {
 	}
 
 	if isatty.IsTerminal(os.Stdout.Fd()) && (len(os.Args) <= 1 || os.Args[1] == analyzeCmd.FullCommand()) {
-		args := tui.Run(os.Args[1:])
+		args, err := tui.Run(os.Args[1:])
+		if err != nil {
+			fmt.Printf("failed to run TUI: %s", err.Error())
+			os.Exit(1)
+		}
 		if len(args) == 0 {
 			os.Exit(0)
 		}

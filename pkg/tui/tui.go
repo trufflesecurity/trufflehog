@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package tui
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	zone "github.com/lrstanley/bubblezone"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
@@ -221,7 +224,7 @@ func (ui *TUI) View() string {
 	)
 }
 
-func Run(args []string) []string {
+func Run(args []string) ([]string, error) {
 	c := common.Common{
 		Copy:   nil,
 		Styles: styles.DefaultStyles(),
@@ -241,7 +244,7 @@ func Run(args []string) []string {
 		analyzer.Run(m.analyzerType, m.analyzerInfo)
 		os.Exit(0)
 	}
-	return m.args
+	return m.args, nil
 }
 
 func (ui *TUI) activePage() page {
