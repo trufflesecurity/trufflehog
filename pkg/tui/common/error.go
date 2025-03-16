@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package common
 
 import tea "github.com/charmbracelet/bubbletea"
