@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package analyze_keys
 
 import (
