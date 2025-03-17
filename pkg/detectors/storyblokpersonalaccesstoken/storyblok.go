@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -46,18 +45,20 @@ func (s Scanner) Description() string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	var uniquePATs = make(map[string]struct{})
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniquePATs[match[1]] = struct{}{}
+	}
 
+	for pat := range uniquePATs {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_StoryblokPersonalAccessToken,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(pat),
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyStoryBlokPersonalAccessToken(ctx, client, resMatch)
+			isVerified, verificationErr := verifyStoryBlokPersonalAccessToken(ctx, client, pat)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
 		}
@@ -70,7 +71,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 // docs: http://storyblok.com/docs/api/management/core-resources/spaces/retrieve-multiple-spaces
 func verifyStoryBlokPersonalAccessToken(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://mapi.storyblok.com/v1/spaces/", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://mapi.storyblok.com/v1/spaces/", nil)
 	if err != nil {
 		return false, err
 	}

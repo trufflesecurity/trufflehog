@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -44,18 +43,21 @@ func (s Scanner) Description() string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueAccessTokens = make(map[string]struct{})
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueAccessTokens[match[1]] = struct{}{}
+	}
+
+	for accessToken := range uniqueAccessTokens {
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_StoryblokAccessToken,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(accessToken),
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyStoryBlokAccessToken(ctx, client, resMatch)
+			isVerified, verificationErr := verifyStoryBlokAccessToken(ctx, client, accessToken)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
 		}
@@ -68,7 +70,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 // docs: https://www.storyblok.com/docs/api/content-delivery/v2/getting-started/authentication
 func verifyStoryBlokAccessToken(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.storyblok.com/v1/cdn/spaces/me/?token="+token, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.storyblok.com/v1/cdn/spaces/me/?token="+token, nil)
 	if err != nil {
 		return false, err
 	}
