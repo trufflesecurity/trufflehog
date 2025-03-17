@@ -24,7 +24,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(`\b(sk-[a-z0-9]{32})+\b`)
+	keyPat = regexp.MustCompile(`\b(sk-[a-z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -67,7 +67,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyToken(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.deepseek.com/user/balance", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.deepseek.com/user/balance", nil)
 	if err != nil {
 		return false, nil, err
 	}
@@ -84,23 +84,17 @@ func verifyToken(ctx context.Context, client *http.Client, token string) (bool, 
 	}()
 
 	switch res.StatusCode {
-	case 200:
+	case http.StatusOK:
 		var resData response
 		if err = json.NewDecoder(res.Body).Decode(&resData); err != nil {
 			return false, nil, err
 		}
 
 		extraData := map[string]string{
-			"is available": fmt.Sprintf("%t", resData.IsAvailable),
-		}
-		if len(resData.BalanceInfos) > 0 {
-			extraData["currency"] = resData.BalanceInfos[0].Currency
-			extraData["total balance"] = resData.BalanceInfos[0].TotalBalance
-			extraData["granted balance"] = resData.BalanceInfos[0].GrantedBalance
-			extraData["topped up balance"] = resData.BalanceInfos[0].ToppedUpBalance
+			"is_available": fmt.Sprintf("%t", resData.IsAvailable),
 		}
 		return true, extraData, nil
-	case 401:
+	case http.StatusUnauthorized:
 		// Invalid
 		return false, nil, nil
 	default:
@@ -117,12 +111,5 @@ func (s Scanner) Description() string {
 }
 
 type response struct {
-	IsAvailable  bool           `json:"is_available"`
-	BalanceInfos []responseInfo `json:"balance_infos"`
-}
-type responseInfo struct {
-	Currency        string `json:"currency"`
-	TotalBalance    string `json:"total_balance"`
-	GrantedBalance  string `json:"granted_balance"`
-	ToppedUpBalance string `json:"topped_up_balance"`
+	IsAvailable bool `json:"is_available"`
 }
