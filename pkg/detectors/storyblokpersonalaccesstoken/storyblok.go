@@ -1,4 +1,4 @@
-package storyblok
+package storyblokpersonalaccesstoken
 
 import (
 	"context"
@@ -23,7 +23,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"storyblok"}) + `\b([0-9A-Za-z]{22}tt)\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"storyblok"}) + `\b([0-9A-Za-z]{22}tt-[0-9]{6}-[A-Za-z0-9_-]{20})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -33,11 +33,13 @@ func (s Scanner) Keywords() []string {
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_StoryblokAccessToken
+	return detectorspb.DetectorType_StoryblokPersonalAccessToken
 }
 
 func (s Scanner) Description() string {
-	return "Storyblok is a headless CMS that allows developers to build flexible and powerful content management solutions. Storyblok tokens can be used to access and modify content within a Storyblok space."
+	return `Storyblok is a headless CMS that allows developers to build flexible and powerful content management solutions.
+			Storyblok personal access tokens can be used with management APIs.
+			The Storyblok Management API allows you to create, edit, update, and delete content using a common interface`
 }
 
 // FromData will find and optionally verify Storyblok secrets in a given set of bytes.
@@ -50,12 +52,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_StoryblokAccessToken,
+			DetectorType: detectorspb.DetectorType_StoryblokPersonalAccessToken,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyStoryBlokAccessToken(ctx, client, resMatch)
+			isVerified, verificationErr := verifyStoryBlokPersonalAccessToken(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
 		}
@@ -66,12 +68,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-// docs: https://www.storyblok.com/docs/api/content-delivery/v2/getting-started/authentication
-func verifyStoryBlokAccessToken(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.storyblok.com/v1/cdn/spaces/me/?token="+token, nil)
+// docs: http://storyblok.com/docs/api/management/core-resources/spaces/retrieve-multiple-spaces
+func verifyStoryBlokPersonalAccessToken(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://mapi.storyblok.com/v1/spaces/", nil)
 	if err != nil {
 		return false, err
 	}
+
+	// docs: https://www.storyblok.com/docs/api/management/getting-started/authentication
+	req.Header.Set("Authorization", token)
 
 	resp, err := client.Do(req)
 	if err != nil {
