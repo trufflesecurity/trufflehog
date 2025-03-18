@@ -45,6 +45,11 @@ func TestSonarCloud_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
 			want:  []string{},
 		},
+		{
+			name:  "invalid pattern - token directly preceded by @",
+			input: fmt.Sprintf("%s token = '@%s'", keyword, validPattern),
+			want:  []string{},
+		},
 	}
 
 	for _, test := range tests {
