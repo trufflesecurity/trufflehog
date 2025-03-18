@@ -81,7 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func VerifyToken(ctx context.Context, client *http.Client, token string) (map[string]string, bool, error) {
 	// api docs: https://docs.sentry.io/api/organizations/
 	// this api will return 200 for user auth tokens with scope of org:<>
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://sentry.io/api/0/organizations/", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://sentry.io/api/0/auth/validate", nil)
 	if err != nil {
 		return nil, false, err
 	}
