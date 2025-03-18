@@ -98,17 +98,7 @@ func VerifyToken(ctx context.Context, client *http.Client, token string) (map[st
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		var organizations []Organization
-		if err = json.NewDecoder(resp.Body).Decode(&organizations); err != nil {
-			return nil, false, err
-		}
-
-		var extraData = make(map[string]string)
-		for _, org := range organizations {
-			extraData[fmt.Sprintf("orginzation_%s", org.ID)] = org.Name
-		}
-
-		return extraData, true, nil
+		return nil, true, nil
 	case http.StatusForbidden:
 		var APIResp interface{}
 		if err = json.NewDecoder(resp.Body).Decode(&APIResp); err != nil {
