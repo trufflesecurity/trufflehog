@@ -202,6 +202,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepseek"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/delighted"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/demio"
 	denodeploy "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deno"
@@ -1036,6 +1037,7 @@ func buildDetectorList() []detectors.Detector {
 		// &debounce.Scanner{},
 		&deepai.Scanner{},
 		&deepgram.Scanner{},
+		&deepseek.Scanner{},
 		&delighted.Scanner{},
 		&demio.Scanner{},
 		&denodeploy.Scanner{},
