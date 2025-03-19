@@ -309,7 +309,7 @@ func analyzeGitlabUser(ctx context.Context, parsedKey any) (*string, error) {
 // replaceSpacesWithNewlines extracts the base64 part, replaces spaces with newlines if needed, and reconstructs the key.
 func replaceSpacesWithNewlines(privateKey string) string {
 	// Regex pattern to extract the key content
-	re := regexp.MustCompile(`(-----BEGIN [A-Z0-9\s]+ PRIVATE KEY-----) ([\s\S]*?) (-----END [A-Z0-9\s]+ PRIVATE KEY-----)`)
+	re := regexp.MustCompile(`(?i)(-----\s*BEGIN[ A-Z0-9_-]*PRIVATE KEY\s*-----)\s*([\s\S]*?)\s*(-----\s*END[ A-Z0-9_-]*PRIVATE KEY\s*-----)`)
 
 	// Find matches
 	matches := re.FindStringSubmatch(privateKey)
