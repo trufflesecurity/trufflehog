@@ -232,7 +232,7 @@ enum DetectorType {
   Duda = 219;
   Yext = 220;
   ContentStack = 221;
-  Storyblok = 222;
+  StoryblokAccessToken = 222;
   GraphCMS = 223;
   Checkmarket = 224;
   Convertkit = 225;
@@ -1025,6 +1025,7 @@ enum DetectorType {
   AzureRefreshToken = 1013;
   AirtableOAuth = 1014;
   AirtablePersonalAccessToken = 1015;
+  StoryblokPersonalAccessToken = 1016;
 }
 
 message Result {
