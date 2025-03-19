@@ -686,6 +686,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stormboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stormglass"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storyblok"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storyblokpersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storychief"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/strava"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/streak"
@@ -1536,6 +1537,7 @@ func buildDetectorList() []detectors.Detector {
 		&stormboard.Scanner{},
 		&stormglass.Scanner{},
 		&storyblok.Scanner{},
+		&storyblokpersonalaccesstoken.Scanner{},
 		&storychief.Scanner{},
 		&strava.Scanner{},
 		&streak.Scanner{},
