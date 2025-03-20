@@ -629,6 +629,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendbirdorganizationapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendgrid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendinbluev2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentryorgtoken"
 	sentrytokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentrytoken/v1"
 	sentrytokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentrytoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/serphouse"
@@ -686,6 +687,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stormboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stormglass"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storyblok"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storyblokpersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storychief"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/strava"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/streak"
@@ -1479,6 +1481,7 @@ func buildDetectorList() []detectors.Detector {
 		&sendinbluev2.Scanner{},
 		&sentrytokenv1.Scanner{},
 		&sentrytokenv2.Scanner{},
+		&sentryorgtoken.Scanner{},
 		&serphouse.Scanner{},
 		&serpstack.Scanner{},
 		&sheety.Scanner{},
@@ -1536,6 +1539,7 @@ func buildDetectorList() []detectors.Detector {
 		&stormboard.Scanner{},
 		&stormglass.Scanner{},
 		&storyblok.Scanner{},
+		&storyblokpersonalaccesstoken.Scanner{},
 		&storychief.Scanner{},
 		&strava.Scanner{},
 		&streak.Scanner{},

@@ -1,4 +1,4 @@
-package sonarcloud
+package sentryorgtoken
 
 import (
 	"context"
@@ -12,12 +12,15 @@ import (
 )
 
 var (
-	validPattern   = "hxrxxgxtcjxj7ta3dn33c5r5i2h0i6cqjv9kwkye"
-	invalidPattern = "hxrxxgxt?jxj7ta3dn33c5r5i2h0i6cqjv9kwkye"
-	keyword        = "sonarcloud"
+	validPattern = `
+	sentry_token := sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sentry_token))
+	`
+	invalidPattern = "sntrys_eyJFAKE-OjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
+	token          = "sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
 )
 
-func TestSonarCloud_Pattern(t *testing.T) {
+func TestSentryToken_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -26,28 +29,18 @@ func TestSonarCloud_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword sonarcloud",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			name:  "valid pattern - with keyword sentry org token",
+			input: validPattern,
+			want:  []string{token},
 		},
 		{
 			name:  "valid pattern - ignore duplicate",
-			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
-			want:  []string{validPattern},
-		},
-		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
-			want:  []string{},
+			input: fmt.Sprintf("token = '%s' | '%s'", validPattern, validPattern),
+			want:  []string{token},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
-			want:  []string{},
-		},
-		{
-			name:  "invalid pattern - token directly preceded by @",
-			input: fmt.Sprintf("%s token = '@%s'", keyword, validPattern),
+			input: invalidPattern,
 			want:  []string{},
 		},
 	}

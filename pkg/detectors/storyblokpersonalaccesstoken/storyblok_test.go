@@ -1,4 +1,4 @@
-package sonarcloud
+package storyblokpersonalaccesstoken
 
 import (
 	"context"
@@ -12,12 +12,12 @@ import (
 )
 
 var (
-	validPattern   = "hxrxxgxtcjxj7ta3dn33c5r5i2h0i6cqjv9kwkye"
-	invalidPattern = "hxrxxgxt?jxj7ta3dn33c5r5i2h0i6cqjv9kwkye"
-	keyword        = "sonarcloud"
+	validPattern   = "5r7EgNfakeXi6ZoEls1twAtt-001100-Q5E2fKfakeRqsUjwmsJn"
+	invalidPattern = "5r7EgNfakeXi6ZoEls1twAt-001100-Q5E2fKfakeRqsUjwmsJn"
+	keyword        = "storyblok"
 )
 
-func TestSonarCloud_Pattern(t *testing.T) {
+func TestStoryblokPersonalAccessToken_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -26,7 +26,7 @@ func TestSonarCloud_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword sonarcloud",
+			name:  "valid pattern - with keyword storyblok",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
 			want:  []string{validPattern},
 		},
@@ -43,11 +43,6 @@ func TestSonarCloud_Pattern(t *testing.T) {
 		{
 			name:  "invalid pattern",
 			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
-			want:  []string{},
-		},
-		{
-			name:  "invalid pattern - token directly preceded by @",
-			input: fmt.Sprintf("%s token = '@%s'", keyword, validPattern),
 			want:  []string{},
 		},
 	}

@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package storyblok
+package storyblokpersonalaccesstoken
 
 import (
 	"context"
@@ -16,15 +16,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestStoryblok_FromChunk(t *testing.T) {
+func TestStoryblokPersonalAccessToken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("STORYBLOK_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("STORYBLOK_INACTIVE")
+
+	secret := testSecrets.MustGetField("STORYBLOK_PAT")
+	inactiveSecret := testSecrets.MustGetField("STORYBLOK_PAT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -48,7 +49,7 @@ func TestStoryblok_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_StoryblokAccessToken,
+					DetectorType: detectorspb.DetectorType_StoryblokPersonalAccessToken,
 					Verified:     true,
 				},
 			},
@@ -64,7 +65,7 @@ func TestStoryblok_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_StoryblokAccessToken,
+					DetectorType: detectorspb.DetectorType_StoryblokPersonalAccessToken,
 					Verified:     false,
 				},
 			},

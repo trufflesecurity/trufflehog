@@ -81,7 +81,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func VerifyToken(ctx context.Context, client *http.Client, token string) (map[string]string, bool, error) {
 	// api docs: https://docs.sentry.io/api/organizations/
 	// this api will return 200 for user auth tokens with scope of org:<>
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://sentry.io/api/0/organizations/", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://sentry.io/api/0/auth/validate/", nil)
 	if err != nil {
 		return nil, false, err
 	}
@@ -98,17 +98,7 @@ func VerifyToken(ctx context.Context, client *http.Client, token string) (map[st
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		var organizations []Organization
-		if err = json.NewDecoder(resp.Body).Decode(&organizations); err != nil {
-			return nil, false, err
-		}
-
-		var extraData = make(map[string]string)
-		for _, org := range organizations {
-			extraData[fmt.Sprintf("orginzation_%s", org.ID)] = org.Name
-		}
-
-		return extraData, true, nil
+		return nil, true, nil
 	case http.StatusForbidden:
 		var APIResp interface{}
 		if err = json.NewDecoder(resp.Body).Decode(&APIResp); err != nil {
