@@ -3,6 +3,7 @@ package ipquality
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -56,19 +57,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_IPQuality,
 			Raw:          []byte(resMatch),
-			ExtraData:    make(map[string]string),
 		}
 
 		if verify {
-			extraData, isVerified, verificationErr := verifyIPQualityAPIKey(ctx, client, resMatch)
+			isVerified, verificationErr := verifyIPQualityAPIKey(ctx, client, resMatch)
 
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
-
-			for key, value := range extraData {
-				s1.ExtraData[key] = value
-			}
-
 		}
 
 		results = append(results, s1)
@@ -85,17 +80,17 @@ func (s Scanner) Description() string {
 	return "IPQualityScore provides tools to detect and prevent fraudulent activity. IPQualityScore API keys can be used to access their fraud prevention services."
 }
 
-func verifyIPQualityAPIKey(ctx context.Context, client *http.Client, apiKey string) (map[string]string, bool, error) {
+func verifyIPQualityAPIKey(ctx context.Context, client *http.Client, apiKey string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.ipqualityscore.com/api/json/account/%s", apiKey), nil)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 
 	defer func() {
@@ -109,26 +104,26 @@ func verifyIPQualityAPIKey(ctx context.Context, client *http.Client, apiKey stri
 
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, false, err
+			return false, err
 		}
 
 		if err = json.Unmarshal(bodyBytes, &response); err != nil {
-			return nil, false, err
+			return false, err
 		}
 
 		switch response.Success {
 		case true:
-			return nil, true, nil
+			return true, nil
 		case false:
 			if strings.Contains(response.Message, insufficientCreditMessage) {
-				return map[string]string{"Account Credit": "Insufficient"}, false, nil
+				return false, errors.New("couldn't verify; API Key has " + insufficientCreditMessage)
 			} else if strings.Contains(response.Message, invalidKeyMessage) {
-				return nil, false, nil
+				return false, nil
 			}
 		}
 
-		return nil, false, nil
+		return false, nil
 	default:
-		return nil, false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }
