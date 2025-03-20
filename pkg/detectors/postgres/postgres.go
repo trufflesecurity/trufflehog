@@ -223,6 +223,15 @@ func verifyPostgres(params map[string]string) (bool, error) {
 		}()
 	}
 
+	// db_type is not a valid configuration parameter, so we remove it before connecting.
+	dbType := params[pgDbType]
+	delete(params, pgDbType)
+
+	// we re-add it before returning to preserve in ExtraData
+	defer func() {
+		params[pgDbType] = dbType
+	}()
+
 	var connStr string
 	for key, value := range params {
 		connStr += fmt.Sprintf("%s='%s'", key, value)
