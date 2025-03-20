@@ -129,7 +129,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			// parameters themselves.
 			if timeout, ok := getDeadlineInSeconds(ctx); ok && timeout > 0 {
 				params[pgConnectTimeout] = strconv.Itoa(timeout)
-			} else if timeout <= 0 {
+			} else if ok && timeout <= 0 {
 				// Deadline in the context has already exceeded.
 				break
 			}
