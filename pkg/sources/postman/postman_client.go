@@ -44,12 +44,12 @@ type IDNameUUID struct {
 }
 
 type KeyValue struct {
-	Key          string      `json:"key"`
-	Value        interface{} `json:"value"`
-	Enabled      bool        `json:"enabled,omitempty"`
-	Type         string      `json:"type,omitempty"`
-	SessionValue string      `json:"sessionValue,omitempty"`
-	Id           string      `json:"id,omitempty"`
+	Key          string `json:"key"`
+	Value        any    `json:"value"`
+	Enabled      bool   `json:"enabled,omitempty"`
+	Type         string `json:"type,omitempty"`
+	SessionValue string `json:"sessionValue,omitempty"`
+	Id           string `json:"id,omitempty"`
 }
 
 type VariableData struct {

@@ -333,3 +333,50 @@ func TestSource_ScanGeneralRateLimit(t *testing.T) {
 		t.Errorf("Rate limiting not working as expected. Elapsed time: %v seconds, expected at least %v seconds", elapsed.Seconds(), (float64(numRequests)-1)/5)
 	}
 }
+
+func TestSource_UnmarshalMultipleHeaderType(t *testing.T) {
+	defer gock.Off()
+	// Mock a collection with request and response headers of KeyValue type
+	gock.New("https://api.getpostman.com").
+		Get("/collections/1234-abc1").
+		Reply(200).
+		BodyString(`{"collection":{"info":{"_postman_id":"abc1","name":"test-collection-1","schema":"https://schema.postman.com/json/collection/v2.1.0/collection.json",
+	 	"updatedAt":"2025-03-21T17:39:25.000Z","createdAt":"2025-03-21T17:37:13.000Z","lastUpdatedBy":"1234","uid":"1234-abc1"},
+	 	"item":[{"name":"echo","id":"req-ues-t1","protocolProfileBehavior":{"disableBodyPruning":true},"request":{"method":"GET","header":[]},
+	 	"response":[{"id":"res-pon-se1","name":"echo-response","originalRequest":{"method":"GET","header":[],
+	 	"url":{"raw":"postman-echo.com/get","host":["postman-echo","com"],"path":["get"]}},"status":"OK","code":200,"_postman_previewlanguage":"json",
+	 	"header":[{"key":"Date","value":"Fri, 21 Mar 2025 17:38:58 GMT"},{"key":"Content-Type","value":"application/json; charset=utf-8"},{"key":"Content-Length","value":"508"},
+	 	{"key":"Connection","value":"keep-alive"},{"key":"Server","value":"nginx"},{"key":"ETag","value":"random-string"},
+		{"key":"set-cookie","value":"sails.sid=long-string; Path=/; HttpOnly"}],"cookie":[], "responseTime":null,"body":"{response-body}","uid":"1234-res-pon-se1"}],"uid":"1234-req-ues-t1"}]}}`)
+	// Mock a collection with request and response headers of string type
+	gock.New("https://api.getpostman.com").
+		Get("/collections/1234-def1").
+		Reply(200).
+		BodyString(`{"collection":{"info":{"_postman_id":"abc1","name":"test-collection-1","schema":"https://schema.postman.com/json/collection/v2.1.0/collection.json",
+	 	"updatedAt":"2025-03-21T17:39:25.000Z","createdAt":"2025-03-21T17:37:13.000Z","lastUpdatedBy":"1234","uid":"1234-def1"},
+	 	"item":[{"name":"echo","id":"req-ues-t1","protocolProfileBehavior":{"disableBodyPruning":true},"request":{"method":"GET","header":"request-header-string"},
+	 	"response":[{"id":"res-pon-se1","name":"echo-response","originalRequest":{"method":"GET","header":"request-header-string",
+	 	"url":{"raw":"postman-echo.com/get","host":["postman-echo","com"],"path":["get"]}},"status":"OK","code":200,"_postman_previewlanguage":"json",
+	 	"header":"response-header-string","cookie":[], "responseTime":null,"body":"{response-body}","uid":"1234-res-pon-se1"}],"uid":"1234-req-ues-t1"}]}}`)
+
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	collectionIds := []string{"1234-abc1", "1234-def1"}
+	for _, collectionId := range collectionIds {
+		_, err := s.client.GetCollection(ctx, collectionId)
+		if err != nil {
+			t.Fatalf("failed to get collection: %v", err)
+		}
+	}
+}
