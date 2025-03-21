@@ -28,9 +28,9 @@ func TestTwitchaccesstoken_Pattern(t *testing.T) {
 			want:  []string{"abc123def456ghi789jkl012mno345"},
 		},
 		{
-			name:  "get request pattern",
+			name:  "get request pattern - keyword out of range",
 			input: "curl -X GET 'https://id.twitch.tv/oauth2/validate' -H 'Authorization: OAuth xbc123def456ghi789jkl012mno345'",
-			want:  []string{"xbc123def456ghi789jkl012mno345"},
+			want:  []string{},
 		},
 		{
 			name:  "finds all matches",
