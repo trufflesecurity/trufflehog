@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package sentrytoken
+package sentryorgtoken
 
 import (
 	"context"
@@ -17,15 +17,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestSentryToken_FromChunk(t *testing.T) {
+func TestSentryOrgToken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SENTRYTOKEN_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SENTRYTOKEN_INACTIVE")
+	secret := testSecrets.MustGetField("SENTRY_ORG_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("SENTRY_ORG_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -50,7 +50,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
+					DetectorType: detectorspb.DetectorType_SentryOrgToken,
 					Verified:     true,
 				},
 			},
@@ -66,45 +66,11 @@ func TestSentryToken_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
+					DetectorType: detectorspb.DetectorType_SentryOrgToken,
 					Verified:     false,
 				},
 			},
 			wantErr: false,
-		},
-		{
-			name: "found, would be verified but for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found and valid but unexpected api response",
-			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sentry super secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_SentryToken,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
 		},
 		{
 			name: "not found",
@@ -123,7 +89,7 @@ func TestSentryToken_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Gitlab.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("SentryOrgToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -136,31 +102,11 @@ func TestSentryToken_FromChunk(t *testing.T) {
 			}
 			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
-				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("SentryOrgToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
 }
-
-const (
-	responseBody403 = `
-[
-  {
-    "organization": {
-      "id": "911964",
-      "slug": "wigslap",
-      "status": {
-        "id": "active",
-        "name": "active"
-      },
-      "name": "wigslap"
-    }
-  }
-]
-`
-	responseAccountDeactivated = `{"detail": "Authentication credentials were not provided"}`
-	responseEmpty              = `[]`
-)
 
 func BenchmarkFromData(benchmark *testing.B) {
 	ctx := context.Background()

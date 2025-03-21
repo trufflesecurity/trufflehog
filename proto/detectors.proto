@@ -1026,6 +1026,7 @@ enum DetectorType {
   AirtableOAuth = 1014;
   AirtablePersonalAccessToken = 1015;
   StoryblokPersonalAccessToken = 1016;
+  SentryOrgToken = 1017;
 }
 
 message Result {
