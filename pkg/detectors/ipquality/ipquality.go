@@ -115,6 +115,12 @@ func verifyIPQualityAPIKey(ctx context.Context, client *http.Client, apiKey stri
 		case true:
 			return true, nil
 		case false:
+			/*
+				for invalid api key and for a key which has insufficient credit the API returns the same response.
+				The scenario where we have correct API key but it has insufficient credit is rare than a scenario that we capture
+				an invalid api key as the pattern is too common. Hence in case we get insufficient credit error message we mark the
+				API Key as inactive and send back a verification error as well.
+			*/
 			if strings.Contains(response.Message, insufficientCreditMessage) {
 				return false, errors.New("couldn't verify; API Key has " + insufficientCreditMessage)
 			} else if strings.Contains(response.Message, invalidKeyMessage) {
