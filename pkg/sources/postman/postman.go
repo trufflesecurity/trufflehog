@@ -529,9 +529,9 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 	originalType := metadata.Type
 
 	// Add in var procesisng for headers
-	if r.Header != nil {
+	if r.HeaderKeyValue != nil {
 		vars := VariableData{
-			KeyValues: r.Header,
+			KeyValues: r.HeaderKeyValue,
 		}
 		metadata.Type = originalType + " > header"
 		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_HEADER
@@ -613,9 +613,9 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	}
 	originalType := m.Type
 
-	if response.Header != nil {
+	if response.HeaderKeyValue != nil {
 		vars := VariableData{
-			KeyValues: response.Header,
+			KeyValues: response.HeaderKeyValue,
 		}
 		m.Type = originalType + " > response header"
 		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_HEADER

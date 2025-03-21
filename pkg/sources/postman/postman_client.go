@@ -136,12 +136,14 @@ type Script struct {
 }
 
 type Request struct {
-	Auth        Auth       `json:"auth,omitempty"`
-	Method      string     `json:"method"`
-	Header      []KeyValue `json:"header,omitempty"`
-	Body        Body       `json:"body,omitempty"` //Need to update with additional options
-	URL         URL        `json:"url"`
-	Description string     `json:"description,omitempty"`
+	Auth           Auth            `json:"auth,omitempty"`
+	Method         string          `json:"method"`
+	HeaderRaw      json.RawMessage `json:"header,omitempty"`
+	HeaderKeyValue []KeyValue
+	HeaderString   []string
+	Body           Body   `json:"body,omitempty"` //Need to update with additional options
+	URL            URL    `json:"url"`
+	Description    string `json:"description,omitempty"`
 }
 
 type Body struct {
@@ -171,12 +173,14 @@ type URL struct {
 }
 
 type Response struct {
-	ID              string     `json:"id"`
-	Name            string     `json:"name,omitempty"`
-	OriginalRequest Request    `json:"originalRequest,omitempty"`
-	Header          []KeyValue `json:"header,omitempty"`
-	Body            string     `json:"body,omitempty"`
-	UID             string     `json:"uid,omitempty"`
+	ID              string          `json:"id"`
+	Name            string          `json:"name,omitempty"`
+	OriginalRequest Request         `json:"originalRequest,omitempty"`
+	HeaderRaw       json.RawMessage `json:"header,omitempty"`
+	HeaderKeyValue  []KeyValue
+	HeaderString    []string
+	Body            string `json:"body,omitempty"`
+	UID             string `json:"uid,omitempty"`
 }
 
 // A Client manages communication with the Postman API.
@@ -373,6 +377,37 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 	r.Body.Close()
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		return Collection{}, fmt.Errorf("could not unmarshal JSON for collection (%s): %w", collection_uuid, err)
+	}
+	// Loop used to deal with seeing whether a request/response header is a string or a key value pair
+	for _, item := range obj.Collection.Items {
+		var requestHeaderKeyValue []KeyValue
+		var requestHeaderString []string
+		if err := json.Unmarshal(item.Request.HeaderRaw, &requestHeaderKeyValue); err == nil {
+			item.Request.HeaderKeyValue = requestHeaderKeyValue
+		} else if err := json.Unmarshal(item.Request.HeaderRaw, &requestHeaderString); err == nil {
+			item.Request.HeaderString = requestHeaderString
+		} else {
+			return Collection{}, fmt.Errorf("could not unmarshal request header JSON for collection (%s): %w", collection_uuid, err)
+		}
+		for _, response := range item.Response {
+			if err := json.Unmarshal(response.OriginalRequest.HeaderRaw, &requestHeaderKeyValue); err == nil {
+				response.OriginalRequest.HeaderKeyValue = requestHeaderKeyValue
+			} else if err := json.Unmarshal(response.OriginalRequest.HeaderRaw, &requestHeaderString); err == nil {
+				response.OriginalRequest.HeaderString = requestHeaderString
+			} else {
+				return Collection{}, fmt.Errorf("could not unmarshal original request header in response JSON for collection (%s): %w", collection_uuid, err)
+			}
+
+			var responseHeaderKeyValue []KeyValue
+			var responseHeaderString []string
+			if err := json.Unmarshal(response.HeaderRaw, &responseHeaderKeyValue); err == nil {
+				response.HeaderKeyValue = responseHeaderKeyValue
+			} else if err := json.Unmarshal(response.HeaderRaw, &responseHeaderString); err == nil {
+				response.HeaderString = responseHeaderString
+			} else {
+				return Collection{}, fmt.Errorf("could not unmarshal response header JSON for collection (%s): %w", collection_uuid, err)
+			}
+		}
 	}
 
 	return obj.Collection, nil
