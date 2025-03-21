@@ -1,3 +1,5 @@
+//go:build !no_circleci
+
 package circleci
 
 import (
