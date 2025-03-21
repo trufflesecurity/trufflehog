@@ -34,6 +34,7 @@ const (
 )
 
 func TestPostgres_FromChunk(t *testing.T) {
+	ctx := context.Background()
 	if err := startPostgres(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			t.Fatalf("could not start local postgres: %v w/stderr:\n%s", err, string(exitErr.Stderr))
@@ -74,7 +75,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "not found",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
@@ -85,7 +86,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI with ssl mode unset, verified",
 			s:    Scanner{detectLoopback: true},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, postgresPass, postgresHost, postgresPort)),
 				verify: true,
 			},
@@ -104,7 +105,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI with ssl mode 'prefer', verified",
 			s:    Scanner{detectLoopback: true},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?sslmode=prefer`, postgresUser, postgresPass, postgresHost, postgresPort)),
 				verify: true,
 			},
@@ -123,7 +124,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI with ssl mode 'allow', verified",
 			s:    Scanner{detectLoopback: true},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?sslmode=allow`, postgresUser, postgresPass, postgresHost, postgresPort)),
 				verify: true,
 			},
@@ -142,7 +143,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI with requiressl=0, verified",
 			s:    Scanner{detectLoopback: true},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?requiressl=0`, postgresUser, postgresPass, postgresHost, postgresPort)),
 				verify: true,
 			},
@@ -161,7 +162,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI without database, verified",
 			s:    Scanner{detectLoopback: true},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/`, postgresUser, postgresPass, postgresHost, postgresPort)),
 				verify: true,
 			},
@@ -180,7 +181,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI, unverified",
 			s:    Scanner{detectLoopback: true},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, inactivePass, postgresHost, postgresPort)),
 				verify: true,
 			},
@@ -199,7 +200,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "ignored localhost",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, postgresPass, "localhost", postgresPort)),
 				verify: true,
 			},
@@ -210,7 +211,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "ignored 127.0.0.1",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, postgresPass, "127.0.0.1", postgresPort)),
 				verify: true,
 			},
@@ -221,7 +222,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI, unverified due to error - inactive host",
 			s:    Scanner{},
 			args: args{
-				ctx:                    context.Background(),
+				ctx:                    ctx,
 				data:                   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2`, postgresUser, postgresPass, inactiveHost, postgresPort)),
 				verify:                 true,
 				requiresTimeoutContext: true,
@@ -243,7 +244,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI, unverified due to error - wrong port",
 			s:    Scanner{detectLoopback: true},
 			args: args{
-				ctx:                    context.Background(),
+				ctx:                    ctx,
 				data:                   []byte(fmt.Sprintf(`postgresql://%s:%s@%s/postgres2`, postgresUser, postgresPass, postgresHost)),
 				verify:                 true,
 				requiresTimeoutContext: true,
@@ -265,7 +266,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI, unverified due to error - ssl not supported (using sslmode)",
 			s:    Scanner{detectLoopback: true},
 			args: args{
-				ctx:                    context.Background(),
+				ctx:                    ctx,
 				data:                   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?sslmode=require`, postgresUser, postgresPass, postgresHost, postgresPort)),
 				verify:                 true,
 				requiresTimeoutContext: true,
@@ -287,7 +288,7 @@ func TestPostgres_FromChunk(t *testing.T) {
 			name: "found connection URI, unverified due to error - ssl not supported (using requiressl)",
 			s:    Scanner{detectLoopback: true},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte(fmt.Sprintf(`postgresql://%s:%s@%s:%s/postgres2?requiressl=1`, postgresUser, postgresPass, postgresHost, postgresPort)),
 				verify: true,
 			},
