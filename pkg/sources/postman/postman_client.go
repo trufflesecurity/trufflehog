@@ -380,30 +380,23 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 	}
 	// Loop used to deal with seeing whether a request/response header is a string or a key value pair
 	for _, item := range obj.Collection.Items {
-		var requestHeaderKeyValue []KeyValue
-		var requestHeaderString []string
-		if err := json.Unmarshal(item.Request.HeaderRaw, &requestHeaderKeyValue); err == nil {
-			item.Request.HeaderKeyValue = requestHeaderKeyValue
-		} else if err := json.Unmarshal(item.Request.HeaderRaw, &requestHeaderString); err == nil {
-			item.Request.HeaderString = requestHeaderString
-		} else {
-			return Collection{}, fmt.Errorf("could not unmarshal request header JSON for collection (%s): %w", collection_uuid, err)
+		if item.Request.HeaderRaw != nil {
+			if err := json.Unmarshal(item.Request.HeaderRaw, &item.Request.HeaderKeyValue); err == nil {
+			} else if err := json.Unmarshal(item.Request.HeaderRaw, &item.Request.HeaderString); err == nil {
+			} else {
+				return Collection{}, fmt.Errorf("could not unmarshal request header JSON for collection (%s): %w", collection_uuid, err)
+			}
 		}
+
 		for _, response := range item.Response {
-			if err := json.Unmarshal(response.OriginalRequest.HeaderRaw, &requestHeaderKeyValue); err == nil {
-				response.OriginalRequest.HeaderKeyValue = requestHeaderKeyValue
-			} else if err := json.Unmarshal(response.OriginalRequest.HeaderRaw, &requestHeaderString); err == nil {
-				response.OriginalRequest.HeaderString = requestHeaderString
+			if err := json.Unmarshal(response.OriginalRequest.HeaderRaw, &response.OriginalRequest.HeaderKeyValue); err == nil {
+			} else if err := json.Unmarshal(response.OriginalRequest.HeaderRaw, &response.OriginalRequest.HeaderString); err == nil {
 			} else {
 				return Collection{}, fmt.Errorf("could not unmarshal original request header in response JSON for collection (%s): %w", collection_uuid, err)
 			}
 
-			var responseHeaderKeyValue []KeyValue
-			var responseHeaderString []string
-			if err := json.Unmarshal(response.HeaderRaw, &responseHeaderKeyValue); err == nil {
-				response.HeaderKeyValue = responseHeaderKeyValue
-			} else if err := json.Unmarshal(response.HeaderRaw, &responseHeaderString); err == nil {
-				response.HeaderString = responseHeaderString
+			if err := json.Unmarshal(response.HeaderRaw, &response.HeaderKeyValue); err == nil {
+			} else if err := json.Unmarshal(response.HeaderRaw, &response.HeaderString); err == nil {
 			} else {
 				return Collection{}, fmt.Errorf("could not unmarshal response header JSON for collection (%s): %w", collection_uuid, err)
 			}
