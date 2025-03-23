@@ -298,7 +298,7 @@ const (
 	DetectorType_Duda                          DetectorType = 219
 	DetectorType_Yext                          DetectorType = 220
 	DetectorType_ContentStack                  DetectorType = 221
-	DetectorType_Storyblok                     DetectorType = 222
+	DetectorType_StoryblokAccessToken          DetectorType = 222
 	DetectorType_GraphCMS                      DetectorType = 223
 	DetectorType_Checkmarket                   DetectorType = 224
 	DetectorType_Convertkit                    DetectorType = 225
@@ -1347,7 +1347,7 @@ var (
 		219:  "Duda",
 		220:  "Yext",
 		221:  "ContentStack",
-		222:  "Storyblok",
+		222:  "StoryblokAccessToken",
 		223:  "GraphCMS",
 		224:  "Checkmarket",
 		225:  "Convertkit",
@@ -2364,7 +2364,7 @@ var (
 		"Duda":                                  219,
 		"Yext":                                  220,
 		"ContentStack":                          221,
-		"Storyblok":                             222,
+		"StoryblokAccessToken":                  222,
 		"GraphCMS":                              223,
 		"Checkmarket":                           224,
 		"Convertkit":                            225,
