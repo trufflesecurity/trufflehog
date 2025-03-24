@@ -60,21 +60,31 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
 	PrintUserAndPermissions(info)
 }
 
-func AnalyzePermissions(cfg *config.Config, token string) (*SecretInfo, error) {
+func AnalyzePermissions(cfg *config.Config, token string) (*secretInfo, error) {
 	client := analyzers.NewAnalyzeClient(cfg)
 	allScopes := getAllScopes()
-	var info = &SecretInfo{Scopes: map[Scope]ScopeStatus{}}
+	scopeToEndpoints, err := getScopeEndpointsMap()
+	if err != nil {
+		return nil, err
+	}
+
+	var info = &secretInfo{Scopes: map[Scope]ScopeStatus{}}
 	for _, scope := range allScopes {
 		info.Scopes[scope] = StatusUnverified
 	}
 
 	for _, scope := range orderedScopeList {
-		resp, err := callEndpointByScope(client, token, scope)
+		endpoint, err := getScopeEndpoint(scopeToEndpoints, scope)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := callAPIEndpoint(client, token, endpoint)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
-		validationResult, err := validateTokenScopesFromResponse(resp, scope)
+
+		validationResult, err := validateTokenScopesFromResponse(resp, endpoint)
 		if err != nil {
 			return nil, err
 		}
@@ -105,27 +115,22 @@ func AnalyzePermissions(cfg *config.Config, token string) (*SecretInfo, error) {
 // the access token has the required scope to perform that action.
 // It returns a validation result object which contains the status of scope for the token, and an error
 // In case the status is StatusDenied, it also returns all the scopes which are StatusGranted
-func validateTokenScopesFromResponse(resp *http.Response, scope Scope) (ScopeValidationResult, error) {
-	endpoint, err := getScopeEndpoint(scope)
-	if err != nil {
-		return ScopeValidationResult{Status: StatusUnverified}, err
-	}
-
+func validateTokenScopesFromResponse(resp *http.Response, endpoint endpoint) (scopeValidationResult, error) {
 	respStatus := resp.StatusCode
 	if respStatus == http.StatusOK {
-		return ScopeValidationResult{Status: StatusGranted}, nil
+		return scopeValidationResult{Status: StatusGranted}, nil
 	}
 
 	// If the response was not a success, we will validate the error object
-	var errorResponse APIErrorResponse
+	var errorResponse apiErrorResponse
 	if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
-		return ScopeValidationResult{Status: StatusUnverified}, err
+		return scopeValidationResult{Status: StatusUnverified}, err
 	}
 
 	expectedResponse := endpoint.ExpectedResponseWithScope
 	if respStatus == expectedResponse.Status {
 		if errorResponse.Message == expectedResponse.Message {
-			return ScopeValidationResult{Status: StatusGranted}, nil
+			return scopeValidationResult{Status: StatusGranted}, nil
 		}
 	}
 
@@ -133,16 +138,16 @@ func validateTokenScopesFromResponse(resp *http.Response, scope Scope) (ScopeVal
 	scopeStrings, scopeIsDenied := validateErrorAndGetScopes(errorResponse, expectedError)
 	if scopeIsDenied {
 		scopes := getScopesFromScopeStrings(scopeStrings)
-		return ScopeValidationResult{Status: StatusDenied, Scopes: scopes}, nil
+		return scopeValidationResult{Status: StatusDenied, Scopes: scopes}, nil
 	}
 
 	// Can not determine scope as the expected error is unknown
-	return ScopeValidationResult{Status: StatusUnverified}, nil
+	return scopeValidationResult{Status: StatusUnverified}, nil
 }
 
 // Matches API response with expected API response in case token has missing scope
 // If the responses match, we can extract all available scopes from the response msg
-func validateErrorAndGetScopes(errorResp APIErrorResponse, expectedResp APIErrorResponse) ([]string, bool) {
+func validateErrorAndGetScopes(errorResp apiErrorResponse, expectedResp apiErrorResponse) ([]string, bool) {
 	if errorResp.Status != expectedResp.Status {
 		return nil, false
 	}
@@ -180,7 +185,7 @@ func cleanUpErrorResponseMessage(msg string) string {
 	return strings.ReplaceAll(result, "]", "")
 }
 
-func MapToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+func MapToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 	if info == nil {
 		return nil
 	}
@@ -209,7 +214,7 @@ func MapToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	return &result
 }
 
-func PrintUserAndPermissions(info *SecretInfo) {
+func PrintUserAndPermissions(info *secretInfo) {
 	color.Yellow("[i] User Info:")
 	t1 := table.NewWriter()
 	t1.SetOutputMirror(os.Stdout)

@@ -1,6 +1,10 @@
 package figma
 
-import "errors"
+import (
+	_ "embed"
+	"encoding/json"
+	"errors"
+)
 
 type Scope string
 
@@ -62,28 +66,12 @@ var scopeToActions = map[Scope][]string{
 	},
 }
 
-var scopeToEndpointName = map[Scope]EndpointName{
-	ScopeFilesRead:             GetUserInfo,
-	ScopeFileVariablesRead:     GetFileVariables,
-	ScopeFileCommentsWrite:     PostFileComment,
-	ScopeFileDevResourcesWrite: PostFileDevResources,
-	ScopeLibraryAnalyticsRead:  GetLibraryComponentAction,
-	ScopeWebhooksWrite:         PostWebhook,
-}
-
-var scopeToEndpoint map[Scope]Endpoint
 var scopeStringToScope map[string]Scope
 
-func init() {
-	scopeToEndpoint = make(map[Scope]Endpoint)
-	for scope, endpointName := range scopeToEndpointName {
-		endpoint, err := getEndpoint(endpointName)
-		if err != nil {
-			continue
-		}
-		scopeToEndpoint[scope] = endpoint
-	}
+//go:embed endpoints.json
+var endpointsConfig []byte
 
+func init() {
 	scopeStringToScope = map[string]Scope{
 		string(ScopeFilesRead):             ScopeFilesRead,
 		string(ScopeFileVariablesRead):     ScopeFileVariablesRead,
@@ -100,11 +88,19 @@ func getScopeActions(scope Scope) []string {
 	return scopeToActions[scope]
 }
 
-func getScopeEndpoint(scope Scope) (Endpoint, error) {
+func getScopeEndpointsMap() (map[Scope]endpoint, error) {
+	var scopeToEndpoints map[Scope]endpoint
+	if err := json.Unmarshal(endpointsConfig, &scopeToEndpoints); err != nil {
+		return nil, errors.New("failed to unmarshal endpoints.json: " + err.Error())
+	}
+	return scopeToEndpoints, nil
+}
+
+func getScopeEndpoint(scopeToEndpoint map[Scope]endpoint, scope Scope) (endpoint, error) {
 	if endpoint, ok := scopeToEndpoint[scope]; ok {
 		return endpoint, nil
 	}
-	return Endpoint{}, errors.New("invalid scope or endpoint doesn't exist")
+	return endpoint{}, errors.New("invalid scope or endpoint doesn't exist")
 }
 
 func getScopesFromScopeStrings(scopeStrings []string) []Scope {
