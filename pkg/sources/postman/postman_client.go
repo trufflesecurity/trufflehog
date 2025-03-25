@@ -378,6 +378,7 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		return Collection{}, fmt.Errorf("could not unmarshal JSON for collection (%s): %w", collection_uuid, err)
 	}
+
 	// Loop used to deal with seeing whether a request/response header is a string or a key value pair
 	for _, item := range obj.Collection.Items {
 		if item.Request.HeaderRaw != nil {

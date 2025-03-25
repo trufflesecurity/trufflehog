@@ -422,7 +422,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_SCRIPT
 	}
 
-	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, data)), metadata)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, data)), metadata)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
@@ -520,7 +520,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	} else if strings.Contains(m.Type, COLLECTION_TYPE) {
 		m.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_AUTHORIZATION
 	}
-	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, authData)), m)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, authData)), m)
 	m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
@@ -539,12 +539,20 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
+	if r.HeaderString != nil {
+		metadata.Type = originalType + " > header"
+		metadata.Link = metadata.Link + "?tab=headers"
+		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_HEADER
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, strings.Join(r.HeaderString, " "))), metadata)
+		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
+	}
+
 	if r.URL.Raw != "" {
 		metadata.Type = originalType + " > request URL (no query parameters)"
 		// Note: query parameters are handled separately
 		u := fmt.Sprintf("%s://%s/%s", r.URL.Protocol, strings.Join(r.URL.Host, "."), strings.Join(r.URL.Path, "/"))
 		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_URL
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(metadata, u)), metadata)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, u)), metadata)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -595,13 +603,13 @@ func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.C
 		m.Type = originalType + " > raw"
 		data := b.Raw
 		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_RAW
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	case "graphql":
 		m.Type = originalType + " > graphql"
 		data := b.GraphQL.Query + " " + b.GraphQL.Variables
 		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_GRAPHQL
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, data)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 }
@@ -623,11 +631,19 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
+	if response.HeaderString != nil {
+		m.Type = originalType + " > response header"
+		// TODO Note: for now, links to Postman responses do not include a more granular tab for the params/header/body, but when they do, we will need to update the metadata.Link info
+		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_HEADER
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, strings.Join(response.HeaderString, " "))), m)
+		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
+	}
+
 	// Body in a response is just a string
 	if response.Body != "" {
 		m.Type = originalType + " > response body"
 		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_BODY
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstitueSet(m, response.Body)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, response.Body)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -660,7 +676,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		if valStr == "" {
 			continue
 		}
-		values = append(values, s.buildSubstitueSet(m, valStr)...)
+		values = append(values, s.buildSubstituteSet(m, valStr)...)
 	}
 
 	m.FieldType = m.Type + " variables"
