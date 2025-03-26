@@ -112,6 +112,22 @@ type Result struct {
 	// analysis to run. The keys of the map are analyzer specific and
 	// should match what is expected in the corresponding analyzer.
 	AnalysisInfo map[string]string
+
+	secretsData []Secret
+}
+
+type Secret struct {
+	Value string
+	Kind  string
+	Line  int64
+}
+
+func (r *Result) AppendSecretData(secret Secret) {
+	r.secretsData = append(r.secretsData, secret)
+}
+
+func (r *Result) GetSecretData() []Secret {
+	return r.secretsData
 }
 
 // CopyVerificationInfo clones verification info (status and error) from another Result struct. This is used when

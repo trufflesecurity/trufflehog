@@ -186,6 +186,13 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		// TODO: Log we're possibly leaving out results.
 		return ctx.Err()
 	}
+
+	result := detectors.Result{
+		DetectorType: detectorspb.DetectorType_CustomRegex,
+		DetectorName: c.GetName(),
+		ExtraData:    map[string]string{},
+	}
+
 	var raw string
 	for _, values := range match {
 		// values[0] contains the entire regex match.
@@ -194,13 +201,16 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			secret = values[1]
 		}
 		raw += secret
+
+		secretData := detectors.Secret{
+			Value: secret,
+			Kind:  "",
+		}
+
+		result.AppendSecretData(secretData)
 	}
-	result := detectors.Result{
-		DetectorType: detectorspb.DetectorType_CustomRegex,
-		DetectorName: c.GetName(),
-		Raw:          []byte(raw),
-		ExtraData:    map[string]string{},
-	}
+
+	result.Raw = []byte(raw)
 
 	if !verify {
 		select {
