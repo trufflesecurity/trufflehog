@@ -113,21 +113,13 @@ type Result struct {
 	// should match what is expected in the corresponding analyzer.
 	AnalysisInfo map[string]string
 
-	secretsData []Secret
-}
-
-type Secret struct {
-	Value string
-	Kind  string
-	Line  int64
-}
-
-func (r *Result) AppendSecretData(secret Secret) {
-	r.secretsData = append(r.secretsData, secret)
-}
-
-func (r *Result) GetSecretData() []Secret {
-	return r.secretsData
+	// primarySecret is used when a detector has multiple secret patterns.
+	// This secret is designated to determine the line number.
+	// If set, the line number will correspond to this secret.
+	primarySecret struct {
+		Value string
+		Line  int64
+	}
 }
 
 // CopyVerificationInfo clones verification info (status and error) from another Result struct. This is used when
@@ -148,6 +140,26 @@ func (r *Result) SetVerificationError(err error, secrets ...string) {
 // Public accessors for the fields could also be provided if needed.
 func (r *Result) VerificationError() error {
 	return r.verificationError
+}
+
+// SetPrimarySecretValue set the value passed as primary secret in the result
+func (r *Result) SetPrimarySecretValue(value string) {
+	if value != "" {
+		r.primarySecret.Value = value
+	}
+}
+
+// SetPrimarySecretLine set the passed line number as primary secret line number
+func (r *Result) SetPrimarySecretLine(line int64) {
+	// line number is only set if value is set for primary secret
+	if r.primarySecret.Value != "" {
+		r.primarySecret.Line = line
+	}
+}
+
+// GetPrimarySecretValue return primary secret match value
+func (r *Result) GetPrimarySecretValue() string {
+	return r.primarySecret.Value
 }
 
 // redactSecrets replaces all instances of the given secrets with [REDACTED] in the error message.

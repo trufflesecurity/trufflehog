@@ -194,7 +194,7 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 	}
 
 	var raw string
-	for _, values := range match {
+	for key, values := range match {
 		// values[0] contains the entire regex match.
 		secret := values[0]
 		if len(values) > 1 {
@@ -202,12 +202,10 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		}
 		raw += secret
 
-		secretData := detectors.Secret{
-			Value: secret,
-			Kind:  "",
+		// if the match is of the primary regex, set it's value as primary secret value in result
+		if c.PrimaryRegexName == key {
+			result.SetPrimarySecretValue(secret)
 		}
-
-		result.AppendSecretData(secretData)
 	}
 
 	result.Raw = []byte(raw)
