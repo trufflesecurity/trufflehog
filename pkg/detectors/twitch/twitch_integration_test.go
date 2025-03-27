@@ -61,14 +61,6 @@ func TestTwitch_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Twitch,
 					Verified:     true,
 				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
 			},
 			wantErr: false,
 		},
@@ -81,14 +73,6 @@ func TestTwitch_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
 				{
 					DetectorType: detectorspb.DetectorType_Twitch,
 					Verified:     false,
@@ -118,14 +102,6 @@ func TestTwitch_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Twitch,
 					Verified:     false,
 				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
 			},
 			wantErr:             false,
 			wantVerificationErr: true,
@@ -139,14 +115,6 @@ func TestTwitch_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
 				{
 					DetectorType: detectorspb.DetectorType_Twitch,
 					Verified:     false,
