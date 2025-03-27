@@ -85,6 +85,9 @@ func AnalyzePermissions(cfg *config.Config, token string) (*secretInfo, error) {
 		}
 		defer resp.Body.Close()
 		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
 
 		scopeStatus := determineScopeStatus(resp.StatusCode, endpoint)
 		if scopeStatus == StatusGranted {
@@ -134,7 +137,7 @@ func determineScopeStatus(statusCode int, endpoint endpoint) ScopeStatus {
 // If the responses match, we can extract all available scopes from the response msg
 func extractScopesFromError(body []byte) ([]Scope, bool) {
 	filteredBody := filterErrorResponseBody(string(body))
-	re := regexp.MustCompile("Invalid scope(?:\\(s\\))?: ([a-zA-Z_:, ]+)\\. This endpoint requires.*")
+	re := regexp.MustCompile(`Invalid scope(?:\(s\))?: ([a-zA-Z_:, ]+)\. This endpoint requires.*`)
 	matches := re.FindStringSubmatch(filteredBody)
 	if len(matches) > 1 {
 		scopes := strings.Split(matches[1], ", ")

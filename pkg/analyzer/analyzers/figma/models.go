@@ -1,10 +1,5 @@
 package figma
 
-type scopeValidationResult struct {
-	Status ScopeStatus
-	Scopes []Scope
-}
-
 type userInfo struct {
 	ID     string `json:"id"`
 	Handle string `json:"handle"`
