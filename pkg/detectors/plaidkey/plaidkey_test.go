@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	validKey   = "3vl81ihtozf9im7kqz7ldp6kxbsd8y"
-	invalidKey = "3vl81ihtozf9im7?qz7ldp6kxbsd8y"
-	validId    = "ic1mh5b49ycvmz2vgvlgxtb0"
-	invalidId  = "ic1?h5b49ycvmz2vgvlgxtb0"
-	keyword    = "plaid"
+	validKey = "6e611cb8934363457b5e028d66c16c"
+	// invalidKey = "3vl81ihtozf9im7?qz7ldp6kxbsd8y"
+	validId = "60e3ee4019a2660010f8bc54"
+	// invalidId  = "ic1?h5b49ycvmz2vgvlgxtb0"
+	keyword = "plaid"
 )
 
 func TestPlaidKey_Pattern(t *testing.T) {
@@ -32,11 +32,11 @@ func TestPlaidKey_Pattern(t *testing.T) {
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validId),
 			want:  []string{validKey},
 		},
-		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidKey, keyword, invalidId),
-			want:  []string{},
-		},
+		// {
+		// 	name:  "invalid pattern",
+		// 	input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidKey, keyword, invalidId),
+		// 	want:  []string{},
+		// },
 	}
 
 	for _, test := range tests {

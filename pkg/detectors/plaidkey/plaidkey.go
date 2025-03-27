@@ -24,8 +24,9 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-z0-9]{30})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-z0-9]{24})\b`)
+	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-z0-9]{30})\b`)
+	idPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-z0-9]{24})\b`)
+	tokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b(access-(sandbox|production)-[a-f0-9\-]{36})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -39,7 +40,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	// find all the matching keys and ids in the data and make a unique maps for both.
-	uniqueKeys, uniqueIds := make(map[string]struct{}), make(map[string]struct{})
+	uniqueKeys, uniqueIds, uniqueTokens := make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
 
 	for _, foundKey := range keyPat.FindAllStringSubmatch(dataStr, -1) {
 		key := foundKey[1]
@@ -57,6 +58,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		uniqueIds[id] = struct{}{}
+	}
+
+	for _, foundToken := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
+		token := foundToken[1]
+		if detectors.StringShannonEntropy(token) < 3 {
+			continue
+		}
+
+		uniqueTokens[token] = struct{}{}
 	}
 
 	for key := range uniqueKeys {
