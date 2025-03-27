@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -83,26 +84,28 @@ func AnalyzePermissions(cfg *config.Config, token string) (*secretInfo, error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
 
-		validationResult, err := validateTokenScopesFromResponse(resp, endpoint)
-		if err != nil {
-			return nil, err
-		}
-		if validationResult.Status == StatusGranted {
+		scopeStatus := determineScopeStatus(resp.StatusCode, endpoint)
+		if scopeStatus == StatusGranted {
 			if scope == ScopeFilesRead {
-				if err := json.NewDecoder(resp.Body).Decode(&info.UserInfo); err != nil {
+				if err := json.Unmarshal(body, &info.UserInfo); err != nil {
 					return nil, fmt.Errorf("error decoding user info from response %v", err)
 				}
 			}
 			info.Scopes[scope] = StatusGranted
 		}
 		// If the token does NOT have the scope, response will include all the scopes it does have
-		if validationResult.Status == StatusDenied {
-			for s := range info.Scopes {
-				info.Scopes[s] = StatusDenied
+		if scopeStatus == StatusDenied {
+			scopes, ok := extractScopesFromError(body)
+			if !ok {
+				return nil, fmt.Errorf("could not extract scopes from error message")
 			}
-			for _, s := range validationResult.Scopes {
-				info.Scopes[s] = StatusGranted
+			for scope := range info.Scopes {
+				info.Scopes[scope] = StatusDenied
+			}
+			for _, scope := range scopes {
+				info.Scopes[scope] = StatusGranted
 			}
 			// We have enough info to finish analysis
 			break
@@ -111,74 +114,38 @@ func AnalyzePermissions(cfg *config.Config, token string) (*secretInfo, error) {
 	return info, nil
 }
 
-// validateTokenScopesFromResponse takes the API response and validates through it whether
-// the access token has the required scope to perform that action.
-// It returns a validation result object which contains the status of scope for the token, and an error
-// In case the status is StatusDenied, it also returns all the scopes which are StatusGranted
-func validateTokenScopesFromResponse(resp *http.Response, endpoint endpoint) (scopeValidationResult, error) {
-	respStatus := resp.StatusCode
-	if respStatus == http.StatusOK {
-		return scopeValidationResult{Status: StatusGranted}, nil
+// determineScopeStatus takes the API response status code and uses it along with the expected
+// status codes to dermine whether the access token has the required scope to perform that action.
+// It returns a ScopeStatus which can be Granted, Denied, or Unverified.
+func determineScopeStatus(statusCode int, endpoint endpoint) ScopeStatus {
+	if statusCode == endpoint.ExpectedStatusCodeWithScope || statusCode == http.StatusOK {
+		return StatusGranted
 	}
 
-	// If the response was not a success, we will validate the error object
-	var errorResponse apiErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&errorResponse); err != nil {
-		return scopeValidationResult{Status: StatusUnverified}, err
-	}
-
-	expectedResponse := endpoint.ExpectedResponseWithScope
-	if respStatus == expectedResponse.Status {
-		if errorResponse.Message == expectedResponse.Message {
-			return scopeValidationResult{Status: StatusGranted}, nil
-		}
-	}
-
-	expectedError := endpoint.ExpectedResponseWithoutScope
-	scopeStrings, scopeIsDenied := validateErrorAndGetScopes(errorResponse, expectedError)
-	if scopeIsDenied {
-		scopes := getScopesFromScopeStrings(scopeStrings)
-		return scopeValidationResult{Status: StatusDenied, Scopes: scopes}, nil
+	if statusCode == endpoint.ExpectedStatusCodeWithoutScope {
+		return StatusDenied
 	}
 
 	// Can not determine scope as the expected error is unknown
-	return scopeValidationResult{Status: StatusUnverified}, nil
+	return StatusUnverified
 }
 
-// Matches API response with expected API response in case token has missing scope
+// Matches API response body with expected message pattern in case the token is missing a scope
 // If the responses match, we can extract all available scopes from the response msg
-func validateErrorAndGetScopes(errorResp apiErrorResponse, expectedResp apiErrorResponse) ([]string, bool) {
-	if errorResp.Status != expectedResp.Status {
-		return nil, false
-	}
-
-	if errorResp.Err != "" {
-		return matchMessageWithExpectedMessage(errorResp.Err, expectedResp.Err)
-	}
-	if errorResp.Message != "" {
-		return matchMessageWithExpectedMessage(errorResp.Message, expectedResp.Message)
-	}
-
-	return nil, false
-}
-
-func matchMessageWithExpectedMessage(msg string, expectedMsg string) ([]string, bool) {
-	cleanedMsg := cleanUpErrorResponseMessage(msg)
-	re := regexp.MustCompile(expectedMsg)
-	matches := re.FindStringSubmatch(cleanedMsg)
-
-	// If we have a match, extract the scopes
+func extractScopesFromError(body []byte) ([]Scope, bool) {
+	filteredBody := filterErrorResponseBody(string(body))
+	re := regexp.MustCompile("Invalid scope(?:\\(s\\))?: ([a-zA-Z_:, ]+)\\. This endpoint requires.*")
+	matches := re.FindStringSubmatch(filteredBody)
 	if len(matches) > 1 {
-		scopes := strings.Split(matches[1], ", ") // Split by ", " to get individual scopes
-		return scopes, true
+		scopes := strings.Split(matches[1], ", ")
+		return getScopesFromScopeStrings(scopes), true
 	}
-
 	return nil, false
 }
 
-// The cleanUpErrorResponseMessage function cleans the provided "invalid permission" API
+// The filterErrorResponseBody function cleans the provided "invalid permission" API
 // response message by removing the characters '"', '[', ']', '\', and '"'.
-func cleanUpErrorResponseMessage(msg string) string {
+func filterErrorResponseBody(msg string) string {
 	result := strings.ReplaceAll(msg, "\\", "")
 	result = strings.ReplaceAll(result, "\"", "")
 	result = strings.ReplaceAll(result, "[", "")

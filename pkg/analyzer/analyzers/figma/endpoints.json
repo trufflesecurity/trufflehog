@@ -2,60 +2,31 @@
     "files:read": {
         "url": "https://api.figma.com/v1/me",
         "method": "GET",
-        "expected_response_with_scope": {
-            "status": 200
-        },
-        "expected_response_without_scope": {
-            "status": 403,
-            "message": "^Invalid scope(?:\\(s\\))?: ([a-zA-Z_:, ]+)\\. This endpoint requires the file_read or files:read or me scope\\.?"
-        }
+        "expected_status_code_with_scope": 200,
+        "expected_status_code_without_scope": 403
     },
     "library_analytics:read": {
         "url": "https://api.figma.com/v1/analytics/libraries/0/component/actions",
         "method": "GET",
-        "expected_response_with_scope": {
-            "status": 400,
-            "message": "Not found"
-        },
-        "expected_response_without_scope": {
-            "status": 403,
-            "message": "^Invalid scope(?:\\(s\\))?: ([a-zA-Z_:, ]+)\\. This endpoint requires the library_analytics:read scope\\.?"
-        }
+        "expected_status_code_with_scope": 400,
+        "expected_status_code_without_scope": 403
     },
     "file_dev_resources:write": {
         "url": "https://api.figma.com/v1/dev_resources",
         "method": "POST",
-        "expected_response_with_scope": {
-            "status": 400,
-            "message": "Missing required parameter dev_resources"
-        },
-        "expected_response_without_scope": {
-            "status": 403,
-            "message": "^Invalid scope(?:\\(s\\))?: ([a-zA-Z_:, ]+)\\. This endpoint requires the file_read or file_dev_resources:write scope\\.?"
-        }
+        "expected_status_code_with_scope": 400,
+        "expected_status_code_without_scope": 403
     },
     "file_variables:read": {
         "url": "https://api.figma.com/v1/files/0/variables/published",
         "method": "GET",
-        "expected_response_with_scope": {
-            "status": 404,
-            "message": "Not found"
-        },
-        "expected_response_without_scope": {
-            "status": 403,
-            "message": "^Invalid scope(?:\\(s\\))?: ([a-zA-Z_:, ]+)\\. This endpoint requires the file_read or file_variables:read scope\\.?"
-        }
+        "expected_status_code_with_scope": 404,
+        "expected_status_code_without_scope": 403
     },
     "webhooks:write": {
         "url": "https://api.figma.com/v2/webhooks",
         "method": "POST",
-        "expected_response_with_scope": {
-            "status": 400,
-            "message": "Missing required parameter team_id"
-        },
-        "expected_response_without_scope": {
-            "status": 403,
-            "message": "^Invalid scope(?:\\(s\\))?: ([a-zA-Z_:, ]+)\\. This endpoint requires the file_read or webhooks:write scope\\.?"
-        }
+        "expected_status_code_with_scope": 400,
+        "expected_status_code_without_scope": 403
     }
 }

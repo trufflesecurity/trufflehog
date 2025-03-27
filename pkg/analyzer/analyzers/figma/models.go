@@ -17,15 +17,9 @@ type secretInfo struct {
 	Scopes   map[Scope]ScopeStatus
 }
 
-type apiErrorResponse struct {
-	Status  int    `json:"status"`
-	Err     string `json:"err"`
-	Message string `json:"message"`
-}
-
 type endpoint struct {
-	URL                          string           `json:"url"`
-	Method                       string           `json:"method"`
-	ExpectedResponseWithScope    apiErrorResponse `json:"expected_response_with_scope"`
-	ExpectedResponseWithoutScope apiErrorResponse `json:"expected_response_without_scope"`
+	URL                            string `json:"url"`
+	Method                         string `json:"method"`
+	ExpectedStatusCodeWithScope    int    `json:"expected_status_code_with_scope"`
+	ExpectedStatusCodeWithoutScope int    `json:"expected_status_code_without_scope"`
 }
