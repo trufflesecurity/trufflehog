@@ -1,34 +1,31 @@
 //go:build detectors
 // +build detectors
 
-package ipquality
+package storyblokpersonalaccesstoken
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestIpquality_FromChunk(t *testing.T) {
+func TestStoryblokPersonalAccessToken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("IPQUALITY")
-	inactiveSecret := testSecrets.MustGetField("IPQUALITY_INACTIVE")
 
-	invalidResult := detectors.Result{DetectorType: detectorspb.DetectorType_IPQuality, Verified: false}
-	invalidResult.SetVerificationError(errors.New("couldn't verify; API Key has " + insufficientCreditMessage))
+	secret := testSecrets.MustGetField("STORYBLOK_PAT")
+	inactiveSecret := testSecrets.MustGetField("STORYBLOK_PAT_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -47,12 +44,12 @@ func TestIpquality_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a ipquality secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a storyblok secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_IPQuality,
+					DetectorType: detectorspb.DetectorType_StoryblokPersonalAccessToken,
 					Verified:     true,
 				},
 			},
@@ -63,11 +60,14 @@ func TestIpquality_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a ipquality secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a storyblok secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
-				invalidResult,
+				{
+					DetectorType: detectorspb.DetectorType_StoryblokPersonalAccessToken,
+					Verified:     false,
+				},
 			},
 			wantErr: false,
 		},
@@ -88,7 +88,7 @@ func TestIpquality_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Ipquality.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Storyblok.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -98,7 +98,7 @@ func TestIpquality_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Ipquality.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Storyblok.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

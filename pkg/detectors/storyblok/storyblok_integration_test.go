@@ -48,7 +48,7 @@ func TestStoryblok_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Storyblok,
+					DetectorType: detectorspb.DetectorType_StoryblokAccessToken,
 					Verified:     true,
 				},
 			},
@@ -64,7 +64,7 @@ func TestStoryblok_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Storyblok,
+					DetectorType: detectorspb.DetectorType_StoryblokAccessToken,
 					Verified:     false,
 				},
 			},

@@ -1,4 +1,4 @@
-package twitch
+package storyblokpersonalaccesstoken
 
 import (
 	"context"
@@ -12,14 +12,12 @@ import (
 )
 
 var (
-	validKey   = "k0lj2mwl8n3ztmrivlpbc7obk914sj"
-	invalidKey = "k0lj2mwl8n3ztmr?vlpbc7obk914sj"
-	validId    = "kn64qw9jt39bhni04h2k5jc7ebefyn"
-	invalidId  = "kn64qw9jt39bhni?4h2k5jc7ebefyn"
-	keyword    = "twitch"
+	validPattern   = "5r7EgNfakeXi6ZoEls1twAtt-001100-Q5E2fKfakeRqsUjwmsJn"
+	invalidPattern = "5r7EgNfakeXi6ZoEls1twAt-001100-Q5E2fKfakeRqsUjwmsJn"
+	keyword        = "storyblok"
 )
 
-func TestTwitch_Pattern(t *testing.T) {
+func TestStoryblokPersonalAccessToken_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -28,13 +26,23 @@ func TestTwitch_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword twitch",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validId),
-			want:  []string{validKey, validId},
+			name:  "valid pattern - with keyword storyblok",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			want:  []string{validPattern},
+		},
+		{
+			name:  "valid pattern - ignore duplicate",
+			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
+			want:  []string{validPattern},
+		},
+		{
+			name:  "valid pattern - key out of prefix range",
+			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
+			want:  []string{},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidKey, keyword, invalidId),
+			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
 			want:  []string{},
 		},
 	}

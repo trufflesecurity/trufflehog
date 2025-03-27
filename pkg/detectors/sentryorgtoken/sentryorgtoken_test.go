@@ -1,4 +1,4 @@
-package twitch
+package sentryorgtoken
 
 import (
 	"context"
@@ -12,14 +12,15 @@ import (
 )
 
 var (
-	validKey   = "k0lj2mwl8n3ztmrivlpbc7obk914sj"
-	invalidKey = "k0lj2mwl8n3ztmr?vlpbc7obk914sj"
-	validId    = "kn64qw9jt39bhni04h2k5jc7ebefyn"
-	invalidId  = "kn64qw9jt39bhni?4h2k5jc7ebefyn"
-	keyword    = "twitch"
+	validPattern = `
+	sentry_token := sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sentry_token))
+	`
+	invalidPattern = "sntrys_eyJFAKE-OjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
+	token          = "sntrys_eyJFAKEiOjE3NDIzNjM1NTIuNTAzMzA5LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbfakem9yZyI6InRydWZmbGUtc2VjdXJpdHktamQifQ==_+zqSnKjs87cicc3FAK08vmZs5cWx9C5EARKHFtW5lqI"
 )
 
-func TestTwitch_Pattern(t *testing.T) {
+func TestSentryToken_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -28,13 +29,18 @@ func TestTwitch_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword twitch",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validId),
-			want:  []string{validKey, validId},
+			name:  "valid pattern - with keyword sentry org token",
+			input: validPattern,
+			want:  []string{token},
+		},
+		{
+			name:  "valid pattern - ignore duplicate",
+			input: fmt.Sprintf("token = '%s' | '%s'", validPattern, validPattern),
+			want:  []string{token},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidKey, keyword, invalidId),
+			input: invalidPattern,
 			want:  []string{},
 		},
 	}
