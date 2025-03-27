@@ -10,17 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-	AZURE_API_MANAGEMENT_GATEWAY_URL=https://trufflesecuritytest.azure-api.net
-	AZURE_API_MANAGEMENT_SUBSCRIPTION_KEY=2c69j0dc327c4929b74d3a832a04266b
-	`
-	invalidPattern = `
-	AZURE_API_MANAGEMENT_GATEWAY_URL=https://trufflesecuritytest.azure-api.net
-	AZURE_API_MANAGEMENT_SUBSCRIPTION_KEY=2c69j2dc3f7c4929b74d3a832a042
-	`
-)
-
 func TestAzureAPIManagementSubscriptionKey_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -31,14 +20,20 @@ func TestAzureAPIManagementSubscriptionKey_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{"https://trufflesecuritytest.azure-api.net:2c69j0dc327c4929b74d3a832a04266b"},
+			name: "valid pattern",
+			input: `
+				AZURE_API_MANAGEMENT_GATEWAY_URL=https://trufflesecuritytest.azure-api.net
+				AZURE_API_MANAGEMENT_SUBSCRIPTION_KEY=2c69j0dc327c4929b74d3a832a04266b
+			`,
+			want: []string{"https://trufflesecuritytest.azure-api.net:2c69j0dc327c4929b74d3a832a04266b"},
 		},
 		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "invalid pattern",
+			input: `
+				AZURE_API_MANAGEMENT_GATEWAY_URL=https://trufflesecuritytest.azure-api.net
+				AZURE_API_MANAGEMENT_SUBSCRIPTION_KEY=2c69j2dc3f7c4929b74d3a832a042
+			`,
+			want: nil,
 		},
 	}
 
