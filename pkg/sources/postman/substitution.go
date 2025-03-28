@@ -47,7 +47,7 @@ func (s *Source) formatAndInjectKeywords(data []string) string {
 	return strings.Join(ret, "")
 }
 
-func (s *Source) buildSubstitueSet(metadata Metadata, data string) []string {
+func (s *Source) buildSubstituteSet(metadata Metadata, data string) []string {
 	var ret []string
 	combos := make(map[string]struct{})
 
