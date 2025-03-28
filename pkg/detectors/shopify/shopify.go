@@ -53,6 +53,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(key + domainRes),
 			}
 
+			// set the key match as primary secret as raw is combination of both key and domain
+			s1.SetPrimarySecretValue(match)
+
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/admin/oauth/access_scopes.json", nil)
 				if err != nil {
