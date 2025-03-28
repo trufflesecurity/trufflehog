@@ -1,0 +1,9 @@
+permissions:
+  - files:read
+  - file_variables:read
+  - file_variables:write
+  - file_comments:write
+  - file_dev_resources:read
+  - file_dev_resources:write
+  - library_analytics:read
+  - webhooks:write
