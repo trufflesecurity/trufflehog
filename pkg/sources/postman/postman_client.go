@@ -271,6 +271,9 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 		Workspaces []Workspace `json:"workspaces"`
 	}{}
 
+	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("could not wait for rate limiter during workspaces enumeration getting: %w", err)
+	}
 	r, err := c.getPostmanReq("https://api.getpostman.com/workspaces", nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not get workspaces during enumeration: %w", err)
