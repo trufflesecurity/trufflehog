@@ -72,6 +72,7 @@ import (
 	azure_entra_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_storage"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azureapimanagementsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresastoken"
@@ -899,6 +900,7 @@ func buildDetectorList() []detectors.Detector {
 		&axonaut.Scanner{},
 		&aylien.Scanner{},
 		&ayrshare.Scanner{},
+		&azureapimanagementsubscriptionkey.Scanner{},
 		&azure_entra_refreshtoken.Scanner{},
 		&azure_entra_serviceprincipal_v1.Scanner{},
 		&azure_entra_serviceprincipal_v2.Scanner{},
