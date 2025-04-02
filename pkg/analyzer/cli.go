@@ -117,6 +117,6 @@ func Run(keyType string, secretInfo SecretInfo) {
 	case "launchdarkly":
 		launchdarkly.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "plaid":
-		plaid.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["secret"], secretInfo.Parts["clientID"], secretInfo.Parts["accessToken"])
+		plaid.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["secret"], secretInfo.Parts["id"], secretInfo.Parts["token"])
 	}
 }

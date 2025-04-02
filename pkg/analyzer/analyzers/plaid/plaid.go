@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -27,54 +28,18 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 	return analyzers.AnalyzerTypePlaid
 }
 
-var permissionToProduct = map[Permission]string{
-	Assets:                "Assets",
-	Auth:                  "Auth",
-	Balance:               "Balance",
-	BalancePlus:           "Balance Plus",
-	Beacon:                "Beacon",
-	CraBaseReport:         "CRA Base Report",
-	CraIncomeInsights:     "CRA Income Insights",
-	CraPartnerInsights:    "CRA Partner Insights",
-	CraNetworkInsights:    "CRA Network Insights",
-	CraCashflowInsights:   "CRA Cashflow Insights",
-	CreditDetails:         "Credit Details",
-	Employment:            "Employment",
-	Identity:              "Identity",
-	IdentityMatch:         "Identity Match",
-	IdentityVerification:  "Identity Verification",
-	Income:                "Income",
-	IncomeVerification:    "Income Verification",
-	Investments:           "Investments",
-	InvestmentsAuth:       "Investments Auth",
-	Layer:                 "Layer",
-	Liabilities:           "Liabilities",
-	PayByBank:             "Pay By Bank",
-	PaymentInitiation:     "Payment Initiation",
-	ProcessorPayments:     "Processor Payments",
-	ProcessorIdentity:     "Processor Identity",
-	Profile:               "Profile",
-	RecurringTransactions: "Recurring Transactions",
-	Signal:                "Signal",
-	StandingOrders:        "Standing Orders",
-	Statements:            "Statements",
-	Transactions:          "Transactions",
-	TransactionsRefresh:   "Transactions Refresh",
-	Transfer:              "Transfer",
-}
-
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	secret, exist := credInfo["secret"]
 	if !exist {
 		return nil, errors.New("secret not found in credentials info")
 	}
-	clientID, exist := credInfo["clientID"]
+	clientID, exist := credInfo["id"]
 	if !exist {
-		return nil, errors.New("clientID not found in credentials info")
+		return nil, errors.New("id not found in credentials info")
 	}
-	accessToken, exist := credInfo["accessToken"]
+	accessToken, exist := credInfo["token"]
 	if !exist {
-		return nil, errors.New("key not found in credentials info")
+		return nil, errors.New("token not found in credentials info")
 	}
 
 	info, err := AnalyzePermissions(a.Cfg, secret, clientID, accessToken)
@@ -88,8 +53,7 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 func AnalyzeAndPrintPermissions(cfg *config.Config, secret string, clientID string, accessToken string) {
 	info, err := AnalyzePermissions(cfg, secret, clientID, accessToken)
 	if err != nil {
-		// just print the error in cli and continue as a partial success
-		color.Red("[x] Invalid Anthropic API key\n")
+		color.Red("[x] Invalid Plaid API key\n")
 		color.Red("[x] Error : %s", err.Error())
 		return
 	}
@@ -100,19 +64,29 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, secret string, clientID stri
 	}
 
 	color.Green("[i] Valid Plaid API Credentials\n")
-
-	// if len(info.plaidResources) > 0 {
-	// 	printplaidResources(info.plaidResources)
-	// }
-
-	color.Yellow("\n[!] Expires: Never")
+	color.Yellow("[i] Environment: %s", info.Environment)
+	if info.Environment == "sandbox" {
+		color.Cyan("Credentials are for Sandbox environment. All resources found are simulated and not real data.\n")
+	}
+	printAccountsAndProducts(info)
 }
 
-func AnalyzePermissions(cfg *config.Config, clientId string, secret string, accessToken string) (*secretInfo, error) {
-	// create a HTTP client
+func AnalyzePermissions(cfg *config.Config, secret string, clientId string, accessToken string) (*secretInfo, error) {
+	environment := ""
+	if strings.Contains(accessToken, "production") {
+		environment = "production"
+	}
+	if strings.Contains(accessToken, "sandbox") {
+		environment = "sandbox"
+	}
+	if environment == "" {
+		return nil, errors.New("Environment could not be parsed from access token")
+	}
+
 	client := analyzers.NewAnalyzeClient(cfg)
 	var secretInfo = &secretInfo{}
-	resp, err := getPlaidAccounts(client, clientId, secret, accessToken)
+	secretInfo.Environment = environment
+	resp, err := getPlaidAccounts(client, clientId, secret, accessToken, environment)
 	if err != nil {
 		return nil, err
 	}
@@ -121,14 +95,15 @@ func AnalyzePermissions(cfg *config.Config, clientId string, secret string, acce
 	return secretInfo, nil
 }
 
-func getPlaidAccounts(client *http.Client, clientID string, secret string, accessToken string) (*accountsResponse, error) {
+func getPlaidAccounts(client *http.Client, clientID string, secret string, accessToken string, environment string) (*accountsResponse, error) {
 	body := map[string]interface{}{
 		"client_id":    clientID,
 		"secret":       secret,
 		"access_token": accessToken,
 	}
+	url := "https://" + environment + ".plaid.com/accounts/get"
 	jsonBody, _ := json.Marshal(body)
-	req, err := http.NewRequest(http.MethodPost, "https://sandbox.plaid.com/accounts/get", bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +160,6 @@ func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 		}
 	}
 
-	result.Bindings = analyzers.BindAllPermissions(userResource, permissions...)
 	return &result
 }
 
@@ -202,24 +176,34 @@ func printAccountsAndProducts(info *secretInfo) {
 			color.GreenString(account.Type),
 			color.GreenString(account.Subtype),
 		})
+		t1.AppendSeparator()
 	}
 	t1.SetOutputMirror(os.Stdout)
 	t1.Render()
 
 	color.Yellow("\n[i] Products:")
 	t2 := table.NewWriter()
-	t2.AppendHeader(table.Row{"Product Name", "Status"})
+	t2.AppendHeader(table.Row{"Product Name", "Status", "Capabilities"})
+
 	// Products are mapped as permissions
 	for perm, str := range PermissionStrings {
-		productCell := color.GreenString(permissionToProduct[perm])
+		product, ok := permissionToProduct[perm]
+		if !ok {
+			continue
+		}
+
+		productCell := color.GreenString(product.Name)
+		productDescCell := color.GreenString(product.Description)
 		status := "Denied"
+
 		for _, product := range info.Products {
 			if product == str {
 				status = "Granted"
 			}
 		}
 
-		t2.AppendRow(table.Row{productCell, color.GreenString(status)})
+		t2.AppendRow(table.Row{productCell, color.GreenString(status), productDescCell})
+		t2.AppendSeparator()
 	}
 
 	t2.SetOutputMirror(os.Stdout)

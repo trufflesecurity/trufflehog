@@ -49,9 +49,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{Cfg: &config.Config{}}
 			got, err := a.Analyze(ctx, map[string]string{
-				"secret":      tt.secret,
-				"clientID":    tt.clientID,
-				"accessToken": tt.accessToken,
+				"secret": tt.secret,
+				"id":     tt.clientID,
+				"token":  tt.accessToken,
 			})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)

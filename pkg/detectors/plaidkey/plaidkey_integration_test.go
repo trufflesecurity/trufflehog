@@ -9,10 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -23,11 +24,10 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	// secret := testSecrets.MustGetField("PLAIDKEY_SECRET")
-	// inactiveSecret := testSecrets.MustGetField("PLAIDKEY_SECRET_INACTIVE")
-	// id := testSecrets.MustGetField("PLAIDKEY_CLIENTID")
-	secret := "6e611cb8934363457b5e028d66c16c"
-	id := "60e3ee4019a2660010f8bc54"
+	secret := testSecrets.MustGetField("PLAIDKEY_SECRET")
+	inactiveSecret := testSecrets.MustGetField("PLAIDKEY_SECRET_INACTIVE")
+	id := testSecrets.MustGetField("PLAIDKEY_CLIENTID")
+	token := testSecrets.MustGetField("PLAIDKEY_ACCESS_TOKEN")
 	env := "sandbox"
 
 	type args struct {
@@ -47,13 +47,19 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a plaidkey secret %s within plaidkey %s", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a plaid secret %s within plaid %s and plaid token %s", secret, id, token)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_PlaidKey,
 					Verified:     true,
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", secret, id, token)),
+					AnalysisInfo: map[string]string{
+						"secret": secret,
+						"id":     id,
+						"token":  token,
+					},
 					ExtraData: map[string]string{
 						"environment": fmt.Sprintf("https://%s.plaid.com", env),
 					},
@@ -61,33 +67,37 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		// {
-		// 	name: "found, unverified",
-		// 	s:    Scanner{},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte(fmt.Sprintf("You can find a plaidkey secret %s within but plaidkey %s not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
-		// 		verify: true,
-		// 	},
-		// 	want: []detectors.Result{
-		// 		{
-		// 			DetectorType: detectorspb.DetectorType_PlaidKey,
-		// 			Verified:     false,
-		// 		},
-		// 	},
-		// 	wantErr: false,
-		// },
-		// {
-		// 	name: "not found",
-		// 	s:    Scanner{},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte("You cannot find the secret within"),
-		// 		verify: true,
-		// 	},
-		// 	want:    nil,
-		// 	wantErr: false,
-		// },
+		{
+			name: "found, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a plaid secret %s within plaid %s and plaid token %s", inactiveSecret, id, token)), // the secret would satisfy the regex but not pass validation
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_PlaidKey,
+					Verified:     false,
+					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", inactiveSecret, id, token)),
+					ExtraData: map[string]string{
+						"environment": fmt.Sprintf("https://%s.plaid.com", env),
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "not found",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("You cannot find the secret within"),
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -101,9 +111,12 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no raw v2 secret present: \n %+v", got[i])
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("PlaidKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
