@@ -3,7 +3,6 @@ package jiratoken
 import (
 	"context"
 	b64 "encoding/base64"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -33,8 +32,6 @@ var (
 	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b((?:[a-zA-Z0-9-]{1,24}\.)+[a-zA-Z0-9-]{2,24}\.[a-zA-Z0-9-]{2,16})\b`)
 	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + common.EmailPattern)
-
-	noSuchHostErr = errors.New("no such host")
 )
 
 const (
@@ -82,9 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if verify {
 					client := s.getClient()
 					isVerified, verificationErr := verifyJiratoken(ctx, client, email, domain, token)
-					if errors.Is(verificationErr, noSuchHostErr) {
-						continue
-					}
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, token)
 				}
@@ -115,9 +109,6 @@ func verifyJiratoken(ctx context.Context, client *http.Client, email, domain, to
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 	res, err := client.Do(req)
 	if err != nil {
-		if strings.Contains(err.Error(), "no such host") {
-			return false, noSuchHostErr
-		}
 		return false, err
 	}
 	defer res.Body.Close()
