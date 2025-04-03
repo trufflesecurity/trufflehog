@@ -90,8 +90,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 								"id":     id,
 								"token":  token,
 							}
+							break
 						}
-						break
 					}
 				}
 				results = append(results, s1)
