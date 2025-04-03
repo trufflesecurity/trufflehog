@@ -257,7 +257,7 @@ func (c *Client) getPostmanReq(ctx context.Context, url string, headers map[stri
 		return nil, err
 	}
 
-	ctx.Logger().V(4).Info("Postman API reponse headers are available", "response_header", resp.Header)
+	ctx.Logger().V(4).Info("postman api response headers are available", "response_header", resp.Header)
 
 	if err := checkResponseStatus(resp); err != nil {
 		return nil, err
