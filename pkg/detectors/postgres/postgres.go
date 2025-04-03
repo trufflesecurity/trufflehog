@@ -129,7 +129,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 			// parameters themselves.
 			if timeout, ok := getDeadlineInSeconds(ctx); ok && timeout > 0 {
 				params[pgConnectTimeout] = strconv.Itoa(timeout)
-			} else if timeout <= 0 {
+			} else if ok && timeout <= 0 {
 				// Deadline in the context has already exceeded.
 				break
 			}
@@ -222,6 +222,15 @@ func verifyPostgres(params map[string]string) (bool, error) {
 			params[pgSslmode] = sslmode
 		}()
 	}
+
+	// db_type is not a valid configuration parameter, so we remove it before connecting.
+	dbType := params[pgDbType]
+	delete(params, pgDbType)
+
+	// we re-add it before returning to preserve in ExtraData
+	defer func() {
+		params[pgDbType] = dbType
+	}()
 
 	var connStr string
 	for key, value := range params {

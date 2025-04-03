@@ -89,7 +89,7 @@ func TestSource_BuildSubstituteSet(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := s.buildSubstitueSet(metadata, tc.data)
+		result := s.buildSubstituteSet(metadata, tc.data)
 		if !reflect.DeepEqual(result, tc.expected) {
 			t.Errorf("Expected substitution set: %v, got: %v", tc.expected, result)
 		}

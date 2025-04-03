@@ -12,11 +12,15 @@ import (
 )
 
 var (
-    validKey   = "YJsq0ige-a9khwVJOSwlzBvX0wp4j8t90s2d"
-    invalidKey = "YJsq0ige-a9kh?VJOSwlzBvX0wp4j8t90s2d"
-    validSec   = "4sSPeeM_jk0VZiTFZJqEwzvXHjcCd6fsq0cvn-4pvyBIQ1OvY6dOv4X2AK5r6UJaFf0Xkp5NjV6lGhtbM"
-    invalidSec = "4sSPeeM_jk0VZiTFZJqEwz?XHjcCd6fsq0cvn-4pvyBIQ1OvY6dOv4X2AK5r6UJaFf0Xkp5NjV6lGhtbM"
-    keyword    = "squareapp"
+	validKey   = "sq0ige-a9khwVJOSwlzBvX0wp4j8t90s2d"
+	invalidKey = "YJsq0ige-a9kh?VJOSwlzBvX0wp4j8t90s2d"
+	validSec   = "4sSPeeM_jk0VZiTFZJqEwzvXHjcCd6fsq0cvn-4pvyBIQ1OvY6dOv4X2AK5r6UJaFf0Xkp5NjV6lGhtbM"
+	invalidSec = "4sSPeeM_jk0VZiTFZJqEwz?XHjcCd6fsq0cvn-4pvyBIQ1OvY6dOv4X2AK5r6UJaFf0Xkp5NjV6lGhtbM"
+
+	// sandbox
+	validSandboxKey    = "sandbox-sq0idb-hFAKEQrhLGgFAKELZEDgpo"
+	validSandboxSecret = "sandbox-sq0csb-o6cs8xFAKExEgIDGbzn2hFAKEZPbzhe713Q-FAKEfbY"
+	keyword            = "squareapp"
 )
 
 func TestSquareApp_Pattern(t *testing.T) {
@@ -31,6 +35,11 @@ func TestSquareApp_Pattern(t *testing.T) {
 			name:  "valid pattern - with keyword squareapp",
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validSec),
 			want:  []string{validKey},
+		},
+		{
+			name:  "valid sandbox pattern - with keyword squareapp",
+			input: fmt.Sprintf("token - '%s'\n secret - '%s'\n", validSandboxKey, validSandboxSecret),
+			want:  []string{validSandboxKey},
 		},
 		{
 			name:  "invalid pattern",
