@@ -12,8 +12,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
-const thinkstMessage = "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries"
-const thinkstKnockoffsMessage = "This is an off brand AWS Canary inspired by canarytokens.org. It wasn't set off; learn more here: https://trufflesecurity.com/canaries"
+const thinkstMessage = "This is an AWS canary token generated at canarytokens.org."
+const thinkstKnockoffsMessage = "This is an off brand AWS Canary inspired by canarytokens.org."
 
 var (
 	thinkstCanaryList = map[string]struct{}{

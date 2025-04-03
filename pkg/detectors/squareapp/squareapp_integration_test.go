@@ -19,13 +19,15 @@ import (
 func TestSquareApp_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
+
+	id := testSecrets.MustGetField("SQUAREAPP_ID")
 	secret := testSecrets.MustGetField("SQUAREAPP_SECRET")
 	secretInactive := testSecrets.MustGetField("SQUAREAPP_INACTIVE")
-	id := testSecrets.MustGetField("SQUAREAPP_ID")
+
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -48,28 +50,23 @@ func TestSquareApp_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Square,
+					DetectorType: detectorspb.DetectorType_SquareApp,
 					Verified:     true,
 					Redacted:     id,
+					ExtraData:    map[string]string{"Env": "Sandbox"},
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "found, unverified",
+			name: "found, unverified - detected but not added in result due to mismatch of env",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a squareapp secret %s within awsId %s", secretInactive, id)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Square,
-					Verified:     false,
-					Redacted:     id,
-				},
-			},
+			want:    []detectors.Result{},
 			wantErr: false,
 		},
 		{

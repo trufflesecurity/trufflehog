@@ -2,7 +2,7 @@ module github.com/trufflesecurity/trufflehog/v3
 
 go 1.23.1
 
-toolchain go1.24.0
+toolchain go1.24.2
 
 replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2.8
 
@@ -29,6 +29,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.59
 	github.com/aws/aws-sdk-go-v2/service/sns v1.33.19
+	github.com/aws/aws-sdk-go-v2/service/sts v1.33.14
 	github.com/aymanbagabas/go-osc52 v1.2.1
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
@@ -57,7 +58,7 @@ require (
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gobwas/glob v0.2.3
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.20.3
 	github.com/google/go-github/v67 v67.0.0
@@ -107,11 +108,12 @@ require (
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.32.0
-	golang.org/x/net v0.34.0
+	golang.org/x/crypto v0.35.0
+	golang.org/x/net v0.36.0
 	golang.org/x/oauth2 v0.25.0
 	golang.org/x/sync v0.11.0
 	golang.org/x/text v0.22.0
+	golang.org/x/time v0.8.0
 	google.golang.org/api v0.214.0
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/h2non/gock.v1 v1.1.2
@@ -160,7 +162,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.13 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.24.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.14 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.33.14 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
@@ -324,7 +325,6 @@ require (
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
-	golang.org/x/time v0.8.0 // indirect
 	golang.org/x/tools v0.29.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/genproto v0.0.0-20241118233622-e639e219e697 // indirect

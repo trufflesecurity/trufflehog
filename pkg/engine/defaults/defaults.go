@@ -75,6 +75,7 @@ import (
 	azurerepositorykey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azureapimanagement/repositorykey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresastoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
@@ -630,6 +631,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendbirdorganizationapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendgrid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendinbluev2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentryorgtoken"
 	sentrytokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentrytoken/v1"
 	sentrytokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentrytoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/serphouse"
@@ -687,6 +689,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stormboard"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stormglass"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storyblok"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storyblokpersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/storychief"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/strava"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/streak"
@@ -905,6 +908,7 @@ func buildDetectorList() []detectors.Detector {
 		&azuredevopspersonalaccesstoken.Scanner{},
 		// &azurefunctionkey.Scanner{}, // detector is throwing some FPs
 		&azure_openai.Scanner{},
+		&azuresastoken.Scanner{},
 		&azuresearchadminkey.Scanner{},
 		&azuresearchquerykey.Scanner{},
 		&azure_storage.Scanner{},
@@ -1481,6 +1485,7 @@ func buildDetectorList() []detectors.Detector {
 		&sendinbluev2.Scanner{},
 		&sentrytokenv1.Scanner{},
 		&sentrytokenv2.Scanner{},
+		&sentryorgtoken.Scanner{},
 		&serphouse.Scanner{},
 		&serpstack.Scanner{},
 		&sheety.Scanner{},
@@ -1538,6 +1543,7 @@ func buildDetectorList() []detectors.Detector {
 		&stormboard.Scanner{},
 		&stormglass.Scanner{},
 		&storyblok.Scanner{},
+		&storyblokpersonalaccesstoken.Scanner{},
 		&storychief.Scanner{},
 		&strava.Scanner{},
 		&streak.Scanner{},

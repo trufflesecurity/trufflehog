@@ -658,6 +658,8 @@ func (m *Bitbucket) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
+	// no validation rules for InstallationType
+
 	switch v := m.Credential.(type) {
 	case *Bitbucket_Token:
 		if v == nil {
@@ -5115,6 +5117,8 @@ func (m *Teams) validate(all bool) error {
 		}
 		errors = append(errors, err)
 	}
+
+	// no validation rules for TenantId
 
 	switch v := m.Credential.(type) {
 	case *Teams_Token:
