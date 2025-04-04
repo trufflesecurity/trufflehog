@@ -246,7 +246,7 @@ func checkResponseStatus(r *http.Response) error {
 	return fmt.Errorf("postman Request failed with status code: %d", r.StatusCode)
 }
 
-func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Response, error) {
+func (c *Client) getPostmanReq(ctx context.Context, url string, headers map[string]string) (*http.Response, error) {
 	req, err := c.NewRequest(url, headers)
 	if err != nil {
 		return nil, err
@@ -256,6 +256,8 @@ func (c *Client) getPostmanReq(url string, headers map[string]string) (*http.Res
 	if err != nil {
 		return nil, err
 	}
+
+	ctx.Logger().V(4).Info("postman api response headers are available", "response_header", resp.Header)
 
 	if err := checkResponseStatus(resp); err != nil {
 		return nil, err
@@ -274,7 +276,7 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("could not wait for rate limiter during workspaces enumeration getting: %w", err)
 	}
-	r, err := c.getPostmanReq("https://api.getpostman.com/workspaces", nil)
+	r, err := c.getPostmanReq(ctx, "https://api.getpostman.com/workspaces", nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not get workspaces during enumeration: %w", err)
 	}
@@ -313,7 +315,7 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
 		return Workspace{}, fmt.Errorf("could not wait for rate limiter during workspace getting: %w", err)
 	}
-	r, err := c.getPostmanReq(url, nil)
+	r, err := c.getPostmanReq(ctx, url, nil)
 	if err != nil {
 		return Workspace{}, fmt.Errorf("could not get workspace (%s): %w", workspaceUUID, err)
 	}
@@ -341,7 +343,7 @@ func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid s
 	if err := c.GeneralRateLimiter.Wait(ctx); err != nil {
 		return VariableData{}, fmt.Errorf("could not wait for rate limiter during environment variable getting: %w", err)
 	}
-	r, err := c.getPostmanReq(url, nil)
+	r, err := c.getPostmanReq(ctx, url, nil)
 	if err != nil {
 		return VariableData{}, fmt.Errorf("could not get env variables for environment (%s): %w", environment_uuid, err)
 	}
@@ -368,7 +370,7 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
 		return Collection{}, fmt.Errorf("could not wait for rate limiter during collection getting: %w", err)
 	}
-	r, err := c.getPostmanReq(url, nil)
+	r, err := c.getPostmanReq(ctx, url, nil)
 	if err != nil {
 		return Collection{}, fmt.Errorf("could not get collection (%s): %w", collection_uuid, err)
 	}
