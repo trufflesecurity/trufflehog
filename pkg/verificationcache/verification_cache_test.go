@@ -23,7 +23,7 @@ func (t *testDetector) FromData(_ context.Context, verify bool, _ []byte) ([]det
 	t.fromDataCallCount = t.fromDataCallCount + 1
 	var results []detectors.Result
 	for _, r := range t.results {
-		copy := detectors.Result{Redacted: r.Redacted, Raw: r.Raw, RawV2: r.RawV2}
+		copy := detectors.Result{Redacted: r.Redacted, Raw: r.Raw, RawV2: r.RawV2, DetectorType: r.DetectorType}
 		if verify {
 			copy.CopyVerificationInfo(&r)
 		}
