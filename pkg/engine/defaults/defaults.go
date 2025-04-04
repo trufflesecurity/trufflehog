@@ -73,6 +73,7 @@ import (
 	azure_entra_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_storage"
+	azurerepositorykey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azureapimanagement/repositorykey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresastoken"
@@ -913,6 +914,7 @@ func buildDetectorList() []detectors.Detector {
 		&azuresearchadminkey.Scanner{},
 		&azuresearchquerykey.Scanner{},
 		&azure_storage.Scanner{},
+		&azurerepositorykey.Scanner{},
 		&bannerbear.Scanner{},
 		&baremetrics.Scanner{},
 		&beamer.Scanner{},
