@@ -238,3 +238,24 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
 	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 	assert.Equal(t, int32(0), metrics.ResultCacheHitsWasted.Load())
 }
+
+func TestVerificationCacheFromData_SameRawDifferentType_CacheMiss(t *testing.T) {
+	detector1 := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), Verified: true, DetectorType: -1},
+	}}
+	detector2 := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), Verified: true, DetectorType: -2},
+	}}
+	cache := New(simple.NewCache[detectors.Result](), nil)
+	_, err := cache.FromData(logContext.Background(), &detector1, true, false, nil)
+	require.NoError(t, err)
+
+	res, err := cache.FromData(logContext.Background(), &detector2, true, false, nil)
+
+	if assert.NoError(t, err) {
+		if assert.Len(t, res, 1) {
+			assert.Equal(t, detectorspb.DetectorType(-2), res[0].DetectorType)
+		}
+	}
+	assert.Len(t, cache.resultCache.Values(), 2)
+}
