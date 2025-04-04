@@ -23,7 +23,7 @@ func (t *testDetector) FromData(_ context.Context, verify bool, _ []byte) ([]det
 	t.fromDataCallCount = t.fromDataCallCount + 1
 	var results []detectors.Result
 	for _, r := range t.results {
-		copy := detectors.Result{Redacted: r.Redacted, Raw: r.Raw, RawV2: r.RawV2}
+		copy := detectors.Result{Redacted: r.Redacted, Raw: r.Raw, RawV2: r.RawV2, DetectorType: r.DetectorType}
 		if verify {
 			copy.CopyVerificationInfo(&r)
 		}
@@ -49,7 +49,7 @@ func getResultCacheKey(t *testing.T, cache *VerificationCache, result detectors.
 	return string(key)
 }
 
-func TestVerificationCacheFromData_Passthrough(t *testing.T) {
+func TestVerificationCache_FromData_Passthrough(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 	}}
@@ -69,7 +69,7 @@ func TestVerificationCacheFromData_Passthrough(t *testing.T) {
 	})
 }
 
-func TestVerificationCacheFromData_VerifyFalseForceCacheUpdateFalse(t *testing.T) {
+func TestVerificationCache_FromData_VerifyFalseForceCacheUpdateFalse(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 	}}
@@ -96,7 +96,7 @@ func TestVerificationCacheFromData_VerifyFalseForceCacheUpdateFalse(t *testing.T
 	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 }
 
-func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
+func TestVerificationCache_FromData_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
@@ -129,7 +129,7 @@ func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
 	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 }
 
-func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T) {
+func TestVerificationCache_FromData_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T) {
 	remoteResults := []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
@@ -169,7 +169,7 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T
 	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 }
 
-func TestFromDataCached_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
+func TestVerificationCache_FromData_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
@@ -205,7 +205,7 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
 	assert.Equal(t, int32(1), metrics.ResultCacheHitsWasted.Load())
 }
 
-func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
+func TestVerificationCache_FromData_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
@@ -237,4 +237,46 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
 	assert.Equal(t, int32(0), metrics.ResultCacheHits.Load())
 	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 	assert.Equal(t, int32(0), metrics.ResultCacheHitsWasted.Load())
+}
+
+func TestVerificationCache_FromData_SameRawDifferentType_CacheMiss(t *testing.T) {
+	detector1 := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), Verified: true, DetectorType: -1},
+	}}
+	detector2 := testDetector{results: []detectors.Result{
+		{Redacted: "hello", Raw: []byte("hello"), Verified: true, DetectorType: -2},
+	}}
+	cache := New(simple.NewCache[detectors.Result](), nil)
+	_, err := cache.FromData(logContext.Background(), &detector1, true, false, nil)
+	require.NoError(t, err)
+
+	res, err := cache.FromData(logContext.Background(), &detector2, true, false, nil)
+
+	if assert.NoError(t, err) {
+		if assert.Len(t, res, 1) {
+			assert.Equal(t, detectorspb.DetectorType(-2), res[0].DetectorType)
+		}
+	}
+	assert.Len(t, cache.resultCache.Values(), 2)
+}
+
+func TestVerificationCache_FromData_SameRawV2DifferentType_CacheMiss(t *testing.T) {
+	detector1 := testDetector{results: []detectors.Result{
+		{Redacted: "hello", RawV2: []byte("there"), Verified: true, DetectorType: -1},
+	}}
+	detector2 := testDetector{results: []detectors.Result{
+		{Redacted: "hello", RawV2: []byte("there"), Verified: true, DetectorType: -2},
+	}}
+	cache := New(simple.NewCache[detectors.Result](), nil)
+	_, err := cache.FromData(logContext.Background(), &detector1, true, false, nil)
+	require.NoError(t, err)
+
+	res, err := cache.FromData(logContext.Background(), &detector2, true, false, nil)
+
+	if assert.NoError(t, err) {
+		if assert.Len(t, res, 1) {
+			assert.Equal(t, detectorspb.DetectorType(-2), res[0].DetectorType)
+		}
+	}
+	assert.Len(t, cache.resultCache.Values(), 2)
 }
