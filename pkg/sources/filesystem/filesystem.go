@@ -127,7 +127,17 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			ctx.Logger().Error(err, "error walking directory")
 			return nil
 		}
+
 		fullPath := filepath.Join(path, relativePath)
+
+		// skip excluded directories early
+		if d.IsDir() {
+			if s.filter != nil && s.filter.ExcludeDir(fullPath) {
+				return fs.SkipDir
+			}
+
+			return nil
+		}
 
 		// Skip over non-regular files. We do this check here to suppress noisy
 		// logs for trying to scan directories and other non-regular files in
@@ -135,6 +145,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 		if !d.Type().IsRegular() {
 			return nil
 		}
+
 		if s.filter != nil && !s.filter.Pass(fullPath) {
 			return nil
 		}
