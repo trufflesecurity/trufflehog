@@ -229,7 +229,7 @@ func (c *Parser) RepoPath(
 	excludedGlobs []string,
 	isBare bool,
 	additionalArgs ...string,
-) (chan *Diff, error) {
+) (<-chan *Diff, <-chan error) {
 	args := []string{
 		"-C", source,
 		"log",
@@ -276,7 +276,7 @@ func (c *Parser) RepoPath(
 }
 
 // Staged parses the output of the `git diff` command for the `source` path.
-func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) {
+func (c *Parser) Staged(ctx context.Context, source string) (<-chan *Diff, <-chan error) {
 	// Provide the --cached flag to diff to get the diff of the staged changes.
 	args := []string{"-C", source, "diff", "-p", "--cached", "--full-history", "--diff-filter=AM", "--date=format:%a %b %d %H:%M:%S %Y %z"}
 
@@ -291,21 +291,28 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 }
 
 // executeCommand runs an exec.Cmd, reads stdout and stderr, and waits for the Cmd to complete.
-func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (chan *Diff, error) {
+func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged bool) (<-chan *Diff, <-chan error) {
 	diffChan := make(chan *Diff, 64)
+	errChan := make(chan error)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
-		return diffChan, err
+		close(diffChan)
+		errChan <- err
+		return diffChan, errChan
 	}
 	stdErr, err := cmd.StderrPipe()
 	if err != nil {
-		return diffChan, err
+		close(diffChan)
+		errChan <- err
+		return diffChan, errChan
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		return diffChan, err
+		close(diffChan)
+		errChan <- err
+		return diffChan, errChan
 	}
 
 	go func() {
@@ -318,16 +325,17 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged boo
 	go func() {
 		defer func() {
 			if err := cmd.Wait(); err != nil {
-				ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
+				errChan <- fmt.Errorf("error waiting for git command to complete: %w", err)
 			}
 		}()
 		c.FromReader(ctx, stdOut, diffChan, isStaged)
 		if err := stdOut.Close(); err != nil {
-			ctx.Logger().V(2).Info("Error closing git stdout pipe.", "error", err)
+			errChan <- fmt.Errorf("error closing git stdout pipe: %w", err)
 		}
+		close(errChan)
 	}()
 
-	return diffChan, nil
+	return diffChan, errChan
 }
 
 func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan *Diff, isStaged bool) {
