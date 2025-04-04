@@ -49,7 +49,7 @@ func getResultCacheKey(t *testing.T, cache *VerificationCache, result detectors.
 	return string(key)
 }
 
-func TestVerificationCacheFromData_Passthrough(t *testing.T) {
+func TestVerificationCache_FromData_Passthrough(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 	}}
@@ -69,7 +69,7 @@ func TestVerificationCacheFromData_Passthrough(t *testing.T) {
 	})
 }
 
-func TestVerificationCacheFromData_VerifyFalseForceCacheUpdateFalse(t *testing.T) {
+func TestVerificationCache_FromData_VerifyFalseForceCacheUpdateFalse(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 	}}
@@ -96,7 +96,7 @@ func TestVerificationCacheFromData_VerifyFalseForceCacheUpdateFalse(t *testing.T
 	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 }
 
-func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
+func TestVerificationCache_FromData_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
@@ -129,7 +129,7 @@ func TestFromDataCached_VerifyFalseForceCacheUpdateTrue(t *testing.T) {
 	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 }
 
-func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T) {
+func TestVerificationCache_FromData_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T) {
 	remoteResults := []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
@@ -169,7 +169,7 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseAllCacheHits(t *testing.T
 	assert.Equal(t, int32(0), metrics.ResultCacheMisses.Load())
 }
 
-func TestFromDataCached_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
+func TestVerificationCache_FromData_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
@@ -205,7 +205,7 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateFalseCacheMiss(t *testing.T) {
 	assert.Equal(t, int32(1), metrics.ResultCacheHitsWasted.Load())
 }
 
-func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
+func TestVerificationCache_FromData_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
 	detector := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), RawV2: []byte("helloV2"), Verified: true},
 		{Redacted: "world", Raw: []byte("world"), RawV2: []byte("worldV2"), Verified: false},
@@ -239,7 +239,7 @@ func TestFromDataCached_VerifyTrueForceCacheUpdateTrue(t *testing.T) {
 	assert.Equal(t, int32(0), metrics.ResultCacheHitsWasted.Load())
 }
 
-func TestVerificationCacheFromData_SameRawDifferentType_CacheMiss(t *testing.T) {
+func TestVerificationCache_FromData_SameRawDifferentType_CacheMiss(t *testing.T) {
 	detector1 := testDetector{results: []detectors.Result{
 		{Redacted: "hello", Raw: []byte("hello"), Verified: true, DetectorType: -1},
 	}}
