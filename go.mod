@@ -23,7 +23,7 @@ require (
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/avast/apkparser v0.0.0-20240729092610-90591e0804ae
+	github.com/avast/apkparser v0.0.0-20250307094510-e2100ee9c0f5
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.13
