@@ -20,6 +20,7 @@ message CustomRegex {
   repeated string exclude_words = 7;
   float entropy = 8;
   repeated string exclude_regexes_match = 9;
+  string primary_regex_name = 10;
 }
 
 

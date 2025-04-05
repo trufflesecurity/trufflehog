@@ -233,6 +233,8 @@ func (m *CustomRegex) validate(all bool) error {
 
 	// no validation rules for Entropy
 
+	// no validation rules for PrimaryRegexName
+
 	if len(errors) > 0 {
 		return CustomRegexMultiError(errors)
 	}
