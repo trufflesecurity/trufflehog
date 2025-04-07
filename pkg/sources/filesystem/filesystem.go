@@ -132,7 +132,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 
 		// skip excluded directories early
 		if d.IsDir() {
-			if s.filter != nil && s.filter.ExcludeDir(fullPath) {
+			if s.filter != nil && s.filter.ShouldExclude(fullPath) {
 				return fs.SkipDir
 			}
 

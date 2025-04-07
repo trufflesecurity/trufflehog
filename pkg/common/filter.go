@@ -115,7 +115,7 @@ func (rules *FilterRuleSet) Matches(object string) bool {
 	return false
 }
 
-// ExcludeDir return true if directory path matches with regular expressions in exclude FilterRuleSet.
-func (filter *Filter) ExcludeDir(path string) bool {
+// ShouldExclude return true if path matches with regular expressions in exclude FilterRuleSet.
+func (filter *Filter) ShouldExclude(path string) bool {
 	return filter.exclude.Matches(path)
 }

@@ -300,6 +300,40 @@ func TestChunkUnitReporterErr(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestSkipDir(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// create a temp directory with files
+	ignoreDir, cleanupDir, err := createTempDir("", "ignore1", "ignore2")
+	assert.NoError(t, err)
+	defer cleanupDir()
+
+	// create an ExcludePathsFile that contains the ignoreDir path
+	excludeFile, cleanupFile, err := createTempFile("", ignoreDir+"\n")
+	assert.NoError(t, err)
+	defer cleanupFile()
+
+	conn, err := anypb.New(&sourcespb.Filesystem{
+		ExcludePathsFile: excludeFile.Name(),
+	})
+	assert.NoError(t, err)
+
+	// initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "exclude directory", 0, 0, true, conn, 1)
+	assert.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{
+		ID: ignoreDir,
+	}, &reporter)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, len(reporter.Chunks), "Expected no chunks from excluded directory")
+	assert.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors for excluded directory")
+}
+
 // createTempFile is a helper function to create a temporary file in the given
 // directory with the provided contents. If dir is "", the operating system's
 // temp directory is used.
