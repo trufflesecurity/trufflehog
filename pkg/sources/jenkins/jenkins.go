@@ -235,7 +235,9 @@ func (s *Source) GetJenkinsObjectsForPath(ctx context.Context, absolutePath stri
 	res := JenkinsJobResponse{}
 	for i := 0; true; i += 100 {
 		baseUrl.Path = path.Join(absolutePath, "api/json")
-		baseUrl.RawQuery = fmt.Sprintf("tree=jobs[name,url]{%d,%d}", i, i+100)
+		params := url.Values{}
+		params.Set("tree", fmt.Sprintf("jobs[name,url]{%d,%d}", i, i+100))
+		baseUrl.RawQuery = params.Encode()
 
 		ctx.Logger().V(4).Info("executing query", "query_url", baseUrl.String())
 		req, err := s.NewRequest(http.MethodGet, baseUrl.String(), nil)
@@ -280,8 +282,10 @@ func (s *Source) GetJenkinsBuilds(ctx context.Context, jobAbsolutePath string) (
 	builds := JenkinsBuildResponse{}
 	buildsUrl := *s.url
 	for i := 0; true; i += 100 {
-		buildsUrl.Path = path.Join(jobAbsolutePath, "/api/json")
-		buildsUrl.RawQuery = fmt.Sprintf("tree=builds[number,url]{%d,%d}", i, i+100)
+		buildsUrl.Path = path.Join(jobAbsolutePath, "api/json")
+		params := url.Values{}
+		params.Set("tree", fmt.Sprintf("builds[number,url]{%d,%d}", i, i+100))
+		buildsUrl.RawQuery = params.Encode()
 		req, err := s.NewRequest(http.MethodGet, buildsUrl.String(), nil)
 		if err != nil {
 			return builds, errors.WrapPrefix(err, "Failed to create new request to get jenkins builds", 0)
