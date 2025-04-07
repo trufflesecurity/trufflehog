@@ -130,15 +130,6 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 
 		fullPath := filepath.Join(path, relativePath)
 
-		// skip excluded directories early
-		if d.IsDir() {
-			if s.filter != nil && s.filter.ShouldExclude(fullPath) {
-				return fs.SkipDir
-			}
-
-			return nil
-		}
-
 		// Skip over non-regular files. We do this check here to suppress noisy
 		// logs for trying to scan directories and other non-regular files in
 		// our traversal.
@@ -147,6 +138,11 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 		}
 
 		if s.filter != nil && !s.filter.Pass(fullPath) {
+			// skip excluded directories
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+
 			return nil
 		}
 
