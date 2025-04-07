@@ -1,6 +1,8 @@
 package verificationcache
 
 import (
+	"bytes"
+	"encoding/binary"
 	"sync"
 	"time"
 
@@ -135,5 +137,11 @@ func (v *VerificationCache) getResultCacheKey(result detectors.Result) ([]byte, 
 	v.hashMu.Lock()
 	defer v.hashMu.Unlock()
 
-	return v.hasher.Hash(append(result.Raw, result.RawV2...))
+	keyBytes := bytes.Join([][]byte{result.Raw, result.RawV2}, nil)
+	keyBytes, err := binary.Append(keyBytes, binary.BigEndian, result.DetectorType)
+	if err != nil {
+		return nil, err
+	}
+
+	return v.hasher.Hash(keyBytes)
 }
