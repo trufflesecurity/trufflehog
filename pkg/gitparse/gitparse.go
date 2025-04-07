@@ -235,6 +235,10 @@ func (c *Parser) RepoPath(
 		"log",
 		"--patch", // https://git-scm.com/docs/git-log#Documentation/git-log.txt---patch
 		"--full-history",
+		// Limit ourselves to a single line of context.  This context is necessary to include the match key for
+		// matching detectors when the match string isn't on the same line as the secret, and the match key
+		// previously existed (as when updating private key certs)
+		"--unified=1", // https://git-scm.com/docs/git-log#Documentation/git-log.txt-code--unifiedltngtcode
 		"--date=format:%a %b %d %H:%M:%S %Y %z",
 		"--pretty=fuller", // https://git-scm.com/docs/git-log#_pretty_formats
 		"--notes",         // https://git-scm.com/docs/git-log#Documentation/git-log.txt---notesltrefgt
@@ -532,8 +536,10 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			if latestState != HunkContentLine {
 				latestState = HunkContentLine
 			}
-			// TODO: Why do we care about this? It creates empty lines in the diff. If there are no plusLines, it's just newlines.
-			if err := currentDiff.write([]byte("\n")); err != nil {
+			// Including context lines in diff chunks allows our chunk-to-detector matching logic to work on
+			// diffs which don't include a change to the matching line (as in when private keys are updated
+			// in an existing keyfile)
+			if err := currentDiff.write(line); err != nil {
 				ctx.Logger().Error(err, "failed to write to diff")
 			}
 		case isHunkPlusLine(latestState, line):
