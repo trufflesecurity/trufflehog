@@ -116,6 +116,8 @@ github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z
 github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
 github.com/avast/apkparser v0.0.0-20240729092610-90591e0804ae h1:rDNramK9mnAbvUBJyIRZnzHchM45cXexHIX9pS9da4Q=
 github.com/avast/apkparser v0.0.0-20240729092610-90591e0804ae/go.mod h1:GNvprXNmXaDjpHmN3RFxz5QdK5VXTUvmQludCbjoBy4=
+github.com/avast/apkparser v0.0.0-20250307094510-e2100ee9c0f5 h1:zRaiVswCgpvZ6lyeErxC94EJaZdSoj0mzUPYRBOnqCI=
+github.com/avast/apkparser v0.0.0-20250307094510-e2100ee9c0f5/go.mod h1:GNvprXNmXaDjpHmN3RFxz5QdK5VXTUvmQludCbjoBy4=
 github.com/aws/aws-sdk-go v1.55.6 h1:cSg4pvZ3m8dgYcgqB97MrcdjUmZ1BeMYKUxMMB89IPk=
 github.com/aws/aws-sdk-go v1.55.6/go.mod h1:eRwEWoyTWFMVYVQzKMNHWP5/RV4xIUGMQfXQHfHkpNU=
 github.com/aws/aws-sdk-go-v2 v1.36.3 h1:mJoei2CxPutQVxaATCzDUjcZEjVRdpsiiXi2o38yqWM=
