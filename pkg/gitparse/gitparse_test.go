@@ -859,7 +859,7 @@ func TestStagedDiffParsing(t *testing.T) {
 				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
 				Message: strings.Builder{},
 			},
-			contentWriter: newBufferWithContent([]byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n")),
+			contentWriter: newBufferWithContent([]byte(" blah blaj\n \nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n \nokay thank you bye\n")),
 			IsBinary:      false,
 		},
 		{
@@ -894,7 +894,7 @@ func TestStagedDiffParsing(t *testing.T) {
 				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
 				Message: strings.Builder{},
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			contentWriter: newBufferWithContent([]byte(" They both may be called deep and profound.\n Deeper and more profound,\n The door of all subtleties!\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
 		},
 		{
@@ -966,7 +966,7 @@ func TestStagedDiffParsingBufferedFileWriter(t *testing.T) {
 				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
 				Message: strings.Builder{},
 			},
-			contentWriter: newBufferedFileWriterWithContent([]byte("\n\nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n\nokay thank you bye\n")),
+			contentWriter: newBufferedFileWriterWithContent([]byte(" blah blaj\n \nthis is the secret: [Default]\nAccess key Id: AKIAILE3JG6KMS3HZGCA\nSecret Access Key: 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\n \nokay thank you bye\n")),
 			IsBinary:      false,
 		},
 		{
@@ -1001,7 +1001,7 @@ func TestStagedDiffParsingBufferedFileWriter(t *testing.T) {
 				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
 				Message: strings.Builder{},
 			},
-			contentWriter: newBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			contentWriter: newBufferedFileWriterWithContent([]byte(" They both may be called deep and profound.\n Deeper and more profound,\n The door of all subtleties!\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
 		},
 		{
@@ -1084,7 +1084,7 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 				Date:      newTime("Tue Jul 11 18:10:49 2023 -0400"),
 				Message:   newStringBuilderValue("Change file\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			contentWriter: newBufferWithContent([]byte(" They both may be called deep and profound.\n Deeper and more profound,\n The door of all subtleties!\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
 		},
 	}
@@ -1138,7 +1138,7 @@ func TestCommitParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 				Date:      newTime("Tue Jul 11 18:10:49 2023 -0400"),
 				Message:   newStringBuilderValue("Change file\n"),
 			},
-			contentWriter: newBufferedFileWriterWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			contentWriter: newBufferedFileWriterWithContent([]byte(" They both may be called deep and profound.\n Deeper and more profound,\n The door of all subtleties!\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
 		},
 	}
@@ -1262,7 +1262,7 @@ func TestDiffParseFailureRecovery(t *testing.T) {
 				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
 				Message: strings.Builder{},
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			contentWriter: newBufferWithContent([]byte(" They both may be called deep and profound.\n Deeper and more profound,\n The door of all subtleties!\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
 		},
 		{
@@ -1322,7 +1322,7 @@ func TestDiffParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 				Date:    newTime("0001-01-01 00:00:00 +0000 UTC"),
 				Message: strings.Builder{},
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			contentWriter: newBufferWithContent([]byte(" They both may be called deep and profound.\n Deeper and more profound,\n The door of all subtleties!\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
 		},
 		{
@@ -2004,7 +2004,7 @@ func expectedDiffs() []*Diff {
 				Date:      newTime("Wed Mar 1 18:20:04 2017 +0300"),
 				Message:   newStringBuilderValue("Все работает, но он не принимает :(\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n\n            <state relative-caret-position=\"72\">\n              <caret line=\"4\" column=\"0\" lean-forward=\"false\" selection-start-line=\"4\" selection-start-column=\"0\" selection-end-line=\"4\" selection-end-column=\"0\" />\n\n\n\n")),
+			contentWriter: newBufferWithContent([]byte("       <file leaf-file-name=\"CMakeLists.txt\" pinned=\"false\" current-in-tab=\"false\">\n         <entry file=\"file://$PROJECT_DIR$/CMakeLists.txt\">\n           <provider selected=\"true\" editor-type-id=\"text-editor\">\n            <state relative-caret-position=\"72\">\n              <caret line=\"4\" column=\"0\" lean-forward=\"false\" selection-start-line=\"4\" selection-start-column=\"0\" selection-end-line=\"4\" selection-end-column=\"0\" />\n               <folding />\n             </state>\n           </provider>\n")),
 			IsBinary:      false,
 		},
 		{
@@ -2017,13 +2017,13 @@ func expectedDiffs() []*Diff {
 				Date:      newTime("Mon Apr 25 16:28:06 2011 +0100"),
 				Message:   newStringBuilderValue("Added Unusable coloring\n\nNotes:\nMessage-Id: <1264640755-22447-1-git-send-email-user@example.de>\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\nlocal Unfit = LibStub('Unfit-1.0')\n\n\n")),
+			contentWriter: newBufferWithContent([]byte(" Bagnon.ItemSlot = ItemSlot\n local ItemSearch = LibStub('LibItemSearch-1.0')\nlocal Unfit = LibStub('Unfit-1.0')\n local function hasBlizzQuestHighlight()\n        return GetContainerItemQuestInfo and true or false\n")),
 			IsBinary:      false,
 		},
 		{
 			PathB:         "embeds.xml",
 			LineStart:     6,
-			contentWriter: newBufferWithContent([]byte("\n\n       <Script file=\"libs\\Unfit-1.0\\Unfit-1.0.lua\"/>\n\n\n\n")),
+			contentWriter: newBufferWithContent([]byte("        <Include file=\"libs\\AceConsole-3.0\\AceConsole-3.0.xml\"/>\n        <Include file=\"libs\\AceLocale-3.0\\AceLocale-3.0.xml\"/>\n       <Script file=\"libs\\Unfit-1.0\\Unfit-1.0.lua\"/>\n        <Script file=\"libs\\LibDataBroker-1.1.lua\"/>\n        <Script file=\"libs\\LibItemSearch-1.0\\LibItemSearch-1.0.lua\"/>\n </Ui>\n")),
 			Commit: &Commit{
 				Hash:      "fd6e99e7a80199b76a694603be57c5ade1de18e7",
 				Author:    "Jaliborc <jaliborc@gmail.com>",
@@ -2080,7 +2080,7 @@ func expectedDiffs() []*Diff {
 		{
 			PathB:         ".gitignore",
 			LineStart:     1,
-			contentWriter: newBufferWithContent([]byte("\n\n\n**/__pycache__/\n**/*.pyc\n")),
+			contentWriter: newBufferWithContent([]byte(" /build/\n /dist/\n /truffleHog.egg-info/\n**/__pycache__/\n**/*.pyc\n")),
 			Commit: &Commit{
 				Hash:      "df393b4125c2aa217211b2429b8963d0cefcee27",
 				Author:    "Stephen <stephen@egroat.com>",
@@ -2184,7 +2184,7 @@ protos:
 				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
 				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n    public boolean containsTokenVerification(String token) {\n        return cacheMap.containsKey(token);\n    }\n\n\n\n\n")),
+			contentWriter: newBufferWithContent([]byte("         return entry == null ? null : entry.result;\n     }\n    public boolean containsTokenVerification(String token) {\n        return cacheMap.containsKey(token);\n    }\n\n     public void clearCache() {\n         cacheMap.clear();\n         size.set(0);\n")),
 			IsBinary:      false,
 		},
 		{
@@ -2197,7 +2197,7 @@ protos:
 				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
 				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n    private boolean isRpInitiatedLogout(RoutingContext context, TenantConfigContext configContext) {\n\n\n")),
+			contentWriter: newBufferWithContent([]byte("                 .toString();\n     }\n    private boolean isRpInitiatedLogout(RoutingContext context, TenantConfigContext configContext) {\n         return isEqualToRequestPath(configContext.oidcConfig.logout.path, context, configContext);\n     }\n")),
 			IsBinary:      false,
 		},
 		{
@@ -2210,7 +2210,7 @@ protos:
 				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
 				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n\n\n    private class LogoutCall implements Function<SecurityIdentity, Uni<?>> {\n        RoutingContext context;\n        TenantConfigContext configContext;\n        String idToken;\n\n        LogoutCall(RoutingContext context, TenantConfigContext configContext, String idToken) {\n            this.context = context;\n            this.configContext = configContext;\n            this.idToken = idToken;\n        }\n\n        @Override\n        public Uni<Void> apply(SecurityIdentity identity) {\n            if (isRpInitiatedLogout(context, configContext)) {\n                LOG.debug(\"Performing an RP initiated logout\");\n                fireEvent(SecurityEvent.Type.OIDC_LOGOUT_RP_INITIATED, identity);\n                return buildLogoutRedirectUriUni(context, configContext, idToken);\n            }\n            if (isBackChannelLogoutPendingAndValid(configContext, identity)\n                    || isFrontChannelLogoutValid(context, configContext,\n                            identity)) {\n                return removeSessionCookie(context, configContext.oidcConfig)\n                        .map(new Function<Void, Void>() {\n                            @Override\n                            public Void apply(Void t) {\n                                throw new LogoutException();\n                            }\n                        });\n\n            }\n            return VOID_UNI;\n        }\n    }\n\n")),
+			contentWriter: newBufferWithContent([]byte("                 ? (tenantIdSuffix + UNDERSCORE + oidcConfig.authentication.cookieSuffix.get())\n                 : tenantIdSuffix;\n     }\n\n    private class LogoutCall implements Function<SecurityIdentity, Uni<?>> {\n        RoutingContext context;\n        TenantConfigContext configContext;\n        String idToken;\n\n        LogoutCall(RoutingContext context, TenantConfigContext configContext, String idToken) {\n            this.context = context;\n            this.configContext = configContext;\n            this.idToken = idToken;\n        }\n\n        @Override\n        public Uni<Void> apply(SecurityIdentity identity) {\n            if (isRpInitiatedLogout(context, configContext)) {\n                LOG.debug(\"Performing an RP initiated logout\");\n                fireEvent(SecurityEvent.Type.OIDC_LOGOUT_RP_INITIATED, identity);\n                return buildLogoutRedirectUriUni(context, configContext, idToken);\n            }\n            if (isBackChannelLogoutPendingAndValid(configContext, identity)\n                    || isFrontChannelLogoutValid(context, configContext,\n                            identity)) {\n                return removeSessionCookie(context, configContext.oidcConfig)\n                        .map(new Function<Void, Void>() {\n                            @Override\n                            public Void apply(Void t) {\n                                throw new LogoutException();\n                            }\n                        });\n\n            }\n            return VOID_UNI;\n        }\n    }\n }\n")),
 			IsBinary:      false,
 		},
 		{
@@ -2223,7 +2223,7 @@ protos:
 				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
 				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n\nquarkus.oidc.code-flow.token.refresh-expired=true\nquarkus.oidc.code-flow.token.refresh-token-time-skew=5M\n\n\n")),
+			contentWriter: newBufferWithContent([]byte(" quarkus.oidc.code-flow.credentials.secret=secret\n quarkus.oidc.code-flow.application-type=web-app\n quarkus.oidc.code-flow.token.audience=https://server.example.com\nquarkus.oidc.code-flow.token.refresh-expired=true\nquarkus.oidc.code-flow.token.refresh-token-time-skew=5M\n quarkus.oidc.code-flow-encrypted-id-token-jwk.auth-server-url=${keycloak.url}/realms/quarkus/\n quarkus.oidc.code-flow-encrypted-id-token-jwk.client-id=quarkus-web-app\n")),
 			IsBinary:      false,
 		},
 		// WTF, shouldn't this be filtered out?
@@ -2237,7 +2237,7 @@ protos:
 				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
 				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n\n\n\n\n")),
+			contentWriter: newBufferWithContent([]byte(" import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;\n import static com.github.tomakehurst.wiremock.client.WireMock.matching;\n import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;\n import static org.junit.jupiter.api.Assertions.assertEquals;\n import static org.junit.jupiter.api.Assertions.assertNotNull;\n import static org.junit.jupiter.api.Assertions.assertNull;\n")),
 			IsBinary:      false,
 		},
 		{
@@ -2250,7 +2250,7 @@ protos:
 				Date:      newTime("Fri Jul 7 17:44:26 2023 +0100"),
 				Message:   newStringBuilderValue("Do not refresh OIDC session if the user is requesting logout\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n            // Logout\n\n\n\n")),
+			contentWriter: newBufferWithContent([]byte("             assertEquals(\"alice, cache size: 0\", page.getBody().asNormalizedText());\n             assertNotNull(getSessionCookie(webClient, \"code-flow\"));\n            // Logout\n             page = webClient.getPage(\"http://localhost:8081/code-flow/logout\");\n             assertEquals(\"Welcome, clientId: quarkus-web-app\", page.getBody().asNormalizedText());\n             assertNull(getSessionCookie(webClient, \"code-flow\"));\n")),
 			IsBinary:      false,
 		},
 		{
@@ -2327,7 +2327,7 @@ protos:
 				Date:      newTime("Tue Jul 11 18:10:49 2023 -0400"),
 				Message:   newStringBuilderValue("Change file\n"),
 			},
-			contentWriter: newBufferWithContent([]byte("\n\n\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
+			contentWriter: newBufferWithContent([]byte(" They both may be called deep and profound.\n Deeper and more profound,\n The door of all subtleties!\n\nSource: https://www.gnu.org/software/diffutils/manual/diffutils.html#An-Example-of-Unified-Format\n")),
 			IsBinary:      false,
 		},
 		{
