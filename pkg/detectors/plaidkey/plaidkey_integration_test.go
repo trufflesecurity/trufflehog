@@ -1,6 +1,3 @@
-//go:build detectors
-// +build detectors
-
 package plaidkey
 
 import (
@@ -20,7 +17,7 @@ import (
 func TestPlaidKey_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -115,7 +112,7 @@ func TestPlaidKey_FromChunk(t *testing.T) {
 					t.Fatalf("no raw v2 secret present: \n %+v", got[i])
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo", "ExtraData")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("PlaidKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

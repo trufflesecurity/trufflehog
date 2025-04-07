@@ -72,18 +72,13 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, secret string, clientID stri
 }
 
 func AnalyzePermissions(cfg *config.Config, secret string, clientId string, accessToken string) (*secretInfo, error) {
-	environment := ""
+	environment := "sandbox"
 	if strings.Contains(accessToken, "production") {
 		environment = "production"
 	}
-	if strings.Contains(accessToken, "sandbox") {
-		environment = "sandbox"
-	}
-	if environment == "" {
-		return nil, errors.New("Environment could not be parsed from access token")
-	}
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	// Plaid API uses POST requests for all requests, so we need to use an unrestricted client
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	var secretInfo = &secretInfo{}
 	secretInfo.Environment = environment
 	resp, err := getPlaidAccounts(client, clientId, secret, accessToken, environment)
@@ -109,11 +104,15 @@ func getPlaidAccounts(client *http.Client, clientID string, secret string, acces
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("received non-OK HTTP status: %d", resp.StatusCode)
+	}
 
 	var accounts accountsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&accounts); err != nil {
@@ -134,17 +133,22 @@ func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 		Bindings:           make([]analyzers.Binding, len(info.Products)),
 		UnboundedResources: make([]analyzers.Resource, len(info.Accounts)),
 	}
-	resource := analyzers.Resource{
-		Name:               "Plaid API Access Token",
-		FullyQualifiedName: "Plaid API Access Token",
-		Type:               "Access Token",
-	}
 
 	for idx, product := range info.Products {
+		productName := product
+		if perm, err := PermissionFromString(product); err == nil {
+			if productDetails, ok := permissionToProduct[perm]; ok {
+				productName = productDetails.Name
+			}
+		}
 		result.Bindings[idx] = analyzers.Binding{
-			Resource: resource,
+			Resource: analyzers.Resource{
+				Name:               productName,
+				FullyQualifiedName: product,
+				Type:               "product",
+			},
 			Permission: analyzers.Permission{
-				Value: product,
+				Value: "full_access",
 			},
 		}
 	}
@@ -152,10 +156,10 @@ func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 	for idx, account := range info.Accounts {
 		result.UnboundedResources[idx] = analyzers.Resource{
 			Name:               account.Name,
-			FullyQualifiedName: account.OfficialName,
+			FullyQualifiedName: account.AccountID,
 			Type:               "account",
 			Metadata: map[string]any{
-				"accountID": account.AccountID,
+				"officialName": account.OfficialName,
 			},
 		}
 	}

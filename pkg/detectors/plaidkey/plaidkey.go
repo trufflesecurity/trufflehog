@@ -77,20 +77,21 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					Raw:          []byte(secret),
 					RawV2:        []byte(fmt.Sprintf(`%s:%s:%s`, secret, id, token)),
 				}
-				environments := []string{"sandbox", "production"}
+
 				if verify {
-					for _, env := range environments {
-						isVerified, _, verificationErr := verifyMatch(ctx, client, id, secret, token, env)
-						s1.Verified = isVerified
-						s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", env)}
-						s1.SetVerificationError(verificationErr, id, secret)
-						if s1.Verified {
-							s1.AnalysisInfo = map[string]string{
-								"secret": secret,
-								"id":     id,
-								"token":  token,
-							}
-							break
+					environment := "sandbox"
+					if strings.Contains(token, "production") {
+						environment = "production"
+					}
+					isVerified, _, verificationErr := verifyMatch(ctx, client, id, secret, token, environment)
+					s1.Verified = isVerified
+					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", environment)}
+					s1.SetVerificationError(verificationErr, id, secret)
+					if s1.Verified {
+						s1.AnalysisInfo = map[string]string{
+							"secret": secret,
+							"id":     id,
+							"token":  token,
 						}
 					}
 				}
