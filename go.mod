@@ -17,13 +17,13 @@ replace github.com/coinbase/waas-client-library-go => github.com/trufflesecurity
 replace google.golang.org/grpc/stats/opentelemetry => google.golang.org/grpc/stats/opentelemetry v0.0.0-20240907200651-3ffb98b2c93a
 
 require (
-	cloud.google.com/go/secretmanager v1.14.2
+	cloud.google.com/go/secretmanager v1.14.6
 	cloud.google.com/go/storage v1.48.0
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/avast/apkparser v0.0.0-20240729092610-90591e0804ae
+	github.com/avast/apkparser v0.0.0-20250307094510-e2100ee9c0f5
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.13
@@ -36,9 +36,9 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.12.0
 	github.com/brianvoe/gofakeit/v7 v7.1.2
 	github.com/charmbracelet/bubbles v0.18.0
-	github.com/charmbracelet/bubbletea v0.27.0
+	github.com/charmbracelet/bubbletea v1.3.4
 	github.com/charmbracelet/glamour v0.7.0
-	github.com/charmbracelet/lipgloss v0.10.0
+	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/coinbase/waas-client-library-go v1.0.8
 	github.com/couchbase/gocb/v2 v2.9.4
 	github.com/crewjam/rfc5424 v0.1.0
@@ -74,7 +74,7 @@ require (
 	github.com/klauspost/pgzip v1.2.6
 	github.com/kylelemons/godebug v1.1.0
 	github.com/lib/pq v1.10.9
-	github.com/lrstanley/bubblezone v0.0.0-20240125042004-b7bafc493195
+	github.com/lrstanley/bubblezone v0.0.0-20250404061050-e13639e27357
 	github.com/marusama/semaphore/v2 v2.5.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mholt/archives v0.0.0-20241216060121-23e0af8fe73d
@@ -102,7 +102,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.34.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.9.0
-	github.com/xo/dburl v0.23.3
+	github.com/xo/dburl v0.23.6
 	gitlab.com/gitlab-org/api/client-go v0.127.0
 	go.mongodb.org/mongo-driver v1.17.3
 	go.uber.org/automaxprocs v1.6.0
@@ -172,9 +172,11 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/charmbracelet/x/ansi v0.1.4 // indirect
+	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
+	github.com/charmbracelet/x/ansi v0.8.0 // indirect
+	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/input v0.1.0 // indirect
-	github.com/charmbracelet/x/term v0.1.1 // indirect
+	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/charmbracelet/x/windows v0.1.0 // indirect
 	github.com/cloudflare/circl v1.3.8 // indirect
 	github.com/cncf/xds/go v0.0.0-20240905190251-b4127c9b8d78 // indirect
@@ -262,7 +264,7 @@ require (
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/muesli/termenv v0.15.2 // indirect
+	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.4.0.20241112120701-034e449c6e78 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
