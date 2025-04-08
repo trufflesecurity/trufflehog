@@ -197,7 +197,7 @@ func DefaultStyles() *Styles {
 	s.TopLevelNormalTab = lipgloss.NewStyle().
 		MarginRight(2)
 
-	s.TopLevelActiveTab = s.TopLevelNormalTab.Copy().
+	s.TopLevelActiveTab = s.TopLevelNormalTab.
 		Foreground(lipgloss.Color("36"))
 
 	s.TopLevelActiveTabDot = lipgloss.NewStyle().
