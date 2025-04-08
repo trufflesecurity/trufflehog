@@ -20,7 +20,7 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/gobwas/glob"
-	"github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
