@@ -2,6 +2,8 @@ package gitparse
 
 import (
 	"bytes"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"strings"
@@ -748,16 +750,19 @@ func TestToFileLinePathParse(t *testing.T) {
 // diffs.
 func assertDiffEqualToExpected(t *testing.T, expected *Diff, actual *Diff) {
 
-	// Assert on the top level fields first
-	assert.Equal(t, expected.PathB, actual.PathB)
-	assert.Equal(t, expected.LineStart, actual.LineStart)
-	assert.Equal(t, expected.IsBinary, actual.IsBinary)
+	// Use `cmp.Diff` to automatically compare all the exported fields.  This allows this test to grow automatically if
+	// new exported fields are added to these structs.  However, the most important field we want to test is unexpected
+	// (i.e. contentWriter) which is where the actual content of the diff is stored.  We break this out next.
+	opts := []cmp.Option{
+		cmpopts.IgnoreUnexported(Diff{}, Commit{}, strings.Builder{}),
+		cmpopts.IgnoreFields(Commit{}, "Size"),
+	}
+	if diff := cmp.Diff(expected, actual, opts...); diff != "" {
+		t.Errorf("%s", diff)
+	}
 
-	// Check the commit details looks the same
-	assert.Equal(t, expected.Commit.Hash, actual.Commit.Hash)
-	assert.Equal(t, expected.Commit.Author, actual.Commit.Author)
-	assert.Equal(t, expected.Commit.Message.String(), actual.Commit.Message.String())
-	assert.Equal(t, expected.Commit.Date, actual.Commit.Date)
+	// Here's where we compare the actual content of the diff. We break that out and test it separately so that we can
+	// keep this test relatively easy to understand and still get meaningful test output on the diff itself
 
 	// If the test author hasn't specified a contentWriter, then we don't want to explode, but we _do_
 	// want to confirm that the actual diff _also_ is nil there
@@ -773,6 +778,8 @@ func assertDiffEqualToExpected(t *testing.T, expected *Diff, actual *Diff) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDiffStr, actualDiffStr)
 	}
+	// TODO - Add test coverage for binary diffs (if it isn't already elsewhere)
+
 }
 
 func TestCommitParsing(t *testing.T) {
