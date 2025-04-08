@@ -18,7 +18,7 @@ replace google.golang.org/grpc/stats/opentelemetry => google.golang.org/grpc/sta
 
 require (
 	cloud.google.com/go/secretmanager v1.14.2
-	cloud.google.com/go/storage v1.48.0
+	cloud.google.com/go/storage v1.51.0
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.23.0
 	github.com/adrg/strutil v0.3.1
