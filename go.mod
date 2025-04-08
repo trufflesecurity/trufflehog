@@ -165,11 +165,14 @@ require (
 	github.com/bodgit/sevenzip v1.6.0 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
+	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
+	github.com/charmbracelet/x/input v0.1.0 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
+	github.com/charmbracelet/x/windows v0.1.0 // indirect
 	github.com/cloudflare/circl v1.3.8 // indirect
 	github.com/cncf/xds/go v0.0.0-20241223141626-cff3c89139a3 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -195,7 +198,7 @@ require (
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.6.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
-	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
+	github.com/envoyproxy/go-control-plane v0.13.4 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
@@ -302,6 +305,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.einride.tech/aip v0.60.0 // indirect
+	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.34.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.59.0 // indirect
