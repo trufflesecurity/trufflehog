@@ -34,7 +34,7 @@ require (
 	github.com/bill-rich/go-syslog v0.0.0-20220413021637-49edb52a574c
 	github.com/bitfinexcom/bitfinex-api-go v0.0.0-20210608095005-9e0b26f200fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.12.0
-	github.com/brianvoe/gofakeit/v7 v7.1.2
+	github.com/brianvoe/gofakeit/v7 v7.2.1
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v1.3.4
 	github.com/charmbracelet/glamour v0.7.0
@@ -45,7 +45,7 @@ require (
 	github.com/csnewman/dextk v0.3.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
-	github.com/envoyproxy/protoc-gen-validate v1.1.0
+	github.com/envoyproxy/protoc-gen-validate v1.2.1
 	github.com/fatih/color v1.18.0
 	github.com/felixge/fgprof v0.9.5
 	github.com/gabriel-vasile/mimetype v1.4.8
@@ -106,7 +106,7 @@ require (
 	gitlab.com/gitlab-org/api/client-go v0.127.0
 	go.mongodb.org/mongo-driver v1.17.3
 	go.uber.org/automaxprocs v1.6.0
-	go.uber.org/mock v0.5.0
+	go.uber.org/mock v0.5.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.35.0
 	golang.org/x/net v0.36.0
