@@ -305,7 +305,7 @@ func TestSkipDir(t *testing.T) {
 	ctx := context.Background()
 
 	// create a temp directory with files
-	ignoreDir, cleanupDir, err := createTempDir("", "ignore1", "ignore2")
+	ignoreDir, cleanupDir, err := createTempDir("", "ignore1", "ignore2", "ignore3")
 	assert.NoError(t, err)
 	defer cleanupDir()
 
@@ -314,8 +314,14 @@ func TestSkipDir(t *testing.T) {
 	assert.NoError(t, err)
 	defer cleanupFile()
 
+	// create include file with the path of the specific file we want to include
+	includeFile, cleanupInclude, err := createTempFile("", filepath.Join(ignoreDir, "ignore3")+"\n")
+	assert.NoError(t, err)
+	defer cleanupInclude()
+
 	conn, err := anypb.New(&sourcespb.Filesystem{
 		ExcludePathsFile: excludeFile.Name(),
+		IncludePathsFile: includeFile.Name(),
 	})
 	assert.NoError(t, err)
 
