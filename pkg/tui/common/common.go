@@ -1,8 +1,11 @@
+//go:build !no_tui
+
 package common
 
 import (
 	"github.com/aymanbagabas/go-osc52"
 	zone "github.com/lrstanley/bubblezone"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/keymap"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/styles"
 )
