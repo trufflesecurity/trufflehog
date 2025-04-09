@@ -42,7 +42,7 @@ func TestAuth0ManagementApiToken_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found, unverified - expired token",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
