@@ -114,7 +114,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"project":        creds.ProjectID,
 			},
 			AnalysisInfo: map[string]string{
-				"principal": creds.ClientEmail,
+				"key": string(credBytes),
 			},
 		}
 
