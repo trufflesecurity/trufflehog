@@ -197,7 +197,7 @@ func DefaultStyles() *Styles {
 	s.TopLevelNormalTab = lipgloss.NewStyle().
 		MarginRight(2)
 
-	s.TopLevelActiveTab = s.TopLevelNormalTab.Copy().
+	s.TopLevelActiveTab = s.TopLevelNormalTab.
 		Foreground(lipgloss.Color("36"))
 
 	s.TopLevelActiveTabDot = lipgloss.NewStyle().
@@ -219,20 +219,20 @@ func DefaultStyles() *Styles {
 	s.RepoSelector.Normal.Updated = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("243"))
 
-	s.RepoSelector.Active.Base = s.RepoSelector.Normal.Base.Copy().
+	s.RepoSelector.Active.Base = s.RepoSelector.Normal.Base.
 		BorderStyle(lipgloss.Border{Left: "┃"}).
 		BorderForeground(lipgloss.Color("176"))
 
-	s.RepoSelector.Active.Title = s.RepoSelector.Normal.Title.Copy().
+	s.RepoSelector.Active.Title = s.RepoSelector.Normal.Title.
 		Foreground(lipgloss.Color("212"))
 
-	s.RepoSelector.Active.Desc = s.RepoSelector.Normal.Desc.Copy().
+	s.RepoSelector.Active.Desc = s.RepoSelector.Normal.Desc.
 		Foreground(lipgloss.Color("246"))
 
-	s.RepoSelector.Active.Updated = s.RepoSelector.Normal.Updated.Copy().
+	s.RepoSelector.Active.Updated = s.RepoSelector.Normal.Updated.
 		Foreground(lipgloss.Color("212"))
 
-	s.RepoSelector.Active.Command = s.RepoSelector.Normal.Command.Copy().
+	s.RepoSelector.Active.Command = s.RepoSelector.Normal.Command.
 		Foreground(lipgloss.Color("204"))
 
 	s.MenuItem = lipgloss.NewStyle().
@@ -317,13 +317,13 @@ func DefaultStyles() *Styles {
 		}, false, false, false, true).
 		PaddingLeft(1)
 
-	s.LogItem.Active.Base = s.LogItem.Normal.Base.Copy().
+	s.LogItem.Active.Base = s.LogItem.Normal.Base.
 		Border(lipgloss.Border{
 			Left: "┃",
 		}, false, false, false, true).
 		BorderForeground(selectorColor)
 
-	s.LogItem.Active.Hash = s.LogItem.Normal.Hash.Copy().
+	s.LogItem.Active.Hash = s.LogItem.Normal.Hash.
 		Foreground(hashColor)
 
 	s.LogItem.Active.Hash = lipgloss.NewStyle().
@@ -343,7 +343,7 @@ func DefaultStyles() *Styles {
 	s.LogItem.Active.Desc = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("95"))
 
-	s.LogItem.Active.Keyword = s.LogItem.Active.Desc.Copy().
+	s.LogItem.Active.Keyword = s.LogItem.Active.Desc.
 		Foreground(highlightColorDim)
 
 	s.LogItem.Normal.Hash = lipgloss.NewStyle().
@@ -397,16 +397,16 @@ func DefaultStyles() *Styles {
 		Bold(true).
 		Foreground(highlightColor)
 
-	s.Ref.Paginator = s.Log.Paginator.Copy()
+	s.Ref.Paginator = s.Log.Paginator
 
-	s.Tree.Selector = s.Tree.Normal.FileName.Copy().
+	s.Tree.Selector = s.Tree.Normal.FileName.
 		Width(1).
 		Foreground(selectorColor)
 
 	s.Tree.Normal.FileName = lipgloss.NewStyle().
 		MarginLeft(1)
 
-	s.Tree.Active.FileName = s.Tree.Normal.FileName.Copy().
+	s.Tree.Active.FileName = s.Tree.Normal.FileName.
 		Bold(true).
 		Foreground(highlightColor)
 
@@ -416,24 +416,24 @@ func DefaultStyles() *Styles {
 	s.Tree.Active.FileDir = lipgloss.NewStyle().
 		Foreground(highlightColor)
 
-	s.Tree.Normal.FileMode = s.Tree.Active.FileName.Copy().
+	s.Tree.Normal.FileMode = s.Tree.Active.FileName.
 		Width(10).
 		Foreground(lipgloss.Color("243"))
 
-	s.Tree.Active.FileMode = s.Tree.Normal.FileMode.Copy().
+	s.Tree.Active.FileMode = s.Tree.Normal.FileMode.
 		Foreground(highlightColorDim)
 
-	s.Tree.Normal.FileSize = s.Tree.Normal.FileName.Copy().
+	s.Tree.Normal.FileSize = s.Tree.Normal.FileName.
 		Foreground(lipgloss.Color("243"))
 
-	s.Tree.Active.FileSize = s.Tree.Normal.FileName.Copy().
+	s.Tree.Active.FileSize = s.Tree.Normal.FileName.
 		Foreground(highlightColorDim)
 
 	s.Tree.FileContent = lipgloss.NewStyle()
 
-	s.Tree.Paginator = s.Log.Paginator.Copy()
+	s.Tree.Paginator = s.Log.Paginator
 
-	s.Tree.NoItems = s.AboutNoReadme.Copy()
+	s.Tree.NoItems = s.AboutNoReadme
 
 	s.Spinner = lipgloss.NewStyle().
 		MarginTop(1).
