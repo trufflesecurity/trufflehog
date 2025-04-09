@@ -3,6 +3,7 @@ package bitlyaccesstoken
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -78,6 +79,11 @@ func verifyBitlyAccessToken(ctx context.Context, client *http.Client, token stri
 	if err != nil {
 		return false, err
 	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
