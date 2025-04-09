@@ -114,8 +114,3 @@ func (rules *FilterRuleSet) Matches(object string) bool {
 	}
 	return false
 }
-
-// ShouldExclude return true if path matches with regular expressions in exclude FilterRuleSet.
-func (filter *Filter) ShouldExclude(path string) bool {
-	return filter.exclude.Matches(path)
-}
