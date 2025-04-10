@@ -133,7 +133,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 		// check if the full path is not matching any pattern in include FilterRuleSet and matching any exclude FilterRuleSet.
 		if s.filter != nil && !s.filter.Pass(fullPath) {
 			// skip excluded directories
-			if d.IsDir() {
+			if d.IsDir() && s.filter.ShouldExclude(fullPath) {
 				return fs.SkipDir
 			}
 

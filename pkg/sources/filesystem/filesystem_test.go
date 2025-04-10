@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -314,14 +315,8 @@ func TestSkipDir(t *testing.T) {
 	assert.NoError(t, err)
 	defer cleanupFile()
 
-	// create include file with the path of the specific file we want to include
-	includeFile, cleanupInclude, err := createTempFile("", filepath.Join(ignoreDir, "ignore3")+"\n")
-	assert.NoError(t, err)
-	defer cleanupInclude()
-
 	conn, err := anypb.New(&sourcespb.Filesystem{
 		ExcludePathsFile: excludeFile.Name(),
-		IncludePathsFile: includeFile.Name(),
 	})
 	assert.NoError(t, err)
 
@@ -338,6 +333,51 @@ func TestSkipDir(t *testing.T) {
 
 	assert.Equal(t, 0, len(reporter.Chunks), "Expected no chunks from excluded directory")
 	assert.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors for excluded directory")
+}
+
+func TestSubDir(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// create a temp directory with files
+	parentDir, cleanupParentDir, err := createTempDir("", "file1")
+	assert.NoError(t, err)
+	defer cleanupParentDir()
+
+	fmt.Println("parent dir: ", parentDir)
+
+	childDir, cleanupChildDir, err := createTempDir(parentDir, "file2")
+	assert.NoError(t, err)
+	defer cleanupChildDir()
+
+	// create an IncludePathsFile that contains the file path
+	file, cleanupFile, err := createTempFile(childDir, "should scan this file")
+	assert.NoError(t, err)
+	defer cleanupFile()
+
+	// create an IncludePathsFile that contains the file path
+	includeFile, cleanupFile, err := createTempFile("", file.Name()+"\n")
+	assert.NoError(t, err)
+	defer cleanupFile()
+
+	conn, err := anypb.New(&sourcespb.Filesystem{
+		IncludePathsFile: includeFile.Name(),
+	})
+	assert.NoError(t, err)
+
+	// initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "include sub directory file", 0, 0, true, conn, 1)
+	assert.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{
+		ID: parentDir,
+	}, &reporter)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, len(reporter.Chunks), "Expected chunks from included file")
+	assert.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors")
 }
 
 // createTempFile is a helper function to create a temporary file in the given
