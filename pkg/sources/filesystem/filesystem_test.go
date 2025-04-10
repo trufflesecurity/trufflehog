@@ -1,7 +1,6 @@
 package filesystem
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -343,8 +342,6 @@ func TestSubDir(t *testing.T) {
 	parentDir, cleanupParentDir, err := createTempDir("", "file1")
 	assert.NoError(t, err)
 	defer cleanupParentDir()
-
-	fmt.Println("parent dir: ", parentDir)
 
 	childDir, cleanupChildDir, err := createTempDir(parentDir, "file2")
 	assert.NoError(t, err)
