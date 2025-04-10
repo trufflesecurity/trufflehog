@@ -196,13 +196,13 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 
 		fileSize := file.Size()
 		if int(fileSize) > maxSize {
-			lCtx.Logger().V(4).Info("skipping file: size exceeds max allowed", "size", fileSize, "limit", maxSize)
+			lCtx.Logger().V(2).Info("skipping file: size exceeds max allowed", "size", fileSize, "limit", maxSize)
 			h.metrics.incFilesSkipped()
 			return nil
 		}
 
 		if common.SkipFile(file.Name()) || common.IsBinary(file.Name()) {
-			lCtx.Logger().V(4).Info("skipping file: extension is ignored")
+			lCtx.Logger().V(2).Info("skipping file: extension is ignored")
 			h.metrics.incFilesSkipped()
 			return nil
 		}
