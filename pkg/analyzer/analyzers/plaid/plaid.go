@@ -64,7 +64,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, secret string, clientID stri
 	}
 
 	color.Green("[i] Valid Plaid API Credentials\n")
-	color.Yellow("[i] Environment: %s", info.Environment)
+	color.Yellow("\n[i] Environment: %s", info.Environment)
 	if info.Environment == "sandbox" {
 		color.Cyan("Credentials are for Sandbox environment. All resources found are simulated and not real data.\n")
 	}
@@ -85,8 +85,8 @@ func AnalyzePermissions(cfg *config.Config, secret string, clientId string, acce
 	if err != nil {
 		return nil, err
 	}
+	secretInfo.Item = resp.Item
 	secretInfo.Accounts = resp.Accounts
-	secretInfo.Products = resp.Item.Products
 	return secretInfo, nil
 }
 
@@ -127,28 +127,33 @@ func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 
+	itemID := info.Item.ItemID
+	userProducts := info.Item.Products
+	userAccounts := info.Accounts
+
 	result := analyzers.AnalyzerResult{
 		AnalyzerType:       analyzers.AnalyzerTypePlaid,
 		Metadata:           nil,
-		Bindings:           make([]analyzers.Binding, len(info.Products)),
-		UnboundedResources: make([]analyzers.Resource, len(info.Accounts)),
+		Bindings:           make([]analyzers.Binding, len(userProducts)),
+		UnboundedResources: make([]analyzers.Resource, len(userAccounts)),
 	}
 
-	for idx, product := range info.Products {
-		productName := product
-		if perm, err := PermissionFromString(product); err == nil {
-			if productDetails, ok := permissionToProduct[perm]; ok {
-				productName = productDetails.Name
-			}
+	for idx, productName := range userProducts {
+		product, ok := GetProductByName(productName)
+		if !ok {
+			continue
 		}
 		result.Bindings[idx] = analyzers.Binding{
 			Resource: analyzers.Resource{
-				Name:               productName,
-				FullyQualifiedName: product,
+				Name:               product.DisplayName,
+				FullyQualifiedName: itemID + "/product/" + product.Name,
 				Type:               "product",
+				Metadata: map[string]any{
+					"productDesc": product.Description,
+				},
 			},
 			Permission: analyzers.Permission{
-				Value: "full_access",
+				Value: PermissionStrings[product.PermissionLevel],
 			},
 		}
 	}
@@ -168,11 +173,16 @@ func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 }
 
 func printAccountsAndProducts(info *secretInfo) {
-	color.Yellow("[i] Accounts Info:")
+	userProducts := info.Item.Products
+	userAccounts := info.Accounts
+
+	color.Yellow("\n[i] Item ID: %s", info.Item.ItemID)
+
+	color.Yellow("\n[i] Accounts Info:")
 	t1 := table.NewWriter()
 	t1.SetOutputMirror(os.Stdout)
 	t1.AppendHeader(table.Row{"ID", "Name", "Official Name", "Type", "Subtype"})
-	for _, account := range info.Accounts {
+	for _, account := range userAccounts {
 		t1.AppendRow(table.Row{
 			color.GreenString(account.AccountID),
 			color.GreenString(account.Name),
@@ -187,26 +197,27 @@ func printAccountsAndProducts(info *secretInfo) {
 
 	color.Yellow("\n[i] Products:")
 	t2 := table.NewWriter()
-	t2.AppendHeader(table.Row{"Product Name", "Status", "Capabilities"})
+	t2.AppendHeader(table.Row{"Product Name", "Access Level", "Capabilities"})
 
-	// Products are mapped as permissions
-	for perm, str := range PermissionStrings {
-		product, ok := permissionToProduct[perm]
-		if !ok {
-			continue
-		}
-
-		productCell := color.GreenString(product.Name)
+	for _, product := range plaidProducts {
+		productCell := color.GreenString(product.DisplayName)
 		productDescCell := color.GreenString(product.Description)
-		status := "Denied"
+		productPermissionCell := color.GreenString("Denied")
 
-		for _, product := range info.Products {
-			if product == str {
-				status = "Granted"
+		for _, productName := range userProducts {
+			if productName == product.Name {
+				permissionLevel := PermissionStrings[product.PermissionLevel]
+				productPermissionCell = "Granted" // If permission level is not defined, default to "Granted"
+				if len(permissionLevel) > 0 {
+					// Capitalize the perssion level string
+					capitalizedLevel := strings.ToUpper(string(permissionLevel[0])) + strings.ToLower(permissionLevel[1:])
+					productPermissionCell = color.GreenString(capitalizedLevel)
+				}
+				break
 			}
 		}
 
-		t2.AppendRow(table.Row{productCell, color.GreenString(status), productDescCell})
+		t2.AppendRow(table.Row{productCell, productPermissionCell, productDescCell})
 		t2.AppendSeparator()
 	}
 

@@ -10,16 +10,16 @@ type account struct {
 
 type item struct {
 	Products []string `json:"products"`
+	ItemID   string   `json:"item_id"`
 }
 
 type accountsResponse struct {
-	Accounts  []account `json:"accounts"`
-	Item      item      `json:"item"`
-	RequestID string    `json:"request_id"`
+	Accounts []account `json:"accounts"`
+	Item     item      `json:"item"`
 }
 
 type secretInfo struct {
+	Item        item
 	Accounts    []account
-	Products    []string
 	Environment string
 }
