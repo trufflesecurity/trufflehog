@@ -174,20 +174,19 @@ func (h *archiveHandler) openArchive(
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
 func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(context.Context, archives.FileInfo) error {
 	return func(ctx context.Context, file archives.FileInfo) error {
+		if common.IsDone(ctx) {
+			return ctx.Err()
+		}
+
 		lCtx := logContext.WithValues(
 			logContext.AddLogger(ctx),
 			"filename", file.Name(),
 			"size", file.Size(),
 		)
-		lCtx.Logger().V(3).Info("Handling extracted file.")
 
 		if file.IsDir() || file.LinkTarget != "" {
-			lCtx.Logger().V(3).Info("skipping directory or symlink")
+			lCtx.Logger().V(4).Info("skipping directory or symlink")
 			return nil
-		}
-
-		if common.IsDone(ctx) {
-			return ctx.Err()
 		}
 
 		depth := 0
@@ -197,13 +196,13 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 
 		fileSize := file.Size()
 		if int(fileSize) > maxSize {
-			lCtx.Logger().V(2).Info("skipping file: size exceeds max allowed", "size", fileSize, "limit", maxSize)
+			lCtx.Logger().V(4).Info("skipping file: size exceeds max allowed", "size", fileSize, "limit", maxSize)
 			h.metrics.incFilesSkipped()
 			return nil
 		}
 
 		if common.SkipFile(file.Name()) || common.IsBinary(file.Name()) {
-			lCtx.Logger().V(3).Info("skipping file: extension is ignored")
+			lCtx.Logger().V(4).Info("skipping file: extension is ignored")
 			h.metrics.incFilesSkipped()
 			return nil
 		}
@@ -233,7 +232,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		rdr, err := newFileReader(ctx, f)
 		if err != nil {
 			if errors.Is(err, ErrEmptyReader) {
-				lCtx.Logger().V(5).Info("empty reader, skipping file")
+				lCtx.Logger().V(4).Info("empty reader, skipping file")
 				return nil
 			}
 			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
@@ -243,7 +242,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
 
-		lCtx.Logger().V(4).Info("Processed file successfully", "filename", file.Name(), "size", file.Size())
+		lCtx.Logger().V(4).Info("Opened file successfully", "filename", file.Name(), "size", file.Size())
 		return h.openArchive(lCtx, depth, rdr, dataOrErrChan)
 	}
 }
