@@ -334,7 +334,7 @@ func TestSkipDir(t *testing.T) {
 	assert.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors for excluded directory")
 }
 
-func TestSubDir(t *testing.T) {
+func TestScanSubDirFile(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -347,7 +347,7 @@ func TestSubDir(t *testing.T) {
 	assert.NoError(t, err)
 	defer cleanupChildDir()
 
-	// create an IncludePathsFile that contains the file path
+	// create a file in child directory
 	file, cleanupFile, err := createTempFile(childDir, "should scan this file")
 	assert.NoError(t, err)
 	defer cleanupFile()
