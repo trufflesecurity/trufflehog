@@ -232,7 +232,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		rdr, err := newFileReader(ctx, f)
 		if err != nil {
 			if errors.Is(err, ErrEmptyReader) {
-				lCtx.Logger().V(4).Info("empty reader, skipping file")
+				lCtx.Logger().V(5).Info("empty reader, skipping file")
 				return nil
 			}
 			return fmt.Errorf("error creating reader for file %s: %w", file.Name(), err)
