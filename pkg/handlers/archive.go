@@ -174,6 +174,10 @@ func (h *archiveHandler) openArchive(
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
 func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(context.Context, archives.FileInfo) error {
 	return func(ctx context.Context, file archives.FileInfo) error {
+		if common.IsDone(ctx) {
+			return ctx.Err()
+		}
+
 		lCtx := logContext.WithValues(
 			logContext.AddLogger(ctx),
 			"filename", file.Name(),
@@ -183,10 +187,6 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		if file.IsDir() || file.LinkTarget != "" {
 			lCtx.Logger().V(4).Info("skipping directory or symlink")
 			return nil
-		}
-
-		if common.IsDone(ctx) {
-			return ctx.Err()
 		}
 
 		depth := 0
