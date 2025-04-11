@@ -45,7 +45,7 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/felixge/fgprof v0.9.5
 	github.com/gabriel-vasile/mimetype v1.4.8
-	github.com/getsentry/sentry-go v0.30.0
+	github.com/getsentry/sentry-go v0.32.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.13.2
 	github.com/go-ldap/ldap/v3 v3.4.10
