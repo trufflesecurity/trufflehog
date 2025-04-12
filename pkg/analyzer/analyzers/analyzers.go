@@ -92,6 +92,8 @@ const (
 	AnalyzerTypeAirtablePat
 	AnalyzerTypeGroq
 	AnalyzerTypeLaunchDarkly
+	AnalyzerTypeFigma
+	AnalyzerTypePlaid
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -129,6 +131,8 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeAirtablePat:   "AirtablePat",
 	AnalyzerTypeGroq:          "Groq",
 	AnalyzerTypeLaunchDarkly:  "LaunchDarkly",
+	AnalyzerTypeFigma:         "Figma",
+	AnalyzerTypePlaid:         "Plaid",
 	// Add new mappings here
 }
 
