@@ -12,11 +12,13 @@ import (
 )
 
 var (
-	validKey   = "3vl81ihtozf9im7kqz7ldp6kxbsd8y"
-	invalidKey = "3vl81ihtozf9im7?qz7ldp6kxbsd8y"
-	validId    = "ic1mh5b49ycvmz2vgvlgxtb0"
-	invalidId  = "ic1?h5b49ycvmz2vgvlgxtb0"
-	keyword    = "plaid"
+	validSecret   = "6e611cb89c263457b5e028d66c16c4"
+	invalidSecret = "3vl81ihtozf9im7dqz7ldp6kxbsd8y"
+	validId       = "60e3ee4019a2660010f8bc54"
+	invalidId     = "ic1Ah5b49ycvmz2vgvlgxtb0"
+	validToken    = "access-sandbox-833d862e-ffa8-43a7-ae28-72f56f1acb32"
+	invalidToken  = "access-sandbox-g33z362e-fha8-43a7-au28-7kf56z1acl32"
+	keyword       = "plaid"
 )
 
 func TestPlaidKey_Pattern(t *testing.T) {
@@ -29,12 +31,12 @@ func TestPlaidKey_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern - with keyword plaid",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validId),
-			want:  []string{validKey},
+			input: fmt.Sprintf("%s secret - '%s'\n%s client id - '%s'\n%s token - '%s'", keyword, validSecret, keyword, validId, keyword, validToken),
+			want:  []string{fmt.Sprintf("%s:%s:%s", validSecret, validId, validToken)},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidKey, keyword, invalidId),
+			name:  "invalid pattern - with keyword plaid",
+			input: fmt.Sprintf("%s secret - '%s'\n%s client id - '%s'\n%s token - '%s'", keyword, invalidSecret, keyword, invalidId, keyword, invalidToken),
 			want:  []string{},
 		},
 	}
