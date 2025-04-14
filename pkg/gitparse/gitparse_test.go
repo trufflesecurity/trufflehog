@@ -2,6 +2,10 @@ package gitparse
 
 import (
 	"bytes"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 	"time"
@@ -742,51 +746,40 @@ func TestToFileLinePathParse(t *testing.T) {
 	}
 }
 
-// Equal compares the content of two Commits to determine if they are the same.
-func (d1 *Diff) Equal(ctx context.Context, d2 *Diff) bool {
-	// isEqualString handles the error-prone String() method calls and compares the results.
-	isEqualContentString := func(s1, s2 contentWriter) (bool, error) {
-		// If the content is nil, it's likely a binary so there won't be any content to compare.
-		if s1.Len() == 0 && s2.Len() == 0 {
-			return true, nil
-		}
+// `asserts` on `Diff`'s _structure_, giving better test output than just comparing two
+// diffs.
+func assertDiffEqualToExpected(t *testing.T, expected *Diff, actual *Diff) {
 
-		str1, err := s1.String()
-		if err != nil {
-			return false, err
-		}
-		str2, err := s2.String()
-		if err != nil {
-			return false, err
-		}
-		return str1 == str2, nil
+	// Use `cmp.Diff` to automatically compare all the exported fields.  This allows this test to grow automatically if
+	// new exported fields are added to these structs.  However, the most important field we want to test is unexpected
+	// (i.e. contentWriter) which is where the actual content of the diff is stored.  We break this out next.
+	opts := []cmp.Option{
+		cmpopts.IgnoreUnexported(Diff{}, Commit{}, strings.Builder{}),
+		cmpopts.IgnoreFields(Commit{}, "Size"),
+	}
+	if diff := cmp.Diff(expected, actual, opts...); diff != "" {
+		t.Errorf("%s", diff)
 	}
 
-	switch {
-	case d1.PathB != d2.PathB:
-		return false
-	case d1.Commit.Hash != d2.Commit.Hash:
-		return false
-	case d1.Commit.Author != d2.Commit.Author:
-		return false
-	case d1.Commit.Date != d2.Commit.Date:
-		return false
-	case d1.Commit.Message.String() != d2.Commit.Message.String():
-		return false
-	case d1.LineStart != d2.LineStart:
-		return false
-	case d1.IsBinary != d2.IsBinary:
-		return false
-	default:
-		if d1.contentWriter != nil && d2.contentWriter != nil {
-			equal, err := isEqualContentString(d1.contentWriter, d2.contentWriter)
-			if err != nil || !equal {
-				ctx.Logger().Error(err, "failed to compare diff content")
-				return false
-			}
-		}
+	// Here's where we compare the actual content of the diff. We break that out and test it separately so that we can
+	// keep this test relatively easy to understand and still get meaningful test output on the diff itself
+
+	// If the test author hasn't specified a contentWriter, then we don't want to explode, but we _do_
+	// want to confirm that the actual diff _also_ is nil there
+	if expected.contentWriter == nil {
+		assert.Nil(t, actual.contentWriter)
 	}
-	return true
+	// Check that the content of the diff itself is as expected for non-binary diffs
+	if expected.contentWriter != nil && !actual.IsBinary {
+		assert.Equal(t, expected.contentWriter.Len(), actual.contentWriter.Len())
+		expectedDiffStr, err := expected.contentWriter.String()
+		require.NoError(t, err)
+		actualDiffStr, err := actual.contentWriter.String()
+		assert.NoError(t, err)
+		assert.Equal(t, expectedDiffStr, actualDiffStr)
+	}
+	// TODO - Add test coverage for binary diffs (if it isn't already elsewhere)
+
 }
 
 func TestCommitParsing(t *testing.T) {
@@ -807,9 +800,7 @@ func TestCommitParsing(t *testing.T) {
 			break
 		}
 
-		if !diff.Equal(context.Background(), expected[i]) {
-			t.Errorf("Diff does not match.\nexpected: %+v\n%s\nactual  : %+v\n%s", expected[i], expected[i].Commit.Hash, diff, diff.Commit.Hash)
-		}
+		assertDiffEqualToExpected(t, expected[i], diff)
 		i++
 	}
 
@@ -936,9 +927,7 @@ func TestStagedDiffParsing(t *testing.T) {
 			break
 		}
 
-		if !diff.Equal(context.Background(), expected[i]) {
-			t.Errorf("Diff does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], diff)
-		}
+		assertDiffEqualToExpected(t, expected[i], diff)
 		i++
 	}
 }
@@ -1043,9 +1032,7 @@ func TestStagedDiffParsingBufferedFileWriter(t *testing.T) {
 			break
 		}
 
-		if !diff.Equal(context.Background(), expected[i]) {
-			t.Errorf("Diff does not match.\nexpected:\n%+v\n\nactual:\n%+v\n", expected[i], diff)
-		}
+		assertDiffEqualToExpected(t, expected[i], diff)
 		i++
 	}
 }
@@ -1097,9 +1084,7 @@ func TestCommitParseFailureRecovery(t *testing.T) {
 	}()
 	i := 0
 	for diff := range diffChan {
-		if !diff.Equal(context.Background(), expected[i]) {
-			t.Errorf("Diff does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], diff)
-		}
+		assertDiffEqualToExpected(t, expected[i], diff)
 		i++
 	}
 }
@@ -1156,9 +1141,7 @@ func TestCommitParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 			break
 		}
 
-		if !diff.Equal(context.Background(), expected[i]) {
-			t.Errorf("Diff does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], diff)
-		}
+		assertDiffEqualToExpected(t, expected[i], diff)
 		i++
 	}
 }
@@ -1292,9 +1275,7 @@ func TestDiffParseFailureRecovery(t *testing.T) {
 			break
 		}
 
-		if !diff.Equal(context.Background(), expected[i]) {
-			t.Errorf("Diff does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], diff)
-		}
+		assertDiffEqualToExpected(t, expected[i], diff)
 		i++
 	}
 }
@@ -1352,9 +1333,7 @@ func TestDiffParseFailureRecoveryBufferedFileWriter(t *testing.T) {
 			break
 		}
 
-		if !diff.Equal(context.Background(), expected[i]) {
-			t.Errorf("Diff does not match.\nexpected: %+v\n\nactual  : %+v\n", expected[i], diff)
-		}
+		assertDiffEqualToExpected(t, expected[i], diff)
 		i++
 	}
 }
