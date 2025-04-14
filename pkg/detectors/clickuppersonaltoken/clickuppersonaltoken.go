@@ -3,6 +3,7 @@ package clickuppersonaltoken
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -13,13 +14,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b(pk_[0-9]{7,9}_[0-9A-Z]{32})\b`)
@@ -48,7 +51,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, err := verifyToken(ctx, resMatch)
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+			isVerified, err := verifyToken(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(err, resMatch)
 		}
@@ -67,8 +74,8 @@ func (s Scanner) Description() string {
 	return "ClickUp is a project management tool. Personal tokens can be used to access and modify data within ClickUp on behalf of a user."
 }
 
-func verifyToken(ctx context.Context, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.clickup.com/api/v2/user", nil)
+func verifyToken(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.clickup.com/api/v2/user", nil)
 	if err != nil {
 		return false, err
 	}
@@ -77,7 +84,11 @@ func verifyToken(ctx context.Context, token string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
