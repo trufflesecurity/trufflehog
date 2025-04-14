@@ -127,15 +127,23 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			ctx.Logger().Error(err, "error walking directory")
 			return nil
 		}
+
 		fullPath := filepath.Join(path, relativePath)
+
+		// check if the full path is not matching any pattern in include FilterRuleSet and matching any exclude FilterRuleSet.
+		if s.filter != nil && !s.filter.Pass(fullPath) {
+			// skip excluded directories
+			if d.IsDir() && s.filter.ShouldExclude(fullPath) {
+				return fs.SkipDir
+			}
+
+			return nil // skip the file
+		}
 
 		// Skip over non-regular files. We do this check here to suppress noisy
 		// logs for trying to scan directories and other non-regular files in
 		// our traversal.
 		if !d.Type().IsRegular() {
-			return nil
-		}
-		if s.filter != nil && !s.filter.Pass(fullPath) {
 			return nil
 		}
 
