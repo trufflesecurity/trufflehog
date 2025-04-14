@@ -12,6 +12,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -19,8 +20,9 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	domainPat = regexp.MustCompile(`\b[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com\b`)
-	tokenPat  = regexp.MustCompile(`\b00[a-zA-Z0-9_-]{40}\b`)
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
+	domainPat     = regexp.MustCompile(`\b[a-z0-9-]{1,40}\.okta(?:preview|-emea){0,1}\.com\b`)
+	tokenPat      = regexp.MustCompile(`\b00[a-zA-Z0-9_-]{40}\b`)
 	// TODO: Oauth client secrets
 )
 
@@ -34,8 +36,7 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	var uniqueTokens = make(map[string]struct{})
-	var uniqueDomains = make(map[string]struct{})
+	var uniqueTokens, uniqueDomains = make(map[string]struct{}), make(map[string]struct{})
 
 	for _, matches := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueTokens[matches[0]] = struct{}{}
@@ -54,7 +55,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyOktaToken(ctx, domain, token)
+				client := s.client
+				if client == nil {
+					client = defaultClient
+				}
+
+				isVerified, verificationErr := verifyOktaToken(ctx, client, domain, token)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr)
 			}
@@ -66,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyOktaToken(ctx context.Context, domain string, token string) (bool, error) {
+func verifyOktaToken(ctx context.Context, client *http.Client, domain string, token string) (bool, error) {
 	// curl -v -X GET \
 	// -H "Accept: application/json" \
 	// -H "Content-Type: application/json" \
@@ -82,7 +88,7 @@ func verifyOktaToken(ctx context.Context, domain string, token string) (bool, er
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("SSWS %s", token))
 
-	resp, err := detectors.DetectorHttpClientWithNoLocalAddresses.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return false, err
 	}
