@@ -8,7 +8,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -26,8 +25,6 @@ var gitlabFingerprints = map[string]string{
 	"SHA256:eUXGGm1YGsMAS7vkcx6JOJdOGHPem5gQp4taiCfCLB8": "ED25519",
 	"SHA256:ROQFvPThGrW4RuWLoL9tq9I9zJ42fK4XywyRtbOz/EQ": "RSA",
 }
-
-var falsePositiveGHUsernames = map[detectors.FalsePositive]struct{}{"aaron1234567890123": {}}
 
 func firstResponseFromSSH(ctx context.Context, parsedKey any, username, hostport string) (string, error) {
 	signer, err := ssh.NewSignerFromKey(parsedKey)
@@ -118,10 +115,6 @@ func VerifyGitHubUser(ctx context.Context, parsedKey any) (*string, error) {
 
 	if strings.Contains(output, "successfully authenticated") {
 		username := strings.TrimSuffix(strings.Split(output, " ")[1], "!")
-		isFalsePositive, _ := detectors.IsKnownFalsePositive(username, falsePositiveGHUsernames, false)
-		if isFalsePositive {
-			return nil, nil
-		}
 		return &username, nil
 	}
 
