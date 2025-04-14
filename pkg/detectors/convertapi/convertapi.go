@@ -22,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"convertapi"}) + `\b([0-9a-zA-Z]{16})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"convertapi"}) + `\b(secret_[0-9a-zA-Z]{16})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -46,7 +46,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://v2.convertapi.com/user?Secret=%s", resMatch), nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://v2.convertapi.com/user?auth=%s", resMatch), nil)
 			if err != nil {
 				continue
 			}
