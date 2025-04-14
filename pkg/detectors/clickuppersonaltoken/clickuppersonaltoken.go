@@ -2,6 +2,7 @@ package clickuppersonaltoken
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -21,7 +22,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(pk_[0-9]{7,8}_[0-9A-Z]{32})\b`)
+	keyPat = regexp.MustCompile(`\b(pk_[0-9]{7,9}_[0-9A-Z]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,10 +35,12 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueMatches := make(map[string]struct{})
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	for resMatch, _ := range uniqueMatches {
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ClickupPersonalToken,
@@ -45,18 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.clickup.com/api/v2/user", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, err := verifyToken(ctx, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err, resMatch)
 		}
 
 		results = append(results, s1)
@@ -71,4 +65,25 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "ClickUp is a project management tool. Personal tokens can be used to access and modify data within ClickUp on behalf of a user."
+}
+
+func verifyToken(ctx context.Context, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.clickup.com/api/v2/user", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Authorization", token)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer res.Body.Close()
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
 }
