@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package okta
+package azureapimanagementsubscriptionkey
 
 import (
 	"context"
@@ -14,19 +14,20 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestOkta_FromChunk(t *testing.T) {
+func TestAzureAPIManagementSubscriptionKey_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("OKTA")
-	secretInactive := testSecrets.MustGetField("OKTA_INACTIVE")
-	domain := testSecrets.MustGetField("OKTA_DOMAIN")
+	url := testSecrets.MustGetField("AZUREAPIMANAGEMENTSUBSCRIPTIONKEY_URL")
+	secret := testSecrets.MustGetField("AZUREDIRECTMANAGEMENTAPISUBSCRIPTIONKEY")
+	inactiveSecret := testSecrets.MustGetField("AZUREDIRECTMANAGEMENTAPISUBSCRIPTIONKEY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -42,16 +43,16 @@ func TestOkta_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found token, verified",
+			name: "found, verified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a okta secret %s within oktaDomain %s", secret, domain)),
+				ctx:    ctx,
+				data:   []byte(fmt.Sprintf("You can find a azure api management gateway url %s and subscription key %s within", url, secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Okta,
+					DetectorType: detectorspb.DetectorType_AzureAPIManagementSubscriptionKey,
 					Verified:     true,
 				},
 			},
@@ -62,13 +63,13 @@ func TestOkta_FromChunk(t *testing.T) {
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a okta secret %s within oktaDomain %s", secretInactive, domain)),
+				ctx:    ctx,
+				data:   []byte(fmt.Sprintf("You can find a azure api management gateway url %s and subscription key %s within but not valid", url, inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Okta,
+					DetectorType: detectorspb.DetectorType_AzureAPIManagementSubscriptionKey,
 					Verified:     false,
 				},
 			},
@@ -79,7 +80,7 @@ func TestOkta_FromChunk(t *testing.T) {
 			name: "not found",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
+				ctx:    ctx,
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
@@ -87,29 +88,12 @@ func TestOkta_FromChunk(t *testing.T) {
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
-		{
-			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a okta secret %s within oktaDomain %s", secretInactive, domain)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Okta,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Okta.FromData) error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("AzureDirectManagementAPIKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -120,9 +104,9 @@ func TestOkta_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "Redacted", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Okta.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("AzureDirectManagementAPIKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
