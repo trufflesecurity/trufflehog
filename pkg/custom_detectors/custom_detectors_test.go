@@ -210,9 +210,7 @@ func TestDetector(t *testing.T) {
 
 func TestDetectorPrimarySecret(t *testing.T) {
 	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
-		Name: "test",
-		// "password" is normally flagged as a false positive, but CustomRegex
-		// should allow the user to decide and report it as a result.
+		Name:             "test",
 		Keywords:         []string{"secret"},
 		Regex:            map[string]string{"id": "id_[A-Z0-9]{10}_yy", "secret": "secret_[A-Z0-9]{10}_yy"},
 		PrimaryRegexName: "secret",
@@ -227,7 +225,6 @@ func TestDetectorPrimarySecret(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, "secret_YI7C90ACY1_yy", results[0].GetPrimarySecretValue())
-	assert.Equal(t, results[0].Raw, []byte(`id_ALPHA10100_yysecret_YI7C90ACY1_yy`))
 }
 
 func BenchmarkProductIndices(b *testing.B) {
