@@ -87,7 +87,7 @@ func TestDigitalOceanToken_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, verified but unexpected api surface",
+			name: "found verifiable secret, verification failed due to unexpected API response",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
