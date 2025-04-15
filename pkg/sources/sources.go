@@ -175,6 +175,8 @@ type DockerConfig struct {
 	BearerToken string
 	// UseDockerKeychain determines whether to use the Docker keychain.
 	UseDockerKeychain bool
+	// ExcludePaths is a list of paths to exclude from scanning.
+	ExcludePaths []string
 }
 
 // GCSConfig defines the optional configuration for a GCS source.

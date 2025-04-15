@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -165,4 +166,90 @@ func isHistoryChunk(t *testing.T, chunk *sources.Chunk) bool {
 
 	return metadata != nil &&
 		strings.HasPrefix(metadata.File, "image-metadata:history:")
+}
+
+func TestDockerExcludeExactPath(t *testing.T) {
+	dockerConn := &sourcespb.Docker{
+		Credential: &sourcespb.Docker_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Images:       []string{"test-image"},
+		ExcludePaths: []string{"/var/log/test"},
+	}
+
+	conn := &anypb.Any{}
+	err := conn.MarshalFrom(dockerConn)
+	assert.NoError(t, err)
+
+	s := &Source{}
+	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	// Create test data
+	testFiles := []struct {
+		path     string
+		excluded bool
+	}{
+		{"/var/log/test", true},      // Should be excluded (exact match)
+		{"/var/log/test2", false},    // Should not be excluded (different path)
+		{"/var/log/test/sub", false}, // Should not be excluded (subdirectory)
+		{"/var/log/other", false},    // Should not be excluded (different path)
+	}
+
+	for _, tf := range testFiles {
+		excluded := false
+		for _, excludePath := range s.excludePaths {
+			if tf.path == excludePath {
+				excluded = true
+				break
+			}
+		}
+		assert.Equal(t, tf.excluded, excluded, "Unexpected exclusion result for path: %s", tf.path)
+	}
+}
+
+func TestDockerExcludeWildcardPath(t *testing.T) {
+	dockerConn := &sourcespb.Docker{
+		Credential: &sourcespb.Docker_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Images:       []string{"test-image"},
+		ExcludePaths: []string{"/var/log/test/*"},
+	}
+
+	conn := &anypb.Any{}
+	err := conn.MarshalFrom(dockerConn)
+	assert.NoError(t, err)
+
+	s := &Source{}
+	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	// Create test data
+	testFiles := []struct {
+		path     string
+		excluded bool
+	}{
+		{"/var/log/test/file1", true},     // Should be excluded (direct child)
+		{"/var/log/test/sub/file2", true}, // Should be excluded (nested child)
+		{"/var/log/test", false},          // Should not be excluded (parent dir)
+		{"/var/log/test2/file", false},    // Should not be excluded (different dir)
+		{"/var/log/other/file", false},    // Should not be excluded (unrelated)
+	}
+
+	for _, tf := range testFiles {
+		excluded := false
+		for _, excludePath := range s.excludePaths {
+			// Convert wildcard pattern to regex
+			pattern := strings.ReplaceAll(excludePath, "*", ".*")
+			pattern = "^" + pattern + "$"
+			isMatch, err := regexp.MatchString(pattern, tf.path)
+			assert.NoError(t, err)
+			if isMatch {
+				excluded = true
+				break
+			}
+		}
+		assert.Equal(t, tf.excluded, excluded, "Unexpected exclusion result for path: %s", tf.path)
+	}
 }

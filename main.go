@@ -178,9 +178,10 @@ var (
 	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
 
-	dockerScan       = cli.Command("docker", "Scan Docker Image")
-	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
-	dockerScanToken  = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
+	dockerScan         = cli.Command("docker", "Scan Docker Image")
+	dockerScanImages   = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+	dockerScanToken    = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
+	dockerExcludePaths = dockerScan.Flag("exclude-paths", "Comma separated list of paths to exclude from scan").String()
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
@@ -835,6 +836,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			BearerToken:       *dockerScanToken,
 			Images:            *dockerScanImages,
 			UseDockerKeychain: *dockerScanToken == "",
+			ExcludePaths:      strings.Split(*dockerExcludePaths, ","),
 		}
 		if ref, err = eng.ScanDocker(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)

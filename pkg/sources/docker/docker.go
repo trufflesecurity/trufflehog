@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,12 +31,13 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_DOCKER
 
 type Source struct {
-	name        string
-	sourceId    sources.SourceID
-	jobId       sources.JobID
-	verify      bool
-	concurrency int
-	conn        sourcespb.Docker
+	name         string
+	sourceId     sources.SourceID
+	jobId        sources.JobID
+	verify       bool
+	concurrency  int
+	conn         sourcespb.Docker
+	excludePaths []string
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -72,6 +74,11 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
+	}
+
+	// Extract exclude paths from connection
+	if paths := s.conn.GetExcludePaths(); len(paths) > 0 {
+		s.excludePaths = paths
 	}
 
 	return nil
@@ -347,6 +354,26 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 	if info.size > filesizeLimitBytes {
 		ctx.Logger().V(2).Info("skipping file: size exceeds max allowed", "file", info.name, "size", info.size, "limit", filesizeLimitBytes)
 		return nil
+	}
+
+	// Check if the file should be excluded
+	filePath := "/" + info.name
+	ctx.Logger().V(2).Info("checking file against exclude paths", "file", filePath, "exclude_paths", s.excludePaths)
+	for _, excludePath := range s.excludePaths {
+		// Convert wildcard pattern to regex
+		pattern := strings.ReplaceAll(excludePath, "*", ".*")
+		pattern = "^" + pattern + "$"
+
+		matched, err := regexp.MatchString(pattern, filePath)
+		if err != nil {
+			ctx.Logger().Error(err, "error matching exclude pattern", "pattern", pattern, "file", filePath)
+			continue
+		}
+
+		if matched {
+			ctx.Logger().V(2).Info("skipping file: matches exclude path", "file", filePath, "exclude_path", excludePath)
+			return nil
+		}
 	}
 
 	chunkReader := sources.NewChunkReader()
