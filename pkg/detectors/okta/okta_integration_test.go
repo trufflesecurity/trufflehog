@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package okta
 
 import (
@@ -89,7 +92,7 @@ func TestOkta_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a okta secret %s within oktaDomain %s", secret, domain)),
+				data:   []byte(fmt.Sprintf("You can find a okta secret %s within oktaDomain %s", secretInactive, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
