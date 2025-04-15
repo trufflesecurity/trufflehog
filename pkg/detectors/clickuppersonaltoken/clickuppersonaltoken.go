@@ -43,8 +43,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueMatches[strings.TrimSpace(match[1])] = struct{}{}
 	}
 
-	for resMatch, _ := range uniqueMatches {
-
+	for resMatch := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ClickupPersonalToken,
 			Raw:          []byte(resMatch),
