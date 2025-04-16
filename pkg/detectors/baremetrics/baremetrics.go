@@ -22,7 +22,13 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"baremetrics"}) + `\b([a-zA-Z0-9_]{25})\b`)
+	/*
+		Baremetrics has two type of keys:
+		- Sandbox: starts with `sk_`
+		- Production: starts with `lk_`
+		The length of key is not fixed and can range between 18 to 25 characters.
+	*/
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"baremetrics"}) + `((?:sk|lk)_[a-zA-Z0-9]{18,25})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
