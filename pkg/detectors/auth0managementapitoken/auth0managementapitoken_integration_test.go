@@ -54,7 +54,7 @@ func TestAuth0ManagementApiToken_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
 					RawV2:        []byte(managementApiToken + domain),
 					Redacted:     domain,
-					Verified:     false, // keeping this false, because the token can have a maximum expiration of 30 days.
+					Verified:     true,
 				},
 			},
 			wantErr: false,
