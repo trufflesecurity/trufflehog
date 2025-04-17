@@ -31,8 +31,6 @@ var (
 	// account name can contain only lowercase letters, numbers and the `-` character, must be between 3 and 44 characters long.
 	accountUrlPattern = regexp.MustCompile(`([a-z0-9-]{3,44}\.(?:documents|table\.cosmos)\.azure\.com)`)
 
-	invalidHosts = simple.NewCache[struct{}]()
-
 	noHostErr = errors.New("no such host")
 )
 
@@ -63,6 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	var uniqueKeyMatches, uniqueAccountMatches = make(map[string]struct{}), make(map[string]struct{})
+	var invalidHosts = simple.NewCache[struct{}]()
 
 	for _, match := range dbKeyPattern.FindAllStringSubmatch(dataStr, -1) {
 		uniqueKeyMatches[match[1]] = struct{}{}
