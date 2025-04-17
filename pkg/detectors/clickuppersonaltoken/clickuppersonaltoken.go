@@ -25,7 +25,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(pk_[0-9]{7,9}_[0-9A-Z]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"clickup"}) + `\b(pk_[0-9]{7,9}_[0-9A-Z]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
