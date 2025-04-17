@@ -33,7 +33,7 @@ var (
 	emailPat    = regexp.MustCompile(common.EmailPattern)
 
 	// Can use password or personal/organization access token (PAT/OAT) for login, but this scanner will only check for PATs and OATs.
-	accessTokenPat = regexp.MustCompile(`\b(dckr_(pat|oat)_[a-zA-Z0-9_-]{27,32})(?:[^a-zA-Z0-9_-]|\z)`)
+	accessTokenPat = regexp.MustCompile(`\b(dckr_(pat|oat)_(?:[a-zA-Z0-9_-]{27}|[a-zA-Z0-9_-]{32}))(?:[^a-zA-Z0-9_-]|\z)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
