@@ -2,6 +2,8 @@ package apimatic
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -20,7 +23,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apimatic", "apikey"}) + `\b([a-zA-Z0-9_-]{64})\b`)
@@ -48,33 +51,52 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			timeout := 10 * time.Second
-			client.Timeout = timeout
-
-			// api docs: https://docs.apimatic.io/platform-api/#/http/api-endpoints/code-generation-external-apis/list-all-code-generations
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.apimatic.io/code-generations", http.NoBody)
-			if err != nil {
-				continue
+			client := s.client
+			if client == nil {
+				client = defaultClient
 			}
 
-			// authentication documentation: https://docs.apimatic.io/platform-api/#/http/guides/authentication
-			req.Header.Set("Authorization", "X-Auth-Key "+apiKey)
-			resp, err := client.Do(req)
-			if err == nil {
-				defer resp.Body.Close()
-				if resp.StatusCode == 200 {
-					s1.Verified = true
-				}
-			} else {
-				// if any error happens during api request capture that as verification error
-				s1.SetVerificationError(err, apiKey)
-			}
+			isVerified, verificationErr := verifyAPImaticKey(ctx, client, apiKey)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
 		}
 
 		results = append(results, s1)
 
 	}
 	return results, nil
+}
+
+func verifyAPImaticKey(ctx context.Context, client *http.Client, key string) (bool, error) {
+	timeout := 10 * time.Second
+	client.Timeout = timeout
+
+	// api docs: https://docs.apimatic.io/platform-api/#/http/api-endpoints/code-generation-external-apis/list-all-code-generations
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.apimatic.io/code-generations", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	// authentication documentation: https://docs.apimatic.io/platform-api/#/http/guides/authentication
+	req.Header.Set("Authorization", "X-Auth-Key "+key)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
