@@ -2,6 +2,8 @@ package blogger
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -44,17 +46,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://www.googleapis.com/blogger/v3/blogs/2399953?key="+resMatch, nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyBlogger(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
 		}
 
 		results = append(results, s1)
@@ -69,4 +63,31 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Blogger API keys can be used to access and manage blogs on the Blogger platform."
+}
+
+// docs: https://developers.google.com/blogger/docs/3.0/using
+func verifyBlogger(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.googleapis.com/blogger/v3/blogs/2399953?key="+key, nil)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusBadRequest, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
