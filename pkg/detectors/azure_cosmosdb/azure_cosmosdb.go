@@ -31,7 +31,9 @@ var (
 	// account name can contain only lowercase letters, numbers and the `-` character, must be between 3 and 44 characters long.
 	accountUrlPattern = regexp.MustCompile(`([a-z0-9-]{3,44}\.(?:documents|table\.cosmos)\.azure\.com)`)
 
-	noHostErr = errors.New("no such host")
+	invalidHosts = simple.NewCache[struct{}]()
+
+	errNoHost = errors.New("no such host")
 )
 
 func (s Scanner) getClient() *http.Client {
@@ -61,7 +63,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	var uniqueKeyMatches, uniqueAccountMatches = make(map[string]struct{}), make(map[string]struct{})
-	var invalidHosts = simple.NewCache[struct{}]()
 
 	for _, match := range dbKeyPattern.FindAllStringSubmatch(dataStr, -1) {
 		uniqueKeyMatches[match[1]] = struct{}{}
@@ -103,7 +104,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				s1.Verified = verified
 				if verificationErr != nil {
-					if errors.Is(verificationErr, noHostErr) {
+					if errors.Is(verificationErr, errNoHost) {
 						invalidHosts.Set(accountUrl, struct{}{})
 						continue
 					}
@@ -145,7 +146,7 @@ func verifyCosmosDocumentDB(client *http.Client, accountUrl, key string) (bool, 
 	if err != nil {
 		// lookup foo.documents.azure.com: no such host
 		if strings.Contains(err.Error(), "no such host") {
-			return false, noHostErr
+			return false, errNoHost
 		}
 
 		return false, err
