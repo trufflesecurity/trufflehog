@@ -2,6 +2,8 @@ package blitapp
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -45,18 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://blitapp.com/api/apps/all", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("API-Key", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyBlitApp(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
 		}
 
 		results = append(results, s1)
@@ -71,4 +64,33 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "BlitApp is a service used for managing applications. BlitApp API keys can be used to access and modify application data."
+}
+
+// docs: https://blitapp.com/api/#/App/get_apps_all
+func verifyBlitApp(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://blitapp.com/api/apps/all", nil)
+	if err != nil {
+		return false, nil
+	}
+
+	req.Header.Add("API-Key", key)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, nil
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
