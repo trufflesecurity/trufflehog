@@ -40,7 +40,7 @@ func verifyCosmosTableDB(client *http.Client, accountUrl, key string) (bool, err
 	if err != nil {
 		// lookup foo.table.cosmos.azure.com: no such host
 		if strings.Contains(err.Error(), "no such host") {
-			return false, noHostErr
+			return false, errNoHost
 		}
 
 		return false, err
