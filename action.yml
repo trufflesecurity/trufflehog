@@ -22,6 +22,10 @@ inputs:
     default: 'latest'
     description: Scan with this trufflehog cli version.
     required: false
+outputs:
+  results:
+    description: "Trufflehog scan outputs"
+    value: ${{ steps.trufflehog.outputs.results }}
 branding:
   icon: "shield"
   color: "green"
@@ -30,6 +34,7 @@ runs:
   using: "composite"
   steps:
   - shell: bash
+    id: trufflehog
     working-directory: ${{ inputs.path }}
     env:
       BASE: ${{ inputs.base }}
@@ -86,14 +91,10 @@ runs:
       ##########################################
       ##          Run TruffleHog              ##
       ##########################################
-      docker run --rm -v .:/tmp -w /tmp \
+      results=$(docker run --rm -v .:/tmp -w /tmp \
       ghcr.io/trufflesecurity/trufflehog:${VERSION} \
       git file:///tmp/ \
-      --since-commit \
-      ${BASE:-''} \
-      --branch \
-      ${HEAD:-''} \
-      --fail \
       --no-update \
       --github-actions \
-      ${ARGS:-''}
+      ${ARGS:-''})
+      echo "results='$(echo $results)'" >> $GITHUB_OUTPUT
