@@ -161,7 +161,7 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 		// If the value of credsProvider is aws.AnonymousCredentials{} from the above switch-case,
 		// we will need to set credsProvider to nil to use SDK's default credential chain.
 		_, isUnauthenticated := credsProvider.(aws.AnonymousCredentials)
-		if !isUnauthenticated {
+		if isUnauthenticated {
 			credsProvider = nil
 		}
 
