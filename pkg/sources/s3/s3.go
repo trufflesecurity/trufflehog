@@ -413,7 +413,12 @@ func (s *Source) getRegionalClientForBucket(
 	role string,
 	bucket string,
 ) (*s3.Client, error) {
-	region, err := s3manager.GetBucketRegion(ctx, defaultRegionClient, bucket)
+	region, err := s3manager.GetBucketRegion(ctx, defaultRegionClient, bucket, func(options *s3.Options) {
+		// GetBucketRegion can return the region through the X-Amz-Bucket-Region header with no credentials.
+		// However, when we provide an invalid credentials, GetBucketRegion return an error.
+		// See full explanation in https://github.com/trufflesecurity/trufflehog/pull/4069#issuecomment-2816678647.
+		options.Credentials = nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not get s3 region for bucket: %s: %w", bucket, err)
 	}
