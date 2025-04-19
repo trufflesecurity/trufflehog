@@ -1,4 +1,4 @@
-package abbysale
+package abyssale
 
 import (
 	"context"
@@ -17,7 +17,7 @@ type Scanner struct {
 	client *http.Client
 }
 
-const abbysaleURL = "https://api.abyssale.com"
+const abyssaleURL = "https://api.abyssale.com"
 
 var (
 	// Ensure the Scanner satisfies the interface at compile time.
@@ -26,13 +26,13 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"abbysale"}) + `\b([a-z0-9A-Z]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"abyssale"}) + `\b([a-z0-9A-Z]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"abbysale"}
+	return []string{"abyssale"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -42,7 +42,7 @@ func (s Scanner) getClient() *http.Client {
 	return defaultClient
 }
 
-// FromData will find and optionally verify Abbysale secrets in a given set of bytes.
+// FromData will find and optionally verify Abyssale secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -52,13 +52,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Abbysale,
+			DetectorType: detectorspb.DetectorType_Abyssale,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
 			client := s.getClient()
-			isVerified, verificationErr := verifyAbbysale(ctx, client, resMatch)
+			isVerified, verificationErr := verifyAbyssale(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
 		}
@@ -69,9 +69,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyAbbysale(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
+func verifyAbyssale(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
 	// https://developers.abyssale.com/rest-api/authentication
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, abbysaleURL+"/ready", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, abyssaleURL+"/ready", nil)
 	if err != nil {
 		return false, err
 	}
@@ -93,9 +93,9 @@ func verifyAbbysale(ctx context.Context, client *http.Client, resMatch string) (
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Abbysale
+	return detectorspb.DetectorType_Abyssale
 }
 
 func (s Scanner) Description() string {
-	return "Abbysale is a service offering various API functionalities for marketing automation and services such as images and ad campaigns. Abbysale API keys can be used to access and interact with this data."
+	return "Abyssale is a service offering various API functionalities for marketing automation and services such as images and ad campaigns. Abyssale API keys can be used to access and interact with this data."
 }

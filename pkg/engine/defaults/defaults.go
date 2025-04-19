@@ -2,8 +2,8 @@ package defaults
 
 import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abyssale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adafruitio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adzuna"
@@ -832,7 +832,7 @@ import (
 
 func buildDetectorList() []detectors.Detector {
 	return []detectors.Detector{
-		&abbysale.Scanner{},
+		&abyssale.Scanner{},
 		// &abstract.Scanner{},
 		&abuseipdb.Scanner{},
 		&accuweather.Scanner{},

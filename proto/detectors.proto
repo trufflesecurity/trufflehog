@@ -249,7 +249,7 @@ enum DetectorType {
   ZonkaFeedback = 236;
   Delighted = 237;
   Feedier = 238;
-  Abbysale = 239;
+  Abyssale = 239;
   Magnetic = 240;
   Nytimes = 241 [deprecated = true];
   Polygon = 242;
