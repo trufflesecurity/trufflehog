@@ -568,13 +568,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 		logValues = append(logValues, "max_depth", scanOptions.MaxDepth)
 	}
 
-	diffChan, err := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
-	if err != nil {
-		return err
-	}
-	if diffChan == nil {
-		return nil
-	}
+	diffChan, errChan := s.parser.RepoPath(repoCtx, path, scanOptions.HeadHash, scanOptions.BaseHash == "", scanOptions.ExcludeGlobs, scanOptions.Bare)
 
 	logger.Info("scanning repo", logValues...)
 
@@ -715,6 +709,11 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			return err
 		}
 	}
+
+	for err := range errChan {
+		return err
+	}
+
 	return nil
 }
 
