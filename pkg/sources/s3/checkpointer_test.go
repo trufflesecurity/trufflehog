@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,11 +22,11 @@ func TestCheckpointerResumption(t *testing.T) {
 	tracker := NewCheckpointer(ctx, initialProgress)
 
 	firstPage := &s3.ListObjectsV2Output{
-		Contents: make([]*s3.Object, 12), // Total of 12 objects
+		Contents: make([]s3types.Object, 12), // Total of 12 objects
 	}
 	for i := range 12 {
 		key := fmt.Sprintf("key-%d", i)
-		firstPage.Contents[i] = &s3.Object{Key: &key}
+		firstPage.Contents[i] = s3types.Object{Key: &key}
 	}
 
 	// Process first 6 objects.
@@ -134,7 +135,7 @@ func TestGetResumePoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tracker := &Checkpointer{ progress: tt.progress}
+			tracker := &Checkpointer{progress: tt.progress}
 
 			resumePoint, err := tracker.ResumePoint(context.Background())
 			if tt.expectError {
@@ -223,10 +224,10 @@ func TestCheckpointerUpdate(t *testing.T) {
 				lowestIncompleteIdx: 0,
 			}
 
-			page := &s3.ListObjectsV2Output{Contents: make([]*s3.Object, tt.pageSize)}
+			page := &s3.ListObjectsV2Output{Contents: make([]s3types.Object, tt.pageSize)}
 			for i := range tt.pageSize {
 				key := fmt.Sprintf("key-%d", i)
-				page.Contents[i] = &s3.Object{Key: &key}
+				page.Contents[i] = s3types.Object{Key: &key}
 			}
 
 			// Setup pre-completed objects.
