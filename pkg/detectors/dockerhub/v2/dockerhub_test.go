@@ -30,6 +30,7 @@ var (
 			user: rRwOdIJpY90QrIzOXO95d3hlSzRk5Z9a
 			docker_email: "docker-test@dockerhub.com"
 			docker_token: "dckr_pat_dlndn9l2JLhWvbdyP3blEZw_j7d"
+			docker_org_token: "dckr_oat_7bA9zRt5-JqX3vP0l_MnY8sK2wE-dF6h"
 
 		# Notes:
 		# - Remember to rotate the secret every 90 days.
@@ -38,6 +39,8 @@ var (
 	secrets = []string{
 		"rRwOdIJpY90QrIzOXO95d3hlSzRk5Z9a:dckr_pat_dlndn9l2JLhWvbdyP3blEZw_j7d",
 		"docker-test@dockerhub.com:dckr_pat_dlndn9l2JLhWvbdyP3blEZw_j7d",
+		"rRwOdIJpY90QrIzOXO95d3hlSzRk5Z9a:dckr_oat_7bA9zRt5-JqX3vP0l_MnY8sK2wE-dF6h",
+		"docker-test@dockerhub.com:dckr_oat_7bA9zRt5-JqX3vP0l_MnY8sK2wE-dF6h",
 	}
 )
 

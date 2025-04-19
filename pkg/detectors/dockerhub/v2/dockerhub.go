@@ -32,14 +32,14 @@ var (
 	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
 	emailPat    = regexp.MustCompile(common.EmailPattern)
 
-	// Can use password or personal access token (PAT) for login, but this scanner will only check for PATs.
-	accessTokenPat = regexp.MustCompile(`\b(dckr_pat_[a-zA-Z0-9_-]{27})(?:[^a-zA-Z0-9_-]|\z)`)
+	// Can use password or personal/organization access token (PAT/OAT) for login, but this scanner will only check for PATs and OATs.
+	accessTokenPat = regexp.MustCompile(`\b(dckr_pat_[a-zA-Z0-9_-]{27}|dckr_oat_[a-zA-Z0-9_-]{32})(?:[^a-zA-Z0-9_-]|\z)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"dckr_pat_"}
+	return []string{"dckr_pat_", "dckr_oat_"}
 }
 
 // FromData will find and optionally verify Dockerhub secrets in a given set of bytes.
@@ -105,9 +105,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) verifyMatch(ctx context.Context, username string, password string) (bool, map[string]string, error) {
-	payload := strings.NewReader(fmt.Sprintf(`{"username": "%s", "password": "%s"}`, username, password))
+	payload := strings.NewReader(fmt.Sprintf(`{"identifier": "%s", "secret": "%s"}`, username, password))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://hub.docker.com/v2/users/login", payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://hub.docker.com/v2/auth/token", payload)
 	if err != nil {
 		return false, nil, err
 	}
@@ -162,7 +162,7 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 }
 
 type tokenResponse struct {
-	Token string `json:"token"`
+	Token string `json:"access_token"`
 }
 
 type userClaims struct {
