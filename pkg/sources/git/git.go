@@ -1296,9 +1296,11 @@ func HandleBinary(
 			)
 		}
 
-		ctx.Logger().V(3).Info(
-			"HandleFile did not consume all stdout data; excess discarded",
-			"bytes_discarded", n)
+		if n > 0 {
+			ctx.Logger().V(3).Info(
+				"HandleFile did not consume all stdout data; excess discarded",
+				"bytes_discarded", n)
+		}
 
 		// Wait for the command to finish and handle any errors.
 		waitErr := cmd.Wait()
