@@ -18,6 +18,12 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
+var (
+	falsePositiveGHUsernames = map[detectors.FalsePositive]struct{}{
+		detectors.FalsePositive("aaron1234567890123"): {},
+	}
+)
+
 type Scanner struct {
 	IncludeExpired bool
 }
@@ -109,12 +115,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				user, err := VerifyGitHubUser(ctx, parsedKey)
+				username, err := VerifyGitHubUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
 				}
-				if user != nil {
-					extraData.Add("github_user", *user)
+				if username != nil {
+					isFalsePositive, _ := detectors.IsKnownFalsePositive(*username, falsePositiveGHUsernames, false)
+					if !isFalsePositive {
+						extraData.Add("github_user", *username)
+					}
 				}
 			}()
 
