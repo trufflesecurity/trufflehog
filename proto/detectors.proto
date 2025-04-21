@@ -1029,6 +1029,7 @@ enum DetectorType {
   SentryOrgToken = 1017;
   AzureApiManagementRepositoryKey = 1018;
   AzureAPIManagementSubscriptionKey = 1019;
+  EverestApiKey = 1020;
 }
 
 message Result {
