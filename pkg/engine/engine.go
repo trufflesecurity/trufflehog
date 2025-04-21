@@ -1,3 +1,6 @@
+// Check the [process flow](docs/process_flow.md) and [concurrency](docs/concurrency.md) docs for
+// something of a structural overview
+
 package engine
 
 import (
