@@ -88,11 +88,11 @@ func TestOkta_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, verified but unexpected api surface",
+			name: "found verifiable secret, verification failed due to unexpected API response",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a okta secret %s within oktaDomain %s", secretInactive, domain)),
+				data:   []byte(fmt.Sprintf("You can find a okta secret %s within oktaDomain %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
