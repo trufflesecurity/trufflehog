@@ -44,7 +44,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.2.1
 	github.com/fatih/color v1.18.0
 	github.com/felixge/fgprof v0.9.5
-	github.com/gabriel-vasile/mimetype v1.4.8
+	github.com/gabriel-vasile/mimetype v1.4.9
 	github.com/getsentry/sentry-go v0.32.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.13.2
@@ -98,7 +98,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.34.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.9.0
-	github.com/xo/dburl v0.23.6
+	github.com/xo/dburl v0.23.7
 	gitlab.com/gitlab-org/api/client-go v0.127.0
 	go.mongodb.org/mongo-driver v1.17.3
 	go.uber.org/automaxprocs v1.6.0
