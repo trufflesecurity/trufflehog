@@ -2,8 +2,8 @@ package besnappy
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -46,20 +46,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 		if verify {
-			data := fmt.Sprintf("%s:x", resMatch)
-			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.besnappy.com/api/v1/accounts", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyBesnappy(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -74,4 +63,33 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Besnappy is a customer service platform. The detected key can be used to access Besnappy's API, potentially exposing sensitive customer service data."
+}
+
+// docs: https://github.com/BeSnappy/api-docs
+func verifyBesnappy(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://app.besnappy.com/api/v1/accounts", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	req.SetBasicAuth(key, "x")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

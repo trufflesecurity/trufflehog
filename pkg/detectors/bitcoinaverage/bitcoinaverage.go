@@ -3,6 +3,8 @@ package bitcoinaverage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -49,26 +51,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			DetectorType: detectorspb.DetectorType_BitcoinAverage,
 			Raw:          []byte(resMatch),
 		}
+
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://apiv2.bitcoinaverage.com/websocket/v3/get_ticket", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("x-ba-key", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					resp := &response{}
-					if err = json.NewDecoder(res.Body).Decode(resp); err != nil {
-						s1.SetVerificationError(err, resMatch)
-						continue
-					}
-					if resp.Success {
-						s1.Verified = true
-					}
-				}
-			}
+			isVerified, verificationErr := verifyBitcoinAverage(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -83,4 +70,42 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "BitcoinAverage is a service that provides cryptocurrency market data. BitcoinAverage API keys can be used to access and retrieve this market data."
+}
+
+// docs: https://apiv2.bitcoinaverage.com/#authentication
+func verifyBitcoinAverage(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://apiv2.bitcoinaverage.com/websocket/v3/get_ticket", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("x-ba-key", key)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		apiResponse := &response{}
+		if err = json.NewDecoder(resp.Body).Decode(apiResponse); err != nil {
+			return false, err
+		}
+
+		if apiResponse.Success {
+			return true, nil
+		}
+
+		return false, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

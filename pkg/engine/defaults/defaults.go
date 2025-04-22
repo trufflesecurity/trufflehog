@@ -2,8 +2,8 @@ package defaults
 
 import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abyssale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adafruitio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adzuna"
@@ -221,6 +221,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docker"
 	dockerhubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v1"
 	dockerhubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
@@ -831,7 +832,7 @@ import (
 
 func buildDetectorList() []detectors.Detector {
 	return []detectors.Detector{
-		&abbysale.Scanner{},
+		&abyssale.Scanner{},
 		// &abstract.Scanner{},
 		&abuseipdb.Scanner{},
 		&accuweather.Scanner{},
@@ -1060,6 +1061,7 @@ func buildDetectorList() []detectors.Detector {
 		&disqus.Scanner{},
 		&ditto.Scanner{},
 		&dnscheck.Scanner{},
+		&docker.Scanner{},
 		&dockerhubv1.Scanner{},
 		&dockerhubv2.Scanner{},
 		&docparser.Scanner{},
