@@ -1,19 +1,13 @@
 package dropbox
 
 type scopeConfig struct {
-	AccountScopes       []scope `json:"account_info_scopes"`
-	FilesMetadataScopes []scope `json:"files_metadata_scopes"`
-	FilesContentScopes  []scope `json:"files_content_scopes"`
-	SharingScopes       []scope `json:"sharing_scopes"`
-	FileRequestsScopes  []scope `json:"file_requests_scopes"`
-	ContactsScopes      []scope `json:"contacts_scopes"`
-	OpenIDScopes        []scope `json:"openid_scopes"`
+	Scopes []scope `json:"scopes"`
 }
 
 type scope struct {
 	Name          string   `json:"name"`
 	TestEndpoint  string   `json:"test_endpoint"`
-	ImpliedScopes []string `json:"impliedScopes"`
+	ImpliedScopes []string `json:"implied_scopes"`
 }
 
 type account struct {
@@ -35,13 +29,7 @@ type name struct {
 	Surname   string `json:"surname"`
 }
 
-type resource struct {
-	Name        string
-	DisplayName string
-	Permissions map[string]PermissionStatus
-}
-
 type secretInfo struct {
-	Account   account
-	Resources []resource
+	Account     account
+	Permissions map[string]PermissionStatus
 }

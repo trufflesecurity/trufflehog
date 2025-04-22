@@ -123,6 +123,6 @@ func Run(keyType string, secretInfo SecretInfo) {
 	case "plaid":
 		plaid.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["secret"], secretInfo.Parts["id"], secretInfo.Parts["token"])
 	case "dropbox":
-		dropbox.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["token"])
+		dropbox.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }

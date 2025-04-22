@@ -2,23 +2,18 @@
 package dropbox
 
 import (
-	// 	"bytes"
-	// 	"encoding/json"
-	// 	"errors"
-	// 	"fmt"
-	// 	"net/http"
-	// 	"os"
-	// 	"strings"
-
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/fatih/color"
-	// "github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/table"
+
+	_ "embed"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
@@ -27,14 +22,20 @@ import (
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
 
+//go:embed scopes.json
+var scopeConfigJson []byte
+
 type Analyzer struct {
 	Cfg *config.Config
 }
+type PermissionStatus string
 
-type resourceDetails struct {
-	Name        string
-	DisplayName string
-}
+const (
+	// Scope Granted Status
+	StatusGranted    PermissionStatus = "Granted"
+	StatusDenied     PermissionStatus = "Denied"
+	StatusUnverified PermissionStatus = "Unverified"
+)
 
 func (a Analyzer) Type() analyzers.AnalyzerType {
 	return analyzers.AnalyzerTypeDropbox
@@ -68,134 +69,119 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
 	}
 
 	color.Green("[i] Valid Dropbox OAuth2 Credentials\n")
-	// printAccountsAndProducts(info)
+	printAccountAndPermissions(info)
 }
 
 func AnalyzePermissions(cfg *config.Config, token string) (*secretInfo, error) {
 	// Dropbox API uses POST requests for all requests, so we need to use an unrestricted client
-	client := analyzers.NewAnalyzeClient(cfg)
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 
 	secretInfo := &secretInfo{
 		Permissions: make(map[string]PermissionStatus),
 	}
-	scopeConfigMap, err := getScopeConfigMap()
-	if err != nil {
-		return nil, err
-	}
 
 	for _, perm := range PermissionStrings {
-		
 		secretInfo.Permissions[perm] = StatusUnverified
 	}
-	accountInfoReadString, ok := PermissionStrings[AccountsInfoRead]
-	if !ok {
-		return nil, errors.New("invalid scope or config doesn't exist")
-	}
 	// Account Info Read permission is always enabled
-	secretInfo.Permissions[accountInfoReadString] = StatusGranted
+	secretInfo.Permissions[PermissionStrings[AccountsInfoRead]] = StatusGranted
 
-	accountInfo, err := getAccountInfo(client, token)
-	if err != nil {
+	if err := populateAccountInfo(client, secretInfo, token); err != nil {
 		return nil, err
 	}
-	secretInfo.Account = accountInfo
 
-	validatedPermissions, err := getPermissions(client, scopeConfigMap, token)
-	if err != nil {
+	if err := testAllPermissions(client, secretInfo, token); err != nil {
 		return nil, err
-	}
-	for _, scope := range validatedPermissions {
-
-		secretInfo.Permissions[scope] = StatusGranted
 	}
 
 	return secretInfo, nil
 }
 
-func getAccountInfo(client *http.Client, token string) (account, error) {
-	url := "https://api.dropboxapi.com/2/users/get_current_account"
-	body, statusCode, err := callDropboxAPIEndpoint(client, url, token)
+func populateAccountInfo(client *http.Client, info *secretInfo, token string) error {
+	endpoint := "/2/users/get_current_account"
+	body, statusCode, err := callDropboxAPIEndpoint(client, endpoint, token)
 	if err != nil {
-		return account{}, err
+		return err
 	}
 	switch statusCode {
 	case http.StatusOK:
-		var accountInfo account
-		if err := json.Unmarshal([]byte(body), &accountInfo); err != nil {
-			return account{}, fmt.Errorf("failed to unmarshal account info: %w", err)
+		if err := json.Unmarshal([]byte(body), &info.Account); err != nil {
+			return fmt.Errorf("failed to unmarshal account info: %w", err)
 		}
-		return accountInfo, nil
+		return nil
 	default:
-		return account{}, fmt.Errorf("failed to validate scope. Status %s: %s", statusCode, body)
+		return fmt.Errorf("failed to validate scope. Status %d: %s", statusCode, body)
 	}
 }
 
-func getPermissions(client *http.Client, scopeConfigMap *scopeConfig, token string) ([]string, error) {
-	validatedPermissions := make([]string, 0)
-	individualScopeLists := [][]scope{
-		scopeConfigMap.AccountScopes,
-		scopeConfigMap.FilesContentScopes,
-		scopeConfigMap.FilesMetadataScopes,
-		scopeConfigMap.SharingScopes,
-		scopeConfigMap.FileRequestsScopes,
-		scopeConfigMap.ContactsScopes,
+func testAllPermissions(client *http.Client, info *secretInfo, token string) error {
+	scopeConfigMap, err := getScopeConfigMap()
+	if err != nil {
+		return err
 	}
 
-	for _, scopeList := range individualScopeLists {
-		for _, scope := range scopeList {
-			if contains(validatedPermissions, scope.Name) || scope.TestEndpoint == "" {
-				// Skip if the scope is already validated or if the test endpoint is not defined
-				continue
-			}
-
-			isValid, err := validatePermission(client, scope.TestEndpoint, token)
-			if err != nil {
-				return nil, err
-			}
-			if isValid {
-				// Add the scope name to the validated permissions list
-				validatedPermissions = append(validatedPermissions, scope.Name)
-				// Add all implied scopes to the validated permissions list as well
-				for _, impliedScope := range scope.ImpliedScopes {
-					if !contains(validatedPermissions, impliedScope) {
-						validatedPermissions = append(validatedPermissions, impliedScope)
-					}
-				}
-			}
-		}
-	}
-
-	for _, scope := range scopeConfigMap.OpenIDScopes {
-		if contains(validatedPermissions, scope.Name) || scope.TestEndpoint == "" {
+	for _, scope := range scopeConfigMap.Scopes {
+		scopeName := scope.Name
+		if info.Permissions[scopeName] == StatusGranted {
+			// Skip if the scope is already granted
 			continue
 		}
-		// Open ID permission can be validated using the /2/users/get_current_account endpoint
-		// If the response contains the "email" key, that implies that the email permission is also granted
-		// Similar case for the "given_name" key and the profile permission
-		body, statusCode, err := callDropboxAPIEndpoint(client, scope.TestEndpoint, token)
-		if err != nil {
-			return nil, err
+
+		if scope.Name == PermissionStrings[Openid] {
+			// The OpenID permission can be validated using the "/2/users/get_current_account" endpoint
+			// If the response contains the "email" key, that implies that the "email" permission is also granted
+			// Similar case for the "given_name" key and the "profile" permission
+			body, statusCode, err := callDropboxAPIEndpoint(client, scope.TestEndpoint, token)
+			if err != nil {
+				return err
+			}
+			switch statusCode {
+			case http.StatusOK, http.StatusConflict:
+				// The endpoint responds with 409 Conflict if the openid scope
+				// is granted but the email and profile scopes are not granted
+				info.Permissions[scopeName] = StatusGranted
+
+				// Check for the "email" key in the response body
+				if strings.Contains(body, "\"email\":") {
+					info.Permissions[PermissionStrings[Email]] = StatusGranted
+				} else {
+					info.Permissions[PermissionStrings[Email]] = StatusDenied
+				}
+
+				// Check for the "given_name" key in the response body
+				if strings.Contains(body, "\"given_name\":") {
+					info.Permissions[PermissionStrings[Profile]] = StatusGranted
+				} else {
+					info.Permissions[PermissionStrings[Profile]] = StatusDenied
+				}
+			case http.StatusUnauthorized:
+				info.Permissions[scopeName] = StatusDenied
+				info.Permissions[PermissionStrings[Email]] = StatusDenied
+				info.Permissions[PermissionStrings[Profile]] = StatusDenied
+			}
+			continue
 		}
-		switch statusCode {
-		case http.StatusOK, http.StatusConflict:
-			validatedPermissions = append(validatedPermissions, scope.Name)
-			if strings.Contains(body, "\"email\": \"") {
-				validatedPermissions = append(validatedPermissions, PermissionStrings[Email])
-			}
-			if strings.Contains(body, "\"given_name\": \"") {
-				validatedPermissions = append(validatedPermissions, PermissionStrings[Profile])
-			}
-		case http.StatusUnauthorized:
-			break
-		default:
-			return nil, fmt.Errorf("failed to validate OpenID scope. Status %s: %s", statusCode, body)
+
+		isGranted, err := testPermission(client, scope.TestEndpoint, token)
+		if err != nil {
+			return err
+		}
+
+		if !isGranted {
+			info.Permissions[scopeName] = StatusDenied
+			continue
+		}
+
+		info.Permissions[scopeName] = StatusGranted
+		for _, impliedScope := range scope.ImpliedScopes {
+			info.Permissions[impliedScope] = StatusGranted
 		}
 	}
 
-	return validatedPermissions, nil
+	return nil
 }
 
-func validatePermission(client *http.Client, testEndpoint string, token string) (bool, error) {
+func testPermission(client *http.Client, testEndpoint string, token string) (bool, error) {
 	body, statusCode, err := callDropboxAPIEndpoint(client, testEndpoint, token)
 	if err != nil {
 		return false, err
@@ -212,11 +198,12 @@ func validatePermission(client *http.Client, testEndpoint string, token string) 
 			return true, nil
 		}
 	}
-	return false, fmt.Errorf("failed to validate scope. Status %s: %s", statusCode, body)
+	return false, fmt.Errorf("failed to validate scope. Status %d: %s", statusCode, body)
 }
 
 func callDropboxAPIEndpoint(client *http.Client, endpoint string, token string) (string, int, error) {
-	req, err := http.NewRequest(http.MethodPost, endpoint, nil)
+	baseURL := "https://api.dropboxapi.com"
+	req, err := http.NewRequest(http.MethodPost, baseURL+endpoint, nil)
 	if err != nil {
 		return "", 0, err
 	}
@@ -239,6 +226,14 @@ func callDropboxAPIEndpoint(client *http.Client, endpoint string, token string) 
 	return string(bodyBytes), res.StatusCode, nil
 }
 
+func getScopeConfigMap() (*scopeConfig, error) {
+	var scopeConfigMap scopeConfig
+	if err := json.Unmarshal(scopeConfigJson, &scopeConfigMap); err != nil {
+		return nil, errors.New("failed to unmarshal scopes.json: " + err.Error())
+	}
+	return &scopeConfigMap, nil
+}
+
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
@@ -255,118 +250,90 @@ func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 
 	account := info.Account
 	accountID := account.AccountID
-	// scopes := info.Permissions
+	allPermissions := getValidatedPermissions(info)
 
+	resource := analyzers.Resource{
+		Name:               fmt.Sprintf("%s %s", account.Name.GivenName, account.Name.Surname),
+		FullyQualifiedName: accountID,
+		Type:               "account",
+		Metadata: map[string]any{
+			"email":         account.Email,
+			"emailVerified": account.EmailVerified,
+			"disabled":      account.Disabled,
+			"country":       account.Country,
+			"accountType":   account.AccountType.Tag,
+		},
+	}
+	analyzers.BindAllPermissions(resource, allPermissions...)
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerTypeDropbox,
 		Metadata:     nil,
-		Bindings:     []analyzers.Binding{},
-		UnboundedResources: []analyzers.Resource{{
-			Name:               fmt.Sprintf("%s %s", account.Name.GivenName, account.Name.Surname),
-			FullyQualifiedName: account.AccountID,
-			Type:               "account",
-			Metadata: map[string]any{
-				"email":         account.Email,
-				"emailVerified": account.EmailVerified,
-				"disabled":      account.Disabled,
-				"country":       account.Country,
-				"accountType":   account.AccountType.Tag,
-			},
-		}},
+		Bindings:     analyzers.BindAllPermissions(resource, allPermissions...),
 	}
-
-	resourceDetails := getResourceDetails()
-	for 
-
-	for {
-		if status == StatusDenied {
-			continue
-		}
-		result.Bindings = append(result.Bindings, analyzers.Binding{
-			Resource: analyzers.Resource{
-				Name:               resource.DisplayName,
-				FullyQualifiedName: accountID + "/resource/" + resource.Name,
-				Type:               "resource",
-			},
-			Permission: analyzers.Permission{
-				Value: string(status),
-			},
-		})
-	}
-
 	return &result
 }
 
-func createResource(name string, displayName string, accountID string) analyzers.Resource {
-	return analyzers.Resource{
-		Name:               displayName,
-		FullyQualifiedName: accountID + "/resource/" + name,
-		Type:               "resource",
+func getValidatedPermissions(info *secretInfo) []analyzers.Permission {
+	permissions := []analyzers.Permission{}
+
+	for permission, status := range info.Permissions {
+		if status != StatusGranted {
+			continue
+		}
+		permissions = append(permissions, analyzers.Permission{
+			Value: permission,
+		})
 	}
+
+	return permissions
 }
 
-func getResourceDetails() []resourceDetails {
-	return []resourceDetails{
-		{Name: "account_info", DisplayName: "Account Info"},
-		{Name: "files_metadata", DisplayName: "Files Metadata"},
-		{Name: "files_content", DisplayName: "Files Content"},
-		{Name: "sharing", DisplayName: "Sharing"},
-		{Name: "file_requests", DisplayName: "File Requests"},
-		{Name: "contacts", DisplayName: "Contacts"},
-		{Name: "openid", DisplayName: "OpenID"},
+func printAccountAndPermissions(info *secretInfo) {
+	color.Yellow("\n[i] Accounts Info:")
+	t1 := table.NewWriter()
+	t1.SetOutputMirror(os.Stdout)
+	t1.AppendHeader(table.Row{"ID", "Name", "Email", "Email Verified", "Disabled", "Country", "Account Type"})
+	emailVerified := "No"
+	disabled := "No"
+	if info.Account.EmailVerified {
+		emailVerified = "Yes"
 	}
+	if info.Account.Disabled {
+		disabled = "Yes"
+	}
+	t1.AppendRow(table.Row{
+		color.GreenString(info.Account.AccountID),
+		color.GreenString(info.Account.Name.GivenName + " " + info.Account.Name.Surname),
+		color.GreenString(info.Account.Email),
+		color.GreenString(emailVerified),
+		color.GreenString(disabled),
+		color.GreenString(info.Account.Country),
+		color.GreenString(info.Account.AccountType.Tag),
+	})
+	t1.SetOutputMirror(os.Stdout)
+	t1.Render()
+
+	color.Yellow("\n[i] Permissions:")
+	t2 := table.NewWriter()
+	t2.AppendHeader(table.Row{"Permission", "Access"})
+
+	permissions := info.Permissions
+	for permission, status := range permissions {
+		access := "Denied"
+		if status == StatusGranted {
+			access = "Granted"
+		}
+		if status == StatusUnverified {
+			access = "Unverified"
+		}
+		t2.AppendRow(table.Row{
+			color.GreenString(permission),
+			color.GreenString(access),
+		})
+		t2.AppendSeparator()
+	}
+
+	t2.SetOutputMirror(os.Stdout)
+	t2.Render()
+	fmt.Printf("%s: https://www.dropbox.com/developers/documentation\n\n", color.GreenString("Ref"))
 }
-
-// func printAccountsAndProducts(info *secretInfo) {
-// 	userProducts := info.Item.Products
-// 	userAccounts := info.Accounts
-
-// 	color.Yellow("\n[i] Item ID: %s", info.Item.ItemID)
-
-// 	color.Yellow("\n[i] Accounts Info:")
-// 	t1 := table.NewWriter()
-// 	t1.SetOutputMirror(os.Stdout)
-// 	t1.AppendHeader(table.Row{"ID", "Name", "Official Name", "Type", "Subtype"})
-// 	for _, account := range userAccounts {
-// 		t1.AppendRow(table.Row{
-// 			color.GreenString(account.AccountID),
-// 			color.GreenString(account.Name),
-// 			color.GreenString(account.OfficialName),
-// 			color.GreenString(account.Type),
-// 			color.GreenString(account.Subtype),
-// 		})
-// 		t1.AppendSeparator()
-// 	}
-// 	t1.SetOutputMirror(os.Stdout)
-// 	t1.Render()
-
-// 	color.Yellow("\n[i] Products:")
-// 	t2 := table.NewWriter()
-// 	t2.AppendHeader(table.Row{"Product Name", "Access Level", "Capabilities"})
-
-// 	for _, product := range plaidProducts {
-// 		productCell := color.GreenString(product.DisplayName)
-// 		productDescCell := color.GreenString(product.Description)
-// 		productPermissionCell := color.GreenString("Denied")
-
-// 		for _, productName := range userProducts {
-// 			if productName == product.Name {
-// 				permissionLevel := PermissionStrings[product.PermissionLevel]
-// 				productPermissionCell = "Granted" // If permission level is not defined, default to "Granted"
-// 				if len(permissionLevel) > 0 {
-// 					// Capitalize the perssion level string
-// 					capitalizedLevel := strings.ToUpper(string(permissionLevel[0])) + strings.ToLower(permissionLevel[1:])
-// 					productPermissionCell = color.GreenString(capitalizedLevel)
-// 				}
-// 				break
-// 			}
-// 		}
-
-// 		t2.AppendRow(table.Row{productCell, productPermissionCell, productDescCell})
-// 		t2.AppendSeparator()
-// 	}
-
-// 	t2.SetOutputMirror(os.Stdout)
-// 	t2.Render()
-// 	fmt.Printf("%s: https://plaid.com/docs/api/\n\n", color.GreenString("Ref"))
-// }

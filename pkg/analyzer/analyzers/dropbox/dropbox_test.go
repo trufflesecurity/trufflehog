@@ -23,8 +23,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	secret := testSecrets.MustGetField("DROPBOX")
-	// inactiveSecret := testSecrets.MustGetField("DROPBOX_INACTIVE")
+	token := testSecrets.MustGetField("DROPBOX")
 
 	tests := []struct {
 		name    string
@@ -34,7 +33,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}{
 		{
 			name:    "valid dropbox credentials",
-			secret:  secret,
+			secret:  token,
 			want:    string(expectedOutput),
 			wantErr: false,
 		},
@@ -44,7 +43,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{Cfg: &config.Config{}}
 			got, err := a.Analyze(ctx, map[string]string{
-				"secret": tt.secret,
+				"token": tt.secret,
 			})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
