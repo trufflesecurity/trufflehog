@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -99,8 +98,7 @@ func TestSource_Chunks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-			var cancelOnce sync.Once
-			defer cancelOnce.Do(cancel)
+			defer cancel()
 
 			for k, v := range tt.init.setEnv {
 				t.Setenv(k, v)
@@ -117,26 +115,29 @@ func TestSource_Chunks(t *testing.T) {
 				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			chunksCh := make(chan *sources.Chunk)
-			var wg sync.WaitGroup
-			wg.Add(1)
+			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
-				defer wg.Done()
+				defer close(chunksCh)
 				err = s.Chunks(ctx, chunksCh)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
 					os.Exit(1)
 				}
 			}()
-			gotChunk := <-chunksCh
-			wantData, _ := base64.StdEncoding.DecodeString(tt.wantChunkData)
 
-			if diff := pretty.Compare(gotChunk.Data, wantData); diff != "" {
-				t.Errorf("%s: Source.Chunks() diff: (-got +want)\n%s", tt.name, diff)
+			select {
+			case <-ctx.Done():
+				close(chunksCh)
+				t.Errorf("TestSource_Chunks timed out: %v", ctx.Err())
+			case gotChunk := <-chunksCh:
+				wantData, _ := base64.StdEncoding.DecodeString(tt.wantChunkData)
+
+				if diff := pretty.Compare(gotChunk.Data, wantData); diff != "" {
+					t.Errorf("%s: Source.Chunks() diff: (-got +want)\n%s", tt.name, diff)
+				}
+				assert.Equal(t, "", s.GetProgress().EncodedResumeInfo)
+				assert.Equal(t, int64(100), s.GetProgress().PercentComplete)
 			}
-			wg.Wait()
-			assert.Equal(t, "", s.GetProgress().EncodedResumeInfo)
-			assert.Equal(t, int64(100), s.GetProgress().PercentComplete)
 		})
 	}
 }
