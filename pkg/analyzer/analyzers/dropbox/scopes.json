@@ -1,0 +1,88 @@
+{
+    "account_info_scopes": [
+        {
+            "name": "account_info.write",
+            "test_endpoint": "https://api.dropboxapi.com/2/account/set_profile_photo"
+        },
+        {
+            "name": "account_info.read",
+            "test_endpoint": "https://api.dropboxapi.com/2/check/user"
+        }
+    ],
+    "files_metadata_scopes": [
+        {
+            "name": "files.metadata.write",
+            "test_endpoint": "https://api.dropboxapi.com/2/file_properties/properties/add",
+            "implied_scopes": [
+                "files.metadata.read"
+            ]
+        },
+        {
+            "name": "files.metadata.read",
+            "test_endpoint": "https://api.dropboxapi.com/2/file_properties/properties/search"
+        }
+    ],
+    "files_content_scopes": [
+        {
+            "name": "files.content.write",
+            "test_endpoint": "https://api.dropboxapi.com/2/files/copy_v2",
+            "implied_scopes": [
+                "files.metadata.read"
+            ]
+        },
+        {
+            "name": "files.content.read",
+            "test_endpoint": "https://api.dropboxapi.com/2/files/get_file_lock_batch"
+        }
+    ],
+    "sharing_scopes": [
+        {
+            "name": "sharing.write",
+            "test_endpoint": "https://api.dropboxapi.com/2/sharing/add_file_member",
+            "implied_scopes": [
+                "sharing.read"
+            ]
+        },
+        {
+            "name": "sharing.read",
+            "test_endpoint": "https://api.dropboxapi.com/2/sharing/get_file_metadata"
+        }
+    ],
+    "file_requests_scopes": [
+        {
+            "name": "file_requests.write",
+            "test_endpoint": "https://api.dropboxapi.com/2/file_requests/update",
+            "implied_scopes": [
+                "file_requests.read"
+            ]
+        },
+        {
+            "name": "file_requests.read",
+            "test_endpoint": "https://api.dropboxapi.com/2/file_requests/list/continue"
+        }
+    ],
+    "contacts_scopes": [
+        {
+            "name": "contacts.write",
+            "test_endpoint": "https://api.dropboxapi.com/2/contacts/delete_manual_contacts_batch",
+            "implied_scopes": [
+                "contacts.read"
+            ]
+        },
+        {
+            "name": "contacts.read"
+        }
+    ],
+    "openid_scopes": [
+        {
+            "name": "openid",
+            "test_endpoint": "https://api.dropboxapi.com/2/openid/userinfo"
+        },
+        {
+            "name": "email"
+        },
+        {
+            "name": "profile"
+        }
+    ]
+}

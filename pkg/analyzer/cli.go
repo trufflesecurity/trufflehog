@@ -13,6 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/digitalocean"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/dockerhub"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/dropbox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/elevenlabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/figma"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github"
@@ -121,5 +122,7 @@ func Run(keyType string, secretInfo SecretInfo) {
 		figma.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "plaid":
 		plaid.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["secret"], secretInfo.Parts["id"], secretInfo.Parts["token"])
+	case "dropbox":
+		dropbox.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["token"])
 	}
 }
