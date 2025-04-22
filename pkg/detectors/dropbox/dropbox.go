@@ -23,13 +23,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(`\b(sl\.(?:u\.)[A-Za-z0-9\-\_]{130,})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"dropbox"}) + `\b(sl\.(u\.)?[A-Za-z0-9\-\_]{130,})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sl."}
+	return []string{"dropbox", "sl."}
 }
 
 // FromData will find and optionally verify Dropbox secrets in a given set of bytes.
@@ -66,6 +66,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyDropboxToken(ctx context.Context, client *http.Client, key string) (bool, error) {
+	// Reference: https://www.dropbox.com/developers/documentation/http/documentation
 	url := "https://api.dropboxapi.com/2/users/get_current_account"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
