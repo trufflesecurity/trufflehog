@@ -48,9 +48,9 @@ func (r RegexState) Matches(data []byte) []string {
 
 	res := make([]string, 0, len(matches))
 
-	// trim off spaces and different quote types ('").
+	// trim off all white spaces and different quote types ('"") & some special characters (,;).
 	for i := range matches {
-		res = append(res, strings.Trim(matches[i][1], `"' )`))
+		res = append(res, strings.Trim(strings.TrimSpace(matches[i][1]), `"' ),;`))
 	}
 
 	return res
