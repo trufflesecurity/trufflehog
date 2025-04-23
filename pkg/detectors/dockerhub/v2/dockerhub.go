@@ -29,17 +29,17 @@ var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	// Can use email or username for login.
-	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker", "dockerhub", "hub.docker"}) + `(?im)(?:user|usr|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
-	emailPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"docker", "dockerhub", "hub.docker"}) + common.EmailPattern)
+	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `(?im)(?:user|usr|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
+	emailPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + common.EmailPattern)
 
 	// Can use password or personal/organization access token (PAT/OAT) for login, but this scanner will only check for PATs and OATs.
-	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker", "dockerhub", "hub.docker"}) + `\b(dckr_pat_[a-zA-Z0-9_-]{27}|dckr_oat_[a-zA-Z0-9_-]{32})(?:[^a-zA-Z0-9_-]|\z)`)
+	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `\b(dckr_pat_[a-zA-Z0-9_-]{27}|dckr_oat_[a-zA-Z0-9_-]{32})(?:[^a-zA-Z0-9_-]|\z)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"docker", "dockerhub", "hub.docker", "dckr_pat_", "dckr_oat_"}
+	return []string{"docker", "dckr_pat_", "dckr_oat_"}
 }
 
 // FromData will find and optionally verify Dockerhub secrets in a given set of bytes.
