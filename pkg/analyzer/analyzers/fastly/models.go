@@ -18,6 +18,7 @@ const (
 	TypeTLSPrivateKey         string = "TLS Private Key"
 	TypeTLSCertificate        string = "TLS Certificates"
 	TypeTLSDomain             string = "TLS Domain"
+	TypeInvoice               string = "Invoice"
 )
 
 type SecretInfo struct {
@@ -201,4 +202,18 @@ type TLSDomainsData struct {
 // TLSDomain is the single TLS Domain in TLSDomainsData
 type TLSDomain struct {
 	ID string `json:"id"`
+}
+
+// InvoicesData is the /billing/v3/invoices API Response
+type InvoicesData struct {
+	Data []Invoice `json:"data"`
+}
+
+// Invoice is the single invoice in InvoicesData
+type Invoice struct {
+	ID              string `json:"invoice_id"`
+	CustomerID      string `json:"customer_id"`
+	Region          string `json:"region"`
+	StatementNo     string `json:"statement_number"`
+	InvoicePostedOn string `json:"invoice_posted_on"`
 }

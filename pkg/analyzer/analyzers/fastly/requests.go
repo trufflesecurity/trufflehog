@@ -30,6 +30,7 @@ const (
 	tlsPrivateKeys
 	tlsCertificates
 	tlsDomains
+	invoices
 )
 
 var (
@@ -53,11 +54,14 @@ var (
 		tlsPrivateKeys:             "/tls/private_keys",
 		tlsCertificates:            "/tls/certificates",
 		tlsDomains:                 "/tls/domains",
+		invoices:                   "/billing/v3/invoices",
 
 		/*
 			API:
 			- /service/service_id/version/version_id/package (The use of this API is discouraged as per documentation due to limited availability release)
 			- /tls/bulk/certificates (The use of this API is discouraged as per documentation due to limited availability release)
+			- /security/workspaces (This Fastly Security API is only available to customers with access to the Next-Gen WAF product )
+			- /events (This API just returns the account events like user logged in or user logged out etc)
 
 			Utilities API Docs:
 			Some of these APIs are deprecated while others return same response for everyone with a global access key.
@@ -157,6 +161,7 @@ func captureResources(client *http.Client, key string, secretInfo *SecretInfo) e
 	launchTask(func() error { return capturePrivateKeys(client, key, secretInfo) })
 	launchTask(func() error { return captureCertificates(client, key, secretInfo) })
 	launchTask(func() error { return captureTLSDomains(client, key, secretInfo) })
+	launchTask(func() error { return captureInvoices(client, key, secretInfo) })
 
 	wg.Wait()
 	close(errChan)
@@ -692,6 +697,39 @@ func captureTLSDomains(client *http.Client, key string, secretInfo *SecretInfo) 
 				ID:   domain.ID,
 				Name: domain.ID,
 				Type: TypeTLSDomain,
+			}
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// captureInvoices calls `/billing/v3/invoices` API
+func captureInvoices(client *http.Client, key string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeFastlyRequest(client, endpoints[invoices], key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var invoices InvoicesData
+
+		if err := json.Unmarshal(respBody, &invoices); err != nil {
+			return err
+		}
+
+		for _, invoice := range invoices.Data {
+			resource := FastlyResource{
+				ID:   invoice.CustomerID + "/region/" + invoice.Region + "/statement/" + invoice.StatementNo + "/invoice/" + invoice.ID,
+				Name: invoice.ID, // no specific name
+				Type: TypeInvoice,
 			}
 
 			secretInfo.appendResource(resource)
