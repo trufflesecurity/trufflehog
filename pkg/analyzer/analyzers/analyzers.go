@@ -94,6 +94,7 @@ const (
 	AnalyzerTypeLaunchDarkly
 	AnalyzerTypeFigma
 	AnalyzerTypePlaid
+	AnalyzerTypeFastly
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -133,6 +134,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeLaunchDarkly:  "LaunchDarkly",
 	AnalyzerTypeFigma:         "Figma",
 	AnalyzerTypePlaid:         "Plaid",
+	AnalyzerTypeFastly:        "Fastly",
 	// Add new mappings here
 }
 
