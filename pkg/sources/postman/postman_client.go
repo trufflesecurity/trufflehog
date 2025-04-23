@@ -285,8 +285,7 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not read response body for workspaces during enumeration: %w", err)
 	}
-	r.Body.Close()
-
+	defer r.Body.Close()
 	if err := json.Unmarshal([]byte(body), &workspacesObj); err != nil {
 		return nil, fmt.Errorf("could not unmarshal workspaces JSON during enumeration: %w", err)
 	}
@@ -324,8 +323,7 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 	if err != nil {
 		return Workspace{}, fmt.Errorf("could not read response body for workspace (%s): %w", workspaceUUID, err)
 	}
-	r.Body.Close()
-
+	defer r.Body.Close()
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		return Workspace{}, fmt.Errorf("could not unmarshal workspace JSON for workspace (%s): %w", workspaceUUID, err)
 	}
@@ -352,7 +350,7 @@ func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid s
 	if err != nil {
 		return VariableData{}, fmt.Errorf("could not read env var response body for environment (%s): %w", environment_uuid, err)
 	}
-	r.Body.Close()
+	defer r.Body.Close()
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		return VariableData{}, fmt.Errorf("could not unmarshal env variables JSON for environment (%s): %w", environment_uuid, err)
 	}
@@ -379,7 +377,7 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 	if err != nil {
 		return Collection{}, fmt.Errorf("could not read response body for collection (%s): %w", collection_uuid, err)
 	}
-	r.Body.Close()
+	defer r.Body.Close()
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		return Collection{}, fmt.Errorf("could not unmarshal JSON for collection (%s): %w", collection_uuid, err)
 	}

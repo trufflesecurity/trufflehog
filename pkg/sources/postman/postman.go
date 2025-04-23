@@ -116,7 +116,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			return errors.New("Postman token is empty")
 		}
 		s.client = NewClient(conn.GetToken())
-		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3)
+		s.client.HTTPClient = common.RetryableHTTPClientTimeout(10)
 		log.RedactGlobally(conn.GetToken())
 	case *sourcespb.Postman_Unauthenticated:
 		s.client = nil
@@ -744,7 +744,7 @@ func unpackWorkspace(workspacePath string) (Workspace, error) {
 			return workspace, err
 		}
 		contents, err := io.ReadAll(rc)
-		rc.Close()
+		defer rc.Close()
 		if err != nil {
 			return workspace, err
 		}
