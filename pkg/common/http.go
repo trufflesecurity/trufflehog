@@ -189,6 +189,7 @@ func RetryableHTTPClient(opts ...ClientOption) *http.Client {
 	return httpClient.StandardClient()
 }
 
+// RetryableHTTPClientTimeout returns a new http client with a specified timeout and a custom transport
 func RetryableHTTPClientTimeout(timeOutSeconds int64, opts ...ClientOption) *http.Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.RetryMax = 3
@@ -202,6 +203,7 @@ func RetryableHTTPClientTimeout(timeOutSeconds int64, opts ...ClientOption) *htt
 
 	standardClient := httpClient.StandardClient()
 	standardClient.Timeout = httpClient.HTTPClient.Timeout
+	standardClient.Transport = httpClient.HTTPClient.Transport
 	return standardClient
 }
 
