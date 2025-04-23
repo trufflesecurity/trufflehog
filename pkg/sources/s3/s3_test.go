@@ -131,6 +131,7 @@ func TestSource_Chunks(t *testing.T) {
 					select {
 					case <-ctx.Done():
 						t.Errorf("TestSource_Chunks timed out: %v", ctx.Err())
+						return
 					case gotChunk, ok := <-chunksCh:
 						if !ok {
 							t.Logf("Source.Chunks() finished, channel closed")
