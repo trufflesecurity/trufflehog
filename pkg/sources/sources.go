@@ -385,6 +385,8 @@ type ElasticsearchConfig struct {
 	BestEffortScan bool
 }
 
+type PipeConfig struct{}
+
 // Progress is used to update job completion progress across sources.
 type Progress struct {
 	mut               sync.Mutex

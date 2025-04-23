@@ -249,6 +249,8 @@ var (
 	huggingfaceIncludeDiscussions = huggingfaceScan.Flag("include-discussions", "Include discussions in scan.").Bool()
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
+	pipeInputScan = cli.Command("pipe", "Find credentials from piped input.")
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
@@ -934,6 +936,11 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 		if ref, err = eng.ScanHuggingface(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan HuggingFace: %v", err)
+		}
+	case pipeInputScan.FullCommand():
+		cfg := sources.PipeConfig{}
+		if ref, err = eng.ScanPipeInput(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan piped input: %v", err)
 		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)

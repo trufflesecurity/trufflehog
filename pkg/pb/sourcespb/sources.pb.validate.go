@@ -6651,3 +6651,101 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = SentryValidationError{}
+
+// Validate checks the field values on Pipe with the rules defined in the proto
+// definition for this message. If any rules are violated, the first error
+// encountered is returned, or nil if there are no violations.
+func (m *Pipe) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Pipe with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in PipeMultiError, or nil if none found.
+func (m *Pipe) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Pipe) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return PipeMultiError(errors)
+	}
+
+	return nil
+}
+
+// PipeMultiError is an error wrapping multiple validation errors returned by
+// Pipe.ValidateAll() if the designated constraints aren't met.
+type PipeMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m PipeMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m PipeMultiError) AllErrors() []error { return m }
+
+// PipeValidationError is the validation error returned by Pipe.Validate if the
+// designated constraints aren't met.
+type PipeValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e PipeValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e PipeValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e PipeValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e PipeValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e PipeValidationError) ErrorName() string { return "PipeValidationError" }
+
+// Error satisfies the builtin error interface
+func (e PipeValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sPipe.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = PipeValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = PipeValidationError{}
