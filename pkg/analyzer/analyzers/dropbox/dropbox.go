@@ -234,15 +234,6 @@ func getScopeConfigMap() (*scopeConfig, error) {
 	return &scopeConfigMap, nil
 }
 
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
 func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 	if info == nil {
 		return nil
