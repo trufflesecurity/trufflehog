@@ -5,15 +5,20 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/brianvoe/gofakeit/v7"
 	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
 func TestSnowflake_Pattern(t *testing.T) {
-	username := gofakeit.Username()
-	password := gofakeit.Password(true, true, true, false, false, 10)
+	validAccount := "tuacoip-zt74995"
+	validPrivateLinkAccount := "tuacoip-zt74995.privatelink"
+	validSingleCharacterAccount := "tuacoip-z"
+	validUsername := "Spencer5091"
+	invalidUsername := "Spencer@5091.com"
+
+	validPassword := "HelloWorld123!"
+	invalidPassword := "!12" // invalid length
 
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -24,25 +29,29 @@ func TestSnowflake_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "Snowflake Credentials",
-			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", "tuacoip-zt74995", username, password),
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, validUsername, validPassword),
 			want: [][]string{
-				[]string{"tuacoip-zt74995", username, password},
+				{validAccount, validUsername, validPassword},
 			},
 		},
 		{
 			name:  "Private Snowflake Credentials",
-			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", "tuacoip-zt74995.privatelink", username, password),
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validPrivateLinkAccount, validUsername, validPassword),
 			want: [][]string{
-				[]string{"tuacoip-zt74995.privatelink", username, password},
+				{validPrivateLinkAccount, validUsername, validPassword},
 			},
 		},
-
 		{
 			name:  "Snowflake Credentials - Single Character account",
-			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", "tuacoip-z", username, password),
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validSingleCharacterAccount, validUsername, validPassword),
 			want: [][]string{
-				[]string{"tuacoip-z", username, password},
+				{validSingleCharacterAccount, validUsername, validPassword},
 			},
+		},
+		{
+			name:  "Snowflake Credentials - Invalid Username & Password",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, invalidUsername, invalidPassword),
+			want:  [][]string{},
 		},
 	}
 
