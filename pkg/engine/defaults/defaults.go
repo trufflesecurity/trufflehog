@@ -67,6 +67,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_batch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_cosmosdb"
 	azure_entra_refreshtoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/refreshtoken"
 	azure_entra_serviceprincipal_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v1"
 	azure_entra_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
@@ -907,6 +908,7 @@ func buildDetectorList() []detectors.Detector {
 		&azure_entra_serviceprincipal_v1.Scanner{},
 		&azure_entra_serviceprincipal_v2.Scanner{},
 		&azure_batch.Scanner{},
+		&azure_cosmosdb.Scanner{},
 		&azurecontainerregistry.Scanner{},
 		&azuredevopspersonalaccesstoken.Scanner{},
 		// &azurefunctionkey.Scanner{}, // detector is throwing some FPs
