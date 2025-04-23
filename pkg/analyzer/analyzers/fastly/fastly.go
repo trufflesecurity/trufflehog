@@ -23,15 +23,19 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, exist := credInfo["key"]
+	key, exist := credInfo["key"]
 	if !exist {
 		return nil, fmt.Errorf("key not found in credential info")
 	}
 
 	// analyze permissions
+	info, err := AnalyzePermissions(a.Cfg, key)
+	if err != nil {
+		return nil, err
+	}
 
 	// secret info to analyzer
-	return nil, nil
+	return secretInfoToAnalyzerResult(info), nil
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
@@ -95,6 +99,55 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}
 
 	return secretInfo, nil
+}
+
+// secretInfoToAnalyzerResult translate secret info to Analyzer Result
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeElevenLabs,
+		Metadata:     map[string]any{},
+		Bindings:     make([]analyzers.Binding, 0),
+	}
+
+	// extract information from resource to create bindings and append to result bindings
+	for _, resource := range info.Resources {
+		binding := analyzers.Binding{
+			Resource: *secretInfoResourceToAnalyzerResource(resource),
+			Permission: analyzers.Permission{
+				Value: info.TokenInfo.Scope,
+			},
+		}
+
+		if resource.Parent != nil {
+			binding.Resource.Parent = secretInfoResourceToAnalyzerResource(*resource.Parent)
+		}
+
+		result.Bindings = append(result.Bindings, binding)
+
+	}
+
+	return &result
+}
+
+// secretInfoResourceToAnalyzerResource translate secret info resource to analyzer resource for binding
+func secretInfoResourceToAnalyzerResource(resource FastlyResource) *analyzers.Resource {
+	analyzerRes := analyzers.Resource{
+		// make fully qualified name unique
+		FullyQualifiedName: resource.Type + "/" + resource.ID,
+		Name:               resource.Name,
+		Type:               resource.Type,
+		Metadata:           map[string]any{},
+	}
+
+	for key, value := range resource.Metadata {
+		analyzerRes.Metadata[key] = value
+	}
+
+	return &analyzerRes
 }
 
 // cli print functions

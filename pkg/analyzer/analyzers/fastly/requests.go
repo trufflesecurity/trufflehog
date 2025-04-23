@@ -21,8 +21,15 @@ const (
 	service
 	serviceVersions
 	serviceVersionACLs
-	serviceVersionDictionary
-	serviceVersionBackend
+	serviceVersionDictionaries
+	serviceVersionBackends
+	serviceVersionDomains
+	serviceVersionHealthChecks
+	configStores
+	secretStores
+	tlsPrivateKeys
+	tlsCertificates
+	tlsDomains
 )
 
 var (
@@ -30,15 +37,32 @@ var (
 
 	// endpoints contain Fastly API endpoints
 	endpoints = map[endpoint]string{
-		selfToken:                "/tokens/self",
-		currentUser:              "/current_user",
-		userTokens:               "/tokens",
-		automationTokens:         "/automation-tokens",
-		service:                  "/service",
-		serviceVersions:          "/service/%s/version",               // require service id
-		serviceVersionACLs:       "/service/%s/version/%s/acl",        // require service id and version number
-		serviceVersionDictionary: "/service/%s/version/%s/dictionary", // require service id and version number
-		serviceVersionBackend:    "/service/%s/version/%s/backend",    // require service id and version number
+		selfToken:                  "/tokens/self",
+		currentUser:                "/current_user",
+		userTokens:                 "/tokens",
+		automationTokens:           "/automation-tokens",
+		service:                    "/service",
+		serviceVersions:            "/service/%s/version",                // require service id
+		serviceVersionACLs:         "/service/%s/version/%s/acl",         // require service id and version number
+		serviceVersionDictionaries: "/service/%s/version/%s/dictionary",  // require service id and version number
+		serviceVersionBackends:     "/service/%s/version/%s/backend",     // require service id and version number
+		serviceVersionDomains:      "/service/%s/version/%s/domain",      // require service id and version number
+		serviceVersionHealthChecks: "/service/%s/version/%s/healthcheck", // require service id and version number
+		configStores:               "/resources/stores/config",
+		secretStores:               "/resources/stores/secret",
+		tlsPrivateKeys:             "/tls/private_keys",
+		tlsCertificates:            "/tls/certificates",
+		tlsDomains:                 "/tls/domains",
+
+		/*
+			API:
+			- /service/service_id/version/version_id/package (The use of this API is discouraged as per documentation due to limited availability release)
+			- /tls/bulk/certificates (The use of this API is discouraged as per documentation due to limited availability release)
+
+			Utilities API Docs:
+			Some of these APIs are deprecated while others return same response for everyone with a global access key.
+			- https://www.fastly.com/documentation/reference/api/utils/
+		*/
 	}
 )
 
@@ -121,10 +145,18 @@ func captureResources(client *http.Client, key string, secretInfo *SecretInfo) e
 			launchTask(func() error { return captureSvcVersionACLs(client, key, version, secretInfo) })
 			launchTask(func() error { return captureSvcVersionDicts(client, key, version, secretInfo) })
 			launchTask(func() error { return captureSvcVersionBackends(client, key, version, secretInfo) })
+			launchTask(func() error { return captureSvcVersionDomains(client, key, version, secretInfo) })
+			launchTask(func() error { return captureSvcVersionHealthChecks(client, key, version, secretInfo) })
 		}
 
 		return nil
 	})
+
+	launchTask(func() error { return captureConfigStores(client, key, secretInfo) })
+	launchTask(func() error { return captureSecretStores(client, key, secretInfo) })
+	launchTask(func() error { return capturePrivateKeys(client, key, secretInfo) })
+	launchTask(func() error { return captureCertificates(client, key, secretInfo) })
+	launchTask(func() error { return captureTLSDomains(client, key, secretInfo) })
 
 	wg.Wait()
 	close(errChan)
@@ -374,7 +406,7 @@ func captureSvcVersionACLs(client *http.Client, key string, parentVersion Fastly
 
 // captureSvcVersionDicts calls `/service/<id>/version/<number>/dictionaries` API
 func captureSvcVersionDicts(client *http.Client, key string, parentVersion FastlyResource, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeFastlyRequest(client, fmt.Sprintf(endpoints[serviceVersionDictionary], parentVersion.Metadata["service_id"], parentVersion.ID), key)
+	respBody, statusCode, err := makeFastlyRequest(client, fmt.Sprintf(endpoints[serviceVersionDictionaries], parentVersion.Metadata["service_id"], parentVersion.ID), key)
 	if err != nil {
 		return err
 	}
@@ -408,7 +440,7 @@ func captureSvcVersionDicts(client *http.Client, key string, parentVersion Fastl
 
 // captureSvcVersionBackends calls `/service/<id>/version/<number>/backend` API
 func captureSvcVersionBackends(client *http.Client, key string, parentVersion FastlyResource, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeFastlyRequest(client, fmt.Sprintf(endpoints[serviceVersionBackend], parentVersion.Metadata["service_id"], parentVersion.ID), key)
+	respBody, statusCode, err := makeFastlyRequest(client, fmt.Sprintf(endpoints[serviceVersionBackends], parentVersion.Metadata["service_id"], parentVersion.ID), key)
 	if err != nil {
 		return err
 	}
@@ -423,10 +455,243 @@ func captureSvcVersionBackends(client *http.Client, key string, parentVersion Fa
 
 		for _, backend := range backends {
 			resource := FastlyResource{
-				ID:     parentVersion.Metadata["service_id"] + "/version/" + parentVersion.ID + "/" + backend.Name, // no specific ID
+				ID:     parentVersion.Metadata["service_id"] + "/version/" + parentVersion.ID + "/backend/" + backend.Name, // no specific ID
 				Name:   backend.Name,
 				Type:   TypeSvcVersionBackend,
 				Parent: &parentVersion,
+			}
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// captureSvcVersionDomains calls `/service/<id>/version/<number>/domain` API
+func captureSvcVersionDomains(client *http.Client, key string, parentVersion FastlyResource, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeFastlyRequest(client, fmt.Sprintf(endpoints[serviceVersionDomains], parentVersion.Metadata["service_id"], parentVersion.ID), key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var domains []Domain
+
+		if err := json.Unmarshal(respBody, &domains); err != nil {
+			return err
+		}
+
+		for _, domain := range domains {
+			resource := FastlyResource{
+				ID:     parentVersion.Metadata["service_id"] + "/version/" + parentVersion.ID + "/domain/" + domain.Name, // no specific ID
+				Name:   domain.Name,
+				Type:   TypeSvcVersionDomain,
+				Parent: &parentVersion,
+			}
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// captureSvcVersionHealthChecks calls `/service/<id>/version/<number>/healthcheck` API
+func captureSvcVersionHealthChecks(client *http.Client, key string, parentVersion FastlyResource, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeFastlyRequest(client, fmt.Sprintf(endpoints[serviceVersionHealthChecks], parentVersion.Metadata["service_id"], parentVersion.ID), key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var healthChecks []HealthCheck
+
+		if err := json.Unmarshal(respBody, &healthChecks); err != nil {
+			return err
+		}
+
+		for _, healthCheck := range healthChecks {
+			resource := FastlyResource{
+				ID:     parentVersion.Metadata["service_id"] + "/version/" + parentVersion.ID + "/healthcheck/" + healthCheck.Name, // no specific ID
+				Name:   healthCheck.Name,
+				Type:   TypeSvcVersionHealthCheck,
+				Parent: &parentVersion,
+			}
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// captureConfigStores calls `/resources/stores/config` API
+func captureConfigStores(client *http.Client, key string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeFastlyRequest(client, endpoints[configStores], key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var configs []ConfigStore
+
+		if err := json.Unmarshal(respBody, &configs); err != nil {
+			return err
+		}
+
+		for _, config := range configs {
+			resource := FastlyResource{
+				ID:   config.ID,
+				Name: config.Name,
+				Type: TypeConfigStore,
+			}
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// captureSecretStores calls `/resources/stores/secret` API
+func captureSecretStores(client *http.Client, key string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeFastlyRequest(client, endpoints[secretStores], key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var secretStores SecretStoreData
+
+		if err := json.Unmarshal(respBody, &secretStores); err != nil {
+			return err
+		}
+
+		for _, secret := range secretStores.Data {
+			resource := FastlyResource{
+				ID:   secret.ID,
+				Name: secret.Name,
+				Type: TypeSecretStore,
+			}
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// capturePrivateKeys calls `/tls/private_keys` API
+func capturePrivateKeys(client *http.Client, key string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeFastlyRequest(client, endpoints[tlsPrivateKeys], key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var privateKeys TLSPrivateKeyData
+
+		if err := json.Unmarshal(respBody, &privateKeys); err != nil {
+			return err
+		}
+
+		for _, privateKey := range privateKeys.Data {
+			resource := FastlyResource{
+				ID:   privateKey.ID,
+				Name: privateKey.Name,
+				Type: TypeTLSPrivateKey,
+			}
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// captureCertificates calls `/tls/certificates` API
+func captureCertificates(client *http.Client, key string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeFastlyRequest(client, endpoints[tlsCertificates], key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var certData TLSCertificatesData
+
+		if err := json.Unmarshal(respBody, &certData); err != nil {
+			return err
+		}
+
+		for _, cert := range certData.Data {
+			resource := FastlyResource{
+				ID:   cert.ID,
+				Name: cert.Name,
+				Type: TypeTLSCertificate,
+			}
+
+			secretInfo.appendResource(resource)
+		}
+
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil
+	default:
+		return fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+}
+
+// captureTLSDomains calls `/tls/domains` API
+func captureTLSDomains(client *http.Client, key string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeFastlyRequest(client, endpoints[tlsDomains], key)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var domainData TLSDomainsData
+
+		if err := json.Unmarshal(respBody, &domainData); err != nil {
+			return err
+		}
+
+		for _, domain := range domainData.Data {
+			resource := FastlyResource{
+				ID:   domain.ID,
+				Name: domain.ID,
+				Type: TypeTLSDomain,
 			}
 
 			secretInfo.appendResource(resource)

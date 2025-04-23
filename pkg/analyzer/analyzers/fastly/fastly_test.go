@@ -1,4 +1,4 @@
-package launchdarkly
+package fastly
 
 import (
 	_ "embed"
@@ -24,7 +24,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	key := testSecrets.MustGetField("LAUNCHDARKLY_TOKEN")
+	key := testSecrets.MustGetField("FASTLYPERSONALTOKEN_TOKEN")
 
 	tests := []struct {
 		name    string
@@ -33,7 +33,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "valid LaunchDarkly token",
+			name:    "valid fastly token",
 			key:     key,
 			want:    expectedOutput,
 			wantErr: false,
@@ -94,9 +94,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 // Helper function to sort bindings
 func sortBindings(bindings []analyzers.Binding) {
 	sort.SliceStable(bindings, func(i, j int) bool {
-		if bindings[i].Resource.Name == bindings[j].Resource.Name {
+		if bindings[i].Resource.FullyQualifiedName == bindings[j].Resource.FullyQualifiedName {
 			return bindings[i].Permission.Value < bindings[j].Permission.Value
 		}
-		return bindings[i].Resource.Name < bindings[j].Resource.Name
+		return bindings[i].Resource.FullyQualifiedName < bindings[j].Resource.FullyQualifiedName
 	})
 }

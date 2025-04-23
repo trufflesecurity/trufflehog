@@ -4,13 +4,20 @@ import "sync"
 
 const (
 	// types
-	TypeUserToken         string = "User Token"
-	TypeAutomationToken   string = "Automation Token"
-	TypeService           string = "Service"
-	TypeSvcVersion        string = "Service Version"
-	TypeSvcVersionACL     string = "Service Version ACL"
-	TypeSvcVersionDict    string = "Service Version Dictionary"
-	TypeSvcVersionBackend string = "Service Version Backend"
+	TypeUserToken             string = "User Token"
+	TypeAutomationToken       string = "Automation Token"
+	TypeService               string = "Service"
+	TypeSvcVersion            string = "Service Version"
+	TypeSvcVersionACL         string = "Service Version ACL"
+	TypeSvcVersionDict        string = "Service Version Dictionary"
+	TypeSvcVersionBackend     string = "Service Version Backend"
+	TypeSvcVersionDomain      string = "Service Version Domain"
+	TypeSvcVersionHealthCheck string = "Service Version Health Check"
+	TypeConfigStore           string = "Config Store"
+	TypeSecretStore           string = "Secret Store"
+	TypeTLSPrivateKey         string = "TLS Private Key"
+	TypeTLSCertificate        string = "TLS Certificates"
+	TypeTLSDomain             string = "TLS Domain"
 )
 
 type SecretInfo struct {
@@ -50,20 +57,6 @@ func (s *SecretInfo) listResourceByType(resourceType string) []FastlyResource {
 	}
 
 	return resources
-}
-
-// getResourceByID get a single resource by ID if found
-func (s *SecretInfo) getResourceByID(id string) *FastlyResource {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	for _, resource := range s.Resources {
-		if resource.ID == id {
-			return &resource
-		}
-	}
-
-	return nil
 }
 
 // API Response models
@@ -146,4 +139,66 @@ type Backend struct {
 	Name    string `json:"name"`
 	Address string `json:"address"`
 	Port    string `json:"port"`
+}
+
+// Domain is the /service/<id>/version/<number>/domain API Response
+type Domain struct {
+	Name string `json:"name"`
+}
+
+// HealthCheck is the /service/<id>/version/<number>/healthcheck API Response
+type HealthCheck struct {
+	Name   string `json:"name"`
+	Host   string `json:"host"`
+	Path   string `json:"path"`
+	Method string `json:"method"`
+}
+
+// ConfigStore is the /resources/stores/config API Response
+type ConfigStore struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// SecretStoreData is the /resources/stores/secret API Response
+type SecretStoreData struct {
+	Data []SecretStore `json:"data"`
+}
+
+// SecretStore is a single store in SecretStoreData
+type SecretStore struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// TLSPrivateKeyData is the /tls/private_keys API Response
+type TLSPrivateKeyData struct {
+	Data []TLSPrivateKey `json:"data"`
+}
+
+// TLSPrivateKey is the single TLS private key in TLSPrivateKeyData
+type TLSPrivateKey struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// TLSCertificatesData is the /tls/certificates API Response
+type TLSCertificatesData struct {
+	Data []TLSCertificate `json:"data"`
+}
+
+// TLSCertificate is the single TLS certificate in TLSCertificatesData
+type TLSCertificate struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// TLSDomainsData is the /tls/domains API Response
+type TLSDomainsData struct {
+	Data []TLSDomain `json:"data"`
+}
+
+// TLSDomain is the single TLS Domain in TLSDomainsData
+type TLSDomain struct {
+	ID string `json:"id"`
 }
