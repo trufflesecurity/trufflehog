@@ -70,10 +70,20 @@ func TestUsernameRegexCheck(t *testing.T) {
 	testString := `username = "johnsmith123"
                    username='johnsmith123'
 				   username:="johnsmith123"
+				   username:="johnsmith123",
+				   username:="johnsmith123";
                    username = johnsmith123
                    username=johnsmith123`
 
-	expectedStr := []string{"johnsmith123", "johnsmith123", "johnsmith123", "johnsmith123", "johnsmith123"}
+	expectedStr := []string{
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+	}
 
 	usernameRegexMatches := usernameRegexPat.Matches([]byte(testString))
 
@@ -90,12 +100,24 @@ func TestPasswordRegexCheck(t *testing.T) {
 	testString := `password = "johnsmith123$!"
                    password='johnsmith123$!'
 				   password:="johnsmith123$!"
+				   password:="johnsmith123$!",
+				   password:="johnsmith123$!";
+				   password:="johnsmi',th123$!";
                    password = johnsmith123$!
                    password=johnsmith123$!
 				   PasswordAuthenticator(username, "johnsmith123$!")`
 
-	expectedStr := []string{"johnsmith123$!", "johnsmith123$!", "johnsmith123$!", "johnsmith123$!", "johnsmith123$!",
-		"johnsmith123$!"}
+	expectedStr := []string{
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmi',th123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+	}
 
 	passwordRegexMatches := passwordRegexPat.Matches([]byte(testString))
 
