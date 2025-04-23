@@ -125,19 +125,36 @@ func TestSource_Chunks(t *testing.T) {
 				}
 			}()
 
-			select {
-			case <-ctx.Done():
-				close(chunksCh)
-				t.Errorf("TestSource_Chunks timed out: %v", ctx.Err())
-			case gotChunk := <-chunksCh:
-				wantData, _ := base64.StdEncoding.DecodeString(tt.wantChunkData)
+			waitFn := func() {
+				receivedFirstChunk := false
+				for {
+					select {
+					case <-ctx.Done():
+						t.Errorf("TestSource_Chunks timed out: %v", ctx.Err())
+					case gotChunk, ok := <-chunksCh:
+						if !ok {
+							t.Logf("Source.Chunks() finished, channel closed")
+							assert.Equal(t, "", s.GetProgress().EncodedResumeInfo)
+							assert.Equal(t, int64(100), s.GetProgress().PercentComplete)
+							return
+						}
+						if receivedFirstChunk {
+							// wantChunkData is the first chunk data. After the first chunk has
+							// been received and matched below, we want to drain chunksCh
+							// so Source.Chunks() can finish completely.
+							continue
+						}
 
-				if diff := pretty.Compare(gotChunk.Data, wantData); diff != "" {
-					t.Errorf("%s: Source.Chunks() diff: (-got +want)\n%s", tt.name, diff)
+						receivedFirstChunk = true
+						wantData, _ := base64.StdEncoding.DecodeString(tt.wantChunkData)
+
+						if diff := pretty.Compare(gotChunk.Data, wantData); diff != "" {
+							t.Logf("%s: Source.Chunks() diff: (-got +want)\n%s", tt.name, diff)
+						}
+					}
 				}
-				assert.Equal(t, "", s.GetProgress().EncodedResumeInfo)
-				assert.Equal(t, int64(100), s.GetProgress().PercentComplete)
 			}
+			waitFn()
 		})
 	}
 }
