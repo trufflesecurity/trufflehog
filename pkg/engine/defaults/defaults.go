@@ -337,6 +337,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gumroad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gyazo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harness"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
@@ -1179,6 +1180,7 @@ func buildDetectorList() []detectors.Detector {
 		&gumroad.Scanner{},
 		&gyazo.Scanner{},
 		&happyscribe.Scanner{},
+		&harness.Scanner{},
 		&harvest.Scanner{},
 		&hellosign.Scanner{},
 		&helpcrunch.Scanner{},
