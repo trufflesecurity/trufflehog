@@ -108,7 +108,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzers.AnalyzerTypeElevenLabs,
+		AnalyzerType: analyzers.AnalyzerTypeFastly,
 		Metadata:     map[string]any{},
 		Bindings:     make([]analyzers.Binding, 0),
 	}

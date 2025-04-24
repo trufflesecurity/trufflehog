@@ -1,5 +1,5 @@
 {
-    "AnalyzerType": 6,
+    "AnalyzerType": 34,
     "Bindings": [
         {
             "Resource": {
@@ -280,23 +280,6 @@
                     "Expires At": "",
                     "Role": "",
                     "Scope": "global:read global"
-                },
-                "Parent": null
-            },
-            "Permission": {
-                "Value": "global:read global",
-                "Parent": null
-            }
-        },
-        {
-            "Resource": {
-                "Name": "manage.fastly.com browser session",
-                "FullyQualifiedName": "User Token/7XJnBcxfDSTXEmEWpaitKY",
-                "Type": "User Token",
-                "Metadata": {
-                    "Expires At": "2025-04-23T19:01:18Z",
-                    "Role": "",
-                    "Scope": "global"
                 },
                 "Parent": null
             },
