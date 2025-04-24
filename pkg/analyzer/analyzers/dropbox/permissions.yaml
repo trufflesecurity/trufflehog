@@ -1,6 +1,6 @@
 permissions:
-  - accounts_info.write
-  - accounts_info.read
+  - account_info.write
+  - account_info.read
   - files.metadata.write
   - files.metadata.read
   - files.content.write

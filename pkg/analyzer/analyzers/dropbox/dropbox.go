@@ -31,7 +31,6 @@ type Analyzer struct {
 type PermissionStatus string
 
 const (
-	// Scope Granted Status
 	StatusGranted    PermissionStatus = "Granted"
 	StatusDenied     PermissionStatus = "Denied"
 	StatusUnverified PermissionStatus = "Unverified"
@@ -75,22 +74,33 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
 func AnalyzePermissions(cfg *config.Config, token string) (*secretInfo, error) {
 	// Dropbox API uses POST requests for all requests, so we need to use an unrestricted client
 	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
-
-	secretInfo := &secretInfo{
-		Permissions: make(map[string]PermissionStatus),
+	scopeConfigMap, err := getScopeConfigMap()
+	if err != nil {
+		return nil, err
 	}
 
+	secretInfo := &secretInfo{}
+
+	accountInfoPermission := PermissionStrings[AccountInfoRead]
 	for _, perm := range PermissionStrings {
-		secretInfo.Permissions[perm] = StatusUnverified
+		scopeDetails := scopeConfigMap.Scopes[perm]
+		status := StatusUnverified
+		if perm == accountInfoPermission {
+			// Account Info Read permission is always enabled
+			status = StatusGranted
+		}
+		secretInfo.Permissions = append(secretInfo.Permissions, accountPermission{
+			Name:    perm,
+			Status:  status,
+			Actions: scopeDetails.Actions,
+		})
 	}
-	// Account Info Read permission is always enabled
-	secretInfo.Permissions[PermissionStrings[AccountsInfoRead]] = StatusGranted
 
 	if err := populateAccountInfo(client, secretInfo, token); err != nil {
 		return nil, err
 	}
 
-	if err := testAllPermissions(client, secretInfo, token); err != nil {
+	if err := testAllPermissions(client, secretInfo, scopeConfigMap, token); err != nil {
 		return nil, err
 	}
 
@@ -114,24 +124,22 @@ func populateAccountInfo(client *http.Client, info *secretInfo, token string) er
 	}
 }
 
-func testAllPermissions(client *http.Client, info *secretInfo, token string) error {
-	scopeConfigMap, err := getScopeConfigMap()
-	if err != nil {
-		return err
-	}
+func testAllPermissions(client *http.Client, info *secretInfo, scopeConfigMap *scopeConfig, token string) error {
+	permissionStatuses := make(map[string]PermissionStatus)
 
-	for _, scope := range scopeConfigMap.Scopes {
-		scopeName := scope.Name
-		if info.Permissions[scopeName] == StatusGranted {
-			// Skip if the scope is already granted
+	for _, perm := range PermissionStrings {
+		scopeDetails := scopeConfigMap.Scopes[perm]
+
+		if _, ok := permissionStatuses[perm]; ok || scopeDetails.TestEndpoint == "" {
+			// Skip if the scope has already been determined or has no test endpoint
 			continue
 		}
 
-		if scope.Name == PermissionStrings[Openid] {
+		if perm == PermissionStrings[Openid] {
 			// The OpenID permission can be validated using the "/2/users/get_current_account" endpoint
 			// If the response contains the "email" key, that implies that the "email" permission is also granted
 			// Similar case for the "given_name" key and the "profile" permission
-			body, statusCode, err := callDropboxAPIEndpoint(client, scope.TestEndpoint, token)
+			body, statusCode, err := callDropboxAPIEndpoint(client, scopeDetails.TestEndpoint, token)
 			if err != nil {
 				return err
 			}
@@ -139,43 +147,48 @@ func testAllPermissions(client *http.Client, info *secretInfo, token string) err
 			case http.StatusOK, http.StatusConflict:
 				// The endpoint responds with 409 Conflict if the openid scope
 				// is granted but the email and profile scopes are not granted
-				info.Permissions[scopeName] = StatusGranted
+				permissionStatuses[perm] = StatusGranted
 
 				// Check for the "email" key in the response body
 				if strings.Contains(body, "\"email\":") {
-					info.Permissions[PermissionStrings[Email]] = StatusGranted
+					permissionStatuses[PermissionStrings[Email]] = StatusGranted
 				} else {
-					info.Permissions[PermissionStrings[Email]] = StatusDenied
+					permissionStatuses[PermissionStrings[Email]] = StatusDenied
 				}
 
 				// Check for the "given_name" key in the response body
 				if strings.Contains(body, "\"given_name\":") {
-					info.Permissions[PermissionStrings[Profile]] = StatusGranted
+					permissionStatuses[PermissionStrings[Profile]] = StatusGranted
 				} else {
-					info.Permissions[PermissionStrings[Profile]] = StatusDenied
+					permissionStatuses[PermissionStrings[Profile]] = StatusDenied
 				}
 			case http.StatusUnauthorized:
-				info.Permissions[scopeName] = StatusDenied
-				info.Permissions[PermissionStrings[Email]] = StatusDenied
-				info.Permissions[PermissionStrings[Profile]] = StatusDenied
+				permissionStatuses[perm] = StatusDenied
+				permissionStatuses[PermissionStrings[Email]] = StatusDenied
+				permissionStatuses[PermissionStrings[Profile]] = StatusDenied
 			}
 			continue
 		}
 
-		isGranted, err := testPermission(client, scope.TestEndpoint, token)
+		isGranted, err := testPermission(client, scopeDetails.TestEndpoint, token)
 		if err != nil {
 			return err
 		}
 
 		if !isGranted {
-			info.Permissions[scopeName] = StatusDenied
+			permissionStatuses[perm] = StatusDenied
 			continue
 		}
 
-		info.Permissions[scopeName] = StatusGranted
-		for _, impliedScope := range scope.ImpliedScopes {
-			info.Permissions[impliedScope] = StatusGranted
+		permissionStatuses[perm] = StatusGranted
+		for _, impliedScope := range scopeDetails.ImpliedScopes {
+			permissionStatuses[impliedScope] = StatusGranted
 		}
+	}
+
+	for idx, permission := range info.Permissions {
+		permission.Status = permissionStatuses[permission.Name]
+		info.Permissions[idx] = permission
 	}
 
 	return nil
@@ -267,12 +280,12 @@ func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 func getValidatedPermissions(info *secretInfo) []analyzers.Permission {
 	permissions := []analyzers.Permission{}
 
-	for permission, status := range info.Permissions {
-		if status != StatusGranted {
+	for _, permission := range info.Permissions {
+		if permission.Status != StatusGranted {
 			continue
 		}
 		permissions = append(permissions, analyzers.Permission{
-			Value: permission,
+			Value: permission.Name,
 		})
 	}
 
@@ -306,21 +319,32 @@ func printAccountAndPermissions(info *secretInfo) {
 
 	color.Yellow("\n[i] Permissions:")
 	t2 := table.NewWriter()
-	t2.AppendHeader(table.Row{"Permission", "Access"})
+	t2.AppendHeader(table.Row{"Permission", "Access", "Actions"})
 
 	permissions := info.Permissions
-	for permission, status := range permissions {
+	for _, permission := range permissions {
 		access := "Denied"
-		if status == StatusGranted {
+		permissionStatus := permission.Status
+		if permissionStatus == StatusGranted {
 			access = "Granted"
 		}
-		if status == StatusUnverified {
+		if permissionStatus == StatusUnverified {
 			access = "Unverified"
 		}
-		t2.AppendRow(table.Row{
-			color.GreenString(permission),
-			color.GreenString(access),
-		})
+		for idx, action := range permission.Actions {
+			permissionCell := ""
+			accessCell := ""
+			if idx == 0 {
+				permissionCell = color.GreenString(permission.Name)
+				accessCell = color.GreenString(access)
+			}
+
+			t2.AppendRow(table.Row{
+				permissionCell,
+				accessCell,
+				action,
+			})
+		}
 		t2.AppendSeparator()
 	}
 

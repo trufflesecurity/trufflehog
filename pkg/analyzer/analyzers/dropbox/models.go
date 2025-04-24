@@ -1,13 +1,13 @@
 package dropbox
 
 type scopeConfig struct {
-	Scopes []scope `json:"scopes"`
+	Scopes map[string]scope `json:"scopes"`
 }
 
 type scope struct {
-	Name          string   `json:"name"`
 	TestEndpoint  string   `json:"test_endpoint"`
 	ImpliedScopes []string `json:"implied_scopes"`
+	Actions       []string `json:"actions"`
 }
 
 type account struct {
@@ -29,7 +29,13 @@ type name struct {
 	Surname   string `json:"surname"`
 }
 
+type accountPermission struct {
+	Name    string
+	Status  PermissionStatus
+	Actions []string
+}
+
 type secretInfo struct {
 	Account     account
-	Permissions map[string]PermissionStatus
+	Permissions []accountPermission
 }

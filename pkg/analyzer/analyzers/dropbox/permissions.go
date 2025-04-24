@@ -7,8 +7,8 @@ type Permission int
 
 const (
     Invalid Permission = iota
-    AccountsInfoWrite Permission = iota
-    AccountsInfoRead Permission = iota
+    AccountInfoWrite Permission = iota
+    AccountInfoRead Permission = iota
     FilesMetadataWrite Permission = iota
     FilesMetadataRead Permission = iota
     FilesContentWrite Permission = iota
@@ -26,8 +26,8 @@ const (
 
 var (
     PermissionStrings = map[Permission]string{
-        AccountsInfoWrite: "accounts_info.write",
-        AccountsInfoRead: "accounts_info.read",
+        AccountInfoWrite: "account_info.write",
+        AccountInfoRead: "account_info.read",
         FilesMetadataWrite: "files.metadata.write",
         FilesMetadataRead: "files.metadata.read",
         FilesContentWrite: "files.content.write",
@@ -44,8 +44,8 @@ var (
     }
 
     StringToPermission = map[string]Permission{
-        "accounts_info.write": AccountsInfoWrite,
-        "accounts_info.read": AccountsInfoRead,
+        "account_info.write": AccountInfoWrite,
+        "account_info.read": AccountInfoRead,
         "files.metadata.write": FilesMetadataWrite,
         "files.metadata.read": FilesMetadataRead,
         "files.content.write": FilesContentWrite,
@@ -62,8 +62,8 @@ var (
     }
 
     PermissionIDs = map[Permission]int{
-        AccountsInfoWrite: 1,
-        AccountsInfoRead: 2,
+        AccountInfoWrite: 1,
+        AccountInfoRead: 2,
         FilesMetadataWrite: 3,
         FilesMetadataRead: 4,
         FilesContentWrite: 5,
@@ -80,8 +80,8 @@ var (
     }
 
     IdToPermission = map[int]Permission{
-        1: AccountsInfoWrite,
-        2: AccountsInfoRead,
+        1: AccountInfoWrite,
+        2: AccountInfoRead,
         3: FilesMetadataWrite,
         4: FilesMetadataRead,
         5: FilesContentWrite,
