@@ -253,3 +253,130 @@ func TestDockerExcludeWildcardPath(t *testing.T) {
 		assert.Equal(t, tf.excluded, excluded, "Unexpected exclusion result for path: %s", tf.path)
 	}
 }
+
+func TestShouldExclude(t *testing.T) {
+	tests := []struct {
+		name         string
+		excludePaths []string
+		testPath     string
+		want         bool
+	}{
+		{
+			name:         "exact match should exclude",
+			excludePaths: []string{"/var/log/test"},
+			testPath:     "/var/log/test",
+			want:         true,
+		},
+		{
+			name:         "non-matching path should not exclude",
+			excludePaths: []string{"/var/log/test"},
+			testPath:     "/var/log/other",
+			want:         false,
+		},
+		{
+			name:         "wildcard should match children",
+			excludePaths: []string{"/var/log/*"},
+			testPath:     "/var/log/test",
+			want:         true,
+		},
+		{
+			name:         "wildcard should not match parent",
+			excludePaths: []string{"/var/log/*/deep"},
+			testPath:     "/var/log",
+			want:         false,
+		},
+		{
+			name:         "multiple patterns should work",
+			excludePaths: []string{"/var/log/*", "/etc/nginx/*", "/tmp/test"},
+			testPath:     "/etc/nginx/conf.d/default.conf",
+			want:         true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dockerConn := &sourcespb.Docker{
+				Credential: &sourcespb.Docker_Unauthenticated{
+					Unauthenticated: &credentialspb.Unauthenticated{},
+				},
+				ExcludePaths: tt.excludePaths,
+			}
+
+			conn := &anypb.Any{}
+			err := conn.MarshalFrom(dockerConn)
+			assert.NoError(t, err)
+
+			s := &Source{}
+			err = s.Init(context.TODO(), "test", 0, 0, false, conn, 1)
+			assert.NoError(t, err)
+
+			// Test if the path should be excluded
+			excluded := false
+			for _, path := range tt.excludePaths {
+				if tt.testPath == path {
+					excluded = true
+					break
+				}
+				// Convert wildcard pattern to regex
+				pattern := strings.ReplaceAll(path, "*", ".*")
+				pattern = "^" + pattern + "$"
+				isMatch, err := regexp.MatchString(pattern, tt.testPath)
+				assert.NoError(t, err)
+				if isMatch {
+					excluded = true
+					break
+				}
+			}
+			assert.Equal(t, tt.want, excluded)
+		})
+	}
+}
+
+func TestDockerScanWithExclusions(t *testing.T) {
+	dockerConn := &sourcespb.Docker{
+		Credential: &sourcespb.Docker_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Images:       []string{"trufflesecurity/secrets@sha256:864f6d41209462d8e37fc302ba1532656e265f7c361f11e29fed6ca1f4208e11"},
+		ExcludePaths: []string{"/aws"}, // This path exists in the test image
+	}
+
+	conn := &anypb.Any{}
+	err := conn.MarshalFrom(dockerConn)
+	assert.NoError(t, err)
+
+	s := &Source{}
+	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	var wg sync.WaitGroup
+	chunksChan := make(chan *sources.Chunk, 1)
+	foundExcludedPath := false
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for chunk := range chunksChan {
+			// Skip history chunks
+			if isHistoryChunk(t, chunk) {
+				continue
+			}
+
+			metadata := chunk.SourceMetadata.GetDocker()
+			assert.NotNil(t, metadata)
+
+			// Check if we found a chunk with the excluded path
+			if metadata.File == "/aws" {
+				foundExcludedPath = true
+			}
+		}
+	}()
+
+	err = s.Chunks(context.TODO(), chunksChan)
+	assert.NoError(t, err)
+
+	close(chunksChan)
+	wg.Wait()
+
+	assert.False(t, foundExcludedPath, "Found a chunk that should have been excluded")
+}

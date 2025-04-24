@@ -31,13 +31,14 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_DOCKER
 
 type Source struct {
-	name         string
-	sourceId     sources.SourceID
-	jobId        sources.JobID
-	verify       bool
-	concurrency  int
-	conn         sourcespb.Docker
-	excludePaths []string
+	name           string
+	sourceId       sources.SourceID
+	jobId          sources.JobID
+	verify         bool
+	concurrency    int
+	conn           sourcespb.Docker
+	excludePaths   []string
+	excludeRegexes []*regexp.Regexp
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -76,9 +77,20 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 		return fmt.Errorf("error unmarshalling connection: %w", err)
 	}
 
-	// Extract exclude paths from connection
+	// Extract exclude paths from connection and compile regexes
 	if paths := s.conn.GetExcludePaths(); len(paths) > 0 {
 		s.excludePaths = paths
+		s.excludeRegexes = make([]*regexp.Regexp, len(paths))
+		for i, path := range paths {
+			// Convert wildcard pattern to regex
+			pattern := strings.ReplaceAll(path, "*", ".*")
+			pattern = "^" + pattern + "$"
+			regex, err := regexp.Compile(pattern)
+			if err != nil {
+				return fmt.Errorf("error compiling exclude path regex for %q: %w", path, err)
+			}
+			s.excludeRegexes[i] = regex
+		}
 	}
 
 	return nil
@@ -359,19 +371,15 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 	// Check if the file should be excluded
 	filePath := "/" + info.name
 	ctx.Logger().V(2).Info("checking file against exclude paths", "file", filePath, "exclude_paths", s.excludePaths)
-	for _, excludePath := range s.excludePaths {
-		// Convert wildcard pattern to regex
-		pattern := strings.ReplaceAll(excludePath, "*", ".*")
-		pattern = "^" + pattern + "$"
-
-		matched, err := regexp.MatchString(pattern, filePath)
-		if err != nil {
-			ctx.Logger().Error(err, "error matching exclude pattern", "pattern", pattern, "file", filePath)
-			continue
+	for i, excludePath := range s.excludePaths {
+		// Check for exact path match first (no regex needed)
+		if filePath == excludePath {
+			ctx.Logger().V(2).Info("skipping file: matches exclude path exactly", "file", filePath, "exclude_path", excludePath)
+			return nil
 		}
-
-		if matched {
-			ctx.Logger().V(2).Info("skipping file: matches exclude path", "file", filePath, "exclude_path", excludePath)
+		// Then check against pre-compiled regex
+		if s.excludeRegexes[i].MatchString(filePath) {
+			ctx.Logger().V(2).Info("skipping file: matches exclude pattern", "file", filePath, "exclude_path", excludePath)
 			return nil
 		}
 	}
