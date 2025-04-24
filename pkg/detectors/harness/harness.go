@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -13,6 +14,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
+
+// Response struct for decoding API responses.
+type response struct {
+	Data struct {
+		LastLogin int `json:"lastLogin"`
+	} `json:"data"`
+}
 
 type Scanner struct {
 	client *http.Client
@@ -99,13 +107,9 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	switch res.StatusCode {
 	case http.StatusOK:
 		extraData := make(map[string]string)
-		var response struct {
-			Data struct {
-				LastLogin int `json:"lastLogin"`
-			} `json:"data"`
-		}
+		var response response
 		if err := json.NewDecoder(res.Body).Decode(&response); err == nil {
-			extraData["last_login"] = fmt.Sprintf("%d", response.Data.LastLogin)
+			extraData["last_login"] = strconv.Itoa(response.Data.LastLogin)
 			return true, extraData, nil
 		}
 		return true, nil, nil
