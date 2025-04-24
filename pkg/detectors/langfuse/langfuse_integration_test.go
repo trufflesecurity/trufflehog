@@ -55,7 +55,6 @@ func TestLangfuse_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Langfuse,
 					Verified:     true,
-					Redacted:     publicKey,
 				},
 			},
 			wantErr:             false,
@@ -73,7 +72,6 @@ func TestLangfuse_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Langfuse,
 					Verified:     false,
-					Redacted:     inactivePublicKey,
 				},
 			},
 			wantErr:             false,
@@ -103,7 +101,6 @@ func TestLangfuse_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Langfuse,
 					Verified:     false,
-					Redacted:     publicKey,
 				},
 			},
 			wantErr:             false,
@@ -121,7 +118,6 @@ func TestLangfuse_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Langfuse,
 					Verified:     false,
-					Redacted:     publicKey,
 				},
 			},
 			wantErr:             false,

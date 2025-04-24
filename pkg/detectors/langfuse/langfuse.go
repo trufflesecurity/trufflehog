@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
-	"encoding/base64"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -28,7 +27,7 @@ var (
 )
 
 func (s Scanner) Keywords() []string {
-	return []string{"langfuse", "pk-lf-", "sk-lf-"}
+	return []string{"pk-lf-", "sk-lf-"}
 }
 
 // FromData will find and optionally verify Langfuse secrets in a given set of bytes.
@@ -49,8 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for skMatch := range secretKeyMatches {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Langfuse,
-				Raw:          []byte(fmt.Sprintf("%s:%s", pkMatch, skMatch)),
-				Redacted:     pkMatch,
+				Raw:          []byte(skMatch),
 			}
 
 			if verify {
@@ -59,9 +57,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client = defaultClient
 				}
 
-				isVerified, extraData, verificationErr := verifyMatch(ctx, client, pkMatch, skMatch)
+				isVerified, verificationErr := verifyMatch(ctx, client, pkMatch, skMatch)
 				s1.Verified = isVerified
-				s1.ExtraData = extraData
 				if verificationErr != nil {
 					s1.SetVerificationError(verificationErr, pkMatch)
 				}
@@ -74,18 +71,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, pkMatch string, skMatch string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, pkMatch string, skMatch string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://cloud.langfuse.com/api/public/projects", nil)
 	if err != nil {
-		return false, nil, nil
+		return false, err
 	}
 
-	authStr := fmt.Sprintf("%s:%s", pkMatch, skMatch)
-	encodedAuth := base64.StdEncoding.EncodeToString([]byte(authStr))
-	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", encodedAuth))
+	req.SetBasicAuth(pkMatch, skMatch)
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -94,11 +89,11 @@ func verifyMatch(ctx context.Context, client *http.Client, pkMatch string, skMat
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return true, nil, nil
+		return true, nil
 	case http.StatusUnauthorized:
-		return false, nil, nil
+		return false, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
