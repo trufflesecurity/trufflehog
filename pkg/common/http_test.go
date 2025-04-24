@@ -264,8 +264,8 @@ func TestRetryableHTTPClientTimeout(t *testing.T) {
 			assert.Equal(t, tc.expectedTimeout, client.Timeout, "HTTP client timeout does not match expected value")
 
 			// Verify that the transport is a custom transport
-			_, isCustomTransport := client.Transport.(*CustomTransport)
-			assert.True(t, isCustomTransport, "HTTP client transport is not a CustomTransport")
+			_, isCustomTransport := client.Transport.(*retryablehttp.RoundTripper)
+			assert.True(t, isCustomTransport, "HTTP client transport is not a retryablehttp.RoundTripper")
 		})
 	}
 }
