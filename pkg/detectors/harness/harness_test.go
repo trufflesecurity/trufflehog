@@ -2,10 +2,20 @@ package harness
 
 import (
 	"context"
+	"fmt"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"testing"
+)
+
+var (
+	validKey               = "pat.4oXWHvYFRNOGLVpFTZGGTA.68077fc826afe36865614d58.2fFEmr57WO3zPmev3jze"
+	validKeyWithoutKeyword = `API Key Token: pat.4oXWHvYFRNOGLVpFTZGGTA.68077fc826afe36865614d58.2fFEmr57WO3zPmev3jze
+	url |https://api.harness.io/`
+	invalidKey = "pat.4oXWHvYFRNOGLVpFTZGGTA.6807c5bed9599c324f6368ce.usCT2fzvADwSoXzXc"
+	keyword    = "harness"
 )
 
 func TestHarness_Pattern(t *testing.T) {
@@ -17,20 +27,19 @@ func TestHarness_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "typical pattern",
-			input: "harness_token = '3aBcDFE5678901234567890_1a2b3c4d'",
-			want:  []string{"3aBcDFE5678901234567890_1a2b3c4d"},
+			name:  "valid pattern",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validKey),
+			want:  []string{validKey},
 		},
 		{
-			name: "finds all matches",
-			input: `harness_token1 = '3aBcDFE5678901234567890_1a2b3c4d'
-harness_token2 = '3aDcDFE56789012245678a0_1a2b3c2d'`,
-			want: []string{"3aBcDFE5678901234567890_1a2b3c4d", "3aDcDFE56789012245678a0_1a2b3c2d"},
+			name:  "valid pattern - no keyword",
+			input: fmt.Sprintf("token = '%s'", validKeyWithoutKeyword),
+			want:  nil,
 		},
 		{
 			name:  "invalid pattern",
-			input: "harness_token = '1a2b3c4d'",
-			want:  []string{},
+			input: fmt.Sprintf("%s token = '%s'", keyword, invalidKey),
+			want:  nil,
 		},
 	}
 

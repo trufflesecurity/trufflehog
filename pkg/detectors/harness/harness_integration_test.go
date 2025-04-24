@@ -24,8 +24,8 @@ func TestHarness_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HARNESS")
-	inactiveSecret := testSecrets.MustGetField("HARNESS_INACTIVE")
+	apiKeyToken := testSecrets.MustGetField("HARNESS_TOKEN")
+	inactiveApiKeyToken := testSecrets.MustGetField("HARNESS_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,13 +45,16 @@ func TestHarness_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a harness secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a harness api key token %s within", apiKeyToken)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Harness,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"last_login": "1745321634105",
+					},
 				},
 			},
 			wantErr:             false,
@@ -62,7 +65,7 @@ func TestHarness_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a harness secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a harness harness api key token %s within but not valid", inactiveApiKeyToken)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -79,7 +82,7 @@ func TestHarness_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
+				data:   []byte("You cannot find the api key token within"),
 				verify: true,
 			},
 			want:                nil,
@@ -91,7 +94,7 @@ func TestHarness_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a harness secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a harness api key token %s within", apiKeyToken)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -108,7 +111,7 @@ func TestHarness_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a harness secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a harness api key token %s within", apiKeyToken)),
 				verify: true,
 			},
 			want: []detectors.Result{

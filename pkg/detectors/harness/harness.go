@@ -24,7 +24,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"harness"}) + `\b(pat\.[A-Za-z0-9]{22}\.6807[0-9a-f]{20}\.[A-Za-z0-9]{20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"harness"}) + `\b(pat\.[A-Za-z0-9]{22}\.[0-9a-f]{24}\.[A-Za-z0-9]{20})\b`)
 )
 
 func (s Scanner) getClient() *http.Client {
