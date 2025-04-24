@@ -3,10 +3,11 @@ package braintreepayments
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -105,7 +106,10 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
 	bodyString := string(bodyBytes)
 	if !(res.StatusCode == http.StatusOK) {

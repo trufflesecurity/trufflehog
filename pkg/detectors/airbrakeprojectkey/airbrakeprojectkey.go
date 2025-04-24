@@ -2,16 +2,20 @@ package airbrakeprojectkey
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
+	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -19,7 +23,7 @@ type Scanner struct{
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"airbrake"}) + `\b([a-zA-Z-0-9]{32})\b`)
@@ -36,40 +40,36 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueKeys, uniqueIds = make(map[string]struct{}), make(map[string]struct{})
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	for _, matches := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[matches[1]] = struct{}{}
+	}
 
-		for _, idMatch := range idMatches {
+	for _, matches := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueIds[matches[1]] = struct{}{}
+	}
 
-			resIdMatch := strings.TrimSpace(idMatch[1])
-
+	for key := range uniqueKeys {
+		for id := range uniqueIds {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_AirbrakeProjectKey,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resIdMatch),
+				Raw:          []byte(key),
+				RawV2:        []byte(key + id),
 			}
 			s1.ExtraData = map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/airbrake/",
 			}
 
 			if verify {
-				payload := strings.NewReader(`{"environment":"production","username":"john","email":"john@smith.com","repository":"https://github.com/airbrake/airbrake","revision":"38748467ea579e7ae64f7815452307c9d05e05c5","version":"v2.0"}`)
+				client := s.client
+				if client == nil {
+					client = defaultClient
+				}
 
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.airbrake.io/api/v4/projects/"+resIdMatch+"/deploys?key="+resMatch, payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyAirbrakeProjectKey(ctx, client, key, id)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr)
 			}
 
 			results = append(results, s1)
@@ -79,6 +79,35 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyAirbrakeProjectKey(ctx context.Context, client *http.Client, key string, id string) (bool, error) {
+	url := "https://api.airbrake.io/api/v4/projects/" + id + "/deploys?key=" + key
+	payload := strings.NewReader(`{"environment":"production","username":"john","email":"john@smith.com","repository":"https://github.com/airbrake/airbrake","revision":"38748467ea579e7ae64f7815452307c9d05e05c5","version":"v2.0"}`)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payload)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	// handle according to detector API responses.
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

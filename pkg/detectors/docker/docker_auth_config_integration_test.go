@@ -1,32 +1,17 @@
 //go:build detectors
 // +build detectors
 
-package budibase
+package docker
 
-import (
-	"context"
-	"fmt"
-	"testing"
-	"time"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-)
-
-func TestBudibase_FromChunk(t *testing.T) {
+func TestDocker_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BUDIBASE")
-	inactiveSecret := testSecrets.MustGetField("BUDIBASE_INACTIVE")
+	secret := testSecrets.MustGetField("DOCKER")
+	inactiveSecret := testSecrets.MustGetField("DOCKER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -46,12 +31,12 @@ func TestBudibase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a budibase secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a docker secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Budibase,
+					DetectorType: detectorspb.DetectorType_Docker,
 					Verified:     true,
 				},
 			},
@@ -63,19 +48,17 @@ func TestBudibase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a budibase secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a docker secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
-			want: func() []detectors.Result {
-				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Budibase,
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Docker,
 					Verified:     false,
-				}
-				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 403"))
-				return []detectors.Result{r}
-			}(),
+				},
+			},
 			wantErr:             false,
-			wantVerificationErr: true,
+			wantVerificationErr: false,
 		},
 		{
 			name: "not found",
@@ -89,12 +72,46 @@ func TestBudibase_FromChunk(t *testing.T) {
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
+		{
+			name: "found, would be verified if not for timeout",
+			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a docker secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Docker,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "found, verified but unexpected api surface",
+			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a docker secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Docker,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Budibase.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Docker.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -102,12 +119,12 @@ func TestBudibase_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Budibase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Docker.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

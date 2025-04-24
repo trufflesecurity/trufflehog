@@ -3,7 +3,9 @@ package dropbox
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -12,63 +14,98 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`\b(sl\.[A-Za-z0-9\-\_]{130,140})\b`)
+	defaultClient = common.SaneHttpClient()
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"dropbox"}) + `\b(sl\.(u\.)?[A-Za-z0-9\-\_]{130,})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sl."}
+	return []string{"dropbox", "sl."}
 }
 
 // FromData will find and optionally verify Dropbox secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueKeys = make(map[string]struct{})
 
-	for _, match := range matches {
+	for _, matches := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[matches[1]] = struct{}{}
+	}
 
-		result := detectors.Result{
+	for key := range uniqueKeys {
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Dropbox,
-			Raw:          []byte(match[1]),
+			Raw:          []byte(key),
 		}
 
 		if verify {
-
-			baseURL := "https://api.dropboxapi.com/2/users/get_current_account"
-
-			client := common.SaneHttpClient()
-
-			req, err := http.NewRequestWithContext(ctx, "POST", baseURL, nil)
-			if err != nil {
-				continue
+			client := s.client
+			if client == nil {
+				client = defaultClient
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", match[1]))
-			res, err := client.Do(req)
-			if err == nil {
-				res.Body.Close() // The request body is unused.
 
-				// 200 means good key for get current user
-				// 400 is bad (malformed)
-				// 403 bad scope
-				if res.StatusCode == http.StatusOK {
-					result.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyDropboxToken(ctx, client, key)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
 		}
 
-		results = append(results, result)
+		results = append(results, s1)
 	}
 
 	return
+}
+
+func verifyDropboxToken(ctx context.Context, client *http.Client, key string) (bool, error) {
+	// Reference: https://www.dropbox.com/developers/documentation/http/documentation
+	url := "https://api.dropboxapi.com/2/users/get_current_account"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusBadRequest:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, fmt.Errorf("failed to read response body: %w", err)
+		}
+		body := string(bodyBytes)
+
+		if strings.Contains(body, "missing_scope") ||
+			strings.Contains(body, "does not have the required scope") {
+			return true, nil // The token is valid but lacks the required scope
+		}
+		if strings.Contains(body, "invalid_access_token") ||
+			strings.Contains(body, "expired_access_token") {
+			return false, nil // The token is invalid or expired
+		}
+		return false, fmt.Errorf("unexpected status code: %d, body: %s", res.StatusCode, body)
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

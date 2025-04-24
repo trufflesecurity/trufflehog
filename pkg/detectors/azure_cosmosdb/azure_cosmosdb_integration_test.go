@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package budibase
+package azure_cosmosdb
 
 import (
 	"context"
@@ -12,21 +12,22 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestBudibase_FromChunk(t *testing.T) {
+func TestCosmosDB_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BUDIBASE")
-	inactiveSecret := testSecrets.MustGetField("BUDIBASE_INACTIVE")
+
+	key := testSecrets.MustGetField("COSMOSDB_KEY")
+	accountUrl := testSecrets.MustGetField("COSMOSDB_ACCOUNT")
+	inactiveKey := testSecrets.MustGetField("COSMOSDB_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,13 +46,13 @@ func TestBudibase_FromChunk(t *testing.T) {
 			name: "found, verified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a budibase secret %s within", secret)),
+				ctx:    ctx,
+				data:   []byte(fmt.Sprintf("You can find a cosmosdb key: %s and account url: %s within", key, accountUrl)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Budibase,
+					DetectorType: detectorspb.DetectorType_AzureCosmosDBKeyIdentifiable,
 					Verified:     true,
 				},
 			},
@@ -62,20 +63,18 @@ func TestBudibase_FromChunk(t *testing.T) {
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a budibase secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				ctx:    ctx,
+				data:   []byte(fmt.Sprintf("You can find a cosmosdb key: %s and accounturl: %s within but not valid", inactiveKey, accountUrl)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
-			want: func() []detectors.Result {
-				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Budibase,
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AzureCosmosDBKeyIdentifiable,
 					Verified:     false,
-				}
-				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 403"))
-				return []detectors.Result{r}
-			}(),
+				},
+			},
 			wantErr:             false,
-			wantVerificationErr: true,
+			wantVerificationErr: false,
 		},
 		{
 			name: "not found",
@@ -94,7 +93,7 @@ func TestBudibase_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Budibase.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CosmosDB.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -102,12 +101,12 @@ func TestBudibase_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Budibase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("CosmosDB.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

@@ -2,6 +2,8 @@ package beamer
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -45,18 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.getbeamer.com/v0/url", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Beamer-Api-Key", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyBeamer(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -71,4 +64,32 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Beamer is a user engagement platform that helps you communicate product updates and other important information to your users. Beamer API keys can be used to access and manage this information."
+}
+
+func verifyBeamer(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.getbeamer.com/v0/url", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Beamer-Api-Key", key)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
