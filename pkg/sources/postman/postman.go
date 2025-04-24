@@ -743,8 +743,8 @@ func unpackWorkspace(workspacePath string) (Workspace, error) {
 		if err != nil {
 			return workspace, err
 		}
-		contents, err := io.ReadAll(rc)
 		defer rc.Close()
+		contents, err := io.ReadAll(rc)
 		if err != nil {
 			return workspace, err
 		}
