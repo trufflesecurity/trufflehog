@@ -11,6 +11,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -49,43 +51,80 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType:       analyzers.AnalyzerTypeOpsgenie,
-		Metadata:           nil,
-		Bindings:           make([]analyzers.Binding, len(info.Permissions)),
-		UnboundedResources: make([]analyzers.Resource, len(info.Users)),
+		AnalyzerType: analyzers.AnalyzerTypePosthog,
+		Metadata:     nil,
+		Bindings:     make([]analyzers.Binding, 0),
 	}
 
-	// Opsgenie has API integrations, so the key does not belong
-	// to a particular user or account, it itself is a resource
-	resource := analyzers.Resource{
-		Name:               "Opsgenie API Integration Key",
-		FullyQualifiedName: "Opsgenie API Integration Key",
+	if info.organizationPermissions == nil {
+		// no permissions to check
+		return &result
+	}
+
+	// for general permissions, the api key itself can be the resource
+	generalResource := analyzers.Resource{
+		Name:               "Posthog Personal API Key",
+		FullyQualifiedName: "Posthog Personal API Key",
 		Type:               "API Key",
-		Metadata: map[string]any{
-			"expires": "never",
-		},
+	}
+	for _, permission := range info.generalPermissions {
+		permissionStr, _ := permission.ToString()
+		analyzerPermission := analyzers.Permission{
+			Value: permissionStr,
+		}
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource:   generalResource,
+			Permission: analyzerPermission,
+		})
 	}
 
-	for idx, permission := range info.Permissions {
-		result.Bindings[idx] = analyzers.Binding{
-			Resource: resource,
-			Permission: analyzers.Permission{
-				Value: permission,
-			},
+	// for organization permissions, we need to bind the permissions to the organization resource
+	organizationResource := analyzers.Resource{
+		Name:               info.organizationPermissions.Organization.Name,
+		FullyQualifiedName: info.organizationPermissions.Organization.ID,
+		Type:               "organization",
+	}
+	for _, permission := range info.organizationPermissions.Permissions {
+		permissionStr, _ := permission.ToString()
+		analyzerPermission := analyzers.Permission{
+			Value: permissionStr,
+		}
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource:   organizationResource,
+			Permission: analyzerPermission,
+		})
+	}
+
+	// for project permissions, we need to bind the permissions to the project resource and organization as the parent resource
+	for _, projectPermission := range info.projectPermissions {
+		projectResource := analyzers.Resource{
+			Name:               projectPermission.Project.Name,
+			FullyQualifiedName: strconv.Itoa(projectPermission.Project.ID),
+			Type:               "project",
+			Parent:             &organizationResource,
+		}
+		for _, permission := range projectPermission.Permissions {
+			permissionStr, _ := permission.ToString()
+			analyzerPermission := analyzers.Permission{
+				Value: permissionStr,
+			}
+			result.Bindings = append(result.Bindings, analyzers.Binding{
+				Resource:   projectResource,
+				Permission: analyzerPermission,
+			})
 		}
 	}
 
-	// We can find list of users in the current account
-	// if the API key has Configuration Access, so these can be
-	// unbounded resources
-	for idx, user := range info.Users {
-		result.UnboundedResources[idx] = analyzers.Resource{
-			Name:               user.FullName,
-			FullyQualifiedName: user.Username,
-			Type:               "user",
-			Metadata: map[string]any{
-				"username": user.Username,
-				"role":     user.Role.Name,
+	// if user is found, we can add it as unbounded resource
+	if info.user != nil {
+		result.UnboundedResources = []analyzers.Resource{
+			{
+				Name:               info.user.FirstName + " " + info.user.LastName,
+				FullyQualifiedName: info.user.UUID,
+				Type:               "user",
+				Metadata: map[string]any{
+					"email": info.user.Email,
+				},
 			},
 		}
 	}
@@ -94,7 +133,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 }
 
 //go:embed scopes.json
-var scopesConfig []byte
+var scopesConfigBytes []byte
 
 type HttpStatusTest struct {
 	Endpoint        string      `json:"endpoint"`
@@ -113,7 +152,7 @@ func StatusContains(status int, vals []int) bool {
 	return false
 }
 
-func (h *HttpStatusTest) RunTest(cfg *config.Config, client *http.Client, headers map[string]string) (bool, error) {
+func (h *HttpStatusTest) RunTest(cfg *config.Config, client *http.Client, domain string, headers map[string]string, args ...any) (bool, error) {
 	// If body data, marshal to JSON
 	var data io.Reader
 	if h.Payload != nil {
@@ -124,7 +163,7 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, client *http.Client, header
 		data = bytes.NewBuffer(jsonData)
 	}
 
-	req, err := http.NewRequest(h.Method, h.Endpoint, data)
+	req, err := http.NewRequest(h.Method, fmt.Sprintf(domain+h.Endpoint, args...), data)
 	if err != nil {
 		return false, err
 	}
@@ -148,8 +187,15 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, client *http.Client, header
 	case StatusContains(resp.StatusCode, h.InvalidStatuses):
 		return false, nil
 	default:
+		fmt.Println(h.Method, h.Endpoint)
 		return false, errors.New("error checking response status code")
 	}
+}
+
+type ScopesConfig struct {
+	GeneralScopes      []Scope `json:"general_scopes"`
+	OrganizationScopes []Scope `json:"organization_scopes"`
+	ProjectScopes      []Scope `json:"project_scopes"`
 }
 
 type Scope struct {
@@ -162,42 +208,45 @@ type ScopeTest struct {
 	Write *HttpStatusTest `json:"write"`
 }
 
-func readInScopes() ([]Scope, error) {
-	var scopes []Scope
-	if err := json.Unmarshal(scopesConfig, &scopes); err != nil {
+func readInScopesConfig() (*ScopesConfig, error) {
+	var scopesConfig ScopesConfig
+	if err := json.Unmarshal(scopesConfigBytes, &scopesConfig); err != nil {
 		return nil, err
 	}
 
-	return scopes, nil
+	return &scopesConfig, nil
 }
 
-func checkPermissions(cfg *config.Config, client *http.Client, domain string, org *organization, key string) ([]string, error) {
-	scopes, err := readInScopes()
-	if err != nil {
-		return nil, fmt.Errorf("reading in scopes: %w", err)
-	}
+func checkPermissions(cfg *config.Config, client *http.Client, domain string, key string, scopes []Scope, args ...any) ([]Permission, error) {
 
-	permissions := make([]string, 0)
+	permissions := make([]Permission, 0)
+	headers := map[string]string{"Authorization": "Bearer " + key}
 	for _, scope := range scopes {
 		var status bool
 		var err error
 		if scope.Test.Write != nil {
-			status, err = scope.Test.Write.RunTest(cfg, client, map[string]string{"Authorization": "Bearer " + key})
+			status, err = scope.Test.Write.RunTest(cfg, client, domain, headers, args...)
 			if err != nil {
 				return nil, fmt.Errorf("running test: %w", err)
 			}
 		}
 		if status {
+			if permission, ok := StringToPermission[scope.Name+":write"]; ok {
+				permissions = append(permissions, permission)
+			}
 			// if write exists, read also exists
-			permissions = append(permissions, scope.Name+":write")
-			permissions = append(permissions, scope.Name+":read")
+			if permission, ok := StringToPermission[scope.Name+":read"]; ok {
+				permissions = append(permissions, permission)
+			}
 		} else {
-			status, err = scope.Test.Read.RunTest(cfg, client, map[string]string{"Authorization": "Bearer " + key})
+			status, err = scope.Test.Read.RunTest(cfg, client, domain, headers, args...)
 			if err != nil {
 				return nil, fmt.Errorf("running test: %w", err)
 			}
 			if status {
-				permissions = append(permissions, scope.Name+":read")
+				if permission, ok := StringToPermission[scope.Name+":read"]; ok {
+					permissions = append(permissions, permission)
+				}
 			}
 		}
 
@@ -206,31 +255,21 @@ func checkPermissions(cfg *config.Config, client *http.Client, domain string, or
 	return permissions, nil
 }
 
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
-type organizationPermissions struct {
-	Organization *organization
+type OrganizationPermissions struct {
+	Organization *Organization
 	Permissions  []Permission
 }
 
-type projectPermissions struct {
-	Organization *organization
-	Project      *project
+type ProjectPermissions struct {
+	Organization *Organization
+	Project      *Project
 	Permissions  []Permission
 }
 
 type SecretInfo struct {
-	isValid                 bool
-	user                    *user
-	organizationPermissions []organizationPermissions
-	projectPermissions      []projectPermissions
+	user                    *User
+	organizationPermissions *OrganizationPermissions
+	projectPermissions      []ProjectPermissions
 	generalPermissions      []Permission
 	unverifiedPermissions   map[Permission]struct{}
 }
@@ -242,12 +281,26 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		return
 	}
 
-	color.Green("[!] Valid Posthog API key\n\n")
-	printPermissions(info.Permissions)
-	if len(info.Users) > 0 {
-		printUsers(info.Users)
+	color.Green("[!] Valid Posthog API key")
+	color.Yellow("[i] Expires: Never")
+	if info.user != nil {
+		printUser(*info.user)
 	}
-	color.Yellow("\n[i] Expires: Never")
+
+	if len(info.generalPermissions) > 0 {
+		printGeneralPermissions(info.generalPermissions)
+	}
+	if info.organizationPermissions != nil {
+		printOrganizationPermissions(*info.organizationPermissions)
+	}
+	if len(info.projectPermissions) > 0 {
+		printProjectPermissions(info.projectPermissions)
+	}
+	printUnverifiedPermissions(info.unverifiedPermissions)
+
+	if info.organizationPermissions == nil {
+		color.Yellow("\n[i] No permissions were verified for this key because the key does not have one of the necessary permissions (user:read or organization:read) required to verifiy other permissions.")
+	}
 
 }
 
@@ -256,7 +309,8 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	// These are permissions that cannot be verified due to no endpoint available
 	info.unverifiedPermissions = map[Permission]struct{}{
-		PluginWrite:               struct{}{},
+		ErrorTrackingRead:         struct{}{},
+		ErrorTrackingWrite:        struct{}{},
 		SharingConfigurationRead:  struct{}{},
 		SharingConfigurationWrite: struct{}{},
 		WebhookRead:               struct{}{},
@@ -270,7 +324,6 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Invalid API Key: %w", err)
 	}
-	info.isValid = true
 
 	info.generalPermissions = make([]Permission, 0)
 	if user != nil {
@@ -282,46 +335,115 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	// If the key has user:read scope, we will get the user above which contains the organizations and projects.
 	// If the key does not have user:read scope, we can call the /organizations/@current endpoint to get the
 	// organization and projects. If the key does not have organization:read scope as well, we cannot determine any scope.
-	org, err := getOrganization(cfg, client, domain, key)
-	if err != nil {
-		return nil, err
-	}
-	if org == nil && user == nil {
-		// can't determine any scopes
-		for permission := range PermissionStrings {
-			info.unverifiedPermissions[permission] = struct{}{}
+	var org *Organization
+	if user == nil {
+		org, err = getOrganization(cfg, client, domain, key)
+		if err != nil {
+			return nil, err
 		}
-		return info, nil
-	}
-	if org == nil {
+		if org == nil {
+			// can't determine any scopes
+			for permission := range PermissionStrings {
+				info.unverifiedPermissions[permission] = struct{}{}
+			}
+			return info, nil
+		}
+	} else {
 		org = &user.Organization
 	}
 
-	permissions, err := checkPermissions(cfg, client, domain, org, key)
+	// read in scopes
+	scopesConfig, err := readInScopesConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	info.Permissions = permissions
+	// check general permissions
+	generalPermissions, err := checkGeneralPermissions(cfg, client, domain, key, scopesConfig)
+	if err != nil {
+		return nil, err
+	}
+	info.generalPermissions = append(info.generalPermissions, generalPermissions...)
+
+	// check organization permissions
+	organizationPermissions, err := checkOrganizationPermissions(cfg, client, domain, key, scopesConfig, org)
+	if err != nil {
+		return nil, err
+	}
+	info.organizationPermissions = organizationPermissions
+
+	// check project permissions
+	projectPermissions, err := checkProjectPermissions(cfg, client, domain, key, scopesConfig, org)
+	if err != nil {
+		return nil, err
+	}
+	info.projectPermissions = projectPermissions
 
 	return info, nil
 }
 
-type user struct {
+func checkGeneralPermissions(cfg *config.Config, client *http.Client, domain, key string, scopesConfig *ScopesConfig) ([]Permission, error) {
+	return checkPermissions(cfg, client, domain, key, scopesConfig.GeneralScopes)
+}
+
+func checkOrganizationPermissions(
+	cfg *config.Config,
+	client *http.Client,
+	domain,
+	key string,
+	scopesConfig *ScopesConfig,
+	org *Organization,
+) (*OrganizationPermissions, error) {
+	organizationPermissions := &OrganizationPermissions{
+		Organization: org,
+	}
+	permissions, err := checkPermissions(cfg, client, domain, key, scopesConfig.OrganizationScopes, org.ID)
+	if err != nil {
+		return nil, err
+	}
+	organizationPermissions.Permissions = permissions
+	return organizationPermissions, nil
+}
+
+func checkProjectPermissions(
+	cfg *config.Config,
+	client *http.Client,
+	domain,
+	key string,
+	scopesConfig *ScopesConfig,
+	org *Organization,
+) ([]ProjectPermissions, error) {
+	projectPermissions := make([]ProjectPermissions, 0)
+	for _, project := range org.Projects {
+		projectPermission := ProjectPermissions{
+			Organization: org,
+			Project:      &project,
+		}
+		permissions, err := checkPermissions(cfg, client, domain, key, scopesConfig.ProjectScopes, project.ID)
+		if err != nil {
+			return nil, err
+		}
+		projectPermission.Permissions = permissions
+		projectPermissions = append(projectPermissions, projectPermission)
+	}
+	return projectPermissions, nil
+}
+
+type User struct {
 	UUID         string       `json:"uuid"`
 	FirstName    string       `json:"first_name"`
 	LastName     string       `json:"last_name"`
 	Email        string       `json:"email"`
-	Organization organization `json:"organization"`
+	Organization Organization `json:"organization"`
 }
 
-type organization struct {
+type Organization struct {
 	ID       string    `json:"id"`
 	Name     string    `json:"name"`
-	Projects []project `json:"projects"`
+	Projects []Project `json:"projects"`
 }
 
-type project struct {
+type Project struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
@@ -330,7 +452,7 @@ type project struct {
 // if the response is 200 OK, it means the domain is valid and user:read permission is also there
 // if the response is 403 Forbidden, it means the domain is valid but user:read permission is not there
 // if the response is 401 Unauthorized, it means the domain is invalid
-func resolveDomainAndUser(cfg *config.Config, client *http.Client, key string) (string, *user, error) {
+func resolveDomainAndUser(cfg *config.Config, client *http.Client, key string) (string, *User, error) {
 
 	domains := []string{USDomain, EUDomain}
 	for _, domain := range domains {
@@ -350,7 +472,7 @@ func resolveDomainAndUser(cfg *config.Config, client *http.Client, key string) (
 		switch resp.StatusCode {
 		case http.StatusOK:
 			// domain is valid and user permission also exists
-			var userInfo user
+			var userInfo User
 			if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
 				return "", nil, err
 			}
@@ -369,7 +491,7 @@ func resolveDomainAndUser(cfg *config.Config, client *http.Client, key string) (
 	return "", nil, fmt.Errorf("invalid Posthog API key")
 }
 
-func getOrganization(cfg *config.Config, client *http.Client, domain string, key string) (*organization, error) {
+func getOrganization(cfg *config.Config, client *http.Client, domain string, key string) (*Organization, error) {
 	req, err := http.NewRequest(http.MethodGet, domain+"/api/organizations/@current/", nil)
 	if err != nil {
 		return nil, err
@@ -385,7 +507,7 @@ func getOrganization(cfg *config.Config, client *http.Client, domain string, key
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		var org organization
+		var org Organization
 		if err := json.NewDecoder(resp.Body).Decode(&org); err != nil {
 			return nil, err
 		}
@@ -397,24 +519,68 @@ func getOrganization(cfg *config.Config, client *http.Client, domain string, key
 	}
 }
 
-func printPermissions(permissions []string) {
-	color.Yellow("[i] Permissions:")
+func printUser(user User) {
+	color.Yellow("\n[i] User Info:")
+	color.Green("[i] Name: %s %s", user.FirstName, user.LastName)
+	color.Green("[i] Email: %s", user.Email)
+	color.Green("[i] ID: %s", user.UUID)
+}
+
+func printGeneralPermissions(permissions []Permission) {
+	color.Yellow("\n[i] General Permissions:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Permission"})
 	for _, permission := range permissions {
-		t.AppendRow(table.Row{color.GreenString(permission)})
+		permissionStr, _ := permission.ToString()
+		t.AppendRow(table.Row{color.GreenString(permissionStr)})
 	}
 	t.Render()
 }
 
-func printUsers(users []User) {
-	color.Green("\n[i] Users:")
+func printOrganizationPermissions(organizationPermissions OrganizationPermissions) {
+	color.Yellow("\n[i] Organization Permissions:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "Username", "Role"})
-	for _, user := range users {
-		t.AppendRow(table.Row{color.GreenString(user.FullName), color.GreenString(user.Username), color.GreenString(user.Role.Name)})
+	t.AppendHeader(table.Row{"Organization", "Permission"})
+	permissionsString := make([]string, len(organizationPermissions.Permissions))
+	for i, permission := range organizationPermissions.Permissions {
+		permissionsString[i], _ = permission.ToString()
+	}
+	t.AppendRow(table.Row{
+		color.GreenString(organizationPermissions.Organization.Name),
+		color.GreenString(strings.Join(permissionsString, "\n")),
+	})
+	t.Render()
+}
+
+func printProjectPermissions(projectPermissions []ProjectPermissions) {
+	color.Yellow("\n[i] Project Permissions:")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Project", "Permission"})
+	for _, projectPermission := range projectPermissions {
+		permissionsString := make([]string, len(projectPermission.Permissions))
+		for i, permission := range projectPermission.Permissions {
+			permissionsString[i], _ = permission.ToString()
+
+		}
+		t.AppendRow(table.Row{
+			color.GreenString(projectPermission.Project.Name),
+			color.GreenString(strings.Join(permissionsString, "\n")),
+		})
+	}
+	t.Render()
+}
+
+func printUnverifiedPermissions(permissions map[Permission]struct{}) {
+	color.Yellow("\n[i] Unverified Permissions:")
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Permission"})
+	for permission := range permissions {
+		permissionStr, _ := permission.ToString()
+		t.AppendRow(table.Row{color.YellowString(permissionStr)})
 	}
 	t.Render()
 }

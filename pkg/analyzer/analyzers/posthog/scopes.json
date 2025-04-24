@@ -17,7 +17,7 @@
                     "endpoint": "/api/organizations",
                     "method": "POST",
                     "valid_status_code": [
-                        500
+                        400
                     ],
                     "invalid_status_code": [
                         403
@@ -627,7 +627,7 @@
                 },
                 "write": {
                     "endpoint": "/api/projects/%d/subscriptions/`nowaythiscanexist",
-                    "method": "POST",
+                    "method": "PATCH",
                     "valid_status_code": [
                         402,
                         404
