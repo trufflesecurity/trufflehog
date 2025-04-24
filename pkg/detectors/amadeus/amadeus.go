@@ -2,6 +2,7 @@ package amadeus
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -13,7 +14,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
+	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -21,7 +23,7 @@ type Scanner struct{
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"amadeus"}) + `\b([0-9A-Za-z]{32})\b`)
@@ -38,40 +40,33 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueKeys, uniqueSecrets = make(map[string]struct{}), make(map[string]struct{})
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-		for _, secretMatch := range secretMatches {
-			resSecret := strings.TrimSpace(secretMatch[1])
+	for _, matches := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[matches[1]] = struct{}{}
+	}
 
+	for _, matches := range secretPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueSecrets[matches[1]] = struct{}{}
+	}
+
+	for key := range uniqueKeys {
+		for secret := range uniqueSecrets {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Amadeus,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resSecret),
+				Raw:          []byte(key),
+				RawV2:        []byte(key + secret),
 			}
 
 			if verify {
-				payload := strings.NewReader("grant_type=client_credentials&client_id=" + resMatch + "&client_secret=" + resSecret)
+				client := s.client
+				if client == nil {
+					client = defaultClient
+				}
 
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://test.api.amadeus.com/v1/security/oauth2/token", payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-					body := string(bodyBytes)
-					if (res.StatusCode >= 200 && res.StatusCode < 300) && strings.Contains(body, "access_token") {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyAdobeIOSecret(ctx, client, key, secret)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr)
 			}
 
 			results = append(results, s1)
@@ -79,6 +74,42 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyAdobeIOSecret(ctx context.Context, client *http.Client, key string, secret string) (bool, error) {
+	payload := strings.NewReader("grant_type=client_credentials&client_id=" + key + "&client_secret=" + secret)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://test.api.amadeus.com/v1/security/oauth2/token", payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		body := string(bodyBytes)
+		if !strings.Contains(body, "access_token") {
+			return false, nil
+		}
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
