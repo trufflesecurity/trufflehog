@@ -116,7 +116,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			return errors.New("Postman token is empty")
 		}
 		s.client = NewClient(conn.GetToken())
-		s.client.HTTPClient = common.RetryableHTTPClientTimeout(10)
+		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3)
 		log.RedactGlobally(conn.GetToken())
 	case *sourcespb.Postman_Unauthenticated:
 		s.client = nil
