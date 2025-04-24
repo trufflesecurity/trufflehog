@@ -246,6 +246,7 @@ func checkResponseStatus(r *http.Response) error {
 	return fmt.Errorf("postman Request failed with status code: %d", r.StatusCode)
 }
 
+// getPostmanResponseBodyBytes makes a request to the Postman API and returns the response body as bytes.
 func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
 	req, err := c.NewRequest(url, headers)
 	if err != nil {
