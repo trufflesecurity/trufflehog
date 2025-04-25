@@ -202,7 +202,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		collection, err := s.client.GetCollection(ctx, collectionID)
 		if err != nil {
-			return fmt.Errorf("error getting collection %s: %w", collectionID, err)
+			// Log and move on, because sometimes the Postman API seems to give us collection IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "error getting collection %s", collectionID)
+			continue
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning collection %s", collectionID), "")
 		s.scanCollection(ctx, chunksChan, Metadata{}, collection)
@@ -302,7 +305,10 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		}
 		collection, err := s.client.GetCollection(ctx, collectionID.UUID)
 		if err != nil {
-			return err
+			// Log and move on, because sometimes the Postman API seems to give us collection IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "error getting collection %s", collectionID)
+			continue
 		}
 		s.scanCollection(ctx, chunksChan, metadata, collection)
 	}
