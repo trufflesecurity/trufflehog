@@ -371,7 +371,7 @@ func (s *Source) scanBuckets(
 					// and therefore not an error.
 					ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
 				}
-				continue
+				break
 			}
 			pageMetadata := pageMetadata{
 				bucket:     bucket,
