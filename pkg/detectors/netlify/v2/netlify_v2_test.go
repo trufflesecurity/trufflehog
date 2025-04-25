@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	validPattern   = "dxyTVGLfvZNOkenli_Eb-T4eCZcOnoBq5rn0tMmqEBG"
-	invalidPattern = "dxy?VGLfvZNOkenli_Eb-T4eCZcOnoBq5rn0tMmqEBG"
+	validPattern   = "nfp_gsTPZr8vTqmit69DY8u8es68N3XvxqW20330"
+	invalidPattern = "nfp_?sTPZr8vTqmit69DY8u8es68N3XvxqW20330"
 	keyword        = "netlify"
 )
 
