@@ -261,7 +261,7 @@ func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, he
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		ctx.Logger().Error(err, "could not read postman response body")
+		return nil, fmt.Errorf("could not read postman response body: %w", err)
 	}
 
 	ctx.Logger().V(4).Info("postman api response headers are available", "response_header", resp.Header)
