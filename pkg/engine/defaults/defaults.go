@@ -468,7 +468,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myfreshworks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myintervals"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nethunt"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify"
+	netlifyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify/v1"
+	netlifyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netsuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
@@ -1320,7 +1321,8 @@ func buildDetectorList() []detectors.Detector {
 		&myintervals.Scanner{},
 		// &nasdaqdatalink.Scanner{},
 		&nethunt.Scanner{},
-		&netlify.Scanner{},
+		&netlifyv1.Scanner{},
+		&netlifyv2.Scanner{},
 		&netsuite.Scanner{},
 		&neutrinoapi.Scanner{},
 		&newrelicpersonalapikey.Scanner{},
