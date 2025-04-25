@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -18,6 +17,7 @@ type Scanner struct {
 }
 
 const accuweatherURL = "https://dataservice.accuweather.com"
+const requiredShannonEntropy = 4
 
 var (
 	// Ensure the Scanner satisfies the interface at compile time.
@@ -46,21 +46,26 @@ func (s Scanner) getClient() *http.Client {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	matches := make(map[string]struct{})
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		k := match[1]
+		if detectors.StringShannonEntropy(k) < requiredShannonEntropy {
+			continue
+		}
+		matches[k] = struct{}{}
+	}
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-
+	for key := range matches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Accuweather,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(key),
 		}
 
 		if verify {
 			client := s.getClient()
-			isVerified, verificationErr := verifyAccuweather(ctx, client, resMatch)
+			isVerified, verificationErr := verifyAccuweather(ctx, client, key)
 			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr, resMatch)
+			s1.SetVerificationError(verificationErr, key)
 		}
 
 		results = append(results, s1)
@@ -69,8 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyAccuweather(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, accuweatherURL+"/locations/v1/cities/autocomplete?apikey="+resMatch+"&q=----&language=en-us", nil)
+func verifyAccuweather(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, accuweatherURL+"/locations/v1/cities/autocomplete?apikey="+key+"&q=----&language=en-us", nil)
 	if err != nil {
 		return false, err
 	}
@@ -97,5 +102,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Accuweather is a weather forecasting service. Accuweather API keys can be used to access weather data and forecasts."
+	return "AccuWeather is a weather forecasting service. AccuWeather API keys can be used to access weather data and forecasts."
 }
