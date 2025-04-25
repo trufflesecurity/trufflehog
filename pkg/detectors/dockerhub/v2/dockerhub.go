@@ -33,7 +33,7 @@ var (
 	emailPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + common.EmailPattern)
 
 	// Can use password or personal/organization access token (PAT/OAT) for login, but this scanner will only check for PATs and OATs.
-	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `\b(dckr_pat_[a-zA-Z0-9_-]{27}|dckr_oat_[a-zA-Z0-9_-]{32})(?:[^a-zA-Z0-9_-]|\z)`)
+	accessTokenPat = regexp.MustCompile(`\b(dckr_pat_[a-zA-Z0-9_-]{27}|dckr_oat_[a-zA-Z0-9_-]{32})(?:[^a-zA-Z0-9_-]|\z)`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
