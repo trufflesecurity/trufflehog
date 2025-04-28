@@ -149,7 +149,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentID: env.ID, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE}, env)
 	}
 
-	// Scan local workspaces
+	// Scan local collections
 	for _, collectionPath := range s.conn.CollectionPaths {
 		collection := Collection{}
 		contents, err := os.ReadFile(collectionPath)
