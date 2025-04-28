@@ -56,50 +56,50 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Bindings:     make([]analyzers.Binding, 0),
 	}
 
-	if info.organizationPermissions == nil {
+	if info.orgPermissions == nil {
 		// no permissions to check
 		return &result
 	}
 
-	// for general permissions, the api key itself can be the resource
-	generalResource := analyzers.Resource{
-		Name:               "Posthog Personal API Key",
-		FullyQualifiedName: "Posthog Personal API Key",
-		Type:               "API Key",
-	}
-	for _, permission := range info.generalPermissions {
-		permissionStr, _ := permission.ToString()
+	if info.user != nil {
+		// for user resource
+		userResource := analyzers.Resource{
+			Name:               info.user.FirstName + " " + info.user.LastName,
+			FullyQualifiedName: info.user.UUID,
+			Type:               "user",
+		}
 		analyzerPermission := analyzers.Permission{
-			Value: permissionStr,
+			Value: PermissionStrings[UserRead],
 		}
 		result.Bindings = append(result.Bindings, analyzers.Binding{
-			Resource:   generalResource,
+			Resource:   userResource,
 			Permission: analyzerPermission,
 		})
 	}
 
 	// for organization permissions, we need to bind the permissions to the organization resource
 	organizationResource := analyzers.Resource{
-		Name:               info.organizationPermissions.Organization.Name,
-		FullyQualifiedName: info.organizationPermissions.Organization.ID,
+		Name:               info.organization.Name,
+		FullyQualifiedName: info.organization.ID,
 		Type:               "organization",
 	}
-	for _, permission := range info.organizationPermissions.Permissions {
-		permissionStr, _ := permission.ToString()
-		analyzerPermission := analyzers.Permission{
-			Value: permissionStr,
+	for _, permission := range info.orgPermissions {
+		if value, ok := PermissionStrings[permission]; ok {
+			analyzerPermission := analyzers.Permission{
+				Value: value,
+			}
+			result.Bindings = append(result.Bindings, analyzers.Binding{
+				Resource:   organizationResource,
+				Permission: analyzerPermission,
+			})
 		}
-		result.Bindings = append(result.Bindings, analyzers.Binding{
-			Resource:   organizationResource,
-			Permission: analyzerPermission,
-		})
 	}
 
 	// for project permissions, we need to bind the permissions to the project resource and organization as the parent resource
 	for _, projectPermission := range info.projectPermissions {
 		projectResource := analyzers.Resource{
 			Name:               projectPermission.Project.Name,
-			FullyQualifiedName: strconv.Itoa(projectPermission.Project.ID),
+			FullyQualifiedName: strconv.FormatInt(projectPermission.Project.ID, 10),
 			Type:               "project",
 			Parent:             &organizationResource,
 		}
@@ -112,20 +112,6 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 				Resource:   projectResource,
 				Permission: analyzerPermission,
 			})
-		}
-	}
-
-	// if user is found, we can add it as unbounded resource
-	if info.user != nil {
-		result.UnboundedResources = []analyzers.Resource{
-			{
-				Name:               info.user.FirstName + " " + info.user.LastName,
-				FullyQualifiedName: info.user.UUID,
-				Type:               "user",
-				Metadata: map[string]any{
-					"email": info.user.Email,
-				},
-			},
 		}
 	}
 
@@ -255,23 +241,18 @@ func checkPermissions(cfg *config.Config, client *http.Client, domain string, ke
 	return permissions, nil
 }
 
-type OrganizationPermissions struct {
-	Organization *Organization
-	Permissions  []Permission
-}
-
 type ProjectPermissions struct {
-	Organization *Organization
-	Project      *Project
-	Permissions  []Permission
+	Project     *Project
+	Permissions []Permission
 }
 
 type SecretInfo struct {
-	user                    *User
-	organizationPermissions *OrganizationPermissions
-	projectPermissions      []ProjectPermissions
-	generalPermissions      []Permission
-	unverifiedPermissions   map[Permission]struct{}
+	user               *User
+	organization       *Organization
+	orgPermissions     []Permission
+	projectPermissions []ProjectPermissions
+	// generalPermissions      []Permission
+	unverifiedPermissions map[Permission]struct{}
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
@@ -287,20 +268,17 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		printUser(*info.user)
 	}
 
-	if len(info.generalPermissions) > 0 {
-		printGeneralPermissions(info.generalPermissions)
+	if info.organization == nil {
+		color.Yellow("\n[i] No permissions were verified for this key because the key does not have one of the necessary permissions (user:read or organization:read) required to verifiy other permissions.")
 	}
-	if info.organizationPermissions != nil {
-		printOrganizationPermissions(*info.organizationPermissions)
+
+	if info.orgPermissions != nil {
+		printOrganizationPermissions(*info.organization, info.orgPermissions)
 	}
 	if len(info.projectPermissions) > 0 {
 		printProjectPermissions(info.projectPermissions)
 	}
 	printUnverifiedPermissions(info.unverifiedPermissions)
-
-	if info.organizationPermissions == nil {
-		color.Yellow("\n[i] No permissions were verified for this key because the key does not have one of the necessary permissions (user:read or organization:read) required to verifiy other permissions.")
-	}
 
 }
 
@@ -309,12 +287,12 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	// These are permissions that cannot be verified due to no endpoint available
 	info.unverifiedPermissions = map[Permission]struct{}{
-		ErrorTrackingRead:         struct{}{},
-		ErrorTrackingWrite:        struct{}{},
-		SharingConfigurationRead:  struct{}{},
-		SharingConfigurationWrite: struct{}{},
-		WebhookRead:               struct{}{},
-		WebhookWrite:              struct{}{},
+		ErrorTrackingRead:         {},
+		ErrorTrackingWrite:        {},
+		SharingConfigurationRead:  {},
+		SharingConfigurationWrite: {},
+		WebhookRead:               {},
+		WebhookWrite:              {},
 	}
 
 	client := analyzers.NewAnalyzeClient(cfg)
@@ -325,11 +303,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 		return nil, fmt.Errorf("Invalid API Key: %w", err)
 	}
 
-	info.generalPermissions = make([]Permission, 0)
-	if user != nil {
-		info.user = user
-		info.generalPermissions = append(info.generalPermissions, UserRead)
-	}
+	info.user = user
 
 	// Most posthog API scopes are bound to projects and organization, so to determine the scopes we need to first get the organization and projects.
 	// If the key has user:read scope, we will get the user above which contains the organizations and projects.
@@ -352,25 +326,30 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 		org = &user.Organization
 	}
 
+	// set the organization in the info struct
+	info.organization = org
+
 	// read in scopes
 	scopesConfig, err := readInScopesConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	// check general permissions
-	generalPermissions, err := checkGeneralPermissions(cfg, client, domain, key, scopesConfig)
-	if err != nil {
-		return nil, err
-	}
-	info.generalPermissions = append(info.generalPermissions, generalPermissions...)
-
 	// check organization permissions
 	organizationPermissions, err := checkOrganizationPermissions(cfg, client, domain, key, scopesConfig, org)
 	if err != nil {
 		return nil, err
 	}
-	info.organizationPermissions = organizationPermissions
+
+	// check general permissions
+	generalOrganizationPermissions, err := checkGeneralPermissions(cfg, client, domain, key, scopesConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// merge general permissions with organization permissions
+	info.orgPermissions = organizationPermissions
+	info.orgPermissions = append(info.orgPermissions, generalOrganizationPermissions...)
 
 	// check project permissions
 	projectPermissions, err := checkProjectPermissions(cfg, client, domain, key, scopesConfig, org)
@@ -393,16 +372,8 @@ func checkOrganizationPermissions(
 	key string,
 	scopesConfig *ScopesConfig,
 	org *Organization,
-) (*OrganizationPermissions, error) {
-	organizationPermissions := &OrganizationPermissions{
-		Organization: org,
-	}
-	permissions, err := checkPermissions(cfg, client, domain, key, scopesConfig.OrganizationScopes, org.ID)
-	if err != nil {
-		return nil, err
-	}
-	organizationPermissions.Permissions = permissions
-	return organizationPermissions, nil
+) ([]Permission, error) {
+	return checkPermissions(cfg, client, domain, key, scopesConfig.OrganizationScopes, org.ID)
 }
 
 func checkProjectPermissions(
@@ -416,8 +387,7 @@ func checkProjectPermissions(
 	projectPermissions := make([]ProjectPermissions, 0)
 	for _, project := range org.Projects {
 		projectPermission := ProjectPermissions{
-			Organization: org,
-			Project:      &project,
+			Project: &project,
 		}
 		permissions, err := checkPermissions(cfg, client, domain, key, scopesConfig.ProjectScopes, project.ID)
 		if err != nil {
@@ -444,7 +414,7 @@ type Organization struct {
 }
 
 type Project struct {
-	ID   int    `json:"id"`
+	ID   int64  `json:"id"`
 	Name string `json:"name"`
 }
 
@@ -481,7 +451,8 @@ func resolveDomainAndUser(cfg *config.Config, client *http.Client, key string) (
 			// domain is valid but user permission does not exist
 			return domain, nil, nil
 		case http.StatusUnauthorized:
-			// domain is invalid
+			// Key might not be valid of this domain
+			// Try the other domain
 			continue
 		default:
 			// unexpected status code
@@ -538,17 +509,17 @@ func printGeneralPermissions(permissions []Permission) {
 	t.Render()
 }
 
-func printOrganizationPermissions(organizationPermissions OrganizationPermissions) {
+func printOrganizationPermissions(organization Organization, permissions []Permission) {
 	color.Yellow("\n[i] Organization Permissions:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Organization", "Permission"})
-	permissionsString := make([]string, len(organizationPermissions.Permissions))
-	for i, permission := range organizationPermissions.Permissions {
+	permissionsString := make([]string, len(permissions))
+	for i, permission := range permissions {
 		permissionsString[i], _ = permission.ToString()
 	}
 	t.AppendRow(table.Row{
-		color.GreenString(organizationPermissions.Organization.Name),
+		color.GreenString(organization.Name),
 		color.GreenString(strings.Join(permissionsString, "\n")),
 	})
 	t.Render()
