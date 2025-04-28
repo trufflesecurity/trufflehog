@@ -19,12 +19,12 @@ import (
 func TestNetlify_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NETLIFY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("NETLIFY_INACTIVE")
+	secret := testSecrets.MustGetField("NETLIFY_V2_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("NETLIFY_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
