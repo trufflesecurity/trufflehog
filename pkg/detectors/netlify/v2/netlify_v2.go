@@ -86,11 +86,14 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		_ = res.Body.Close()
 	}()
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	switch res.StatusCode {
+	case http.StatusOK:
 		return true, nil, nil
+	case http.StatusUnauthorized:
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
-
-	return false, nil, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
