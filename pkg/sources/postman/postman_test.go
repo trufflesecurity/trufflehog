@@ -2,6 +2,7 @@ package postman
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"sort"
 	"strings"
@@ -332,6 +333,110 @@ func TestSource_ScanGeneralRateLimit(t *testing.T) {
 	if elapsed < time.Duration((numRequests-1)/5)*time.Second {
 		t.Errorf("Rate limiting not working as expected. Elapsed time: %v seconds, expected at least %v seconds", elapsed.Seconds(), (float64(numRequests)-1)/5)
 	}
+}
+
+func TestSource_BadPostmanWorkspaceApiResponseDoesntEndScan(t *testing.T) {
+	// The goal here is to make sure that, if we get a bad ID (or other issue) for a workspace and the Postman API
+	// gives us a non 200 responses, it doesn't stop the whole scan.  To do that we're going to  have it get a set
+	// of 3 workspaces from /workspaces/ and then mock all but the last as a bad request.  Then we'll check that the
+	// third one was properly requested.
+	defer gock.Off()
+
+	// We'll use the IDs later in a couple of places
+	id1WorkspaceBadRequest := "1f0df51a-8658-4ee8-a2a1-d2567dfa09a9"
+	id2WorkspaceBadId := "a0f46158-1529-11ee-be56-0242ac120002"
+	id3WorkspaceGood := "f8801e9e-03a4-4c7b-b31e-5db5cd771696"
+
+	// Mock the workspace list response.  This gives EnumerateWorkspaces what it needs
+	// to make calls for the individual workspaces details
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"workspaces": []map[string]interface{}{
+				{
+					"id":         id1WorkspaceBadRequest,
+					"name":       "My Workspace",
+					"createdBy":  "12345678",
+					"type":       "personal",
+					"visibility": "personal",
+				},
+				{
+					"id":         id2WorkspaceBadId,
+					"name":       "Private Workspace",
+					"createdBy":  "12345678",
+					"type":       "team",
+					"visibility": "private",
+				},
+				{
+					"id":         id3WorkspaceGood,
+					"name":       "Team Workspace",
+					"createdBy":  "12345678",
+					"type":       "team",
+					"visibility": "team",
+				},
+			},
+		})
+
+	// Make a call for the first workspace respond with a malformed response
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/workspaces/%s", id1WorkspaceBadRequest)).
+		Reply(200).
+		BodyString("INTENTIONALLY MALFORMED RESPONSE BODY")
+	// Make a call for the second workspace respond not found
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/workspaces/%s", id2WorkspaceBadId)).
+		Reply(404).
+		JSON(map[string]interface{}{
+			"error": map[string]interface{}{
+				"name":       "workspaceNotFoundError",
+				"mesage":     "workspace not found",
+				"statusCode": 404,
+			},
+		})
+	// Make a call for the third workspace succeed
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/workspaces/%s", id3WorkspaceGood)).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"workspace": map[string]interface{}{
+				"id":           id3WorkspaceGood,
+				"name":         "Team Workspace",
+				"type":         "team",
+				"description":  "This is a team workspace.",
+				"visibility":   "team",
+				"createdBy":    "12345678",
+				"updatedBy":    "12345678",
+				"createdAt":    "2022-07-06T16:18:32.000Z",
+				"updatedAt":    "2022-07-06T20:55:13.000Z",
+				"collections":  []map[string]interface{}{},
+				"environments": []map[string]interface{}{},
+				"mocks":        []map[string]interface{}{},
+				"monitors":     []map[string]interface{}{},
+				"apis":         []map[string]interface{}{},
+			},
+		})
+
+	// Set up the source and inject the mocks
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	// Do the thing
+	_, _ = s.client.EnumerateWorkspaces(ctx)
+
+	// If all the calls were made, then we know the one bad request didn't cause explosions
+	assert.True(t, gock.IsDone())
+
 }
 
 func TestSource_UnmarshalMultipleHeaderTypes(t *testing.T) {
