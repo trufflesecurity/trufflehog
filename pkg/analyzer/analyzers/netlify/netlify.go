@@ -1,3 +1,4 @@
+//go:generate generate_permissions permissions.yaml permissions.go netlify
 package netlify
 
 import (
@@ -22,12 +23,17 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, exist := credInfo["key"]
+	key, exist := credInfo["key"]
 	if !exist {
 		return nil, fmt.Errorf("key not found in credential info")
 	}
 
-	return nil, nil
+	info, err := AnalyzePermissions(a.Cfg, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return secretInfoToAnalyzerResult(info), nil
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
@@ -69,6 +75,51 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 	}
 
 	return secretInfo, nil
+}
+
+// secretInfoToAnalyzerResult translate secret info to Analyzer Result
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeNetlify,
+		Metadata:     map[string]any{},
+		Bindings:     make([]analyzers.Binding, 0),
+	}
+
+	// extract information from resource to create bindings and append to result bindings
+	for _, resource := range info.Resources {
+		binding := analyzers.Binding{
+			Resource: analyzers.Resource{
+				Name:               resource.Name,
+				FullyQualifiedName: fmt.Sprintf("netlify/%s/%s", resource.Type, resource.ID), // e.g: netlify/site/123
+				Type:               resource.Type,
+				Metadata:           map[string]any{}, // to avoid panic
+			},
+			Permission: analyzers.Permission{
+				Value: PermissionStrings[FullAccess], // no fine grain access
+			},
+		}
+
+		if resource.Parent != nil {
+			binding.Resource.Parent = &analyzers.Resource{
+				Name:               resource.Parent.Name,
+				FullyQualifiedName: resource.Parent.ID,
+				Type:               resource.Parent.Type,
+				// not copying parent metadata
+			}
+		}
+
+		for key, value := range resource.Metadata {
+			binding.Resource.Metadata[key] = value
+		}
+
+		result.Bindings = append(result.Bindings, binding)
+	}
+
+	return &result
 }
 
 // cli print functions
