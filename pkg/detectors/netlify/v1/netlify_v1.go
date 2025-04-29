@@ -9,8 +9,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"maps"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -23,10 +21,13 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
-	client           = common.SaneHttpClient()
+	client = common.SaneHttpClient()
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"netlify"}) + `\b([A-Za-z0-9_-]{43,45})\b`)
+)
+
+const (
 	rotationGuideUrl = "https://howtorotate.com/docs/tutorials/netlify/"
 	verificationUrl  = "https://api.netlify.com/api/v1/sites"
-	keyPat           = regexp.MustCompile(detectors.PrefixRegex([]string{"netlify"}) + `\b([A-Za-z0-9_-]{43,45})\b`)
 )
 
 func (Scanner) Version() int { return 1 }
@@ -58,9 +59,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
+			isVerified, verificationErr := verifyMatch(ctx, client, match)
 			s1.Verified = isVerified
-			maps.Copy(s1.ExtraData, extraData)
 			s1.SetVerificationError(verificationErr, match)
 		}
 
@@ -70,16 +70,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, verificationUrl, nil)
 	if err != nil {
-		return false, nil, nil
+		return false, nil
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	res, err := client.Do(req)
 
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 
 	defer func() {
@@ -89,11 +89,11 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return true, nil, nil
+		return true, nil
 	case http.StatusUnauthorized:
-		return false, nil, nil
+		return false, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
