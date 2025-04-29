@@ -52,6 +52,7 @@ func TestNetlify_FromChunk(t *testing.T) {
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
+						"version":        "2",
 					},
 				},
 			},
@@ -71,6 +72,7 @@ func TestNetlify_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
+						"version":        "2",
 					},
 				},
 			},

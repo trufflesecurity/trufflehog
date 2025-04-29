@@ -3,9 +3,11 @@ package netlify
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+	"strconv"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -16,12 +18,15 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"netlify"}) + `\b([A-Za-z0-9_-]{43,45})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"netlify"}) + `\b(nfp_[a-zA-Z0-9_]{36})\b`)
 )
+
+func (Scanner) Version() int { return 2 }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -44,6 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		s1.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
+			"version":        strconv.Itoa(s.Version()),
 		}
 
 		if verify {
