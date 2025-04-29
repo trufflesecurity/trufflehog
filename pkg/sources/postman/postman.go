@@ -182,7 +182,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	for _, workspaceID := range s.conn.Workspaces {
 		w, err := s.client.GetWorkspace(ctx, workspaceID)
 		if err != nil {
-			return fmt.Errorf("error getting workspace %s: %w", workspaceID, err)
+			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "error getting workspace %s", workspaceID)
+			continue
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspaceID), "")
 		ctx.Logger().V(2).Info("scanning workspace from workspaces given", "workspace", workspaceID)

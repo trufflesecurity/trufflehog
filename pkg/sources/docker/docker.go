@@ -237,7 +237,7 @@ func getHistoryEntries(ctx context.Context, imgInfo imageInfo, layers []v1.Layer
 				if err == nil {
 					e.layerDigest = digest.String()
 				} else {
-					ctx.Logger().V(2).Error(err, "cannot associate layer with history entry: layer digest failed",
+					ctx.Logger().Error(err, "cannot associate layer with history entry: layer digest failed",
 						"layerIndex", layerIndex, "historyIndex", historyIndex)
 				}
 			} else {
