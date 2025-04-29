@@ -294,7 +294,10 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 	for i, workspace := range workspacesObj.Workspaces {
 		tempWorkspace, err := c.GetWorkspace(ctx, workspace.ID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get workspace %q (%s) during enumeration: %w", workspace.Name, workspace.ID, err)
+			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "could not get workspace %q (%s) during enumeration", workspace.Name, workspace.ID)
+			continue
 		}
 		workspacesObj.Workspaces[i] = tempWorkspace
 
