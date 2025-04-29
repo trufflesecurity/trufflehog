@@ -249,7 +249,7 @@ enum DetectorType {
   ZonkaFeedback = 236;
   Delighted = 237;
   Feedier = 238;
-  Abbysale = 239;
+  Abyssale = 239;
   Magnetic = 240;
   Nytimes = 241 [deprecated = true];
   Polygon = 242;
@@ -1028,6 +1028,8 @@ enum DetectorType {
   StoryblokPersonalAccessToken = 1016;
   SentryOrgToken = 1017;
   AzureApiManagementRepositoryKey = 1018;
+  AzureAPIManagementSubscriptionKey = 1019;
+  Harness = 1020;
 }
 
 message Result {
