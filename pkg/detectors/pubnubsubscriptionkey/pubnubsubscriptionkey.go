@@ -67,7 +67,7 @@ func (s Scanner) Description() string {
 }
 
 func verifyKey(ctx context.Context, client *http.Client, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://ps.pndsn.com/v2/objects/"+key+"/uuids", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://ps.pndsn.com/v2/objects/"+key+"/uuids", nil)
 	if err != nil {
 		return false, err
 	}
