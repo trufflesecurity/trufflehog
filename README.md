@@ -561,7 +561,7 @@ Depending on the event type (push or PR), we calculate the number of commits pre
 
 ### Canary detection
 
-TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/) and lets you know when they're present without setting them off. You can learn more here: [https://trufflesecurity.com/canaries](https://trufflesecurity.com/canaries)
+TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/).
 
 ![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/74ace530-08c5-4eaf-a169-84a73e328f6f)
 
@@ -656,98 +656,15 @@ TruffleHog will send a JSON POST request containing the regex matches to a
 configured webhook endpoint. If the endpoint responds with a `200 OK` response
 status code, the secret is considered verified.
 
+Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret, 
+and excluded word lists checked against the secret (captured group if present, entire match if capture group is not present). Note that if
+your custom detector has multiple `regex` set (in this example `hogID`, and `hogToken`), then the filters get applied to each regex. [Here](examples/generic_with_filters.yml) is an example of a custom detector using these filters.
+
 **NB:** This feature is alpha and subject to change.
 
-## Regex Detector Example
+### Regex Detector Example
+[Here](/pkg/custom_detectors/CUSTOM_DETECTORS.md) is how to setup a custom regex detector with verification server.
 
-```yaml
-# config.yaml
-detectors:
-  - name: HogTokenDetector
-    keywords:
-      - hog
-    regex:
-      hogID: '\b(HOG[0-9A-Z]{17})\b'
-      hogToken: '[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}'
-    verify:
-      - endpoint: http://localhost:8000/
-        # unsafe must be set if the endpoint is HTTP
-        unsafe: true
-        headers:
-          - "Authorization: super secret authorization header"
-```
-
-```
-$ trufflehog filesystem /tmp --config config.yaml --results=verified,unknown
-🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
-
-Found verified result 🐷🔑
-Detector Type: CustomRegex
-Decoder Type: PLAIN
-Raw result: HOGAAIUNNWHAHJJWUQYR
-File: /tmp/hog-facts.txt
-```
-
-Data structure sent to the custom verification server:
-
-```
-{
-    "HogTokenDetector": {
-        "HogID": ["HOGAAIUNNWHAHJJWUQYR"],
-        "HogSecret": ["sD9vzqdSsAOxntjAJ/qZ9sw+8PvEYg0r7D1Hhh0C"],
-    }
-}
-```
-
-## Verification Server Example (Python)
-
-Unless you run a verification server, secrets found by the custom regex
-detector will be unverified. Here is an example Python implementation of a
-verification server for the above `config.yaml` file.
-
-```python
-import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
-AUTH_HEADER = 'super secret authorization header'
-
-
-class Verifier(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(405)
-        self.end_headers()
-
-    def do_POST(self):
-        try:
-            if self.headers['Authorization'] != AUTH_HEADER:
-                self.send_response(401)
-                self.end_headers()
-                return
-
-            # read the body
-            length = int(self.headers['Content-Length'])
-            request = json.loads(self.rfile.read(length))
-            self.log_message("%s", request)
-
-            # check the match, you'll need to implement validateToken, which takes an array of ID's and Secrets
-            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']):
-                self.send_response(200)
-                self.end_headers()
-            else:
-                # any other response besides 200
-                self.send_response(406)
-                self.end_headers()
-        except Exception:
-            self.send_response(400)
-            self.end_headers()
-
-
-with HTTPServer(('', 8000), Verifier) as server:
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-```
 
 ## :mag: Analyze
 

@@ -82,37 +82,6 @@ func TestSource_ChunksLarge(t *testing.T) {
 	assert.Equal(t, got, wantChunkCount)
 }
 
-func TestSourceChunksNoResumption(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-
-	s := Source{}
-	connection := &sourcespb.S3{
-		Credential: &sourcespb.S3_Unauthenticated{},
-		Buckets:    []string{"trufflesec-ahrav-test-2"},
-	}
-	conn, err := anypb.New(connection)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = s.Init(ctx, "test name", 0, 0, false, conn, 1)
-	chunksCh := make(chan *sources.Chunk)
-	go func() {
-		defer close(chunksCh)
-		err = s.Chunks(ctx, chunksCh)
-		assert.Nil(t, err)
-	}()
-
-	wantChunkCount := 19787
-	got := 0
-
-	for range chunksCh {
-		got++
-	}
-	assert.Equal(t, got, wantChunkCount)
-}
-
 func TestSource_Validate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
@@ -251,34 +220,50 @@ func TestSource_Validate(t *testing.T) {
 func TestSourceChunksNoResumption(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-
-	s := Source{}
-	connection := &sourcespb.S3{
-		Credential: &sourcespb.S3_Unauthenticated{},
-		Buckets:    []string{"integration-resumption-tests"},
+	tests := []struct {
+		bucket         string
+		wantChunkCount int
+	}{
+		{
+			bucket:         "trufflesec-ahrav-test-2",
+			wantChunkCount: 19787,
+		},
+		{
+			bucket:         "integration-resumption-tests",
+			wantChunkCount: 19787,
+		},
 	}
-	conn, err := anypb.New(connection)
-	if err != nil {
-		t.Fatal(err)
+
+	for _, tt := range tests {
+		t.Run(tt.bucket, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+			defer cancel()
+
+			s := Source{}
+			connection := &sourcespb.S3{
+				Credential: &sourcespb.S3_Unauthenticated{},
+				Buckets:    []string{tt.bucket},
+			}
+			conn, err := anypb.New(connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, "test name", 0, 0, false, conn, 1)
+			chunksCh := make(chan *sources.Chunk)
+			go func() {
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh)
+				assert.Nil(t, err)
+			}()
+
+			got := 0
+			for range chunksCh {
+				got++
+			}
+			assert.Equal(t, tt.wantChunkCount, got)
+		})
 	}
-
-	err = s.Init(ctx, "test name", 0, 0, false, conn, 1)
-	chunksCh := make(chan *sources.Chunk)
-	go func() {
-		defer close(chunksCh)
-		err = s.Chunks(ctx, chunksCh)
-		assert.Nil(t, err)
-	}()
-
-	wantChunkCount := 19787
-	got := 0
-
-	for range chunksCh {
-		got++
-	}
-	assert.Equal(t, wantChunkCount, got)
 }
 
 func TestSourceChunksResumption(t *testing.T) {

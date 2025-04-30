@@ -232,7 +232,7 @@ enum DetectorType {
   Duda = 219;
   Yext = 220;
   ContentStack = 221;
-  Storyblok = 222;
+  StoryblokAccessToken = 222;
   GraphCMS = 223;
   Checkmarket = 224;
   Convertkit = 225;
@@ -249,7 +249,7 @@ enum DetectorType {
   ZonkaFeedback = 236;
   Delighted = 237;
   Feedier = 238;
-  Abbysale = 239;
+  Abyssale = 239;
   Magnetic = 240;
   Nytimes = 241 [deprecated = true];
   Polygon = 242;
@@ -1022,6 +1022,15 @@ enum DetectorType {
   TwitchAccessToken = 1010;
   TwilioApiKey = 1011;
   Sanity = 1012;
+  AzureRefreshToken = 1013;
+  AirtableOAuth = 1014;
+  AirtablePersonalAccessToken = 1015;
+  StoryblokPersonalAccessToken = 1016;
+  SentryOrgToken = 1017;
+  AzureApiManagementRepositoryKey = 1018;
+  AzureAPIManagementSubscriptionKey = 1019;
+  Harness = 1020;
+  Langfuse = 1021;
 }
 
 message Result {

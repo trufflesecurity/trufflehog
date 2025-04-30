@@ -25,7 +25,8 @@ func TestAnthropic_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ANTHROPIC")
+
+	apiKey := testSecrets.MustGetField("ANTHROPIC")
 	inactiveSecret := testSecrets.MustGetField("ANTHROPIC_INACTIVE")
 
 	type args struct {
@@ -46,7 +47,7 @@ func TestAnthropic_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a anthropic secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a anthropic secret %s within", apiKey)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -92,24 +93,7 @@ func TestAnthropic_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a anthropic secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Anthropic,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
-			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a anthropic secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a anthropic secret %s within", apiKey)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -137,7 +121,7 @@ func TestAnthropic_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Anthropic.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

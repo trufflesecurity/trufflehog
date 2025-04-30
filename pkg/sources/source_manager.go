@@ -181,14 +181,8 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 	}
 
 	// Create a JobProgress object for tracking progress.
-	sem := s.sem
 	ctx, cancel := context.WithCancelCause(ctx)
 	progress := NewJobProgress(jobID, sourceID, sourceName, WithHooks(s.hooks...), WithCancel(cancel))
-	if err := sem.Acquire(ctx, 1); err != nil {
-		// Context cancelled.
-		progress.ReportError(Fatal{err})
-		return progress.Ref(), Fatal{err}
-	}
 
 	// Wrap the passed in reporter so we update the progress information.
 	reporter = baseUnitReporter{
@@ -200,7 +194,6 @@ func (s *SourceManager) Enumerate(ctx context.Context, sourceName string, source
 	go func() {
 		// Call Finish after the semaphore has been released.
 		defer progress.Finish()
-		defer sem.Release(1)
 		defer s.wg.Done()
 		ctx := context.WithValues(ctx,
 			"source_manager_worker_id", common.RandomID(5),
@@ -406,8 +399,7 @@ func (s *SourceManager) enumerate(ctx context.Context, source Source, report *Jo
 	// Check if source units are supported and configured.
 	canUseSourceUnits := s.useSourceUnitsFunc != nil
 	if enumChunker, ok := source.(SourceUnitEnumerator); ok && canUseSourceUnits && s.useSourceUnitsFunc() {
-		ctx.Logger().Info("running source",
-			"with_units", true)
+		ctx.Logger().Info("running source", "with_units", true)
 		return s.enumerateWithUnits(ctx, enumChunker, report, reporter)
 	}
 	return fmt.Errorf("Enumeration not supported or configured for source: %s", source.Type().String())

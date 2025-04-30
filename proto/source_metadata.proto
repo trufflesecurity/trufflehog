@@ -296,10 +296,11 @@ message AzureRepos {
 }
 
 message Postman {
+  reserved 4, 14, 15;
+  reserved "globals_id", "field_name", "variable_type";
   string link = 1;
   string workspace_uuid = 2;
   string workspace_name = 3;
-  string globals_id = 4;
   string collection_id = 5;
   string collection_name = 6;
   string environment_id = 7;
@@ -308,9 +309,29 @@ message Postman {
   string request_name = 10;
   string folder_id = 11;
   string folder_name = 12;
-  string field_type = 13;
-  string field_name = 14;
-  string variable_type = 15;
+  string field_type = 13; // Do not use this field for transport. It is only used for output to STDOUT.
+  PostmanLocationType location_type = 16;
+}
+
+enum PostmanLocationType {
+  UNKNOWN_POSTMAN = 0;
+  REQUEST_QUERY_PARAMETER = 1;
+  REQUEST_AUTHORIZATION = 2;
+  REQUEST_HEADER = 3;
+  REQUEST_BODY_FORM_DATA = 4;
+  REQUEST_BODY_RAW = 5;
+  REQUEST_BODY_URL_ENCODED = 6;
+  REQUEST_BODY_GRAPHQL = 7;
+  REQUEST_SCRIPT = 8;
+  REQUEST_URL = 9;
+  ENVIRONMENT_VARIABLE = 10;
+  FOLDER_AUTHORIZATION = 11;
+  FOLDER_SCRIPT = 12;
+  COLLECTION_SCRIPT = 13;
+  COLLECTION_VARIABLE = 14;
+  COLLECTION_AUTHORIZATION = 15;
+  RESPONSE_BODY = 16;
+  RESPONSE_HEADER = 17;
 }
 
 message Vector {

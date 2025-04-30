@@ -57,9 +57,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -104,6 +101,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							}
 						}
 					}
+
+					s1.AnalysisInfo = map[string]string{
+						"key": resMatch,
+					}
+
 				} else if res.StatusCode == 401 {
 					// 401 is expected for an invalid token, so there is nothing to do here.
 				} else {

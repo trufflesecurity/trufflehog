@@ -13,7 +13,6 @@ import (
 	"github.com/adrg/strutil"
 	"github.com/adrg/strutil/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcache"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -29,9 +28,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcache"
 )
 
-var detectionTimeout = 10 * time.Second
+var detectionTimeout = detectors.DefaultResponseTimeout
 
 var errOverlap = errors.New(
 	"More than one detector has found this result. For your safety, verification has been disabled." +
@@ -181,7 +181,7 @@ type Engine struct {
 	scanEntireChunk bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
-	ahoCorasickCore *ahocorasick.Core
+	AhoCorasickCore *ahocorasick.Core
 
 	// Engine synchronization primitives.
 	sourceManager                 *sources.SourceManager
@@ -524,7 +524,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 	}
 
 	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
+	e.AhoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
@@ -785,11 +785,11 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
 
 			if decoded == nil {
-				ctx.Logger().V(5).Info("decoder not applicable for chunk", "decoder", decoder.Type().String(), "chunk", chunk)
+				// This means that the decoder didn't understand this chunk and isn't applicable to it.
 				continue
 			}
 
-			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
@@ -937,7 +937,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				results, err := detector.FromData(ctx, false, match)
 				cancel()
 				if err != nil {
-					ctx.Logger().V(2).Error(
+					ctx.Logger().Error(
 						err, "error finding results in chunk during verification overlap",
 						"detector", detector.Key.Type().String(),
 					)

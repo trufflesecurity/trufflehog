@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fatih/color"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -61,8 +62,11 @@ const (
 const (
 	AnalyzerTypeInvalid AnalyzerType = iota
 	AnalyzerTypeAirbrake
+	AnalyzerAnthropic
 	AnalyzerTypeAsana
 	AnalyzerTypeBitbucket
+	AnalyzerTypeDockerHub
+	AnalyzerTypeElevenLabs
 	AnalyzerTypeGitHub
 	AnalyzerTypeGitLab
 	AnalyzerTypeHuggingFace
@@ -80,32 +84,55 @@ const (
 	AnalyzerTypeSquare
 	AnalyzerTypeStripe
 	AnalyzerTypeTwilio
+	AnalyzerTypePrivateKey
+	AnalyzerTypeNotion
+	AnalyzerTypeDigitalOcean
+	AnalyzerTypePlanetScale
+	AnalyzerTypeAirtableOAuth
+	AnalyzerTypeAirtablePat
+	AnalyzerTypeGroq
+	AnalyzerTypeLaunchDarkly
+	AnalyzerTypeFigma
+	AnalyzerTypePlaid
 	// Add new items here with AnalyzerType prefix
 )
 
 // analyzerTypeStrings maps the enum to its string representation.
 var analyzerTypeStrings = map[AnalyzerType]string{
-	AnalyzerTypeInvalid:     "Invalid",
-	AnalyzerTypeAirbrake:    "Airbrake",
-	AnalyzerTypeAsana:       "Asana",
-	AnalyzerTypeBitbucket:   "Bitbucket",
-	AnalyzerTypeGitHub:      "GitHub",
-	AnalyzerTypeGitLab:      "GitLab",
-	AnalyzerTypeHuggingFace: "HuggingFace",
-	AnalyzerTypeMailchimp:   "Mailchimp",
-	AnalyzerTypeMailgun:     "Mailgun",
-	AnalyzerTypeMySQL:       "MySQL",
-	AnalyzerTypeOpenAI:      "OpenAI",
-	AnalyzerTypeOpsgenie:    "Opsgenie",
-	AnalyzerTypePostgres:    "Postgres",
-	AnalyzerTypePostman:     "Postman",
-	AnalyzerTypeSendgrid:    "Sendgrid",
-	AnalyzerTypeShopify:     "Shopify",
-	AnalyzerTypeSlack:       "Slack",
-	AnalyzerTypeSourcegraph: "Sourcegraph",
-	AnalyzerTypeSquare:      "Square",
-	AnalyzerTypeStripe:      "Stripe",
-	AnalyzerTypeTwilio:      "Twilio",
+	AnalyzerTypeInvalid:       "Invalid",
+	AnalyzerTypeAirbrake:      "Airbrake",
+	AnalyzerAnthropic:         "Anthropic",
+	AnalyzerTypeAsana:         "Asana",
+	AnalyzerTypeBitbucket:     "Bitbucket",
+	AnalyzerTypeDigitalOcean:  "DigitalOcean",
+	AnalyzerTypeDockerHub:     "DockerHub",
+	AnalyzerTypeElevenLabs:    "ElevenLabs",
+	AnalyzerTypeGitHub:        "GitHub",
+	AnalyzerTypeGitLab:        "GitLab",
+	AnalyzerTypeHuggingFace:   "HuggingFace",
+	AnalyzerTypeMailchimp:     "Mailchimp",
+	AnalyzerTypeMailgun:       "Mailgun",
+	AnalyzerTypeMySQL:         "MySQL",
+	AnalyzerTypeOpenAI:        "OpenAI",
+	AnalyzerTypeOpsgenie:      "Opsgenie",
+	AnalyzerTypePostgres:      "Postgres",
+	AnalyzerTypePostman:       "Postman",
+	AnalyzerTypeSendgrid:      "Sendgrid",
+	AnalyzerTypeShopify:       "Shopify",
+	AnalyzerTypeSlack:         "Slack",
+	AnalyzerTypeSourcegraph:   "Sourcegraph",
+	AnalyzerTypeSquare:        "Square",
+	AnalyzerTypeStripe:        "Stripe",
+	AnalyzerTypeTwilio:        "Twilio",
+	AnalyzerTypePrivateKey:    "PrivateKey",
+	AnalyzerTypeNotion:        "Notion",
+	AnalyzerTypePlanetScale:   "PlanetScale",
+	AnalyzerTypeAirtableOAuth: "AirtableOAuth",
+	AnalyzerTypeAirtablePat:   "AirtablePat",
+	AnalyzerTypeGroq:          "Groq",
+	AnalyzerTypeLaunchDarkly:  "LaunchDarkly",
+	AnalyzerTypeFigma:         "Figma",
+	AnalyzerTypePlaid:         "Plaid",
 	// Add new mappings here
 }
 

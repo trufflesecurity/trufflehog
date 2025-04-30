@@ -12,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -41,15 +41,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	subdomainMatches := subDomainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, subdomainMatch := range subdomainMatches {
-		if len(subdomainMatch) != 2 {
-			continue
-		}
 		resSubdomainMatch := strings.TrimSpace(subdomainMatch[1])
 
 		for _, match := range matches {
-			if len(match) != 2 {
-				continue
-			}
 			resMatch := strings.TrimSpace(match[1])
 
 			s1 := detectors.Result{

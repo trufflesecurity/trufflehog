@@ -103,7 +103,7 @@ func sshDialWithContext(ctx context.Context, network, addr string, config *ssh.C
 
 var errPermissionDenied = errors.New("permission denied")
 
-func verifyGitHubUser(ctx context.Context, parsedKey any) (*string, error) {
+func VerifyGitHubUser(ctx context.Context, parsedKey any) (*string, error) {
 	output, err := firstResponseFromSSH(ctx, parsedKey, "git", "github.com:22")
 	if err != nil {
 		return nil, err
@@ -115,13 +115,19 @@ func verifyGitHubUser(ctx context.Context, parsedKey any) (*string, error) {
 
 	if strings.Contains(output, "successfully authenticated") {
 		username := strings.TrimSuffix(strings.Split(output, " ")[1], "!")
+		// This hack is because it's probably one of the most widely distributed github keys
+		// and a frequent annoyance.
+		// It is active at the time of this commit, but the developer is unresponsive.
+		if username == "aaron1234567890123" {
+			return nil, nil
+		}
 		return &username, nil
 	}
 
 	return nil, nil
 }
 
-func verifyGitLabUser(ctx context.Context, parsedKey any) (*string, error) {
+func VerifyGitLabUser(ctx context.Context, parsedKey any) (*string, error) {
 	output, err := firstResponseFromSSH(ctx, parsedKey, "git", "gitlab.com:22")
 	if err != nil {
 		return nil, err

@@ -3417,8 +3417,6 @@ func (m *Postman) validate(all bool) error {
 
 	// no validation rules for WorkspaceName
 
-	// no validation rules for GlobalsId
-
 	// no validation rules for CollectionId
 
 	// no validation rules for CollectionName
@@ -3437,9 +3435,7 @@ func (m *Postman) validate(all bool) error {
 
 	// no validation rules for FieldType
 
-	// no validation rules for FieldName
-
-	// no validation rules for VariableType
+	// no validation rules for LocationType
 
 	if len(errors) > 0 {
 		return PostmanMultiError(errors)

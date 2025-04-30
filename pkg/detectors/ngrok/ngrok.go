@@ -3,9 +3,10 @@ package ngrok
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
-	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -18,69 +19,78 @@ type Scanner struct {
 
 var _ detectors.Detector = (*Scanner)(nil)
 
-var (
-	defaultClient = common.SaneHttpClient()
-
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b2[a-zA-Z0-9]{26}_\d[a-zA-Z0-9]{20}\b`)
-)
-
-func (s Scanner) Keywords() []string {
-	return []string{"ngrok"}
-}
-
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
-
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
-
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Ngrok,
-			Raw:          []byte(resMatch),
-		}
-
-		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.ngrok.com/agent_ingresses", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			req.Header.Add("ngrok-version", "2")
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else if res.StatusCode == 401 {
-					// The secret is determinately not verified (nothing to do)
-				} else {
-					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					s1.SetVerificationError(err, resMatch)
-				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
-			}
-		}
-
-		results = append(results, s1)
-	}
-
-	return results, nil
-}
-
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Ngrok
 }
 
 func (s Scanner) Description() string {
 	return "Ngrok is a service that provides secure introspectable tunnels to localhost. Ngrok keys can be used to manage and control these tunnels."
+}
+
+func (s Scanner) Keywords() []string {
+	return []string{"ngrok"}
+}
+
+var (
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b(2[a-zA-Z0-9]{26}_\d[a-zA-Z0-9]{20})\b`)
+)
+
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	dataStr := string(data)
+
+	uniqueMatches := make(map[string]struct{})
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		m := match[1]
+		if detectors.StringShannonEntropy(m) < 3 {
+			continue
+		}
+		uniqueMatches[m] = struct{}{}
+	}
+
+	for token := range uniqueMatches {
+		r := detectors.Result{
+			DetectorType: detectorspb.DetectorType_Ngrok,
+			Raw:          []byte(token),
+		}
+
+		if verify {
+			if s.client == nil {
+				s.client = common.SaneHttpClient()
+			}
+			isVerified, vErr := verifyMatch(ctx, s.client, token)
+			r.Verified = isVerified
+			r.SetVerificationError(vErr, token)
+		}
+
+		results = append(results, r)
+	}
+
+	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.ngrok.com/agent_ingresses", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("ngrok-version", "2")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("ngrok: unexpected status code: %d", res.StatusCode)
+	}
 }

@@ -114,7 +114,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"project":        creds.ProjectID,
 			},
 			AnalysisInfo: map[string]string{
-				"principal": creds.ClientEmail,
+				"key": string(credBytes),
 			},
 		}
 
@@ -123,21 +123,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			credentials, err := google.CredentialsFromJSON(ctx, credBytes, "https://www.googleapis.com/auth/cloud-platform")
-			if err != nil {
-				continue
-			}
-
-			if _, err = credentials.TokenSource.Token(); err != nil {
-				continue
-			}
-			result.Verified = true
+			isVerified, verificationErr := verifyMatch(ctx, credBytes)
+			result.Verified = isVerified
+			result.SetVerificationError(verificationErr, match)
 		}
 
 		results = append(results, result)
 	}
 
 	return
+}
+
+func verifyMatch(ctx context.Context, credBytes []byte) (bool, error) {
+	credentials, err := google.CredentialsFromJSON(ctx, credBytes, "https://www.googleapis.com/auth/cloud-platform")
+	if err != nil {
+		return false, err
+	}
+
+	if _, err = credentials.TokenSource.Token(); err != nil {
+		if strings.Contains(err.Error(), "invalid_grant") {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {

@@ -22,14 +22,14 @@ var (
 		api:
 			auth_type: "API-Key"
 			in: "Path"
-			convertapi_key: "H9ZGTfAERfN5W0AX"
-			base_url: "https://api.example.com/v1/user?Secret=$convertapi_key"
+			convertapi_key: "secret_H9ZGTfAERfN5W0AX"
+			base_url: "https://api.example.com/v1/user?auth=$convertapi_key"
 
 		# Notes:
 		# - Remember to rotate the secret every 90 days.
 		# - The above credentials should only be used in a secure environment.
 	`
-	secret = "H9ZGTfAERfN5W0AX"
+	secret = "secret_H9ZGTfAERfN5W0AX"
 )
 
 func TestConvertAPI_Pattern(t *testing.T) {

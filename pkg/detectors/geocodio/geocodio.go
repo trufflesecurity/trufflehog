@@ -41,15 +41,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	searchMatches := searchPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, searchMatch := range searchMatches {
-			if len(searchMatch) != 2 {
-				continue
-			}
 			resSearchMatch := strings.TrimSpace(searchMatch[1])
 
 			s1 := detectors.Result{
