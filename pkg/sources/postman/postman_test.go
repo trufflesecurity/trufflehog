@@ -2,6 +2,7 @@ package postman
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"sort"
 	"strings"
@@ -332,6 +333,245 @@ func TestSource_ScanGeneralRateLimit(t *testing.T) {
 	if elapsed < time.Duration((numRequests-1)/5)*time.Second {
 		t.Errorf("Rate limiting not working as expected. Elapsed time: %v seconds, expected at least %v seconds", elapsed.Seconds(), (float64(numRequests)-1)/5)
 	}
+}
+
+func TestSource_BadPostmanCollectionApiResponseDoesntEndScan(t *testing.T) {
+	// The goal here is to make sure that, if we get a bad ID for a collection (or some other request issue) and the
+	// Postman API gives us a non 200 responses, it doesn't stop the whole scan.  To do that we're going to  have it get
+	// a set of 3 collections from /collections/ and then mock all but the last request as bad in some way.  Then we'll
+	// check that the third one was properly requested
+	defer gock.Off()
+
+	// IDs we'll use later
+	userId := "12345678"
+	workspaceId := "1f0df51a-8658-4ee8-a2a1-d2567dfa09a9"
+	id1CollectionBadResponse := "dac5eac9-148d-a32e-b76b-3edee9da28f7"
+	id2CollectionBadId := "12ece9e1-2abf-4edc-8e34-de66e74114d2"
+	id3CollectionGood := "f695cab7-6878-eb55-7943-ad88e1ccfd65"
+	uid1CollectionBadResponse := fmt.Sprintf("%s-%s", userId, id1CollectionBadResponse)
+	uid2CollectionBadId := fmt.Sprintf("%s-%s", userId, id2CollectionBadId)
+	uid3CollectionGood := fmt.Sprintf("%s-%s", userId, id3CollectionGood)
+
+	// Mock the workspace list response
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"workspaces": []map[string]interface{}{
+				{
+					"id":         workspaceId,
+					"name":       "My Workspace",
+					"createdBy":  userId,
+					"type":       "personal",
+					"visibility": "personal",
+				},
+			},
+		})
+	// Mock the workspace details response
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/workspaces/%s", workspaceId)).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"workspace": map[string]interface{}{
+				"id":          workspaceId,
+				"name":        "Team Workspace",
+				"type":        "team",
+				"description": "This is a team workspace.",
+				"visibility":  "team",
+				"createdBy":   userId,
+				"updatedBy":   userId,
+				"createdAt":   "2022-07-06T16:18:32.000Z",
+				"updatedAt":   "2022-07-06T20:55:13.000Z",
+				"collections": []map[string]interface{}{
+					{
+						"id":   id1CollectionBadResponse,
+						"name": "Test Collection",
+						"uid":  uid1CollectionBadResponse,
+					},
+					{
+						"id":   id2CollectionBadId,
+						"name": "Test Collection2",
+						"uid":  uid2CollectionBadId,
+					},
+					{
+						"id":   id3CollectionGood,
+						"name": "Test Collection3",
+						"uid":  uid3CollectionGood,
+					},
+				},
+				"environments": []map[string]interface{}{},
+				"mocks":        []map[string]interface{}{},
+				"monitors":     []map[string]interface{}{},
+				"apis":         []map[string]interface{}{},
+			},
+		})
+
+	// Make a call for the first colection respond with a malformed response
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/collections/%s", uid1CollectionBadResponse)).
+		Reply(200).
+		BodyString("INTENTIONALLY MALFORMED RESPONSE HERE")
+	// Make a call for the second collection respond not found
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/collections/%s", uid2CollectionBadId)).
+		Reply(404).
+		JSON(map[string]interface{}{
+			"error": map[string]string{
+				"name":    "instanceNotFoundError",
+				"message": "We could not find the collection you are looking for",
+			},
+		})
+	// Make a call for the third workspace succeed
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/collections/%s", uid3CollectionGood)).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"collection": map[string]interface{}{
+				"info": map[string]interface{}{
+					"_postman_id":   id3CollectionGood,
+					"name":          "Test Collection",
+					"description":   "This is a test.",
+					"schema":        "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+					"updatedAt":     "2023-10-09T18:34:58.000Z",
+					"createdAt":     "2023-10-09T18:34:58.000Z",
+					"lastUpdatedBy": userId,
+					"uid":           uid3CollectionGood,
+				},
+				"item": []interface{}{},
+				"auth": map[string]interface{}{
+					"type":   "apikey",
+					"apikey": []interface{}{},
+				},
+				"event":    []interface{}{},
+				"variable": []interface{}{},
+			},
+		})
+
+	// Set up the source and inject the mocks
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	// Do the thing
+	workspaces, _ := s.client.EnumerateWorkspaces(ctx)
+	_ = s.scanWorkspace(ctx, make(chan *sources.Chunk), workspaces[0])
+
+	// If all the calls were made, then we know the one bad request didn't cause explosions
+	assert.True(t, gock.IsDone())
+
+}
+
+func TestSource_BadPostmanWorkspaceApiResponseDoesntEndScan(t *testing.T) {
+	// The goal here is to make sure that, if we get a bad ID (or other issue) for a workspace and the Postman API
+	// gives us a non 200 responses, it doesn't stop the whole scan.  To do that we're going to  have it get a set
+	// of 3 workspaces from /workspaces/ and then mock all but the last as a bad request.  Then we'll check that the
+	// third one was properly requested.
+	defer gock.Off()
+
+	// We'll use the IDs later in a couple of places
+	id1WorkspaceBadRequest := "1f0df51a-8658-4ee8-a2a1-d2567dfa09a9"
+	id2WorkspaceBadId := "a0f46158-1529-11ee-be56-0242ac120002"
+	id3WorkspaceGood := "f8801e9e-03a4-4c7b-b31e-5db5cd771696"
+
+	// Mock the workspace list response.  This gives EnumerateWorkspaces what it needs
+	// to make calls for the individual workspaces details
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"workspaces": []map[string]interface{}{
+				{
+					"id":         id1WorkspaceBadRequest,
+					"name":       "My Workspace",
+					"createdBy":  "12345678",
+					"type":       "personal",
+					"visibility": "personal",
+				},
+				{
+					"id":         id2WorkspaceBadId,
+					"name":       "Private Workspace",
+					"createdBy":  "12345678",
+					"type":       "team",
+					"visibility": "private",
+				},
+				{
+					"id":         id3WorkspaceGood,
+					"name":       "Team Workspace",
+					"createdBy":  "12345678",
+					"type":       "team",
+					"visibility": "team",
+				},
+			},
+		})
+
+	// Make a call for the first workspace respond with a malformed response
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/workspaces/%s", id1WorkspaceBadRequest)).
+		Reply(200).
+		BodyString("INTENTIONALLY MALFORMED RESPONSE BODY")
+	// Make a call for the second workspace respond not found
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/workspaces/%s", id2WorkspaceBadId)).
+		Reply(404).
+		JSON(map[string]interface{}{
+			"error": map[string]interface{}{
+				"name":       "workspaceNotFoundError",
+				"mesage":     "workspace not found",
+				"statusCode": 404,
+			},
+		})
+	// Make a call for the third workspace succeed
+	gock.New("https://api.getpostman.com").
+		Get(fmt.Sprintf("/workspaces/%s", id3WorkspaceGood)).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"workspace": map[string]interface{}{
+				"id":           id3WorkspaceGood,
+				"name":         "Team Workspace",
+				"type":         "team",
+				"description":  "This is a team workspace.",
+				"visibility":   "team",
+				"createdBy":    "12345678",
+				"updatedBy":    "12345678",
+				"createdAt":    "2022-07-06T16:18:32.000Z",
+				"updatedAt":    "2022-07-06T20:55:13.000Z",
+				"collections":  []map[string]interface{}{},
+				"environments": []map[string]interface{}{},
+				"mocks":        []map[string]interface{}{},
+				"monitors":     []map[string]interface{}{},
+				"apis":         []map[string]interface{}{},
+			},
+		})
+
+	// Set up the source and inject the mocks
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+	err := s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	if err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	// Do the thing
+	_, _ = s.client.EnumerateWorkspaces(ctx)
+
+	// If all the calls were made, then we know the one bad request didn't cause explosions
+	assert.True(t, gock.IsDone())
+
 }
 
 func TestSource_UnmarshalMultipleHeaderTypes(t *testing.T) {
