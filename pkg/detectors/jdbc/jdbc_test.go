@@ -2,7 +2,6 @@ package jdbc
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 
@@ -13,9 +12,65 @@ import (
 )
 
 var (
-	validPattern   = "jdbc:mysql:localhost:3306/mydatabase"
-	invalidPattern = "jdbc:my?ql:localhost:3306/my database"
-	keyword        = "jdbc"
+	// examples from: https://github.com/trufflesecurity/trufflehog/issues/1458
+	validPattern = `
+	<?xml version="1.0" encoding="UTF-8"?>
+		<project version="4">
+		<component name="DataSourceManagerImpl" format="xml" multifile-model="true">
+			<data-source source="LOCAL" name="PostgreSQL - postgres@localhost" uuid="18f0f64d-b804-471d-9351-e98a67c8389f">
+			<driver-ref>postgresql</driver-ref>
+			<synchronize>true</synchronize>
+			<jdbc-driver>org.postgresql.Driver</jdbc-driver>
+			<jdbc-url>jdbc:postgresql://localhost:5432/postgres</jdbc-url>
+			<jdbc-url>jdbc:sqlserver:</jdbc-url>
+			<jdbc-url>jdbc:postgresql://#{uri.host}#{uri.path}?user=#{uri.user}</jdbc-url>
+			<jdbc-url>postgresql://postgres:postgres@<your-connection-ip-address>:5432</jdbc-url>
+			<jdbc-url>jdbc:mysql:localhost:3306/mydatabase</jdbc-url>
+			<working-dir>$ProjectFileDir$</working-dir>
+			</data-source>
+		</component>
+		</project>
+	`
+	// should match all
+	truePositives = `
+	{
+		"detector": "jdbc",
+		"potential_matches": [
+			"jdbc:postgresql://localhost:5432/mydb",
+			"jdbc:mysql://user:pass@host:3306/db?param=1",
+			"jdbc:sqlite:/data/test.db",
+			"jdbc:oracle:thin:@host:1521:db",
+			"jdbc:mysql://host:3306/db,other_param",
+			"jdbc:db2://host:50000/db?param=1"
+		]
+	}`
+	// should not match any
+	falsePositives = `
+	{
+		"detector": "jdbc",
+		"false_positives": [
+			"jdbc:xyz:short",
+			"somejdbc:mysql://host/db",
+			"jdbc:invalid_driver:test",
+			"jdbc:mysql://host/db>next",
+			"adjdbc:mysql://host/db",
+			"jdbc:my?ql:localhost:3306/my database"
+		]
+	}`
+
+	// wantLists are the expected output from the valid patterns
+	wantList1 = []string{
+		"jdbc:postgresql://localhost:5432/postgres",
+		"jdbc:mysql:localhost:3306/mydatabase",
+	}
+	wantList2 = []string{
+		"jdbc:postgresql://localhost:5432/mydb",
+		"jdbc:mysql://user:pass@host:3306/db?param=1",
+		"jdbc:sqlite:/data/test.db",
+		"jdbc:oracle:thin:@host:1521:db",
+		"jdbc:mysql://host:3306/db",
+		"jdbc:db2://host:50000/db?param=1",
+	}
 )
 
 func TestJdbc_Pattern(t *testing.T) {
@@ -28,12 +83,17 @@ func TestJdbc_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			input: validPattern,
+			want:  wantList1,
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			name:  "valid pattern - true positives",
+			input: truePositives,
+			want:  wantList2,
+		},
+		{
+			name:  "invalid pattern - false positives",
+			input: falsePositives,
 			want:  []string{},
 		},
 	}
