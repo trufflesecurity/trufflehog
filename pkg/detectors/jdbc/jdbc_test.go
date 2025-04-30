@@ -11,68 +11,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	// examples from: https://github.com/trufflesecurity/trufflehog/issues/1458
-	validPattern = `
-	<?xml version="1.0" encoding="UTF-8"?>
-		<project version="4">
-		<component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-			<data-source source="LOCAL" name="PostgreSQL - postgres@localhost" uuid="18f0f64d-b804-471d-9351-e98a67c8389f">
-			<driver-ref>postgresql</driver-ref>
-			<synchronize>true</synchronize>
-			<jdbc-driver>org.postgresql.Driver</jdbc-driver>
-			<jdbc-url>jdbc:postgresql://localhost:5432/postgres</jdbc-url>
-			<jdbc-url>jdbc:sqlserver:</jdbc-url>
-			<jdbc-url>jdbc:postgresql://#{uri.host}#{uri.path}?user=#{uri.user}</jdbc-url>
-			<jdbc-url>postgresql://postgres:postgres@<your-connection-ip-address>:5432</jdbc-url>
-			<jdbc-url>jdbc:mysql:localhost:3306/mydatabase</jdbc-url>
-			<working-dir>$ProjectFileDir$</working-dir>
-			</data-source>
-		</component>
-		</project>
-	`
-	// should match all
-	truePositives = `
-	{
-		"detector": "jdbc",
-		"potential_matches": [
-			"jdbc:postgresql://localhost:5432/mydb",
-			"jdbc:mysql://user:pass@host:3306/db?param=1",
-			"jdbc:sqlite:/data/test.db",
-			"jdbc:oracle:thin:@host:1521:db",
-			"jdbc:mysql://host:3306/db,other_param",
-			"jdbc:db2://host:50000/db?param=1"
-		]
-	}`
-	// should not match any
-	falsePositives = `
-	{
-		"detector": "jdbc",
-		"false_positives": [
-			"jdbc:xyz:short",
-			"somejdbc:mysql://host/db",
-			"jdbc:invalid_driver:test",
-			"jdbc:mysql://host/db>next",
-			"adjdbc:mysql://host/db",
-			"jdbc:my?ql:localhost:3306/my database"
-		]
-	}`
-
-	// wantLists are the expected output from the valid patterns
-	wantList1 = []string{
-		"jdbc:postgresql://localhost:5432/postgres",
-		"jdbc:mysql:localhost:3306/mydatabase",
-	}
-	wantList2 = []string{
-		"jdbc:postgresql://localhost:5432/mydb",
-		"jdbc:mysql://user:pass@host:3306/db?param=1",
-		"jdbc:sqlite:/data/test.db",
-		"jdbc:oracle:thin:@host:1521:db",
-		"jdbc:mysql://host:3306/db",
-		"jdbc:db2://host:50000/db?param=1",
-	}
-)
-
 func TestJdbc_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -82,19 +20,69 @@ func TestJdbc_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  wantList1,
+			// examples from: https://github.com/trufflesecurity/trufflehog/issues/3704
+			name: "valid patterns",
+			input: `
+				<?xml version="1.0" encoding="UTF-8"?>
+					<project version="4">
+						<component name="DataSourceManagerImpl" format="xml" multifile-model="true">
+							<data-source source="LOCAL" name="PostgreSQL - postgres@localhost" uuid="18f0f64d-b804-471d-9351-e98a67c8389f">
+							<driver-ref>postgresql</driver-ref>
+							<synchronize>true</synchronize>
+							<jdbc-driver>org.postgresql.Driver</jdbc-driver>
+							<jdbc-url>jdbc:postgresql://localhost:5432/postgres</jdbc-url>
+							<jdbc-url>jdbc:sqlserver:</jdbc-url>
+							<jdbc-url>jdbc:postgresql://#{uri.host}#{uri.path}?user=#{uri.user}</jdbc-url>
+							<jdbc-url>postgresql://postgres:postgres@<your-connection-ip-address>:5432</jdbc-url>
+							<jdbc-url>jdbc:mysql:localhost:3306/mydatabase</jdbc-url>
+							<working-dir>$ProjectFileDir$</working-dir>
+							</data-source>
+						</component>
+					</project>
+			`,
+			want: []string{
+				"jdbc:postgresql://localhost:5432/postgres",
+				"jdbc:mysql:localhost:3306/mydatabase",
+			},
 		},
 		{
-			name:  "valid pattern - true positives",
-			input: truePositives,
-			want:  wantList2,
+			name: "valid pattern - true positives",
+			input: `
+				{
+					"detector": "jdbc",
+					"potential_matches": [
+						"jdbc:postgresql://localhost:5432/mydb",
+						"jdbc:mysql://user:pass@host:3306/db?param=1",
+						"jdbc:sqlite:/data/test.db",
+						"jdbc:oracle:thin:@host:1521:db",
+						"jdbc:mysql://host:3306/db,other_param",
+						"jdbc:db2://host:50000/db?param=1"
+					]
+				}`,
+			want: []string{
+				"jdbc:postgresql://localhost:5432/mydb",
+				"jdbc:mysql://user:pass@host:3306/db?param=1",
+				"jdbc:sqlite:/data/test.db",
+				"jdbc:oracle:thin:@host:1521:db",
+				"jdbc:mysql://host:3306/db",
+				"jdbc:db2://host:50000/db?param=1",
+			},
 		},
 		{
-			name:  "invalid pattern - false positives",
-			input: falsePositives,
-			want:  []string{},
+			name: "invalid pattern - false positives",
+			input: `
+				{
+					"detector": "jdbc",
+					"false_positives": [
+						"jdbc:xyz:short",
+						"somejdbc:mysql://host/db",
+						"jdbc:invalid_driver:test",
+						"jdbc:mysql://host/db>next",
+						"adjdbc:mysql://host/db",
+						"jdbc:my?ql:localhost:3306/my database"
+					]
+				}`,
+			want: []string{},
 		},
 	}
 
