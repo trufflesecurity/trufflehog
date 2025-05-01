@@ -91,7 +91,7 @@ runs:
       ##########################################
       ##          Run TruffleHog              ##
       ##########################################
-      results=$(docker run --rm -v .:/tmp -w /tmp \
+      results=$(docker run --rm -v ${{ github.workspace }}:/tmp -w /tmp \
       ghcr.io/trufflesecurity/trufflehog:${VERSION} \
       git file:///tmp/ \
       --no-update \
