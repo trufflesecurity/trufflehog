@@ -169,6 +169,20 @@ func PrintGitHubRepos(repos []*gh.Repository) {
 	fmt.Print("\n\n")
 }
 
+func safeGetString(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
+}
+
+func safeGetBool(ptr *bool) bool {
+	if ptr == nil {
+		return false
+	}
+	return *ptr
+}
+
 func PrintGists(gists []*gh.Gist, showAll bool) {
 	privateCount := 0
 
@@ -176,12 +190,20 @@ func PrintGists(gists []*gh.Gist, showAll bool) {
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Gist ID", "Gist Link", "Description", "Private"})
 	for _, gist := range gists {
-		if showAll && *gist.Public {
-			t.AppendRow([]interface{}{*gist.ID, *gist.HTMLURL, *gist.Description, "false"})
-		} else if !*gist.Public {
+		if gist == nil {
+			continue
+		}
+		gistID := safeGetString(gist.ID)
+		gistLink := safeGetString(gist.HTMLURL)
+		gistDescription := safeGetString(gist.Description)
+		isPublic := safeGetBool(gist.Public)
+
+		if showAll && isPublic {
+			t.AppendRow([]any{gistID, gistLink, gistDescription, "false"})
+		} else if !isPublic {
 			privateCount++
 			green := color.New(color.FgGreen).SprintFunc()
-			t.AppendRow([]interface{}{green(*gist.ID), green(*gist.HTMLURL), green(*gist.Description), green("true")})
+			t.AppendRow([]any{green(gistID), green(gistLink), green(gistDescription), green("true")})
 		}
 	}
 	if showAll && len(gists) == 0 {
