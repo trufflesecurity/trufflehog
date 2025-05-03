@@ -94,6 +94,10 @@ runs:
       results=$(docker run --rm -v ${{ github.workspace }}:/tmp -w /tmp \
       ghcr.io/trufflesecurity/trufflehog:${VERSION} \
       git file:///tmp/ \
+      --since-commit \
+      ${BASE:-''} \
+      --branch \
+      ${HEAD:-''} \
       --no-update \
       --github-actions \
       ${ARGS:-''})
