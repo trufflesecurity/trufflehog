@@ -915,7 +915,7 @@ func buildDetectorList() []detectors.Detector {
 		&azure_batch.Scanner{},
 		&azure_cosmosdb.Scanner{},
 		&azurecontainerregistry.Scanner{},
-		&azuredevopspersonalaccesstoken.Scanner{},
+		&azure_devops.Scanner{},
 		// &azurefunctionkey.Scanner{}, // detector is throwing some FPs
 		&azure_openai.Scanner{},
 		&azuresastoken.Scanner{},
