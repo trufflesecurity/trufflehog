@@ -812,6 +812,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldcoinindex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wrike"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/xai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yandex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yelp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/youneedabudget"
@@ -1674,6 +1675,7 @@ func buildDetectorList() []detectors.Detector {
 		&workstack.Scanner{},
 		&worldcoinindex.Scanner{},
 		&worldweather.Scanner{},
+		&xai.Scanner{},
 		&wrike.Scanner{},
 		&yandex.Scanner{},
 		&yelp.Scanner{},
