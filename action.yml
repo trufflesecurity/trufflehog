@@ -1,5 +1,5 @@
 name: 'TruffleHog OSS'
-description: 'Scan Github Actions with TruffleHog.'
+description: 'Find and verify leaked credentials in your source code.'
 author: Truffle Security Co. <support@trufflesec.com>
 
 inputs:
