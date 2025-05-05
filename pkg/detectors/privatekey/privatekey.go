@@ -20,6 +20,9 @@ import (
 
 var (
 	falsePositiveGHUsernames = map[detectors.FalsePositive]struct{}{
+		// This hack is because it's probably one of the most widely distributed github keys
+		// and a frequent annoyance.
+		// It is active at the time of this commit, but the developer is unresponsive.
 		detectors.FalsePositive("aaron1234567890123"): {},
 	}
 )
