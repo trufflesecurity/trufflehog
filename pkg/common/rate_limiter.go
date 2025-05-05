@@ -87,7 +87,7 @@ func (rl *RateLimiter) Do(
 
 	// [NOTE] errgroup.Group oddly isn't what we want here. It presumes you want
 	// 			  to stop all other processing if a single task fails (we don't), and
-	// 			  that functionality is the only resaon to use it instead of a
+	// 			  that functionality is the only reason to use it instead of a
 	// 			  WaitGroup.
 	wg := &sync.WaitGroup{}
 	updateErrorLock := &sync.Mutex{}
