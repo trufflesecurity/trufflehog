@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"golang.org/x/time/rate"
 
@@ -183,6 +184,42 @@ type Response struct {
 	UID             string `json:"uid,omitempty"`
 }
 
+// TokenBucketRateLimit implements a basic "requests per second with
+// bursting" rate limiter.
+type TokenBucketRateLimit struct {
+	limiter *rate.Limiter
+}
+
+// Creates a new TokenBucketRateLimit
+// lim: a Limit representing the max number of requests per second
+// burst: max number of requests that can be sent if any requests can be sent
+//
+// This is a (very) thin wrapper around Google's rate limiter.
+func NewTokenBucketRateLimit(lim rate.Limit, burst int) *TokenBucketRateLimit {
+	return &TokenBucketRateLimit{
+		limiter: rate.NewLimiter(rate.Limit(lim), burst),
+	}
+}
+
+func (tp *TokenBucketRateLimit) Execute(
+	ctx context.Context,
+	req *http.Request,
+	now time.Time,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	return tp.limiter.Wait(ctx)
+}
+
+func (tp *TokenBucketRateLimit) Update(
+	ctx context.Context,
+	res *http.Response,
+) error {
+	return nil
+}
+
 // A Client manages communication with the Postman API.
 type Client struct {
 	// HTTP client used to communicate with the API
@@ -193,10 +230,10 @@ type Client struct {
 
 	// Rate limiter needed for Postman API workspace and collection requests. Postman API rate limit
 	// is 10 calls in 10 seconds for GET /collections, GET /workspaces, and GET /workspaces/{id} endpoints.
-	WorkspaceAndCollectionRateLimiter *rate.Limiter
+	WorkspaceAndCollectionRateLimiter *common.RateLimiter
 
 	// Rate limiter needed for Postman API. General rate limit is 300 requests per minute.
-	GeneralRateLimiter *rate.Limiter
+	GeneralRateLimiter *common.RateLimiter
 }
 
 // NewClient returns a new Postman API client.
@@ -208,10 +245,14 @@ func NewClient(postmanToken string) *Client {
 	}
 
 	c := &Client{
-		HTTPClient:                        http.DefaultClient,
-		Headers:                           bh,
-		WorkspaceAndCollectionRateLimiter: rate.NewLimiter(rate.Every(time.Second), 1),
-		GeneralRateLimiter:                rate.NewLimiter(rate.Every(time.Second/5), 1),
+		HTTPClient: http.DefaultClient,
+		Headers:    bh,
+		WorkspaceAndCollectionRateLimiter: common.NewRateLimiter(
+			NewTokenBucketRateLimit(rate.Every(time.Second), 1),
+		),
+		GeneralRateLimiter: common.NewRateLimiter(
+			NewTokenBucketRateLimit(rate.Every(time.Second/5), 1),
+		),
 	}
 
 	return c
@@ -247,13 +288,15 @@ func checkResponseStatus(r *http.Response) error {
 }
 
 // getPostmanResponseBodyBytes makes a request to the Postman API and returns the response body as bytes.
-func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
+func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string, rl *common.RateLimiter) ([]byte, error) {
 	req, err := c.NewRequest(url, headers)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := c.HTTPClient.Do(req)
+	resp, err := rl.Do(ctx, req, func() (*http.Response, error) {
+		return c.HTTPClient.Do(req)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -280,10 +323,12 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 		Workspaces []Workspace `json:"workspaces"`
 	}{}
 
-	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("could not wait for rate limiter during workspaces enumeration getting: %w", err)
-	}
-	body, err := c.getPostmanResponseBodyBytes(ctx, "https://api.getpostman.com/workspaces", nil)
+	body, err := c.getPostmanResponseBodyBytes(
+		ctx,
+		"https://api.getpostman.com/workspaces",
+		nil,
+		c.WorkspaceAndCollectionRateLimiter,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not get postman workspace response bytes during enumeration: %w", err)
 	}
@@ -315,10 +360,12 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 	}{}
 
 	url := fmt.Sprintf(WORKSPACE_URL, workspaceUUID)
-	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
-		return Workspace{}, fmt.Errorf("could not wait for rate limiter during workspace getting: %w", err)
-	}
-	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
+	body, err := c.getPostmanResponseBodyBytes(
+		ctx,
+		url,
+		nil,
+		c.WorkspaceAndCollectionRateLimiter,
+	)
 	if err != nil {
 		return Workspace{}, fmt.Errorf("could not get postman workspace (%s) response bytes: %w", workspaceUUID, err)
 	}
@@ -336,10 +383,12 @@ func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid s
 	}{}
 
 	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
-	if err := c.GeneralRateLimiter.Wait(ctx); err != nil {
-		return VariableData{}, fmt.Errorf("could not wait for rate limiter during environment variable getting: %w", err)
-	}
-	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
+	body, err := c.getPostmanResponseBodyBytes(
+		ctx,
+		url,
+		nil,
+		c.GeneralRateLimiter,
+	)
 	if err != nil {
 		return VariableData{}, fmt.Errorf("could not get postman environment (%s) response bytes: %w", environment_uuid, err)
 	}
@@ -357,10 +406,12 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 	}{}
 
 	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
-	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
-		return Collection{}, fmt.Errorf("could not wait for rate limiter during collection getting: %w", err)
-	}
-	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
+	body, err := c.getPostmanResponseBodyBytes(
+		ctx,
+		url,
+		nil,
+		c.WorkspaceAndCollectionRateLimiter,
+	)
 	if err != nil {
 		return Collection{}, fmt.Errorf("could not get postman collection (%s) response bytes: %w", collection_uuid, err)
 	}
