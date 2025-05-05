@@ -169,20 +169,6 @@ func PrintGitHubRepos(repos []*gh.Repository) {
 	fmt.Print("\n\n")
 }
 
-func safeGetString(ptr *string) string {
-	if ptr == nil {
-		return ""
-	}
-	return *ptr
-}
-
-func safeGetBool(ptr *bool) bool {
-	if ptr == nil {
-		return false
-	}
-	return *ptr
-}
-
 func PrintGists(gists []*gh.Gist, showAll bool) {
 	privateCount := 0
 
@@ -193,10 +179,10 @@ func PrintGists(gists []*gh.Gist, showAll bool) {
 		if gist == nil {
 			continue
 		}
-		gistID := safeGetString(gist.ID)
-		gistLink := safeGetString(gist.HTMLURL)
-		gistDescription := safeGetString(gist.Description)
-		isPublic := safeGetBool(gist.Public)
+		gistID := gist.GetID()
+		gistLink := gist.GetHTMLURL()
+		gistDescription := gist.GetDescription()
+		isPublic := gist.GetPublic()
 
 		if showAll && isPublic {
 			t.AppendRow([]any{gistID, gistLink, gistDescription, "false"})
