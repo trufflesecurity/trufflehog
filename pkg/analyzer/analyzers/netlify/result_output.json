@@ -1,0 +1,726 @@
+{
+    "AnalyzerType": 34,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "/assets/404-bp-rpyh2.js",
+                "FullyQualifiedName": "netlify/Site File/dda81214-b126-43bf-9508-ae94cf9d0506//assets/404-bp-rpyh2.js",
+                "Type": "Site File",
+                "Metadata": {
+                    "site_mime_type": "application/javascript"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "/assets/about-c6ru7nfs.js",
+                "FullyQualifiedName": "netlify/Site File/dda81214-b126-43bf-9508-ae94cf9d0506//assets/about-c6ru7nfs.js",
+                "Type": "Site File",
+                "Metadata": {
+                    "site_mime_type": "application/javascript"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "/assets/index-bjt0jjds.css",
+                "FullyQualifiedName": "netlify/Site File/dda81214-b126-43bf-9508-ae94cf9d0506//assets/index-bjt0jjds.css",
+                "Type": "Site File",
+                "Metadata": {
+                    "site_mime_type": "text/css"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "/assets/index-csbqlcvs.js",
+                "FullyQualifiedName": "netlify/Site File/dda81214-b126-43bf-9508-ae94cf9d0506//assets/index-csbqlcvs.js",
+                "Type": "Site File",
+                "Metadata": {
+                    "site_mime_type": "application/javascript"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "/index.html",
+                "FullyQualifiedName": "netlify/Site File/dda81214-b126-43bf-9508-ae94cf9d0506//index.html",
+                "Type": "Site File",
+                "Metadata": {
+                    "site_mime_type": "text/html"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "/netlify.toml",
+                "FullyQualifiedName": "netlify/Site File/dda81214-b126-43bf-9508-ae94cf9d0506//netlify.toml",
+                "Type": "Site File",
+                "Metadata": {
+                    "site_mime_type": "application/octet-stream"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "680a1332fb8af883c4da6666/state/ready",
+                "FullyQualifiedName": "netlify/Site Build/680a1332fb8af883c4da6666",
+                "Type": "Site Build",
+                "Metadata": {},
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Addon example",
+                "FullyQualifiedName": "netlify/Service/5ec5b30682bb8a00bad573ee",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "DataStax Astra",
+                "FullyQualifiedName": "netlify/Service/5fadc1941f0b1600909ffe94",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "DatoCMS Local",
+                "FullyQualifiedName": "netlify/Service/5bc77c2bac7ff24e6152b43c",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "DatoCMS Staging",
+                "FullyQualifiedName": "netlify/Service/5bc77adbac7ff24e6152b43b",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Demo add-on",
+                "FullyQualifiedName": "netlify/Service/5c1abf2cac7ff2374d58fce2",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "EXAMPLE_KEY/***ALUE",
+                "FullyQualifiedName": "netlify/Site Env Variable/EXAMPLE_KEY/0016840d-61c5-4e4a-aab4-8f9d73125846",
+                "Type": "Site Env Variable",
+                "Metadata": {
+                    "scopes": "builds;functions;post_processing;runtime",
+                    "value": "EXAMPLE_VALUE"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "EXAMPLE_KEY_2/***anch",
+                "FullyQualifiedName": "netlify/Site Env Variable/EXAMPLE_KEY_2/c5d9d7f5-52f9-48a8-a218-a80d294f347e",
+                "Type": "Site Env Variable",
+                "Metadata": {
+                    "scopes": "builds;functions;runtime",
+                    "value": "****************anch"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "EXAMPLE_KEY_2/***ocal",
+                "FullyQualifiedName": "netlify/Site Env Variable/EXAMPLE_KEY_2/b9df8f4a-7a18-4cc1-bf80-e0affa32569b",
+                "Type": "Site Env Variable",
+                "Metadata": {
+                    "scopes": "builds;functions;runtime",
+                    "value": "local"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "EXAMPLE_KEY_2/***od_1",
+                "FullyQualifiedName": "netlify/Site Env Variable/EXAMPLE_KEY_2/1973b53f-60ab-40ce-ac23-20f6f2241fb3",
+                "Type": "Site Env Variable",
+                "Metadata": {
+                    "scopes": "builds;functions;runtime",
+                    "value": "****************od_1"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "EXAMPLE_KEY_2/***ploy",
+                "FullyQualifiedName": "netlify/Site Env Variable/EXAMPLE_KEY_2/dab3426a-fb1e-405c-b89c-5143650e510e",
+                "Type": "Site Env Variable",
+                "Metadata": {
+                    "scopes": "builds;functions;runtime",
+                    "value": "****************ploy"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "EXAMPLE_KEY_2/***thon",
+                "FullyQualifiedName": "netlify/Site Env Variable/EXAMPLE_KEY_2/658308b6-0cef-4987-a2a7-3235997af270",
+                "Type": "Site Env Variable",
+                "Metadata": {
+                    "scopes": "builds;functions;runtime",
+                    "value": "****************thon"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "EXAMPLE_KEY_2/***view",
+                "FullyQualifiedName": "netlify/Site Env Variable/EXAMPLE_KEY_2/a210fa75-1194-42a2-8ff9-788bdf70d2b3",
+                "Type": "Site Env Variable",
+                "Metadata": {
+                    "scopes": "builds;functions;runtime",
+                    "value": "****************view"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Expired Token",
+                "FullyQualifiedName": "netlify/Token/680b33106d9ae981575b4dec",
+                "Type": "Token",
+                "Metadata": {
+                    "expires_at": "2025-04-26T00:00:01.262Z",
+                    "personal": "true"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Express Example",
+                "FullyQualifiedName": "netlify/Service/5b96e429ac7ff24ff6916ae1",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Fauna DB staging",
+                "FullyQualifiedName": "netlify/Service/5bbbea43ac7ff23902cc2a64",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "FaunaDB Cloud",
+                "FullyQualifiedName": "netlify/Service/5bcf902fac7ff255bfc36233",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Get off my lawn",
+                "FullyQualifiedName": "netlify/Service/5ce6f8be82bb8a00b9940dfd",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Hasura GraphQL Engine",
+                "FullyQualifiedName": "netlify/Service/5c196638ac7ff255c853647e",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Joy Staging",
+                "FullyQualifiedName": "netlify/Service/5d23c4e682bb8a00ba311f23",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Netlify CMS Media Manager",
+                "FullyQualifiedName": "netlify/Service/5b9addcdac7ff27e11b0d4e4",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Nimbella",
+                "FullyQualifiedName": "netlify/Service/5f6d15de1f0b1600903dde32",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Nimbella Staging",
+                "FullyQualifiedName": "netlify/Service/5d9e587082bb8a00bb94943f",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "No Exp Token",
+                "FullyQualifiedName": "netlify/Token/680b32c6bccfc08cd7732add",
+                "Type": "Token",
+                "Metadata": {
+                    "expires_at": "never",
+                    "personal": "true"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Takeshape CMS",
+                "FullyQualifiedName": "netlify/Service/5c9934a882bb8a00bc657db7",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Takeshape CMS staging",
+                "FullyQualifiedName": "netlify/Service/5c798b4582bb8a00b7504197",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "VGS Staging",
+                "FullyQualifiedName": "netlify/Service/5be1c5bfac7ff267e9ba987b",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Very Good Security",
+                "FullyQualifiedName": "netlify/Service/5c6f1bbf82bb8a00bcdea659",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "View source banner addon",
+                "FullyQualifiedName": "netlify/Service/5b9aef73ac7ff23d0a3fecd4",
+                "Type": "Service",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "analyzer-test(do not delete)",
+                "FullyQualifiedName": "netlify/Token/6810b09ab80020167d7525fe",
+                "Type": "Token",
+                "Metadata": {
+                    "expires_at": "never",
+                    "personal": "true"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "function//provider/",
+                "FullyQualifiedName": "netlify/Site Function/",
+                "Type": "Site Function",
+                "Metadata": {},
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "hook1",
+                "FullyQualifiedName": "netlify/Site Build Hook/680a168ae30f218cd01bd4e8",
+                "Type": "Site Build Hook",
+                "Metadata": {
+                    "build_hook_branch": "main"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "test-app",
+                "FullyQualifiedName": "netlify/Token/6809f1dbfb8af846a8da644f",
+                "Type": "Token",
+                "Metadata": {
+                    "expires_at": "never",
+                    "personal": "false"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "test01",
+                "FullyQualifiedName": "netlify/Token/6809f1b5830a5c43672123f8",
+                "Type": "Token",
+                "Metadata": {
+                    "expires_at": "2025-05-24T08:09:25.796Z",
+                    "personal": "true"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "truffle-test-site",
+                "FullyQualifiedName": "netlify/Site/dda81214-b126-43bf-9508-ae94cf9d0506",
+                "Type": "Site",
+                "Metadata": {
+                    "site_admin_url": "https://app.netlify.com/sites/truffle-test-site",
+                    "site_repo_url": "",
+                    "site_url": "http://truffle-test-site.netlify.app"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "truffle-test-site",
+                "FullyQualifiedName": "netlify/Site Deploy/dda81214-b126-43bf-9508-ae94cf9d0506/deploy/680a1332fb8af883c4da6668",
+                "Type": "Site Deploy",
+                "Metadata": {
+                    "deploy_build_id": "680a1332fb8af883c4da6666",
+                    "deploy_state": "ready",
+                    "deploy_url": "http://truffle-test-site.netlify.app"
+                },
+                "Parent": {
+                    "Name": "truffle-test-site",
+                    "FullyQualifiedName": "dda81214-b126-43bf-9508-ae94cf9d0506",
+                    "Type": "Site",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "trufflesecurity.com",
+                "FullyQualifiedName": "netlify/DNS Zone/6809f163830a5c42ca212432",
+                "Type": "DNS Zone",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        }
+    ],
+    "UnboundedResources": null,
+    "Metadata": {}
+}
