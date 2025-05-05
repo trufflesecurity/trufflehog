@@ -1,50 +1,36 @@
-package accuweather
+package bingsubscriptionkey
 
 import (
 	"context"
-	"fmt"
-	"testing"
-
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"testing"
 )
 
-var (
-	validPattern           = "DqFtwc490oPc%xaE67sBSF741M56%sd091A"
-	invalidPattern         = "DqFtwc490oPc%xaE67sBSF741M56=sd091A"
-	validPatternLowEntropy = "DsFtwfaEsAPS%eaEsaESEsFesfMsfMsDmdA"
-)
-
-func TestAccuWeather_Pattern(t *testing.T) {
+func TestBingsubscriptionkey_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("accuweather token = '%s'", validPattern),
-			want:  []string{validPattern},
+			name:  "typical pattern",
+			input: "bing_subscription_key=89017d414ed64edb9c776d4a52102b9a",
+			want:  []string{"89017d414ed64edb9c776d4a52102b9a"},
 		},
 		{
-			name:  "valid pattern - out of prefix range",
-			input: fmt.Sprintf("accuweather token keyword is not close to the real token = '%s'", validPattern),
-			want:  nil,
+			name: "finds all matches",
+			input: `bing_subscription_key1=89017d414ed64edb9c776d4a52102b9b'
+bing_subscription_key2=89017d414ed64edb9c776d4a52102b9c`,
+			want: []string{"89017d414ed64edb9c776d4a52102b9b", "89017d414ed64edb9c776d4a52102b9c"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("accuweather = '%s'", invalidPattern),
-			want:  nil,
-		},
-		{
-			name:  "valid pattern - Shannon entropy below threshold",
-			input: fmt.Sprintf("accuweather = '%s'", validPatternLowEntropy),
-			want:  nil,
+			input: "bing_subscription_key=89017d414ed64edb9c776d4a52102b9",
+			want:  []string{},
 		},
 	}
 

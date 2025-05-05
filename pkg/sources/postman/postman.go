@@ -116,7 +116,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			return errors.New("Postman token is empty")
 		}
 		s.client = NewClient(conn.GetToken())
-		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3)
+		s.client.HTTPClient = common.RetryableHTTPClientTimeout(10)
 		log.RedactGlobally(conn.GetToken())
 	case *sourcespb.Postman_Unauthenticated:
 		s.client = nil
@@ -149,7 +149,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentID: env.ID, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE}, env)
 	}
 
-	// Scan local workspaces
+	// Scan local collections
 	for _, collectionPath := range s.conn.CollectionPaths {
 		collection := Collection{}
 		contents, err := os.ReadFile(collectionPath)
@@ -182,7 +182,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	for _, workspaceID := range s.conn.Workspaces {
 		w, err := s.client.GetWorkspace(ctx, workspaceID)
 		if err != nil {
-			return fmt.Errorf("error getting workspace %s: %w", workspaceID, err)
+			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "error getting workspace %s", workspaceID)
+			continue
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspaceID), "")
 		ctx.Logger().V(2).Info("scanning workspace from workspaces given", "workspace", workspaceID)
@@ -199,7 +202,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		collection, err := s.client.GetCollection(ctx, collectionID)
 		if err != nil {
-			return fmt.Errorf("error getting collection %s: %w", collectionID, err)
+			// Log and move on, because sometimes the Postman API seems to give us collection IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "error getting collection %s", collectionID)
+			continue
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning collection %s", collectionID), "")
 		s.scanCollection(ctx, chunksChan, Metadata{}, collection)
@@ -299,7 +305,10 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		}
 		collection, err := s.client.GetCollection(ctx, collectionID.UUID)
 		if err != nil {
-			return err
+			// Log and move on, because sometimes the Postman API seems to give us collection IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "error getting collection %s", collectionID)
+			continue
 		}
 		s.scanCollection(ctx, chunksChan, metadata, collection)
 	}
@@ -743,8 +752,8 @@ func unpackWorkspace(workspacePath string) (Workspace, error) {
 		if err != nil {
 			return workspace, err
 		}
+		defer rc.Close()
 		contents, err := io.ReadAll(rc)
-		rc.Close()
 		if err != nil {
 			return workspace, err
 		}

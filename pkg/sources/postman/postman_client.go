@@ -246,7 +246,8 @@ func checkResponseStatus(r *http.Response) error {
 	return fmt.Errorf("postman Request failed with status code: %d", r.StatusCode)
 }
 
-func (c *Client) getPostmanReq(ctx context.Context, url string, headers map[string]string) (*http.Response, error) {
+// getPostmanResponseBodyBytes makes a request to the Postman API and returns the response body as bytes.
+func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
 	req, err := c.NewRequest(url, headers)
 	if err != nil {
 		return nil, err
@@ -256,13 +257,19 @@ func (c *Client) getPostmanReq(ctx context.Context, url string, headers map[stri
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("could not read postman response body: %w", err)
+	}
 
 	ctx.Logger().V(4).Info("postman api response headers are available", "response_header", resp.Header)
 
 	if err := checkResponseStatus(resp); err != nil {
 		return nil, err
 	}
-	return resp, nil
+	return body, nil
 }
 
 // EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
@@ -276,17 +283,10 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("could not wait for rate limiter during workspaces enumeration getting: %w", err)
 	}
-	r, err := c.getPostmanReq(ctx, "https://api.getpostman.com/workspaces", nil)
+	body, err := c.getPostmanResponseBodyBytes(ctx, "https://api.getpostman.com/workspaces", nil)
 	if err != nil {
-		return nil, fmt.Errorf("could not get workspaces during enumeration: %w", err)
+		return nil, fmt.Errorf("could not get postman workspace response bytes during enumeration: %w", err)
 	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return nil, fmt.Errorf("could not read response body for workspaces during enumeration: %w", err)
-	}
-	r.Body.Close()
-
 	if err := json.Unmarshal([]byte(body), &workspacesObj); err != nil {
 		return nil, fmt.Errorf("could not unmarshal workspaces JSON during enumeration: %w", err)
 	}
@@ -294,7 +294,10 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 	for i, workspace := range workspacesObj.Workspaces {
 		tempWorkspace, err := c.GetWorkspace(ctx, workspace.ID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get workspace %q (%s) during enumeration: %w", workspace.Name, workspace.ID, err)
+			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "could not get workspace %q (%s) during enumeration", workspace.Name, workspace.ID)
+			continue
 		}
 		workspacesObj.Workspaces[i] = tempWorkspace
 
@@ -315,17 +318,10 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
 		return Workspace{}, fmt.Errorf("could not wait for rate limiter during workspace getting: %w", err)
 	}
-	r, err := c.getPostmanReq(ctx, url, nil)
+	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
 	if err != nil {
-		return Workspace{}, fmt.Errorf("could not get workspace (%s): %w", workspaceUUID, err)
+		return Workspace{}, fmt.Errorf("could not get postman workspace (%s) response bytes: %w", workspaceUUID, err)
 	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return Workspace{}, fmt.Errorf("could not read response body for workspace (%s): %w", workspaceUUID, err)
-	}
-	r.Body.Close()
-
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		return Workspace{}, fmt.Errorf("could not unmarshal workspace JSON for workspace (%s): %w", workspaceUUID, err)
 	}
@@ -343,16 +339,10 @@ func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid s
 	if err := c.GeneralRateLimiter.Wait(ctx); err != nil {
 		return VariableData{}, fmt.Errorf("could not wait for rate limiter during environment variable getting: %w", err)
 	}
-	r, err := c.getPostmanReq(ctx, url, nil)
+	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
 	if err != nil {
-		return VariableData{}, fmt.Errorf("could not get env variables for environment (%s): %w", environment_uuid, err)
+		return VariableData{}, fmt.Errorf("could not get postman environment (%s) response bytes: %w", environment_uuid, err)
 	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return VariableData{}, fmt.Errorf("could not read env var response body for environment (%s): %w", environment_uuid, err)
-	}
-	r.Body.Close()
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		return VariableData{}, fmt.Errorf("could not unmarshal env variables JSON for environment (%s): %w", environment_uuid, err)
 	}
@@ -370,16 +360,10 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
 		return Collection{}, fmt.Errorf("could not wait for rate limiter during collection getting: %w", err)
 	}
-	r, err := c.getPostmanReq(ctx, url, nil)
+	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
 	if err != nil {
-		return Collection{}, fmt.Errorf("could not get collection (%s): %w", collection_uuid, err)
+		return Collection{}, fmt.Errorf("could not get postman collection (%s) response bytes: %w", collection_uuid, err)
 	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return Collection{}, fmt.Errorf("could not read response body for collection (%s): %w", collection_uuid, err)
-	}
-	r.Body.Close()
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
 		return Collection{}, fmt.Errorf("could not unmarshal JSON for collection (%s): %w", collection_uuid, err)
 	}
