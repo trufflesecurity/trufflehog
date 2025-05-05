@@ -13,6 +13,8 @@ type Scanner struct {
 	v1.Scanner
 }
 
+func (s Scanner) Version() int { return 2 }
+
 var (
 	// Ensure the Scanner satisfies the interface at compile time.
 	_ detectors.Detector = (*Scanner)(nil)

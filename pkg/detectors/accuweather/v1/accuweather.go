@@ -35,6 +35,8 @@ func (s Scanner) Keywords() []string {
 	return []string{"accuweather"}
 }
 
+func (s Scanner) Version() int { return 1 }
+
 func (s Scanner) getClient() *http.Client {
 	if s.Client != nil {
 		return s.Client
