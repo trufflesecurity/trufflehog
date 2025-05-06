@@ -50,6 +50,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for envID := range uniqueEnvIDs {
+		if _, ok := detectors.UuidFalsePositives[detectors.FalsePositive(envID)]; ok {
+			continue
+		}
+
+		if detectors.StringShannonEntropy(envID) < 3 {
+			continue
+		}
+
 		for apiKey := range uniqueAPIKeys {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Kontent,
