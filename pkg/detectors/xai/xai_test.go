@@ -1,50 +1,36 @@
-package accuweather
+package xai
 
 import (
 	"context"
-	"fmt"
-	"testing"
-
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"testing"
 )
 
-var (
-	validPattern           = "DqFtwc490oPc%xaE67sBSF741M56%sd091A"
-	invalidPattern         = "DqFtwc490oPc%xaE67sBSF741M56=sd091A"
-	validPatternLowEntropy = "DsFtwfaEsAPS%eaEsaESEsFesfMsfMsDmdA"
-)
-
-func TestAccuWeather_Pattern(t *testing.T) {
+func TestXai_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("accuweather token = '%s'", validPattern),
-			want:  []string{validPattern},
+			name:  "typical pattern",
+			input: "xai_token = 'xai-W5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42Ab'",
+			want:  []string{"xai-W5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42Ab"},
 		},
 		{
-			name:  "valid pattern - out of prefix range",
-			input: fmt.Sprintf("accuweather token keyword is not close to the real token = '%s'", validPattern),
-			want:  nil,
+			name: "finds all matches",
+			input: `grok_token1 = 'xai-W5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42Ab'
+xai_token2 = 'xai-W5zbfUkzlXedo7qD42AbBLlRSsyJr1W5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42Ab'`,
+			want: []string{"xai-W5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42Ab", "xai-W5zbfUkzlXedo7qD42AbBLlRSsyJr1W5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXedo7qD42Ab"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("accuweather = '%s'", invalidPattern),
-			want:  nil,
-		},
-		{
-			name:  "valid pattern - Shannon entropy below threshold",
-			input: fmt.Sprintf("accuweather = '%s'", validPatternLowEntropy),
-			want:  nil,
+			input: "xai_token = 'xai-W5zbfUkzlXedo7qD42AbBLlRSsyJrOW5zbfUkzlXe'",
+			want:  []string{},
 		},
 	}
 

@@ -1029,6 +1029,10 @@ enum DetectorType {
   SentryOrgToken = 1017;
   AzureApiManagementRepositoryKey = 1018;
   AzureAPIManagementSubscriptionKey = 1019;
+  Harness = 1020;
+  Langfuse = 1021;
+  BingSubscriptionKey = 1022;
+  XAI = 1023;
 }
 
 message Result {

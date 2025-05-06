@@ -1,3 +1,6 @@
+// Check the [process flow](docs/process_flow.md) and [concurrency](docs/concurrency.md) docs for
+// something of a structural overview
+
 package engine
 
 import (
@@ -937,7 +940,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				results, err := detector.FromData(ctx, false, match)
 				cancel()
 				if err != nil {
-					ctx.Logger().V(2).Error(
+					ctx.Logger().Error(
 						err, "error finding results in chunk during verification overlap",
 						"detector", detector.Key.Type().String(),
 					)

@@ -19,12 +19,12 @@ import (
 func TestNetlify_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NETLIFY_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("NETLIFY_INACTIVE")
+	secret := testSecrets.MustGetField("NETLIFY_V2_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("NETLIFY_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -52,6 +52,7 @@ func TestNetlify_FromChunk(t *testing.T) {
 					Verified:     true,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
+						"version":        "2",
 					},
 				},
 			},
@@ -71,6 +72,7 @@ func TestNetlify_FromChunk(t *testing.T) {
 					Verified:     false,
 					ExtraData: map[string]string{
 						"rotation_guide": "https://howtorotate.com/docs/tutorials/netlify/",
+						"version":        "2",
 					},
 				},
 			},
@@ -101,6 +103,7 @@ func TestNetlify_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].AnalysisInfo = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Netlify.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
