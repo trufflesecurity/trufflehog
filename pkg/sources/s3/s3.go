@@ -157,14 +157,6 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 	}
 
 	if roleArn != "" {
-		// A valid credentials is required to assume IAM role. aws.AnonymousCredentials is not a valid credentials.
-		// If the value of credsProvider is aws.AnonymousCredentials{} from the above switch-case,
-		// we will need to set credsProvider to nil to use SDK's default credential chain.
-		_, isUnauthenticated := credsProvider.(aws.AnonymousCredentials)
-		if isUnauthenticated {
-			credsProvider = nil
-		}
-
 		// The config loaded here will be used to retrieve and refresh temporary credentials from AssumeRole
 		cfg, err := config.LoadDefaultConfig(ctx, config.WithCredentialsProvider(credsProvider))
 		if err != nil {
