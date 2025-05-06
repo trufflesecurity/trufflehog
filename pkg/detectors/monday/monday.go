@@ -3,6 +3,7 @@ package monday
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -85,6 +86,11 @@ func verifyMondayPAT(ctx context.Context, client *http.Client, token string) (bo
 	if err != nil {
 		return false, err
 	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
