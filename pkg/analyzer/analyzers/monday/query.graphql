@@ -71,6 +71,5 @@
     id
     name
     kind
-    description
   }
 }
