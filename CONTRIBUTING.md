@@ -8,6 +8,12 @@ Contributors need to [sign our CLA](https://cla-assistant.io/trufflesecurity/tru
 
 # Resources
 
+## How things work
+
+It can be a bit daunting diving into the code and wrapping your head around the project from a high level.  The following two docs help give that high level overview:
+* [Process Flow](docs/process_flow.md)
+* [Concurrency Overview](docs/concurrency.md)
+
 ## Adding new secret detectors
 
 We have published some [documentation and tooling to get started on adding new secret detectors](hack/docs/Adding_Detectors_external.md). Let's improve detection together!

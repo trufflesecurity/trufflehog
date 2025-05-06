@@ -249,7 +249,7 @@ enum DetectorType {
   ZonkaFeedback = 236;
   Delighted = 237;
   Feedier = 238;
-  Abbysale = 239;
+  Abyssale = 239;
   Magnetic = 240;
   Nytimes = 241 [deprecated = true];
   Polygon = 242;
@@ -1029,7 +1029,11 @@ enum DetectorType {
   SentryOrgToken = 1017;
   AzureApiManagementRepositoryKey = 1018;
   AzureAPIManagementSubscriptionKey = 1019;
-  AzureDirectManagementKey = 1020;
+  Harness = 1020;
+  Langfuse = 1021;
+  BingSubscriptionKey = 1022;
+  XAI = 1023;
+  AzureDirectManagementKey = 1024;
 }
 
 message Result {

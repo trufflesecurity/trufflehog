@@ -1,50 +1,43 @@
-package accuweather
+package langfuse
 
 import (
 	"context"
-	"fmt"
-	"testing"
-
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"testing"
 )
 
-var (
-	validPattern           = "DqFtwc490oPc%xaE67sBSF741M56%sd091A"
-	invalidPattern         = "DqFtwc490oPc%xaE67sBSF741M56=sd091A"
-	validPatternLowEntropy = "DsFtwfaEsAPS%eaEsaESEsFesfMsfMsDmdA"
-)
-
-func TestAccuWeather_Pattern(t *testing.T) {
+func TestLangfuse_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("accuweather token = '%s'", validPattern),
-			want:  []string{validPattern},
+			name:  "typical pattern",
+			input: `langfuse_public_key = pk-lf-00000000-0000-0000-0000-000000000000
+                    langfuse_secret_key = sk-lf-00000000-0000-0000-0000-000000000000`,
+			want:  []string{"sk-lf-00000000-0000-0000-0000-000000000000"},
 		},
 		{
-			name:  "valid pattern - out of prefix range",
-			input: fmt.Sprintf("accuweather token keyword is not close to the real token = '%s'", validPattern),
-			want:  nil,
+			name: "finds all matches",
+			input: `langfuse_public_key1 = pk-lf-00000000-0000-0000-0000-000000000000
+                    langfuse_secret_key1 = sk-lf-00000000-0000-0000-0000-000000000000
+					langfuse_public_key2 = pk-lf-11111111-1111-1111-1111-111111111111
+                    langfuse_secret_key2 = sk-lf-11111111-1111-1111-1111-111111111111`,
+			want: []string{"sk-lf-00000000-0000-0000-0000-000000000000",
+			 "sk-lf-11111111-1111-1111-1111-111111111111",
+			 "sk-lf-11111111-1111-1111-1111-111111111111",
+			 "sk-lf-00000000-0000-0000-0000-000000000000"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("accuweather = '%s'", invalidPattern),
-			want:  nil,
-		},
-		{
-			name:  "valid pattern - Shannon entropy below threshold",
-			input: fmt.Sprintf("accuweather = '%s'", validPatternLowEntropy),
-			want:  nil,
+			input: `langfuse_public_key1 = pk-lf-invalid
+                    langfuse_secret_key1 = sk-lf-invalid`,
+			want:  []string{},
 		},
 	}
 
