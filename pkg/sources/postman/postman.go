@@ -318,13 +318,13 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 // scanCollection scans a collection and all its items, folders, and requests.
 // locally scoped Metadata is updated as we drill down into the collection.
 func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
-	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Info.Name, "collection_uuid", collection.Info.UID)
+	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Info.Name, "collection_uuid", collection.Info.Uid)
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
 	s.attemptToAddKeyword(collection.Info.Name)
 
 	if !metadata.fromLocal {
-		metadata.FullID = metadata.CollectionInfo.UID
+		metadata.FullID = metadata.CollectionInfo.Uid
 		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
 	}
 
@@ -361,20 +361,20 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		metadata.FolderName = item.Name
 	}
 
-	if item.UID != "" {
-		metadata.FullID = item.UID
+	if item.Uid != "" {
+		metadata.FullID = item.Uid
 		metadata.Link = LINK_BASE_URL + FOLDER_TYPE + "/" + metadata.FullID
 	}
 	// recurse through the folders
 	for _, subItem := range item.Items {
-		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.UID)
+		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.Uid)
 	}
 
 	// The assignment of the folder ID to be the current item UID is due to wanting to assume that your current item is a folder unless you have request data inside of your item.
 	// If your current item is a folder, you will want the folder ID to match the UID of the current item.
 	// If your current item is a request, you will want the folder ID to match the UID of the parent folder.
 	// If the request is at the root of a collection and has no parent folder, the folder ID will be empty.
-	metadata.FolderID = item.UID
+	metadata.FolderID = item.Uid
 	// check if there are any requests in the folder
 	if item.Request.Method != "" {
 		metadata.FolderName = strings.Replace(metadata.FolderName, (" > " + item.Name), "", -1)
@@ -382,13 +382,13 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		if metadata.FolderID == "" {
 			metadata.FolderName = ""
 		}
-		metadata.RequestID = item.UID
+		metadata.RequestID = item.Uid
 		metadata.RequestName = item.Name
 		metadata.Type = REQUEST_TYPE
-		if item.UID != "" {
+		if item.Uid != "" {
 			// Route to API endpoint
-			metadata.FullID = item.UID
-			metadata.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.UID
+			metadata.FullID = item.Uid
+			metadata.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.Uid
 		} else {
 			// Route to collection.json
 			metadata.FullID = item.ID
@@ -624,9 +624,9 @@ func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.C
 }
 
 func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, response Response) {
-	if response.UID != "" {
-		m.Link = LINK_BASE_URL + "example/" + response.UID
-		m.FullID = response.UID
+	if response.Uid != "" {
+		m.Link = LINK_BASE_URL + "example/" + response.Uid
+		m.FullID = response.Uid
 	}
 	originalType := m.Type
 
@@ -720,7 +720,7 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					Link:            metadata.Link,
 					WorkspaceUuid:   metadata.WorkspaceUUID,
 					WorkspaceName:   metadata.WorkspaceName,
-					CollectionId:    metadata.CollectionInfo.UID,
+					CollectionId:    metadata.CollectionInfo.Uid,
 					CollectionName:  metadata.CollectionInfo.Name,
 					EnvironmentId:   metadata.EnvironmentID,
 					EnvironmentName: metadata.EnvironmentName,
