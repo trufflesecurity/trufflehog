@@ -146,7 +146,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err = json.Unmarshal(contents, &env); err != nil {
 			return err
 		}
-		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentID: env.ID, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE}, env)
+		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentID: env.Id, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE}, env)
 	}
 
 	// Scan local collections
@@ -174,7 +174,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			}
 		}
 		basename := path.Base(workspacePath)
-		workspace.ID = strings.TrimSuffix(basename, filepath.Ext(basename))
+		workspace.Id = strings.TrimSuffix(basename, filepath.Ext(basename))
 		s.scanLocalWorkspace(ctx, chunksChan, workspace, workspacePath)
 	}
 
@@ -219,9 +219,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 		ctx.Logger().V(2).Info("enumerated workspaces", "workspaces", workspaces)
 		for _, workspace := range workspaces {
-			s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspace.ID), "")
+			s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspace.Id), "")
 			if err = s.scanWorkspace(ctx, chunksChan, workspace); err != nil {
-				return fmt.Errorf("error scanning workspace %s: %w", workspace.ID, err)
+				return fmt.Errorf("error scanning workspace %s: %w", workspace.Id, err)
 			}
 		}
 	}
@@ -235,12 +235,12 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 	s.resetKeywords()
 
 	metadata := Metadata{
-		WorkspaceUUID: workspace.ID,
+		WorkspaceUUID: workspace.Id,
 		fromLocal:     true,
 	}
 
 	for _, environment := range workspace.EnvironmentsRaw {
-		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/environments/" + environment.ID + ".json"
+		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/environments/" + environment.Id + ".json"
 		metadata.LocationType = source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE
 		s.scanVariableData(ctx, chunksChan, metadata, environment)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
@@ -258,7 +258,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// initiate metadata to track the tree structure of postman data
 	metadata := Metadata{
-		WorkspaceUUID: workspace.ID,
+		WorkspaceUUID: workspace.Id,
 		WorkspaceName: workspace.Name,
 		CreatedBy:     workspace.CreatedBy,
 		Type:          "workspace",
@@ -276,7 +276,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		}
 		metadata.Type = ENVIRONMENT_TYPE
 		metadata.Link = LINK_BASE_URL + "environments/" + envID.Uid
-		metadata.FullID = envVars.ID
+		metadata.FullID = envVars.Id
 		metadata.EnvironmentID = envID.Uid
 		metadata.EnvironmentName = envVars.Name
 
@@ -391,7 +391,7 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 			metadata.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.Uid
 		} else {
 			// Route to collection.json
-			metadata.FullID = item.ID
+			metadata.FullID = item.Id
 		}
 		s.scanHTTPRequest(ctx, chunksChan, metadata, item.Request)
 	}
