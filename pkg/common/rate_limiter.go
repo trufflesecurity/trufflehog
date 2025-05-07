@@ -16,8 +16,8 @@ import (
 // - Call .Do instead of what you would normally call to make a request
 // - Process the response (returned from .Do) as normal
 //
-// A RateLimiter should only be used on at most 1 API. If you're making
-// requests to multiple APIs, use multiple RateLimiters.
+// A RateLimiter should only be used on a single API. If you're making requests
+// to multiple APIs, use multiple RateLimiters.
 type RateLimiter struct {
 	limits []RateLimit
 }
@@ -30,7 +30,7 @@ type RateLimiter struct {
 //     time.
 //
 // Usage requirements:
-// - RateLimits can only be used on at most 1 API
+// - RateLimits can only be used on a single API.
 //   - An implementation might worry that it has to track request counts (etc.)
 //     across different APIs, but this way it doesn't.
 //   - This also means that RateLimits can be used in multiple RateLimiters, as
