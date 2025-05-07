@@ -95,6 +95,7 @@ const (
 	AnalyzerTypeFigma
 	AnalyzerTypePlaid
 	AnalyzerTypeNetlify
+	AnalyzerTypeMux
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -135,6 +136,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeFigma:         "Figma",
 	AnalyzerTypePlaid:         "Plaid",
 	AnalyzerTypeNetlify:       "Netlify",
+	AnalyzerTypeMux:           "Mux",
 	// Add new mappings here
 }
 
