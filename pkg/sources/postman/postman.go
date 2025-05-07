@@ -266,18 +266,18 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// gather and scan environment variables
 	for _, envID := range workspace.Environments {
-		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.UUID)
+		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.Uid)
 		if err != nil {
-			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.UUID)
+			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.Uid)
 			continue
 		}
-		if shouldSkip(envID.UUID, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
+		if shouldSkip(envID.Uid, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
 			continue
 		}
 		metadata.Type = ENVIRONMENT_TYPE
-		metadata.Link = LINK_BASE_URL + "environments/" + envID.UUID
+		metadata.Link = LINK_BASE_URL + "environments/" + envID.Uid
 		metadata.FullID = envVars.ID
-		metadata.EnvironmentID = envID.UUID
+		metadata.EnvironmentID = envID.Uid
 		metadata.EnvironmentName = envVars.Name
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
@@ -300,10 +300,10 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	// at this point we have all the possible
 	// substitutions from Environment variables
 	for _, collectionID := range workspace.Collections {
-		if shouldSkip(collectionID.UUID, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
+		if shouldSkip(collectionID.Uid, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
 			continue
 		}
-		collection, err := s.client.GetCollection(ctx, collectionID.UUID)
+		collection, err := s.client.GetCollection(ctx, collectionID.Uid)
 		if err != nil {
 			// Log and move on, because sometimes the Postman API seems to give us collection IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.

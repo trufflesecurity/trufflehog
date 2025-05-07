@@ -22,25 +22,25 @@ const (
 )
 
 type Workspace struct {
-	ID              string       `json:"id"`
-	Name            string       `json:"name"`
-	Type            string       `json:"type"`
-	Description     string       `json:"description"`
-	Visibility      string       `json:"visibility"`
-	CreatedBy       string       `json:"createdBy"`
-	UpdatedBy       string       `json:"updatedBy"`
-	CreatedAt       string       `json:"createdAt"`
-	UpdatedAt       string       `json:"updatedAt"`
-	Collections     []IDNameUUID `json:"collections"`
-	Environments    []IDNameUUID `json:"environments"`
+	ID              string      `json:"id"`
+	Name            string      `json:"name"`
+	Type            string      `json:"type"`
+	Description     string      `json:"description"`
+	Visibility      string      `json:"visibility"`
+	CreatedBy       string      `json:"createdBy"`
+	UpdatedBy       string      `json:"updatedBy"`
+	CreatedAt       string      `json:"createdAt"`
+	UpdatedAt       string      `json:"updatedAt"`
+	Collections     []IdNameUid `json:"collections"`
+	Environments    []IdNameUid `json:"environments"`
 	CollectionsRaw  []Collection
 	EnvironmentsRaw []VariableData
 }
 
-type IDNameUUID struct {
+type IdNameUid struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
-	UUID string `json:"uid"`
+	Uid  string `json:"uid"`
 }
 
 type KeyValue struct {
