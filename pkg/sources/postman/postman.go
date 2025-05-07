@@ -303,7 +303,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		if shouldSkip(collectionID.UUID, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
 			continue
 		}
-		collection, err := s.client.GetCollection(ctx, collectionID.UUID)
+		collection, err := s.client.GetCollection(ctx, collectionID.ID)
 		if err != nil {
 			// Log and move on, because sometimes the Postman API seems to give us collection IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
