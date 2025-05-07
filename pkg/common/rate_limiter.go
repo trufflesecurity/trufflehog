@@ -11,13 +11,28 @@ import (
 )
 
 // RateLimit represents a rate limiting implementation. A rate limiter
-// comprises 0 or more limits. Policies should be goroutine safe.
+// comprises 0 or more limits. Implementation requirements:
+//   - Be goroutine safe.
+//   - .Execute can *NEVER* sleep for a duration; it can only sleep _UNTIL_ a
+//     time.
 //
-// Importantly, limits can assume they're only ever used on a single API, and
-// thus can be used in more than one rate limiter. For example, if an API has 2
-// endpoints, one accepts 5r/s and another accepts 1r/s, but both have a limit
-// of total 500r/month, the policy implementing the 500r/month limit should be
-// able to be used in both of the 2 rate limiters for the 5r/s and 1r/s limits.
+// Usage requirements:
+//
+// - RateLimits can only be used on at most 1 API
+//   - An implementation might worry that it has to track request counts (etc.)
+//     across different APIs, but this way it doesn't.
+//   - This also means that RateLimits can be used in multiple RateLimiters, as
+//     long as those RateLimiters are all only used against the same API.
+//
+// For example, if an API has 2 endpoints, A with a 1r/s limit and another B
+// with a 5r/s limit, and the API in general has a 500r/month limit, this
+// configuration is possible:
+//
+// oneReqPerSecond := NewTokenBucketRateLimit(rate.Every(time.Second), 1)
+// fiveReqsPerSecond := NewTokenBucketRateLimit(rate.Every(time.Second)/5, 1)
+// fiveHundredReqsPerMonth := NewPersistentRateLimit(500, MONTH)
+// rateLimiterA := NewRateLimiter(oneReqPerSecond, fiveHundredReqsPerMonth)
+// rateLimiterB := NewRateLimiter(fiveReqsPerSecond, fiveHundredReqsPerMonth)
 type RateLimit interface {
 	// Execute and update execute and update a policy, respectively. These
 	// should:
