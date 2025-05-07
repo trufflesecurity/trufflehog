@@ -330,42 +330,42 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 }
 
 // GetEnvironmentVariables returns the environment variables for a given environment
-func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid string) (VariableData, error) {
+func (c *Client) GetEnvironmentVariables(ctx context.Context, environmentUid string) (VariableData, error) {
 	obj := struct {
 		VariableData VariableData `json:"environment"`
 	}{}
 
-	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
+	url := fmt.Sprintf(ENVIRONMENTS_URL, environmentUid)
 	if err := c.GeneralRateLimiter.Wait(ctx); err != nil {
 		return VariableData{}, fmt.Errorf("could not wait for rate limiter during environment variable getting: %w", err)
 	}
 	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
 	if err != nil {
-		return VariableData{}, fmt.Errorf("could not get postman environment (%s) response bytes: %w", environment_uuid, err)
+		return VariableData{}, fmt.Errorf("could not get postman environment (%s) response bytes: %w", environmentUid, err)
 	}
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
-		return VariableData{}, fmt.Errorf("could not unmarshal env variables JSON for environment (%s): %w", environment_uuid, err)
+		return VariableData{}, fmt.Errorf("could not unmarshal env variables JSON for environment (%s): %w", environmentUid, err)
 	}
 
 	return obj.VariableData, nil
 }
 
 // GetCollection returns the collection for a given collection
-func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Collection, error) {
+func (c *Client) GetCollection(ctx context.Context, collectionId string) (Collection, error) {
 	obj := struct {
 		Collection Collection `json:"collection"`
 	}{}
 
-	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
+	url := fmt.Sprintf(COLLECTIONS_URL, collectionId)
 	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
 		return Collection{}, fmt.Errorf("could not wait for rate limiter during collection getting: %w", err)
 	}
 	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
 	if err != nil {
-		return Collection{}, fmt.Errorf("could not get postman collection (%s) response bytes: %w", collection_uuid, err)
+		return Collection{}, fmt.Errorf("could not get postman collection (%s) response bytes: %w", collectionId, err)
 	}
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
-		return Collection{}, fmt.Errorf("could not unmarshal JSON for collection (%s): %w", collection_uuid, err)
+		return Collection{}, fmt.Errorf("could not unmarshal JSON for collection (%s): %w", collectionId, err)
 	}
 
 	// Loop used to deal with seeing whether a request/response header is a string or a key value pair
@@ -374,7 +374,7 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 			if err := json.Unmarshal(obj.Collection.Items[i].Request.HeaderRaw, &obj.Collection.Items[i].Request.HeaderKeyValue); err == nil {
 			} else if err := json.Unmarshal(obj.Collection.Items[i].Request.HeaderRaw, &obj.Collection.Items[i].Request.HeaderString); err == nil {
 			} else {
-				return Collection{}, fmt.Errorf("could not unmarshal request header JSON for collection (%s): %w", collection_uuid, err)
+				return Collection{}, fmt.Errorf("could not unmarshal request header JSON for collection (%s): %w", collectionId, err)
 			}
 		}
 
@@ -382,13 +382,13 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 			if err := json.Unmarshal(obj.Collection.Items[i].Response[j].OriginalRequest.HeaderRaw, &obj.Collection.Items[i].Response[j].OriginalRequest.HeaderKeyValue); err == nil {
 			} else if err := json.Unmarshal(obj.Collection.Items[i].Response[j].OriginalRequest.HeaderRaw, &obj.Collection.Items[i].Response[j].OriginalRequest.HeaderString); err == nil {
 			} else {
-				return Collection{}, fmt.Errorf("could not unmarshal original request header in response JSON for collection (%s): %w", collection_uuid, err)
+				return Collection{}, fmt.Errorf("could not unmarshal original request header in response JSON for collection (%s): %w", collectionId, err)
 			}
 
 			if err := json.Unmarshal(obj.Collection.Items[i].Response[j].HeaderRaw, &obj.Collection.Items[i].Response[j].HeaderKeyValue); err == nil {
 			} else if err := json.Unmarshal(obj.Collection.Items[i].Response[j].HeaderRaw, &obj.Collection.Items[i].Response[j].HeaderString); err == nil {
 			} else {
-				return Collection{}, fmt.Errorf("could not unmarshal response header JSON for collection (%s): %w", collection_uuid, err)
+				return Collection{}, fmt.Errorf("could not unmarshal response header JSON for collection (%s): %w", collectionId, err)
 			}
 		}
 	}
