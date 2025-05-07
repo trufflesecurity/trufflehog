@@ -99,7 +99,7 @@ type Info struct {
 	Description string    `json:"description"`
 	Schema      string    `json:"schema"`
 	UpdatedAt   time.Time `json:"updatedAt"`
-	UID         string    `json:"uid"` //Need to use this to get the collection via API
+	Uid         string    `json:"uid"` //Need to use this to get the collection via API
 }
 
 type Item struct {
@@ -112,7 +112,7 @@ type Item struct {
 	Request     Request    `json:"request,omitempty"`
 	Response    []Response `json:"response,omitempty"`
 	Description string     `json:"description,omitempty"`
-	UID         string     `json:"uid,omitempty"` //Need to use this to get the collection via API. The UID is a concatenation of the ID and the user ID of whoever created the item.
+	Uid         string     `json:"uid,omitempty"` //Need to use this to get the collection via API. The UID is a concatenation of the ID and the user ID of whoever created the item.
 }
 
 type Auth struct {
@@ -180,7 +180,7 @@ type Response struct {
 	HeaderKeyValue  []KeyValue
 	HeaderString    []string
 	Body            string `json:"body,omitempty"`
-	UID             string `json:"uid,omitempty"`
+	Uid             string `json:"uid,omitempty"`
 }
 
 // A Client manages communication with the Postman API.
