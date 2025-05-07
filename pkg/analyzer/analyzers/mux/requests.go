@@ -33,6 +33,26 @@ func makeAPIRequest(client *http.Client, key, secret, method, endpoint string) (
 	return body, res.StatusCode, nil
 }
 
+func testAllPermissions(client *http.Client, info *secretInfo, key string, secret string) error {
+	testsConfig, err := readTestsConfig()
+	if err != nil {
+		return err
+	}
+
+	for _, test := range testsConfig.Tests {
+		hasPermission, err := test.testPermission(client, key, secret)
+		if err != nil {
+			return err
+		}
+		if !hasPermission {
+			continue
+		}
+		info.addPermission(test.ResourceType, test.Permission)
+	}
+
+	return nil
+}
+
 func populateAllResources(client *http.Client, info *secretInfo, key string, secret string) error {
 	if info.hasPermission(ResourceTypeVideo, Read) {
 		if err := populateAssets(client, info, key, secret); err != nil {

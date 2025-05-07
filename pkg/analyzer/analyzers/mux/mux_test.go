@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -16,15 +17,13 @@ var expectedOutput []byte
 func TestAnalyzer_Analyze(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
-	// testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "analyzers1")
-	// if err != nil {
-	// 	t.Fatalf("could not get test secrets from GCP: %s", err)
-	// }
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "analyzers1")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
 
-	// key := testSecrets.MustGetField("MUX_KEY")
-	// secret := testSecrets.MustGetField("MUX")
-	key := "25ab41df-e129-47c0-92ce-b2ac10537a9a"
-	secret := "mJBF7ccU+uhBuziIznT9ye+3lquEgXlngKCuyQHs/Ya0a2V+AHAQfTJT6mHsg8SmoJGQtB4FwMl"
+	key := testSecrets.MustGetField("MUX_KEY")
+	secret := testSecrets.MustGetField("MUX_SECRET")
 
 	tests := []struct {
 		name    string

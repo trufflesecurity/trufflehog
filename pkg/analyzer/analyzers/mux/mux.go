@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/fatih/color"
@@ -23,13 +22,6 @@ var _ analyzers.Analyzer = (*Analyzer)(nil)
 type Analyzer struct {
 	Cfg *config.Config
 }
-
-type AccountType string
-
-const (
-	AccountFree AccountType = "Free"
-	AccountPaid AccountType = "Paid"
-)
 
 //go:embed tests.json
 var testsConfig []byte
@@ -92,26 +84,6 @@ func AnalyzePermissions(cfg *config.Config, key string, secret string) (*secretI
 	}
 
 	return secretInfo, nil
-}
-
-func testAllPermissions(client *http.Client, info *secretInfo, key string, secret string) error {
-	testsConfig, err := readTestsConfig()
-	if err != nil {
-		return err
-	}
-
-	for _, test := range testsConfig.Tests {
-		hasPermission, err := test.testPermission(client, key, secret)
-		if err != nil {
-			return err
-		}
-		if !hasPermission {
-			continue
-		}
-		info.addPermission(test.ResourceType, test.Permission)
-	}
-
-	return nil
 }
 
 func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
@@ -216,25 +188,55 @@ func printResourcesAndPermissions(info *secretInfo) {
 			color.GreenString(resource),
 		})
 	}
+	t1.AppendSeparator()
+
+	for idx, resource := range muxResourcesMap[ResourceTypeSystem] {
+		category, access := "", ""
+		if idx == 0 {
+			category = "Mux System"
+			access = getAccessLevelStringFromPermission(info.Permissions[ResourceTypeSystem])
+		}
+		t1.AppendRow(table.Row{
+			color.GreenString(category),
+			color.GreenString(access),
+			color.GreenString(resource),
+		})
+	}
 	t1.SetOutputMirror(os.Stdout)
 	t1.Render()
 
 	color.Yellow("\n[i] Resources:")
 
+	if info.hasPermission(ResourceTypeVideo, Read) {
+		printMuxVideoResources(info)
+	}
+
+	if info.hasPermission(ResourceTypeData, Read) {
+		printMuxDataResources(info)
+	}
+
+	if info.hasPermission(ResourceTypeSystem, Read) {
+		printMuxSystemResources(info)
+	}
+
+	fmt.Printf("%s: https://www.mux.com/docs/api-reference\n\n", color.GreenString("Ref"))
+}
+
+func printMuxVideoResources(info *secretInfo) {
+	t1 := table.NewWriter()
+	t1.SetTitle("Assets")
+	t1.AppendHeader(table.Row{"ID", "Title", "Duration", "Status", "Creator ID", "External ID", "Created At"})
+
 	t2 := table.NewWriter()
-	t2.SetTitle("Assets")
-	t2.AppendHeader(table.Row{"ID", "Title", "Duration", "Status", "Creator ID", "External ID", "Created At"})
+	t2.SetTitle("Asset Tracks")
+	t2.AppendHeader(table.Row{"Asset ID", "ID", "Name", "Type", "Duration", "Status", "Primary"})
 
 	t3 := table.NewWriter()
-	t3.SetTitle("Asset Tracks")
-	t3.AppendHeader(table.Row{"ID", "Name", "Type", "Duration", "Status", "Primary"})
-
-	t4 := table.NewWriter()
-	t4.SetTitle("Asset Playback IDs")
-	t4.AppendHeader(table.Row{"ID", "Policy"})
+	t3.SetTitle("Asset Playback IDs")
+	t3.AppendHeader(table.Row{"Asset ID", "ID", "Policy"})
 
 	for _, asset := range info.Assets {
-		t2.AppendRow(table.Row{
+		t1.AppendRow(table.Row{
 			color.GreenString(asset.ID),
 			color.GreenString(asset.Meta.Title),
 			color.GreenString(fmt.Sprintf("%.2fs", asset.Duration)),
@@ -243,8 +245,10 @@ func printResourcesAndPermissions(info *secretInfo) {
 			color.GreenString(asset.Meta.ExternalID),
 			color.GreenString(asset.CreatedAt),
 		})
+		t1.AppendSeparator()
 		for _, track := range asset.Tracks {
-			t3.AppendRow(table.Row{
+			t2.AppendRow(table.Row{
+				color.GreenString(asset.ID),
 				color.GreenString(track.ID),
 				color.GreenString(track.Name),
 				color.GreenString(track.Type),
@@ -252,47 +256,55 @@ func printResourcesAndPermissions(info *secretInfo) {
 				color.GreenString(track.Status),
 				color.GreenString(fmt.Sprintf("%t", track.Primary)),
 			})
+			t2.AppendSeparator()
 		}
 		for _, playbackID := range asset.PlaybackIDs {
-			t4.AppendRow(table.Row{
+			t3.AppendRow(table.Row{
+				color.GreenString(asset.ID),
 				color.GreenString(playbackID.ID),
 				color.GreenString(playbackID.Policy),
 			})
+			t3.AppendSeparator()
 		}
 	}
+	t1.SetOutputMirror(os.Stdout)
+	t1.Render()
+
 	t2.SetOutputMirror(os.Stdout)
 	t2.Render()
 
 	t3.SetOutputMirror(os.Stdout)
 	t3.Render()
+}
 
-	t4.SetOutputMirror(os.Stdout)
-	t4.Render()
-
-	t5 := table.NewWriter()
-	t5.SetTitle("Annotations")
-	t5.AppendHeader(table.Row{"ID", "Note", "Date", "Sub Property ID"})
+func printMuxDataResources(info *secretInfo) {
+	t1 := table.NewWriter()
+	t1.SetTitle("Annotations")
+	t1.AppendHeader(table.Row{"ID", "Note", "Date", "Sub Property ID"})
 	for _, annotation := range info.Annotations {
-		t5.AppendRow(table.Row{
+		t1.AppendRow(table.Row{
 			color.GreenString(annotation.ID),
 			color.GreenString(annotation.Note),
 			color.GreenString(annotation.Date),
 			color.GreenString(annotation.SubPropertyID),
 		})
 	}
-	t5.SetOutputMirror(os.Stdout)
-	t5.Render()
+	t1.SetOutputMirror(os.Stdout)
+	t1.Render()
+}
 
-	t6 := table.NewWriter()
-	t6.SetTitle("Signing Keys")
-	t6.AppendHeader(table.Row{"ID", "Created At"})
+func printMuxSystemResources(info *secretInfo) {
+	t1 := table.NewWriter()
+	t1.SetTitle("Signing Keys")
+	t1.AppendHeader(table.Row{"ID", "Created At"})
 	for _, signingKey := range info.SigningKeys {
-		t6.AppendRow(table.Row{
+		t1.AppendRow(table.Row{
 			color.GreenString(signingKey.ID),
 			color.GreenString(signingKey.CreatedAt),
 		})
 	}
-
+	t1.SetOutputMirror(os.Stdout)
+	t1.Render()
 }
 
 func getAccessLevelStringFromPermission(permission Permission) string {
