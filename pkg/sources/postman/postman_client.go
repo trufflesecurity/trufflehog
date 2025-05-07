@@ -76,7 +76,8 @@ type Metadata struct {
 	FolderName      string // Folder path if the item is nested under one or more folders
 	RequestID       string // UUID of the request (but not full ID)
 	RequestName     string
-	FullID          string //full ID of the reference item (created_by + ID) OR just the UUID
+	Id              string // Postman designated object ID
+	Uid             string // Postman designated "full" ID
 	Link            string //direct link to the folder (could be .json file path)
 	Type            string //folder, request, etc.
 	EnvironmentName string

@@ -276,11 +276,11 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		}
 		metadata.Type = ENVIRONMENT_TYPE
 		metadata.Link = LINK_BASE_URL + "environments/" + envID.Uid
-		metadata.FullID = envVars.Id
+		metadata.Id = envVars.Id
 		metadata.EnvironmentID = envID.Uid
 		metadata.EnvironmentName = envVars.Name
 
-		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
+		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.Id)
 		for _, word := range strings.Split(envVars.Name, " ") {
 			s.attemptToAddKeyword(word)
 		}
@@ -289,10 +289,10 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 		metadata.Type = ""
 		metadata.Link = ""
-		metadata.FullID = ""
+		metadata.Id = ""
 		metadata.EnvironmentID = ""
 		metadata.EnvironmentName = ""
-		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", metadata.FullID)
+		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", metadata.Id)
 	}
 	ctx.Logger().V(2).Info("finished scanning environments")
 
@@ -324,8 +324,8 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	s.attemptToAddKeyword(collection.Info.Name)
 
 	if !metadata.fromLocal {
-		metadata.FullID = metadata.CollectionInfo.Uid
-		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
+		metadata.Uid = metadata.CollectionInfo.Uid
+		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.Id
 	}
 
 	metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_VARIABLE
@@ -362,8 +362,8 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	}
 
 	if item.Uid != "" {
-		metadata.FullID = item.Uid
-		metadata.Link = LINK_BASE_URL + FOLDER_TYPE + "/" + metadata.FullID
+		metadata.Uid = item.Uid
+		metadata.Link = LINK_BASE_URL + FOLDER_TYPE + "/" + metadata.Id
 	}
 	// recurse through the folders
 	for _, subItem := range item.Items {
@@ -387,11 +387,11 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		metadata.Type = REQUEST_TYPE
 		if item.Uid != "" {
 			// Route to API endpoint
-			metadata.FullID = item.Uid
+			metadata.Uid = item.Uid
 			metadata.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.Uid
 		} else {
 			// Route to collection.json
-			metadata.FullID = item.Id
+			metadata.Id = item.Id
 		}
 		s.scanHTTPRequest(ctx, chunksChan, metadata, item.Request)
 	}
@@ -415,7 +415,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 	// Prep direct links. Ignore updating link if it's a local JSON file
 	if !metadata.fromLocal {
-		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.FullID
+		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.Id
 		if event.Listen == "prerequest" {
 			metadata.Link += "?tab=pre-request-scripts"
 		} else {
@@ -626,7 +626,7 @@ func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.C
 func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, response Response) {
 	if response.Uid != "" {
 		m.Link = LINK_BASE_URL + "example/" + response.Uid
-		m.FullID = response.Uid
+		m.Uid = response.Uid
 	}
 	originalType := m.Type
 
@@ -664,7 +664,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, variableData VariableData) {
 	if len(variableData.KeyValues) == 0 {
-		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "item_uuid", m.FullID)
+		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "item_uuid", m.Id)
 		return
 	}
 
