@@ -17,7 +17,7 @@ func TestNewSubstitution(t *testing.T) {
 func TestSubstitution_Add(t *testing.T) {
 	sub := NewSubstitution()
 	metadata := Metadata{
-		CollectionInfo: Info{PostmanID: "col1"},
+		CollectionInfo: Info{Id: "col1"},
 	}
 	sub.add(metadata, "key1", "value1")
 	sub.add(metadata, "key1", "value2")

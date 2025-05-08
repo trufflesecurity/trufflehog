@@ -2,9 +2,12 @@ package postman
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"gopkg.in/h2non/gock.v1"
 
+	"github.com/repeale/fp-go"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -71,8 +75,8 @@ func TestSource_ScanCollection(t *testing.T) {
 			name: "GET request with URL",
 			collection: Collection{
 				Info: Info{
-					PostmanID: "col1",
-					Name:      "Test Collection",
+					Id:   "col1",
+					Name: "Test Collection",
 				},
 				Items: []Item{
 					{
@@ -97,8 +101,8 @@ func TestSource_ScanCollection(t *testing.T) {
 			name: "POST request with URL and auth",
 			collection: Collection{
 				Info: Info{
-					PostmanID: "col2",
-					Name:      "Test Collection",
+					Id:   "col2",
+					Name: "Test Collection",
 				},
 				Items: []Item{
 					{
@@ -180,8 +184,8 @@ func TestSource_ScanVariableData(t *testing.T) {
 			name: "Single variable",
 			metadata: Metadata{
 				CollectionInfo: Info{
-					PostmanID: "col1",
-					Name:      "Test Collection",
+					Id:   "col1",
+					Name: "Test Collection",
 				},
 			},
 			variableData: VariableData{
@@ -200,8 +204,8 @@ func TestSource_ScanVariableData(t *testing.T) {
 			name: "Multiple variables",
 			metadata: Metadata{
 				CollectionInfo: Info{
-					PostmanID: "col2",
-					Name:      "Test Collection",
+					Id:   "col2",
+					Name: "Test Collection",
 				},
 			},
 			variableData: VariableData{
@@ -685,4 +689,142 @@ func TestSource_HeadersScanning(t *testing.T) {
 	} else {
 		t.Logf("Generated %d chunks from the mock data", chunksReceived)
 	}
+}
+
+func makePostmanUid[A, B any](userId A, objectId B) string {
+	return fmt.Sprint(userId, '-', objectId)
+}
+
+func Test_WorkspaceListUnmarshalling(t *testing.T) {
+	// This test is designed to cover the unmarshalling of the response to a request
+	// like: curl --location 'https://api.getpostman.com/workspaces'
+	defer gock.Off()
+
+	aUserId := strconv.Itoa(10000000 + rand.Intn(99999999-10000000))
+
+	myWorkspaceId := uuid.New().String()
+	myWorkspaceTestCollectionId := uuid.New().String()
+	myWorkspaceTestCollectionUid := makePostmanUid(aUserId, myWorkspaceTestCollectionId)
+	myWorkspaceTestEnvironemntId := uuid.New().String()
+	myWorkspaceTestEnvironemntUid := makePostmanUid(aUserId, myWorkspaceTestEnvironemntId)
+
+	privateWorkspaceId := uuid.New().String()
+	teamWorkspaceId := uuid.New().String()
+	publicWorkspaceId := uuid.New().String()
+	partnerWorkspaceId := uuid.New().String()
+
+	// Set up some responses
+
+	successfulWorkspaceListResponseStr := `
+		{
+			"workspaces": [
+				{
+					"id": "` + myWorkspaceId + `",
+					"name": "My Workspace",
+					"createdBy": "` + aUserId + `",
+					"type": "personal",
+					"visibility": "personal"
+				},
+				{
+					"id": "` + privateWorkspaceId + `",
+					"name": "Private Workspace",
+					"createdBy": "` + aUserId + `",
+					"type": "team",
+					"visibility": "private"
+				},
+				{
+					"id": "` + teamWorkspaceId + `",
+					"name": "Team Workspace",
+					"createdBy": "` + aUserId + `",
+					"type": "team",
+					"visibility": "team"
+				},
+				{
+					"id": "` + publicWorkspaceId + `",
+					"name": "Public Workspace",
+					"createdBy": "` + aUserId + `",
+					"type": "team",
+					"visibility": "public"
+				},
+				{
+					"id": "` + partnerWorkspaceId + `",
+					"name": "Partner Workspace",
+					"createdBy": "` + aUserId + `",
+					"type": "team",
+					"visibility": "partner"
+				}
+			]
+		}
+	`
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces").
+		Reply(200).
+		BodyString(successfulWorkspaceListResponseStr)
+
+	successfulMyWorkspaceDetailsResponseStr := `
+		{
+			"workspace": {
+				"id": "` + myWorkspaceId + `",
+				"name": "Partner Workspace",
+				"type": "team",
+				"description": "This is a partner workspace.",
+				"visibility": "partner",
+				"createdBy": "` + aUserId + `",
+				"updatedBy": "` + aUserId + `",
+				"createdAt": "2022-07-06T16:18:32.000Z",
+				"updatedAt": "2022-07-06T20:55:13.000Z",
+				"collections": [
+					{
+						"id": "` + myWorkspaceTestCollectionId + `",
+						"name": "Test Collection",
+						"uid": "` + myWorkspaceTestCollectionUid + `"
+					}
+				],
+				"environments": [
+					{
+						"id": "` + myWorkspaceTestEnvironemntId + `",
+						"name": "Test Environment",
+						"uid": "` + myWorkspaceTestEnvironemntUid + `"
+					}
+				],
+				"mocks": [],
+				"monitors": [],
+				"apis": [],
+				"scim": {
+					"createdBy": "405775fe15ed41872a8eea4c8aa2b38cda9749812cc55c99",
+					"updatedBy": "405775fe15ed41872a8eea4c8aa2b38cda9749812cc55c99"
+				}
+			}
+		}
+`
+	gock.New("https://api.getpostman.com").
+		Get("/workspaces/" + myWorkspaceId).
+		Reply(200).
+		BodyString(successfulMyWorkspaceDetailsResponseStr)
+
+	// Generice setup that we have to do every time
+	ctx := context.Background()
+	s, conn := createTestSource(&sourcespb.Postman{
+		Credential: &sourcespb.Postman_Token{
+			Token: "super-secret-token",
+		},
+	})
+	s.Init(ctx, "test - postman", 0, 1, false, conn, 1)
+	gock.InterceptClient(s.client.HTTPClient)
+	defer gock.RestoreClient(s.client.HTTPClient)
+
+	// Kick off the thing.  At this point we expect calls to the following:
+	//   1) https://api.getpostman.com/workspaces
+	//  		- to get the initial list of workspaces
+	//   2) https://api.getpostman.com/workspaces/{workspace_id}
+	//			- for _each_ of the returned workspaces, to get their full information
+	workspaces, _ := s.client.EnumerateWorkspaces(ctx)
+
+	// First we check that the returned list of workspaces looks exactly like we want it to
+	actualWorkspaceIds := fp.Map(func(w Workspace) string { return w.Id })(workspaces)
+	expectedWorkspaceIds := []string{myWorkspaceId, privateWorkspaceId, publicWorkspaceId, partnerWorkspaceId, teamWorkspaceId}
+	assert.ElementsMatch(t, actualWorkspaceIds, expectedWorkspaceIds)
+
+	// Now we check that the appropriate calls were made
+	fmt.Printf("%v", workspaces)
 }

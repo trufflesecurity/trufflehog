@@ -22,25 +22,24 @@ const (
 )
 
 type Workspace struct {
-	Id              string      `json:"id"`
-	Name            string      `json:"name"`
-	Type            string      `json:"type"`
-	Description     string      `json:"description"`
-	Visibility      string      `json:"visibility"`
-	CreatedBy       string      `json:"createdBy"`
-	UpdatedBy       string      `json:"updatedBy"`
-	CreatedAt       string      `json:"createdAt"`
-	UpdatedAt       string      `json:"updatedAt"`
-	Collections     []IdNameUid `json:"collections"`
-	Environments    []IdNameUid `json:"environments"`
+	Id              string   `json:"id"`
+	Name            string   `json:"name"`
+	Type            string   `json:"type"`
+	Description     string   `json:"description"`
+	Visibility      string   `json:"visibility"`
+	CreatedBy       string   `json:"createdBy"`
+	UpdatedBy       string   `json:"updatedBy"`
+	CreatedAt       string   `json:"createdAt"`
+	UpdatedAt       string   `json:"updatedAt"`
+	Collections     []IdName `json:"collections"`
+	Environments    []IdName `json:"environments"`
 	CollectionsRaw  []Collection
 	EnvironmentsRaw []VariableData
 }
 
-type IdNameUid struct {
+type IdName struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
-	Uid  string `json:"uid"`
 }
 
 type KeyValue struct {
@@ -53,7 +52,7 @@ type KeyValue struct {
 }
 
 type VariableData struct {
-	Id        string     `json:"id"` // For globals and envs, this is just the UUID, not the full ID.
+	Id        string     `json:"id"` // UUID of the folder (but not full ID/UID)
 	Name      string     `json:"name"`
 	KeyValues []KeyValue `json:"values"`
 	Owner     string     `json:"owner"`
@@ -67,16 +66,16 @@ type Environment struct {
 }
 
 type Metadata struct {
-	WorkspaceUUID   string
+	WorkspaceId     string
 	WorkspaceName   string
 	CreatedBy       string
-	EnvironmentID   string
+	EnvironmentId   string
 	CollectionInfo  Info
-	FolderID        string // UUID of the folder (but not full ID)
+	FolderId        string // UUID of the folder (but not full ID/UID)
 	FolderName      string // Folder path if the item is nested under one or more folders
-	RequestID       string // UUID of the request (but not full ID)
+	RequestId       string // UUID of the folder (but not full ID/UID)
 	RequestName     string
-	FullID          string //full ID of the reference item (created_by + ID) OR just the UUID
+	Id              string // Postman designated object ID (not the UID)
 	Link            string //direct link to the folder (could be .json file path)
 	Type            string //folder, request, etc.
 	EnvironmentName string
@@ -94,12 +93,11 @@ type Collection struct {
 }
 
 type Info struct {
-	PostmanID   string    `json:"_postman_id"` // This is a UUID. Needs createdBy ID prefix to be used with API.
+	Id          string    `json:"id"` // This is a UUID, but not a UID
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Schema      string    `json:"schema"`
 	UpdatedAt   time.Time `json:"updatedAt"`
-	Uid         string    `json:"uid"` //Need to use this to get the collection via API
 }
 
 type Item struct {
@@ -112,7 +110,6 @@ type Item struct {
 	Request     Request    `json:"request,omitempty"`
 	Response    []Response `json:"response,omitempty"`
 	Description string     `json:"description,omitempty"`
-	Uid         string     `json:"uid,omitempty"` //Need to use this to get the collection via API. The UID is a concatenation of the ID and the user ID of whoever created the item.
 }
 
 type Auth struct {
@@ -180,7 +177,6 @@ type Response struct {
 	HeaderKeyValue  []KeyValue
 	HeaderString    []string
 	Body            string `json:"body,omitempty"`
-	Uid             string `json:"uid,omitempty"`
 }
 
 // A Client manages communication with the Postman API.
@@ -308,64 +304,64 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 }
 
 // GetWorkspace returns the workspace for a given workspace
-func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Workspace, error) {
-	ctx.Logger().V(2).Info("getting workspace", "workspace", workspaceUUID)
+func (c *Client) GetWorkspace(ctx context.Context, workspaceId string) (Workspace, error) {
+	ctx.Logger().V(2).Info("getting workspace", "workspace", workspaceId)
 	obj := struct {
 		Workspace Workspace `json:"workspace"`
 	}{}
 
-	url := fmt.Sprintf(WORKSPACE_URL, workspaceUUID)
+	url := fmt.Sprintf(WORKSPACE_URL, workspaceId)
 	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
 		return Workspace{}, fmt.Errorf("could not wait for rate limiter during workspace getting: %w", err)
 	}
 	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
 	if err != nil {
-		return Workspace{}, fmt.Errorf("could not get postman workspace (%s) response bytes: %w", workspaceUUID, err)
+		return Workspace{}, fmt.Errorf("could not get postman workspace (%s) response bytes: %w", workspaceId, err)
 	}
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
-		return Workspace{}, fmt.Errorf("could not unmarshal workspace JSON for workspace (%s): %w", workspaceUUID, err)
+		return Workspace{}, fmt.Errorf("could not unmarshal workspace JSON for workspace (%s): %w", workspaceId, err)
 	}
 
 	return obj.Workspace, nil
 }
 
 // GetEnvironmentVariables returns the environment variables for a given environment
-func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid string) (VariableData, error) {
+func (c *Client) GetEnvironmentVariables(ctx context.Context, environmentId string) (VariableData, error) {
 	obj := struct {
 		VariableData VariableData `json:"environment"`
 	}{}
 
-	url := fmt.Sprintf(ENVIRONMENTS_URL, environment_uuid)
+	url := fmt.Sprintf(ENVIRONMENTS_URL, environmentId)
 	if err := c.GeneralRateLimiter.Wait(ctx); err != nil {
 		return VariableData{}, fmt.Errorf("could not wait for rate limiter during environment variable getting: %w", err)
 	}
 	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
 	if err != nil {
-		return VariableData{}, fmt.Errorf("could not get postman environment (%s) response bytes: %w", environment_uuid, err)
+		return VariableData{}, fmt.Errorf("could not get postman environment (%s) response bytes: %w", environmentId, err)
 	}
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
-		return VariableData{}, fmt.Errorf("could not unmarshal env variables JSON for environment (%s): %w", environment_uuid, err)
+		return VariableData{}, fmt.Errorf("could not unmarshal env variables JSON for environment (%s): %w", environmentId, err)
 	}
 
 	return obj.VariableData, nil
 }
 
 // GetCollection returns the collection for a given collection
-func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Collection, error) {
+func (c *Client) GetCollection(ctx context.Context, collectionId string) (Collection, error) {
 	obj := struct {
 		Collection Collection `json:"collection"`
 	}{}
 
-	url := fmt.Sprintf(COLLECTIONS_URL, collection_uuid)
+	url := fmt.Sprintf(COLLECTIONS_URL, collectionId)
 	if err := c.WorkspaceAndCollectionRateLimiter.Wait(ctx); err != nil {
 		return Collection{}, fmt.Errorf("could not wait for rate limiter during collection getting: %w", err)
 	}
 	body, err := c.getPostmanResponseBodyBytes(ctx, url, nil)
 	if err != nil {
-		return Collection{}, fmt.Errorf("could not get postman collection (%s) response bytes: %w", collection_uuid, err)
+		return Collection{}, fmt.Errorf("could not get postman collection (%s) response bytes: %w", collectionId, err)
 	}
 	if err := json.Unmarshal([]byte(body), &obj); err != nil {
-		return Collection{}, fmt.Errorf("could not unmarshal JSON for collection (%s): %w", collection_uuid, err)
+		return Collection{}, fmt.Errorf("could not unmarshal JSON for collection (%s): %w", collectionId, err)
 	}
 
 	// Loop used to deal with seeing whether a request/response header is a string or a key value pair
@@ -374,7 +370,7 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 			if err := json.Unmarshal(obj.Collection.Items[i].Request.HeaderRaw, &obj.Collection.Items[i].Request.HeaderKeyValue); err == nil {
 			} else if err := json.Unmarshal(obj.Collection.Items[i].Request.HeaderRaw, &obj.Collection.Items[i].Request.HeaderString); err == nil {
 			} else {
-				return Collection{}, fmt.Errorf("could not unmarshal request header JSON for collection (%s): %w", collection_uuid, err)
+				return Collection{}, fmt.Errorf("could not unmarshal request header JSON for collection (%s): %w", collectionId, err)
 			}
 		}
 
@@ -382,13 +378,13 @@ func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Col
 			if err := json.Unmarshal(obj.Collection.Items[i].Response[j].OriginalRequest.HeaderRaw, &obj.Collection.Items[i].Response[j].OriginalRequest.HeaderKeyValue); err == nil {
 			} else if err := json.Unmarshal(obj.Collection.Items[i].Response[j].OriginalRequest.HeaderRaw, &obj.Collection.Items[i].Response[j].OriginalRequest.HeaderString); err == nil {
 			} else {
-				return Collection{}, fmt.Errorf("could not unmarshal original request header in response JSON for collection (%s): %w", collection_uuid, err)
+				return Collection{}, fmt.Errorf("could not unmarshal original request header in response JSON for collection (%s): %w", collectionId, err)
 			}
 
 			if err := json.Unmarshal(obj.Collection.Items[i].Response[j].HeaderRaw, &obj.Collection.Items[i].Response[j].HeaderKeyValue); err == nil {
 			} else if err := json.Unmarshal(obj.Collection.Items[i].Response[j].HeaderRaw, &obj.Collection.Items[i].Response[j].HeaderString); err == nil {
 			} else {
-				return Collection{}, fmt.Errorf("could not unmarshal response header JSON for collection (%s): %w", collection_uuid, err)
+				return Collection{}, fmt.Errorf("could not unmarshal response header JSON for collection (%s): %w", collectionId, err)
 			}
 		}
 	}
