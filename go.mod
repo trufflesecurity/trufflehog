@@ -36,7 +36,7 @@ require (
 	github.com/charmbracelet/glamour v0.7.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/coinbase/waas-client-library-go v1.0.8
-	github.com/couchbase/gocb/v2 v2.9.4
+	github.com/couchbase/gocb/v2 v2.10.0
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/csnewman/dextk v0.3.0
 	github.com/dustin/go-humanize v1.0.1
@@ -44,7 +44,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.2.1
 	github.com/fatih/color v1.18.0
 	github.com/felixge/fgprof v0.9.5
-	github.com/gabriel-vasile/mimetype v1.4.8
+	github.com/gabriel-vasile/mimetype v1.4.9
 	github.com/getsentry/sentry-go v0.32.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.13.2
@@ -87,7 +87,7 @@ require (
 	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 	github.com/shuheiktgw/go-travis v0.3.1
-	github.com/snowflakedb/gosnowflake v1.12.1
+	github.com/snowflakedb/gosnowflake v1.13.3
 	github.com/stretchr/testify v1.10.0
 	github.com/tailscale/depaware v0.0.0-20250112153213-b748de04d81b
 	github.com/testcontainers/testcontainers-go v0.34.0
@@ -98,7 +98,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.34.0
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.9.0
-	github.com/xo/dburl v0.23.6
+	github.com/xo/dburl v0.23.7
 	gitlab.com/gitlab-org/api/client-go v0.127.0
 	go.mongodb.org/mongo-driver v1.17.3
 	go.uber.org/automaxprocs v1.6.0
@@ -175,7 +175,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.16.3 // indirect
-	github.com/couchbase/gocbcore/v10 v10.5.4 // indirect
+	github.com/couchbase/gocbcore/v10 v10.7.0 // indirect
 	github.com/couchbase/gocbcoreps v0.1.3 // indirect
 	github.com/couchbase/goprotostellar v1.0.2 // indirect
 	github.com/couchbaselabs/gocbconnstr/v2 v2.0.0-20240607131231-fb385523de28 // indirect
@@ -222,6 +222,7 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect

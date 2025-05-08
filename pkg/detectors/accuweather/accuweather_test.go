@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	validPattern   = "dqftwc490oPc%xae67sBSF741M56%sd091a"
-	invalidPattern = "dqftwc490oPc%xae67sBSF741M56=sd091a"
+	validPattern           = "DqFtwc490oPc%xaE67sBSF741M56%sd091A"
+	invalidPattern         = "DqFtwc490oPc%xaE67sBSF741M56=sd091A"
+	validPatternLowEntropy = "DsFtwfaEsAPS%eaEsaESEsFesfMsfMsDmdA"
 )
 
 func TestAccuWeather_Pattern(t *testing.T) {
@@ -38,6 +39,11 @@ func TestAccuWeather_Pattern(t *testing.T) {
 		{
 			name:  "invalid pattern",
 			input: fmt.Sprintf("accuweather = '%s'", invalidPattern),
+			want:  nil,
+		},
+		{
+			name:  "valid pattern - Shannon entropy below threshold",
+			input: fmt.Sprintf("accuweather = '%s'", validPatternLowEntropy),
 			want:  nil,
 		},
 	}
