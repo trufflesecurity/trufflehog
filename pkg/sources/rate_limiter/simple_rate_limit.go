@@ -8,16 +8,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// SimpleRateLimit implements a basic "requests per second with bursting"
-// rate limiter.  It's a (very) thin wrapper around Google's rate limiter with
-// a hardcoded burst rate of 1.
+// SimpleRateLimit implements a basic "requests per second" rate limiter.  It's
+// a (very) thin wrapper around Google's rate limiter with a hardcoded burst
+// rate of 1.
 type SimpleRateLimit struct {
 	limiter *rate.Limiter
 }
 
-// Creates a new SimpleRateLimit
-// lim: a Limit representing the max number of requests per second
-// burst: max number of requests that can be sent if any requests can be sent
 func NewSimpleRateLimit(requestsPerSecond int) *SimpleRateLimit {
 	lim := rate.Every(time.Second / time.Duration(requestsPerSecond))
 	return &SimpleRateLimit{
@@ -30,10 +27,6 @@ func (tp *SimpleRateLimit) MaybeWait(
 	req *http.Request,
 	now time.Time,
 ) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
 	return tp.limiter.Wait(ctx)
 }
 
