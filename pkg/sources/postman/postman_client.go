@@ -208,24 +208,23 @@ func NewClient(postmanToken string) *Client {
 		"X-API-Key":    postmanToken,
 	}
 
-	oneRequestPerSecondRateLimit := rate_limiter.NewTokenBucketRateLimit(
-		rate.Every(time.Second),
-		1,
+	workspaceAndCollectionRateLimiter := rate_limiter.NewRateLimiter(
+		map[string]rate_limiter.RateLimit{
+			"1r/s": rate_limiter.NewTokenBucketRateLimit(rate.Every(time.Second), 1),
+		},
 	)
-	fiveRequestsPerSecondRateLimit := rate_limiter.NewTokenBucketRateLimit(
-		rate.Every(time.Second/5),
-		1,
+
+	generalRateLimiter := rate_limiter.NewRateLimiter(
+		map[string]rate_limiter.RateLimit{
+			"5r/s": rate_limiter.NewTokenBucketRateLimit(rate.Every(time.Second/5), 1),
+		},
 	)
 
 	c := &Client{
-		HTTPClient: http.DefaultClient,
-		Headers:    bh,
-		WorkspaceAndCollectionRateLimiter: rate_limiter.NewRateLimiter(
-			oneRequestPerSecondRateLimit,
-		),
-		GeneralRateLimiter: rate_limiter.NewRateLimiter(
-			fiveRequestsPerSecondRateLimit,
-		),
+		HTTPClient:                        http.DefaultClient,
+		Headers:                           bh,
+		WorkspaceAndCollectionRateLimiter: workspaceAndCollectionRateLimiter,
+		GeneralRateLimiter:                generalRateLimiter,
 	}
 
 	return c
