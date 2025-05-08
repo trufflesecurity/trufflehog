@@ -44,22 +44,34 @@ func (api *APIRateLimiter) Do(
 
 	now := time.Now()
 
+	// [NOTE] errgroup.Group oddly isn't what we want here. It presumes you want
+	// 			  to stop all other processing if a single task fails (we don't), and
+	// 			  that functionality is the only reason to use it instead of a
+	// 			  WaitGroup.
+	maybeWaitGroup := &sync.WaitGroup{}
+	maybeWaitErrorLock := &sync.Mutex{}
 	var maybeWaitError error = nil
 
 	for name, lim := range api.limits {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
+		maybeWaitGroup.Add(1)
+		go func(name string, lim APIRateLimit) {
+			defer maybeWaitGroup.Done()
 
-		// [NOTE] It's perhaps better to do this asynchronously, in case an errant
-		//		    limit sleeps for a duration instead of until a specific time, but
-		//			  I haven't thought through that.
-		if err := lim.MaybeWait(ctx, req, now); err != nil {
-			maybeWaitError = errors.Join(maybeWaitError, fmt.Errorf(
-				"error executing rate limit %s: %w", name, err,
-			))
-		}
+			if err := lim.MaybeWait(ctx, req, now); err != nil {
+				err = fmt.Errorf("error updating rate limit %s: %w", name, err)
+
+				maybeWaitErrorLock.Lock()
+				if maybeWaitError == nil {
+					maybeWaitError = err
+				} else {
+					maybeWaitError = errors.Join(maybeWaitError, err)
+				}
+				maybeWaitErrorLock.Unlock()
+			}
+		}(name, lim)
 	}
+
+	maybeWaitGroup.Wait()
 
 	if maybeWaitError != nil {
 		return nil, fmt.Errorf("error honoring rate limits: %w", maybeWaitError)
@@ -72,18 +84,14 @@ func (api *APIRateLimiter) Do(
 
 	now = time.Now()
 
-	// [NOTE] errgroup.Group oddly isn't what we want here. It presumes you want
-	// 			  to stop all other processing if a single task fails (we don't), and
-	// 			  that functionality is the only reason to use it instead of a
-	// 			  WaitGroup.
-	wg := &sync.WaitGroup{}
+	updateWaitGroup := &sync.WaitGroup{}
 	updateErrorLock := &sync.Mutex{}
 	var updateError error = nil
 
 	for name, lim := range api.limits {
-		wg.Add(1)
+		updateWaitGroup.Add(1)
 		go func(name string, lim APIRateLimit) {
-			defer wg.Done()
+			defer updateWaitGroup.Done()
 
 			if err := lim.Update(ctx, res, now); err != nil {
 				err = fmt.Errorf("error updating rate limit %s: %w", name, err)
@@ -99,7 +107,7 @@ func (api *APIRateLimiter) Do(
 		}(name, lim)
 	}
 
-	wg.Wait()
+	updateWaitGroup.Wait()
 
 	if updateError != nil {
 		return nil, fmt.Errorf("error updating rate limits: %w", updateError)
