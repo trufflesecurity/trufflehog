@@ -282,7 +282,7 @@ func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, he
 		return nil, err
 	}
 
-	resp, err := rl.Do(ctx, req, func() (*http.Response, error) {
+	resp, err := rl.DoWithRateLimiting(ctx, req, func() (*http.Response, error) {
 		return c.HTTPClient.Do(req)
 	})
 	if err != nil {

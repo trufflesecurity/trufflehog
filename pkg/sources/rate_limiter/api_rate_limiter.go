@@ -47,7 +47,7 @@ func NewAPIRateLimiter(
 }
 
 // Makes an HTTP request to an API while honoring its limits.
-func (api *APIRateLimiter) Do(
+func (api *APIRateLimiter) DoWithRateLimiting(
 	ctx context.Context,
 	req *http.Request,
 	makeRequest func() (*http.Response, error),
