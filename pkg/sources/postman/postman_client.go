@@ -194,10 +194,10 @@ type Client struct {
 
 	// Rate limiter needed for Postman API workspace and collection requests. Postman API rate limit
 	// is 10 calls in 10 seconds for GET /collections, GET /workspaces, and GET /workspaces/{id} endpoints.
-	WorkspaceAndCollectionRateLimiter *rate_limiter.RateLimiter
+	WorkspaceAndCollectionRateLimiter *rate_limiter.APIRateLimiter
 
 	// Rate limiter needed for Postman API. General rate limit is 300 requests per minute.
-	GeneralRateLimiter *rate_limiter.RateLimiter
+	GeneralRateLimiter *rate_limiter.APIRateLimiter
 }
 
 // NewClient returns a new Postman API client.
@@ -208,14 +208,14 @@ func NewClient(postmanToken string) *Client {
 		"X-API-Key":    postmanToken,
 	}
 
-	workspaceAndCollectionRateLimiter := rate_limiter.NewRateLimiter(
-		map[string]rate_limiter.RateLimit{
+	workspaceAndCollectionRateLimiter := rate_limiter.NewAPIRateLimiter(
+		map[string]rate_limiter.APIRateLimit{
 			"1r/s": rate_limiter.NewTokenBucketRateLimit(rate.Every(time.Second), 1),
 		},
 	)
 
-	generalRateLimiter := rate_limiter.NewRateLimiter(
-		map[string]rate_limiter.RateLimit{
+	generalRateLimiter := rate_limiter.NewAPIRateLimiter(
+		map[string]rate_limiter.APIRateLimit{
 			"5r/s": rate_limiter.NewTokenBucketRateLimit(rate.Every(time.Second/5), 1),
 		},
 	)
@@ -260,7 +260,7 @@ func checkResponseStatus(r *http.Response) error {
 }
 
 // getPostmanResponseBodyBytes makes a request to the Postman API and returns the response body as bytes.
-func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string, rl *rate_limiter.RateLimiter) ([]byte, error) {
+func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string, rl *rate_limiter.APIRateLimiter) ([]byte, error) {
 	req, err := c.NewRequest(url, headers)
 	if err != nil {
 		return nil, err
