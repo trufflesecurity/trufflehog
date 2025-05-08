@@ -23,6 +23,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/launchdarkly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailchimp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailgun"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/monday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mysql"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/netlify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/notion"
@@ -127,5 +128,7 @@ func Run(keyType string, secretInfo SecretInfo) {
 		netlify.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "fastly":
 		fastly.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "monday":
+		monday.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }
