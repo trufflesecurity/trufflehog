@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/rate_limiter"
 	"golang.org/x/time/rate"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -184,42 +184,6 @@ type Response struct {
 	UID             string `json:"uid,omitempty"`
 }
 
-// TokenBucketRateLimit implements a basic "requests per second with
-// bursting" rate limiter.
-type TokenBucketRateLimit struct {
-	limiter *rate.Limiter
-}
-
-// Creates a new TokenBucketRateLimit
-// lim: a Limit representing the max number of requests per second
-// burst: max number of requests that can be sent if any requests can be sent
-//
-// This is a (very) thin wrapper around Google's rate limiter.
-func NewTokenBucketRateLimit(lim rate.Limit, burst int) *TokenBucketRateLimit {
-	return &TokenBucketRateLimit{
-		limiter: rate.NewLimiter(rate.Limit(lim), burst),
-	}
-}
-
-func (tp *TokenBucketRateLimit) Execute(
-	ctx context.Context,
-	req *http.Request,
-	now time.Time,
-) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	return tp.limiter.Wait(ctx)
-}
-
-func (tp *TokenBucketRateLimit) Update(
-	ctx context.Context,
-	res *http.Response,
-) error {
-	return nil
-}
-
 // A Client manages communication with the Postman API.
 type Client struct {
 	// HTTP client used to communicate with the API
@@ -230,10 +194,10 @@ type Client struct {
 
 	// Rate limiter needed for Postman API workspace and collection requests. Postman API rate limit
 	// is 10 calls in 10 seconds for GET /collections, GET /workspaces, and GET /workspaces/{id} endpoints.
-	WorkspaceAndCollectionRateLimiter *common.RateLimiter
+	WorkspaceAndCollectionRateLimiter *rate_limiter.RateLimiter
 
 	// Rate limiter needed for Postman API. General rate limit is 300 requests per minute.
-	GeneralRateLimiter *common.RateLimiter
+	GeneralRateLimiter *rate_limiter.RateLimiter
 }
 
 // NewClient returns a new Postman API client.
@@ -244,14 +208,23 @@ func NewClient(postmanToken string) *Client {
 		"X-API-Key":    postmanToken,
 	}
 
+	oneRequestPerSecondRateLimit := rate_limiter.NewTokenBucketRateLimit(
+		rate.Every(time.Second),
+		1,
+	)
+	fiveRequestsPerSecondRateLimit := rate_limiter.NewTokenBucketRateLimit(
+		rate.Every(time.Second/5),
+		1,
+	)
+
 	c := &Client{
 		HTTPClient: http.DefaultClient,
 		Headers:    bh,
-		WorkspaceAndCollectionRateLimiter: common.NewRateLimiter(
-			NewTokenBucketRateLimit(rate.Every(time.Second), 1),
+		WorkspaceAndCollectionRateLimiter: rate_limiter.NewRateLimiter(
+			oneRequestPerSecondRateLimit,
 		),
-		GeneralRateLimiter: common.NewRateLimiter(
-			NewTokenBucketRateLimit(rate.Every(time.Second/5), 1),
+		GeneralRateLimiter: rate_limiter.NewRateLimiter(
+			fiveRequestsPerSecondRateLimit,
 		),
 	}
 
@@ -288,7 +261,7 @@ func checkResponseStatus(r *http.Response) error {
 }
 
 // getPostmanResponseBodyBytes makes a request to the Postman API and returns the response body as bytes.
-func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string, rl *common.RateLimiter) ([]byte, error) {
+func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string, rl *rate_limiter.RateLimiter) ([]byte, error) {
 	req, err := c.NewRequest(url, headers)
 	if err != nil {
 		return nil, err

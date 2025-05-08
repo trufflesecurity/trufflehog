@@ -1,4 +1,4 @@
-package common
+package rate_limiter
 
 import (
 	"errors"
@@ -26,7 +26,7 @@ type RateLimiter struct {
 //
 // Implementation requirements:
 //   - Be goroutine safe.
-//   - .Execute can *NEVER* sleep for a duration; it can only sleep _UNTIL_ a
+//   - .MaybeWait can *NEVER* sleep for a duration; it can only sleep _UNTIL_ a
 //     time.
 //
 // Usage requirements:
