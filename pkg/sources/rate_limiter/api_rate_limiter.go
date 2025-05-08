@@ -19,7 +19,8 @@ import (
 // A APIRateLimiter should only be used on a single API. If you're making
 // requests to multiple APIs, use multiple APIRateLimiters.
 type APIRateLimiter struct {
-	limits map[string]APIRateLimit
+	hostname string
+	limits   map[string]APIRateLimit
 }
 
 // Returns a new rate limiter with the given limits. Limits are passed by name
@@ -28,8 +29,21 @@ type APIRateLimiter struct {
 //	NewAPIRateLimiter(map[string]RateLimit{
 //	  "5r/s": fiveRequestsPerSecondLimit,
 //	})
-func NewAPIRateLimiter(limits map[string]APIRateLimit) *APIRateLimiter {
-	return &APIRateLimiter{limits: limits}
+func NewAPIRateLimiter(
+	hostname string,
+	limits map[string]APIRateLimit,
+) (*APIRateLimiter, error) {
+	for limitHostname := range limits {
+		if limitHostname != hostname {
+			return nil, fmt.Errorf(
+				"cannot add rate limit for API %q to rate limiter for different API %q",
+				limitHostname,
+				hostname,
+			)
+		}
+	}
+
+	return &APIRateLimiter{hostname: hostname, limits: limits}, nil
 }
 
 // Makes an HTTP request to an API while honoring its limits.
@@ -40,6 +54,14 @@ func (api *APIRateLimiter) Do(
 ) (*http.Response, error) {
 	if len(api.limits) == 0 {
 		return makeRequest()
+	}
+
+	if req.URL.Hostname() != api.hostname {
+		return nil, fmt.Errorf(
+			"cannot rate limit requests to API %q with a rate limiter for API %q",
+			req.URL.Hostname(),
+			api.hostname,
+		)
 	}
 
 	now := time.Now()

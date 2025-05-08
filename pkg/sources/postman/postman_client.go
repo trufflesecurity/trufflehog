@@ -201,24 +201,40 @@ type Client struct {
 }
 
 // NewClient returns a new Postman API client.
-func NewClient(postmanToken string) *Client {
+func NewClient(postmanToken string) (*Client, error) {
 	bh := map[string]string{
 		"Content-Type": defaultContentType,
 		"User-Agent":   userAgent,
 		"X-API-Key":    postmanToken,
 	}
 
-	workspaceAndCollectionRateLimiter := rate_limiter.NewAPIRateLimiter(
+	workspaceAndCollectionRateLimiter, err := rate_limiter.NewAPIRateLimiter(
+		"api.getpostman.com",
 		map[string]rate_limiter.APIRateLimit{
-			"1r/s": rate_limiter.NewTokenBucketRateLimit(rate.Every(time.Second), 1),
+			"1r/s": rate_limiter.NewTokenBucketRateLimit(
+				rate.Every(time.Second),
+				1,
+			),
 		},
 	)
 
-	generalRateLimiter := rate_limiter.NewAPIRateLimiter(
+	if err != nil {
+		return nil, err
+	}
+
+	generalRateLimiter, err := rate_limiter.NewAPIRateLimiter(
+		"api.getpostman.com",
 		map[string]rate_limiter.APIRateLimit{
-			"5r/s": rate_limiter.NewTokenBucketRateLimit(rate.Every(time.Second/5), 1),
+			"5r/s": rate_limiter.NewTokenBucketRateLimit(
+				rate.Every(time.Second/5),
+				1,
+			),
 		},
 	)
+
+	if err != nil {
+		return nil, err
+	}
 
 	c := &Client{
 		HTTPClient:                        http.DefaultClient,
@@ -227,7 +243,7 @@ func NewClient(postmanToken string) *Client {
 		GeneralRateLimiter:                generalRateLimiter,
 	}
 
-	return c
+	return c, nil
 }
 
 // NewRequest creates an API request (Only GET needed for our interaction w/ Postman)
