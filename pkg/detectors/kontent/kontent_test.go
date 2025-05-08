@@ -2,19 +2,12 @@ package kontent
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "jca9is4icbynssyi1y4spdwcbwe3vwv9jn4d"
-	invalidPattern = "jca9is4icbynssyi1y4spdwcbwe3vwv9jn4"
-	keyword        = "kontent"
 )
 
 func TestKontent_Pattern(t *testing.T) {
@@ -26,24 +19,20 @@ func TestKontent_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword kontent",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			name: "valid pattern - with keyword kontent",
+			input: `
+				// the following are credentials for kontent.ai APIs - do not share with anyone
+				kontent_personal_api_key = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjOTE4OThlMWZlMGI0NDcwOTczOGM0ZmE0YzVlYzk0MyIsImlhdCI6MTc0NjUyNzQyNSwibmJmIjoxNzQ2NTI3NDI1LCJleHAiOjE3NjI0MjQ5NDAsInZlciI6IjMuMC4wIiwidWlkIjoidmlydHVhbF8zNTI4OGIxNC00YmE3LTQ5MzgtODZiNC1lYjFhYjczMDBiZTciLCJzY29wZV9pZCI6IjAyYmYxZDg5NzYzMjQ3ZWE4MTFkYjkwMjVhYjc0MTRhIiwicHJvamVjdF9jb250YWluZXJfaWQiOiI0MDFkMzg1NmMyYzUwMGZlOTYwMTE5YzFhMThkNWY4OCIsImF1ZCI6Im1hbmFnZS5rZW50aWNvY2xvdWQuY29tIn0.yfZTic9Zba6Dui8N6UO6t-SGbZYf17bKAd-uJ9enYPw
+				kontent_env_id = 3d5f4d88-0511-00b3-37f1-31bb55c25ab4`,
+			want: []string{"3d5f4d88-0511-00b3-37f1-31bb55c25ab4eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjOTE4OThlMWZlMGI0NDcwOTczOGM0ZmE0YzVlYzk0MyIsImlhdCI6MTc0NjUyNzQyNSwibmJmIjoxNzQ2NTI3NDI1LCJleHAiOjE3NjI0MjQ5NDAsInZlciI6IjMuMC4wIiwidWlkIjoidmlydHVhbF8zNTI4OGIxNC00YmE3LTQ5MzgtODZiNC1lYjFhYjczMDBiZTciLCJzY29wZV9pZCI6IjAyYmYxZDg5NzYzMjQ3ZWE4MTFkYjkwMjVhYjc0MTRhIiwicHJvamVjdF9jb250YWluZXJfaWQiOiI0MDFkMzg1NmMyYzUwMGZlOTYwMTE5YzFhMThkNWY4OCIsImF1ZCI6Im1hbmFnZS5rZW50aWNvY2xvdWQuY29tIn0.yfZTic9Zba6Dui8N6UO6t-SGbZYf17bKAd-uJ9enYPw"},
 		},
 		{
-			name:  "valid pattern - ignore duplicate",
-			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
-			want:  []string{validPattern},
-		},
-		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
-			want:  []string{},
-		},
-		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
-			want:  []string{},
+			name: "invalid pattern",
+			input: `
+				// the following are credentials for kontent.ai APIs - do not share with anyone
+				kontent_personal_api_key = eyJhbGciOiJIUzI1NiIsInR5cCVCJ9.eyJqdGkiOiJjOTE4OThlMWZlMGI0NDcwOTczOGM0ZmE0YzVlYzk0MyIsImlhdCI6MTc0NjUyNzQyNSwibmJmIjoxNzQ2NTI3NDI1LCJleHAiOjE3NjI0MjQ5NDAsInZlciI6IjMuMC4wIiwidWlkIjoidmlydHVhbF8zNTI4OGIxNC00YmE3LTQ5MzgtODZiNC1lYjFhYjczMDBiZTciLCJzY29wZV9pZCI6IjAyYmYxZDg5NzYzMjQ3ZWE4MTFkYjkwMjVhYjc0MTRhIiwicHJvamVjdF9jb250YWluZXJfaWQiOiI0MDFkMzg1NmMyYzUwMGZlOTYwMTE5YzFhMThkNWY4OCIsImF1ZCI6Im1hbmFnZS5rZW50aWNvY2xvdWQuY29tIn0.yfZTic9Zba6Dui8N6UO6t-SGbZYf17bKAd-uJ9enYPw
+				kontent_env_id = 3d5f4d88-051-00b3-37f1-31bb55c25ab4`,
+			want: []string{},
 		},
 	}
 
