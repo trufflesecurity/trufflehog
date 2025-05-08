@@ -158,7 +158,7 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 
 	if roleArn != "" {
 		// The config loaded here will be used to retrieve and refresh temporary credentials from AssumeRole
-		cfg, err := config.LoadDefaultConfig(ctx, config.WithCredentialsProvider(credsProvider))
+		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region), config.WithCredentialsProvider(credsProvider))
 		if err != nil {
 			return nil, err
 		}
