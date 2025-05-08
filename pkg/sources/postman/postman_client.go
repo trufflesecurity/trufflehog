@@ -9,7 +9,6 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/rate_limiter"
-	"golang.org/x/time/rate"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
@@ -211,10 +210,7 @@ func NewClient(postmanToken string) (*Client, error) {
 	workspaceAndCollectionRateLimiter, err := rate_limiter.NewAPIRateLimiter(
 		"api.getpostman.com",
 		map[string]rate_limiter.APIRateLimit{
-			"1r/s": rate_limiter.NewTokenBucketRateLimit(
-				rate.Every(time.Second),
-				1,
-			),
+			"1r/s": rate_limiter.NewSimpleRateLimit(1),
 		},
 	)
 
@@ -225,10 +221,7 @@ func NewClient(postmanToken string) (*Client, error) {
 	generalRateLimiter, err := rate_limiter.NewAPIRateLimiter(
 		"api.getpostman.com",
 		map[string]rate_limiter.APIRateLimit{
-			"5r/s": rate_limiter.NewTokenBucketRateLimit(
-				rate.Every(time.Second/5),
-				1,
-			),
+			"5r/s": rate_limiter.NewSimpleRateLimit(5),
 		},
 	)
 
