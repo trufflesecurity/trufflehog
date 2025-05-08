@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/aws/aws-sdk-go/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -153,7 +153,7 @@ func (p *Checkpointer) UpdateObjectCompletion(
 	ctx context.Context,
 	completedIdx int,
 	bucket string,
-	pageContents []*s3.Object,
+	pageContents []s3types.Object,
 ) error {
 	ctx = context.WithValues(ctx, "bucket", bucket, "completedIdx", completedIdx)
 	ctx.Logger().V(5).Info("Updating progress")

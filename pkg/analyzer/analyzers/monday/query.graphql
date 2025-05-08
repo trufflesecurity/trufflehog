@@ -1,0 +1,75 @@
+{
+  me {
+    id
+    name
+    email
+    title
+    is_admin
+    is_guest
+    is_view_only
+    is_pending
+    is_verified
+    teams {
+      id
+      name
+    }
+  }
+  account {
+    id
+    name
+    slug
+    tier
+  }
+  users {
+    email
+    account {
+      name
+      id
+    }
+  }
+  boards {
+    id
+    name
+    state
+    permissions
+    groups {
+      title
+      id
+    }
+    columns {
+      id
+      title
+      type
+    }
+    owners {
+      id
+      name
+    }
+  }
+  docs {
+    id
+    object_id
+    name
+    created_by {
+      id
+      name
+    }
+  }
+  folders {
+    name
+    id
+  }
+  tags {
+    id
+    name
+  }
+  teams {
+    id
+    name
+  }
+  workspaces {
+    id
+    name
+    kind
+  }
+}

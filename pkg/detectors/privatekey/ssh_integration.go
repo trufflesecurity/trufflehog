@@ -115,12 +115,6 @@ func VerifyGitHubUser(ctx context.Context, parsedKey any) (*string, error) {
 
 	if strings.Contains(output, "successfully authenticated") {
 		username := strings.TrimSuffix(strings.Split(output, " ")[1], "!")
-		// This hack is because it's probably one of the most widely distributed github keys
-		// and a frequent annoyance.
-		// It is active at the time of this commit, but the developer is unresponsive.
-		if username == "aaron1234567890123" {
-			return nil, nil
-		}
 		return &username, nil
 	}
 
