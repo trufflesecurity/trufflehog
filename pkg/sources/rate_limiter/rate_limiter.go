@@ -19,7 +19,7 @@ import (
 // A RateLimiter should only be used on a single API. If you're making requests
 // to multiple APIs, use multiple RateLimiters.
 type RateLimiter struct {
-	limits []RateLimit
+	limits map[string]RateLimit
 }
 
 // RateLimit describes a single rate limit of an API.
@@ -79,8 +79,13 @@ type RateLimit interface {
 	Update(ctx context.Context, res *http.Response, now time.Time) error
 }
 
-// Returns a new rate limiter with the given limits.
-func NewRateLimiter(limits ...RateLimit) *RateLimiter {
+// Returns a new rate limiter with the given limits. Limits are passed by name
+// in the map, ex:
+//
+//	NewRateLimiter(map[string]RateLimit{
+//	  "5r/s": fiveRequestsPerSecondLimit,
+//	})
+func NewRateLimiter(limits map[string]RateLimit) *RateLimiter {
 	return &RateLimiter{limits: limits}
 }
 
@@ -98,7 +103,7 @@ func (rl *RateLimiter) Do(
 
 	var maybeWaitError error = nil
 
-	for i, lim := range rl.limits {
+	for name, lim := range rl.limits {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -108,7 +113,7 @@ func (rl *RateLimiter) Do(
 		//			  I haven't thought through that.
 		if err := lim.MaybeWait(ctx, req, now); err != nil {
 			maybeWaitError = errors.Join(maybeWaitError, fmt.Errorf(
-				"error executing rate limit %d: %w", i, err,
+				"error executing rate limit %s: %w", name, err,
 			))
 		}
 	}
@@ -132,13 +137,13 @@ func (rl *RateLimiter) Do(
 	updateErrorLock := &sync.Mutex{}
 	var updateError error = nil
 
-	for i, lim := range rl.limits {
+	for name, lim := range rl.limits {
 		wg.Add(1)
-		go func(i int, lim RateLimit) {
+		go func(name string, lim RateLimit) {
 			defer wg.Done()
 
 			if err := lim.Update(ctx, res, now); err != nil {
-				err = fmt.Errorf("error updating rate limit %d: %w", i, err)
+				err = fmt.Errorf("error updating rate limit %s: %w", name, err)
 
 				updateErrorLock.Lock()
 				if updateError == nil {
@@ -148,7 +153,7 @@ func (rl *RateLimiter) Do(
 				}
 				updateErrorLock.Unlock()
 			}
-		}(i, lim)
+		}(name, lim)
 	}
 
 	wg.Wait()
