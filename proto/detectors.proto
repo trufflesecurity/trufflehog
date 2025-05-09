@@ -1034,6 +1034,7 @@ enum DetectorType {
   BingSubscriptionKey = 1022;
   XAI = 1023;
   AzureDirectManagementKey = 1024;
+  AzureAppConfigConnectionString = 1025;
 }
 
 message Result {
