@@ -14,6 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/digitalocean"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/dockerhub"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/elevenlabs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/fastly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/figma"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/gitlab"
@@ -22,6 +23,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/launchdarkly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailchimp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailgun"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/monday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mysql"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/netlify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/notion"
@@ -124,5 +126,9 @@ func Run(keyType string, secretInfo SecretInfo) {
 		plaid.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["secret"], secretInfo.Parts["id"], secretInfo.Parts["token"])
 	case "netlify":
 		netlify.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "fastly":
+		fastly.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "monday":
+		monday.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }
