@@ -97,7 +97,7 @@ repos:
         description: Detect secrets in your data.
         entry: bash -c 'trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail'
         language: system
-        stages: ["commit", "push"]
+        stages: ["pre-commit", "pre-push"]
 ```
 
 2. Install the pre-commit hook:
