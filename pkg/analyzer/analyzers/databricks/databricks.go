@@ -19,3 +19,15 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	return nil, nil
 }
+
+func AnalyzePermissions(cfg *config.Config, domain, key string) (*SecretInfo, error) {
+	client := analyzers.NewAnalyzeClient(cfg)
+
+	var secretInfo = &SecretInfo{}
+
+	if err := captureUserInfo(client, domain, key, secretInfo); err != nil {
+		return nil, err
+	}
+
+	return secretInfo, nil
+}
