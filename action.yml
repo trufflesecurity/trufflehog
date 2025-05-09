@@ -14,6 +14,10 @@ inputs:
   head:
     description: Scan commits until here (usually dev branch).
     required: false
+  no_fail:
+    description: When set, trufflehog does not exit with a 183 code when a credential is found.
+    required: false
+    default: ''
   extra_args:
     default: ''
     description: Extra args to be passed to the trufflehog cli.
@@ -40,6 +44,7 @@ runs:
       BASE: ${{ inputs.base }}
       HEAD: ${{ inputs.head }}
       ARGS: ${{ inputs.extra_args }}
+      NO_FAIL: ${{ inputs.no_fail }}
       COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
       VERSION: ${{ inputs.version }}
     run: |
@@ -89,6 +94,14 @@ runs:
         fi
       fi
       ##########################################
+      ##      Determine additional args       ##
+      ##########################################
+      if [ -n "$NO_FAIL" ]; then
+        FAIL=""
+      else
+        FAIL="--fail"
+      fi
+      ##########################################
       ##          Run TruffleHog              ##
       ##########################################
       results=$(docker run --rm -v ${{ github.workspace }}:/tmp -w /tmp \
@@ -98,6 +111,7 @@ runs:
       ${BASE:-''} \
       --branch \
       ${HEAD:-''} \
+      ${FAIL} \
       --no-update \
       --github-actions \
       ${ARGS:-''})
