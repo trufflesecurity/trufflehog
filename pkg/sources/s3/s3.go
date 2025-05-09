@@ -8,13 +8,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	s3manager "github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/go-errors/errors"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -108,7 +109,7 @@ func (s *Source) Init(
 
 func (s *Source) Validate(ctx context.Context) []error {
 	var errs []error
-	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error {
+	visitor := func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error {
 		roleErrs := s.validateBucketAccess(c, defaultRegionClient, roleArn, buckets)
 		if len(roleErrs) > 0 {
 			errs = append(errs, roleErrs...)
@@ -134,14 +135,11 @@ func (s *Source) setMaxObjectSize(maxObjectSize int64) {
 	}
 }
 
-func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
-	cfg := aws.NewConfig()
-	cfg.CredentialsChainVerboseErrors = aws.Bool(true)
-	cfg.Region = aws.String(region)
-
+func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Client, error) {
+	var credsProvider aws.CredentialsProvider
 	switch cred := s.conn.GetCredential().(type) {
 	case *sourcespb.S3_SessionToken:
-		cfg.Credentials = credentials.NewStaticCredentials(
+		credsProvider = credentials.NewStaticCredentialsProvider(
 			cred.SessionToken.GetKey(),
 			cred.SessionToken.GetSecret(),
 			cred.SessionToken.GetSessionToken(),
@@ -149,36 +147,42 @@ func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 		log.RedactGlobally(cred.SessionToken.GetSecret())
 		log.RedactGlobally(cred.SessionToken.GetSessionToken())
 	case *sourcespb.S3_AccessKey:
-		cfg.Credentials = credentials.NewStaticCredentials(cred.AccessKey.GetKey(), cred.AccessKey.GetSecret(), "")
+		credsProvider = credentials.NewStaticCredentialsProvider(cred.AccessKey.GetKey(), cred.AccessKey.GetSecret(), "")
 		log.RedactGlobally(cred.AccessKey.GetSecret())
 	case *sourcespb.S3_Unauthenticated:
-		cfg.Credentials = credentials.AnonymousCredentials
+		credsProvider = aws.AnonymousCredentials{}
 	default:
 		// In all other cases, the AWS SDK will follow its normal waterfall logic to pick up credentials (i.e. they can
 		// come from the environment or the credentials file or whatever else AWS gets up to).
 	}
 
 	if roleArn != "" {
-		sess, err := session.NewSession(cfg)
+		// The config loaded here will be used to retrieve and refresh temporary credentials from AssumeRole
+		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region), config.WithCredentialsProvider(credsProvider))
 		if err != nil {
 			return nil, err
 		}
 
-		stsClient := sts.New(sess)
-		cfg.Credentials = stscreds.NewCredentialsWithClient(stsClient, roleArn, func(p *stscreds.AssumeRoleProvider) {
-			p.RoleSessionName = "trufflehog"
+		stsClient := sts.NewFromConfig(cfg)
+		provider := stscreds.NewAssumeRoleProvider(stsClient, roleArn, func(options *stscreds.AssumeRoleOptions) {
+			options.RoleSessionName = "trufflehog"
 		})
+		// From https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/configure-gosdk.html#specify-credentials-programmatically:
+		//   "If you explicitly configure a provider on aws.Config directly,
+		//    you must also explicitly wrap the provider with this type using NewCredentialsCache"
+		credsProvider = aws.NewCredentialsCache(provider)
 	}
 
-	sess, err := session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            *cfg,
-	})
+	cfg, err := config.LoadDefaultConfig(
+		ctx,
+		config.WithRegion(region),
+		config.WithCredentialsProvider(credsProvider),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	return s3.New(sess), nil
+	return s3.NewFromConfig(cfg), nil
 }
 
 // getBucketsToScan returns a list of S3 buckets to scan.
@@ -188,7 +192,7 @@ func (s *Source) newClient(region, roleArn string) (*s3.S3, error) {
 // which allows resuming scanning from the same place if the scan is interrupted.
 //
 // Note: The IAM identity needs the s3:ListBuckets permission.
-func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
+func (s *Source) getBucketsToScan(ctx context.Context, client *s3.Client) ([]string, error) {
 	if buckets := s.conn.GetBuckets(); len(buckets) > 0 {
 		slices.Sort(buckets)
 		return buckets, nil
@@ -199,7 +203,7 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 		ignore[bucket] = struct{}{}
 	}
 
-	res, err := client.ListBuckets(&s3.ListBucketsInput{})
+	res, err := client.ListBuckets(ctx, &s3.ListBucketsInput{})
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +224,7 @@ func (s *Source) getBucketsToScan(client *s3.S3) ([]string, error) {
 type pageMetadata struct {
 	bucket     string                  // The name of the S3 bucket being scanned
 	pageNumber int                     // Current page number in the pagination sequence
-	client     *s3.S3                  // AWS S3 client configured for the appropriate region
+	client     *s3.Client              // AWS S3 client configured for the appropriate region
 	page       *s3.ListObjectsV2Output // Contains the list of S3 objects in this page
 }
 
@@ -280,7 +284,7 @@ func determineResumePosition(ctx context.Context, tracker *Checkpointer, buckets
 
 func (s *Source) scanBuckets(
 	ctx context.Context,
-	client *s3.S3,
+	client *s3.Client,
 	role string,
 	bucketsToScan []string,
 	chunksChan chan *sources.Chunk,
@@ -346,36 +350,34 @@ func (s *Source) scanBuckets(
 		}
 
 		pageNumber := 1
-		err = regionalClient.ListObjectsV2PagesWithContext(
-			ctx,
-			input,
-			func(page *s3.ListObjectsV2Output, _ bool) bool {
-				pageMetadata := pageMetadata{
-					bucket:     bucket,
-					pageNumber: pageNumber,
-					client:     regionalClient,
-					page:       page,
+		paginator := s3.NewListObjectsV2Paginator(regionalClient, input)
+		for paginator.HasMorePages() {
+			output, err := paginator.NextPage(ctx)
+			if err != nil {
+				if role == "" {
+					ctx.Logger().Error(err, "could not list objects in bucket")
+				} else {
+					// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
+					// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
+					// account, but the role probably doesn't have access to all of them). This makes it expected behavior
+					// and therefore not an error.
+					ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
 				}
-				processingState := processingState{
-					errorCount:  &errorCount,
-					objectCount: &objectCount,
-				}
-				s.pageChunker(ctx, pageMetadata, processingState, chunksChan)
-
-				pageNumber++
-				return true
-			})
-
-		if err != nil {
-			if role == "" {
-				ctx.Logger().Error(err, "could not list objects in bucket")
-			} else {
-				// Our documentation blesses specifying a role to assume without specifying buckets to scan, which will
-				// often cause this to happen a lot (because in that case the scanner tries to scan every bucket in the
-				// account, but the role probably doesn't have access to all of them). This makes it expected behavior
-				// and therefore not an error.
-				ctx.Logger().V(3).Info("could not list objects in bucket", "err", err)
+				break
 			}
+			pageMetadata := pageMetadata{
+				bucket:     bucket,
+				pageNumber: pageNumber,
+				client:     regionalClient,
+				page:       output,
+			}
+			processingState := processingState{
+				errorCount:  &errorCount,
+				objectCount: &objectCount,
+			}
+			s.pageChunker(ctx, pageMetadata, processingState, chunksChan)
+
+			pageNumber++
 		}
 	}
 
@@ -389,7 +391,7 @@ func (s *Source) scanBuckets(
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	visitor := func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error {
+	visitor := func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error {
 		s.scanBuckets(c, defaultRegionClient, roleArn, buckets, chunksChan)
 		return nil
 	}
@@ -399,20 +401,20 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 func (s *Source) getRegionalClientForBucket(
 	ctx context.Context,
-	defaultRegionClient *s3.S3,
+	defaultRegionClient *s3.Client,
 	role string,
 	bucket string,
-) (*s3.S3, error) {
-	region, err := s3manager.GetBucketRegionWithClient(ctx, defaultRegionClient, bucket)
+) (*s3.Client, error) {
+	region, err := s3manager.GetBucketRegion(ctx, defaultRegionClient, bucket)
 	if err != nil {
-		return nil, fmt.Errorf("could not get s3 region for bucket: %s", bucket)
+		return nil, fmt.Errorf("could not get s3 region for bucket: %s: %w", bucket, err)
 	}
 
 	if region == defaultAWSRegion {
 		return defaultRegionClient, nil
 	}
 
-	regionalClient, err := s.newClient(region, role)
+	regionalClient, err := s.newClient(ctx, region, role)
 	if err != nil {
 		return nil, fmt.Errorf("could not create regional s3 client for bucket %s: %w", bucket, err)
 	}
@@ -431,14 +433,6 @@ func (s *Source) pageChunker(
 	ctx = context.WithValues(ctx, "bucket", metadata.bucket, "page_number", metadata.pageNumber)
 
 	for objIdx, obj := range metadata.page.Contents {
-		if obj == nil {
-			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "nil_object", 0)
-			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
-				ctx.Logger().Error(err, "could not update progress for nil object")
-			}
-			continue
-		}
-
 		ctx = context.WithValues(ctx, "key", *obj.Key, "size", *obj.Size)
 
 		if common.IsDone(ctx) {
@@ -446,8 +440,8 @@ func (s *Source) pageChunker(
 		}
 
 		// Skip GLACIER and GLACIER_IR objects.
-		if obj.StorageClass == nil || strings.Contains(*obj.StorageClass, "GLACIER") {
-			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", *obj.StorageClass)
+		if obj.StorageClass == s3types.ObjectStorageClassGlacier || obj.StorageClass == s3types.ObjectStorageClassGlacierIr {
+			ctx.Logger().V(5).Info("Skipping object in storage class", "storage_class", obj.StorageClass)
 			s.metricsCollector.RecordObjectSkipped(metadata.bucket, "storage_class", float64(*obj.Size))
 			if err := s.checkpointer.UpdateObjectCompletion(ctx, objIdx, metadata.bucket, metadata.page.Contents); err != nil {
 				ctx.Logger().Error(err, "could not update progress for glacier object")
@@ -514,7 +508,7 @@ func (s *Source) pageChunker(
 			objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
 			defer cancel()
 
-			res, err := metadata.client.GetObjectWithContext(objCtx, &s3.GetObjectInput{
+			res, err := metadata.client.GetObject(objCtx, &s3.GetObjectInput{
 				Bucket: &metadata.bucket,
 				Key:    obj.Key,
 			})
@@ -567,7 +561,7 @@ func (s *Source) pageChunker(
 						S3: &source_metadatapb.S3{
 							Bucket:    metadata.bucket,
 							File:      sanitizer.UTF8(*obj.Key),
-							Link:      sanitizer.UTF8(makeS3Link(metadata.bucket, *metadata.client.Config.Region, *obj.Key)),
+							Link:      sanitizer.UTF8(makeS3Link(metadata.bucket, metadata.client.Options().Region, *obj.Key)),
 							Email:     sanitizer.UTF8(email),
 							Timestamp: sanitizer.UTF8(modified),
 						},
@@ -605,7 +599,7 @@ func (s *Source) pageChunker(
 	_ = s.jobPool.Wait()
 }
 
-func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleArn string, buckets []string) []error {
+func (s *Source) validateBucketAccess(ctx context.Context, client *s3.Client, roleArn string, buckets []string) []error {
 	shouldHaveAccessToAllBuckets := roleArn == ""
 	wasAbleToListAnyBucket := false
 	var errs []error
@@ -621,7 +615,7 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleAr
 			continue
 		}
 
-		_, err = regionalClient.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: &bucket})
+		_, err = regionalClient.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &bucket})
 		if err == nil {
 			wasAbleToListAnyBucket = true
 		} else if shouldHaveAccessToAllBuckets {
@@ -650,7 +644,7 @@ func (s *Source) validateBucketAccess(ctx context.Context, client *s3.S3, roleAr
 // If no roles are configured, it will call the function with an empty role ARN.
 func (s *Source) visitRoles(
 	ctx context.Context,
-	f func(c context.Context, defaultRegionClient *s3.S3, roleArn string, buckets []string) error,
+	f func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error,
 ) error {
 	roles := s.conn.GetRoles()
 	if len(roles) == 0 {
@@ -660,12 +654,12 @@ func (s *Source) visitRoles(
 	for _, role := range roles {
 		s.metricsCollector.RecordRoleScanned(role)
 
-		client, err := s.newClient(defaultAWSRegion, role)
+		client, err := s.newClient(ctx, defaultAWSRegion, role)
 		if err != nil {
 			return fmt.Errorf("could not create s3 client: %w", err)
 		}
 
-		bucketsToScan, err := s.getBucketsToScan(client)
+		bucketsToScan, err := s.getBucketsToScan(ctx, client)
 		if err != nil {
 			return fmt.Errorf("role %q could not list any s3 buckets for scanning: %w", role, err)
 		}
@@ -678,13 +672,10 @@ func (s *Source) visitRoles(
 	return nil
 }
 
-// S3 links currently have the general format of:
-// https://[bucket].s3[.region unless us-east-1].amazonaws.com/[key]
+// makeS3Link creates a S3 virtual-hosted–style URIs. They have the format of:
+// https://[bucket-name].s3.[region-code].amazonaws.com/[key-name]
+//
+// See https://docs.aws.amazon.com/AmazonS3/latest/userguide/VirtualHosting.html#virtual-hosted-style-access
 func makeS3Link(bucket, region, key string) string {
-	if region == defaultAWSRegion {
-		region = ""
-	} else {
-		region = "." + region
-	}
-	return fmt.Sprintf("https://%s.s3%s.amazonaws.com/%s", bucket, region, key)
+	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucket, region, key)
 }

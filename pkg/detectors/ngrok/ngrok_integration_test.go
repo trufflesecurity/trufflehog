@@ -25,7 +25,8 @@ func TestNgrok_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("NGROK")
+	secretAPIKey := testSecrets.MustGetField("NGROK")
+	secretAuthtoken := testSecrets.MustGetField("NGROK_AUTHTOKEN")
 	inactiveSecret := testSecrets.MustGetField("NGROK_INACTIVE")
 
 	type args struct {
@@ -42,11 +43,28 @@ func TestNgrok_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found, API key, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a ngrok secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a ngrok secret API key %s within", secretAPIKey)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Ngrok,
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
+			name: "found, tunnel authtoken, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a ngrok secret tunnel authtoken %s within", secretAuthtoken)),
 				verify: true,
 			},
 			want: []detectors.Result{

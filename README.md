@@ -623,26 +623,7 @@ In the example pipeline above, we're scanning for live secrets in all repository
 
 TruffleHog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
 
-**Key Usage Note:**
-
-- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures TruffleHog analyzes all intended changes.
-- **Avoid using `git commit -am`, as it might bypass pre-commit hook execution for unstaged modifications.**
-
-An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
-
-```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: trufflehog
-        name: TruffleHog
-        description: Detect secrets in your data.
-        entry: bash -c 'trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail'
-        # For running trufflehog in docker, use the following entry instead:
-        # entry: bash -c 'docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --results=verified,unknown --fail'
-        language: system
-        stages: ["commit", "push"]
-```
+See the [pre-commit hook documentation](PreCommit.md) for more information.
 
 ## Regex Detector (alpha)
 
