@@ -1,9 +1,5 @@
 package ngrok
 
-type apiKeyResponse struct {
-	APIKeys []apiKey `json:"keys"`
-}
-
 type apiKey struct {
 	ID          string `json:"id"`
 	URI         string `json:"uri"`
@@ -11,10 +7,6 @@ type apiKey struct {
 	Metadata    string `json:"metadata"`
 	OwnerID     string `json:"owner_id"`
 	CreatedAt   string `json:"created_at"`
-}
-
-type authtokenResponse struct {
-	Authtokens []authtoken `json:"credentials"`
 }
 
 type authtoken struct {
@@ -25,10 +17,6 @@ type authtoken struct {
 	ACL         []string `json:"acl"`
 	OwnerID     string   `json:"owner_id"`
 	CreatedAt   string   `json:"created_at"`
-}
-
-type sshCredentialResponse struct {
-	SSHCredentials []sshCredential `json:"ssh_credentials"`
 }
 
 type sshCredential struct {
@@ -42,20 +30,12 @@ type sshCredential struct {
 	CreatedAt   string   `json:"created_at"`
 }
 
-type domainResponse struct {
-	Domains []domain `json:"reserved_domains"`
-}
-
 type domain struct {
 	ID        string `json:"id"`
 	URI       string `json:"uri"`
 	Domain    string `json:"domain"`
 	Metadata  string `json:"metadata"`
 	CreatedAt string `json:"created_at"`
-}
-
-type endpointResponse struct {
-	Endpoints []endpoint `json:"endpoints"`
 }
 
 type endpoint struct {
@@ -74,20 +54,6 @@ type endpoint struct {
 	UpdatedAt string   `json:"updated_at"`
 }
 
-type paginatedResponse struct {
-	NextPageURI    string          `json:"next_page_uri"`
-	APIKeys        []apiKey        `json:"keys,omitempty"`
-	Authtokens     []authtoken     `json:"credentials,omitempty"`
-	SSHCredentials []sshCredential `json:"ssh_credentials,omitempty"`
-	Domains        []domain        `json:"reserved_domains,omitempty"`
-	Endpoints      []endpoint      `json:"endpoints,omitempty"`
-	BotUsers       []botUser       `json:"bot_users,omitempty"`
-}
-
-type botUserResponse struct {
-	BotUsers []botUser `json:"bot_users"`
-}
-
 type botUser struct {
 	ID        string `json:"id"`
 	URI       string `json:"uri"`
@@ -98,6 +64,16 @@ type botUser struct {
 
 type user struct {
 	ID string `json:"id"`
+}
+
+type paginatedResponse struct {
+	NextPageURI    string          `json:"next_page_uri"`
+	APIKeys        []apiKey        `json:"keys,omitempty"`
+	Authtokens     []authtoken     `json:"credentials,omitempty"`
+	SSHCredentials []sshCredential `json:"ssh_credentials,omitempty"`
+	Domains        []domain        `json:"reserved_domains,omitempty"`
+	Endpoints      []endpoint      `json:"endpoints,omitempty"`
+	BotUsers       []botUser       `json:"bot_users,omitempty"`
 }
 
 type secretInfo struct {
