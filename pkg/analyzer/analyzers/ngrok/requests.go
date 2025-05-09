@@ -6,6 +6,19 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
+)
+
+const (
+	ngrokAPIBaseURL           = "https://api.ngrok.com"
+	reservedAddressesEndpoint = "/reserved_addrs"
+	domainsEndpoint           = "/reserved_domains"
+	endpointsEndpoint         = "/endpoints"
+	apiKeysEndpoint           = "/api_keys"
+	sshCredentialsEndpoint    = "/ssh_credentials"
+	authtokensEndpoint        = "/credentials"
+	botUsersEndpoint          = "/bot_users"
 )
 
 func determineAccountType(client *http.Client, info *secretInfo, key string) error {
@@ -16,7 +29,8 @@ func determineAccountType(client *http.Client, info *secretInfo, key string) err
 
 	const errorCodeFreeAccount = "ERR_NGROK_501"
 
-	body, statusCode, err := callNgrokAPIEndpoint(client, http.MethodPost, "/reserved_addrs", key)
+	url := fmt.Sprintf("%s%s", ngrokAPIBaseURL, reservedAddressesEndpoint)
+	body, statusCode, err := makeAPIRequest(client, http.MethodPost, url, key)
 	if err != nil {
 		return err
 	}
@@ -72,75 +86,126 @@ func populateAllResources(client *http.Client, info *secretInfo, key string) err
 }
 
 func populateEndpoints(client *http.Client, info *secretInfo, key string) error {
-	res := endpointResponse{}
-	if err := populateNgrokResource(client, &res, "/endpoints", key); err != nil {
-		return err
+	url := fmt.Sprintf("%s%s", ngrokAPIBaseURL, endpointsEndpoint)
+	info.Endpoints = []endpoint{}
+	for {
+		res, err := fetchResources(client, url, key)
+		if err != nil {
+			return err
+		}
+		info.Endpoints = append(info.Endpoints, res.Endpoints...)
+		url = res.NextPageURI
+		if url == "" {
+			break
+		}
 	}
-	info.Endpoints = res.Endpoints
 	return nil
 }
 
 func populateAPIKeys(client *http.Client, info *secretInfo, key string) error {
-	res := apiKeyResponse{}
-	if err := populateNgrokResource(client, &res, "/api_keys", key); err != nil {
-		return err
+	url := fmt.Sprintf("%s%s", ngrokAPIBaseURL, apiKeysEndpoint)
+	info.APIKeys = []apiKey{}
+	for {
+		res, err := fetchResources(client, url, key)
+		if err != nil {
+			return err
+		}
+		info.APIKeys = append(info.APIKeys, res.APIKeys...)
+		url = res.NextPageURI
+		if url == "" {
+			break
+		}
 	}
-	info.APIKeys = res.APIKeys
 	return nil
 }
 
 func populateSSHCredentials(client *http.Client, info *secretInfo, key string) error {
-	res := sshCredentialResponse{}
-	if err := populateNgrokResource(client, &res, "/ssh_credentials", key); err != nil {
-		return err
+	url := fmt.Sprintf("%s%s", ngrokAPIBaseURL, sshCredentialsEndpoint)
+	info.SSHCredentials = []sshCredential{}
+	for {
+		res, err := fetchResources(client, url, key)
+		if err != nil {
+			return err
+		}
+		info.SSHCredentials = append(info.SSHCredentials, res.SSHCredentials...)
+		url = res.NextPageURI
+		if url == "" {
+			break
+		}
 	}
-	info.SSHCredentials = res.SSHCredentials
 	return nil
 }
 
 func populateAuthtokens(client *http.Client, info *secretInfo, key string) error {
-	res := authtokenResponse{}
-	if err := populateNgrokResource(client, &res, "/credentials", key); err != nil {
-		return err
+	url := fmt.Sprintf("%s%s", ngrokAPIBaseURL, authtokensEndpoint)
+	info.Authtokens = []authtoken{}
+	for {
+		res, err := fetchResources(client, url, key)
+		if err != nil {
+			return err
+		}
+		info.Authtokens = append(info.Authtokens, res.Authtokens...)
+		url = res.NextPageURI
+		if url == "" {
+			break
+		}
 	}
-	info.Authtokens = res.Authtokens
 	return nil
 }
 
 func populateDomains(client *http.Client, info *secretInfo, key string) error {
-	res := domainResponse{}
-	if err := populateNgrokResource(client, &res, "/reserved_domains", key); err != nil {
-		return err
+	url := fmt.Sprintf("%s%s", ngrokAPIBaseURL, domainsEndpoint)
+	info.Domains = []domain{}
+	for {
+		res, err := fetchResources(client, url, key)
+		if err != nil {
+			return err
+		}
+		info.Domains = append(info.Domains, res.Domains...)
+		url = res.NextPageURI
+		if url == "" {
+			break
+		}
 	}
-	info.Domains = res.Domains
 	return nil
 }
 
 func populateBotUsers(client *http.Client, info *secretInfo, key string) error {
-	res := botUserResponse{}
-	if err := populateNgrokResource(client, &res, "/bot_users", key); err != nil {
-		return err
+	url := fmt.Sprintf("%s%s", ngrokAPIBaseURL, botUsersEndpoint)
+	info.BotUsers = []botUser{}
+	for {
+		res, err := fetchResources(client, url, key)
+		if err != nil {
+			return err
+		}
+		info.BotUsers = append(info.BotUsers, res.BotUsers...)
+		url = res.NextPageURI
+		if url == "" {
+			break
+		}
 	}
-	info.BotUsers = res.BotUsers
 	return nil
 }
 
-func populateNgrokResource(client *http.Client, targetResource any, endpoint string, key string) error {
-	body, status, err := callNgrokAPIEndpoint(client, http.MethodGet, endpoint+"?limit=5", key)
-	if err != nil {
-		return err
-	}
-	switch status {
-	case http.StatusOK:
-		if err := json.Unmarshal(body, &targetResource); err != nil {
-			return err
+func fetchResources(client *http.Client, url string, key string) (*paginatedResponse, error) {
+	for {
+		body, status, err := makeAPIRequest(client, http.MethodGet, url, key)
+		if err != nil {
+			return nil, err
 		}
-	case http.StatusForbidden:
-		return fmt.Errorf("invalid API key or access forbidden: %s", body)
-	default:
-		return fmt.Errorf("unexpected status code: %d", status)
+		switch status {
+		case http.StatusOK:
+			var resource paginatedResponse
+			if err := json.Unmarshal(body, &resource); err != nil {
+				return nil, err
+			}
+			return &resource, nil
+		case http.StatusForbidden:
+			return nil, fmt.Errorf("invalid API key or access forbidden: %s", body)
+		default:
+			return nil, fmt.Errorf("unexpected status code: %d", status)
+		}
 	}
-	return nil
 }
 
 func populateUsers(info *secretInfo) {
@@ -171,12 +236,12 @@ func populateUsers(info *secretInfo) {
 	}
 }
 
-func callNgrokAPIEndpoint(client *http.Client, method string, endpoint string, key string) ([]byte, int, error) {
+func makeAPIRequest(client *http.Client, method string, url string, key string) ([]byte, int, error) {
 	var reqBody io.Reader = nil
 	if method == http.MethodPost {
 		reqBody = strings.NewReader("{}")
 	}
-	req, err := http.NewRequest(method, ngrokAPIBaseURL+endpoint, reqBody)
+	req, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -199,4 +264,111 @@ func callNgrokAPIEndpoint(client *http.Client, method string, endpoint string, k
 	}
 
 	return bodyBytes, res.StatusCode, nil
+}
+
+// Functions to create analyzers.Resource objects for different resource types
+
+func createEndpointResource(endpoint endpoint) analyzers.Resource {
+	return analyzers.Resource{
+		Name:               endpoint.ID,
+		FullyQualifiedName: "endpoint/" + endpoint.ID,
+		Type:               "endpoint",
+		Metadata: map[string]any{
+			"region":    endpoint.Region,
+			"host":      endpoint.Host,
+			"port":      endpoint.Port,
+			"publicURL": endpoint.PublicURL,
+			"proto":     endpoint.Proto,
+			"hostport":  endpoint.Hostport,
+			"type":      endpoint.Type,
+			"uri":       endpoint.URI,
+			"bindings":  endpoint.Bindings,
+			"metadata":  endpoint.Metadata,
+			"createdAt": endpoint.CreatedAt,
+			"updatedAt": endpoint.UpdatedAt,
+		},
+	}
+}
+
+func createDomainResource(domain domain) analyzers.Resource {
+	return analyzers.Resource{
+		Name:               domain.ID,
+		FullyQualifiedName: "domain/" + domain.ID,
+		Type:               "domain",
+		Metadata: map[string]any{
+			"uri":       domain.URI,
+			"domain":    domain.Domain,
+			"metadata":  domain.Metadata,
+			"createdAt": domain.CreatedAt,
+		},
+	}
+}
+
+func createAPIKeyResource(apiKey apiKey) analyzers.Resource {
+	return analyzers.Resource{
+		Name:               apiKey.ID,
+		FullyQualifiedName: "api_key/" + apiKey.ID,
+		Type:               "api_key",
+		Metadata: map[string]any{
+			"uri":         apiKey.URI,
+			"description": apiKey.Description,
+			"metadata":    apiKey.Metadata,
+			"ownerID":     apiKey.OwnerID,
+			"createdAt":   apiKey.CreatedAt,
+		},
+	}
+}
+func createSSHKeyResource(sshCredential sshCredential) analyzers.Resource {
+	return analyzers.Resource{
+		Name:               sshCredential.ID,
+		FullyQualifiedName: "ssh_credential/" + sshCredential.ID,
+		Type:               "ssh_credential",
+		Metadata: map[string]any{
+			"uri":         sshCredential.URI,
+			"description": sshCredential.Description,
+			"publicKey":   sshCredential.PublicKey,
+			"metadata":    sshCredential.Metadata,
+			"acl":         sshCredential.ACL,
+			"ownerID":     sshCredential.OwnerID,
+			"createdAt":   sshCredential.CreatedAt,
+		},
+	}
+}
+
+func createAuthtokenResource(authtoken authtoken) analyzers.Resource {
+	return analyzers.Resource{
+		Name:               authtoken.ID,
+		FullyQualifiedName: "authtoken/" + authtoken.ID,
+		Type:               "authtoken",
+		Metadata: map[string]any{
+			"uri":         authtoken.URI,
+			"description": authtoken.Description,
+			"metadata":    authtoken.Metadata,
+			"acl":         authtoken.ACL,
+			"ownerID":     authtoken.OwnerID,
+			"createdAt":   authtoken.CreatedAt,
+		},
+	}
+}
+
+func createBotUserResource(botUser botUser) analyzers.Resource {
+	return analyzers.Resource{
+		Name:               botUser.ID,
+		FullyQualifiedName: "bot_user/" + botUser.ID,
+		Type:               "bot_user",
+		Metadata: map[string]any{
+			"uri":       botUser.URI,
+			"name":      botUser.Name,
+			"active":    botUser.Active,
+			"createdAt": botUser.CreatedAt,
+		},
+	}
+}
+
+func createUserResource(user user) analyzers.Resource {
+	return analyzers.Resource{
+		Name:               user.ID,
+		FullyQualifiedName: "user/" + user.ID,
+		Type:               "user",
+	}
 }

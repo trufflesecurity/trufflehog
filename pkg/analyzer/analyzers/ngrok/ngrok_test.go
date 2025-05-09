@@ -3,9 +3,11 @@ package ngrok
 import (
 	_ "embed"
 	"encoding/json"
+	"sort"
 	"testing"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -48,6 +50,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			// bindings need to be in the same order to be comparable
+			sortBindings(got.Bindings)
 
 			// marshal the actual result to JSON
 			gotJSON, err := json.Marshal(got)
@@ -55,15 +59,30 @@ func TestAnalyzer_Analyze(t *testing.T) {
 				t.Fatalf("could not marshal got to JSON: %s", err)
 			}
 
+			// Parse the expected JSON string
+			var wantObj analyzers.AnalyzerResult
+			if err := json.Unmarshal([]byte(tt.want), &wantObj); err != nil {
+				t.Fatalf("could not unmarshal want JSON string: %s", err)
+			}
+
+			// bindings need to be in the same order to be comparable
+			sortBindings(wantObj.Bindings)
+
+			// Marshal the expected result to JSON (to normalize)
+			wantJSON, err := json.Marshal(wantObj)
+			if err != nil {
+				t.Fatalf("could not marshal want to JSON: %s", err)
+			}
+
 			// compare the JSON strings
-			if string(gotJSON) != string(tt.want) {
+			if string(gotJSON) != string(wantJSON) {
 				// pretty-print both JSON strings for easier comparison
 				var gotIndented, wantIndented []byte
 				gotIndented, err = json.MarshalIndent(got, "", " ")
 				if err != nil {
 					t.Fatalf("could not marshal got to indented JSON: %s", err)
 				}
-				wantIndented, err = json.MarshalIndent(tt.want, "", " ")
+				wantIndented, err = json.MarshalIndent(wantObj, "", " ")
 				if err != nil {
 					t.Fatalf("could not marshal want to indented JSON: %s", err)
 				}
@@ -71,4 +90,14 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Helper function to sort bindings
+func sortBindings(bindings []analyzers.Binding) {
+	sort.SliceStable(bindings, func(i, j int) bool {
+		if bindings[i].Resource.Type == bindings[j].Resource.Type {
+			return bindings[i].Permission.Value < bindings[j].Permission.Value
+		}
+		return bindings[i].Resource.Type < bindings[j].Resource.Type
+	})
 }

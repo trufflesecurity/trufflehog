@@ -28,7 +28,6 @@ const (
 	AccountFree AccountType = "Free"
 	AccountPaid AccountType = "Paid"
 )
-const ngrokAPIBaseURL = "https://api.ngrok.com"
 
 func (a Analyzer) Type() analyzers.AnalyzerType {
 	return analyzers.AnalyzerTypeNgrok
@@ -93,135 +92,50 @@ func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 	}
 
 	for _, endpoint := range info.Endpoints {
-		resource := analyzers.Resource{
-			Name:               endpoint.ID,
-			FullyQualifiedName: "endpoint/" + endpoint.ID,
-			Type:               "endpoint",
-			Metadata: map[string]any{
-				"region":    endpoint.Region,
-				"host":      endpoint.Host,
-				"port":      endpoint.Port,
-				"publicURL": endpoint.PublicURL,
-				"proto":     endpoint.Proto,
-				"hostport":  endpoint.Hostport,
-				"type":      endpoint.Type,
-				"uri":       endpoint.URI,
-				"bindings":  endpoint.Bindings,
-				"metadata":  endpoint.Metadata,
-				"createdAt": endpoint.CreatedAt,
-				"updatedAt": endpoint.UpdatedAt,
-			},
-		}
 		bindings = append(bindings, analyzers.Binding{
-			Resource:   resource,
+			Resource:   createEndpointResource(endpoint),
 			Permission: fullAccessPermission,
 		})
 	}
 
 	for _, domain := range info.Domains {
-		resource := analyzers.Resource{
-			Name:               domain.ID,
-			FullyQualifiedName: "domain/" + domain.ID,
-			Type:               "domain",
-			Metadata: map[string]any{
-				"uri":       domain.URI,
-				"domain":    domain.Domain,
-				"metadata":  domain.Metadata,
-				"createdAt": domain.CreatedAt,
-			},
-		}
 		bindings = append(bindings, analyzers.Binding{
-			Resource:   resource,
+			Resource:   createDomainResource(domain),
 			Permission: fullAccessPermission,
 		})
 	}
 
 	for _, apiKey := range info.APIKeys {
-		resource := analyzers.Resource{
-			Name:               apiKey.ID,
-			FullyQualifiedName: "api_key/" + apiKey.ID,
-			Type:               "api_key",
-			Metadata: map[string]any{
-				"uri":         apiKey.URI,
-				"description": apiKey.Description,
-				"metadata":    apiKey.Metadata,
-				"ownerID":     apiKey.OwnerID,
-				"createdAt":   apiKey.CreatedAt,
-			},
-		}
 		bindings = append(bindings, analyzers.Binding{
-			Resource:   resource,
+			Resource:   createAPIKeyResource(apiKey),
 			Permission: fullAccessPermission,
 		})
 	}
 
 	for _, authtoken := range info.Authtokens {
-		resource := analyzers.Resource{
-			Name:               authtoken.ID,
-			FullyQualifiedName: "authtoken/" + authtoken.ID,
-			Type:               "authtoken",
-			Metadata: map[string]any{
-				"uri":         authtoken.URI,
-				"description": authtoken.Description,
-				"metadata":    authtoken.Metadata,
-				"acl":         authtoken.ACL,
-				"ownerID":     authtoken.OwnerID,
-				"createdAt":   authtoken.CreatedAt,
-			},
-		}
 		bindings = append(bindings, analyzers.Binding{
-			Resource:   resource,
+			Resource:   createAuthtokenResource(authtoken),
 			Permission: fullAccessPermission,
 		})
 	}
 
 	for _, sshCredential := range info.SSHCredentials {
-		resource := analyzers.Resource{
-			Name:               sshCredential.ID,
-			FullyQualifiedName: "ssh_credential/" + sshCredential.ID,
-			Type:               "ssh_credential",
-			Metadata: map[string]any{
-				"uri":         sshCredential.URI,
-				"description": sshCredential.Description,
-				"publicKey":   sshCredential.PublicKey,
-				"metadata":    sshCredential.Metadata,
-				"acl":         sshCredential.ACL,
-				"ownerID":     sshCredential.OwnerID,
-				"createdAt":   sshCredential.CreatedAt,
-			},
-		}
 		bindings = append(bindings, analyzers.Binding{
-			Resource:   resource,
+			Resource:   createSSHKeyResource(sshCredential),
 			Permission: fullAccessPermission,
 		})
 	}
 
 	for _, botUser := range info.BotUsers {
-		resource := analyzers.Resource{
-			Name:               botUser.ID,
-			FullyQualifiedName: "bot_user/" + botUser.ID,
-			Type:               "bot_user",
-			Metadata: map[string]any{
-				"uri":       botUser.URI,
-				"name":      botUser.Name,
-				"active":    botUser.Active,
-				"createdAt": botUser.CreatedAt,
-			},
-		}
 		bindings = append(bindings, analyzers.Binding{
-			Resource:   resource,
+			Resource:   createBotUserResource(botUser),
 			Permission: fullAccessPermission,
 		})
 	}
 
 	for _, user := range info.Users {
-		resource := analyzers.Resource{
-			Name:               user.ID,
-			FullyQualifiedName: "user/" + user.ID,
-			Type:               "user",
-		}
 		bindings = append(bindings, analyzers.Binding{
-			Resource:   resource,
+			Resource:   createUserResource(user),
 			Permission: fullAccessPermission,
 		})
 	}

@@ -74,6 +74,16 @@ type endpoint struct {
 	UpdatedAt string   `json:"updated_at"`
 }
 
+type paginatedResponse struct {
+	NextPageURI    string          `json:"next_page_uri"`
+	APIKeys        []apiKey        `json:"keys,omitempty"`
+	Authtokens     []authtoken     `json:"credentials,omitempty"`
+	SSHCredentials []sshCredential `json:"ssh_credentials,omitempty"`
+	Domains        []domain        `json:"reserved_domains,omitempty"`
+	Endpoints      []endpoint      `json:"endpoints,omitempty"`
+	BotUsers       []botUser       `json:"bot_users,omitempty"`
+}
+
 type botUserResponse struct {
 	BotUsers []botUser `json:"bot_users"`
 }
