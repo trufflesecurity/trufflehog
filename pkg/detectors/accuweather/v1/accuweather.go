@@ -46,12 +46,12 @@ func (s Scanner) getClient() *http.Client {
 
 // FromData will find and optionally verify Accuweather secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	allMatches := keyPat.FindAllStringSubmatch(string(data), -1)
-	return s.VerifyAllMatches(ctx, allMatches, verify)
+	matches := keyPat.FindAllStringSubmatch(string(data), -1)
+	return s.ProcessMatches(ctx, matches, verify)
 }
 
-func (s Scanner) VerifyAllMatches(ctx context.Context, allMatches [][]string, verify bool) (results []detectors.Result, err error) {
-	uniqueMatches := getUniqueMatches(allMatches)
+func (s Scanner) ProcessMatches(ctx context.Context, matches [][]string, verify bool) (results []detectors.Result, err error) {
+	uniqueMatches := getUniqueMatches(matches)
 	for key := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Accuweather,

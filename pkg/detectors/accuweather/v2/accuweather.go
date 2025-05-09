@@ -25,6 +25,6 @@ var (
 
 // FromData will find and optionally verify Accuweather secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	allMatches := keyPat.FindAllStringSubmatch(string(data), -1)
-	return s.VerifyAllMatches(ctx, allMatches, verify)
+	matches := keyPat.FindAllStringSubmatch(string(data), -1)
+	return s.ProcessMatches(ctx, matches, verify)
 }
