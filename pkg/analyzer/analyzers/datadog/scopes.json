@@ -1,0 +1,38 @@
+[
+  {
+    "id": "d90f6830-d3d8-11e9-a77a-b3404e5e9ee2",
+    "name": "dashboards_read",
+    "title": "Dashboards Read",
+    "description": "View dashboards.",
+    "test": {
+      "endpoint": "/v1/dashboard",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "d90f6831-d3d8-11e9-a77a-4fd230ddbc6a",
+    "name": "dashboards_write",
+    "title": "Dashboards Write",
+    "description": "Create and change dashboards.",
+    "test": {
+      "endpoint": "/v1/dashboard",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "d90f6832-d3d8-11e9-a77a-bf8a2607f864",
+    "name": "dashboards_public_share",
+    "title": "Dashboards Public Share",
+    "description": "Create, modify and delete shared dashboards with share type 'Public'. These dashboards can be accessed by anyone on the internet.",
+    "test": {
+      "endpoint": "/v1/dashboard/public",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  }
+]
