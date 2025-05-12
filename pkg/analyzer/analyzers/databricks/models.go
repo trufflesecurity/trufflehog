@@ -8,6 +8,7 @@ func (r ResourceType) String() string {
 
 const (
 	CurrentUser ResourceType = "User"
+	TokensInfo  ResourceType = "Token"
 )
 
 type SecretInfo struct {
@@ -50,8 +51,12 @@ type CurrentUserInfo struct {
 	} `json:"emails"`
 }
 
-type userEmails struct {
-	Display string `json:"display"`
-	Value   string `json:"value"`
-	Primary bool   `json:"primary"`
+type Tokens struct {
+	TokensInfo []struct {
+		ID          string `json:"token_id"`
+		Name        string `json:"comment"`
+		ExpiryTime  int    `json:"expiry_time"`
+		LastUsedDay int    `json:"last_used_day"`
+		CreatedBy   string `json:"created_by_username"`
+	} `json:"token_infos"`
 }
