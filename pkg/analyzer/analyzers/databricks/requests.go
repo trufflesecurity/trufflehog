@@ -10,8 +10,20 @@ import (
 
 var (
 	apiEndpoints = map[ResourceType]string{
-		CurrentUser: "/api/2.0/preview/scim/v2/Me",
-		TokensInfo:  "/api/2.0/token-management/tokens",
+		CurrentUser:      "/api/2.0/preview/scim/v2/Me",
+		TokensInfo:       "/api/2.0/token-management/tokens",
+		TokenPermissions: "/api/2.0/permissions/authorization/tokens/permissionLevels",
+		Repositories:     "/api/2.0/repos",
+		GitCredentials:   "/api/2.0/git-credentials",
+		Jobs:             "/api/2.2/jobs/list",
+		Clusters:         "/api/2.1/clusters/list",
+		Groups:           "/api/2.0/preview/scim/v2/Groups",
+		Users:            "/api/2.0/preview/scim/v2/Users",
+		/*
+			TODO:
+				- https://docs.databricks.com/api/gcp/workspace/workspace/list (list content inside path)
+				- http://docs.databricks.com/api/gcp/workspace/libraries/allclusterlibrarystatuses (list cluster statuses)
+		*/
 	}
 )
 
@@ -42,6 +54,34 @@ func makeDataBricksRequest(client *http.Client, endpoint, token string) ([]byte,
 	}
 
 	return responseBodyByte, resp.StatusCode, nil
+}
+
+func captureDataBricksResources(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	if err := captureRepos(client, domain, token, secretInfo); err != nil {
+		return err
+	}
+
+	if err := captureGitCreds(client, domain, token, secretInfo); err != nil {
+		return err
+	}
+
+	if err := captureJobs(client, domain, token, secretInfo); err != nil {
+		return err
+	}
+
+	if err := captureClusters(client, domain, token, secretInfo); err != nil {
+		return err
+	}
+
+	if err := captureGroups(client, domain, token, secretInfo); err != nil {
+		return err
+	}
+
+	if err := captureUsers(client, domain, token, secretInfo); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func captureUserInfo(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
@@ -101,6 +141,232 @@ func captureTokensInfo(client *http.Client, domain, token string, secretInfo *Se
 			}
 
 			secretInfo.Tokens = append(secretInfo.Tokens, t)
+		}
+
+		return nil
+	case http.StatusUnauthorized:
+		return fmt.Errorf("invalid/expired personal access token")
+	default:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	}
+}
+
+func captureTokenPermissions(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[TokenPermissions], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var permissions Permissions
+
+		if err := json.Unmarshal(respBody, &permissions); err != nil {
+			return err
+		}
+
+		for _, item := range permissions.PermissionLevels {
+			secretInfo.TokenPermissionLevels = append(secretInfo.TokenPermissionLevels, item.PermissionLevel)
+		}
+
+		return nil
+	case http.StatusUnauthorized:
+		return fmt.Errorf("invalid/expired personal access token")
+	default:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	}
+}
+
+func captureRepos(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Repositories], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var repos ReposResponse
+
+		if err := json.Unmarshal(respBody, &repos); err != nil {
+			return err
+		}
+
+		for _, repo := range repos.Repositories {
+			if repo.ID == "" {
+				repo.ID = repo.URL
+			}
+
+			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+				ID:   repo.ID,
+				Name: repo.Path,
+				Type: Repositories.String(),
+				Metadata: map[string]string{
+					"provider": repo.Provider,
+					"url":      repo.URL,
+				},
+			})
+		}
+
+		return nil
+	case http.StatusUnauthorized:
+		return fmt.Errorf("invalid/expired personal access token")
+	default:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	}
+}
+
+func captureGitCreds(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[GitCredentials], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var creds GitCreds
+
+		if err := json.Unmarshal(respBody, &creds); err != nil {
+			return err
+		}
+
+		for _, credential := range creds.Credentials {
+			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+				ID:   credential.ID,
+				Name: credential.UserName,
+				Type: GitCredentials.String(),
+				Metadata: map[string]string{
+					"provider": credential.Provider,
+				},
+			})
+		}
+
+		return nil
+	case http.StatusUnauthorized:
+		return fmt.Errorf("invalid/expired personal access token")
+	default:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	}
+}
+
+func captureJobs(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Jobs], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var jobs JobsResponse
+
+		if err := json.Unmarshal(respBody, &jobs); err != nil {
+			return err
+		}
+
+		for _, job := range jobs.Jobs {
+			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+				ID:   job.ID,
+				Name: job.Name,
+				Type: Jobs.String(),
+				Metadata: map[string]string{
+					"description": job.Description,
+				},
+			})
+		}
+
+		return nil
+	case http.StatusUnauthorized:
+		return fmt.Errorf("invalid/expired personal access token")
+	default:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	}
+}
+
+func captureClusters(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Clusters], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var clusters ClustersResponse
+
+		if err := json.Unmarshal(respBody, &clusters); err != nil {
+			return err
+		}
+
+		for _, cluster := range clusters.Clusters {
+			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+				ID:   cluster.ID,
+				Name: cluster.Name,
+				Type: Clusters.String(),
+				Metadata: map[string]string{
+					"created by": cluster.CreatedBy,
+				},
+			})
+		}
+
+		return nil
+	case http.StatusUnauthorized:
+		return fmt.Errorf("invalid/expired personal access token")
+	default:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	}
+}
+
+func captureGroups(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Groups], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var groups GroupsResponse
+
+		if err := json.Unmarshal(respBody, &groups); err != nil {
+			return err
+		}
+
+		for _, group := range groups.Resources {
+			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+				ID:   group.ID,
+				Name: group.Name,
+				Type: Groups.String(),
+			})
+		}
+
+		return nil
+	case http.StatusUnauthorized:
+		return fmt.Errorf("invalid/expired personal access token")
+	default:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	}
+}
+
+func captureUsers(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Users], token)
+	if err != nil {
+		return err
+	}
+
+	switch statusCode {
+	case http.StatusOK:
+		var users UsersResponse
+
+		if err := json.Unmarshal(respBody, &users); err != nil {
+			return err
+		}
+
+		for _, user := range users.Resources {
+			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+				ID:   user.ID,
+				Name: user.UserName,
+				Type: Users.String(),
+				Metadata: map[string]string{
+					"active": fmt.Sprintf("%t", user.Active),
+				},
+			})
 		}
 
 		return nil
