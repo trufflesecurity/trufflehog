@@ -34,5 +34,369 @@
       "valid_statuses": [200, 400, 404, 429],
       "invalid_statuses": [403]
     }
+  },
+  {
+    "id": "4441648c-d8b1-11e9-a77a-1b899a04b304",
+    "name": "monitors_read",
+    "title": "Monitors Read",
+    "description": "View monitors.",
+    "test": {
+      "endpoint": "/v1/monitor",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "48ef71ea-d8b1-11e9-a77a-93f408470ad0",
+    "name": "monitors_write",
+    "title": "Monitors Write",
+    "description": "Edit and delete individual monitors.",
+    "test": {
+      "endpoint": "/v1/monitor",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "5e605652-dd12-11e8-9e53-375565b8970e",
+    "name": "logs_read_index_data",
+    "title": "Logs Read Index Data",
+    "description": "Read log data, possibly scoped to one or more indexes. In order to read log data, a user must have both this permission and Logs Read Data.",
+    "test": {
+      "endpoint": "/v1/logs-indexes",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403],
+      "absent_in_docs": true
+    }
+  },
+  {
+    "id": "62cc036c-dd12-11e8-9e54-db9995643092",
+    "name": "logs_modify_indexes",
+    "title": "Logs Modify Indexes",
+    "description": "Read and modify all indexes in your account.",
+    "test": {
+      "endpoint": "/v1/logs/config/indexes/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "6f66600e-dd12-11e8-9e55-7f30fbb45e73",
+    "name": "logs_live_tail",
+    "title": "Logs Live Tail",
+    "description": "View the live tail feed for all log indexes, even if otherwise specifically restricted.",
+    "test": {
+      "endpoint": "/v1/logs-livetail",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403],
+      "absent_in_docs": true
+    }
+  },
+  {
+    "id": "7d7c98ac-dd12-11e8-9e56-93700598622d",
+    "name": "logs_write_exclusion_filters",
+    "title": "Logs Write Exclusion Filters",
+    "description": "Add and change exclusion filters for all or some log indexes.",
+    "test": {
+      "endpoint": "/v1/logs-indexes/exclusion-filters",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403],
+      "absent_in_docs": true
+    }
+  },
+  {
+    "id": "811ac4ca-dd12-11e8-9e57-676a7f0beef9",
+    "name": "logs_write_pipelines",
+    "title": "Logs Write Pipelines",
+    "description": "Add and change log pipeline configurations.",
+    "test": {
+      "endpoint": "/v1/logs/config/pipelines/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "84aa3ae4-dd12-11e8-9e58-a373a514ccd0",
+    "name": "logs_write_processors",
+    "title": "Logs Write Processors",
+    "description": "Add and change some or all log processor configurations.",
+    "test": {
+      "endpoint": "/v1/logs/config/processors",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403],
+      "absent_in_docs": true
+    }
+  },
+  {
+    "id": "87b00304-dd12-11e8-9e59-cbeb5f71f72f",
+    "name": "logs_write_archives",
+    "title": "Logs Write Archives",
+    "description": "Add and edit Log Archives.",
+    "test": {
+      "endpoint": "/v2/logs/config/archives/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "979df720-aed7-11e9-99c6-a7eb8373165a",
+    "name": "logs_generate_metrics",
+    "title": "Logs Generate Metrics",
+    "description": "Create custom metrics from logs.",
+    "test": {
+      "endpoint": "/v2/logs/config/metrics",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "4d87d5f8-d8b1-11e9-a77a-eb9c8350d04f",
+    "name": "monitors_downtime",
+    "title": "Manage Downtimes",
+    "description": "Set downtimes to suppress alerts from any monitor in an organization.",
+    "test": {
+      "endpoint": "/v1/downtime",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "1af86ce4-7823-11ea-93dc-d7cad1b1c6cb",
+    "name": "logs_read_data",
+    "title": "Logs Read Data",
+    "description": "Read log data. In order to read log data, a user must have both this permission and Logs Read Index Data.",
+    "test": {
+      "endpoint": "/v2/logs/events",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "b382b982-8535-11ea-93de-2bf1bdf20798",
+    "name": "logs_read_archives",
+    "title": "Logs Read Archives",
+    "description": "Read Log Archives location and use it for rehydration.",
+    "test": {
+      "endpoint": "/v2/logs/config/archives",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "7314eb20-aa58-11ea-95e2-6fb6e4a451d5",
+    "name": "security_monitoring_rules_read",
+    "title": "Security Rules Read",
+    "description": "Read Detection Rules.",
+    "test": {
+      "endpoint": "/v2/cloud_security_management/custom_frameworks/must/not-exist",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "7b516476-aa58-11ea-95e2-93718cd56369",
+    "name": "security_monitoring_rules_write",
+    "title": "Security Rules Write",
+    "description": "Create and edit Detection Rules.",
+    "test": {
+      "endpoint": "/v2/security_monitoring/rules",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "80de1ec0-aa58-11ea-95e2-aff381626d5d",
+    "name": "security_monitoring_signals_read",
+    "title": "Security Signals Read",
+    "description": "View Security Signals.",
+    "test": {
+      "endpoint": "/v2/security_monitoring/signals",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "5c1680d0-ff6d-11eb-a494-da7ad0900005",
+    "name": "security_monitoring_signals_write",
+    "title": "Security Signals Write",
+    "description": "Modify Security Signals.",
+    "test": {
+      "endpoint": "/v1/security_analytics/signals/must-not-exist/add_to_incident",
+      "method": "PATCH",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "9ac1d8cc-e707-11ea-aa2d-73d37e989a9d",
+    "name": "user_access_invite",
+    "title": "User Access Invite",
+    "description": "Invite other users to your organization.",
+    "test": {
+      "endpoint": "v2/user_invitations/does-not-exist",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "9de604d8-e707-11ea-aa9f-93f1a783b3a3",
+    "name": "user_access_manage",
+    "title": "User Access Manage",
+    "description": "Disable users, manage user roles, manage SAML-to-role mappings, and configure logs restriction queries.",
+    "test": {
+      "endpoint": "/v2/users/does-not-exist",
+      "method": "PATCH",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "46a301dd-ec5c-11ea-aa9f-97edfb345bc9",
+    "name": "synthetics_private_location_read",
+    "title": "Synthetics Private Locations Read",
+    "description": "View, search, and use Synthetics private locations.",
+    "test": {
+      "endpoint": "/v1/synthetics/private-locations/does-not-exit",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "46a301de-ec5c-11ea-aa9f-a73252c24806",
+    "name": "synthetics_private_location_write",
+    "title": "Synthetics Private Locations Write",
+    "description": "Create and delete private locations in addition to having access to the associated installation guidelines.",
+    "test": {
+      "endpoint": "/v1/synthetics/private-locations/does-not-exit",
+      "method": "PUT",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "46a301e1-ec5c-11ea-aa9f-afa39f6f3e36",
+    "name": "usage_read",
+    "title": "Usage Read",
+    "description": "View your organization's usage and usage attribution.",
+    "test": {
+      "endpoint": "/v2/usage/hourly_usage",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "46a301e4-ec5c-11ea-aa9f-87282b3a50cc",
+    "name": "metric_tags_write",
+    "title": "Metric Tags Write",
+    "description": "Edit and save tag configurations for custom metrics.",
+    "test": {
+      "endpoint": "/v2/metrics/does-not-exit/tags",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "2fbdac76-f923-11ea-adbc-07f3823e2b43",
+    "name": "audit_logs_read",
+    "title": "Audit Trail Read",
+    "description": "View Audit Trail in your organization.",
+    "test": {
+      "endpoint": "/v2/audit/events",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "4628ca54-f923-11ea-adbc-4b2b7f88c5e9",
+    "name": "synthetics_global_variable_read",
+    "title": "Synthetics Global Variable Read",
+    "description": "View, search, and use Synthetics global variables.",
+    "test": {
+      "endpoint": "/v1/synthetics/variables",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "4ada6e36-f923-11ea-adbc-0788e5c5e3cf",
+    "name": "synthetics_global_variable_write",
+    "title": "Synthetics Global Variable Write",
+    "description": "Create, edit, and delete global variables for Synthetics.",
+    "test": {
+      "endpoint": "/v1/synthetics/variables",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "5025ee24-f923-11ea-adbc-576ea241df8d",
+    "name": "synthetics_read",
+    "title": "Synthetics Read",
+    "description": "List and view configured Synthetic tests and test results.",
+    "test": {
+      "endpoint": "/v1/synthetics/tests",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "55f4b5ec-f923-11ea-adbc-1bfa2334a755",
+    "name": "synthetics_write",
+    "title": "Synthetics Write",
+    "description": "Create, edit, and delete Synthetic tests.",
+    "test": {
+      "endpoint": "/v1/synthetics/tests/mobile/does-not-exit",
+      "method": "PUT",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "5c6b88e2-f923-11ea-adbc-abf57d079420",
+    "name": "synthetics_default_settings_read",
+    "title": "Synthetics Default Settings Read",
+    "description": "View the default settings for Synthetic Monitoring.",
+    "test": {
+      "endpoint": "/v1/synthetics/settings/default_locations",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "a42e94b2-1476-11eb-bd08-efda28c04248",
+    "name": "service_account_write",
+    "title": "Service Account Write",
+    "description": "Create, disable, and use Service Accounts in your organization.",
+    "test": {
+      "endpoint": "/v2/service_accounts/does-not-exist/application_keys",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
   }
 ]
