@@ -35,6 +35,8 @@ func TestJdbc_Pattern(t *testing.T) {
 							<jdbc-url>jdbc:postgresql://#{uri.host}#{uri.path}?user=#{uri.user}</jdbc-url>
 							<jdbc-url>postgresql://postgres:postgres@<your-connection-ip-address>:5432</jdbc-url>
 							<jdbc-url>jdbc:mysql:localhost:3306/mydatabase</jdbc-url>
+							<jdbc-url>jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false</jdbc-url>
+							<jdbc-url>jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks</jdbc-url>
 							<working-dir>$ProjectFileDir$</working-dir>
 							</data-source>
 						</component>
@@ -43,6 +45,8 @@ func TestJdbc_Pattern(t *testing.T) {
 			want: []string{
 				"jdbc:postgresql://localhost:5432/postgres",
 				"jdbc:mysql:localhost:3306/mydatabase",
+				"jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false",
+				"jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks",
 			},
 		},
 		{
