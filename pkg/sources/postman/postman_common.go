@@ -1,5 +1,7 @@
 package postman
 
+import "github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
+
 // TODO - Move these into postman/common.go or similar
 // TODO - Verify that all these fields are populated
 type PostmanWorkspaceSummary struct {
@@ -37,52 +39,13 @@ type PostmanEnvironment struct {
 	}
 }
 
-type PostmanKeyValue struct {
-	Key   string
-	Value string
-}
+type PostmanMetadata struct {
+	fromLocal    bool
+	LocationType source_metadatapb.PostmanLocationType
 
-type PostmanAuth struct {
-	Type   string
-	Apikey []PostmanKeyValue
-	Bearer []PostmanKeyValue
-	AWSv4  []PostmanKeyValue
-	Basic  []PostmanKeyValue
-	OAuth2 []PostmanKeyValue
-}
+	Type string
+	Link string
 
-type PostmanUrl struct {
-	Raw      string
-	Protocol string
-	Host     []string
-	Path     []string
-	Query    []PostmanKeyValue
-}
-
-type PostmanBody struct {
-	Mode       string
-	Raw        string
-	File       PostmanBodyFile
-	UrlEncoded []PostmanKeyValue
-	FormData   []PostmanKeyValue
-	GraphQL    PostmanBodyGraphQL
-}
-
-type PostmanBodyGraphQL struct {
-	Query     string
-	Variables string
-}
-
-type PostmanBodyFile struct {
-	Src string
-}
-
-type PostmanRequest struct {
-	Auth            PostmanAuth
-	Method          string
-	HeaderStrings   []string
-	HeaderKeyValues []PostmanKeyValue
-	Body            PostmanBody
-	Url             PostmanUrl
-	Description     string
+	CollectionUid  string
+	CollectionName string
 }

@@ -281,11 +281,11 @@ func TestSource_ScanEnumerateWorkspaceRateLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init error: %v", err)
 	}
-	gock.InterceptClient(s.client.HTTPClient)
-	defer gock.RestoreClient(s.client.HTTPClient)
+	gock.InterceptClient(s.apiClient.HTTPClient)
+	defer gock.RestoreClient(s.apiClient.HTTPClient)
 
 	start := time.Now()
-	_, err = s.client.EnumerateWorkspaces(ctx)
+	_, err = s.apiClient.EnumerateWorkspaces(ctx)
 	if err != nil {
 		t.Fatalf("enumeration error: %v", err)
 	}
@@ -316,13 +316,13 @@ func TestSource_ScanGeneralRateLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init error: %v", err)
 	}
-	gock.InterceptClient(s.client.HTTPClient)
-	defer gock.RestoreClient(s.client.HTTPClient)
+	gock.InterceptClient(s.apiClient.HTTPClient)
+	defer gock.RestoreClient(s.apiClient.HTTPClient)
 
 	numRequests := 3
 	start := time.Now()
 	for i := 0; i < numRequests; i++ {
-		_, err = s.client.GetEnvironmentVariables(ctx, "abc")
+		_, err = s.apiClient.GetEnvironmentVariables(ctx, "abc")
 		if err != nil {
 			t.Fatalf("get environment variables error: %v", err)
 		}
@@ -458,11 +458,11 @@ func TestSource_BadPostmanCollectionApiResponseDoesntEndScan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init error: %v", err)
 	}
-	gock.InterceptClient(s.client.HTTPClient)
-	defer gock.RestoreClient(s.client.HTTPClient)
+	gock.InterceptClient(s.apiClient.HTTPClient)
+	defer gock.RestoreClient(s.apiClient.HTTPClient)
 
 	// Do the thing
-	workspaces, _ := s.client.EnumerateWorkspaces(ctx)
+	workspaces, _ := s.apiClient.EnumerateWorkspaces(ctx)
 	_ = s.scanWorkspace(ctx, make(chan *sources.Chunk), workspaces[0])
 
 	// If all the calls were made, then we know the one bad request didn't cause explosions
@@ -563,11 +563,11 @@ func TestSource_BadPostmanWorkspaceApiResponseDoesntEndScan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init error: %v", err)
 	}
-	gock.InterceptClient(s.client.HTTPClient)
-	defer gock.RestoreClient(s.client.HTTPClient)
+	gock.InterceptClient(s.apiClient.HTTPClient)
+	defer gock.RestoreClient(s.apiClient.HTTPClient)
 
 	// Do the thing
-	_, _ = s.client.EnumerateWorkspaces(ctx)
+	_, _ = s.apiClient.EnumerateWorkspaces(ctx)
 
 	// If all the calls were made, then we know the one bad request didn't cause explosions
 	assert.True(t, gock.IsDone())
@@ -609,12 +609,12 @@ func TestSource_UnmarshalMultipleHeaderTypes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init error: %v", err)
 	}
-	gock.InterceptClient(s.client.HTTPClient)
-	defer gock.RestoreClient(s.client.HTTPClient)
+	gock.InterceptClient(s.apiClient.HTTPClient)
+	defer gock.RestoreClient(s.apiClient.HTTPClient)
 
 	collectionIds := []string{"1234-abc1", "1234-def1"}
 	for _, collectionId := range collectionIds {
-		_, err := s.client.GetCollection(ctx, collectionId)
+		_, err := s.apiClient.GetCollection(ctx, collectionId)
 		if err != nil {
 			t.Fatalf("failed to get collection: %v", err)
 		}
@@ -663,14 +663,14 @@ func TestSource_HeadersScanning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init error: %v", err)
 	}
-	gock.InterceptClient(s.client.HTTPClient)
-	defer gock.RestoreClient(s.client.HTTPClient)
+	gock.InterceptClient(s.apiClient.HTTPClient)
+	defer gock.RestoreClient(s.apiClient.HTTPClient)
 
 	chunksChan := make(chan *sources.Chunk, 10)
 	collectionIds := []string{"1234-abc1", "1234-def1"}
 
 	for _, collectionId := range collectionIds {
-		collection, err := s.client.GetCollection(ctx, collectionId)
+		collection, err := s.apiClient.GetCollection(ctx, collectionId)
 		if err != nil {
 			t.Fatalf("failed to get collection: %v", err)
 		}

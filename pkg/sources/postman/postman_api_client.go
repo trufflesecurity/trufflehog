@@ -344,7 +344,7 @@ func (pc *postmanApiClient) waitForClientRateLimiters(ctx context.Context, reque
 	// Now we do the actual wait
 	err := limiter.Wait(ctx)
 	if err != nil {
-		return false, fmt.Errorf("error waiting for rate limiter in postman client: %w", err)
+		return false, fmt.Errorf("error waiting for rate limiter in postman apiClient: %w", err)
 	}
 
 	// If we made it here, we're good

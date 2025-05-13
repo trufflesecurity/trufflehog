@@ -40,7 +40,7 @@ type Source struct {
 	sourceId         sources.SourceID
 	jobId            sources.JobID
 	verify           bool
-	client           *Client
+	apiClient        *postmanApiClient
 	conn             *sourcespb.Postman
 	DetectorKeywords map[string]struct{}
 
@@ -115,11 +115,12 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		if conn.GetToken() == "" {
 			return errors.New("Postman token is empty")
 		}
-		s.client = NewClient(conn.GetToken())
-		s.client.HTTPClient = common.RetryableHTTPClientTimeout(10)
+		s.apiClient = NewPostmanApiClient(conn.GetToken())
+		// TODO - Move this into the client itself.  It shouldn't be here
+		s.apiClient.httpClient = common.RetryableHTTPClientTimeout(10)
 		log.RedactGlobally(conn.GetToken())
 	case *sourcespb.Postman_Unauthenticated:
-		s.client = nil
+		s.apiClient = nil
 		// No client needed if reading from local
 	default:
 		return errors.New("credential type not implemented for Postman")
@@ -180,7 +181,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Scan workspaces
 	for _, workspaceID := range s.conn.Workspaces {
-		w, err := s.client.GetWorkspace(ctx, workspaceID)
+		w, err := s.apiClient.GetWorkspace(ctx, workspaceID)
 		if err != nil {
 			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
@@ -200,7 +201,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			continue
 		}
 
-		collection, err := s.client.GetCollection(ctx, collectionID)
+		collection, err := s.apiClient.GetCollection(ctx, collectionID)
 		if err != nil {
 			// Log and move on, because sometimes the Postman API seems to give us collection IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
@@ -213,7 +214,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	// Scan personal workspaces (from API token)
 	if s.conn.Workspaces == nil && s.conn.Collections == nil && s.conn.Environments == nil && s.conn.GetToken() != "" {
-		workspaces, err := s.client.EnumerateWorkspaces(ctx)
+		workspaces, err := s.apiClient.EnumerateWorkspaces(ctx)
 		if err != nil {
 			return fmt.Errorf("error enumerating postman workspaces: %w", err)
 		}
@@ -266,7 +267,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// gather and scan environment variables
 	for _, envID := range workspace.Environments {
-		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.Uid)
+		envVars, err := s.apiClient.GetEnvironmentVariables(ctx, envID.Uid)
 		if err != nil {
 			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.Uid)
 			continue
@@ -303,7 +304,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		if shouldSkip(collectionID.Uid, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
 			continue
 		}
-		collection, err := s.client.GetCollection(ctx, collectionID.Uid)
+		collection, err := s.apiClient.GetCollection(ctx, collectionID.Uid)
 		if err != nil {
 			// Log and move on, because sometimes the Postman API seems to give us collection IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
@@ -317,19 +318,19 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 // scanCollection scans a collection and all its items, folders, and requests.
 // locally scoped Metadata is updated as we drill down into the collection.
-func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
-	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Info.Name, "collection_uuid", collection.Info.Uid)
-	metadata.CollectionInfo = collection.Info
+func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata PostmanMetadata, collection PostmanCollection) {
+	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Name, "collection_uid", collection.Uid)
+	metadata.CollectionName = collection.Name
+	metadata.CollectionUid = collection.Uid
 	metadata.Type = COLLECTION_TYPE
-	s.attemptToAddKeyword(collection.Info.Name)
+	s.attemptToAddKeyword(collection.Name)
 
 	if !metadata.fromLocal {
-		metadata.FullID = metadata.CollectionInfo.Uid
-		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
+		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + collection.Uid
 	}
 
 	metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_VARIABLE
-	// variables must be scanned first before drilling down into the folders and events
+	// environment variables must be scanned first before drilling down into the folders and events
 	// because we need to pick up the substitutions from the top level collection variables
 	s.scanVariableData(ctx, chunksChan, metadata, VariableData{
 		KeyValues: collection.Variables,
