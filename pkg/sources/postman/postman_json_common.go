@@ -168,6 +168,21 @@ type PostmanEnvironmentJson struct {
 	} `json:"environment"`
 }
 
+func GetCollectionFromJsonBytes(bytes []byte) (PostmanCollection, error) {
+	// TODO - Implement
+	return PostmanCollection{}, nil
+}
+
+func GetWorkspaceFromJsonBytes(bytes []byte) (PostmanWorkspace, error) {
+	// TODO - Implement
+	return PostmanWorkspace{}, nil
+}
+
+func GetEnvironmentFromJsonBytes(bytes []byte) (PostmanEnvironment, error) {
+	// TODO - Implement
+	return PostmanEnvironment{}, nil
+}
+
 func (pcj *PostmanCollectionJson) GetCollection() PostmanCollection {
 	// TODO - implement
 	return PostmanCollection{}

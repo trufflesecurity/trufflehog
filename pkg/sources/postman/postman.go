@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/repeale/fp-go"
 	neturl "net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -140,56 +142,62 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 // Check out the postman UI to see what I mean.
 // Metadata is used to track information that informs the source of the chunk (e.g. the workspace -> collection -> request -> variable hierarchy).
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	//// Scan local environments
-	//// TODO - This is broken, fix it
-	//for _, envPath := range s.conn.EnvironmentPaths {
-	//	env := VariableData{}
-	//	contents, err := os.ReadFile(envPath)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if err = json.Unmarshal(contents, &env); err != nil {
-	//		return err
-	//	}
-	//	s.scanVariableData(
-	//		ctx,
-	//		chunksChan,
-	//		PostmanMetadata{EnvironmentId: env.Id, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE},
-	//		env)
-	//}
-	//
-	//// Scan local collections
-	//// TODO - This is broken, fix it
-	//for _, collectionPath := range s.conn.CollectionPaths {
-	//	collection := PostmanCollection{}
-	//	contents, err := os.ReadFile(collectionPath)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if err = json.Unmarshal(contents, &collection); err != nil {
-	//		return err
-	//	}
-	//	s.scanCollection(
-	//		ctx,
-	//		chunksChan,
-	//		PostmanMetadata{CollectionUid: collection.Uid, CollectionName: collection.Name, fromLocal: true, Link: collectionPath},
-	//		collection)
-	//}
-	//
-	//// Scan local workspaces
-	//// TODO - This is broken, fix it
-	//for _, workspacePath := range s.conn.WorkspacePaths {
-	//	// check if zip file
-	//	if strings.HasSuffix(workspacePath, ".zip") {
-	//		fileReadOutput, err := unpackWorkspace(workspacePath)
-	//		if err != nil {
-	//			return err
-	//		}
-	//		basename := path.Base(workspacePath)
-	//		workspaceId := strings.TrimSuffix(basename, filepath.Ext(basename))
-	//		s.scanLocalWorkspace(ctx, chunksChan, workspaceId, fileReadOutput, workspacePath)
-	//	}
-	//}
+	// Scan local environments
+	for _, envPath := range s.conn.EnvironmentPaths {
+		contents, err := os.ReadFile(envPath)
+		if err != nil {
+			return err
+		}
+		environment, err := GetEnvironmentFromJsonBytes(contents)
+		if err != nil {
+			return err
+		}
+		vars := fp.Map(func(p struct{ Key, Value, SessionValue string }) VariableDatum {
+			return VariableDatum{Key: p.Key, Value: p.Value}
+		})(environment.KeyValues)
+		s.scanVariableData(
+			ctx,
+			chunksChan,
+			PostmanMetadata{
+				EnvironmentUid:  environment.Uid,
+				EnvironmentName: environment.Name,
+				fromLocal:       true,
+				Link:            envPath,
+				LocationType:    source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE},
+			vars)
+	}
+
+	// Scan local collections
+	for _, collectionPath := range s.conn.CollectionPaths {
+		contents, err := os.ReadFile(collectionPath)
+		if err != nil {
+			return err
+		}
+		collection, err := GetCollectionFromJsonBytes(contents)
+		if err != nil {
+			return err
+		}
+		s.scanCollection(
+			ctx,
+			chunksChan,
+			PostmanMetadata{CollectionUid: collection.Uid, CollectionName: collection.Name, fromLocal: true, Link: collectionPath},
+			collection)
+	}
+
+	// Scan local workspaces
+	// TODO - This is broken, fix it
+	for _, workspacePath := range s.conn.WorkspacePaths {
+		// check if zip file
+		if strings.HasSuffix(workspacePath, ".zip") {
+			fileReadOutput, err := unpackWorkspace(workspacePath)
+			if err != nil {
+				return err
+			}
+			basename := path.Base(workspacePath)
+			workspaceId := strings.TrimSuffix(basename, filepath.Ext(basename))
+			s.scanLocalWorkspace(ctx, chunksChan, workspaceId, fileReadOutput, workspacePath)
+		}
+	}
 
 	// Scan workspaces
 	for _, workspaceID := range s.conn.Workspaces {
@@ -237,7 +245,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			// Get the full workspace information
 			workspace, err := s.apiClient.GetWorkspaceById(ctx, workspace_summary.Id)
 			if err != nil {
-				return fmt.Errorf("error getting workspace info with id: %s", workspace_summary.Id, err)
+				return fmt.Errorf("error getting workspace info with id: %s, %v", workspace_summary.Id, err)
 			}
 
 			if err = s.scanWorkspace(ctx, chunksChan, workspace); err != nil {

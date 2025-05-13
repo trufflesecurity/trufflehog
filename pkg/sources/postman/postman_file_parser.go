@@ -2,7 +2,6 @@ package postman
 
 import (
 	"archive/zip"
-	"encoding/json"
 	"io"
 	"strings"
 )
@@ -33,19 +32,18 @@ func unpackWorkspace(workspacePath string) (PostmanProcessedFile, error) {
 			return postmanFileReadOutput, err
 		}
 		if strings.Contains(file.Name, "collection") {
-			// read in the collection then scan it
-			var collectionJson PostmanCollectionJson
-			if err = json.Unmarshal(contents, &collectionJson); err != nil {
-				return postmanFileReadOutput, err
+			collection, err := GetCollectionFromJsonBytes(contents)
+			if err != nil {
+				return PostmanProcessedFile{}, err
 			}
-			postmanFileReadOutput.Collections = append(postmanFileReadOutput.Collections, collectionJson.GetCollection())
+			postmanFileReadOutput.Collections = append(postmanFileReadOutput.Collections, collection)
 		}
 		if strings.Contains(file.Name, "environment") {
-			var environmentJson PostmanEnvironmentJson
-			if err = json.Unmarshal(contents, &environmentJson); err != nil {
-				return postmanFileReadOutput, err
+			environment, err := GetEnvironmentFromJsonBytes(contents)
+			if err != nil {
+				return PostmanProcessedFile{}, err
 			}
-			postmanFileReadOutput.Environments = append(postmanFileReadOutput.Environments, environmentJson.GetEnvironment())
+			postmanFileReadOutput.Environments = append(postmanFileReadOutput.Environments, environment)
 		}
 	}
 	return postmanFileReadOutput, nil
