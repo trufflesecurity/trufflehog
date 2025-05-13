@@ -14,13 +14,14 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather/v1"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func TestAccuweather_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -57,7 +58,7 @@ func TestAccuweather_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, real secrets, verification error due to timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			s:    Scanner{Scanner: v1.Scanner{Client: common.SaneHttpClientTimeOut(1 * time.Microsecond)}},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a accuweather secret %s within", secret)),
@@ -75,7 +76,7 @@ func TestAccuweather_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, real secrets, verification error due to unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(500, "{}")},
+			s:    Scanner{Scanner: v1.Scanner{Client: common.ConstantResponseHttpClient(500, "{}")}},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a accuweather secret %s within", secret)),

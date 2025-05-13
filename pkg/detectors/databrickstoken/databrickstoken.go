@@ -2,7 +2,6 @@ package databrickstoken
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -29,9 +27,6 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	domain = regexp.MustCompile(`\b([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azuredatabricks\.net))\b`)
 	keyPat = regexp.MustCompile(`\b(dapi[0-9a-f]{32}(-\d)?)\b`)
-
-	invalidHosts = simple.NewCache[struct{}]()
-	errNoHost    = errors.New("no such host")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -55,11 +50,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueTokens {
 		for domain := range uniqueDomains {
-			if invalidHosts.Exists(domain) {
-				delete(uniqueDomains, domain)
-				continue
-			}
-
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_DatabricksToken,
 				Raw:          []byte(token),
@@ -74,14 +64,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				isVerified, verificationErr := verifyDatabricksToken(client, domain, token)
 				s1.Verified = isVerified
-				if verificationErr != nil {
-					if errors.Is(verificationErr, errNoHost) {
-						invalidHosts.Set(domain, struct{}{})
-						continue
-					}
-
-					s1.SetVerificationError(verificationErr)
-				}
+				s1.SetVerificationError(verificationErr)
 
 				if s1.Verified {
 					s1.AnalysisInfo = map[string]string{
@@ -114,10 +97,6 @@ func verifyDatabricksToken(client *http.Client, domain, token string) (bool, err
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	resp, err := client.Do(req)
 	if err != nil {
-		if strings.Contains(err.Error(), "no such host") {
-			return false, errNoHost
-		}
-
 		return false, err
 	}
 

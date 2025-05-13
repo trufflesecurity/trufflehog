@@ -97,6 +97,7 @@ const (
 	AnalyzerTypeNetlify
 	AnalyzerTypeFastly
 	AnalyzerTypeMonday
+	AnalyzerTypeNgrok
 	AnalyzerTypeDataBricks
 	// Add new items here with AnalyzerType prefix
 )
@@ -140,6 +141,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeNetlify:       "Netlify",
 	AnalyzerTypeFastly:        "Fastly",
 	AnalyzerTypeMonday:        "Monday",
+	AnalyzerTypeNgrok:         "Ngrok",
 	AnalyzerTypeDataBricks:    "DataBricks",
 	// Add new mappings here
 }

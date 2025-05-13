@@ -27,6 +27,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/monday"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mysql"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/netlify"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/ngrok"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/notion"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/opsgenie"
@@ -131,6 +132,8 @@ func Run(keyType string, secretInfo SecretInfo) {
 		fastly.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "monday":
 		monday.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "ngrok":
+		ngrok.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "databricks":
 		databricks.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["domain"], secretInfo.Parts["token"])
 	}
