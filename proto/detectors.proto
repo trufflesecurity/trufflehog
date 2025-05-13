@@ -1035,6 +1035,7 @@ enum DetectorType {
   XAI = 1023;
   AzureDirectManagementKey = 1024;
   AzureAppConfigConnectionString = 1025;
+  Personio = 1026;
 }
 
 message Result {
