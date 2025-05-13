@@ -52,13 +52,22 @@ type PostmanCollectionResponse struct {
 	Body string
 
 	OriginalRequest PostmanCollectionRequest
+
+	Headers []struct {
+		Key   string
+		Value string
+	}
 }
 
 type PostmanCollectionRequest struct {
-	Method string
-	Url    PostmanCollectionUrl
-	Auth   PostmanCollectionAuth
-	Body   PostmanRequestBody
+	Method  string
+	Url     PostmanCollectionUrl
+	Auth    PostmanCollectionAuth
+	Body    PostmanRequestBody
+	Headers []struct {
+		Key   string
+		Value string
+	}
 }
 
 type PostmanRequestBody struct {

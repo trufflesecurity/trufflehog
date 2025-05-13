@@ -1,13 +1,10 @@
 package postman
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/repeale/fp-go"
 	neturl "net/url"
-	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -39,7 +36,6 @@ const (
 	REQUEST_TYPE     = "request"
 	FOLDER_TYPE      = "folder"
 	COLLECTION_TYPE  = "collection"
-	EVENT_TYPE       = "script"
 )
 
 type Source struct {
@@ -102,7 +98,7 @@ func (s *Source) JobID() sources.JobID {
 }
 
 // Init returns an initialized Postman source.
-func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourceId sources.SourceID, verify bool, connection *anypb.Any, _ int) error {
 	s.name = name
 	s.sourceId = sourceId
 	s.jobId = jobId
@@ -376,7 +372,8 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	s.scanAuth(ctx, chunksChan, metadata, collection.Auth, PostmanCollectionUrl{})
 
 	for _, event := range collection.Events {
-		s.scanEvent(ctx, chunksChan, metadata, event)
+		// Top level events don't have an Item ID (since they're at the top), so we just feed through an empty string)
+		s.scanEvent(ctx, chunksChan, metadata, event, "")
 	}
 
 	for _, item := range collection.Items {
@@ -434,20 +431,20 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	}
 
 	for _, event := range item.Events {
-		s.scanEvent(ctx, chunksChan, metadata, event)
+		s.scanEvent(ctx, chunksChan, metadata, event, item.Uid)
 	}
 	// an auth all by its lonesome could be inherited to subfolders and requests
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.Url)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
-func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata PostmanMetadata, event PostmanCollectionEvent) {
+func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata PostmanMetadata, event PostmanCollectionEvent, itemId string) {
 	metadata.Type = metadata.Type + " > event"
 	data := strings.Join(event.Script.Exec, " ")
 
 	// Prep direct links. Ignore updating link if it's a local JSON file
 	if !metadata.fromLocal {
-		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.FullID
+		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + itemId
 		if event.Listen == "prerequest" {
 			metadata.Link += "?tab=pre-request-scripts"
 		} else {
@@ -570,21 +567,13 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 	originalType := metadata.Type
 
 	// Add in var procesisng for headers
-	if request.HeaderKeyValue != nil {
-		vars := VariableData{
-			KeyValues: r.HeaderKeyValue,
-		}
+	if request.Headers != nil {
+		vars := fp.Map(func(p struct{ Key, Value string }) VariableDatum {
+			return VariableDatum{Key: p.Key, Value: p.Value}
+		})(request.Headers)
 		metadata.Type = originalType + " > header"
 		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_HEADER
 		s.scanVariableData(ctx, chunksChan, metadata, vars)
-		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
-	}
-
-	if request.HeaderString != nil {
-		metadata.Type = originalType + " > header"
-		metadata.Link = metadata.Link + "?tab=headers"
-		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_HEADER
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, strings.Join(request.HeaderString, " "))), metadata)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -661,21 +650,13 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	}
 	originalType := metadata.Type
 
-	if response.HeaderKeyValue != nil {
-		vars := VariableData{
-			KeyValues: response.HeaderKeyValue,
-		}
+	if response.Headers != nil {
+		vars := fp.Map(func(p struct{ Key, Value string }) VariableDatum {
+			return VariableDatum{Key: p.Key, Value: p.Value}
+		})(response.Headers)
 		metadata.Type = originalType + " > response header"
 		metadata.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_HEADER
 		s.scanVariableData(ctx, chunksChan, metadata, vars)
-		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
-	}
-
-	if response.HeaderString != nil {
-		metadata.Type = originalType + " > response header"
-		// TODO Note: for now, links to Postman responses do not include a more granular tab for the params/header/body, but when they do, we will need to update the metadata.Link info
-		metadata.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_HEADER
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, strings.Join(response.HeaderString, " "))), metadata)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -695,7 +676,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.Chunk, metadata PostmanMetadata, variableData []VariableDatum) {
 	if len(variableData) == 0 {
-		ctx.Logger().V(2).Info("no variables to scan", "type", metadata.Type, "item_uuid", metadata.FullID)
+		ctx.Logger().V(2).Info("no variables to scan", "type", metadata.Type, "metadata", metadata)
 		return
 	}
 

@@ -70,9 +70,8 @@ type PostmanCollectionJson struct {
 	} `json:"collection"`
 }
 type PostmanGetCollectionItemRequest struct {
-	Auth   PostmanCollectionAuthJson    `json:"auth"`
-	Method string                       `json:"method"`
-	Header []PostmanGetCollectionHeader `json:"header"`
+	Auth   PostmanCollectionAuthJson `json:"auth"`
+	Method string                    `json:"method"`
 	Body   struct {
 		Mode    string `json:"mode"`
 		Raw     string `json:"raw"`
@@ -93,6 +92,11 @@ type PostmanGetCollectionItemRequest struct {
 			Description string `json:"description"`
 		} `json:"query"`
 	} `json:"url"`
+
+	// We have to handle headers in post-processing, because sometimes they come in different shapes
+	// TODO - Actually do this
+	HeaderRaw string `json:"header"`
+	Header    []PostmanGetCollectionHeader
 }
 type PostmanCollectionEventJson struct {
 	Listen string `json:"listen"`
@@ -119,10 +123,14 @@ type PostmanCollectionItemJson struct {
 		Status                 string                          `json:"status"`
 		Code                   int8                            `json:"code"`
 		PostmanPreviewLanguage string                          `json:"_postman_previewlanguage"`
-		Header                 PostmanGetCollectionHeader      `json:"header"`
 		Cookie                 []struct{}                      `json:"cookie"`
 		ResponseTime           null.String                     `json:"responseTime"`
 		Body                   string                          `json:"body"`
+
+		// We have to handle headers in post-processing, because sometimes they come in different shapes
+		// TODO - Actually do this
+		HeaderRaw string `json:"header"`
+		Header    []PostmanGetCollectionHeader
 	} `json:"response"`
 	Item  []PostmanCollectionItemJson  `json:"item"`
 	Event []PostmanCollectionEventJson `json:"event"`
