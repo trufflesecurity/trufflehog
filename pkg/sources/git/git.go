@@ -3,6 +3,7 @@ package git
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -373,6 +374,10 @@ func GitURLParse(gitURL string) (*url.URL, error) {
 			return nil, originalError
 		}
 	}
+
+	// make sure the url does not contain any user information
+	parsedURL.User = nil
+
 	return parsedURL, nil
 }
 
@@ -412,16 +417,21 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	if err != nil {
 		return nil, err
 	}
-	if cloneURL.User == nil {
-		cloneURL.User = params.userInfo
+
+	var gitArgs []string
+
+	pass, ok := params.userInfo.Password()
+	if ok {
+		authHeader := base64.StdEncoding.EncodeToString(fmt.Appendf([]byte(""), "%s:%s", params.userInfo.Username(), pass))
+		gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", authHeader))
 	}
 
-	gitArgs := []string{
-		"clone",
+	gitArgs = append(gitArgs, "clone",
 		cloneURL.String(),
 		params.clonePath,
 		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
-	}
+	)
+
 	if !feature.SkipAdditionalRefs.Load() {
 		gitArgs = append(gitArgs,
 			"-c",
