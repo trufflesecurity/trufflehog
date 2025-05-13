@@ -74,7 +74,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				isVerified, verificationErr := verifyDatabricksToken(client, domain, token)
 				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr)
+				if verificationErr != nil {
+					if errors.Is(verificationErr, errNoHost) {
+						invalidHosts.Set(domain, struct{}{})
+						continue
+					}
+
+					s1.SetVerificationError(verificationErr)
+				}
 
 				if s1.Verified {
 					s1.AnalysisInfo = map[string]string{

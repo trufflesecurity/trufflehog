@@ -24,7 +24,7 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 	return analyzers.AnalyzerTypeDataBricks
 }
 
-func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	token, exist := credInfo["token"]
 	if !exist {
 		return nil, fmt.Errorf("key not found in credential info")
@@ -35,7 +35,7 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 		return nil, fmt.Errorf("domain not found in credential info")
 	}
 
-	info, err := AnalyzePermissions(a.Cfg, domain, token)
+	info, err := AnalyzePermissions(ctx, a.Cfg, domain, token)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,9 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, domain, token string) {
-	info, err := AnalyzePermissions(cfg, domain, token)
+	ctx := context.Background()
+
+	info, err := AnalyzePermissions(ctx, cfg, domain, token)
 	if err != nil {
 		// just print the error in cli and continue as a partial success
 		color.Red("[x] Error : %s", err.Error())
@@ -68,25 +70,25 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, domain, token string) {
 	color.Yellow("\n[i] Expires: %s", "N/A (Refer to Token Information Table)")
 }
 
-func AnalyzePermissions(cfg *config.Config, domain, token string) (*SecretInfo, error) {
+func AnalyzePermissions(ctx context.Context, cfg *config.Config, domain, token string) (*SecretInfo, error) {
 	client := analyzers.NewAnalyzeClient(cfg)
 
 	var secretInfo = &SecretInfo{}
 
-	if err := captureUserInfo(client, domain, token, secretInfo); err != nil {
+	if err := captureUserInfo(ctx, client, domain, token, secretInfo); err != nil {
 		return nil, err
 	}
 
-	if err := captureTokensInfo(client, domain, token, secretInfo); err != nil {
+	if err := captureTokensInfo(ctx, client, domain, token, secretInfo); err != nil {
 		return secretInfo, err
 	}
 
-	if err := captureTokenPermissions(client, domain, token, secretInfo); err != nil {
+	if err := captureTokenPermissions(ctx, client, domain, token, secretInfo); err != nil {
 		return secretInfo, err
 	}
 
 	// capture resources
-	if err := captureDataBricksResources(client, domain, token, secretInfo); err != nil {
+	if err := captureDataBricksResources(ctx, client, domain, token, secretInfo); err != nil {
 		return secretInfo, err
 	}
 

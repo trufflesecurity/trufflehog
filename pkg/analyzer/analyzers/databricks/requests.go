@@ -2,13 +2,20 @@ package databricks
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 var (
+	// ErrUnauthorized is returned when the Databricks API answers with HTTP-401.
+	errUnAuthorized = errors.New("invalid/expired personal access token")
+
 	apiEndpoints = map[ResourceType]string{
 		CurrentUser:      "/api/2.0/preview/scim/v2/Me",
 		TokensInfo:       "/api/2.0/token-management/tokens",
@@ -27,354 +34,260 @@ var (
 	}
 )
 
-// makeDataBricksRequest send the API request to passed url with passed key as access token and return response body and status code
-func makeDataBricksRequest(client *http.Client, endpoint, token string) ([]byte, int, error) {
-	// create request
-	req, err := http.NewRequest(http.MethodGet, "https://"+endpoint, http.NoBody)
-	if err != nil {
-		return nil, 0, err
+// doAndDecode performs an authenticated GET request against the constructed
+// Databricks URL and JSON-decodes the response into the supplied result.
+//
+// The generic type parameter T allows the caller to decide which concrete
+// struct the response should be unmarshalled into:
+func doAndDecode[T any](ctx context.Context, client *http.Client, domain string, rt ResourceType, token string, out *T) error {
+	u := url.URL{
+		Scheme: "https",
+		Host:   domain,
+		Path:   apiEndpoints[rt],
 	}
 
-	// add key in the header
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
+	if err != nil {
+		return fmt.Errorf("building request: %w", err)
+	}
 
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Accept", "application/json")
+
+	// Execute request and read / decode body. We stream directly into the
+	// decoder instead of loading the whole response into memory first.
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, 0, err
+		return fmt.Errorf("performing request: %w", err)
 	}
-
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}()
 
-	responseBodyByte, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, 0, err
-	}
+	switch resp.StatusCode {
+	case http.StatusOK:
+		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+			return fmt.Errorf("decoding response: %w", err)
+		}
 
-	return responseBodyByte, resp.StatusCode, nil
+		return nil
+	case http.StatusUnauthorized:
+		return errUnAuthorized
+	default:
+		return fmt.Errorf("unexpected status code %d for API %s", resp.StatusCode, apiEndpoints[rt])
+	}
 }
 
-func captureDataBricksResources(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	if err := captureRepos(client, domain, token, secretInfo); err != nil {
+func captureDataBricksResources(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	if err := captureRepos(ctx, client, domain, token, secretInfo); err != nil {
 		return err
 	}
 
-	if err := captureGitCreds(client, domain, token, secretInfo); err != nil {
+	if err := captureGitCreds(ctx, client, domain, token, secretInfo); err != nil {
 		return err
 	}
 
-	if err := captureJobs(client, domain, token, secretInfo); err != nil {
+	if err := captureJobs(ctx, client, domain, token, secretInfo); err != nil {
 		return err
 	}
 
-	if err := captureClusters(client, domain, token, secretInfo); err != nil {
+	if err := captureClusters(ctx, client, domain, token, secretInfo); err != nil {
 		return err
 	}
 
-	if err := captureGroups(client, domain, token, secretInfo); err != nil {
+	if err := captureGroups(ctx, client, domain, token, secretInfo); err != nil {
 		return err
 	}
 
-	if err := captureUsers(client, domain, token, secretInfo); err != nil {
+	if err := captureUsers(ctx, client, domain, token, secretInfo); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func captureUserInfo(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[CurrentUser], token)
-	if err != nil {
+func captureUserInfo(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	var user CurrentUserInfo
+
+	if err := doAndDecode(ctx, client, domain, CurrentUser, token, &user); err != nil {
 		return err
 	}
 
-	switch statusCode {
-	case http.StatusOK:
-		var user CurrentUserInfo
-
-		if err := json.Unmarshal(respBody, &user); err != nil {
-			return err
-		}
-
-		secretInfo.UserInfo = User{
-			ID:       user.ID,
-			UserName: user.UserName,
-		}
-
-		for _, email := range user.Emails {
-			if email.Primary {
-				secretInfo.UserInfo.PrimaryEmail = email.Value
-			}
-		}
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired personal access token")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	secretInfo.UserInfo = User{
+		ID:       user.ID,
+		UserName: user.UserName,
 	}
+
+	for _, email := range user.Emails {
+		if email.Primary {
+			secretInfo.UserInfo.PrimaryEmail = email.Value
+		}
+	}
+
+	return nil
 }
 
-func captureTokensInfo(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[TokensInfo], token)
-	if err != nil {
+func captureTokensInfo(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	var tokens Tokens
+
+	if err := doAndDecode(ctx, client, domain, TokensInfo, token, &tokens); err != nil {
 		return err
 	}
 
-	switch statusCode {
-	case http.StatusOK:
-		var tokens Tokens
-
-		if err := json.Unmarshal(respBody, &tokens); err != nil {
-			return err
-		}
-
-		for _, token := range tokens.TokensInfo {
-			t := Token{
-				ID:          token.ID,
-				Name:        token.Name,
-				ExpiryTime:  readableTime(token.ExpiryTime),
-				LastUsedDay: readableTime(token.LastUsedDay),
-				CreatedBy:   token.CreatedBy,
-			}
-
-			secretInfo.Tokens = append(secretInfo.Tokens, t)
-		}
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired personal access token")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	for _, t := range tokens.TokensInfo {
+		secretInfo.Tokens = append(secretInfo.Tokens, Token{
+			ID:          t.ID,
+			Name:        t.Name,
+			ExpiryTime:  readableTime(t.ExpiryTime),
+			LastUsedDay: readableTime(t.LastUsedDay),
+			CreatedBy:   t.CreatedBy,
+		})
 	}
+
+	return nil
 }
 
-func captureTokenPermissions(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[TokenPermissions], token)
-	if err != nil {
+func captureTokenPermissions(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	var permissions Permissions
+
+	if err := doAndDecode(ctx, client, domain, TokenPermissions, token, &permissions); err != nil {
 		return err
 	}
 
-	switch statusCode {
-	case http.StatusOK:
-		var permissions Permissions
-
-		if err := json.Unmarshal(respBody, &permissions); err != nil {
-			return err
-		}
-
-		for _, item := range permissions.PermissionLevels {
-			secretInfo.TokenPermissionLevels = append(secretInfo.TokenPermissionLevels, item.PermissionLevel)
-		}
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired personal access token")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	for _, item := range permissions.PermissionLevels {
+		secretInfo.TokenPermissionLevels = append(secretInfo.TokenPermissionLevels, item.PermissionLevel)
 	}
+
+	return nil
 }
 
-func captureRepos(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Repositories], token)
-	if err != nil {
+func captureRepos(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	var repos ReposResponse
+
+	if err := doAndDecode(ctx, client, domain, Repositories, token, &repos); err != nil {
 		return err
 	}
 
-	switch statusCode {
-	case http.StatusOK:
-		var repos ReposResponse
-
-		if err := json.Unmarshal(respBody, &repos); err != nil {
-			return err
+	for _, repo := range repos.Repositories {
+		if repo.ID == "" {
+			repo.ID = repo.URL
 		}
 
-		for _, repo := range repos.Repositories {
-			if repo.ID == "" {
-				repo.ID = repo.URL
-			}
-
-			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
-				ID:   repo.ID,
-				Name: repo.Path,
-				Type: Repositories.String(),
-				Metadata: map[string]string{
-					"provider": repo.Provider,
-					"url":      repo.URL,
-				},
-			})
-		}
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired personal access token")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+		secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+			ID:   repo.ID,
+			Name: repo.Path,
+			Type: Repositories.String(),
+			Metadata: map[string]string{
+				"provider": repo.Provider,
+				"url":      repo.URL,
+			},
+		})
 	}
+
+	return nil
 }
 
-func captureGitCreds(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[GitCredentials], token)
-	if err != nil {
+func captureGitCreds(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	var creds GitCreds
+
+	if err := doAndDecode(ctx, client, domain, GitCredentials, token, &creds); err != nil {
 		return err
 	}
 
-	switch statusCode {
-	case http.StatusOK:
-		var creds GitCreds
-
-		if err := json.Unmarshal(respBody, &creds); err != nil {
-			return err
-		}
-
-		for _, credential := range creds.Credentials {
-			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
-				ID:   credential.ID,
-				Name: credential.UserName,
-				Type: GitCredentials.String(),
-				Metadata: map[string]string{
-					"provider": credential.Provider,
-				},
-			})
-		}
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired personal access token")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	for _, credential := range creds.Credentials {
+		secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+			ID:   credential.ID,
+			Name: credential.UserName,
+			Type: GitCredentials.String(),
+			Metadata: map[string]string{
+				"provider": credential.Provider,
+			},
+		})
 	}
+
+	return nil
 }
 
-func captureJobs(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Jobs], token)
-	if err != nil {
+func captureJobs(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	var jobs JobsResponse
+
+	if err := doAndDecode(ctx, client, domain, Jobs, token, &jobs); err != nil {
 		return err
 	}
 
-	switch statusCode {
-	case http.StatusOK:
-		var jobs JobsResponse
-
-		if err := json.Unmarshal(respBody, &jobs); err != nil {
-			return err
-		}
-
-		for _, job := range jobs.Jobs {
-			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
-				ID:   job.ID,
-				Name: job.Name,
-				Type: Jobs.String(),
-				Metadata: map[string]string{
-					"description": job.Description,
-				},
-			})
-		}
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired personal access token")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	for _, job := range jobs.Jobs {
+		secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+			ID:   job.ID,
+			Name: job.Name,
+			Type: Jobs.String(),
+			Metadata: map[string]string{
+				"description": job.Description,
+			},
+		})
 	}
+
+	return nil
 }
 
-func captureClusters(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Clusters], token)
-	if err != nil {
+func captureClusters(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	var clusters ClustersResponse
+
+	if err := doAndDecode(ctx, client, domain, Clusters, token, &clusters); err != nil {
 		return err
 	}
 
-	switch statusCode {
-	case http.StatusOK:
-		var clusters ClustersResponse
-
-		if err := json.Unmarshal(respBody, &clusters); err != nil {
-			return err
-		}
-
-		for _, cluster := range clusters.Clusters {
-			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
-				ID:   cluster.ID,
-				Name: cluster.Name,
-				Type: Clusters.String(),
-				Metadata: map[string]string{
-					"created by": cluster.CreatedBy,
-				},
-			})
-		}
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired personal access token")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	for _, cluster := range clusters.Clusters {
+		secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+			ID:   cluster.ID,
+			Name: cluster.Name,
+			Type: Clusters.String(),
+			Metadata: map[string]string{
+				"created by": cluster.CreatedBy,
+			},
+		})
 	}
+
+	return nil
 }
 
-func captureGroups(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Groups], token)
-	if err != nil {
+func captureGroups(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	var groups GroupsResponse
+
+	if err := doAndDecode(ctx, client, domain, Groups, token, &groups); err != nil {
 		return err
 	}
 
-	switch statusCode {
-	case http.StatusOK:
-		var groups GroupsResponse
-
-		if err := json.Unmarshal(respBody, &groups); err != nil {
-			return err
-		}
-
-		for _, group := range groups.Resources {
-			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
-				ID:   group.ID,
-				Name: group.Name,
-				Type: Groups.String(),
-			})
-		}
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired personal access token")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	for _, group := range groups.Resources {
+		secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+			ID:   group.ID,
+			Name: group.Name,
+			Type: Groups.String(),
+		})
 	}
+
+	return nil
 }
 
-func captureUsers(client *http.Client, domain, token string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeDataBricksRequest(client, domain+apiEndpoints[Users], token)
-	if err != nil {
+func captureUsers(ctx context.Context, client *http.Client, domain, token string, secretInfo *SecretInfo) error {
+	var users UsersResponse
+
+	if err := doAndDecode(ctx, client, domain, Users, token, &users); err != nil {
 		return err
 	}
 
-	switch statusCode {
-	case http.StatusOK:
-		var users UsersResponse
-
-		if err := json.Unmarshal(respBody, &users); err != nil {
-			return err
-		}
-
-		for _, user := range users.Resources {
-			secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
-				ID:   user.ID,
-				Name: user.UserName,
-				Type: Users.String(),
-				Metadata: map[string]string{
-					"active": fmt.Sprintf("%t", user.Active),
-				},
-			})
-		}
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired personal access token")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, apiEndpoints[CurrentUser])
+	for _, user := range users.Resources {
+		secretInfo.Resources = append(secretInfo.Resources, DataBricksResource{
+			ID:   user.ID,
+			Name: user.UserName,
+			Type: Users.String(),
+			Metadata: map[string]string{
+				"active": fmt.Sprintf("%t", user.Active),
+			},
+		})
 	}
+
+	return nil
 }
 
 func readableTime(timestamp int) string {
