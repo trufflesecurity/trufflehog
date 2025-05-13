@@ -13,7 +13,7 @@ import (
 )
 
 type Scanner struct {
-	client *http.Client
+	Client *http.Client
 }
 
 const accuweatherURL = "https://dataservice.accuweather.com"
@@ -35,27 +35,24 @@ func (s Scanner) Keywords() []string {
 	return []string{"accuweather"}
 }
 
+func (s Scanner) Version() int { return 1 }
+
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
+	if s.Client != nil {
+		return s.Client
 	}
 	return defaultClient
 }
 
 // FromData will find and optionally verify Accuweather secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	matches := keyPat.FindAllStringSubmatch(string(data), -1)
+	return s.ProcessMatches(ctx, matches, verify)
+}
 
-	matches := make(map[string]struct{})
-	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		k := match[1]
-		if detectors.StringShannonEntropy(k) < requiredShannonEntropy {
-			continue
-		}
-		matches[k] = struct{}{}
-	}
-
-	for key := range matches {
+func (s Scanner) ProcessMatches(ctx context.Context, matches [][]string, verify bool) (results []detectors.Result, err error) {
+	uniqueMatches := getUniqueMatches(matches)
+	for key := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Accuweather,
 			Raw:          []byte(key),
@@ -71,7 +68,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return
+}
+
+func getUniqueMatches(allMatches [][]string) map[string]struct{} {
+	uniqueMatches := map[string]struct{}{}
+	for _, match := range allMatches {
+		k := match[1]
+		if detectors.StringShannonEntropy(k) < requiredShannonEntropy {
+			continue
+		}
+		uniqueMatches[k] = struct{}{}
+	}
+	return uniqueMatches
 }
 
 func verifyAccuweather(ctx context.Context, client *http.Client, key string) (bool, error) {
