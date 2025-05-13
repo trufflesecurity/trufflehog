@@ -60,19 +60,6 @@
     }
   },
   {
-    "id": "5e605652-dd12-11e8-9e53-375565b8970e",
-    "name": "logs_read_index_data",
-    "title": "Logs Read Index Data",
-    "description": "Read log data, possibly scoped to one or more indexes. In order to read log data, a user must have both this permission and Logs Read Data.",
-    "test": {
-      "endpoint": "/v1/logs-indexes",
-      "method": "GET",
-      "valid_statuses": [200, 404, 429],
-      "invalid_statuses": [403],
-      "absent_in_docs": true
-    }
-  },
-  {
     "id": "62cc036c-dd12-11e8-9e54-db9995643092",
     "name": "logs_modify_indexes",
     "title": "Logs Modify Indexes",
@@ -85,32 +72,6 @@
     }
   },
   {
-    "id": "6f66600e-dd12-11e8-9e55-7f30fbb45e73",
-    "name": "logs_live_tail",
-    "title": "Logs Live Tail",
-    "description": "View the live tail feed for all log indexes, even if otherwise specifically restricted.",
-    "test": {
-      "endpoint": "/v1/logs-livetail",
-      "method": "GET",
-      "valid_statuses": [200, 404, 429],
-      "invalid_statuses": [403],
-      "absent_in_docs": true
-    }
-  },
-  {
-    "id": "7d7c98ac-dd12-11e8-9e56-93700598622d",
-    "name": "logs_write_exclusion_filters",
-    "title": "Logs Write Exclusion Filters",
-    "description": "Add and change exclusion filters for all or some log indexes.",
-    "test": {
-      "endpoint": "/v1/logs-indexes/exclusion-filters",
-      "method": "POST",
-      "valid_statuses": [200, 400, 404, 429],
-      "invalid_statuses": [403],
-      "absent_in_docs": true
-    }
-  },
-  {
     "id": "811ac4ca-dd12-11e8-9e57-676a7f0beef9",
     "name": "logs_write_pipelines",
     "title": "Logs Write Pipelines",
@@ -120,19 +81,6 @@
       "method": "DELETE",
       "valid_statuses": [200, 400, 404, 429],
       "invalid_statuses": [403]
-    }
-  },
-  {
-    "id": "84aa3ae4-dd12-11e8-9e58-a373a514ccd0",
-    "name": "logs_write_processors",
-    "title": "Logs Write Processors",
-    "description": "Add and change some or all log processor configurations.",
-    "test": {
-      "endpoint": "/v1/logs/config/processors",
-      "method": "POST",
-      "valid_statuses": [200, 400, 404, 429],
-      "invalid_statuses": [403],
-      "absent_in_docs": true
     }
   },
   {
@@ -256,6 +204,42 @@
     }
   },
   {
+    "id": "46a301da-ec5c-11ea-aa9f-73bedeab67ee",
+    "title": "User App Keys",
+    "name": "user_app_keys",
+    "description": "View and manage Application Keys owned by the user.",
+    "test": {
+      "endpoint": "/v2/current_user/application_keys/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "46a301db-ec5c-11ea-aa9f-2fe72193d60e",
+    "name": "org_app_keys_read",
+    "title": "Org App Keys Read",
+    "description": "View Application Keys owned by all users in the organization.",
+    "test": {
+      "endpoint": "/v2/application_keys",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "46a301dc-ec5c-11ea-aa9f-13b33f8f46ea",
+    "name": "org_app_keys_write",
+    "title": "Org App Keys Write",
+    "description": "Manage Application Keys owned by all users in the organization.",
+    "test": {
+      "endpoint": "/v2/application_keys/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
     "id": "9de604d8-e707-11ea-aa9f-93f1a783b3a3",
     "name": "user_access_manage",
     "title": "User Access Manage",
@@ -324,6 +308,30 @@
       "endpoint": "/v2/audit/events",
       "method": "GET",
       "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "372896c4-f923-11ea-adbc-4fecd107156d",
+    "name": "api_keys_read",
+    "title": "API Keys Read",
+    "description": "List and retrieve the key values of all API Keys in your organization.",
+    "test": {
+      "endpoint": "/v2/api_keys",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "3e4d4d28-f923-11ea-adbc-e3565938c12e",
+    "name": "api_keys_write",
+    "title": "API Keys Write",
+    "description": "Create and rename API Keys for your organization.",
+    "test": {
+      "endpoint": "/v2/api_keys/does-not-exist",
+      "method": "PATCH",
+      "valid_statuses": [200, 400, 404, 429],
       "invalid_statuses": [403]
     }
   },
@@ -398,5 +406,413 @@
       "valid_statuses": [200, 400, 404, 429],
       "invalid_statuses": [403]
     }
-  }
+  },
+  {
+    "id": "417ba636-2dce-11eb-84c0-6bce5b0d9de0",
+    "name": "apm_read",
+    "title": "APM Read",
+    "description": "Read and query APM and Trace Analytics.",
+    "test": {
+      "endpoint": "/v2/apm/config/metrics",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "43fa188e-2dce-11eb-84c0-835ad1fd6287",
+    "name": "apm_retention_filter_read",
+    "title": "APM Retention Filters Read",
+    "description": "Read trace retention filters. A user with this permission can view the retention filters page, list of filters, their statistics, and creation info.",
+    "test": {
+      "endpoint": "/v2/apm/config/retention-filters/should-not-exist",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "465cfe66-2dce-11eb-84c0-6baa888239fa",
+    "name": "apm_retention_filter_write",
+    "title": "APM Retention Filters Write",
+    "description": "Create, edit, and delete trace retention filters. A user with this permission can create new retention filters, and update or delete to existing retention filters.",
+    "test": {
+      "endpoint": "/v2/apm/config/retention-filters/should-not-exit",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "8106300a-54f7-11eb-8cbc-7781a434a67b",
+    "name": "rum_apps_write",
+    "title": "RUM Apps Write",
+    "description": "Create, edit, and delete RUM applications. Creating a RUM application automatically generates a Client Token. In order to create Client Tokens directly, a user needs the Client Tokens Write permission.",
+    "test": {
+      "endpoint": "/v2/rum/applications/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "bf0dcf7c-90af-11eb-9b82-da7ad0900002",
+    "name": "data_scanner_read",
+    "title": "Data Scanner Read",
+    "description": "View Sensitive Data Scanner configurations and scanning results.",
+    "test": {
+      "endpoint": "/v2/sensitive-data-scanner/config/standard-patterns",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "bf0dcf7d-90af-11eb-9b82-da7ad0900002",
+    "name": "data_scanner_write",
+    "title": "Data Scanner Write",
+    "description": "Edit Sensitive Data Scanner configurations.",
+    "test": {
+      "endpoint": "/v2/sensitive-data-scanner/config/groups/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "7df222b6-a45c-11eb-a0af-da7ad0900002",
+    "name": "org_management",
+    "title": "Org Management",
+    "description": "Edit org configurations, including authentication and certain security preferences such as configuring SAML, renaming an org, configuring allowed login methods, creating child orgs, subscribing & unsubscribing from apps in the marketplace, and enabling & disabling Remote Configuration for the entire organization.",
+    "test": {
+      "endpoint": "/v1/org",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "98b984f4-b16d-11eb-a2c6-da7ad0900002",
+    "name": "security_monitoring_filters_read",
+    "title": "Security Filters Read",
+    "description": "Read Security Filters.",
+    "test": {
+      "endpoint": "/v2/security_monitoring/configuration/security_filters",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "98b984f5-b16d-11eb-a2c6-da7ad0900002",
+    "name": "security_monitoring_filters_write",
+    "title": "Security Filters Write",
+    "description": "Create, edit, and delete Security Filters.",
+    "test": {
+      "endpoint": "/v2/security_monitoring/configuration/security_filters/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "12efc20e-d36c-11eb-a9b8-da7ad0900002",
+    "name": "incident_read",
+    "title": "Incidents Read",
+    "description": "View incidents in Datadog.",
+    "test": {
+      "endpoint": "/v2/incidents",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "12efc211-d36c-11eb-a9b8-da7ad0900002",
+    "name": "incident_write",
+    "title": "Incidents Write",
+    "description": "Create, view, and manage incidents in Datadog.",
+    "test": {
+      "endpoint": "/v2/incidents/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "12efc210-d36c-11eb-a9b8-da7ad0900002",
+    "name": "incident_settings_write",
+    "title": "Incident Settings Write",
+    "description": "Configure Incident Settings.",
+    "test": {
+      "endpoint": "/v2/incidents/config/types/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "aa7ccb44-fa13-11eb-b17c-da7ad0900005",
+    "name": "rum_apps_read",
+    "title": "RUM Apps Read",
+    "description": "View RUM Applications data.",
+    "test": {
+      "endpoint": "/v2/rum/applications",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "1ba2f2d8-16c7-11ec-b77d-da7ad0900005",
+    "name": "security_monitoring_notification_profiles_read",
+    "title": "Security Notification Rules Read",
+    "description": "Read Notification Rules.",
+    "test": {
+      "endpoint": "/v2/security/signals/notification_rules",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "1ba4caa4-16c7-11ec-b77d-da7ad0900005",
+    "name": "security_monitoring_notification_profiles_write",
+    "title": "Security Notification Rules Write",
+    "description": "Create, edit, and delete Notification Rules.",
+    "test": {
+      "endpoint": "/v2/security/signals/notification_rules/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "34438974-1703-11ec-952 1-da7ad0900005",
+    "name": "apm_generate_metrics",
+    "title": "APM Generate Metrics",
+    "description": "Create custom metrics from spans.",
+    "test": {
+      "endpoint": "/v2/apm/config/metrics/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "0c07b512-56a4-11ec-9d67-da7ad0900005",
+    "name": "apm_pipelines_write",
+    "title": "APM Pipelines Write",
+    "description": "Add and change APM pipeline configurations.",
+    "test": {
+      "endpoint": "/v2/apm/config/retention-filters/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "e2371690-574f-11ec-9b69-da7ad0900005",
+    "name": "apm_pipelines_read",
+    "title": "APM Pipelines Read",
+    "description": "View APM pipeline configurations.",
+    "test": {
+      "endpoint": "/v2/apm/config/retention-filters",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "8dbe76fe-5884-11ec-82c1-da7ad0900005",
+    "name": "observability_pipelines_read",
+    "title": "Observability Pipelines Read",
+    "description": "View pipelines in your organization.",
+    "test": {
+      "endpoint": "/v2/remote_config/products/obs_pipelines/pipelines",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "0fc8e272-8500-11ec-9176-da7ad0900005",
+    "name": "workflows_read",
+    "title": "Workflows Read",
+    "description": "View workflows.",
+    "test": {
+      "endpoint": "/v2/workflows/does-not-exist",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "0fc97610-8500-11ec-9176-da7ad0900005",
+    "name": "workflows_write",
+    "title": "Workflows Write",
+    "description": "Create, edit, and delete workflows.",
+    "test": {
+      "endpoint": "/v2/workflows/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "0fc93150-8500-11ec-9176-da7ad0900005",
+    "name": "workflows_run",
+    "title": "Workflows Run",
+    "description": "Run workflows.",
+    "test": {
+      "endpoint": "/v2/workflows/should-not-exist/instances",
+      "method": "POST",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "0fc821fc-8500-11ec-9176-da7ad0900005",
+    "name": "connections_read",
+    "title": "Connections Read",
+    "description": "List and view available connections. Connections contain secrets that cannot be revealed.",
+    "test": {
+      "endpoint": "/v2/actions/connections/does-not-exist",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "0fc894fc-8500-11ec-9176-da7ad0900005",
+    "name": "connections_write",
+    "title": "Connections Write",
+    "description": "Create and delete connections.",
+    "test": {
+      "endpoint": "/v2/actions/connections/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "caea6b48-9a59-11ec-b6fc-da7ad0900005",
+    "name": "notebooks_read",
+    "title": "Notebooks Read",
+    "description": "View notebooks.",
+    "test": {
+      "endpoint": "/v1/notebooks",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "caeae1ea-9a59-11ec-b6fc-da7ad0900005",
+    "name": "notebooks_write",
+    "title": "Notebooks Write",
+    "description": "Create and change notebooks.",
+    "test": {
+      "endpoint": "/v1/notebooks/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "6df70e30-c59e-11ec-9bfe-da7ad0900005",
+    "name": "aws_configurations_manage",
+    "title": "AWS Configurations Manage",
+    "description": "Add or remove but not edit AWS integration configurations.",
+    "test": {
+      "endpoint": "/v2/integration/aws/accounts/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "6df8034e-c59e-11ec-9bfe-da7ad0900005",
+    "name": "azure_configurations_manage",
+    "title": "Azure Configurations Manage",
+    "description": "Add or remove but not edit Azure integration configurations.",
+    "test": {
+      "endpoint": "/v1/integration/azure",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "6df7a0de-c59e-11ec-9bfe-da7ad0900005",
+    "name": "gcp_configurations_manage",
+    "title": "GCP Configurations Manage",
+    "description": "Add or remove but not edit GCP integration configurations.",
+    "test": {
+      "endpoint": "/v2/integration/gcp/accounts/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "6df8628a-c59e-11ec-9bfe-da7ad0900005",
+    "name": "manage_integrations",
+    "title": "Integrations Manage",
+    "description": "Install, uninstall, and configure integrations.",
+    "test": {
+      "endpoint": "/v2/integrations/cloudflare/accounts/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "eee67f20-e746-11ec-a905-da7ad0900005",
+    "name": "slos_read",
+    "title": "SLOs Read",
+    "description": "View SLOs and status corrections.",
+    "test": {
+      "endpoint": "/v1/slo",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "eee6d434-e746-11ec-a905-da7ad0900005",
+    "name": "slos_write",
+    "title": "SLOs Write",
+    "description": "Create, edit, and delete SLOs.",
+    "test": {
+      "endpoint": "/v1/slo/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "eee61788-e746-11ec-a905-da7ad0900005",
+    "name": "slos_corrections",
+    "title": "SLOs Status Corrections",
+    "description": "Apply, edit, and delete SLO status corrections. A user with this permission can make status corrections, even if they do not have permission to edit those SLOs.",
+    "test": {
+      "endpoint": "/v1/slo/correction",
+      "method": "POST",
+      "valid_statuses": [400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "id": "279926d0-f311-11ec-9321-da7ad0900005",
+    "name": "monitor_config_policy_write",
+    "title": "Monitor Configuration Policy Write",
+    "description": "Create, update, and delete monitor configuration policies.",
+    "test": {
+      "endpoint": "/v2/monitor/policy/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  }  
 ]

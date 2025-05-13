@@ -57,8 +57,6 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string, appKey string
 	printUser(info.User)
 	printResources(info.Resources)
 	printPermissions(info.Permissions)
-
-	color.Yellow("\n[!] Expires: Never")
 }
 
 // AnalyzePermissions will collect all the scopes assigned to token along with resource it can access
@@ -69,15 +67,17 @@ func AnalyzePermissions(cfg *config.Config, apiKey string, appKey string) (*Secr
 	var secretInfo = &SecretInfo{}
 
 	// capture user information in secretInfo
-	if err := CaptureUserInformation(client, apiKey, appKey, secretInfo); err != nil {
-		return nil, fmt.Errorf("failed to fetch current user: %v", err)
-	}
+	// If the application key is scoped, user information cannot be retrieved even if all the permissions are granted
+	// This is a non-documented Endpoint and can lead to unexpected behavior in future updates
+	// If user information is not retrieved, we will move ahead with the rest of the analysis and print the error
+	CaptureUserInformation(client, apiKey, appKey, secretInfo)
 
 	// capture resources in secretInfo
 	if err := CaptureResources(client, apiKey, appKey, secretInfo); err != nil {
 		return nil, fmt.Errorf("failed to fetch resources: %v", err)
 	}
 
+	// capture permissions in secretInfo
 	if err := CapturePermissions(client, apiKey, appKey, secretInfo); err != nil {
 		return nil, fmt.Errorf("failed to fetch permissions: %v", err)
 	}
@@ -129,6 +129,11 @@ func secretInfoResourceToAnalyzerResource(resource Resource) *analyzers.Resource
 }
 
 func printUser(user User) {
+	if user.Id == "" {
+		color.Red("\n[x] User information not available")
+		return
+	}
+
 	color.Green("\n[i] User Information:")
 	userTable := table.NewWriter()
 	userTable.SetOutputMirror(os.Stdout)
@@ -138,6 +143,11 @@ func printUser(user User) {
 }
 
 func printResources(resources []Resource) {
+	if len(resources) == 0 {
+		color.Red("[x] No resources found")
+		return
+	}
+
 	color.Green("\n[i] Resources:")
 	resourceTable := table.NewWriter()
 	resourceTable.SetOutputMirror(os.Stdout)
@@ -152,6 +162,11 @@ func printResources(resources []Resource) {
 }
 
 func printPermissions(permissions []Permission) {
+	if len(permissions) == 0 {
+		color.Red("[x] No permissions found")
+		return
+	}
+
 	color.Green("\n[i] Permissions:")
 	permissionTable := table.NewWriter()
 	permissionTable.SetOutputMirror(os.Stdout)

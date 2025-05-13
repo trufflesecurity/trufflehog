@@ -42,7 +42,6 @@ type HttpStatusTest struct {
 	Endpoint        string `json:"endpoint"`
 	ValidStatuses   []int  `json:"valid_statuses"`
 	InvalidStatuses []int  `json:"invalid_statuses"`
-	AbsentInDocs    bool   `json:"absent_in_docs"`
 }
 
 // Scope represents a permission scope with a test
@@ -96,8 +95,6 @@ func (h *HttpStatusTest) RunTest(client *http.Client, headers map[string]string)
 	appKey := headers[appKeyHeader]
 
 	_, statusCode, err := makeDataDogRequest(client, h.Endpoint, h.Method, apiKey, appKey)
-	fmt.Printf("Status code: %d\n", statusCode)
-	fmt.Printf("\n\n")
 
 	if err != nil {
 		fmt.Printf("Error making request: %v\n", err)
@@ -181,9 +178,6 @@ func CapturePermissions(client *http.Client, apiKey string, appKey string, secre
 	}
 
 	for _, scope := range scopes {
-		if scope.HttpTest.AbsentInDocs {
-			continue
-		}
 		status, err := scope.HttpTest.RunTest(client, headers)
 		if err != nil {
 			return fmt.Errorf("running test for scope %s: %w", scope.Name, err)
