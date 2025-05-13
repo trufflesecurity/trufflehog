@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/repeale/fp-go"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/volatiletech/null/v8"
 	"golang.org/x/time/rate"
 	"io"
 	"net/http"
@@ -16,12 +15,6 @@ import (
 const (
 	POSTMAN_API_BASE_URL = "https://api.postman.com"
 )
-
-// *****************************************************
-// *****************************************************
-// Primary Exported Objects
-// *****************************************************
-// *****************************************************
 
 // *****************************************************
 // *****************************************************
@@ -64,48 +57,7 @@ type PostmanApiResponse_GetWorkspaceListResponse_429 struct {
 // https://www.postman.com/postman/postman-public-workspace/documentation/i2uqzpp/postman-api?entity=request-3a56b6f8-8d0c-410f-a933-03e26589c742
 // *****************************************************
 type PostmanApiResponse_GetWorkspaceResponse_200 struct {
-	Workspace struct {
-		Id          string `json:"id"`
-		Name        string `json:"name"`
-		Type        string `json:"type"`
-		Description string `json:"description"`
-		Visibility  string `json:"visibility"`
-		CreatedBy   string `json:"createdBy"`
-		UpdatedBy   string `json:"updatedBy"`
-		CreatedAt   string `json:"createdAt"`
-		UpdatedAt   string `json:"updatedAt"`
-		Collections []struct {
-			Id   string `json:"id"`
-			Name string `json:"name"`
-			Uid  string `json:"uid"`
-		} `json:"collections"`
-		Environments []struct {
-			Id   string `json:"id"`
-			Name string `json:"name"`
-			Uid  string `json:"uid"`
-		} `json:"environments"`
-		Mocks []struct {
-			Id          string `json:"id"`
-			Name        string `json:"name"`
-			Uid         string `json:"uid"`
-			Deactivated bool   `json:"deactivated"`
-		} `json:"mocks"`
-		Monitors []struct {
-			Id          string `json:"id"`
-			Name        string `json:"name"`
-			Uid         string `json:"uid"`
-			Deactivated bool   `json:"deactivated"`
-		} `json:"monitors"`
-		Apis []struct {
-			Id   string `json:"id"`
-			Name string `json:"name"`
-			Uid  string `json:"uid"`
-		} `json:"apis"`
-		Scim struct {
-			CreatedBy string `json:"createdBy"`
-			UpdatedBy string `json:"updatedBy"`
-		} `json:"scim"`
-	} `json:"workspace"`
+	PostmanWorkspaceJson
 }
 type PostmanApiResponse_GetWorkspaceResponse_401 struct {
 	Error struct {
@@ -140,26 +92,7 @@ type PostmanApiResponse_GetWorkspaceResponse_429 struct {
 // https://www.postman.com/postman/postman-public-workspace/documentation/i2uqzpp/postman-api?entity=request-a6a282df-907e-438b-8fe6-e5efaa60b8bf
 // *****************************************************
 type PostmanApiResponse_GetCollectionResponse_200 struct {
-	Collection struct {
-		Info struct {
-			PostmanId     string `json:"_postman_id"`
-			Name          string `json:"name"`
-			Description   string `json:"description"`
-			Schema        string `json:"schema"`
-			UpdatedAt     string `json:"updatedAt"`
-			CreatedAt     string `json:"createdAt"`
-			LastUpdatedBy string `json:"lastUpdatedBy"`
-			Uid           string `json:"uid"`
-		} `json:"collection"`
-		Auth     PostmanApiResponse_GetCollectionResponse_Auth        `json:"auth"`
-		Item     []PostmanApiResponse_GetCollectionResponse_Item      `json:"item"`
-		Event    []PostmanApiResponse_GetCollectionResponse_ItemEvent `json:"event"`
-		Variable []struct {
-			Key   string `json:"key"`
-			Value string `json:"value"`
-			Type  string `json:"type"`
-		} `json:"variable"`
-	} `json:"collection"`
+	PostmanCollectionJson
 }
 type PostmanApiResponse_GetCollectionResponse_401 struct {
 	Error struct {
@@ -178,98 +111,12 @@ type PostmanApiResponse_GetCollectionResponse_429 struct {
 	Message string `json:"message"`
 }
 
-type PostmanApiResponse_GetCollectionResponse_Header struct {
-	Key         string `json:"key"`
-	Value       string `json:"value"`
-	Type        string `json:"type"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-type PostmanApiResponse_GetCollectionResponse_ItemRequest struct {
-	Auth   PostmanApiResponse_GetCollectionResponse_Auth     `json:"auth"`
-	Method string                                            `json:"method"`
-	Header []PostmanApiResponse_GetCollectionResponse_Header `json:"header"`
-	Body   struct {
-		Mode    string `json:"mode"`
-		Raw     string `json:"raw"`
-		Options struct {
-			Raw struct {
-				Language string `json:"language"`
-			} `json:"raw"`
-		} `json:"options"`
-	} `json:"body"`
-	Url struct {
-		Raw      string   `json:"raw"`
-		Protocol string   `json:"protocol"`
-		Host     []string `json:"host"`
-		Path     []string `json:"path"`
-		Query    []struct {
-			Key         string `json:"key"`
-			Value       string `json:"value"`
-			Description string `json:"description"`
-		} `json:"query"`
-	} `json:"url"`
-}
-type PostmanApiResponse_GetCollectionResponse_ItemEvent struct {
-	Listen string `json:"listen"`
-	Script struct {
-		Type string   `json:"type"`
-		Exec []string `json:"exec"`
-	} `json:"script"`
-}
-type PostmanApiResponse_GetCollectionResponse_Item struct {
-	Name                    string                                        `json:"name"`
-	Id                      string                                        `json:"id"`
-	Uid                     string                                        `json:"uid"`
-	Description             string                                        `json:"description"`
-	Auth                    PostmanApiResponse_GetCollectionResponse_Auth `json:"auth"`
-	ProtocolProfileBehavior struct {
-		DisableBodyPruning bool `json:"disableBodyPruning"`
-	} `json:"protocolProfileBehavior"`
-	Request  PostmanApiResponse_GetCollectionResponse_ItemRequest `json:"request"`
-	Response []struct {
-		Id                     string                                               `json:"id"`
-		Uid                    string                                               `json:"uid"`
-		Name                   string                                               `json:"name"`
-		OriginalRequest        PostmanApiResponse_GetCollectionResponse_ItemRequest `json:"originalRequest"`
-		Status                 string                                               `json:"status"`
-		Code                   int8                                                 `json:"code"`
-		PostmanPreviewLanguage string                                               `json:"_postman_previewlanguage"`
-		Header                 PostmanApiResponse_GetCollectionResponse_Header      `json:"header"`
-		Cookie                 []struct{}                                           `json:"cookie"`
-		ResponseTime           null.String                                          `json:"responseTime"`
-		Body                   string                                               `json:"body"`
-	} `json:"response"`
-	Item  []PostmanApiResponse_GetCollectionResponse_Item      `json:"item"`
-	Event []PostmanApiResponse_GetCollectionResponse_ItemEvent `json:"event"`
-}
-type PostmanApiResponse_GetCollectionResponse_Auth struct {
-	Type   string `json:"type"`
-	ApiKey []struct {
-		Key   string `json:"key"`
-		Value string `json:"value"`
-		Type  string `json:"type"`
-	} `json:"apikey"`
-}
-
 // PostmanApiResponse_GetEnvironmentResponse_200
 // *****************************************************
 // GET /environments/{UID}
 // *****************************************************
 type PostmanApiResponse_GetEnvironmentResponse_200 struct {
-	Environment struct {
-		Id        string `json:"id"`
-		Name      string `json:"name"`
-		Owner     string `json:"owner"`
-		CreatedAt string `json:"createdAt"`
-		UpdatedAt string `json:"updatedAt"`
-		Values    []struct {
-			Key     string `json:"key"`
-			Value   string `json:"value"`
-			Enabled bool   `json:"enabled"`
-			Type    string `json:"type"`
-		} `json:"values"`
-	} `json:"environment"`
+	PostmanEnvironmentJson
 }
 type PostmanApiResponse_GetEnvironmentResponse_401 struct {
 	Error struct {
