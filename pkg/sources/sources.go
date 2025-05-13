@@ -385,7 +385,7 @@ type ElasticsearchConfig struct {
 	BestEffortScan bool
 }
 
-type PipeConfig struct{}
+type StdinConfig struct{}
 
 // Progress is used to update job completion progress across sources.
 type Progress struct {

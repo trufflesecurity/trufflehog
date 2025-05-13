@@ -52,7 +52,7 @@ enum SourceType {
   SOURCE_TYPE_GITHUB_EXPERIMENTAL = 37;
   SOURCE_TYPE_SENTRY = 38;
   SOURCE_TYPE_GITHUB_REALTIME = 39;
-  SOURCE_TYPE_PIPE = 40;
+  SOURCE_TYPE_STDIN = 40;
 }
 
 message LocalSource {
@@ -497,4 +497,4 @@ message Sentry {
   string projects = 6;
 }
 
-message Pipe {}
+message Stdin {}

@@ -6652,21 +6652,21 @@ var _ interface {
 	ErrorName() string
 } = SentryValidationError{}
 
-// Validate checks the field values on Pipe with the rules defined in the proto
-// definition for this message. If any rules are violated, the first error
-// encountered is returned, or nil if there are no violations.
-func (m *Pipe) Validate() error {
+// Validate checks the field values on Stdin with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Stdin) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on Pipe with the rules defined in the
+// ValidateAll checks the field values on Stdin with the rules defined in the
 // proto definition for this message. If any rules are violated, the result is
-// a list of violation errors wrapped in PipeMultiError, or nil if none found.
-func (m *Pipe) ValidateAll() error {
+// a list of violation errors wrapped in StdinMultiError, or nil if none found.
+func (m *Stdin) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *Pipe) validate(all bool) error {
+func (m *Stdin) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -6674,18 +6674,18 @@ func (m *Pipe) validate(all bool) error {
 	var errors []error
 
 	if len(errors) > 0 {
-		return PipeMultiError(errors)
+		return StdinMultiError(errors)
 	}
 
 	return nil
 }
 
-// PipeMultiError is an error wrapping multiple validation errors returned by
-// Pipe.ValidateAll() if the designated constraints aren't met.
-type PipeMultiError []error
+// StdinMultiError is an error wrapping multiple validation errors returned by
+// Stdin.ValidateAll() if the designated constraints aren't met.
+type StdinMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m PipeMultiError) Error() string {
+func (m StdinMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -6694,11 +6694,11 @@ func (m PipeMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m PipeMultiError) AllErrors() []error { return m }
+func (m StdinMultiError) AllErrors() []error { return m }
 
-// PipeValidationError is the validation error returned by Pipe.Validate if the
-// designated constraints aren't met.
-type PipeValidationError struct {
+// StdinValidationError is the validation error returned by Stdin.Validate if
+// the designated constraints aren't met.
+type StdinValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -6706,22 +6706,22 @@ type PipeValidationError struct {
 }
 
 // Field function returns field value.
-func (e PipeValidationError) Field() string { return e.field }
+func (e StdinValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e PipeValidationError) Reason() string { return e.reason }
+func (e StdinValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e PipeValidationError) Cause() error { return e.cause }
+func (e StdinValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e PipeValidationError) Key() bool { return e.key }
+func (e StdinValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e PipeValidationError) ErrorName() string { return "PipeValidationError" }
+func (e StdinValidationError) ErrorName() string { return "StdinValidationError" }
 
 // Error satisfies the builtin error interface
-func (e PipeValidationError) Error() string {
+func (e StdinValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -6733,14 +6733,14 @@ func (e PipeValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sPipe.%s: %s%s",
+		"invalid %sStdin.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = PipeValidationError{}
+var _ error = StdinValidationError{}
 
 var _ interface {
 	Field() string
@@ -6748,4 +6748,4 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = PipeValidationError{}
+} = StdinValidationError{}

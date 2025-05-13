@@ -1,4 +1,4 @@
-package pipe
+package stdin
 
 import (
 	"os"
@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const SourceType = sourcespb.SourceType_SOURCE_TYPE_PIPE
+const SourceType = sourcespb.SourceType_SOURCE_TYPE_STDIN
 
 type Source struct {
 	name     string
@@ -58,11 +58,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		SourceID:   s.SourceID(),
 		JobID:      s.JobID(),
 		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Filesystem{
-				Filesystem: &source_metadatapb.Filesystem{
-					File: "<stdin>",
-				},
-			},
+			Data: &source_metadatapb.MetaData_Stdin{},
 		},
 		Verify: s.verify,
 	}
