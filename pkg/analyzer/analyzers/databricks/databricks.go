@@ -4,7 +4,6 @@ package databricks
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -116,16 +115,20 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 				Type:               resource.Type,
 				Metadata:           map[string]any{}, // to avoid panic
 			},
-			Permission: analyzers.Permission{
-				Value: strings.Join(info.TokenPermissionLevels, ";"), // no fine grain access
-			},
 		}
 
 		for key, value := range resource.Metadata {
 			binding.Resource.Metadata[key] = value
 		}
 
-		result.Bindings = append(result.Bindings, binding)
+		// for each permission add a binding to resource
+		for _, perm := range info.TokenPermissionLevels {
+			binding.Permission = analyzers.Permission{
+				Value: perm,
+			}
+
+			result.Bindings = append(result.Bindings, binding)
+		}
 	}
 
 	return &result
