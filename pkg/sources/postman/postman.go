@@ -574,7 +574,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 	s.addKeywords(request.Url.Host)
 	originalType := metadata.Type
 
-	// Add in var procesisng for headers
+	// Add in var processing for headers
 	if request.Headers != nil {
 		vars := fp.Map(func(p struct{ Key, Value string }) VariableDatum {
 			return VariableDatum{Key: p.Key, Value: p.Value}

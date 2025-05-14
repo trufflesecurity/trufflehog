@@ -1,6 +1,10 @@
 package postman
 
-import "github.com/volatiletech/null/v8"
+import (
+	"encoding/json"
+	"github.com/repeale/fp-go"
+	"github.com/volatiletech/null/v8"
+)
 
 type PostmanWorkspaceJson struct {
 	Workspace struct {
@@ -135,13 +139,20 @@ type PostmanCollectionItemJson struct {
 	Item  []PostmanCollectionItemJson  `json:"item"`
 	Event []PostmanCollectionEventJson `json:"event"`
 }
+
+type CredentialJson struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+	Type  string `json:"type"`
+}
+
 type PostmanCollectionAuthJson struct {
-	Type   string `json:"type"`
-	ApiKey []struct {
-		Key   string `json:"key"`
-		Value string `json:"value"`
-		Type  string `json:"type"`
-	} `json:"apikey"`
+	Type   string           `json:"type"`
+	ApiKey []CredentialJson `json:"apikey"`
+	Bearer []CredentialJson `json:"bearer"`
+	AwsV4  []CredentialJson `json:"awsv4"`
+	Basic  []CredentialJson `json:"basic"`
+	OAuth2 []CredentialJson `json:"oauth2"`
 }
 type PostmanGetCollectionHeader struct {
 	Key         string `json:"key"`
@@ -169,8 +180,84 @@ type PostmanEnvironmentJson struct {
 }
 
 func GetCollectionFromJsonBytes(bytes []byte) (PostmanCollection, error) {
-	// TODO - Implement
-	return PostmanCollection{}, nil
+
+	var parsedJson PostmanCollectionJson
+	if err := json.Unmarshal(bytes, &parsedJson); err != nil {
+		return PostmanCollection{}, err
+	}
+
+	return PostmanCollection{
+		Uid:  parsedJson.Collection.Info.Uid,
+		Name: parsedJson.Collection.Info.Name,
+
+		Auth:      getCollectionAuthFromParsedJson(parsedJson.Collection.Auth),
+		Variables: getCollectionVariablesFromParsedJson(parsedJson),
+		Events:    getCollectionEventsFromParsedJson(parsedJson),
+
+		Items: fp.Map(getCollectionItemFromParsedJson)(parsedJson.Collection.Item),
+	}, nil
+}
+
+func getCollectionItemFromParsedJson(parsedItemJson PostmanCollectionItemJson) PostmanCollectionItem {
+	return PostmanCollectionItem{
+		Name: parsedItemJson.Name,
+		Id:   parsedItemJson.Id,
+		Uid:  parsedItemJson.Uid,
+
+		Items: fp.Map(getCollectionItemFromParsedJson)(parsedItemJson.Item),
+
+		Request: PostmanCollectionRequest{
+			Method: parsedItemJson.Request.Method,
+			Url: PostmanCollectionUrl{
+				Protocol: parsedItemJson.Request.Url.Protocol,
+				Host:     parsedItemJson.Request.Url.Host,
+				Path:     parsedItemJson.Request.Url.Path,
+				Raw:      parsedItemJson.Request.Url.Raw,
+				Query: fp.Map(func(q struct{ Key, Value, Description string }) struct{ Key, Value string } {
+
+				})(parsedItemJson.Request.Url.Query),
+			},
+			Auth:    getCollectionAuthFromParsedJson(parsedItemJson.Request.Auth),
+			Body:    PostmanRequestBody{},
+			Headers: nil,
+		},
+	}
+}
+
+func getCollectionEventsFromParsedJson(parsedJson PostmanCollectionJson) []PostmanCollectionEvent {
+	return fp.Map(func(e PostmanCollectionEventJson) PostmanCollectionEvent {
+		return PostmanCollectionEvent{
+			Listen: e.Listen,
+			Script: struct{ Exec []string }{Exec: e.Script.Exec},
+		}
+	})(parsedJson.Collection.Event)
+}
+
+func getCollectionVariablesFromParsedJson(parsedJson PostmanCollectionJson) []struct{ Key, Value string } {
+	return fp.Map(func(v struct{ Key, Value, Type string }) struct{ Key, Value string } {
+		return struct{ Key, Value string }{v.Key, v.Value}
+	})([]struct{ Key, Value, Type string }(parsedJson.Collection.Variable))
+}
+
+func getCollectionAuthFromParsedJson(parsedAuthJson PostmanCollectionAuthJson) PostmanCollectionAuth {
+	return PostmanCollectionAuth{
+		Type: parsedAuthJson.Type,
+		ApiKey: fp.Map(func(c CredentialJson) struct{ Key, Value string } {
+			return struct{ Key, Value string }{c.Key, c.Value}
+		})(parsedAuthJson.ApiKey),
+		AwsV4: fp.Map(func(c CredentialJson) struct{ Key, Value string } {
+			return struct{ Key, Value string }{c.Key, c.Value}
+		})(parsedAuthJson.AwsV4),
+		Bearer: fp.Map(func(c CredentialJson) struct{ Key, Value string } {
+			return struct{ Key, Value string }{c.Key, c.Value}
+		})(parsedAuthJson.Bearer),
+		Basic: fp.Map(func(c CredentialJson) struct{ Key, Value string } {
+			return struct{ Key, Value string }{c.Key, c.Value}
+		})(parsedAuthJson.Basic),
+		OAuth2: fp.Map(func(c CredentialJson) struct{ Key, Value string } {
+			return struct{ Key, Value string }{c.Key, c.Value}
+		})(parsedAuthJson.OAuth2),
+	}
 }
 
 func GetWorkspaceFromJsonBytes(bytes []byte) (PostmanWorkspace, error) {
@@ -181,19 +268,4 @@ func GetWorkspaceFromJsonBytes(bytes []byte) (PostmanWorkspace, error) {
 func GetEnvironmentFromJsonBytes(bytes []byte) (PostmanEnvironment, error) {
 	// TODO - Implement
 	return PostmanEnvironment{}, nil
-}
-
-func (pcj *PostmanCollectionJson) GetCollection() PostmanCollection {
-	// TODO - implement
-	return PostmanCollection{}
-}
-
-func (pwj *PostmanWorkspaceJson) GetWorkspace() PostmanWorkspace {
-	// TODO - implement
-	return PostmanWorkspace{}
-}
-
-func (pej *PostmanEnvironmentJson) GetEnvironment() PostmanEnvironment {
-	// TODO - implement
-	return PostmanEnvironment{}
 }
