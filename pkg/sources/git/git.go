@@ -422,6 +422,11 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 
 	pass, ok := params.userInfo.Password()
 	if ok {
+		/*
+			Sources:
+				- https://medium.com/%40szpytfire/authenticating-with-github-via-a-personal-access-token-7c639a979eb3
+				- https://trinhngocthuyen.com/posts/tech/50-shades-of-git-remotes-and-authentication/#using-httpextraheader-config
+		*/
 		authHeader := base64.StdEncoding.EncodeToString(fmt.Appendf([]byte(""), "%s:%s", params.userInfo.Username(), pass))
 		gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", authHeader))
 	}
