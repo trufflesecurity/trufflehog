@@ -316,7 +316,7 @@ func captureDashboard(client *http.Client, baseURL, apiKey, appKey string, secre
 			secretInfo.appendResource(resource)
 		}
 		return nil
-	case http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusForbidden:
 		return nil
 	default:
 		return fmt.Errorf("unexpected status code for dashboard API: %d", statusCode)
@@ -347,7 +347,7 @@ func captureMonitor(client *http.Client, baseURL, apiKey, appKey string, secretI
 			secretInfo.appendResource(resource)
 		}
 		return nil
-	case http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusForbidden:
 		return nil
 	default:
 		return fmt.Errorf("unexpected status code for monitor API: %d", statusCode)
