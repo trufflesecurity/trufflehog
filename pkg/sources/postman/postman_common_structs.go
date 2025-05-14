@@ -16,6 +16,7 @@ type PostmanWorkspace struct {
 	EnvironmentSummaries []PostmanEnvironmentSummary
 }
 type PostmanCollectionSummary struct {
+	// TODO - Consider removing the Id field
 	Id   string
 	Name string
 	Uid  string
@@ -132,6 +133,7 @@ type PostmanCollectionAuth struct {
 }
 
 type PostmanEnvironmentSummary struct {
+	// TODO - Consider removing the Id field
 	Id   string
 	Name string
 	Uid  string

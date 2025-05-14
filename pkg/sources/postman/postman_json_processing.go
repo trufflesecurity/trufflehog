@@ -73,7 +73,7 @@ type PostmanCollectionJson struct {
 		} `json:"variable"`
 	} `json:"collection"`
 }
-type PostmanGetCollectionItemRequest struct {
+type PostmanGetCollectionItemRequestJson struct {
 	Auth   PostmanCollectionAuthJson `json:"auth"`
 	Method string                    `json:"method"`
 	Body   struct {
@@ -118,26 +118,28 @@ type PostmanCollectionItemJson struct {
 	ProtocolProfileBehavior struct {
 		DisableBodyPruning bool `json:"disableBodyPruning"`
 	} `json:"protocolProfileBehavior"`
-	Request  PostmanGetCollectionItemRequest `json:"request"`
-	Response []struct {
-		Id                     string                          `json:"id"`
-		Uid                    string                          `json:"uid"`
-		Name                   string                          `json:"name"`
-		OriginalRequest        PostmanGetCollectionItemRequest `json:"originalRequest"`
-		Status                 string                          `json:"status"`
-		Code                   int8                            `json:"code"`
-		PostmanPreviewLanguage string                          `json:"_postman_previewlanguage"`
-		Cookie                 []struct{}                      `json:"cookie"`
-		ResponseTime           null.String                     `json:"responseTime"`
-		Body                   string                          `json:"body"`
+	Request  PostmanGetCollectionItemRequestJson    `json:"request"`
+	Response []PostmanGetCollectionItemResponseJson `json:"response"`
+	Item     []PostmanCollectionItemJson            `json:"item"`
+	Event    []PostmanCollectionEventJson           `json:"event"`
+}
 
-		// We have to handle headers in post-processing, because sometimes they come in different shapes
-		// TODO - Actually do this
-		HeaderRaw string `json:"header"`
-		Header    []PostmanGetCollectionHeader
-	} `json:"response"`
-	Item  []PostmanCollectionItemJson  `json:"item"`
-	Event []PostmanCollectionEventJson `json:"event"`
+type PostmanGetCollectionItemResponseJson struct {
+	Id                     string                              `json:"id"`
+	Uid                    string                              `json:"uid"`
+	Name                   string                              `json:"name"`
+	OriginalRequest        PostmanGetCollectionItemRequestJson `json:"originalRequest"`
+	Status                 string                              `json:"status"`
+	Code                   int8                                `json:"code"`
+	PostmanPreviewLanguage string                              `json:"_postman_previewlanguage"`
+	Cookie                 []struct{}                          `json:"cookie"`
+	ResponseTime           null.String                         `json:"responseTime"`
+	Body                   string                              `json:"body"`
+
+	// We have to handle headers in post-processing, because sometimes they come in different shapes
+	// TODO - Actually do this
+	HeaderRaw string `json:"header"`
+	Header    []PostmanGetCollectionHeader
 }
 
 type CredentialJson struct {
@@ -191,8 +193,8 @@ func GetCollectionFromJsonBytes(bytes []byte) (PostmanCollection, error) {
 		Name: parsedJson.Collection.Info.Name,
 
 		Auth:      getCollectionAuthFromParsedJson(parsedJson.Collection.Auth),
-		Variables: getCollectionVariablesFromParsedJson(parsedJson),
-		Events:    getCollectionEventsFromParsedJson(parsedJson),
+		Variables: fp.Map(getCollectionVariableFromParsedJson)([]struct{ Key, Value, Type string }(parsedJson.Collection.Variable)),
+		Events:    fp.Map(getCollectionItemEventFromParsedEventJson)(parsedJson.Collection.Event),
 
 		Items: fp.Map(getCollectionItemFromParsedJson)(parsedJson.Collection.Item),
 	}, nil
@@ -204,39 +206,64 @@ func getCollectionItemFromParsedJson(parsedItemJson PostmanCollectionItemJson) P
 		Id:   parsedItemJson.Id,
 		Uid:  parsedItemJson.Uid,
 
+		Request:   getPostmanCollectionItemRequestFromParsedItemJson(parsedItemJson.Request),
+		Responses: fp.Map(getCollectionItemResponseFromParsedItemJson)(parsedItemJson.Response),
+		Events:    fp.Map(getCollectionItemEventFromParsedEventJson)(parsedItemJson.Event),
+		Auth:      getCollectionAuthFromParsedJson(parsedItemJson.Auth),
+
 		Items: fp.Map(getCollectionItemFromParsedJson)(parsedItemJson.Item),
-
-		Request: PostmanCollectionRequest{
-			Method: parsedItemJson.Request.Method,
-			Url: PostmanCollectionUrl{
-				Protocol: parsedItemJson.Request.Url.Protocol,
-				Host:     parsedItemJson.Request.Url.Host,
-				Path:     parsedItemJson.Request.Url.Path,
-				Raw:      parsedItemJson.Request.Url.Raw,
-				Query: fp.Map(func(q struct{ Key, Value, Description string }) struct{ Key, Value string } {
-
-				})(parsedItemJson.Request.Url.Query),
-			},
-			Auth:    getCollectionAuthFromParsedJson(parsedItemJson.Request.Auth),
-			Body:    PostmanRequestBody{},
-			Headers: nil,
-		},
 	}
 }
 
-func getCollectionEventsFromParsedJson(parsedJson PostmanCollectionJson) []PostmanCollectionEvent {
-	return fp.Map(func(e PostmanCollectionEventJson) PostmanCollectionEvent {
-		return PostmanCollectionEvent{
-			Listen: e.Listen,
-			Script: struct{ Exec []string }{Exec: e.Script.Exec},
-		}
-	})(parsedJson.Collection.Event)
+func getCollectionItemEventFromParsedEventJson(parsedEventJson PostmanCollectionEventJson) PostmanCollectionEvent {
+	return PostmanCollectionEvent{
+		Listen: parsedEventJson.Listen,
+		Script: struct{ Exec []string }{Exec: parsedEventJson.Script.Exec},
+	}
 }
 
-func getCollectionVariablesFromParsedJson(parsedJson PostmanCollectionJson) []struct{ Key, Value string } {
-	return fp.Map(func(v struct{ Key, Value, Type string }) struct{ Key, Value string } {
-		return struct{ Key, Value string }{v.Key, v.Value}
-	})([]struct{ Key, Value, Type string }(parsedJson.Collection.Variable))
+func getCollectionItemResponseFromParsedItemJson(parsedItemResponseJson PostmanGetCollectionItemResponseJson) PostmanCollectionResponse {
+	return PostmanCollectionResponse{
+		Uid:  parsedItemResponseJson.Uid,
+		Body: parsedItemResponseJson.Body,
+
+		OriginalRequest: getPostmanCollectionItemRequestFromParsedItemJson(parsedItemResponseJson.OriginalRequest),
+		Headers: fp.Map(func(h PostmanGetCollectionHeader) struct{ Key, Value string } {
+			return struct{ Key, Value string }{Key: h.Key, Value: h.Value}
+		})(parsedItemResponseJson.Header),
+	}
+}
+
+func getPostmanCollectionItemRequestFromParsedItemJson(parsedItemRequestJson PostmanGetCollectionItemRequestJson) PostmanCollectionRequest {
+	return PostmanCollectionRequest{
+		Method: parsedItemRequestJson.Method,
+		Url:    getPostmanCollectionUrlFromParsedJson(parsedItemRequestJson),
+		Auth:   getCollectionAuthFromParsedJson(parsedItemRequestJson.Auth),
+		Body: PostmanRequestBody{
+			Mode: parsedItemRequestJson.Body.Mode,
+			Raw:  parsedItemRequestJson.Body.Raw,
+			// TODO - fill GraphQL, FormData, and UrlEncoded (if they're actually used)
+		},
+		Headers: fp.Map(func(h PostmanGetCollectionHeader) struct{ Key, Value string } {
+			return struct{ Key, Value string }{Key: h.Key, Value: h.Value}
+		})(parsedItemRequestJson.Header),
+	}
+}
+
+func getPostmanCollectionUrlFromParsedJson(parsedItemRequestJson PostmanGetCollectionItemRequestJson) PostmanCollectionUrl {
+	return PostmanCollectionUrl{
+		Protocol: parsedItemRequestJson.Url.Protocol,
+		Host:     parsedItemRequestJson.Url.Host,
+		Path:     parsedItemRequestJson.Url.Path,
+		Raw:      parsedItemRequestJson.Url.Raw,
+		Query: fp.Map(func(q struct{ Key, Value, Description string }) struct{ Key, Value string } {
+			return struct{ Key, Value string }{q.Key, q.Value}
+		})([]struct{ Key, Value, Description string }(parsedItemRequestJson.Url.Query)),
+	}
+}
+
+func getCollectionVariableFromParsedJson(parsedVariableJson struct{ Key, Value, Type string }) struct{ Key, Value string } {
+	return struct{ Key, Value string }{Key: parsedVariableJson.Key, Value: parsedVariableJson.Value}
 }
 
 func getCollectionAuthFromParsedJson(parsedAuthJson PostmanCollectionAuthJson) PostmanCollectionAuth {
@@ -261,8 +288,32 @@ func getCollectionAuthFromParsedJson(parsedAuthJson PostmanCollectionAuthJson) P
 }
 
 func GetWorkspaceFromJsonBytes(bytes []byte) (PostmanWorkspace, error) {
-	// TODO - Implement
-	return PostmanWorkspace{}, nil
+
+	var parsedJson PostmanWorkspaceJson
+	if err := json.Unmarshal(bytes, &parsedJson); err != nil {
+		return PostmanWorkspace{}, err
+	}
+	return PostmanWorkspace{
+		Id:        parsedJson.Workspace.Id,
+		Name:      parsedJson.Workspace.Name,
+		CreatedBy: parsedJson.Workspace.CreatedBy,
+
+		CollectionSummaries: fp.Map(func(c struct{ Id, Name, Uid string }) PostmanCollectionSummary {
+			return PostmanCollectionSummary{
+				Name: c.Name,
+				Id:   c.Id,
+				Uid:  c.Uid,
+			}
+		})([]struct{ Id, Name, Uid string }(parsedJson.Workspace.Collections)),
+		
+		EnvironmentSummaries: fp.Map(func(c struct{ Id, Name, Uid string }) PostmanEnvironmentSummary {
+			return PostmanEnvironmentSummary{
+				Name: c.Name,
+				Id:   c.Id,
+				Uid:  c.Uid,
+			}
+		})([]struct{ Id, Name, Uid string }(parsedJson.Workspace.Environments)),
+	}, nil
 }
 
 func GetEnvironmentFromJsonBytes(bytes []byte) (PostmanEnvironment, error) {
