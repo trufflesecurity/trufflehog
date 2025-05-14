@@ -4,6 +4,7 @@ import "sync"
 
 // Resource type constants for consistent usage
 const (
+	ResourceTypeValidate    = "Validate"
 	ResourceTypeCurrentUser = "Current User"
 	ResourceTypeDashboard   = "Dashboard"
 	ResourceTypeMonitor     = "Monitor"

@@ -66,19 +66,25 @@ func AnalyzePermissions(cfg *config.Config, apiKey string, appKey string) (*Secr
 
 	var secretInfo = &SecretInfo{}
 
+	// First detect which DataDog domain works with this API key
+	baseURL, err := DetectDomain(client, apiKey, appKey)
+	if err != nil {
+		return nil, fmt.Errorf("[x] %v", err)
+	}
+
 	// capture user information in secretInfo
 	// If the application key is scoped, user information cannot be retrieved even if all the permissions are granted
 	// This is a non-documented Endpoint and can lead to unexpected behavior in future updates
 	// If user information is not retrieved, we will move ahead with the rest of the analysis and print the error
-	CaptureUserInformation(client, apiKey, appKey, secretInfo)
+	_ = CaptureUserInformation(client, baseURL, apiKey, appKey, secretInfo)
 
 	// capture resources in secretInfo
-	if err := CaptureResources(client, apiKey, appKey, secretInfo); err != nil {
+	if err := CaptureResources(client, baseURL, apiKey, appKey, secretInfo); err != nil {
 		return nil, fmt.Errorf("failed to fetch resources: %v", err)
 	}
 
 	// capture permissions in secretInfo
-	if err := CapturePermissions(client, apiKey, appKey, secretInfo); err != nil {
+	if err := CapturePermissions(client, baseURL, apiKey, appKey, secretInfo); err != nil {
 		return nil, fmt.Errorf("failed to fetch permissions: %v", err)
 	}
 

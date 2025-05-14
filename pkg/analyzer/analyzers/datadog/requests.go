@@ -17,16 +17,26 @@ import (
 // Constants and configuration
 const (
 	defaultTimeout = 12 * time.Second
-	baseURL        = "https://api.us5.datadoghq.com/api"
 	apiKeyHeader   = "DD-API-KEY"
 	appKeyHeader   = "DD-APPLICATION-KEY"
 )
+
+// List of all DataDog domains to try
+var datadogDomains = []string{
+	"https://api.us5.datadoghq.com/api", // Default domain
+	"https://api.app.datadoghq.com/api",
+	"https://api.us3.datadoghq.com/api",
+	"https://api.app.datadoghq.eu/api",
+	"https://api.app.ddog-gov.com/api",
+	"https://api.ap1.datadoghq.com/api",
+}
 
 // Endpoints map for API paths
 var endpoints = map[string]string{
 	ResourceTypeCurrentUser: "/v2/current_user",
 	ResourceTypeDashboard:   "/v1/dashboard",
 	ResourceTypeMonitor:     "/v1/monitor",
+	ResourceTypeValidate:    "/v1/validate",
 }
 
 //go:embed scopes.json
@@ -53,11 +63,54 @@ type Scope struct {
 }
 
 // --------------------------------
+// Domain detection
+// --------------------------------
+
+// DetectDomain tries each DataDog domain to find a working one
+func DetectDomain(client *http.Client, apiKey string, appKey string) (string, error) {
+	for _, domain := range datadogDomains {
+		// Use a simple endpoint to test if the domain works
+		endpoint := domain + endpoints[ResourceTypeValidate]
+
+		ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+		defer cancel()
+
+		// Create request
+		req, err := http.NewRequestWithContext(ctx, "GET", endpoint, http.NoBody)
+		if err != nil {
+			continue // Skip to next domain if request creation fails
+		}
+
+		// Add required keys in the header
+		req.Header.Set(apiKeyHeader, apiKey)
+		req.Header.Set(appKeyHeader, appKey)
+
+		resp, err := client.Do(req)
+
+		if err != nil {
+			continue // Skip to next domain if request fails
+		}
+
+		defer func() {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}()
+
+		// If we get a response that's not a connection error, this domain works
+		if resp.StatusCode == http.StatusOK {
+			return domain, nil
+		}
+	}
+
+	return "", errors.New("unable to validate any DataDog domain with the provided API key")
+}
+
+// --------------------------------
 // HTTP request utilities
 // --------------------------------
 
 // makeDataDogRequest sends an HTTP GET API request to the specified endpoint with auth tokens
-func makeDataDogRequest(client *http.Client, endpoint, method, apiKey string, appKey string) ([]byte, int, error) {
+func makeDataDogRequest(client *http.Client, baseURL, endpoint, method, apiKey string, appKey string) ([]byte, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
@@ -90,11 +143,11 @@ func makeDataDogRequest(client *http.Client, endpoint, method, apiKey string, ap
 }
 
 // RunTest executes an HTTP test against an API endpoint with provided headers
-func (h *HttpStatusTest) RunTest(client *http.Client, headers map[string]string) (bool, error) {
+func (h *HttpStatusTest) RunTest(client *http.Client, baseURL string, headers map[string]string) (bool, error) {
 	apiKey := headers[apiKeyHeader]
 	appKey := headers[appKeyHeader]
 
-	_, statusCode, err := makeDataDogRequest(client, h.Endpoint, h.Method, apiKey, appKey)
+	_, statusCode, err := makeDataDogRequest(client, baseURL, h.Endpoint, h.Method, apiKey, appKey)
 
 	if err != nil {
 		fmt.Printf("Error making request: %v\n", err)
@@ -117,8 +170,8 @@ func (h *HttpStatusTest) RunTest(client *http.Client, headers map[string]string)
 // --------------------------------
 
 // CaptureUserInformation retrieves and stores user information
-func CaptureUserInformation(client *http.Client, apiKey string, appKey string, secretInfo *SecretInfo) error {
-	caller, err := getCurrentUserInfo(client, apiKey, appKey)
+func CaptureUserInformation(client *http.Client, baseURL, apiKey, appKey string, secretInfo *SecretInfo) error {
+	caller, err := getCurrentUserInfo(client, baseURL, apiKey, appKey)
 	if err != nil {
 		return err
 	}
@@ -129,7 +182,7 @@ func CaptureUserInformation(client *http.Client, apiKey string, appKey string, s
 }
 
 // CaptureResources retrieves and stores dashboard and monitor resources
-func CaptureResources(client *http.Client, apiKey string, appKey string, secretInfo *SecretInfo) error {
+func CaptureResources(client *http.Client, baseURL, apiKey, appKey string, secretInfo *SecretInfo) error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, 2) // Buffer size matches the number of tasks
 
@@ -144,8 +197,8 @@ func CaptureResources(client *http.Client, apiKey string, appKey string, secretI
 		}()
 	}
 
-	launchTask(func() error { return captureDashboard(client, apiKey, appKey, secretInfo) })
-	launchTask(func() error { return captureMonitor(client, apiKey, appKey, secretInfo) })
+	launchTask(func() error { return captureDashboard(client, baseURL, apiKey, appKey, secretInfo) })
+	launchTask(func() error { return captureMonitor(client, baseURL, apiKey, appKey, secretInfo) })
 
 	// Wait for all tasks to complete
 	wg.Wait()
@@ -165,7 +218,7 @@ func CaptureResources(client *http.Client, apiKey string, appKey string, secretI
 }
 
 // CapturePermissions tests and records available permissions
-func CapturePermissions(client *http.Client, apiKey string, appKey string, secretInfo *SecretInfo) error {
+func CapturePermissions(client *http.Client, baseURL, apiKey, appKey string, secretInfo *SecretInfo) error {
 	scopes, err := readInScopes()
 	if err != nil {
 		return fmt.Errorf("reading in scopes: %w", err)
@@ -178,7 +231,7 @@ func CapturePermissions(client *http.Client, apiKey string, appKey string, secre
 	}
 
 	for _, scope := range scopes {
-		status, err := scope.HttpTest.RunTest(client, headers)
+		status, err := scope.HttpTest.RunTest(client, baseURL, headers)
 		if err != nil {
 			return fmt.Errorf("running test for scope %s: %w", scope.Name, err)
 		}
@@ -201,8 +254,8 @@ func CapturePermissions(client *http.Client, apiKey string, appKey string, secre
 // --------------------------------
 
 // getCurrentUserInfo retrieves information about the current user
-func getCurrentUserInfo(client *http.Client, apiKey string, appKey string) (*currentUserResponse, error) {
-	response, statusCode, err := makeDataDogRequest(client, endpoints[ResourceTypeCurrentUser], http.MethodGet, apiKey, appKey)
+func getCurrentUserInfo(client *http.Client, baseURL, apiKey, appKey string) (*currentUserResponse, error) {
+	response, statusCode, err := makeDataDogRequest(client, baseURL, endpoints[ResourceTypeCurrentUser], http.MethodGet, apiKey, appKey)
 	if err != nil {
 		return nil, err
 	}
@@ -233,8 +286,8 @@ func addUserToSecretInfo(caller *currentUserResponse, secretInfo *SecretInfo) {
 }
 
 // captureDashboard retrieves dashboard information
-func captureDashboard(client *http.Client, apiKey string, appKey string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeDataDogRequest(client, endpoints[ResourceTypeDashboard], http.MethodGet, apiKey, appKey)
+func captureDashboard(client *http.Client, baseURL, apiKey, appKey string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeDataDogRequest(client, baseURL, endpoints[ResourceTypeDashboard], http.MethodGet, apiKey, appKey)
 	if err != nil {
 		return err
 	}
@@ -271,8 +324,8 @@ func captureDashboard(client *http.Client, apiKey string, appKey string, secretI
 }
 
 // captureMonitor retrieves monitor information
-func captureMonitor(client *http.Client, apiKey string, appKey string, secretInfo *SecretInfo) error {
-	response, statusCode, err := makeDataDogRequest(client, endpoints[ResourceTypeMonitor], http.MethodGet, apiKey, appKey)
+func captureMonitor(client *http.Client, baseURL, apiKey, appKey string, secretInfo *SecretInfo) error {
+	response, statusCode, err := makeDataDogRequest(client, baseURL, endpoints[ResourceTypeMonitor], http.MethodGet, apiKey, appKey)
 	if err != nil {
 		return err
 	}
