@@ -98,6 +98,7 @@ const (
 	AnalyzerTypeFastly
 	AnalyzerTypeMonday
 	AnalyzerTypeDatadog
+	AnalyzerTypeNgrok
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -141,6 +142,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeFastly:        "Fastly",
 	AnalyzerTypeMonday:        "Monday",
 	AnalyzerTypeDatadog:       "Datadog",
+	AnalyzerTypeNgrok:         "Ngrok",
 	// Add new mappings here
 }
 
