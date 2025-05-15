@@ -2,6 +2,8 @@ package monday
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -45,18 +47,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := strings.NewReader(`{"query":"{boards(limit:1){id name}}"}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.monday.com/v2", payload)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("Authorization", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
+			isVerified, verificationErr := verifyMondayPAT(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
+
+			if s1.Verified {
+				s1.AnalysisInfo = map[string]string{
+					"key": resMatch,
 				}
 			}
 		}
@@ -73,4 +70,34 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Monday.com is a work operating system that powers teams to run projects and workflows with confidence. Monday API keys can be used to access and modify data and workflows on the platform."
+}
+
+func verifyMondayPAT(ctx context.Context, client *http.Client, token string) (bool, error) {
+	payload := strings.NewReader(`{"query":"{boards(limit:1){id name}}"}`)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.monday.com/v2", payload)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Authorization", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
