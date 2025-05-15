@@ -2,51 +2,131 @@ package stripepaymentintent
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	Client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	defaultClient = common.SaneHttpClient()
+
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`(pi_[a-zA-Z0-9]{24}_secret_[a-zA-Z0-9]{25})`)
+	clientSecretPat   = regexp.MustCompile(`(pi_[a-zA-Z0-9]{24}_secret_[a-zA-Z0-9]{25})`)
+	secretKeyPat      = regexp.MustCompile(`([rs]k_live_[a-zA-Z0-9]{20,247})`)
+	publishableKeyPat = regexp.MustCompile(`(pk_live_[a-zA-Z0-9]{20,247})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"pi_", "_secret_"}
+	return []string{"pi_", "_secret_", "sk_live_", "rk_live_", "pk_live_"}
 }
 
-// FromData will find and optionally verify Stripepaymentintent secrets in a given set of bytes.
+func (s Scanner) getClient() *http.Client {
+	if s.Client != nil {
+		return s.Client
+	}
+	return defaultClient
+}
+
+// FromData will find and optionally verify Stripe Payment Intent secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-	var uniqueKeys = make(map[string]struct{})
+	clientSecrets := extractMatches(clientSecretPat, dataStr)
+	secretKeys := extractMatches(secretKeyPat, dataStr)
+	publishableKeys := extractMatches(publishableKeyPat, dataStr)
 
-	for _, matches := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueKeys[matches[1]] = struct{}{}
-	}
-
-	for match := range uniqueKeys {
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_StripePaymentIntent,
-			Raw:          []byte(match),
-			Verified:     false,
+	if !verify || (len(secretKeys) == 0 && len(publishableKeys) == 0) {
+		for clientSecret := range clientSecrets {
+			results = append(results, createResult(clientSecret, false, nil))
 		}
-		s1.SetVerificationError(errors.New("unable to verify as the verification requires a valid Stripe secret/publishable key"), match)
 
-		results = append(results, s1)
+		return results, nil
 	}
 
-	return
+	for clientSecret := range clientSecrets {
+		result := createResult(clientSecret, false, nil)
+
+		if verify {
+			client := s.getClient()
+			verified := false
+			var verificationErr error
+
+			for secretKey := range secretKeys {
+				verificationResult, err := verifyPaymentIntentWithSecretKey(ctx, client, clientSecret, secretKey)
+				if err == nil && verificationResult.IsValid {
+					verified = true
+					break
+				}
+				if err != nil {
+					verificationErr = err
+				}
+			}
+
+			if !verified && len(publishableKeys) > 0 {
+				for publishableKey := range publishableKeys {
+					verificationResult, err := verifyPaymentIntentWithPublishableKey(ctx, client, clientSecret, publishableKey)
+					if err == nil && verificationResult.IsValid {
+						verified = true
+						break
+					}
+					if err != nil {
+						verificationErr = err
+					}
+				}
+			}
+
+			result.Verified = verified
+			result.SetVerificationError(verificationErr, clientSecret)
+		}
+
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
+// Helper function to extract matches into a map for uniqueness
+func extractMatches(pattern *regexp.Regexp, data string) map[string]struct{} {
+	matches := pattern.FindAllStringSubmatch(data, -1)
+	result := make(map[string]struct{}, len(matches))
+
+	for _, match := range matches {
+		if len(match) >= 2 {
+			result[match[1]] = struct{}{}
+		}
+	}
+
+	return result
+}
+
+func createResult(clientSecret string, verified bool, verificationErr error) detectors.Result {
+	result := detectors.Result{
+		DetectorType: detectorspb.DetectorType_StripePaymentIntent,
+		Raw:          []byte(clientSecret),
+		Verified:     verified,
+	}
+
+	if verificationErr != nil {
+		result.SetVerificationError(verificationErr, clientSecret)
+	}
+
+	return result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
@@ -55,4 +135,177 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Stripepaymentintent objects represent a customer's intent to pay and track the lifecycle of a payment. These objects are used to initiate and manage payment flows, including confirmation, authentication, and capture of funds."
+}
+
+type StripeErrorResponse struct {
+	Error struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+type VerificationResult struct {
+	IsValid bool   `json:"is_valid"`
+	Message string `json:"message"`
+	Details string `json:"details,omitempty"`
+}
+
+// VerifyPaymentIntentWithSecretKey verifies a Stripe PaymentIntent using the secret key.
+// It checks if the PaymentIntent ID is valid and if the secret key has access to it.
+// It returns a VerificationResult indicating the validity of the PaymentIntent and any error messages.
+func verifyPaymentIntentWithSecretKey(ctx context.Context, client *http.Client, clientSecret, secretKey string) (*VerificationResult, error) {
+	url := fmt.Sprintf("https://api.stripe.com/v1/payment_intents/%s", extractIntentID(clientSecret))
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", secretKey))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %v", err)
+	}
+
+	switch resp.StatusCode {
+	case 200:
+		return &VerificationResult{
+			IsValid: true,
+			Message: "Payment intent exists and is accessible",
+		}, nil
+	case 404:
+		return &VerificationResult{
+			IsValid: false,
+			Message: "Payment intent does not exist",
+		}, fmt.Errorf("payment intent does not exist")
+	case 401:
+		var errorResp StripeErrorResponse
+		if err := json.Unmarshal(body, &errorResp); err == nil {
+			return &VerificationResult{
+				IsValid: false,
+				Message: "Authentication failed. Secret key may be invalid.",
+				Details: errorResp.Error.Message,
+			}, fmt.Errorf("authentication failed: %s", errorResp.Error.Message)
+		}
+		return &VerificationResult{
+			IsValid: false,
+			Message: "Authentication failed. Secret key may be invalid.",
+		}, fmt.Errorf("authentication failed, status code: %d", resp.StatusCode)
+	default:
+		var errorResp StripeErrorResponse
+		if err := json.Unmarshal(body, &errorResp); err == nil {
+			return &VerificationResult{
+				IsValid: false,
+				Message: fmt.Sprintf("Error: %s", errorResp.Error.Message),
+				Details: string(body),
+			}, fmt.Errorf("error: %s", errorResp.Error.Message)
+		}
+		return &VerificationResult{
+			IsValid: false,
+			Message: fmt.Sprintf("Unknown error, status code: %d", resp.StatusCode),
+			Details: string(body),
+		}, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
+	}
+}
+
+// verifyPaymentIntentWithPublishableKey verifies a Stripe PaymentIntent using the publishable key.
+// It checks if the PaymentIntent ID is valid and if the publishable key has access to it.
+// It returns a VerificationResult indicating the validity of the PaymentIntent and any error messages.
+// Note: It should only be used for client-side verification or in scenarios where the secret key is unavailable.
+func verifyPaymentIntentWithPublishableKey(ctx context.Context, client *http.Client, clientSecret, publishableKey string) (*VerificationResult, error) {
+	paymentIntentId := extractIntentID(clientSecret)
+	if paymentIntentId == "" {
+		return nil, fmt.Errorf("payment intent ID is required")
+	}
+
+	// Construct the request URL and add publishable key as a query parameter (this is how Stripe.js works)
+	url := fmt.Sprintf("https://api.stripe.com/v1/payment_intents/%s", paymentIntentId)
+	url = url + fmt.Sprintf("?key=%s", publishableKey)
+	url = url + fmt.Sprintf("&client_secret=%s", clientSecret)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %v", err)
+	}
+
+	switch resp.StatusCode {
+	case 200:
+		return &VerificationResult{
+			IsValid: true,
+			Message: "Payment intent exists and is accessible",
+		}, nil
+	case 404:
+		return &VerificationResult{
+			IsValid: false,
+			Message: "Payment intent does not exist",
+		}, fmt.Errorf("payment intent does not exist")
+	case 401:
+		var errorResp StripeErrorResponse
+		if err := json.Unmarshal(body, &errorResp); err == nil {
+			return &VerificationResult{
+				IsValid: false,
+				Message: "Authentication failed. Publishable key may be invalid.",
+				Details: errorResp.Error.Message,
+			}, fmt.Errorf("authentication failed: %s", errorResp.Error.Message)
+		}
+		return &VerificationResult{
+			IsValid: false,
+			Message: "Authentication failed. Secret key may be invalid.",
+		}, fmt.Errorf("authentication failed, status code: %d", resp.StatusCode)
+	default:
+		var errorResp StripeErrorResponse
+		if err := json.Unmarshal(body, &errorResp); err == nil && errorResp.Error.Message != "" {
+			if strings.Contains(errorResp.Error.Message, "No such payment_intent") {
+				return &VerificationResult{
+					IsValid: false,
+					Message: "Payment intent does not exist",
+					Details: errorResp.Error.Message,
+				}, fmt.Errorf("payment intent does not exist: %s", errorResp.Error.Message)
+			} else if errorResp.Error.Type == "invalid_request_error" {
+				return &VerificationResult{
+					IsValid: false,
+					Message: "Invalid payment intent ID format",
+					Details: errorResp.Error.Message,
+				}, fmt.Errorf("invalid payment intent ID format: %s", errorResp.Error.Message)
+			} else {
+				return &VerificationResult{
+					IsValid: false,
+					Message: fmt.Sprintf("Error: %s", errorResp.Error.Message),
+					Details: string(body),
+				}, fmt.Errorf("error: %s", errorResp.Error.Message)
+			}
+		}
+
+		return &VerificationResult{
+			IsValid: false,
+			Message: fmt.Sprintf("Unknown error, status code: %d", resp.StatusCode),
+			Details: string(body),
+		}, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
+	}
+}
+
+func extractIntentID(clientSecret string) string {
+	parts := strings.SplitN(clientSecret, "_secret_", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[0]
 }
