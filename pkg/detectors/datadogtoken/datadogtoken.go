@@ -23,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 var _ detectors.CloudProvider = (*Scanner)(nil)
 
-func (Scanner) CloudEndpoint() string { return "https://api.us5.datadoghq.com" }
+func (Scanner) CloudEndpoint() string { return "https://api.datadoghq.com" }
 
 var (
 	client = common.SaneHttpClient()
