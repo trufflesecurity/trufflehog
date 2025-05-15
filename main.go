@@ -722,6 +722,9 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
 			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization or repository")
 		}
+		if len(*githubScanRepos) > 0 && len(*githubScanOrgs) > 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both organizations and repositories")
+		}
 
 		cfg := sources.GithubConfig{
 			Endpoint:                   *githubScanEndpoint,
