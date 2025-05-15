@@ -26,13 +26,19 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 
 // Analyze performs the analysis of the Datadog API key and returns the analyzer result.
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	// check if the `key` exist in the credentials info
-	key, exist := credInfo["key"]
+	// Check for both possible input formats - "key" or "apiKey"
+	apiKey, exist := credInfo["apiKey"]
 	if !exist {
-		return nil, errors.New("key not found in credentials info")
+		apiKey, exist = credInfo["key"]
+		if !exist {
+			return nil, errors.New("API key not found in credentials info")
+		}
 	}
 
-	info, err := AnalyzePermissions(a.Cfg, key, "")
+	// Get appKey if provided
+	appKey := credInfo["appKey"]
+
+	info, err := AnalyzePermissions(a.Cfg, apiKey, appKey)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +58,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string, appKey string
 		return
 	}
 
-	color.Green("[i] Valid Datadog Token\n")
+	color.Green("[i] Valid Datadog API Key\n")
 
 	printUser(info.User)
 	printResources(info.Resources)
@@ -103,10 +109,29 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Bindings:     make([]analyzers.Binding, 0),
 	}
 
+	// Create user resource to use as parent
+	var userResource *analyzers.Resource
+	if info.User.Id != "" {
+		userResource = &analyzers.Resource{
+			Name: info.User.Name,
+			Type: "user",
+			Metadata: map[string]any{
+				"email": info.User.Email,
+			},
+		}
+	}
+
 	// Extract information from permissions to create bindings
 	for _, perm := range info.Permissions {
+		resource := secretInfoResourceToAnalyzerResource(perm)
+
+		// Set the user resource as parent if available
+		if userResource != nil {
+			resource.Parent = userResource
+		}
+
 		binding := analyzers.Binding{
-			Resource: *secretInfoResourceToAnalyzerResource(perm),
+			Resource: *resource,
 			Permission: analyzers.Permission{
 				Value: perm.Name,
 			},

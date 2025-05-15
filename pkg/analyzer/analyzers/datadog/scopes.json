@@ -137,7 +137,7 @@
     "resource": "Logs",
     "test": {
       "endpoint": "/v2/logs/events",
-      "method": "POST",
+      "method": "GET",
       "valid_statuses": [200, 400, 404, 429],
       "invalid_statuses": [403]
     }
@@ -214,8 +214,8 @@
     "description": "Invite other users to your organization.",
     "resource": "Users",
     "test": {
-      "endpoint": "v2/user_invitations/does-not-exist",
-      "method": "POST",
+      "endpoint": "/v2/user_invitations/does-not-exist",
+      "method": "GET",
       "valid_statuses": [200, 400, 404, 429],
       "invalid_statuses": [403]
     }

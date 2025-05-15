@@ -84,7 +84,10 @@ func DetectDomain(client *http.Client, apiKey string, appKey string) (string, er
 
 		// Add required keys in the header
 		req.Header.Set(apiKeyHeader, apiKey)
-		req.Header.Set(appKeyHeader, appKey)
+
+		if appKey != "" {
+			req.Header.Set(appKeyHeader, appKey)
+		}
 
 		resp, err := client.Do(req)
 
@@ -123,7 +126,10 @@ func makeDataDogRequest(client *http.Client, baseURL, endpoint, method, apiKey s
 
 	// add required keys in the header
 	req.Header.Set(apiKeyHeader, apiKey)
-	req.Header.Set(appKeyHeader, appKey)
+
+	if appKey != "" {
+		req.Header.Set(appKeyHeader, appKey)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
