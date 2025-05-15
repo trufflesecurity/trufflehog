@@ -59,6 +59,7 @@ type Scope struct {
 	Name        string         `json:"name"`
 	Title       string         `json:"title"`
 	Description string         `json:"description"`
+	Resource    string         `json:"resource"`
 	HttpTest    HttpStatusTest `json:"test"`
 }
 
@@ -235,11 +236,17 @@ func CapturePermissions(client *http.Client, baseURL, apiKey, appKey string, sec
 		if err != nil {
 			return fmt.Errorf("running test for scope %s: %w", scope.Name, err)
 		}
+
+		metadata := map[string]string{
+			"Resource": scope.Resource,
+		}
+
 		if status {
 			permission := Permission{
 				Name:        scope.Name,
 				Title:       scope.Title,
 				Description: scope.Description,
+				MetaData:    metadata,
 			}
 			permissions = append(permissions, permission)
 		}

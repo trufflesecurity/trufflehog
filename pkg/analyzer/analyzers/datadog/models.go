@@ -15,6 +15,7 @@ type Permission struct {
 	Name        string
 	Title       string
 	Description string
+	MetaData    map[string]string
 }
 
 // SecretInfo holds all information gathered about a Datadog API key

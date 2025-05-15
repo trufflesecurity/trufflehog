@@ -103,12 +103,12 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Bindings:     make([]analyzers.Binding, 0),
 	}
 
-	// Extract information from resources to create bindings
-	for _, resource := range info.Resources {
+	// Extract information from permissions to create bindings
+	for _, perm := range info.Permissions {
 		binding := analyzers.Binding{
-			Resource: *secretInfoResourceToAnalyzerResource(resource),
+			Resource: *secretInfoResourceToAnalyzerResource(perm),
 			Permission: analyzers.Permission{
-				Value: "admin", // Using admin as default permission level
+				Value: perm.Name,
 			},
 		}
 
@@ -119,15 +119,15 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 }
 
 // secretInfoResourceToAnalyzerResource translate secret info resource to analyzer resource for binding
-func secretInfoResourceToAnalyzerResource(resource Resource) *analyzers.Resource {
+func secretInfoResourceToAnalyzerResource(perm Permission) *analyzers.Resource {
 	analyzerRes := analyzers.Resource{
-		FullyQualifiedName: resource.ID,
-		Name:               resource.Name,
-		Type:               resource.Type,
+		FullyQualifiedName: perm.Title,
+		Name:               perm.Title,
+		Type:               perm.MetaData["Resource"],
 		Metadata:           map[string]any{},
 	}
 
-	for key, value := range resource.MetaData {
+	for key, value := range perm.MetaData {
 		analyzerRes.Metadata[key] = value
 	}
 
