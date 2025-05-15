@@ -95,6 +95,10 @@ const (
 	AnalyzerTypeFigma
 	AnalyzerTypePlaid
 	AnalyzerTypeNetlify
+	AnalyzerTypeFastly
+	AnalyzerTypeMonday
+	AnalyzerTypeNgrok
+	AnalyzerTypeMux
 	AnalyzerTypeDropbox
 	// Add new items here with AnalyzerType prefix
 )
@@ -136,6 +140,10 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeFigma:         "Figma",
 	AnalyzerTypePlaid:         "Plaid",
 	AnalyzerTypeNetlify:       "Netlify",
+	AnalyzerTypeFastly:        "Fastly",
+	AnalyzerTypeMonday:        "Monday",
+	AnalyzerTypeNgrok:         "Ngrok",
+	AnalyzerTypeMux:           "Mux",
 	AnalyzerTypeDropbox:       "Dropbox",
 	// Add new mappings here
 }
