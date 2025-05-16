@@ -146,7 +146,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err = json.Unmarshal(contents, &env); err != nil {
 			return err
 		}
-		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentID: env.Id, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE}, env)
+		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentId: env.Id, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE}, env)
 	}
 
 	// Scan local collections
@@ -235,8 +235,8 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 	s.resetKeywords()
 
 	metadata := Metadata{
-		WorkspaceUUID: workspace.Id,
-		fromLocal:     true,
+		WorkspaceId: workspace.Id,
+		fromLocal:   true,
 	}
 
 	for _, environment := range workspace.EnvironmentsRaw {
@@ -246,7 +246,7 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 	for _, collection := range workspace.CollectionsRaw {
-		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/collections/" + collection.Info.PostmanID + ".json"
+		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/collections/" + collection.Info.Id + ".json"
 		s.scanCollection(ctx, chunksChan, metadata, collection)
 	}
 }
@@ -258,7 +258,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// initiate metadata to track the tree structure of postman data
 	metadata := Metadata{
-		WorkspaceUUID: workspace.Id,
+		WorkspaceId:   workspace.Id,
 		WorkspaceName: workspace.Name,
 		CreatedBy:     workspace.CreatedBy,
 		Type:          "workspace",
@@ -266,21 +266,21 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// gather and scan environment variables
 	for _, envID := range workspace.Environments {
-		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.Uid)
+		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.Id)
 		if err != nil {
-			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.Uid)
+			ctx.Logger().Error(err, "could not get env variables", "environment_id", envID.Id)
 			continue
 		}
-		if shouldSkip(envID.Uid, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
+		if shouldSkip(envID.Id, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
 			continue
 		}
 		metadata.Type = ENVIRONMENT_TYPE
-		metadata.Link = LINK_BASE_URL + "environments/" + envID.Uid
-		metadata.FullID = envVars.Id
-		metadata.EnvironmentID = envID.Uid
+		metadata.Link = LINK_BASE_URL + "environments/" + envID.Id
+		metadata.Id = envVars.Id
+		metadata.EnvironmentId = envID.Id
 		metadata.EnvironmentName = envVars.Name
 
-		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
+		ctx.Logger().V(2).Info("scanning environment vars", "environment_id", metadata.Id)
 		for _, word := range strings.Split(envVars.Name, " ") {
 			s.attemptToAddKeyword(word)
 		}
@@ -289,10 +289,10 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 		metadata.Type = ""
 		metadata.Link = ""
-		metadata.FullID = ""
-		metadata.EnvironmentID = ""
+		metadata.Id = ""
+		metadata.EnvironmentId = ""
 		metadata.EnvironmentName = ""
-		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_uuid", metadata.FullID)
+		ctx.Logger().V(2).Info("finished scanning environment vars", "environment_id", metadata.Id)
 	}
 	ctx.Logger().V(2).Info("finished scanning environments")
 
@@ -300,10 +300,10 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	// at this point we have all the possible
 	// substitutions from Environment variables
 	for _, collectionID := range workspace.Collections {
-		if shouldSkip(collectionID.Uid, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
+		if shouldSkip(collectionID.Id, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
 			continue
 		}
-		collection, err := s.client.GetCollection(ctx, collectionID.Uid)
+		collection, err := s.client.GetCollection(ctx, collectionID.Id)
 		if err != nil {
 			// Log and move on, because sometimes the Postman API seems to give us collection IDs
 			// that we don't have access to, so we don't want to kill the scan because of it.
@@ -318,14 +318,14 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 // scanCollection scans a collection and all its items, folders, and requests.
 // locally scoped Metadata is updated as we drill down into the collection.
 func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
-	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Info.Name, "collection_uuid", collection.Info.Uid)
+	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Info.Name, "collection_id", collection.Info.Id)
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
 	s.attemptToAddKeyword(collection.Info.Name)
 
 	if !metadata.fromLocal {
-		metadata.FullID = metadata.CollectionInfo.Uid
-		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
+		metadata.Id = metadata.CollectionInfo.Id
+		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.Id
 	}
 
 	metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_VARIABLE
@@ -361,37 +361,38 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		metadata.FolderName = item.Name
 	}
 
-	if item.Uid != "" {
-		metadata.FullID = item.Uid
-		metadata.Link = LINK_BASE_URL + FOLDER_TYPE + "/" + metadata.FullID
+	if item.Id != "" {
+		metadata.Id = item.Id
+		metadata.Link = LINK_BASE_URL + FOLDER_TYPE + "/" + metadata.Id
 	}
 	// recurse through the folders
 	for _, subItem := range item.Items {
-		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.Uid)
+		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.Id)
 	}
 
-	// The assignment of the folder ID to be the current item UID is due to wanting to assume that your current item is a folder unless you have request data inside of your item.
-	// If your current item is a folder, you will want the folder ID to match the UID of the current item.
-	// If your current item is a request, you will want the folder ID to match the UID of the parent folder.
+	// The assignment of the folder ID to be the current item ID is due to wanting to assume that your current item
+	// is a folder unless you have request data inside of your item.
+	// If your current item is a folder, you will want the folder ID to match the ID of the current item.
+	// If your current item is a request, you will want the folder ID to match the ID of the parent folder.
 	// If the request is at the root of a collection and has no parent folder, the folder ID will be empty.
-	metadata.FolderID = item.Uid
+	metadata.FolderId = item.Id
 	// check if there are any requests in the folder
 	if item.Request.Method != "" {
 		metadata.FolderName = strings.Replace(metadata.FolderName, (" > " + item.Name), "", -1)
-		metadata.FolderID = parentItemId
-		if metadata.FolderID == "" {
+		metadata.FolderId = parentItemId
+		if metadata.FolderId == "" {
 			metadata.FolderName = ""
 		}
-		metadata.RequestID = item.Uid
+		metadata.RequestId = item.Id
 		metadata.RequestName = item.Name
 		metadata.Type = REQUEST_TYPE
-		if item.Uid != "" {
+		if item.Id != "" {
 			// Route to API endpoint
-			metadata.FullID = item.Uid
-			metadata.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.Uid
+			metadata.Id = item.Id
+			metadata.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.Id
 		} else {
 			// Route to collection.json
-			metadata.FullID = item.Id
+			metadata.Id = item.Id
 		}
 		s.scanHTTPRequest(ctx, chunksChan, metadata, item.Request)
 	}
@@ -415,7 +416,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 	// Prep direct links. Ignore updating link if it's a local JSON file
 	if !metadata.fromLocal {
-		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.FullID
+		metadata.Link = LINK_BASE_URL + (strings.Replace(metadata.Type, " > event", "", -1)) + "/" + metadata.Id
 		if event.Listen == "prerequest" {
 			metadata.Link += "?tab=pre-request-scripts"
 		} else {
@@ -624,9 +625,9 @@ func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.C
 }
 
 func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, response Response) {
-	if response.Uid != "" {
-		m.Link = LINK_BASE_URL + "example/" + response.Uid
-		m.FullID = response.Uid
+	if response.Id != "" {
+		m.Link = LINK_BASE_URL + "example/" + response.Id
+		m.Id = response.Id
 	}
 	originalType := m.Type
 
@@ -664,7 +665,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, variableData VariableData) {
 	if len(variableData.KeyValues) == 0 {
-		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "item_uuid", m.FullID)
+		ctx.Logger().V(2).Info("no variables to scan", "type", m.Type, "item_id", m.Id)
 		return
 	}
 
@@ -700,7 +701,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 
 func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, data string, metadata Metadata) {
 	if data == "" {
-		ctx.Logger().V(3).Info("Data string is empty", "workspace_id", metadata.WorkspaceUUID)
+		ctx.Logger().V(3).Info("Data string is empty", "workspace_id", metadata.WorkspaceId)
 		return
 	}
 	if metadata.FieldType == "" {
@@ -718,15 +719,15 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 			Data: &source_metadatapb.MetaData_Postman{
 				Postman: &source_metadatapb.Postman{
 					Link:            metadata.Link,
-					WorkspaceUuid:   metadata.WorkspaceUUID,
+					WorkspaceUuid:   metadata.WorkspaceId,
 					WorkspaceName:   metadata.WorkspaceName,
-					CollectionId:    metadata.CollectionInfo.Uid,
+					CollectionId:    metadata.CollectionInfo.Id,
 					CollectionName:  metadata.CollectionInfo.Name,
-					EnvironmentId:   metadata.EnvironmentID,
+					EnvironmentId:   metadata.EnvironmentId,
 					EnvironmentName: metadata.EnvironmentName,
-					RequestId:       metadata.RequestID,
+					RequestId:       metadata.RequestId,
 					RequestName:     metadata.RequestName,
-					FolderId:        metadata.FolderID,
+					FolderId:        metadata.FolderId,
 					FolderName:      metadata.FolderName,
 					FieldType:       metadata.FieldType,
 					LocationType:    metadata.LocationType,
@@ -776,11 +777,11 @@ func unpackWorkspace(workspacePath string) (Workspace, error) {
 	return workspace, nil
 }
 
-func shouldSkip(uuid string, include []string, exclude []string) bool {
-	if slices.Contains(exclude, uuid) {
+func shouldSkip(object_id string, include []string, exclude []string) bool {
+	if slices.Contains(exclude, object_id) {
 		return true
 	}
-	if len(include) > 0 && !slices.Contains(include, uuid) {
+	if len(include) > 0 && !slices.Contains(include, object_id) {
 		return true
 	}
 	return false

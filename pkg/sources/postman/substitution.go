@@ -67,7 +67,7 @@ func (s *Source) buildSubstitution(data string, metadata Metadata, combos *map[s
 	matches := removeDuplicateStr(subRe.FindAllString(data, -1))
 	for _, match := range matches {
 		for _, slice := range s.sub.variables[strings.Trim(match, "{}")] {
-			if slice.Metadata.CollectionInfo.PostmanID != "" && slice.Metadata.CollectionInfo.PostmanID != metadata.CollectionInfo.PostmanID {
+			if slice.Metadata.CollectionInfo.Id != "" && slice.Metadata.CollectionInfo.Id != metadata.CollectionInfo.Id {
 				continue
 			}
 
