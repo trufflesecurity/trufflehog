@@ -20,7 +20,7 @@ import (
 
 func createTestSource(src *sourcespb.Postman) (*Source, *anypb.Any) {
 	s := &Source{
-		metrics: newMetrics("Test Source", 1),
+		metrics: newMetrics("Test Source"),
 	}
 	conn, err := anypb.New(src)
 	if err != nil {

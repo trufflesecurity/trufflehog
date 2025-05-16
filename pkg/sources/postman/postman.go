@@ -104,7 +104,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.verify = verify
 	s.keywords = make(map[string]struct{})
 	s.sub = NewSubstitution()
-	s.metrics = newMetrics(name, int(jobId))
+	s.metrics = newMetrics(name)
 
 	var conn sourcespb.Postman
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
