@@ -186,21 +186,29 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 		// TODO: Log we're possibly leaving out results.
 		return ctx.Err()
 	}
+
+	result := detectors.Result{
+		DetectorType: detectorspb.DetectorType_CustomRegex,
+		DetectorName: c.GetName(),
+		ExtraData:    map[string]string{},
+	}
+
 	var raw string
-	for _, values := range match {
+	for key, values := range match {
 		// values[0] contains the entire regex match.
 		secret := values[0]
 		if len(values) > 1 {
 			secret = values[1]
 		}
 		raw += secret
+
+		// if the match is of the primary regex, set it's value as primary secret value in result
+		if c.PrimaryRegexName == key {
+			result.SetPrimarySecretValue(secret)
+		}
 	}
-	result := detectors.Result{
-		DetectorType: detectorspb.DetectorType_CustomRegex,
-		DetectorName: c.GetName(),
-		Raw:          []byte(raw),
-		ExtraData:    map[string]string{},
-	}
+
+	result.Raw = []byte(raw)
 
 	if !verify {
 		select {
