@@ -24,6 +24,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailchimp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailgun"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/monday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mux"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mysql"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/netlify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/ngrok"
@@ -33,6 +34,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/plaid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/planetscale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postgres"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/posthog"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/sendgrid"
@@ -133,5 +135,9 @@ func Run(keyType string, secretInfo SecretInfo) {
 		monday.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "ngrok":
 		ngrok.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "mux":
+		mux.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"], secretInfo.Parts["secret"])
+	case "posthog":
+		posthog.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
 }
