@@ -199,7 +199,9 @@ type Client struct {
 	// Rate limiter needed for Postman API. General rate limit is 300 requests per minute.
 	GeneralRateLimiter *rate.Limiter
 
-	// Metrics to track usage
+	// Postman has a monthly rate limit, so we need to persist our API call
+	// counts outside of individual scans to track it effectively. We currently
+	// use metrics and alerts for this.
 	Metrics *metrics
 }
 
