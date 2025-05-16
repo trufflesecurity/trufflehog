@@ -48,7 +48,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		return
 	}
 
-	color.Green("[!] Valid Fastly API key\n\n")
+	color.Green("[!] Valid Netlify API key\n\n")
 
 	printUserInfo(info.UserInfo)
 	printTokenInfo(info.listResourceByType(Token))
