@@ -276,7 +276,7 @@ func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, he
 	if rateLimitRemainingMonthValue != "" {
 		rateLimitRemainingMonth, err := strconv.Atoi(rateLimitRemainingMonthValue)
 		if err != nil {
-			ctx.Logger().V(1).Info("Couldn't convert RateLimit-Remaining-Month to an int",
+			ctx.Logger().Error(err, "Couldn't convert RateLimit-Remaining-Month to an int",
 				"header_value", rateLimitRemainingMonthValue,
 			)
 		} else {
