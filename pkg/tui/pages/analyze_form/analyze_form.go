@@ -95,6 +95,7 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Required:    true,
 			RedactInput: true,
 		}}
+<<<<<<< HEAD
 	case "databricks":
 		inputs = []textinputs.InputConfig{{
 			Label:       "Access Token",
@@ -104,6 +105,17 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 		}, {
 			Label:    "Domain",
 			Key:      "domain",
+=======
+	case "mux":
+		inputs = []textinputs.InputConfig{{
+			Label:       "Secret",
+			Key:         "secret",
+			Required:    true,
+			RedactInput: true,
+		}, {
+			Label:    "Key",
+			Key:      "key",
+>>>>>>> main
 			Required: true,
 		}}
 	default:
