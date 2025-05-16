@@ -1048,7 +1048,7 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 	defer common.Recover(ctx)
 
-	ctx = context.WithValue(ctx, "detector", data.detector.Key.Loggable())
+	ctx = context.WithValues(ctx, "decoder", data.decoder.String(), "detector", data.detector.Key.Loggable())
 
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
