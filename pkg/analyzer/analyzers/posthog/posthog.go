@@ -497,18 +497,6 @@ func printUser(user User) {
 	color.Green("[i] ID: %s", user.UUID)
 }
 
-func printGeneralPermissions(permissions []Permission) {
-	color.Yellow("\n[i] General Permissions:")
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Permission"})
-	for _, permission := range permissions {
-		permissionStr, _ := permission.ToString()
-		t.AppendRow(table.Row{color.GreenString(permissionStr)})
-	}
-	t.Render()
-}
-
 func printOrganizationPermissions(organization Organization, permissions []Permission) {
 	color.Yellow("\n[i] Organization Permissions:")
 	t := table.NewWriter()
