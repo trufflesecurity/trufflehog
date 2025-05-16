@@ -99,6 +99,7 @@ const (
 	AnalyzerTypeMonday
 	AnalyzerTypeDatadog
 	AnalyzerTypeNgrok
+	AnalyzerTypeMux
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -143,6 +144,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeMonday:        "Monday",
 	AnalyzerTypeDatadog:       "Datadog",
 	AnalyzerTypeNgrok:         "Ngrok",
+	AnalyzerTypeMux:           "Mux",
 	// Add new mappings here
 }
 

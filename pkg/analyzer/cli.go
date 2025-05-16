@@ -25,6 +25,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailchimp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mailgun"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/monday"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mux"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/mysql"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/netlify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/ngrok"
@@ -136,5 +137,7 @@ func Run(keyType string, secretInfo SecretInfo) {
 		datadog.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["apiKey"], secretInfo.Parts["appKey"])
 	case "ngrok":
 		ngrok.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "mux":
+		mux.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"], secretInfo.Parts["secret"])
 	}
 }
