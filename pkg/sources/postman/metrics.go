@@ -1,8 +1,6 @@
 package postman
 
 import (
-	"strconv"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -20,7 +18,7 @@ var (
 		Name:      "postman_api_requests",
 		Help:      "Total number of API requests made to Postman.",
 	},
-		[]string{"source_name", "job_id", "endpoint"})
+		[]string{"source_name", "endpoint"})
 
 	postmanAPIMonthlyRequestsRemaining = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: common.MetricsNamespace,
@@ -31,11 +29,10 @@ var (
 		[]string{"source_name"})
 )
 
-func newMetricsFromJob(sourceName string, jobID int) *metrics {
+func newMetrics(sourceName string) *metrics {
 	return &metrics{
 		apiRequests: postmanAPIRequestsMetric.MustCurryWith(map[string]string{
 			"source_name": sourceName,
-			"job_id":      strconv.Itoa(jobID),
 		}),
 		apiMonthlyRequestsRemaining: postmanAPIMonthlyRequestsRemaining.MustCurryWith(map[string]string{
 			"source_name": sourceName,
