@@ -1,8 +1,7 @@
-package accuweather
+package azureappconfigconnectionstring
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,11 +11,11 @@ import (
 )
 
 var (
-	validPattern   = "dqftwc490oPc%xae67sBSF741M56%sd091a"
-	invalidPattern = "dqftwc490oPc%xae67sBSF741M56=sd091a"
+	validPattern   = `Endpoint=https://trufflesecurity.azconfig.io;Id=u+De;Secret=80DtxZkndXpM2mV2J1JjX2vL1x4gm1hHn8Y3JeFJ4N0PPLSO5D70JQQJ99BBAC1i4FpQkb5wAAACAAZC26dr`
+	invalidPattern = `Endpoint=https://trufflesecurity.azconfig.io;Secret=80DtxZkndXpMTmV2J3JjX2vL1x4gm1hHn8Y3KeFV4N0PPLSO5D70JQQJ79BBAC1i4FpRkb5wAAACAAZC26dr`
 )
 
-func TestAccuWeather_Pattern(t *testing.T) {
+func TestAzureAppConfigConnectionString_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -27,17 +26,12 @@ func TestAccuWeather_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("accuweather token = '%s'", validPattern),
-			want:  []string{validPattern},
-		},
-		{
-			name:  "valid pattern - out of prefix range",
-			input: fmt.Sprintf("accuweather token keyword is not close to the real token = '%s'", validPattern),
-			want:  nil,
+			input: validPattern,
+			want:  []string{"Endpoint=https://trufflesecurity.azconfig.io;Id=u+De;Secret=80DtxZkndXpM2mV2J1JjX2vL1x4gm1hHn8Y3JeFJ4N0PPLSO5D70JQQJ99BBAC1i4FpQkb5wAAACAAZC26dr"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("accuweather = '%s'", invalidPattern),
+			input: invalidPattern,
 			want:  nil,
 		},
 	}
