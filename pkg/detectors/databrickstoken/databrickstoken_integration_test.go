@@ -21,7 +21,7 @@ import (
 func TestDatabricksToken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -138,7 +138,7 @@ func TestDatabricksToken_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "AnalysisInfo")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("DatabricksToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
