@@ -1,31 +1,32 @@
 //go:build detectors
 // +build detectors
 
-package abbysale
+package accuweather
 
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather/v1"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestAbbysale_FromChunk(t *testing.T) {
+func TestAccuweather_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("ABBYSALE_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("ABBYSALE_INACTIVE")
+	secret := testSecrets.MustGetField("ACCUWEATHER")
+	inactiveSecret := testSecrets.MustGetField("ACCUWEATHER_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -44,12 +45,12 @@ func TestAbbysale_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a abbysale secret %s within but verified", secret)),
+				data:   []byte(fmt.Sprintf("You can find a accuweather secret %s within but verified", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Abbysale,
+					DetectorType: detectorspb.DetectorType_Accuweather,
 					Verified:     true,
 				},
 			},
@@ -57,15 +58,15 @@ func TestAbbysale_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, real secrets, verification error due to timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			s:    Scanner{Scanner: v1.Scanner{Client: common.SaneHttpClientTimeOut(1 * time.Microsecond)}},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a abbysale secret %s within but verified", secret)),
+				data:   []byte(fmt.Sprintf("You can find a accuweather secret %s within", secret)),
 				verify: true,
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Abbysale,
+					DetectorType: detectorspb.DetectorType_Accuweather,
 					Verified:     false,
 				}
 				r.SetVerificationError(context.DeadlineExceeded)
@@ -75,15 +76,15 @@ func TestAbbysale_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, real secrets, verification error due to unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(500, "{}")},
+			s:    Scanner{Scanner: v1.Scanner{Client: common.ConstantResponseHttpClient(500, "{}")}},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a abbysale secret %s within but verified", secret)),
+				data:   []byte(fmt.Sprintf("You can find a accuweather secret %s within", secret)),
 				verify: true,
 			},
 			want: func() []detectors.Result {
 				r := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Abbysale,
+					DetectorType: detectorspb.DetectorType_Accuweather,
 					Verified:     false,
 				}
 				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 500"))
@@ -96,12 +97,12 @@ func TestAbbysale_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a abbysale secret %s within but verified", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a accuweather secret %s within but verified", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Abbysale,
+					DetectorType: detectorspb.DetectorType_Accuweather,
 					Verified:     false,
 				},
 			},
@@ -123,7 +124,7 @@ func TestAbbysale_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Abbysale.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Accuweather.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -138,14 +139,14 @@ func TestAbbysale_FromChunk(t *testing.T) {
 				if tt.want[i].VerificationError() != nil {
 					wantErr = tt.want[i].VerificationError().Error()
 				}
-
 				if gotErr != wantErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
 				}
+				got[i].Raw = nil
 			}
 			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Abbysale.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Accuweather.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

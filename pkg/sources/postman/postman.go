@@ -49,6 +49,8 @@ type Source struct {
 	keywords map[string]struct{}
 	sub      *Substitution
 
+	metrics *metrics
+
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -102,6 +104,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.verify = verify
 	s.keywords = make(map[string]struct{})
 	s.sub = NewSubstitution()
+	s.metrics = newMetrics(name)
 
 	var conn sourcespb.Postman
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
@@ -115,8 +118,8 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		if conn.GetToken() == "" {
 			return errors.New("Postman token is empty")
 		}
-		s.client = NewClient(conn.GetToken())
-		s.client.HTTPClient = common.RetryableHTTPClientTimeout(3)
+		s.client = NewClient(conn.GetToken(), s.metrics)
+		s.client.HTTPClient = common.RetryableHTTPClientTimeout(10)
 		log.RedactGlobally(conn.GetToken())
 	case *sourcespb.Postman_Unauthenticated:
 		s.client = nil
@@ -146,10 +149,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		if err = json.Unmarshal(contents, &env); err != nil {
 			return err
 		}
-		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentID: env.ID, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE}, env)
+		s.scanVariableData(ctx, chunksChan, Metadata{EnvironmentID: env.Id, EnvironmentName: env.Name, fromLocal: true, Link: envPath, LocationType: source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE}, env)
 	}
 
-	// Scan local workspaces
+	// Scan local collections
 	for _, collectionPath := range s.conn.CollectionPaths {
 		collection := Collection{}
 		contents, err := os.ReadFile(collectionPath)
@@ -174,7 +177,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 			}
 		}
 		basename := path.Base(workspacePath)
-		workspace.ID = strings.TrimSuffix(basename, filepath.Ext(basename))
+		workspace.Id = strings.TrimSuffix(basename, filepath.Ext(basename))
 		s.scanLocalWorkspace(ctx, chunksChan, workspace, workspacePath)
 	}
 
@@ -182,7 +185,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	for _, workspaceID := range s.conn.Workspaces {
 		w, err := s.client.GetWorkspace(ctx, workspaceID)
 		if err != nil {
-			return fmt.Errorf("error getting workspace %s: %w", workspaceID, err)
+			// Log and move on, because sometimes the Postman API seems to give us workspace IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "error getting workspace %s", workspaceID)
+			continue
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspaceID), "")
 		ctx.Logger().V(2).Info("scanning workspace from workspaces given", "workspace", workspaceID)
@@ -199,7 +205,10 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 		collection, err := s.client.GetCollection(ctx, collectionID)
 		if err != nil {
-			return fmt.Errorf("error getting collection %s: %w", collectionID, err)
+			// Log and move on, because sometimes the Postman API seems to give us collection IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "error getting collection %s", collectionID)
+			continue
 		}
 		s.SetProgressOngoing(fmt.Sprintf("Scanning collection %s", collectionID), "")
 		s.scanCollection(ctx, chunksChan, Metadata{}, collection)
@@ -213,9 +222,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		}
 		ctx.Logger().V(2).Info("enumerated workspaces", "workspaces", workspaces)
 		for _, workspace := range workspaces {
-			s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspace.ID), "")
+			s.SetProgressOngoing(fmt.Sprintf("Scanning workspace %s", workspace.Id), "")
 			if err = s.scanWorkspace(ctx, chunksChan, workspace); err != nil {
-				return fmt.Errorf("error scanning workspace %s: %w", workspace.ID, err)
+				return fmt.Errorf("error scanning workspace %s: %w", workspace.Id, err)
 			}
 		}
 	}
@@ -229,12 +238,12 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 	s.resetKeywords()
 
 	metadata := Metadata{
-		WorkspaceUUID: workspace.ID,
+		WorkspaceUUID: workspace.Id,
 		fromLocal:     true,
 	}
 
 	for _, environment := range workspace.EnvironmentsRaw {
-		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/environments/" + environment.ID + ".json"
+		metadata.Link = strings.TrimSuffix(path.Base(filePath), path.Ext(filePath)) + "/environments/" + environment.Id + ".json"
 		metadata.LocationType = source_metadatapb.PostmanLocationType_ENVIRONMENT_VARIABLE
 		s.scanVariableData(ctx, chunksChan, metadata, environment)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
@@ -252,7 +261,7 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// initiate metadata to track the tree structure of postman data
 	metadata := Metadata{
-		WorkspaceUUID: workspace.ID,
+		WorkspaceUUID: workspace.Id,
 		WorkspaceName: workspace.Name,
 		CreatedBy:     workspace.CreatedBy,
 		Type:          "workspace",
@@ -260,18 +269,18 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 
 	// gather and scan environment variables
 	for _, envID := range workspace.Environments {
-		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.UUID)
+		envVars, err := s.client.GetEnvironmentVariables(ctx, envID.Uid)
 		if err != nil {
-			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.UUID)
+			ctx.Logger().Error(err, "could not get env variables", "environment_uuid", envID.Uid)
 			continue
 		}
-		if shouldSkip(envID.UUID, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
+		if shouldSkip(envID.Uid, s.conn.IncludeEnvironments, s.conn.ExcludeEnvironments) {
 			continue
 		}
 		metadata.Type = ENVIRONMENT_TYPE
-		metadata.Link = LINK_BASE_URL + "environments/" + envID.UUID
-		metadata.FullID = envVars.ID
-		metadata.EnvironmentID = envID.UUID
+		metadata.Link = LINK_BASE_URL + "environments/" + envID.Uid
+		metadata.FullID = envVars.Id
+		metadata.EnvironmentID = envID.Uid
 		metadata.EnvironmentName = envVars.Name
 
 		ctx.Logger().V(2).Info("scanning environment vars", "environment_uuid", metadata.FullID)
@@ -294,12 +303,15 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 	// at this point we have all the possible
 	// substitutions from Environment variables
 	for _, collectionID := range workspace.Collections {
-		if shouldSkip(collectionID.UUID, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
+		if shouldSkip(collectionID.Uid, s.conn.IncludeCollections, s.conn.ExcludeCollections) {
 			continue
 		}
-		collection, err := s.client.GetCollection(ctx, collectionID.UUID)
+		collection, err := s.client.GetCollection(ctx, collectionID.Uid)
 		if err != nil {
-			return err
+			// Log and move on, because sometimes the Postman API seems to give us collection IDs
+			// that we don't have access to, so we don't want to kill the scan because of it.
+			ctx.Logger().Error(err, "error getting collection %s", collectionID)
+			continue
 		}
 		s.scanCollection(ctx, chunksChan, metadata, collection)
 	}
@@ -309,13 +321,13 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 // scanCollection scans a collection and all its items, folders, and requests.
 // locally scoped Metadata is updated as we drill down into the collection.
 func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
-	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Info.Name, "collection_uuid", collection.Info.UID)
+	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Info.Name, "collection_uuid", collection.Info.Uid)
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
 	s.attemptToAddKeyword(collection.Info.Name)
 
 	if !metadata.fromLocal {
-		metadata.FullID = metadata.CollectionInfo.UID
+		metadata.FullID = metadata.CollectionInfo.Uid
 		metadata.Link = LINK_BASE_URL + COLLECTION_TYPE + "/" + metadata.FullID
 	}
 
@@ -352,20 +364,20 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		metadata.FolderName = item.Name
 	}
 
-	if item.UID != "" {
-		metadata.FullID = item.UID
+	if item.Uid != "" {
+		metadata.FullID = item.Uid
 		metadata.Link = LINK_BASE_URL + FOLDER_TYPE + "/" + metadata.FullID
 	}
 	// recurse through the folders
 	for _, subItem := range item.Items {
-		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.UID)
+		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.Uid)
 	}
 
 	// The assignment of the folder ID to be the current item UID is due to wanting to assume that your current item is a folder unless you have request data inside of your item.
 	// If your current item is a folder, you will want the folder ID to match the UID of the current item.
 	// If your current item is a request, you will want the folder ID to match the UID of the parent folder.
 	// If the request is at the root of a collection and has no parent folder, the folder ID will be empty.
-	metadata.FolderID = item.UID
+	metadata.FolderID = item.Uid
 	// check if there are any requests in the folder
 	if item.Request.Method != "" {
 		metadata.FolderName = strings.Replace(metadata.FolderName, (" > " + item.Name), "", -1)
@@ -373,16 +385,16 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 		if metadata.FolderID == "" {
 			metadata.FolderName = ""
 		}
-		metadata.RequestID = item.UID
+		metadata.RequestID = item.Uid
 		metadata.RequestName = item.Name
 		metadata.Type = REQUEST_TYPE
-		if item.UID != "" {
+		if item.Uid != "" {
 			// Route to API endpoint
-			metadata.FullID = item.UID
-			metadata.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.UID
+			metadata.FullID = item.Uid
+			metadata.Link = LINK_BASE_URL + REQUEST_TYPE + "/" + item.Uid
 		} else {
 			// Route to collection.json
-			metadata.FullID = item.ID
+			metadata.FullID = item.Id
 		}
 		s.scanHTTPRequest(ctx, chunksChan, metadata, item.Request)
 	}
@@ -422,7 +434,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_SCRIPT
 	}
 
-	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, data)), metadata)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, data, DefaultMaxRecursionDepth)), metadata)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
@@ -520,7 +532,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	} else if strings.Contains(m.Type, COLLECTION_TYPE) {
 		m.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_AUTHORIZATION
 	}
-	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, authData)), m)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, authData, DefaultMaxRecursionDepth)), m)
 	m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
@@ -543,7 +555,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		metadata.Type = originalType + " > header"
 		metadata.Link = metadata.Link + "?tab=headers"
 		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_HEADER
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, strings.Join(r.HeaderString, " "))), metadata)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, strings.Join(r.HeaderString, " "), DefaultMaxRecursionDepth)), metadata)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -552,7 +564,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		// Note: query parameters are handled separately
 		u := fmt.Sprintf("%s://%s/%s", r.URL.Protocol, strings.Join(r.URL.Host, "."), strings.Join(r.URL.Path, "/"))
 		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_URL
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, u)), metadata)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, u, DefaultMaxRecursionDepth)), metadata)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -603,21 +615,21 @@ func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.C
 		m.Type = originalType + " > raw"
 		data := b.Raw
 		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_RAW
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data, DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	case "graphql":
 		m.Type = originalType + " > graphql"
 		data := b.GraphQL.Query + " " + b.GraphQL.Variables
 		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_GRAPHQL
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data, DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 }
 
 func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, response Response) {
-	if response.UID != "" {
-		m.Link = LINK_BASE_URL + "example/" + response.UID
-		m.FullID = response.UID
+	if response.Uid != "" {
+		m.Link = LINK_BASE_URL + "example/" + response.Uid
+		m.FullID = response.Uid
 	}
 	originalType := m.Type
 
@@ -635,7 +647,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 		m.Type = originalType + " > response header"
 		// TODO Note: for now, links to Postman responses do not include a more granular tab for the params/header/body, but when they do, we will need to update the metadata.Link info
 		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_HEADER
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, strings.Join(response.HeaderString, " "))), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, strings.Join(response.HeaderString, " "), DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -643,7 +655,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	if response.Body != "" {
 		m.Type = originalType + " > response body"
 		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_BODY
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, response.Body)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, response.Body, DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -676,7 +688,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		if valStr == "" {
 			continue
 		}
-		values = append(values, s.buildSubstituteSet(m, valStr)...)
+		values = append(values, s.buildSubstituteSet(m, valStr, DefaultMaxRecursionDepth)...)
 	}
 
 	m.FieldType = m.Type + " variables"
@@ -711,7 +723,7 @@ func (s *Source) scanData(ctx context.Context, chunksChan chan *sources.Chunk, d
 					Link:            metadata.Link,
 					WorkspaceUuid:   metadata.WorkspaceUUID,
 					WorkspaceName:   metadata.WorkspaceName,
-					CollectionId:    metadata.CollectionInfo.UID,
+					CollectionId:    metadata.CollectionInfo.Uid,
 					CollectionName:  metadata.CollectionInfo.Name,
 					EnvironmentId:   metadata.EnvironmentID,
 					EnvironmentName: metadata.EnvironmentName,
@@ -743,8 +755,8 @@ func unpackWorkspace(workspacePath string) (Workspace, error) {
 		if err != nil {
 			return workspace, err
 		}
+		defer rc.Close()
 		contents, err := io.ReadAll(rc)
-		rc.Close()
 		if err != nil {
 			return workspace, err
 		}

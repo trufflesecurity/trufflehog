@@ -57,7 +57,7 @@ func TestAccuweather_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, real secrets, verification error due to timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
+			s:    Scanner{Client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a accuweather secret %s within", secret)),
@@ -75,7 +75,7 @@ func TestAccuweather_FromChunk(t *testing.T) {
 		},
 		{
 			name: "found, real secrets, verification error due to unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(500, "{}")},
+			s:    Scanner{Client: common.ConstantResponseHttpClient(500, "{}")},
 			args: args{
 				ctx:    context.Background(),
 				data:   []byte(fmt.Sprintf("You can find a accuweather secret %s within", secret)),

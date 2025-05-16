@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -14,10 +13,11 @@ import (
 )
 
 type Scanner struct {
-	client *http.Client
+	Client *http.Client
 }
 
 const accuweatherURL = "https://dataservice.accuweather.com"
+const requiredShannonEntropy = 4
 
 var (
 	// Ensure the Scanner satisfies the interface at compile time.
@@ -35,42 +35,56 @@ func (s Scanner) Keywords() []string {
 	return []string{"accuweather"}
 }
 
+func (s Scanner) Version() int { return 1 }
+
 func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
+	if s.Client != nil {
+		return s.Client
 	}
 	return defaultClient
 }
 
 // FromData will find and optionally verify Accuweather secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+	matches := keyPat.FindAllStringSubmatch(string(data), -1)
+	return s.ProcessMatches(ctx, matches, verify)
+}
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-
+func (s Scanner) ProcessMatches(ctx context.Context, matches [][]string, verify bool) (results []detectors.Result, err error) {
+	uniqueMatches := getUniqueMatches(matches)
+	for key := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Accuweather,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(key),
 		}
 
 		if verify {
 			client := s.getClient()
-			isVerified, verificationErr := verifyAccuweather(ctx, client, resMatch)
+			isVerified, verificationErr := verifyAccuweather(ctx, client, key)
 			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr, resMatch)
+			s1.SetVerificationError(verificationErr, key)
 		}
 
 		results = append(results, s1)
 	}
 
-	return results, nil
+	return
 }
 
-func verifyAccuweather(ctx context.Context, client *http.Client, resMatch string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, accuweatherURL+"/locations/v1/cities/autocomplete?apikey="+resMatch+"&q=----&language=en-us", nil)
+func getUniqueMatches(allMatches [][]string) map[string]struct{} {
+	uniqueMatches := map[string]struct{}{}
+	for _, match := range allMatches {
+		k := match[1]
+		if detectors.StringShannonEntropy(k) < requiredShannonEntropy {
+			continue
+		}
+		uniqueMatches[k] = struct{}{}
+	}
+	return uniqueMatches
+}
+
+func verifyAccuweather(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, accuweatherURL+"/locations/v1/cities/autocomplete?apikey="+key+"&q=----&language=en-us", nil)
 	if err != nil {
 		return false, err
 	}
@@ -97,5 +111,5 @@ func (s Scanner) Type() detectorspb.DetectorType {
 }
 
 func (s Scanner) Description() string {
-	return "Accuweather is a weather forecasting service. Accuweather API keys can be used to access weather data and forecasts."
+	return "AccuWeather is a weather forecasting service. AccuWeather API keys can be used to access weather data and forecasts."
 }
