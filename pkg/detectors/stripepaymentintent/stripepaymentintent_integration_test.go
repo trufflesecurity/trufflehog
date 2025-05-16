@@ -25,6 +25,7 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("STRIPEPAYMENTINTENT")
+	secretInactive := testSecrets.MustGetField("STRIPEPAYMENTINTENT_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -39,11 +40,28 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
+			name: "found, verified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a stripepaymentintent secret %s within", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_StripePaymentIntent,
+					Verified:     true,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: false,
+		},
+		{
 			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a stripepaymentintent secret %s within but not valid", secret)),
+				data:   []byte(fmt.Sprintf("You can find a stripepaymentintent secret %s within but not valid", secretInactive)),
 				verify: true,
 			},
 			want: []detectors.Result{
