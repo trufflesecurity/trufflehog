@@ -20,12 +20,13 @@ import (
 func TestStripepaymentintent_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("STRIPEPAYMENTINTENT")
-	secretInactive := testSecrets.MustGetField("STRIPEPAYMENTINTENT_INACTIVE")
+	secret := testSecrets.MustGetField("STRIPE_SECRET")
+	paymentIntent := testSecrets.MustGetField("STRIPE_PAYMENT_INTENT")
+	secretInactive := testSecrets.MustGetField("STRIPE_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -44,7 +45,7 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a stripepaymentintent secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a stripepaymentintent secret %s and payment intent: %s within", secret, paymentIntent)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -61,7 +62,7 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a stripepaymentintent secret %s within but not valid", secretInactive)),
+				data:   []byte(fmt.Sprintf("You can find a stripepaymentintent secret %s and payment intent %s within but not valid", secretInactive, paymentIntent)),
 				verify: true,
 			},
 			want: []detectors.Result{
