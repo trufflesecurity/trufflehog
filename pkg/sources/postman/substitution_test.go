@@ -89,7 +89,7 @@ func TestSource_BuildSubstituteSet(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := s.buildSubstituteSet(metadata, tc.data)
+		result := s.buildSubstituteSet(metadata, tc.data, DefaultMaxRecursionDepth)
 		if !reflect.DeepEqual(result, tc.expected) {
 			t.Errorf("Expected substitution set: %v, got: %v", tc.expected, result)
 		}
@@ -231,7 +231,7 @@ func TestSource_BuildSubstitution_RecursionLimit(t *testing.T) {
 			if tc.maxDepth > 0 {
 				s.buildSubstitution(tc.data, metadata, &combos, 0, tc.maxDepth)
 			} else {
-				s.buildSubstitution(tc.data, metadata, &combos, 0)
+				s.buildSubstitution(tc.data, metadata, &combos, 0, DefaultMaxRecursionDepth)
 			}
 
 			var result []string

@@ -51,17 +51,10 @@ func (s *Source) formatAndInjectKeywords(data []string) string {
 }
 
 // buildSubstituteSet creates a set of substitutions for the given data
-// maxDepth is an optional parameter to specify the maximum recursion depth
-// if not provided, DefaultMaxRecursionDepth will be used
-func (s *Source) buildSubstituteSet(metadata Metadata, data string, maxDepth ...int) []string {
+// maxRecursionDepth is the maximum recursion depth to use for variable substitution
+func (s *Source) buildSubstituteSet(metadata Metadata, data string, maxRecursionDepth int) []string {
 	var ret []string
 	combos := make(map[string]struct{})
-
-	// Use provided maxDepth or default to DefaultMaxRecursionDepth
-	maxRecursionDepth := DefaultMaxRecursionDepth
-	if len(maxDepth) > 0 && maxDepth[0] > 0 {
-		maxRecursionDepth = maxDepth[0]
-	}
 
 	// Call buildSubstitution with initial depth of 0 and the maxRecursionDepth
 	s.buildSubstitution(data, metadata, &combos, 0, maxRecursionDepth)
@@ -77,16 +70,9 @@ func (s *Source) buildSubstituteSet(metadata Metadata, data string, maxDepth ...
 }
 
 // buildSubstitution performs variable substitution with a maximum recursion depth
-// buildSubstitution performs variable substitution with a maximum recursion depth
-// maxDepth is an optional parameter to specify the maximum recursion depth
-// if not provided, DefaultMaxRecursionDepth will be used
-func (s *Source) buildSubstitution(data string, metadata Metadata, combos *map[string]struct{}, depth int, maxDepth ...int) {
-	// Determine the maximum recursion depth to use
-	maxRecursionDepth := DefaultMaxRecursionDepth
-	if len(maxDepth) > 0 && maxDepth[0] > 0 {
-		maxRecursionDepth = maxDepth[0]
-	}
-
+// depth is the current recursion depth
+// maxRecursionDepth is the maximum recursion depth to use for variable substitution
+func (s *Source) buildSubstitution(data string, metadata Metadata, combos *map[string]struct{}, depth int, maxRecursionDepth int) {
 	// Limit recursion depth to prevent stack overflow
 	if depth > maxRecursionDepth {
 		(*combos)[data] = struct{}{}
