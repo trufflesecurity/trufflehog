@@ -9,29 +9,42 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
+var (
+	validClientSecret        = "pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_YrKJUKribcBjcG8HVhfZluoGH"
+	anotherValidClientSecret = "pi_4NuxCxMleJwHu7ix28a3tqPa_secret_YsKJUKrjbcBjcG8HVhfZlabGH"
+	invalidClientSecret      = "pi_3MtwBwLkdIwHu7ix28a3tqPa"
+)
+
 func TestStripepaymentintent_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "typical pattern",
-			input: "stripepaymentintent_token = 'pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_YrKJUKribcBjcG8HVhfZluoGH'",
-			want:  []string{"pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_YrKJUKribcBjcG8HVhfZluoGH"},
+			name:  "single valid client secret",
+			input: "stripepaymentintent_token = '" + validClientSecret + "'",
+			want:  []string{validClientSecret},
 		},
 		{
-			name: "finds all matches",
-			input: `stripepaymentintent_token1 = 'pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_YrKJUKribcBjcG8HVhfZluoGH'
-stripepaymentintent_token2 = 'pi_4NuxCxMleJwHu7ix28a3tqPa_secret_YsKJUKrjbcBjcG8HVhfZlabGH'`,
-			want: []string{"pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_YrKJUKribcBjcG8HVhfZluoGH", "pi_4NuxCxMleJwHu7ix28a3tqPa_secret_YsKJUKrjbcBjcG8HVhfZlabGH"},
+			name: "multiple valid client secrets",
+			input: `stripepaymentintent_token1 = '` + validClientSecret + `'
+	stripepaymentintent_token2 = '` + anotherValidClientSecret + `'`,
+			want: []string{validClientSecret, anotherValidClientSecret},
 		},
 		{
-			name:  "invalid pattern",
-			input: "stripepaymentintent_token = 'pi_3MtwBwLkdIwHu7ix28a3tqPa'",
+			name:  "only invalid client secret",
+			input: "stripepaymentintent_token = '" + invalidClientSecret + "'",
 			want:  []string{},
+		},
+		{
+			name: "mixed valid and invalid client secrets",
+			input: `some_token = '` + validClientSecret + `'
+	other_token = '` + invalidClientSecret + `'`,
+			want: []string{validClientSecret},
 		},
 	}
 
@@ -66,6 +79,7 @@ stripepaymentintent_token2 = 'pi_4NuxCxMleJwHu7ix28a3tqPa_secret_YsKJUKrjbcBjcG8
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}
