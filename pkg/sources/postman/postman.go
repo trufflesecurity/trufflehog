@@ -49,6 +49,8 @@ type Source struct {
 	keywords map[string]struct{}
 	sub      *Substitution
 
+	metrics *metrics
+
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -102,6 +104,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.verify = verify
 	s.keywords = make(map[string]struct{})
 	s.sub = NewSubstitution()
+	s.metrics = newMetrics(name)
 
 	var conn sourcespb.Postman
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
@@ -115,7 +118,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		if conn.GetToken() == "" {
 			return errors.New("Postman token is empty")
 		}
-		s.client = NewClient(conn.GetToken())
+		s.client = NewClient(conn.GetToken(), s.metrics)
 		s.client.HTTPClient = common.RetryableHTTPClientTimeout(10)
 		log.RedactGlobally(conn.GetToken())
 	case *sourcespb.Postman_Unauthenticated:
