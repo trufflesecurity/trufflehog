@@ -35,6 +35,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/plaid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/planetscale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postgres"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/posthog"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/sendgrid"
@@ -137,6 +138,8 @@ func Run(keyType string, secretInfo SecretInfo) {
 		ngrok.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "mux":
 		mux.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"], secretInfo.Parts["secret"])
+	case "posthog":
+		posthog.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "dropbox":
 		dropbox.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	}
