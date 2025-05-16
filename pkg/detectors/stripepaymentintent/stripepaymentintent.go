@@ -68,8 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			var verificationErr error
 
 			for secretKey := range secretKeys {
-				verificationResult, err := verifyPaymentIntentWithSecretKey(ctx, client, clientSecret, secretKey)
-				if err == nil && verificationResult.IsValid {
+				isValid, err := verifyPaymentIntentWithSecretKey(ctx, client, clientSecret, secretKey)
+				if err == nil && isValid {
 					verified = true
 					break
 				}
@@ -80,8 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			if !verified && len(publishableKeys) > 0 {
 				for publishableKey := range publishableKeys {
-					verificationResult, err := verifyPaymentIntentWithPublishableKey(ctx, client, clientSecret, publishableKey)
-					if err == nil && verificationResult.IsValid {
+					isValid, err := verifyPaymentIntentWithPublishableKey(ctx, client, clientSecret, publishableKey)
+					if err == nil && isValid {
 						verified = true
 						break
 					}
@@ -144,74 +144,47 @@ type StripeErrorResponse struct {
 	} `json:"error"`
 }
 
-type VerificationResult struct {
-	IsValid bool   `json:"is_valid"`
-	Message string `json:"message"`
-	Details string `json:"details,omitempty"`
-}
-
 // VerifyPaymentIntentWithSecretKey verifies a Stripe PaymentIntent using the secret key.
 // It checks if the PaymentIntent ID is valid and if the secret key has access to it.
 // It returns a VerificationResult indicating the validity of the PaymentIntent and any error messages.
-func verifyPaymentIntentWithSecretKey(ctx context.Context, client *http.Client, clientSecret, secretKey string) (*VerificationResult, error) {
+func verifyPaymentIntentWithSecretKey(ctx context.Context, client *http.Client, clientSecret, secretKey string) (bool, error) {
 	url := fmt.Sprintf("https://api.stripe.com/v1/payment_intents/%s", extractIntentID(clientSecret))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return false, fmt.Errorf("error creating request: %v", err)
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", secretKey))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		return false, fmt.Errorf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response: %v", err)
+		return false, fmt.Errorf("error reading response: %v", err)
 	}
 
 	switch resp.StatusCode {
 	case 200:
-		return &VerificationResult{
-			IsValid: true,
-			Message: "Payment intent exists and is accessible",
-		}, nil
+		return true, nil
 	case 404:
-		return &VerificationResult{
-			IsValid: false,
-			Message: "Payment intent does not exist",
-		}, fmt.Errorf("payment intent does not exist")
+		return false, fmt.Errorf("payment intent does not exist")
 	case 401:
 		var errorResp StripeErrorResponse
 		if err := json.Unmarshal(body, &errorResp); err == nil {
-			return &VerificationResult{
-				IsValid: false,
-				Message: "Authentication failed. Secret key may be invalid.",
-				Details: errorResp.Error.Message,
-			}, fmt.Errorf("authentication failed: %s", errorResp.Error.Message)
+			return false, fmt.Errorf("authentication failed: %s", errorResp.Error.Message)
 		}
-		return &VerificationResult{
-			IsValid: false,
-			Message: "Authentication failed. Secret key may be invalid.",
-		}, fmt.Errorf("authentication failed, status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("authentication failed, status code: %d", resp.StatusCode)
 	default:
 		var errorResp StripeErrorResponse
 		if err := json.Unmarshal(body, &errorResp); err == nil {
-			return &VerificationResult{
-				IsValid: false,
-				Message: fmt.Sprintf("Error: %s", errorResp.Error.Message),
-				Details: string(body),
-			}, fmt.Errorf("error: %s", errorResp.Error.Message)
+			return false, fmt.Errorf("error: %s", errorResp.Error.Message)
 		}
-		return &VerificationResult{
-			IsValid: false,
-			Message: fmt.Sprintf("Unknown error, status code: %d", resp.StatusCode),
-			Details: string(body),
-		}, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
 	}
 }
 
@@ -219,10 +192,10 @@ func verifyPaymentIntentWithSecretKey(ctx context.Context, client *http.Client, 
 // It checks if the PaymentIntent ID is valid and if the publishable key has access to it.
 // It returns a VerificationResult indicating the validity of the PaymentIntent and any error messages.
 // Note: It should only be used for client-side verification or in scenarios where the secret key is unavailable.
-func verifyPaymentIntentWithPublishableKey(ctx context.Context, client *http.Client, clientSecret, publishableKey string) (*VerificationResult, error) {
+func verifyPaymentIntentWithPublishableKey(ctx context.Context, client *http.Client, clientSecret, publishableKey string) (bool, error) {
 	paymentIntentId := extractIntentID(clientSecret)
 	if paymentIntentId == "" {
-		return nil, fmt.Errorf("payment intent ID is required")
+		return false, fmt.Errorf("payment intent ID is required")
 	}
 
 	// Construct the request URL and add publishable key as a query parameter (this is how Stripe.js works)
@@ -232,73 +205,44 @@ func verifyPaymentIntentWithPublishableKey(ctx context.Context, client *http.Cli
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return false, fmt.Errorf("error creating request: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		return false, fmt.Errorf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response: %v", err)
+		return false, fmt.Errorf("error reading response: %v", err)
 	}
 
 	switch resp.StatusCode {
 	case 200:
-		return &VerificationResult{
-			IsValid: true,
-			Message: "Payment intent exists and is accessible",
-		}, nil
+		return true, nil
 	case 404:
-		return &VerificationResult{
-			IsValid: false,
-			Message: "Payment intent does not exist",
-		}, fmt.Errorf("payment intent does not exist")
+		return false, fmt.Errorf("payment intent does not exist")
 	case 401:
 		var errorResp StripeErrorResponse
 		if err := json.Unmarshal(body, &errorResp); err == nil {
-			return &VerificationResult{
-				IsValid: false,
-				Message: "Authentication failed. Publishable key may be invalid.",
-				Details: errorResp.Error.Message,
-			}, fmt.Errorf("authentication failed: %s", errorResp.Error.Message)
+			return false, fmt.Errorf("authentication failed: %s", errorResp.Error.Message)
 		}
-		return &VerificationResult{
-			IsValid: false,
-			Message: "Authentication failed. Secret key may be invalid.",
-		}, fmt.Errorf("authentication failed, status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("authentication failed, status code: %d", resp.StatusCode)
 	default:
 		var errorResp StripeErrorResponse
 		if err := json.Unmarshal(body, &errorResp); err == nil && errorResp.Error.Message != "" {
 			if strings.Contains(errorResp.Error.Message, "No such payment_intent") {
-				return &VerificationResult{
-					IsValid: false,
-					Message: "Payment intent does not exist",
-					Details: errorResp.Error.Message,
-				}, fmt.Errorf("payment intent does not exist: %s", errorResp.Error.Message)
+				return false, fmt.Errorf("payment intent does not exist: %s", errorResp.Error.Message)
 			} else if errorResp.Error.Type == "invalid_request_error" {
-				return &VerificationResult{
-					IsValid: false,
-					Message: "Invalid payment intent ID format",
-					Details: errorResp.Error.Message,
-				}, fmt.Errorf("invalid payment intent ID format: %s", errorResp.Error.Message)
+				return false, fmt.Errorf("invalid payment intent ID format: %s", errorResp.Error.Message)
 			} else {
-				return &VerificationResult{
-					IsValid: false,
-					Message: fmt.Sprintf("Error: %s", errorResp.Error.Message),
-					Details: string(body),
-				}, fmt.Errorf("error: %s", errorResp.Error.Message)
+				return false, fmt.Errorf("error: %s", errorResp.Error.Message)
 			}
 		}
 
-		return &VerificationResult{
-			IsValid: false,
-			Message: fmt.Sprintf("Unknown error, status code: %d", resp.StatusCode),
-			Details: string(body),
-		}, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
 	}
 }
 
