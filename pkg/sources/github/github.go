@@ -298,7 +298,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 // Validate is used by enterprise CLI to validate the GitHub config file.
 func (s *Source) Validate(ctx context.Context) []error {
-	if _, _, err := s.connector.APIClient().Users.Get(ctx, ""); err != nil {
+	/*
+		Uses the rate limit API (docs: https://docs.github.com/en/rest/rate-limit) because:
+		- Works with all auth types: user tokens, PATs, App credentials, and unauthenticated requests
+		- Returns 401 for invalid credentials but works with no auth (as unauthenticated)
+		- Doesn't consume API quota when called
+	*/
+	if _, _, err := s.connector.APIClient().RateLimit.Get(ctx); err != nil {
 		return []error{err}
 	}
 
