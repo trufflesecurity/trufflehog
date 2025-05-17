@@ -364,6 +364,8 @@ message Sentry {
   string link = 9;
 }
 
+message Stdin {}
+
 message MetaData {
   oneof data {
     Azure azure = 1;
@@ -399,5 +401,6 @@ message MetaData {
     Elasticsearch elasticsearch = 31;
     Huggingface huggingface = 32;
     Sentry sentry = 33;
+    Stdin stdin = 34;
   }
 }
