@@ -31,7 +31,21 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/circleci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/docker"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/elasticsearch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/filesystem"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/gcs"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/git"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/github"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/gitlab"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/huggingface"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/jenkins"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/postman"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/s3"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/syslog"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/travisci"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
@@ -278,7 +292,11 @@ func init() {
 	}
 
 	if isatty.IsTerminal(os.Stdout.Fd()) && (len(os.Args) <= 1 || os.Args[1] == analyzeCmd.FullCommand()) {
-		args := tui.Run(os.Args[1:])
+		args, err := tui.Run(os.Args[1:])
+		if err != nil {
+			fmt.Printf("failed to run TUI: %s", err.Error())
+			os.Exit(1)
+		}
 		if len(args) == 0 {
 			os.Exit(0)
 		}
@@ -711,7 +729,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Bare:             *gitScanBare,
 			ExcludeGlobs:     *gitScanExcludeGlobs,
 		}
-		if ref, err = eng.ScanGit(ctx, gitCfg); err != nil {
+		if ref, err = git.Scan(ctx, gitCfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
 		}
 	case githubScan.FullCommand():
@@ -740,7 +758,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CommentsTimeframeDays:      *githubCommentsTimeframeDays,
 			Filter:                     filter,
 		}
-		if ref, err = eng.ScanGitHub(ctx, cfg); err != nil {
+		if ref, err = github.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)
 		}
 	case githubExperimentalScan.FullCommand():
@@ -751,7 +769,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CollisionThreshold: *githubExperimentalCollisionThreshold,
 			DeleteCachedData:   *githubExperimentalDeleteCache,
 		}
-		if ref, err = eng.ScanGitHubExperimental(ctx, cfg); err != nil {
+		if ref, err = github.ScanExperimental(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan using Github Experimental: %v", err)
 		}
 	case gitlabScan.FullCommand():
@@ -768,7 +786,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			ExcludeRepos: *gitlabScanExcludeRepos,
 			Filter:       filter,
 		}
-		if ref, err = eng.ScanGitLab(ctx, cfg); err != nil {
+		if ref, err = gitlab.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)
 		}
 	case filesystemScan.FullCommand():
@@ -783,7 +801,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludePathsFile: *filesystemScanIncludePaths,
 			ExcludePathsFile: *filesystemScanExcludePaths,
 		}
-		if ref, err = eng.ScanFileSystem(ctx, cfg); err != nil {
+		if ref, err = filesystem.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
 		}
 	case s3Scan.FullCommand():
@@ -797,7 +815,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
 		}
-		if ref, err = eng.ScanS3(ctx, cfg); err != nil {
+		if ref, err = s3.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)
 		}
 	case syslogScan.FullCommand():
@@ -809,15 +827,15 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			KeyPath:     *syslogTLSKey,
 			Concurrency: *concurrency,
 		}
-		if ref, err = eng.ScanSyslog(ctx, cfg); err != nil {
+		if ref, err = syslog.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan syslog: %v", err)
 		}
 	case circleCiScan.FullCommand():
-		if ref, err = eng.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
+		if ref, err = circleci.Scan(ctx, *circleCiScanToken, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan CircleCI: %v", err)
 		}
 	case travisCiScan.FullCommand():
-		if ref, err = eng.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
+		if ref, err = travisci.Scan(ctx, *travisCiScanToken, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan TravisCI: %v", err)
 		}
 	case gcsScan.FullCommand():
@@ -834,7 +852,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Concurrency:    *concurrency,
 			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
-		if ref, err = eng.ScanGCS(ctx, cfg); err != nil {
+		if ref, err = gcs.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GCS: %v", err)
 		}
 	case dockerScan.FullCommand():
@@ -843,7 +861,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Images:            *dockerScanImages,
 			UseDockerKeychain: *dockerScanToken == "",
 		}
-		if ref, err = eng.ScanDocker(ctx, cfg); err != nil {
+		if ref, err = docker.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)
 		}
 	case postmanScan.FullCommand():
@@ -880,7 +898,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			WorkspacePaths:      *postmanWorkspacePaths,
 			EnvironmentPaths:    *postmanEnvironmentPaths,
 		}
-		if ref, err = eng.ScanPostman(ctx, cfg); err != nil {
+		if ref, err = postman.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Postman: %v", err)
 		}
 	case elasticsearchScan.FullCommand():
@@ -896,17 +914,17 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			SinceTimestamp: *elasticsearchSinceTimestamp,
 			BestEffortScan: *elasticsearchBestEffortScan,
 		}
-		if ref, err = eng.ScanElasticsearch(ctx, cfg); err != nil {
+		if ref, err = elasticsearch.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Elasticsearch: %v", err)
 		}
 	case jenkinsScan.FullCommand():
-		cfg := engine.JenkinsConfig{
+		cfg := sources.JenkinsConfig{
 			Endpoint:              *jenkinsURL,
 			InsecureSkipVerifyTLS: *jenkinsInsecureSkipVerifyTLS,
 			Username:              *jenkinsUsername,
 			Password:              *jenkinsPassword,
 		}
-		if ref, err = eng.ScanJenkins(ctx, cfg); err != nil {
+		if ref, err = jenkins.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
 		}
 	case huggingfaceScan.FullCommand():
@@ -918,7 +936,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization, user, model, space or dataset")
 		}
 
-		cfg := engine.HuggingfaceConfig{
+		cfg := sources.HuggingfaceConfig{
 			Endpoint:           *huggingfaceEndpoint,
 			Models:             *huggingfaceModels,
 			Spaces:             *huggingfaceSpaces,
@@ -939,7 +957,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludePrs:         *huggingfaceIncludePrs,
 			Concurrency:        *concurrency,
 		}
-		if ref, err = eng.ScanHuggingface(ctx, cfg); err != nil {
+		if ref, err = huggingface.Scan(ctx, cfg, eng); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan HuggingFace: %v", err)
 		}
 	default:

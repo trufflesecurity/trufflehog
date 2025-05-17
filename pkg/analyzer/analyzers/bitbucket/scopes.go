@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package bitbucket
 
 var credential_type_map = map[string]string{

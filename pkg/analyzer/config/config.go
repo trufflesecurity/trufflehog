@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package config
 
 // TODO: separate CLI configuration from analysis configuration.
