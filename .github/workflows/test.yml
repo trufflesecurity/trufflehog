@@ -17,12 +17,12 @@ jobs:
       contents: "read"
       id-token: "write"
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Install Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.24"
-      - name: Checkout code
-        uses: actions/checkout@v4
       - id: "auth"
         uses: "google-github-actions/auth@v2"
         with:
@@ -59,11 +59,11 @@ jobs:
       actions: "read"
       contents: "read"
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Install Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.24"
-      - name: Checkout code
-        uses: actions/checkout@v4
       - name: Test
         run: make test-community
