@@ -1,6 +1,5 @@
 [
   {
-    "id": "d90f6830-d3d8-11e9-a77a-b3404e5e9ee2",
     "name": "dashboards_read",
     "title": "Dashboards Read",
     "description": "View dashboards.",
@@ -13,7 +12,6 @@
     }
   },
   {
-    "id": "d90f6831-d3d8-11e9-a77a-4fd230ddbc6a",
     "name": "dashboards_write",
     "title": "Dashboards Write",
     "description": "Create and change dashboards.",
@@ -26,7 +24,6 @@
     }
   },
   {
-    "id": "d90f6832-d3d8-11e9-a77a-bf8a2607f864",
     "name": "dashboards_public_share",
     "title": "Dashboards Public Share",
     "description": "Create, modify and delete shared dashboards with share type 'Public'. These dashboards can be accessed by anyone on the internet.",
@@ -39,7 +36,6 @@
     }
   },
   {
-    "id": "4441648c-d8b1-11e9-a77a-1b899a04b304",
     "name": "monitors_read",
     "title": "Monitors Read",
     "description": "View monitors.",
@@ -52,7 +48,6 @@
     }
   },
   {
-    "id": "48ef71ea-d8b1-11e9-a77a-93f408470ad0",
     "name": "monitors_write",
     "title": "Monitors Write",
     "description": "Edit and delete individual monitors.",
@@ -65,7 +60,6 @@
     }
   },
   {
-    "id": "62cc036c-dd12-11e8-9e54-db9995643092",
     "name": "logs_modify_indexes",
     "title": "Logs Modify Indexes",
     "description": "Read and modify all indexes in your account.",
@@ -78,7 +72,6 @@
     }
   },
   {
-    "id": "811ac4ca-dd12-11e8-9e57-676a7f0beef9",
     "name": "logs_write_pipelines",
     "title": "Logs Write Pipelines",
     "description": "Add and change log pipeline configurations.",
@@ -91,7 +84,6 @@
     }
   },
   {
-    "id": "87b00304-dd12-11e8-9e59-cbeb5f71f72f",
     "name": "logs_write_archives",
     "title": "Logs Write Archives",
     "description": "Add and edit Log Archives.",
@@ -104,7 +96,6 @@
     }
   },
   {
-    "id": "979df720-aed7-11e9-99c6-a7eb8373165a",
     "name": "logs_generate_metrics",
     "title": "Logs Generate Metrics",
     "description": "Create custom metrics from logs.",
@@ -117,7 +108,6 @@
     }
   },
   {
-    "id": "4d87d5f8-d8b1-11e9-a77a-eb9c8350d04f",
     "name": "monitors_downtime",
     "title": "Manage Downtimes",
     "description": "Set downtimes to suppress alerts from any monitor in an organization.",
@@ -130,7 +120,6 @@
     }
   },
   {
-    "id": "1af86ce4-7823-11ea-93dc-d7cad1b1c6cb",
     "name": "logs_read_data",
     "title": "Logs Read Data",
     "description": "Read log data. In order to read log data, a user must have both this permission and Logs Read Index Data.",
@@ -143,7 +132,6 @@
     }
   },
   {
-    "id": "b382b982-8535-11ea-93de-2bf1bdf20798",
     "name": "logs_read_archives",
     "title": "Logs Read Archives",
     "description": "Read Log Archives location and use it for rehydration.",
@@ -156,7 +144,6 @@
     }
   },
   {
-    "id": "7314eb20-aa58-11ea-95e2-6fb6e4a451d5",
     "name": "security_monitoring_rules_read",
     "title": "Security Rules Read",
     "description": "Read Detection Rules.",
@@ -169,7 +156,6 @@
     }
   },
   {
-    "id": "7b516476-aa58-11ea-95e2-93718cd56369",
     "name": "security_monitoring_rules_write",
     "title": "Security Rules Write",
     "description": "Create and edit Detection Rules.",
@@ -182,7 +168,6 @@
     }
   },
   {
-    "id": "80de1ec0-aa58-11ea-95e2-aff381626d5d",
     "name": "security_monitoring_signals_read",
     "title": "Security Signals Read",
     "description": "View Security Signals.",
@@ -195,7 +180,6 @@
     }
   },
   {
-    "id": "5c1680d0-ff6d-11eb-a494-da7ad0900005",
     "name": "security_monitoring_signals_write",
     "title": "Security Signals Write",
     "description": "Modify Security Signals.",
@@ -208,7 +192,6 @@
     }
   },
   {
-    "id": "9ac1d8cc-e707-11ea-aa2d-73d37e989a9d",
     "name": "user_access_invite",
     "title": "User Access Invite",
     "description": "Invite other users to your organization.",
@@ -221,7 +204,6 @@
     }
   },
   {
-    "id": "46a301da-ec5c-11ea-aa9f-73bedeab67ee",
     "title": "User App Keys",
     "name": "user_app_keys",
     "description": "View and manage Application Keys owned by the user.",
@@ -234,7 +216,6 @@
     }
   },
   {
-    "id": "46a301db-ec5c-11ea-aa9f-2fe72193d60e",
     "name": "org_app_keys_read",
     "title": "Org App Keys Read",
     "description": "View Application Keys owned by all users in the organization.",
@@ -247,7 +228,6 @@
     }
   },
   {
-    "id": "46a301dc-ec5c-11ea-aa9f-13b33f8f46ea",
     "name": "org_app_keys_write",
     "title": "Org App Keys Write",
     "description": "Manage Application Keys owned by all users in the organization.",
@@ -260,7 +240,6 @@
     }
   },
   {
-    "id": "9de604d8-e707-11ea-aa9f-93f1a783b3a3",
     "name": "user_access_manage",
     "title": "User Access Manage",
     "description": "Disable users, manage user roles, manage SAML-to-role mappings, and configure logs restriction queries.",
@@ -273,7 +252,6 @@
     }
   },
   {
-    "id": "46a301dd-ec5c-11ea-aa9f-97edfb345bc9",
     "name": "synthetics_private_location_read",
     "title": "Synthetics Private Locations Read",
     "description": "View, search, and use Synthetics private locations.",
@@ -286,7 +264,6 @@
     }
   },
   {
-    "id": "46a301de-ec5c-11ea-aa9f-a73252c24806",
     "name": "synthetics_private_location_write",
     "title": "Synthetics Private Locations Write",
     "description": "Create and delete private locations in addition to having access to the associated installation guidelines.",
@@ -299,7 +276,6 @@
     }
   },
   {
-    "id": "46a301e1-ec5c-11ea-aa9f-afa39f6f3e36",
     "name": "usage_read",
     "title": "Usage Read",
     "description": "View your organization's usage and usage attribution.",
@@ -312,7 +288,6 @@
     }
   },
   {
-    "id": "46a301e4-ec5c-11ea-aa9f-87282b3a50cc",
     "name": "metric_tags_write",
     "title": "Metric Tags Write",
     "description": "Edit and save tag configurations for custom metrics.",
@@ -325,7 +300,6 @@
     }
   },
   {
-    "id": "2fbdac76-f923-11ea-adbc-07f3823e2b43",
     "name": "audit_logs_read",
     "title": "Audit Trail Read",
     "description": "View Audit Trail in your organization.",
@@ -338,7 +312,6 @@
     }
   },
   {
-    "id": "372896c4-f923-11ea-adbc-4fecd107156d",
     "name": "api_keys_read",
     "title": "API Keys Read",
     "description": "List and retrieve the key values of all API Keys in your organization.",
@@ -351,7 +324,6 @@
     }
   },
   {
-    "id": "3e4d4d28-f923-11ea-adbc-e3565938c12e",
     "name": "api_keys_write",
     "title": "API Keys Write",
     "description": "Create and rename API Keys for your organization.",
@@ -364,7 +336,6 @@
     }
   },
   {
-    "id": "4628ca54-f923-11ea-adbc-4b2b7f88c5e9",
     "name": "synthetics_global_variable_read",
     "title": "Synthetics Global Variable Read",
     "description": "View, search, and use Synthetics global variables.",
@@ -377,7 +348,6 @@
     }
   },
   {
-    "id": "4ada6e36-f923-11ea-adbc-0788e5c5e3cf",
     "name": "synthetics_global_variable_write",
     "title": "Synthetics Global Variable Write",
     "description": "Create, edit, and delete global variables for Synthetics.",
@@ -390,7 +360,6 @@
     }
   },
   {
-    "id": "5025ee24-f923-11ea-adbc-576ea241df8d",
     "name": "synthetics_read",
     "title": "Synthetics Read",
     "description": "List and view configured Synthetic tests and test results.",
@@ -403,7 +372,6 @@
     }
   },
   {
-    "id": "55f4b5ec-f923-11ea-adbc-1bfa2334a755",
     "name": "synthetics_write",
     "title": "Synthetics Write",
     "description": "Create, edit, and delete Synthetic tests.",
@@ -416,7 +384,6 @@
     }
   },
   {
-    "id": "5c6b88e2-f923-11ea-adbc-abf57d079420",
     "name": "synthetics_default_settings_read",
     "title": "Synthetics Default Settings Read",
     "description": "View the default settings for Synthetic Monitoring.",
@@ -429,7 +396,6 @@
     }
   },
   {
-    "id": "a42e94b2-1476-11eb-bd08-efda28c04248",
     "name": "service_account_write",
     "title": "Service Account Write",
     "description": "Create, disable, and use Service Accounts in your organization.",
@@ -442,7 +408,6 @@
     }
   },
   {
-    "id": "417ba636-2dce-11eb-84c0-6bce5b0d9de0",
     "name": "apm_read",
     "title": "APM Read",
     "description": "Read and query APM and Trace Analytics.",
@@ -455,7 +420,6 @@
     }
   },
   {
-    "id": "43fa188e-2dce-11eb-84c0-835ad1fd6287",
     "name": "apm_retention_filter_read",
     "title": "APM Retention Filters Read",
     "description": "Read trace retention filters. A user with this permission can view the retention filters page, list of filters, their statistics, and creation info.",
@@ -468,7 +432,6 @@
     }
   },
   {
-    "id": "465cfe66-2dce-11eb-84c0-6baa888239fa",
     "name": "apm_retention_filter_write",
     "title": "APM Retention Filters Write",
     "description": "Create, edit, and delete trace retention filters. A user with this permission can create new retention filters, and update or delete to existing retention filters.",
@@ -481,7 +444,6 @@
     }
   },
   {
-    "id": "8106300a-54f7-11eb-8cbc-7781a434a67b",
     "name": "rum_apps_write",
     "title": "RUM Apps Write",
     "description": "Create, edit, and delete RUM applications. Creating a RUM application automatically generates a Client Token. In order to create Client Tokens directly, a user needs the Client Tokens Write permission.",
@@ -494,7 +456,6 @@
     }
   },
   {
-    "id": "bf0dcf7c-90af-11eb-9b82-da7ad0900002",
     "name": "data_scanner_read",
     "title": "Data Scanner Read",
     "description": "View Sensitive Data Scanner configurations and scanning results.",
@@ -507,7 +468,6 @@
     }
   },
   {
-    "id": "bf0dcf7d-90af-11eb-9b82-da7ad0900002",
     "name": "data_scanner_write",
     "title": "Data Scanner Write",
     "description": "Edit Sensitive Data Scanner configurations.",
@@ -520,7 +480,6 @@
     }
   },
   {
-    "id": "7df222b6-a45c-11eb-a0af-da7ad0900002",
     "name": "org_management",
     "title": "Org Management",
     "description": "Edit org configurations, including authentication and certain security preferences such as configuring SAML, renaming an org, configuring allowed login methods, creating child orgs, subscribing & unsubscribing from apps in the marketplace, and enabling & disabling Remote Configuration for the entire organization.",
@@ -533,7 +492,6 @@
     }
   },
   {
-    "id": "98b984f4-b16d-11eb-a2c6-da7ad0900002",
     "name": "security_monitoring_filters_read",
     "title": "Security Filters Read",
     "description": "Read Security Filters.",
@@ -546,7 +504,6 @@
     }
   },
   {
-    "id": "98b984f5-b16d-11eb-a2c6-da7ad0900002",
     "name": "security_monitoring_filters_write",
     "title": "Security Filters Write",
     "description": "Create, edit, and delete Security Filters.",
@@ -559,7 +516,6 @@
     }
   },
   {
-    "id": "12efc20e-d36c-11eb-a9b8-da7ad0900002",
     "name": "incident_read",
     "title": "Incidents Read",
     "description": "View incidents in Datadog.",
@@ -572,7 +528,6 @@
     }
   },
   {
-    "id": "12efc211-d36c-11eb-a9b8-da7ad0900002",
     "name": "incident_write",
     "title": "Incidents Write",
     "description": "Create, view, and manage incidents in Datadog.",
@@ -585,7 +540,6 @@
     }
   },
   {
-    "id": "12efc210-d36c-11eb-a9b8-da7ad0900002",
     "name": "incident_settings_write",
     "title": "Incident Settings Write",
     "description": "Configure Incident Settings.",
@@ -598,7 +552,6 @@
     }
   },
   {
-    "id": "aa7ccb44-fa13-11eb-b17c-da7ad0900005",
     "name": "rum_apps_read",
     "title": "RUM Apps Read",
     "description": "View RUM Applications data.",
@@ -611,7 +564,6 @@
     }
   },
   {
-    "id": "1ba2f2d8-16c7-11ec-b77d-da7ad0900005",
     "name": "security_monitoring_notification_profiles_read",
     "title": "Security Notification Rules Read",
     "description": "Read Notification Rules.",
@@ -624,7 +576,6 @@
     }
   },
   {
-    "id": "1ba4caa4-16c7-11ec-b77d-da7ad0900005",
     "name": "security_monitoring_notification_profiles_write",
     "title": "Security Notification Rules Write",
     "description": "Create, edit, and delete Notification Rules.",
@@ -637,7 +588,6 @@
     }
   },
   {
-    "id": "34438974-1703-11ec-952 1-da7ad0900005",
     "name": "apm_generate_metrics",
     "title": "APM Generate Metrics",
     "description": "Create custom metrics from spans.",
@@ -650,7 +600,6 @@
     }
   },
   {
-    "id": "0c07b512-56a4-11ec-9d67-da7ad0900005",
     "name": "apm_pipelines_write",
     "title": "APM Pipelines Write",
     "description": "Add and change APM pipeline configurations.",
@@ -663,7 +612,6 @@
     }
   },
   {
-    "id": "e2371690-574f-11ec-9b69-da7ad0900005",
     "name": "apm_pipelines_read",
     "title": "APM Pipelines Read",
     "description": "View APM pipeline configurations.",
@@ -676,7 +624,6 @@
     }
   },
   {
-    "id": "8dbe76fe-5884-11ec-82c1-da7ad0900005",
     "name": "observability_pipelines_read",
     "title": "Observability Pipelines Read",
     "description": "View pipelines in your organization.",
@@ -689,7 +636,6 @@
     }
   },
   {
-    "id": "0fc8e272-8500-11ec-9176-da7ad0900005",
     "name": "workflows_read",
     "title": "Workflows Read",
     "description": "View workflows.",
@@ -702,7 +648,6 @@
     }
   },
   {
-    "id": "0fc97610-8500-11ec-9176-da7ad0900005",
     "name": "workflows_write",
     "title": "Workflows Write",
     "description": "Create, edit, and delete workflows.",
@@ -715,7 +660,6 @@
     }
   },
   {
-    "id": "0fc93150-8500-11ec-9176-da7ad0900005",
     "name": "workflows_run",
     "title": "Workflows Run",
     "description": "Run workflows.",
@@ -728,7 +672,6 @@
     }
   },
   {
-    "id": "0fc821fc-8500-11ec-9176-da7ad0900005",
     "name": "connections_read",
     "title": "Connections Read",
     "description": "List and view available connections. Connections contain secrets that cannot be revealed.",
@@ -741,7 +684,6 @@
     }
   },
   {
-    "id": "0fc894fc-8500-11ec-9176-da7ad0900005",
     "name": "connections_write",
     "title": "Connections Write",
     "description": "Create and delete connections.",
@@ -754,7 +696,6 @@
     }
   },
   {
-    "id": "caea6b48-9a59-11ec-b6fc-da7ad0900005",
     "name": "notebooks_read",
     "title": "Notebooks Read",
     "description": "View notebooks.",
@@ -767,7 +708,6 @@
     }
   },
   {
-    "id": "caeae1ea-9a59-11ec-b6fc-da7ad0900005",
     "name": "notebooks_write",
     "title": "Notebooks Write",
     "description": "Create and change notebooks.",
@@ -780,7 +720,6 @@
     }
   },
   {
-    "id": "6df70e30-c59e-11ec-9bfe-da7ad0900005",
     "name": "aws_configurations_manage",
     "title": "AWS Configurations Manage",
     "description": "Add or remove but not edit AWS integration configurations.",
@@ -793,7 +732,6 @@
     }
   },
   {
-    "id": "6df8034e-c59e-11ec-9bfe-da7ad0900005",
     "name": "azure_configurations_manage",
     "title": "Azure Configurations Manage",
     "description": "Add or remove but not edit Azure integration configurations.",
@@ -806,7 +744,6 @@
     }
   },
   {
-    "id": "6df7a0de-c59e-11ec-9bfe-da7ad0900005",
     "name": "gcp_configurations_manage",
     "title": "GCP Configurations Manage",
     "description": "Add or remove but not edit GCP integration configurations.",
@@ -819,7 +756,6 @@
     }
   },
   {
-    "id": "6df8628a-c59e-11ec-9bfe-da7ad0900005",
     "name": "manage_integrations",
     "title": "Integrations Manage",
     "description": "Install, uninstall, and configure integrations.",
@@ -832,7 +768,6 @@
     }
   },
   {
-    "id": "eee67f20-e746-11ec-a905-da7ad0900005",
     "name": "slos_read",
     "title": "SLOs Read",
     "description": "View SLOs and status corrections.",
@@ -845,7 +780,6 @@
     }
   },
   {
-    "id": "eee6d434-e746-11ec-a905-da7ad0900005",
     "name": "slos_write",
     "title": "SLOs Write",
     "description": "Create, edit, and delete SLOs.",
@@ -858,7 +792,6 @@
     }
   },
   {
-    "id": "eee61788-e746-11ec-a905-da7ad0900005",
     "name": "slos_corrections",
     "title": "SLOs Status Corrections",
     "description": "Apply, edit, and delete SLO status corrections. A user with this permission can make status corrections, even if they do not have permission to edit those SLOs.",
@@ -871,7 +804,6 @@
     }
   },
   {
-    "id": "279926d0-f311-11ec-9321-da7ad0900005",
     "name": "monitor_config_policy_write",
     "title": "Monitor Configuration Policy Write",
     "description": "Create, update, and delete monitor configuration policies.",

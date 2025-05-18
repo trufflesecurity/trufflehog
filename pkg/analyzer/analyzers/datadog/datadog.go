@@ -26,13 +26,9 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 
 // Analyze performs the analysis of the Datadog API key and returns the analyzer result.
 func (a Analyzer) Analyze(ctx context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	// Check for both possible input formats - "key" or "apiKey"
 	apiKey, exist := credInfo["apiKey"]
 	if !exist {
-		apiKey, exist = credInfo["key"]
-		if !exist {
-			return nil, errors.New("API key not found in credentials info")
-		}
+		return nil, errors.New("API key not found in credentials info")
 	}
 
 	// Get appKey if provided
@@ -51,11 +47,6 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string, appKey string
 	if err != nil {
 		// just print the error in cli and continue as a partial success
 		color.Red("[x] Error : %s", err.Error())
-	}
-
-	if info == nil {
-		color.Red("[x] Error : %s", "No information found")
-		return
 	}
 
 	color.Green("[i] Valid Datadog API Key\n")
@@ -113,17 +104,21 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	var userResource *analyzers.Resource
 	if info.User.Id != "" {
 		userResource = &analyzers.Resource{
-			Name: info.User.Name,
-			Type: "user",
+			FullyQualifiedName: info.User.Id,
+			Name:               info.User.Name,
+			Type:               "User",
 			Metadata: map[string]any{
 				"email": info.User.Email,
 			},
 		}
 	}
 
-	// Extract information from permissions to create bindings
-	for _, perm := range info.Permissions {
-		resource := secretInfoResourceToAnalyzerResource(perm)
+	permissionBindings := secretInfoPermissionsToAnalyzerPermission(info.Permissions)
+	result.Bindings = analyzers.BindAllPermissions(*userResource, *permissionBindings...)
+
+	// Extract information from resources to create bindings
+	for _, resource := range info.Resources {
+		resource := secretInfoResourceToAnalyzerResource(resource)
 
 		// Set the user resource as parent if available
 		if userResource != nil {
@@ -132,9 +127,6 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 		binding := analyzers.Binding{
 			Resource: *resource,
-			Permission: analyzers.Permission{
-				Value: perm.Name,
-			},
 		}
 
 		result.Bindings = append(result.Bindings, binding)
@@ -143,16 +135,27 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	return &result
 }
 
-// secretInfoResourceToAnalyzerResource translate secret info resource to analyzer resource for binding
-func secretInfoResourceToAnalyzerResource(perm Permission) *analyzers.Resource {
+// secretInfoPermissionsToAnalyzerPermission translate secret info Permission to analyzer resource for binding
+func secretInfoPermissionsToAnalyzerPermission(perms []Permission) *[]analyzers.Permission {
+	permissions := make([]analyzers.Permission, 0, len(perms))
+	for _, perm := range perms {
+		permissions = append(permissions, analyzers.Permission{
+			Value: perm.Title,
+		})
+	}
+	return &permissions
+}
+
+// secretInfoResourceToAnalyzerResource translate secret info Resource to analyzer resource for binding
+func secretInfoResourceToAnalyzerResource(resource Resource) *analyzers.Resource {
 	analyzerRes := analyzers.Resource{
-		FullyQualifiedName: perm.Title,
-		Name:               perm.Title,
-		Type:               perm.MetaData["Resource"],
+		FullyQualifiedName: resource.ID,
+		Name:               resource.Name,
+		Type:               resource.Type,
 		Metadata:           map[string]any{},
 	}
 
-	for key, value := range perm.MetaData {
+	for key, value := range resource.MetaData {
 		analyzerRes.Metadata[key] = value
 	}
 
