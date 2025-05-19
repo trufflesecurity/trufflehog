@@ -24,7 +24,10 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
-	connection := &sourcespb.GitLab{SkipBinaries: c.SkipBinaries}
+	connection := &sourcespb.GitLab{
+		SkipBinaries: c.SkipBinaries,
+		AuthInUrl:    c.AuthInUrl,
+	}
 
 	switch {
 	case len(c.Token) > 0:

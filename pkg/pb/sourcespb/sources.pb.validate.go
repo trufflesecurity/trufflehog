@@ -2317,6 +2317,8 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for ExcludeProjectsSharedIntoGroups
 
+	// no validation rules for AuthInUrl
+
 	switch v := m.Credential.(type) {
 	case *GitLab_Token:
 		if v == nil {

@@ -60,6 +60,8 @@ type Source struct {
 
 	jobPool *errgroup.Group
 	sources.CommonSourceUnitUnmarshaller
+
+	useAuthInUrl bool
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -158,6 +160,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.ignoreRepos = conn.GetIgnoreRepos()
 	s.includeRepos = conn.GetIncludeRepos()
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
+	s.useAuthInUrl = conn.AuthInUrl
 
 	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
 	ctx.Logger().V(3).Info("setting include repos patterns", "patterns", s.includeRepos)
@@ -213,6 +216,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			}
 		},
 		UseCustomContentWriter: s.useCustomContentWriter,
+		AuthInUrl:              s.useAuthInUrl,
 	}
 	s.git = git.NewGit(cfg)
 
@@ -653,7 +657,12 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				if user == "" {
 					user = "placeholder"
 				}
-				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
+
+				if s.useAuthInUrl {
+					path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
+				} else {
+					path, repo, err = git.CloneRepoUsingTokenInHeader(ctx, s.token, repoURL, user)
+				}
 			}
 			if err != nil {
 				scanErrs.Add(err)
@@ -836,7 +845,12 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		if user == "" {
 			user = "placeholder"
 		}
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
+
+		if s.useAuthInUrl {
+			path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
+		} else {
+			path, repo, err = git.CloneRepoUsingTokenInHeader(ctx, s.token, repoURL, user)
+		}
 	}
 	if err != nil {
 		return err

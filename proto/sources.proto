@@ -229,6 +229,7 @@ message GitLab {
   bool skip_archives = 8;
   repeated string include_repos = 9;
   bool exclude_projects_shared_into_groups = 10;
+  bool auth_in_url = 11;
 }
 
 message GitHub {

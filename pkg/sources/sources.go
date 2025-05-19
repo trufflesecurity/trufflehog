@@ -295,6 +295,8 @@ type GitlabConfig struct {
 	IncludeRepos []string
 	// ExcludeRepos is a list of repositories to exclude from the scan.
 	ExcludeRepos []string
+	// AuthInUrl determines wether to use authentication token in repository url or in header.
+	AuthInUrl bool
 }
 
 // FilesystemConfig defines the optional configuration for a filesystem source.
