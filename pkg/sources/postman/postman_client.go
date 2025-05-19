@@ -358,6 +358,7 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 
 // GetEnvironmentVariables returns the environment variables for a given environment
 func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid string) (VariableData, error) {
+	ctx.Logger().V(4).Info("getting environment variables", "environment_uuid", environment_uuid)
 	obj := struct {
 		VariableData VariableData `json:"environment"`
 	}{}
@@ -379,6 +380,7 @@ func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid s
 
 // GetCollection returns the collection for a given collection
 func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Collection, error) {
+	ctx.Logger().V(4).Info("getting collection", "collection_uuid", collection_uuid)
 	obj := struct {
 		Collection Collection `json:"collection"`
 	}{}
