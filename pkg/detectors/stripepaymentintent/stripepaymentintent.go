@@ -26,15 +26,15 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	clientSecretPat   = regexp.MustCompile(`(pi_[a-zA-Z0-9]{24}_secret_[a-zA-Z0-9]{25})`)
-	secretKeyPat      = regexp.MustCompile(`([rs]k_live_[a-zA-Z0-9]{20,247})`)
-	publishableKeyPat = regexp.MustCompile(`(pk_live_[a-zA-Z0-9]{20,247})`)
+	clientSecretPat   = regexp.MustCompile(`\b(pi_[a-zA-Z0-9]{24}_secret_[a-zA-Z0-9]{25})\b`)
+	secretKeyPat      = regexp.MustCompile(`\b([rs]k_live_[a-zA-Z0-9]{20,247})\b`)
+	publishableKeyPat = regexp.MustCompile(`\b(pk_live_[a-zA-Z0-9]{20,247})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"pi_", "_secret_", "sk_live_", "rk_live_", "pk_live_"}
+	return []string{"pi_", "_secret_"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -50,14 +50,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	clientSecrets := extractMatches(clientSecretPat, dataStr)
 	secretKeys := extractMatches(secretKeyPat, dataStr)
 	publishableKeys := extractMatches(publishableKeyPat, dataStr)
-
-	if !verify || (len(secretKeys) == 0 && len(publishableKeys) == 0) {
-		for clientSecret := range clientSecrets {
-			results = append(results, createResult(clientSecret, false, nil))
-		}
-
-		return results, nil
-	}
 
 	for clientSecret := range clientSecrets {
 		result := createResult(clientSecret, false, nil)
@@ -171,14 +163,14 @@ func verifyPaymentIntentWithSecretKey(ctx context.Context, client *http.Client, 
 	switch resp.StatusCode {
 	case 200:
 		return true, nil
-	case 404:
-		return false, fmt.Errorf("payment intent does not exist")
+	case 400:
+		return false, nil
 	case 401:
-		var errorResp StripeErrorResponse
-		if err := json.Unmarshal(body, &errorResp); err == nil {
-			return false, fmt.Errorf("authentication failed: %s", errorResp.Error.Message)
-		}
-		return false, fmt.Errorf("authentication failed, status code: %d", resp.StatusCode)
+		return false, nil
+	case 403:
+		return false, nil
+	case 404:
+		return false, nil
 	default:
 		var errorResp StripeErrorResponse
 		if err := json.Unmarshal(body, &errorResp); err == nil {
@@ -222,21 +214,21 @@ func verifyPaymentIntentWithPublishableKey(ctx context.Context, client *http.Cli
 	switch resp.StatusCode {
 	case 200:
 		return true, nil
-	case 404:
-		return false, fmt.Errorf("payment intent does not exist")
+	case 400:
+		return false, nil
 	case 401:
-		var errorResp StripeErrorResponse
-		if err := json.Unmarshal(body, &errorResp); err == nil {
-			return false, fmt.Errorf("authentication failed: %s", errorResp.Error.Message)
-		}
-		return false, fmt.Errorf("authentication failed, status code: %d", resp.StatusCode)
+		return false, nil
+	case 403:
+		return false, nil
+	case 404:
+		return false, nil
 	default:
 		var errorResp StripeErrorResponse
 		if err := json.Unmarshal(body, &errorResp); err == nil && errorResp.Error.Message != "" {
 			if strings.Contains(errorResp.Error.Message, "No such payment_intent") {
-				return false, fmt.Errorf("payment intent does not exist: %s", errorResp.Error.Message)
+				return false, nil
 			} else if errorResp.Error.Type == "invalid_request_error" {
-				return false, fmt.Errorf("invalid payment intent ID format: %s", errorResp.Error.Message)
+				return false, nil
 			} else {
 				return false, fmt.Errorf("error: %s", errorResp.Error.Message)
 			}

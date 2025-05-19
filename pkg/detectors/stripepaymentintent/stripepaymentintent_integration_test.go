@@ -72,7 +72,7 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 				},
 			},
 			wantErr:             false,
-			wantVerificationErr: true,
+			wantVerificationErr: false,
 		},
 		{
 			name: "not found",
