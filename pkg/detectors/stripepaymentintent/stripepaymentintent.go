@@ -2,7 +2,6 @@ package stripepaymentintent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -56,35 +55,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		if verify {
 			client := s.getClient()
-			verified := false
-			var verificationErr error
 
 			for secretKey := range secretKeys {
-				isValid, err := verifyPaymentIntentWithSecretKey(ctx, client, clientSecret, secretKey)
-				if err == nil && isValid {
-					verified = true
+				isVerified, verificationErr := verifyPaymentIntentWithSecretKey(ctx, client, clientSecret, secretKey)
+				result.Verified = isVerified
+				result.SetVerificationError(verificationErr)
+				if result.Verified {
 					break
 				}
-				if err != nil {
-					verificationErr = err
-				}
 			}
 
-			if !verified && len(publishableKeys) > 0 {
+			if !result.Verified {
 				for publishableKey := range publishableKeys {
-					isValid, err := verifyPaymentIntentWithPublishableKey(ctx, client, clientSecret, publishableKey)
-					if err == nil && isValid {
-						verified = true
+					isVerified, verificationErr := verifyPaymentIntentWithPublishableKey(ctx, client, clientSecret, publishableKey)
+					result.Verified = isVerified
+					result.SetVerificationError(verificationErr)
+					if result.Verified {
 						break
 					}
-					if err != nil {
-						verificationErr = err
-					}
 				}
 			}
-
-			result.Verified = verified
-			result.SetVerificationError(verificationErr, clientSecret)
 		}
 
 		results = append(results, result)
@@ -129,13 +119,6 @@ func (s Scanner) Description() string {
 	return "Stripepaymentintent objects represent a customer's intent to pay and track the lifecycle of a payment. These objects are used to initiate and manage payment flows, including confirmation, authentication, and capture of funds."
 }
 
-type StripeErrorResponse struct {
-	Error struct {
-		Type    string `json:"type"`
-		Message string `json:"message"`
-	} `json:"error"`
-}
-
 // VerifyPaymentIntentWithSecretKey verifies a Stripe PaymentIntent using the secret key.
 // It checks if the PaymentIntent ID is valid and if the secret key has access to it.
 // It returns a VerificationResult indicating the validity of the PaymentIntent and any error messages.
@@ -153,29 +136,18 @@ func verifyPaymentIntentWithSecretKey(ctx context.Context, client *http.Client, 
 	if err != nil {
 		return false, fmt.Errorf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, fmt.Errorf("error reading response: %v", err)
-	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	switch resp.StatusCode {
-	case 200:
+	case http.StatusOK:
 		return true, nil
-	case 400:
-		return false, nil
-	case 401:
-		return false, nil
-	case 403:
-		return false, nil
-	case 404:
+	case http.StatusUnauthorized, http.StatusNotFound:
 		return false, nil
 	default:
-		var errorResp StripeErrorResponse
-		if err := json.Unmarshal(body, &errorResp); err == nil {
-			return false, fmt.Errorf("error: %s", errorResp.Error.Message)
-		}
 		return false, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
 	}
 }
@@ -204,36 +176,17 @@ func verifyPaymentIntentWithPublishableKey(ctx context.Context, client *http.Cli
 	if err != nil {
 		return false, fmt.Errorf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, fmt.Errorf("error reading response: %v", err)
-	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	switch resp.StatusCode {
-	case 200:
+	case http.StatusOK:
 		return true, nil
-	case 400:
-		return false, nil
-	case 401:
-		return false, nil
-	case 403:
-		return false, nil
-	case 404:
+	case http.StatusUnauthorized, http.StatusNotFound:
 		return false, nil
 	default:
-		var errorResp StripeErrorResponse
-		if err := json.Unmarshal(body, &errorResp); err == nil && errorResp.Error.Message != "" {
-			if strings.Contains(errorResp.Error.Message, "No such payment_intent") {
-				return false, nil
-			} else if errorResp.Error.Type == "invalid_request_error" {
-				return false, nil
-			} else {
-				return false, fmt.Errorf("error: %s", errorResp.Error.Message)
-			}
-		}
-
 		return false, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
 	}
 }
