@@ -2317,7 +2317,7 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for ExcludeProjectsSharedIntoGroups
 
-	// no validation rules for AuthInUrl
+	// no validation rules for RemoveAuthInUrl
 
 	switch v := m.Credential.(type) {
 	case *GitLab_Token:
@@ -2550,7 +2550,7 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for CommentsTimeframeDays
 
-	// no validation rules for AuthInUrl
+	// no validation rules for RemoveAuthInUrl
 
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:

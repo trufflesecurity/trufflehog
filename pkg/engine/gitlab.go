@@ -25,8 +25,8 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (source
 	scanOptions := git.NewScanOptions(opts...)
 
 	connection := &sourcespb.GitLab{
-		SkipBinaries: c.SkipBinaries,
-		AuthInUrl:    c.AuthInUrl,
+		SkipBinaries:    c.SkipBinaries,
+		RemoveAuthInUrl: !c.AuthInUrl, // Enterprise uses the opposite field in proto to keep credentials in the URL by default.
 	}
 
 	switch {

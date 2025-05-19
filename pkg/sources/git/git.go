@@ -453,6 +453,7 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
+	fmt.Println("Clone CMD: ", cloneCmd)
 
 	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
 	if err != nil {

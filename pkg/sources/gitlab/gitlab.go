@@ -160,7 +160,12 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.ignoreRepos = conn.GetIgnoreRepos()
 	s.includeRepos = conn.GetIncludeRepos()
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
-	s.useAuthInUrl = conn.AuthInUrl
+
+	// Enterprise uses the inverse logic of the `useAuthInUrl` flag.
+	// This is intentional to preserve existing behavior: in Enterprise, credentials are passed in the URL by default,
+	// whereas in OSS, the default is to pass credentials in the Authorization header.
+	// This ensures backward compatibility in both environments.
+	s.useAuthInUrl = !conn.RemoveAuthInUrl
 
 	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
 	ctx.Logger().V(3).Info("setting include repos patterns", "patterns", s.includeRepos)
