@@ -1048,7 +1048,14 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 	defer common.Recover(ctx)
 
-	ctx = context.WithValue(ctx, "detector", data.detector.Key.Loggable())
+	ctx = context.WithValues(ctx,
+		"detector", data.detector.Key.Loggable(),
+		"decoder_type", data.decoder.String(),
+		"chunk_source_name", data.chunk.SourceName,
+		"chunk_source_id", data.chunk.SourceID,
+		"chunk_source_metadata", data.chunk.SourceMetadata.String())
+
+	ctx.Logger().V(4).Info("Starting to detect chunk")
 
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
@@ -1119,6 +1126,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 
 	matchesPerChunk.Observe(float64(matchCount))
+
+	ctx.Logger().V(4).Info("Finished detecting chunk")
 
 	data.wgDoneFn()
 }
