@@ -159,6 +159,57 @@ func TestFragmentLineOffset(t *testing.T) {
 	}
 }
 
+func TestFragmentLineOffsetWithPrimarySecret(t *testing.T) {
+	primarySecretResult1 := &detectors.Result{
+		Raw: []byte("id heresecret here"), // RAW has two secrets merged
+	}
+
+	primarySecretResult1.SetPrimarySecretValue("secret here") // set `secret here` as primary secret value for line number calculation
+
+	primarySecretResult2 := &detectors.Result{
+		Raw: []byte("idsecret"), // RAW has two secrets merged
+	}
+
+	tests := []struct {
+		name         string
+		chunk        *sources.Chunk
+		result       *detectors.Result
+		expectedLine int64
+		ignore       bool
+	}{
+		{
+			name: "primary secret line number - correct line number",
+			chunk: &sources.Chunk{
+				Data: []byte("line1\nline2\nid here\nsecret here\nline5"),
+			},
+			result:       primarySecretResult1,
+			expectedLine: 3,
+			ignore:       false,
+		},
+		{
+			name: "no primary secret set - wrong line number",
+			chunk: &sources.Chunk{
+				Data: []byte("line1\nline2\nid\nsecret\nline5"),
+			},
+			result:       primarySecretResult2,
+			expectedLine: 0,
+			ignore:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lineOffset, isIgnored := FragmentLineOffset(tt.chunk, tt.result)
+			if lineOffset != tt.expectedLine {
+				t.Errorf("Expected line offset to be %d, got %d", tt.expectedLine, lineOffset)
+			}
+			if isIgnored != tt.ignore {
+				t.Errorf("Expected isIgnored to be %v, got %v", tt.ignore, isIgnored)
+			}
+		})
+	}
+}
+
 func setupFragmentLineOffsetBench(totalLines, needleLine int) (*sources.Chunk, *detectors.Result) {
 	data := make([]byte, 0, 4096)
 	needle := []byte("needle")
