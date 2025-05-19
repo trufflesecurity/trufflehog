@@ -261,6 +261,8 @@ type GithubConfig struct {
 	IncludeWikis bool
 	// CommentsTimeframeDays indicates how many days of comments to include in the scan.
 	CommentsTimeframeDays uint32
+	// AuthInUrl determines wether to use authentication token in repository url or in header.
+	AuthInUrl bool
 }
 
 // GitHubExperimentalConfig defines the optional configuration for an experimental GitHub source.

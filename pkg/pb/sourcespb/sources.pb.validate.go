@@ -2548,6 +2548,8 @@ func (m *GitHub) validate(all bool) error {
 
 	// no validation rules for CommentsTimeframeDays
 
+	// no validation rules for AuthInUrl
+
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
 		if v == nil {
