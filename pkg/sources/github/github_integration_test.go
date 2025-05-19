@@ -11,6 +11,7 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
@@ -938,7 +939,8 @@ func TestSource_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			connector, _ := newConnector(tt.sourceConfig)
+			connector, err := newConnector(tt.sourceConfig)
+			require.NoError(t, err)
 			tt.sourceConfig.connector = connector
 
 			if err := tt.sourceConfig.Validate(tt.args.ctx); err != nil && !tt.wantErr {
