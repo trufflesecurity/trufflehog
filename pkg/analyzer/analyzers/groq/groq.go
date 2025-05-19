@@ -19,7 +19,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-// SecretInfo hold the information about the anthropic key
+// SecretInfo hold the information about the groq key
 type SecretInfo struct {
 	Valid         bool
 	Reference     string
@@ -73,7 +73,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	info, err := AnalyzePermissions(cfg, key)
 	if err != nil {
 		// just print the error in cli and continue as a partial success
-		color.Red("[x] Invalid Anthropic API key\n")
+		color.Red("[x] Invalid Groq API key\n")
 		color.Red("[x] Error : %s", err.Error())
 		return
 	}
@@ -83,7 +83,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		return
 	}
 
-	color.Green("[i] Valid Anthropic API key\n")
+	color.Green("[i] Valid Groq API key\n")
 	color.Yellow("\n[i] Permission: Full Access\n")
 
 	if len(info.GroqResources) > 0 {
@@ -117,7 +117,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzers.AnalyzerAnthropic,
+		AnalyzerType: analyzers.AnalyzerTypeGroq,
 		Metadata:     map[string]any{"Valid_Key": info.Valid},
 		Bindings:     make([]analyzers.Binding, len(info.GroqResources)),
 	}
