@@ -208,6 +208,25 @@ func TestDetector(t *testing.T) {
 	assert.Equal(t, results[0].Raw, []byte(`123456`))
 }
 
+func TestDetectorPrimarySecret(t *testing.T) {
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:             "test",
+		Keywords:         []string{"secret"},
+		Regex:            map[string]string{"id": "id_[A-Z0-9]{10}_yy", "secret": "secret_[A-Z0-9]{10}_yy"},
+		PrimaryRegexName: "secret",
+	})
+	assert.NoError(t, err)
+	results, err := detector.FromData(context.Background(), false, []byte(`
+	// getData returns id and secret
+	func getData()(string, string){
+    	return "id_ALPHA10100_yy", "secret_YI7C90ACY1_yy"
+	}
+	`))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, "secret_YI7C90ACY1_yy", results[0].GetPrimarySecretValue())
+}
+
 func BenchmarkProductIndices(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = productIndices(3, 2, 6)

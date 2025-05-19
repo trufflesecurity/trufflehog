@@ -84,12 +84,12 @@ func TestSource_BuildSubstituteSet(t *testing.T) {
 		{"{{var2}}", []string{"value2"}},
 		{"{{var1}}:{{var2}}", []string{"value1:value2"}},
 		{"no variables", []string{"no variables"}},
-		{"{{var1}}:{{continuation_token}}", []string{"value1:'continuation_token'"}},
-		{"{{var1}}:{{continuation_token2}}", []string{"value1:'{continuation_token2}'"}},
+		{"{{var1}}:{{continuation_token}}", []string{"value1:{{continuation_token}}"}},
+		{"{{var1}}:{{continuation_token2}}", []string{"value1:{{continuation_token2}}"}},
 	}
 
 	for _, tc := range testCases {
-		result := s.buildSubstituteSet(metadata, tc.data)
+		result := s.buildSubstituteSet(metadata, tc.data, DefaultMaxRecursionDepth)
 		if !reflect.DeepEqual(result, tc.expected) {
 			t.Errorf("Expected substitution set: %v, got: %v", tc.expected, result)
 		}
@@ -154,5 +154,103 @@ func TestSource_FormatAndInjectKeywords(t *testing.T) {
 		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Expected result: %q, got: %q", tc.expected, result)
 		}
+	}
+}
+
+func TestSource_BuildSubstitution_RecursionLimit(t *testing.T) {
+	s := &Source{
+		sub: NewSubstitution(),
+	}
+	metadata := Metadata{
+		Type: ENVIRONMENT_TYPE,
+	}
+
+	// Setup test cases
+
+	// 1. Self-referential variable (should be skipped)
+	s.sub.add(metadata, "self_ref", "{{self_ref}}")
+
+	// 2. Nested variables for testing recursion depth
+	s.sub.add(metadata, "var1", "{{var2}}")
+	s.sub.add(metadata, "var2", "{{var3}}")
+	s.sub.add(metadata, "var3", "{{var4}}")
+	s.sub.add(metadata, "var4", "{{var5}}")
+	s.sub.add(metadata, "var5", "{{var6}}")
+	s.sub.add(metadata, "var6", "{{var7}}")
+	s.sub.add(metadata, "var7", "{{var8}}")
+	s.sub.add(metadata, "var8", "{{var9}}")
+	s.sub.add(metadata, "var9", "{{var10}}")
+	s.sub.add(metadata, "var10", "{{var11}}")
+	s.sub.add(metadata, "var11", "{{var12}}")
+	s.sub.add(metadata, "var12", "final_value")
+
+	// 3. Circular reference
+	s.sub.add(metadata, "circular1", "{{circular2}}")
+	s.sub.add(metadata, "circular2", "{{circular3}}")
+	s.sub.add(metadata, "circular3", "{{circular1}}")
+
+	testCases := []struct {
+		name     string
+		data     string
+		expected []string
+		maxDepth int
+	}{
+		{
+			name:     "Self-referential variable",
+			data:     "{{self_ref}}",
+			expected: []string{"{{self_ref}}"},
+		},
+		{
+			name:     "Nested variables within depth limit",
+			data:     "{{var8}}",
+			expected: []string{"{{var11}}"},
+		},
+		{
+			name:     "Nested variables exceeding depth limit",
+			data:     "{{var1}}",
+			expected: []string{"{{var4}}"},
+		},
+		{
+			name:     "Circular reference",
+			data:     "{{circular1}}",
+			expected: []string{"{{circular1}}"},
+		},
+		{
+			name:     "Custom recursion depth limit (5)",
+			data:     "{{var1}}",
+			expected: []string{"{{var7}}"},
+			maxDepth: 5,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			combos := make(map[string]struct{})
+
+			// Use custom maxDepth if provided, otherwise use default
+			if tc.maxDepth > 0 {
+				s.buildSubstitution(tc.data, metadata, &combos, 0, tc.maxDepth)
+			} else {
+				s.buildSubstitution(tc.data, metadata, &combos, 0, DefaultMaxRecursionDepth)
+			}
+
+			var result []string
+			for combo := range combos {
+				result = append(result, combo)
+			}
+
+			// If no substitutions were made, the original data should be returned
+			if len(result) == 0 {
+				result = []string{tc.data}
+			}
+
+			// Sort both slices for consistent comparison
+			sort.Strings(result)
+			sort.Strings(tc.expected)
+
+			if !reflect.DeepEqual(result, tc.expected) {
+				t.Errorf("Expected: %v, got: %v", tc.expected, result)
+			}
+		})
 	}
 }
