@@ -14,6 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/databricks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/digitalocean"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/dockerhub"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/dropbox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/elevenlabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/fastly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/figma"
@@ -140,6 +141,8 @@ func Run(keyType string, secretInfo SecretInfo) {
 		mux.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"], secretInfo.Parts["secret"])
 	case "posthog":
 		posthog.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "dropbox":
+		dropbox.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "databricks":
 		databricks.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["domain"], secretInfo.Parts["token"])
 	}

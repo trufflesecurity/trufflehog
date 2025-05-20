@@ -100,6 +100,7 @@ const (
 	AnalyzerTypeNgrok
 	AnalyzerTypeMux
 	AnalyzerTypePosthog
+	AnalyzerTypeDropbox
 	AnalyzerTypeDataBricks
 	// Add new items here with AnalyzerType prefix
 )
@@ -146,6 +147,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeNgrok:         "Ngrok",
 	AnalyzerTypeMux:           "Mux",
 	AnalyzerTypePosthog:       "Posthog",
+	AnalyzerTypeDropbox:       "Dropbox",
 	AnalyzerTypeDataBricks:    "DataBricks",
 	// Add new mappings here
 }
