@@ -22,6 +22,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+
+	"github.com/repeale/fp-go"
 )
 
 const (
@@ -139,6 +141,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 // Check out the postman UI to see what I mean.
 // Metadata is used to track information that informs the source of the chunk (e.g. the workspace -> collection -> request -> variable hierarchy).
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
+
 	// Scan local environments
 	for _, envPath := range s.conn.EnvironmentPaths {
 		env := VariableData{}
@@ -255,6 +258,13 @@ func (s *Source) scanLocalWorkspace(ctx context.Context, chunksChan chan *source
 }
 
 func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chunk, workspace Workspace) error {
+	ctx.Logger().V(4).Info("scanning workspace",
+		"workspace_id", workspace.Id,
+		"collection_uids", fp.Map(func(i IdNameUid) string { return i.Uid })(workspace.Collections),
+		"environment_uids", fp.Map(func(i IdNameUid) string { return i.Uid })(workspace.Environments),
+		"collection_raw_uids", fp.Map(func(c Collection) string { return c.Info.Uid })(workspace.CollectionsRaw),
+		"environment_raw_ids", fp.Map(func(v VariableData) string { return v.Id })(workspace.EnvironmentsRaw),
+	)
 	// reset keywords for each workspace
 	s.resetKeywords()
 	s.attemptToAddKeyword(workspace.Name)
@@ -321,7 +331,10 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 // scanCollection scans a collection and all its items, folders, and requests.
 // locally scoped Metadata is updated as we drill down into the collection.
 func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
-	ctx.Logger().V(2).Info("starting to scan collection", "collection_name", collection.Info.Name, "collection_uuid", collection.Info.Uid)
+	ctx.Logger().V(2).Info("starting to scan collection",
+		"collection_name", collection.Info.Name,
+		"collection_uuid", collection.Info.Uid,
+		"variable_count", len(collection.Variables))
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
 	s.attemptToAddKeyword(collection.Info.Name)
@@ -342,10 +355,18 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	// collections don't have URLs in the Postman API, but we can scan the Authorization section without it.
 	s.scanAuth(ctx, chunksChan, metadata, collection.Auth, URL{})
 
+	ctx.Logger().V(4).Info("Scanning events in collection",
+		"collection_uid", collection.Info.Uid,
+		"event_count", len(collection.Events),
+	)
 	for _, event := range collection.Events {
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
 
+	ctx.Logger().V(4).Info("Scanning items in collection",
+		"collection_uid", collection.Info.Uid,
+		"item_ids", fp.Map(func(i Item) string { return i.Id })(collection.Items),
+	)
 	for _, item := range collection.Items {
 		s.scanItem(ctx, chunksChan, collection, metadata, item, "")
 	}
@@ -353,6 +374,14 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 }
 
 func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item, parentItemId string) {
+	ctx.Logger().V(4).Info("Starting to scan item",
+		"item_uid", item.Uid,
+		"item_parent_item_id", parentItemId,
+		"item_descendent_item_uids", fp.Map(func(i Item) string { return i.Uid })(item.Items),
+		"item_event_count", len(item.Events),
+		"item_response_count", len(item.Response),
+		"item_variable_count", len(item.Variable),
+	)
 	s.attemptToAddKeyword(item.Name)
 
 	// override the base collection metadata with item-specific metadata
@@ -410,6 +439,8 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	// an auth all by its lonesome could be inherited to subfolders and requests
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
+
+	ctx.Logger().V(4).Info("Finished scanning item", "item_uid", item.Uid)
 }
 
 func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, event Event) {
@@ -537,6 +568,13 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
+	ctx.Logger().V(4).Info("scanning http request",
+		"request_header_count", len(r.HeaderKeyValue),
+		"request_has_string_header", r.HeaderString == nil,
+		"request_url_query_param_count", len(r.URL.Query),
+		"request_url_path_param_count", len(r.URL.Path),
+	)
+
 	s.addKeywords(r.URL.Host)
 	originalType := metadata.Type
 
@@ -590,6 +628,10 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 }
 
 func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
+	ctx.Logger().V(4).Info("scanning request body",
+		"request_body_form_data_count", len(b.FormData),
+		"request_body_url_encoded_param_count", len(b.URLEncoded),
+	)
 	if !m.fromLocal {
 		m.Link = m.Link + "?tab=body"
 	}
