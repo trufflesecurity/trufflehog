@@ -355,7 +355,7 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	// collections don't have URLs in the Postman API, but we can scan the Authorization section without it.
 	s.scanAuth(ctx, chunksChan, metadata, collection.Auth, URL{})
 
-	ctx.Logger().V(4).Info("Scanning events in collection",
+	ctx.Logger().V(3).Info("Scanning events in collection",
 		"collection_uid", collection.Info.Uid,
 		"event_count", len(collection.Events),
 	)
@@ -363,7 +363,7 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 		s.scanEvent(ctx, chunksChan, metadata, event)
 	}
 
-	ctx.Logger().V(4).Info("Scanning items in collection",
+	ctx.Logger().V(3).Info("Scanning items in collection",
 		"collection_uid", collection.Info.Uid,
 		"item_ids", fp.Map(func(i Item) string { return i.Id })(collection.Items),
 	)
@@ -374,7 +374,7 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 }
 
 func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item, parentItemId string) {
-	ctx.Logger().V(4).Info("Starting to scan item",
+	ctx.Logger().V(3).Info("Starting to scan item",
 		"item_uid", item.Uid,
 		"item_parent_item_id", parentItemId,
 		"item_descendent_item_uids", fp.Map(func(i Item) string { return i.Uid })(item.Items),
@@ -440,7 +440,7 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	s.scanAuth(ctx, chunksChan, metadata, item.Auth, item.Request.URL)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 
-	ctx.Logger().V(4).Info("Finished scanning item", "item_uid", item.Uid)
+	ctx.Logger().V(3).Info("Finished scanning item", "item_uid", item.Uid)
 }
 
 func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, event Event) {
@@ -568,7 +568,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 }
 
 func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, r Request) {
-	ctx.Logger().V(4).Info("scanning http request",
+	ctx.Logger().V(3).Info("scanning http request",
 		"request_header_count", len(r.HeaderKeyValue),
 		"request_has_string_header", r.HeaderString == nil,
 		"request_url_query_param_count", len(r.URL.Query),
@@ -628,7 +628,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 }
 
 func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.Chunk, m Metadata, b Body) {
-	ctx.Logger().V(4).Info("scanning request body",
+	ctx.Logger().V(3).Info("scanning request body",
 		"request_body_form_data_count", len(b.FormData),
 		"request_body_url_encoded_param_count", len(b.URLEncoded),
 	)
