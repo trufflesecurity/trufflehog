@@ -12,7 +12,7 @@ import (
 var (
 	validClientSecret        = "pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_YrKJUKribcBjcG8HVhfZluoGH"
 	anotherValidClientSecret = "pi_4NuxCxMleJwHu7ix28a3tqPa_secret_YsKJUKrjbcBjcG8HVhfZlabGH"
-	invalidClientSecret      = "pi_3MtwBwLkdIwHu7ix28a3tqPa"
+	invalidClientSecret      = "test_secret_test_1234567890abcdefg"
 )
 
 func TestStripepaymentintent_Pattern(t *testing.T) {
