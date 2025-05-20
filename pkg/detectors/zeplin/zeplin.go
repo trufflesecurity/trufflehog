@@ -3,9 +3,10 @@ package zeplin
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -71,4 +72,8 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Zeplin is a collaboration app for UI designers and front-end developers. Zeplin API keys can be used to access and modify project data."
+}
+
+func verifyZeplinKey(ctx context.Context, client *http.Client, key string) (bool, error) {
+	return false, nil
 }
