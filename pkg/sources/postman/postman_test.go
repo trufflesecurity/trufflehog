@@ -2,12 +2,13 @@ package postman
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"gopkg.in/h2non/gock.v1"
@@ -18,7 +19,9 @@ import (
 )
 
 func createTestSource(src *sourcespb.Postman) (*Source, *anypb.Any) {
-	s := &Source{}
+	s := &Source{
+		metrics: newMetrics("Test Source"),
+	}
 	conn, err := anypb.New(src)
 	if err != nil {
 		panic(err)

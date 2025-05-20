@@ -11,8 +11,10 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/asana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/databricks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/digitalocean"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/dockerhub"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/dropbox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/elevenlabs"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/fastly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/figma"
@@ -34,6 +36,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/plaid"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/planetscale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postgres"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/posthog"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/postman"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/privatekey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/sendgrid"
@@ -136,5 +139,11 @@ func Run(keyType string, secretInfo SecretInfo) {
 		ngrok.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
 	case "mux":
 		mux.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"], secretInfo.Parts["secret"])
+	case "posthog":
+		posthog.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "dropbox":
+		dropbox.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["key"])
+	case "databricks":
+		databricks.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["domain"], secretInfo.Parts["token"])
 	}
 }

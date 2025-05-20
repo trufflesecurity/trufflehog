@@ -49,6 +49,8 @@ type Source struct {
 	keywords map[string]struct{}
 	sub      *Substitution
 
+	metrics *metrics
+
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -102,6 +104,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.verify = verify
 	s.keywords = make(map[string]struct{})
 	s.sub = NewSubstitution()
+	s.metrics = newMetrics(name)
 
 	var conn sourcespb.Postman
 	if err := anypb.UnmarshalTo(connection, &conn, proto.UnmarshalOptions{}); err != nil {
@@ -115,7 +118,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 		if conn.GetToken() == "" {
 			return errors.New("Postman token is empty")
 		}
-		s.client = NewClient(conn.GetToken())
+		s.client = NewClient(conn.GetToken(), s.metrics)
 		s.client.HTTPClient = common.RetryableHTTPClientTimeout(10)
 		log.RedactGlobally(conn.GetToken())
 	case *sourcespb.Postman_Unauthenticated:
@@ -431,7 +434,7 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_SCRIPT
 	}
 
-	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, data)), metadata)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, data, DefaultMaxRecursionDepth)), metadata)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
@@ -529,7 +532,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	} else if strings.Contains(m.Type, COLLECTION_TYPE) {
 		m.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_AUTHORIZATION
 	}
-	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, authData)), m)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, authData, DefaultMaxRecursionDepth)), m)
 	m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
@@ -552,7 +555,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		metadata.Type = originalType + " > header"
 		metadata.Link = metadata.Link + "?tab=headers"
 		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_HEADER
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, strings.Join(r.HeaderString, " "))), metadata)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, strings.Join(r.HeaderString, " "), DefaultMaxRecursionDepth)), metadata)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -561,7 +564,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		// Note: query parameters are handled separately
 		u := fmt.Sprintf("%s://%s/%s", r.URL.Protocol, strings.Join(r.URL.Host, "."), strings.Join(r.URL.Path, "/"))
 		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_URL
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, u)), metadata)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, u, DefaultMaxRecursionDepth)), metadata)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -612,13 +615,13 @@ func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.C
 		m.Type = originalType + " > raw"
 		data := b.Raw
 		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_RAW
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data, DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	case "graphql":
 		m.Type = originalType + " > graphql"
 		data := b.GraphQL.Query + " " + b.GraphQL.Variables
 		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_GRAPHQL
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data, DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 }
@@ -644,7 +647,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 		m.Type = originalType + " > response header"
 		// TODO Note: for now, links to Postman responses do not include a more granular tab for the params/header/body, but when they do, we will need to update the metadata.Link info
 		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_HEADER
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, strings.Join(response.HeaderString, " "))), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, strings.Join(response.HeaderString, " "), DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -652,7 +655,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	if response.Body != "" {
 		m.Type = originalType + " > response body"
 		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_BODY
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, response.Body)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, response.Body, DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -685,7 +688,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		if valStr == "" {
 			continue
 		}
-		values = append(values, s.buildSubstituteSet(m, valStr)...)
+		values = append(values, s.buildSubstituteSet(m, valStr, DefaultMaxRecursionDepth)...)
 	}
 
 	m.FieldType = m.Type + " variables"
