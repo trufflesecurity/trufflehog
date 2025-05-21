@@ -88,7 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					client := s.getClient()
-					isVerified, verificationErr := verifyJiratoken(ctx, client, email, domain, token)
+					isVerified, verificationErr := VerifyJiraToken(ctx, client, email, domain, token)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, token)
 				}
@@ -101,7 +101,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyJiratoken(ctx context.Context, client *http.Client, email, domain, token string) (bool, error) {
+func VerifyJiraToken(ctx context.Context, client *http.Client, email, domain, token string) (bool, error) {
 	// wrap the query in a JSON body
 	body := map[string]string{
 		"query": `verify { me { user {name}}}`,
