@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kingpin/v2"
+	"github.com/fatih/color"
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
@@ -58,6 +59,8 @@ var (
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to verified,unverified,unknown.").String()
+	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
+	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
@@ -317,6 +320,10 @@ func init() {
 		} else {
 			log.SetLevel(l)
 		}
+	}
+
+	if *noColor || *noColour {
+		color.NoColor = true // disables colorized output
 	}
 }
 

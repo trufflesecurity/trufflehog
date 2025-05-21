@@ -2,8 +2,8 @@ package bitbar
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -23,7 +23,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bitbar"}) + `\b([0-9a-z]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bitbar"}) + `\b([0-9a-zA-Z]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -47,21 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			data := fmt.Sprintf("%s:", resMatch)
-			baseToken := b64.StdEncoding.EncodeToString([]byte(data))
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://cloud.bitbar.com/api/me", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", baseToken))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyBitBar(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -76,4 +64,34 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Bitbar provides a cloud-based mobile app testing platform. Bitbar API keys can be used to access and manage testing resources and data."
+}
+
+// docs: https://support.smartbear.com/bitbar/docs/en/use-rest-apis-with-bitbar.html
+func verifyBitBar(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://cloud.bitbar.com/api/me", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.SetBasicAuth(key, "")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

@@ -92,6 +92,16 @@ const (
 	AnalyzerTypeAirtablePat
 	AnalyzerTypeGroq
 	AnalyzerTypeLaunchDarkly
+	AnalyzerTypeFigma
+	AnalyzerTypePlaid
+	AnalyzerTypeNetlify
+	AnalyzerTypeFastly
+	AnalyzerTypeMonday
+	AnalyzerTypeNgrok
+	AnalyzerTypeMux
+	AnalyzerTypePosthog
+	AnalyzerTypeDropbox
+	AnalyzerTypeDataBricks
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -129,6 +139,16 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeAirtablePat:   "AirtablePat",
 	AnalyzerTypeGroq:          "Groq",
 	AnalyzerTypeLaunchDarkly:  "LaunchDarkly",
+	AnalyzerTypeFigma:         "Figma",
+	AnalyzerTypePlaid:         "Plaid",
+	AnalyzerTypeNetlify:       "Netlify",
+	AnalyzerTypeFastly:        "Fastly",
+	AnalyzerTypeMonday:        "Monday",
+	AnalyzerTypeNgrok:         "Ngrok",
+	AnalyzerTypeMux:           "Mux",
+	AnalyzerTypePosthog:       "Posthog",
+	AnalyzerTypeDropbox:       "Dropbox",
+	AnalyzerTypeDataBricks:    "DataBricks",
 	// Add new mappings here
 }
 

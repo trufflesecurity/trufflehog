@@ -30,7 +30,7 @@ func TestTwitch_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword twitch",
 			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validId),
-			want:  []string{validKey, validId},
+			want:  []string{validId + ":" + validKey, validKey + ":" + validId},
 		},
 		{
 			name:  "invalid pattern",

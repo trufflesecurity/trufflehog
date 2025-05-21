@@ -3,6 +3,7 @@ package betterstack
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -51,25 +52,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://uptime.betterstack.com/api/v2/monitors", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else if res.StatusCode == 401 {
-					// The secret is determinately not verified (nothing to do)
-				} else {
-					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					s1.SetVerificationError(err, resMatch)
-				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
-			}
+
+			isVerified, verificationErr := verifyBetterStack(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -84,4 +70,33 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Betterstack is a monitoring service for uptime and performance of websites and APIs. Betterstack API keys can be used to access and manage these monitoring services."
+}
+
+// docs: https://betterstack.com/docs/uptime/api/list-all-existing-monitors/
+func verifyBetterStack(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://uptime.betterstack.com/api/v2/monitors", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

@@ -240,3 +240,32 @@ func TestRetryableHTTPClientBackoff(t *testing.T) {
 		})
 	}
 }
+
+func TestRetryableHTTPClientTimeout(t *testing.T) {
+	testCases := []struct {
+		name            string
+		timeoutSeconds  int64
+		expectedTimeout time.Duration
+	}{
+		{
+			name:            "5 second timeout",
+			timeoutSeconds:  5,
+			expectedTimeout: 5 * time.Second,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			// Call the function with the test timeout value
+			client := RetryableHTTPClientTimeout(tc.timeoutSeconds)
+
+			// Verify that the timeout is set correctly
+			assert.Equal(t, tc.expectedTimeout, client.Timeout, "HTTP client timeout does not match expected value")
+
+			// Verify that the transport is a custom transport
+			_, isRoundTripperTransport := client.Transport.(*retryablehttp.RoundTripper)
+			assert.True(t, isRoundTripperTransport, "HTTP client transport is not a retryablehttp.RoundTripper")
+		})
+	}
+}

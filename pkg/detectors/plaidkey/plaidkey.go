@@ -24,8 +24,9 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-z0-9]{30})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-z0-9]{24})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-f0-9]{30})\b`)
+	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-f0-9]{24})\b`)
+	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b(access-(sandbox|production)-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -39,15 +40,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	// find all the matching keys and ids in the data and make a unique maps for both.
-	uniqueKeys, uniqueIds := make(map[string]struct{}), make(map[string]struct{})
+	uniqueSecrets, uniqueIds, uniqueTokens := make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
 
-	for _, foundKey := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+	for _, foundKey := range secretPat.FindAllStringSubmatch(dataStr, -1) {
 		key := foundKey[1]
 		if detectors.StringShannonEntropy(key) < 3 {
 			continue
 		}
 
-		uniqueKeys[key] = struct{}{}
+		uniqueSecrets[key] = struct{}{}
 	}
 
 	for _, foundId := range idPat.FindAllStringSubmatch(dataStr, -1) {
@@ -59,38 +60,53 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueIds[id] = struct{}{}
 	}
 
-	for key := range uniqueKeys {
-		for id := range uniqueIds {
+	for _, foundToken := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
+		token := foundToken[1]
+		if detectors.StringShannonEntropy(token) < 3 {
+			continue
+		}
 
-			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_PlaidKey,
-				Raw:          []byte(key),
-			}
-			environments := []string{"sandbox", "production"}
-			if verify {
-				for _, env := range environments {
-					isVerified, _, verificationErr := verifyMatch(ctx, client, id, key, env)
+		uniqueTokens[token] = struct{}{}
+	}
+
+	for secret := range uniqueSecrets {
+		for id := range uniqueIds {
+			for token := range uniqueTokens {
+				s1 := detectors.Result{
+					DetectorType: detectorspb.DetectorType_PlaidKey,
+					Raw:          []byte(secret),
+					RawV2:        []byte(fmt.Sprintf(`%s:%s:%s`, secret, id, token)),
+				}
+
+				if verify {
+					environment := "sandbox"
+					if strings.Contains(token, "production") {
+						environment = "production"
+					}
+					isVerified, _, verificationErr := verifyMatch(ctx, client, id, secret, token, environment)
 					s1.Verified = isVerified
-					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", env)}
-					s1.SetVerificationError(verificationErr, id, key)
+					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", environment)}
+					s1.SetVerificationError(verificationErr, id, secret)
+					if s1.Verified {
+						s1.AnalysisInfo = map[string]string{
+							"secret": secret,
+							"id":     id,
+							"token":  token,
+						}
+					}
 				}
-				results = append(results, s1)
-				// if the environment is sandbox, we don't need to check production
-				if s1.Verified {
-					break
-				}
-			} else {
 				results = append(results, s1)
 			}
 		}
 	}
 
-	return results, nil
+	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, id string, secret string, env string) (bool, map[string]string, error) {
-	payload := strings.NewReader(`{"client_id":"` + id + `","secret":"` + secret + `","user":{"client_user_id":"60e3ee4019a2660010f8bc54","phone_number_verified_time":"0001-01-01T00:00:00Z","email_address_verified_time":"0001-01-01T00:00:00Z"},"client_name":"Plaid Test App","products":["auth","transactions"],"country_codes":["US"],"webhook":"https://webhook-uri.com","account_filters":{"depository":{"account_subtypes":["checking","savings"]}},"language":"en","link_customization_name":"default"}`)
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://"+env+".plaid.com/link/token/create", payload)
+func verifyMatch(ctx context.Context, client *http.Client, id string, secret string, token string, env string) (bool, map[string]string, error) {
+	payload := strings.NewReader(`{"client_id":"` + id + `","secret":"` + secret + `","access_token":"` + token + `"}`)
+	url := "https://" + env + ".plaid.com/item/get"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, payload)
 	if err != nil {
 		return false, nil, nil
 	}

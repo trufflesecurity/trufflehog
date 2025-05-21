@@ -75,6 +75,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			} else {
 				s1.SetVerificationError(err, resMatch)
 			}
+			if s1.Verified {
+				s1.AnalysisInfo = map[string]string{"token": resMatch}
+			}
 		}
 
 		results = append(results, s1)

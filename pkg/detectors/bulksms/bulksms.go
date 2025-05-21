@@ -2,6 +2,7 @@ package bulksms
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -56,27 +57,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.bulksms.com/v1/messages", nil)
-				if err != nil {
-					continue
-				}
-				req.SetBasicAuth(id, key)
-				res, err := client.Do(req)
-				if err == nil {
-					defer func() {
-						_, _ = io.Copy(io.Discard, res.Body)
-						_ = res.Body.Close()
-					}()
-
-					if res.StatusCode == http.StatusOK {
-						s1.Verified = true
-						results = append(results, s1)
-						// move to next id, by skipping remaining key's
-						break
-					}
-				} else {
-					s1.SetVerificationError(err, key)
-				}
+				isVerified, verificationErr := verifyBulksms(ctx, client, id, key)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr)
 			}
 
 			results = append(results, s1)
@@ -92,4 +75,33 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "BulkSMS is a service used for sending SMS messages in bulk. BulkSMS credentials can be used to access and send messages through the BulkSMS API."
+}
+
+// docs: https://www.bulksms.com/developer/json/v1/
+func verifyBulksms(ctx context.Context, client *http.Client, id, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.bulksms.com/v1/messages", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.SetBasicAuth(id, key)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

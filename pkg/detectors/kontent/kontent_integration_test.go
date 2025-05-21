@@ -19,11 +19,13 @@ import (
 func TestKontent_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("KONTENT")
+
+	envID := testSecrets.MustGetField("KONTENT_ENV_ID")
+	secret := testSecrets.MustGetField("KONTENT_API_KEY")
 	inactiveSecret := testSecrets.MustGetField("KONTENT_INACTIVE")
 
 	type args struct {
@@ -43,7 +45,7 @@ func TestKontent_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a kontent secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a kontent env id: %s and kontent secret %s within", envID, secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -59,7 +61,7 @@ func TestKontent_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a kontent secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a kontent env id: %s and kontent secret %s within but not valid", envID, inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -95,6 +97,7 @@ func TestKontent_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Kontent.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

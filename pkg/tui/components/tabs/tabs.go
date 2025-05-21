@@ -77,10 +77,10 @@ func (t *Tabs) View() string {
 	s := strings.Builder{}
 	sep := t.TabSeparator
 	for i, tab := range t.tabs {
-		style := t.TabInactive.Copy()
+		style := t.TabInactive
 		prefix := "  "
 		if i == t.activeTab {
-			style = t.TabActive.Copy()
+			style = t.TabActive
 			prefix = t.TabDot.Render("• ")
 		}
 		if t.UseDot {
