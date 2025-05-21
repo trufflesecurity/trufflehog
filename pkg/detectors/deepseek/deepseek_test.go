@@ -10,14 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-	other.code()
-    deepseek.Apikey = sk-abc123def456ghi789jkl012mno345pq
-	`
-	invalidPattern = "sk-abc123invalid"
-)
-
 func TestDeepseek_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -28,15 +20,18 @@ func TestDeepseek_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
+			name: "valid pattern",
+			input: `
+				other.code()
+				deepseek.Apikey = sk-abc123def456ghi789jkl012mno345pq
+			`,
 			want: []string{
 				"sk-abc123def456ghi789jkl012mno345pq",
 			},
 		},
 		{
 			name:  "invalid pattern",
-			input: invalidPattern,
+			input: "deepseek.key = sk-abc123invalid",
 			want:  nil,
 		},
 	}
