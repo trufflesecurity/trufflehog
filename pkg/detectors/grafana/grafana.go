@@ -24,7 +24,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\b(glc_[A-Za-z0-9+\/]{50,150}\={0,2})`)
+	keyPat = regexp.MustCompile(`\b(glc_eyJ[A-Za-z0-9+\/=]{60,160})`)
 )
 
 func (s Scanner) getClient() *http.Client {
@@ -39,7 +39,7 @@ func (s Scanner) getClient() *http.Client {
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"glc_"}
+	return []string{"glc_eyJ"}
 }
 
 // FromData will find and optionally verify Grafana secrets in a given set of bytes.
