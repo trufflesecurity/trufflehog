@@ -1,0 +1,424 @@
+{
+    "apis": [
+        {
+            "api_name": "Advanced Trade API",
+            "resources": [
+                {
+                    "name": "Accounts",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Best Bids/Asks",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Convert Quotes",
+                    "actions": [
+                        {
+                            "name": "Create",
+                            "required_permission": "trade"
+                        }
+                    ]
+                },
+                {
+                    "name": "Convert Trades",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Commit",
+                            "required_permission": "trade"
+                        }
+                    ]
+                },
+                {
+                    "name": "Current Margin Window",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Fills",
+                    "actions": [
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Futures Balances",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Futures Positions",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Futures Sweeps",
+                    "actions": [
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Schedule",
+                            "required_permission": "transfer"
+                        },
+                        {
+                            "name": "Cancel",
+                            "required_permission": "transfer"
+                        }
+                    ]
+                },
+                {
+                    "name": "Intraday Margin Settings",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Set",
+                            "required_permission": "trade"
+                        }
+                    ]
+                },
+                {
+                    "name": "Market Trades",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Multi Asset Collaterals",
+                    "actions": [
+                        {
+                            "name": "Opt-In",
+                            "required_permission": "trade"
+                        }
+                    ]
+                },
+                {
+                    "name": "Orders",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Preview",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "trade"
+                        },
+                        {
+                            "name": "Cancel",
+                            "required_permission": "trade"
+                        }
+                    ]
+                },
+                {
+                    "name": "Payment Methods",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Perpetuals Portfolio Balances",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Perpetuals Portfolio Summary",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Perpetuals Positions",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Portfolios",
+                    "actions": [
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "transfer"
+                        },
+                        {
+                            "name": "Move",
+                            "required_permission": "transfer"
+                        },
+                        {
+                            "name": "Allocate",
+                            "required_permission": "transfer"
+                        },
+                        {
+                            "name": "Delete",
+                            "required_permission": "trade"
+                        }
+                    ]
+                },
+                {
+                    "name": "Products",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Product Books",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Product Candles",
+                    "actions": [
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Transaction Summaries",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "api_name": "Transfer API",
+            "resources": [
+                {
+                    "name": "Money",
+                    "actions": [
+                        {
+                            "name": "Send",
+                            "required_permission": "transfer"
+                        }
+                    ]
+                },
+                {
+                    "name": "Fiat Deposits",
+                    "actions": [
+                        {
+                            "name": "Show",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Deposit",
+                            "required_permission": "transfer"
+                        },
+                        {
+                            "name": "Commit",
+                            "required_permission": "transfer"
+                        }
+                    ]
+                },
+                {
+                    "name": "Fiat Withdrawals",
+                    "actions": [
+                        {
+                            "name": "Show",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Withdraw",
+                            "required_permission": "transfer"
+                        },
+                        {
+                            "name": "Commit",
+                            "required_permission": "transfer"
+                        }
+                    ]
+                },
+                {
+                    "name": "Onchain Addresses",
+                    "actions": [
+                        {
+                            "name": "Show",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "transfer"
+                        }
+                    ]
+                },
+                {
+                    "name": "Transactions",
+                    "actions": [
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "api_name": "Track API",
+            "resources": [
+                {
+                    "name": "Accounts",
+                    "actions": [
+                        {
+                            "name": "Show",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Transactions",
+                    "actions": [
+                        {
+                            "name": "Show",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Currencies",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Exchange Rates",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Prices",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Server Time",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

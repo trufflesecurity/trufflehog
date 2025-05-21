@@ -117,6 +117,18 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Key:      "domain",
 			Required: true,
 		}}
+	case "coinbase":
+		inputs = []textinputs.InputConfig{{
+			Label:       "Key ID",
+			Key:         "keyID",
+			Required:    true,
+			RedactInput: true,
+		}, {
+			Label:       "Secret",
+			Key:         "secret",
+			Required:    true,
+			RedactInput: true,
+		}}
 	default:
 		inputs = []textinputs.InputConfig{{
 			Label:       "Secret",
