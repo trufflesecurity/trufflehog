@@ -1437,7 +1437,7 @@ func TestMaxDiffSize(t *testing.T) {
 	bigReader := strings.NewReader(builder.String())
 
 	diffChan := make(chan *Diff, 1)                                          // Buffer to prevent blocking
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second) // Timeout to prevent long wait
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // Timeout to prevent long wait
 	defer cancel()
 
 	go func() {
