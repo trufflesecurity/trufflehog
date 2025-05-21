@@ -161,10 +161,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.includeRepos = conn.GetIncludeRepos()
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
 
-	// Enterprise uses the inverse logic of the `useAuthInUrl` flag.
-	// This is intentional to preserve existing behavior: in Enterprise, credentials are passed in the URL by default,
-	// whereas in OSS, the default is to pass credentials in the Authorization header.
-	// This ensures backward compatibility in both environments.
+	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !conn.RemoveAuthInUrl
 
 	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
@@ -663,11 +660,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 					user = "placeholder"
 				}
 
-				if s.useAuthInUrl {
-					path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
-				} else {
-					path, repo, err = git.CloneRepoUsingTokenInHeader(ctx, s.token, repoURL, user)
-				}
+				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user, s.useAuthInUrl)
 			}
 			if err != nil {
 				scanErrs.Add(err)
@@ -851,11 +844,7 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 			user = "placeholder"
 		}
 
-		if s.useAuthInUrl {
-			path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
-		} else {
-			path, repo, err = git.CloneRepoUsingTokenInHeader(ctx, s.token, repoURL, user)
-		}
+		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user, s.useAuthInUrl)
 	}
 	if err != nil {
 		return err

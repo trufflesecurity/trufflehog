@@ -57,11 +57,7 @@ func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...stri
 		return "", nil, err
 	}
 
-	if c.authInUrl {
-		return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.user, args...)
-	} else {
-		return git.CloneRepoUsingTokenInHeader(ctx, c.token, repoURL, c.user, args...)
-	}
+	return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.user, c.authInUrl, args...)
 }
 
 func (c *tokenConnector) IsGithubEnterprise() bool {

@@ -228,10 +228,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
-	// Enterprise uses the inverse logic of the `useAuthInUrl` flag.
-	// This is intentional to preserve existing behavior: in Enterprise, credentials are passed in the URL by default,
-	// whereas in OSS, the default is to pass credentials in the Authorization header.
-	// This ensures backward compatibility in both environments.
+	// configuration uses the inverse logic of the `useAuthInUrl` flag.
 	s.useAuthInUrl = !s.conn.RemoveAuthInUrl
 
 	connector, err := newConnector(s)
