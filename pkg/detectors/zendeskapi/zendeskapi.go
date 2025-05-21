@@ -24,7 +24,7 @@ var (
 
 	token  = regexp.MustCompile(detectors.PrefixRegex([]string{"zendesk"}) + `([A-Za-z0-9_-]{40})`)
 	email  = regexp.MustCompile(`\b([a-zA-Z-0-9-]{5,16}\@[a-zA-Z-0-9]{4,16}\.[a-zA-Z-0-9]{3,6})\b`)
-	domain = regexp.MustCompile(`\b([a-zA-Z-0-9]{3,16}\.zendesk\.com)\b`)
+	domain = regexp.MustCompile(`\b([a-zA-Z-0-9]{3,25}\.zendesk\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -90,7 +90,7 @@ func verifyZendesk(ctx context.Context, client *http.Client, email, token, domai
 	}
 
 	// docs: https://developer.zendesk.com/api-reference/introduction/security-and-auth/
-	req.SetBasicAuth(email+"/token:", token)
+	req.SetBasicAuth(email+"/token", token)
 	resp, err := client.Do(req)
 	if err != nil {
 		return false, err

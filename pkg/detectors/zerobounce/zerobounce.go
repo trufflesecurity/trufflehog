@@ -67,7 +67,7 @@ func (s Scanner) Description() string {
 }
 
 func verifyZeroBounceKey(ctx context.Context, client *http.Client, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.zerobounce.net/v1/activity?email=testemail@email.com&api_key="+key, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.zerobounce.net/v2/activity?email=testemail@email.com&api_key="+key, http.NoBody)
 	if err != nil {
 		return false, err
 	}

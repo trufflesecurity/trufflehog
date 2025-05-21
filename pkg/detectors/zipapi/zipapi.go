@@ -25,7 +25,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"zipapi"}) + `\b([0-9a-z]{32})\b`)
+	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"zipapi"}) + `\b([A-Z0-9a-z]{32})\b`)
 	emailPat = regexp.MustCompile(common.EmailPattern)
 	pwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zipapi"}) + `\b([a-zA-Z0-9!=@#$%^]{7,})`)
 )
@@ -105,7 +105,7 @@ func verifyZipAPI(ctx context.Context, client *http.Client, email, key, password
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized:
+	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)

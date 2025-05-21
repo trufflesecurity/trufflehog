@@ -97,7 +97,7 @@ func verifyZipBooksCredentials(ctx context.Context, client *http.Client, email, 
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized:
+	case http.StatusUnauthorized, http.StatusNotFound: // username or password not found
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
