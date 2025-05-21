@@ -72,7 +72,13 @@ func (s *Source) buildSubstituteSet(metadata Metadata, data string, maxRecursion
 // buildSubstitution performs variable substitution with a maximum recursion depth
 // depth is the current recursion depth
 // maxRecursionDepth is the maximum recursion depth to use for variable substitution
-func (s *Source) buildSubstitution(data string, metadata Metadata, combos *map[string]struct{}, depth int, maxRecursionDepth int) {
+func (s *Source) buildSubstitution(
+	data string,
+	metadata Metadata,
+	combos *map[string]struct{},
+	depth int,
+	maxRecursionDepth int,
+) {
 	// Limit recursion depth to prevent stack overflow
 	if depth > maxRecursionDepth {
 		(*combos)[data] = struct{}{}

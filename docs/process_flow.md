@@ -78,7 +78,7 @@ flowchart LR
 
 
     KeywordMatching["`**Keyword Matching**
-_(Aho-Corsick)_
+_(Aho-Corasick)_
 
 Match chunks to detectors based on the presence of specific keywords in the chunk`"]
     
@@ -105,7 +105,7 @@ subgraph Detector
 
         De-Dupe-Detectors["`**De-Dupe-Detectors**
 
-If multiple detectors keyword-match on the same chunk, we have some logic that chooses which detector will verify found secret (so we don't duplicate verification requests to externa APIs)`"]
+If multiple detectors keyword-match on the same chunk, we have some logic that chooses which detector will verify found secret (so we don't duplicate verification requests to external APIs)`"]
 
         CollectMatches["`**Collect Matches**
 

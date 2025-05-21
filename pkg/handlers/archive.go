@@ -202,7 +202,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		}
 
 		if common.SkipFile(file.Name()) || common.IsBinary(file.Name()) {
-			lCtx.Logger().V(3).Info("skipping file: extension is ignored")
+			lCtx.Logger().V(4).Info("skipping file: extension is ignored")
 			h.metrics.incFilesSkipped()
 			return nil
 		}
