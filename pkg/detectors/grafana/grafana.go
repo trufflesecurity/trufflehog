@@ -104,11 +104,7 @@ func verifyGrafanaKey(ctx context.Context, client *http.Client, token string) (b
 		}
 
 		// token is valid but has restricted permissions
-		if strings.Contains(string(bodyBytes), "Unauthorized") {
-			return true, nil
-		}
-
-		return false, nil
+		return strings.Contains(string(bodyBytes), "Unauthorized"), nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
