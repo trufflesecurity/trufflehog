@@ -86,7 +86,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyResult(ctx context.Context, client *http.Client, domain, id, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s/api/v1/users", domain), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s/api/v1/users", domain), http.NoBody)
 	if err != nil {
 		return false, err
 	}

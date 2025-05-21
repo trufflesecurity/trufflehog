@@ -49,7 +49,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			isVerified, verificationErr := verifyZenrowsKey(ctx, client, resMatch)
 			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr)
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
