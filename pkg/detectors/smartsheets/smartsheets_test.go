@@ -28,8 +28,9 @@ func TestSmartsheets_Pattern(t *testing.T) {
 			want: []string{"MVE7zmdxouvunYkowLzaudyX7tvMpkqJ3q52C"},
 		},
 		{
-			name: "valid pattern - with keyword sheet",
+			name: "valid pattern - with prefixRegex sheet",
 			input: `
+			# smartsheet credentials
 			sheet_id := "MVE7zmdxouvunFAKELzaudyX7tvMpkqJ3q52d"
 			`,
 			want: []string{"MVE7zmdxouvunFAKELzaudyX7tvMpkqJ3q52d"},
@@ -37,6 +38,7 @@ func TestSmartsheets_Pattern(t *testing.T) {
 		{
 			name: "valid pattern - ignore duplicate",
 			input: `
+			# smartsheet duplicate credentials
 			sheet_id1 := "MVE7zmdxouvunFAKELzaudyX7tvMpkqJ3q52d"
 			sheet_id2 := "MVE7zmdxouvunFAKELzaudyX7tvMpkqJ3q52d"
 			`,
@@ -56,6 +58,7 @@ func TestSmartsheets_Pattern(t *testing.T) {
 		{
 			name: "invalid pattern",
 			input: `
+			# smartsheet secret
 			sheet_id = MVE7?mdxouvunYkowLzaudyX7tvMpkqJ3q52C
 			`,
 			want: []string{},
