@@ -105,6 +105,16 @@ func secretInfoToAnalyzerResult(info *secretInfo) *analyzers.AnalyzerResult {
 		bindings = append(bindings, createBindings(info, &resource)...)
 	}
 
+	for _, wallet := range info.Wallets {
+		resource := createWalletResource(wallet)
+		bindings = append(bindings, createBindings(info, &resource)...)
+	}
+
+	for _, address := range info.Addresses {
+		resource := createAddressResource(address)
+		bindings = append(bindings, createBindings(info, &resource)...)
+	}
+
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerTypeCoinbase,
 		Metadata:     nil,
@@ -147,28 +157,26 @@ func printPermissionsTable(info *secretInfo) {
 
 func printAccessLevelTable(info *secretInfo, resourceConfig *coinbaseAPIResourceConfig) {
 	color.Yellow("\n[i] Resource Access Levels:")
-	accessLevelTable := table.NewWriter()
-	accessLevelTable.AppendHeader(table.Row{"API Name", "Resource", "Action", "Can Perform"})
+	accessLevelTableHeader := table.Row{"Resource", "Action", "Can Perform"}
 
 	for _, api := range resourceConfig.APIs {
+		accessLevelTable := table.NewWriter()
+		accessLevelTable.SetTitle(api.APIName)
+		accessLevelTable.AppendHeader(accessLevelTableHeader)
 		for _, resource := range api.Resources {
 			for idx, action := range resource.Actions {
-				apiTypeText := ""
 				resourceText := ""
 				canPerformText := "No"
 
 				if idx == 0 {
-					apiTypeText = api.APIName
 					resourceText = resource.Name
 				}
 
-				requiredPermission := action.RequiredPermission
-				if info.hasPermission(requiredPermission) {
+				if info.hasPermission(action.RequiredPermission) {
 					canPerformText = "Yes"
 				}
 
 				accessLevelTable.AppendRow(table.Row{
-					color.GreenString(apiTypeText),
 					color.GreenString(resourceText),
 					color.GreenString(action.Name),
 					color.GreenString(canPerformText),
@@ -176,10 +184,9 @@ func printAccessLevelTable(info *secretInfo, resourceConfig *coinbaseAPIResource
 			}
 			accessLevelTable.AppendSeparator()
 		}
+		accessLevelTable.SetOutputMirror(os.Stdout)
+		accessLevelTable.Render()
 	}
-
-	accessLevelTable.SetOutputMirror(os.Stdout)
-	accessLevelTable.Render()
 }
 
 func printResources(info *secretInfo) {
@@ -187,6 +194,8 @@ func printResources(info *secretInfo) {
 	printOrders(info)
 	printPortfolios(info)
 	printPaymentMethods(info)
+	printWallets(info)
+	printAddresses(info)
 }
 
 func printAccounts(info *secretInfo) {
@@ -304,4 +313,50 @@ func printPaymentMethods(info *secretInfo) {
 
 	paymentMethodsTable.SetOutputMirror(os.Stdout)
 	paymentMethodsTable.Render()
+}
+
+func printWallets(info *secretInfo) {
+	color.Yellow("\n[i] Wallets:")
+	walletsTable := table.NewWriter()
+	walletsTable.AppendHeader(table.Row{
+		"ID",
+		"Network ID",
+		"Server Signer Status",
+	})
+
+	for _, wallet := range info.Wallets {
+		walletsTable.AppendRow(table.Row{
+			wallet.ID,
+			wallet.NetworkID,
+			wallet.ServerSignerStatus,
+		})
+		walletsTable.AppendSeparator()
+	}
+
+	walletsTable.SetOutputMirror(os.Stdout)
+	walletsTable.Render()
+}
+
+func printAddresses(info *secretInfo) {
+	color.Yellow("\n[i] Wallet Addresses:")
+	addressesTable := table.NewWriter()
+	addressesTable.AppendHeader(table.Row{
+		"Wallet ID",
+		"Network ID",
+		"Public Key",
+		"Address ID",
+	})
+
+	for _, address := range info.Addresses {
+		addressesTable.AppendRow(table.Row{
+			address.WalletID,
+			address.NetworkID,
+			address.PublicKey,
+			address.AddressID,
+		})
+		addressesTable.AppendSeparator()
+	}
+
+	addressesTable.SetOutputMirror(os.Stdout)
+	addressesTable.Render()
 }

@@ -15,13 +15,13 @@ import (
 )
 
 const (
-	baseUrl     = "https://api.coinbase.com"
-	requestHost = "api.coinbase.com"
+	requestHostProductAPI = "api.coinbase.com"
+	requestHostCDPAPI     = "api.cdp.coinbase.com"
 )
 
 // Coinbase API requires the credentials encoded in a JWT token
 // The JWT token is signed with the private key and expires in 2 minutes
-func buildJWT(method, endpoint, keyName, key string) (string, error) {
+func buildJWT(method, host, endpoint, keyName, key string) (string, error) {
 	// Decode the PEM key
 	pemStr := strings.ReplaceAll(key, `\n`, "\n")
 	block, _ := pem.Decode([]byte(pemStr))
@@ -40,7 +40,7 @@ func buildJWT(method, endpoint, keyName, key string) (string, error) {
 		"iss": "cdp",
 		"nbf": now,
 		"exp": now + 120,
-		"uri": fmt.Sprintf("%s %s%s", method, requestHost, endpoint),
+		"uri": fmt.Sprintf("%s %s%s", method, host, endpoint),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
@@ -61,8 +61,8 @@ func makeNonce() []byte {
 	return nonce
 }
 
-func makeAPIRequest(client *http.Client, method, endpoint, jwtToken string) ([]byte, error) {
-	req, err := http.NewRequest(method, baseUrl+endpoint, http.NoBody)
+func makeAPIRequest(client *http.Client, method, uri, jwtToken string) ([]byte, error) {
+	req, err := http.NewRequest(method, uri, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +97,12 @@ func makeAPIRequest(client *http.Client, method, endpoint, jwtToken string) ([]b
 
 func testAllPermissions(client *http.Client, info *secretInfo, keyName, key string) error {
 	permissionEndpoint := "/api/v3/brokerage/key_permissions"
-	jwt, err := buildJWT(http.MethodGet, permissionEndpoint, keyName, key)
+	jwt, err := buildJWT(http.MethodGet, requestHostProductAPI, permissionEndpoint, keyName, key)
 	if err != nil {
 		return err
 	}
-	body, err := makeAPIRequest(client, http.MethodGet, permissionEndpoint, jwt)
+	uri := fmt.Sprintf("https://%s%s", requestHostProductAPI, permissionEndpoint)
+	body, err := makeAPIRequest(client, http.MethodGet, uri, jwt)
 	if err != nil {
 		return err
 	}
@@ -135,22 +136,29 @@ func populateResources(client *http.Client, info *secretInfo, keyName, key strin
 	if err := populatePaymentMethods(client, info, keyName, key); err != nil {
 		return err
 	}
+	if err := populateWallets(client, info, keyName, key); err != nil {
+		return err
+	}
+	if err := populateAddresses(client, info, keyName, key); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func populateAccounts(client *http.Client, info *secretInfo, keyName, key string) error {
 	limit := 250
-	maxPageLimit := 50 // Safety: stop after 50 pages
+	maxPageLimit := 25 // Safety: stop after 25 pages
 	endpoint := "/api/v3/brokerage/accounts"
+	uri := fmt.Sprintf("https://%s%s", requestHostProductAPI, endpoint)
 	params := fmt.Sprintf("?limit=%d", limit)
 
-	jwt, err := buildJWT(http.MethodGet, endpoint, keyName, key)
+	jwt, err := buildJWT(http.MethodGet, requestHostProductAPI, endpoint, keyName, key)
 	if err != nil {
 		return err
 	}
 	for i := 0; i < maxPageLimit; i++ {
-		body, err := makeAPIRequest(client, http.MethodGet, endpoint+params, jwt)
+		body, err := makeAPIRequest(client, http.MethodGet, uri+params, jwt)
 		if err != nil {
 			return err
 		}
@@ -160,7 +168,7 @@ func populateAccounts(client *http.Client, info *secretInfo, keyName, key string
 		}
 		info.Accounts = append(info.Accounts, accountsResponse.Accounts...)
 		if accountsResponse.HasNext {
-			endpoint = fmt.Sprintf("?limit=%d&cursor=%s", limit, accountsResponse.Cursor)
+			uri = fmt.Sprintf("?limit=%d&cursor=%s", limit, accountsResponse.Cursor)
 		} else {
 			break
 		}
@@ -171,16 +179,17 @@ func populateAccounts(client *http.Client, info *secretInfo, keyName, key string
 
 func populateOrders(client *http.Client, info *secretInfo, keyName, key string) error {
 	limit := 100
-	maxPageLimit := 50
+	maxPageLimit := 25
 	endpoint := "/api/v3/brokerage/orders/historical/batch"
+	uri := fmt.Sprintf("https://%s%s", requestHostProductAPI, endpoint)
 	params := fmt.Sprintf("?limit=%d", limit)
 
-	jwt, err := buildJWT(http.MethodGet, endpoint, keyName, key)
+	jwt, err := buildJWT(http.MethodGet, requestHostProductAPI, endpoint, keyName, key)
 	if err != nil {
 		return err
 	}
 	for i := 0; i < maxPageLimit; i++ {
-		body, err := makeAPIRequest(client, http.MethodGet, endpoint+params, jwt)
+		body, err := makeAPIRequest(client, http.MethodGet, uri+params, jwt)
 		if err != nil {
 			return err
 		}
@@ -201,17 +210,18 @@ func populateOrders(client *http.Client, info *secretInfo, keyName, key string) 
 
 func populatePaymentMethods(client *http.Client, info *secretInfo, keyName, key string) error {
 	endpoint := "/api/v3/brokerage/payment_methods"
-	jwt, err := buildJWT(http.MethodGet, endpoint, keyName, key)
+	uri := fmt.Sprintf("https://%s%s", requestHostProductAPI, endpoint)
+	jwt, err := buildJWT(http.MethodGet, requestHostProductAPI, endpoint, keyName, key)
 	if err != nil {
 		return err
 	}
-	body, err := makeAPIRequest(client, http.MethodGet, endpoint, jwt)
+	body, err := makeAPIRequest(client, http.MethodGet, uri, jwt)
 	if err != nil {
 		return err
 	}
 	var paymentMethodsResponse paymentMethodsResponse
 	if err := json.Unmarshal(body, &paymentMethodsResponse); err != nil {
-		return fmt.Errorf("failed to unmarshal orders response: %w", err)
+		return fmt.Errorf("failed to unmarshal payment methods response: %w", err)
 	}
 	info.PaymentMethods = paymentMethodsResponse.PaymentMethods
 
@@ -220,19 +230,82 @@ func populatePaymentMethods(client *http.Client, info *secretInfo, keyName, key 
 
 func populatePortfolios(client *http.Client, info *secretInfo, keyName, key string) error {
 	endpoint := "/api/v3/brokerage/portfolios"
-	jwt, err := buildJWT(http.MethodGet, endpoint, keyName, key)
+	uri := fmt.Sprintf("https://%s%s", requestHostProductAPI, endpoint)
+	jwt, err := buildJWT(http.MethodGet, requestHostProductAPI, endpoint, keyName, key)
 	if err != nil {
 		return err
 	}
-	body, err := makeAPIRequest(client, http.MethodGet, endpoint, jwt)
+	body, err := makeAPIRequest(client, http.MethodGet, uri, jwt)
 	if err != nil {
 		return err
 	}
 	var portfoliosResponse portfoliosResponse
 	if err := json.Unmarshal(body, &portfoliosResponse); err != nil {
-		return fmt.Errorf("failed to unmarshal orders response: %w", err)
+		return fmt.Errorf("failed to unmarshal portfolios response: %w", err)
 	}
 	info.Portfolios = portfoliosResponse.Portfolios
+
+	return nil
+}
+
+func populateWallets(client *http.Client, info *secretInfo, keyID, secret string) error {
+	limit := 100
+	maxPageLimit := 25
+	endpoint := "/platform/v1/wallets"
+	uri := fmt.Sprintf("https://%s%s", requestHostCDPAPI, endpoint)
+	params := fmt.Sprintf("?limit=%d", limit)
+	jwt, err := buildJWT(http.MethodGet, requestHostCDPAPI, endpoint, keyID, secret)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < maxPageLimit; i++ {
+		body, err := makeAPIRequest(client, http.MethodGet, uri+params, jwt)
+		if err != nil {
+			return err
+		}
+		var walletssResponse walletesResponse
+		if err := json.Unmarshal(body, &walletssResponse); err != nil {
+			return fmt.Errorf("failed to unmarshal wallets response: %w", err)
+		}
+		info.Wallets = append(info.Wallets, walletssResponse.Data...)
+		if walletssResponse.HasMore {
+			uri = fmt.Sprintf("?limit=%d&page=%s", limit, walletssResponse.NextPage)
+		} else {
+			break
+		}
+	}
+
+	return nil
+}
+
+func populateAddresses(client *http.Client, info *secretInfo, keyID, secret string) error {
+	limit := 100
+	maxPageLimit := 25
+	for _, wallet := range info.Wallets {
+		endpoint := fmt.Sprintf("/platform/v1/wallets/%s/addresses", wallet.ID)
+		uri := fmt.Sprintf("https://%s%s", requestHostCDPAPI, endpoint)
+		params := fmt.Sprintf("?limit=%d", limit)
+		jwt, err := buildJWT(http.MethodGet, requestHostCDPAPI, endpoint, keyID, secret)
+		if err != nil {
+			return err
+		}
+		for i := 0; i < maxPageLimit; i++ {
+			body, err := makeAPIRequest(client, http.MethodGet, uri+params, jwt)
+			if err != nil {
+				return err
+			}
+			var addressesResponse addressesResponse
+			if err := json.Unmarshal(body, &addressesResponse); err != nil {
+				return fmt.Errorf("failed to unmarshal addresses response: %w", err)
+			}
+			info.Addresses = append(info.Addresses, addressesResponse.Data...)
+			if addressesResponse.HasMore {
+				uri = fmt.Sprintf("?limit=%d&page=%s", limit, addressesResponse.NextPage)
+			} else {
+				break
+			}
+		}
+	}
 
 	return nil
 }

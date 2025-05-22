@@ -419,6 +419,377 @@
                     ]
                 }
             ]
+        },
+        {
+            "api_name": "CDP API v1",
+            "resources": [
+                {
+                    "name": "Addresses",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Assets",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Networks",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Onramps",
+                    "actions": [
+                        {
+                            "name": "Get onramp transactions",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get offramp transactions",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get buy config",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get buy options",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create buy quote",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get sell config",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get sell options",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create sell quote",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create session token",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Smart Contracts",
+                    "actions": [
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List events",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Register",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Update",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Stakings",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get context",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get validator",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List validators",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Broadcast operation",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Build operation",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get balances",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get rewards",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Trades",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Broadcast",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Transfers",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Broadcast",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Wallets",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get balance",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List balances",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Webhooks",
+                    "actions": [
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Update",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Delete",
+                            "required_permission": "view"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "api_name": "CDP API v2",
+            "resources": [
+                {
+                    "name": "EVM Accounts",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create"
+                        },
+                        {
+                            "name": "Import"
+                        },
+                        {
+                            "name": "Sign Transaction"
+                        },
+                        {
+                            "name": "Update"
+                        }
+                    ]
+                },
+                {
+                    "name": "Smart Account",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get Operation",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Prepare Operation",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Send Operation",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "EVM Token Balances",
+                    "actions": [
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Faucets",
+                    "actions": [
+                        {
+                            "name": "Request funds",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Payments",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Execute",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Get crypto rails",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Policies",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Delete",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Update",
+                            "required_permission": "view"
+                        }
+                    ]
+                },
+                {
+                    "name": "Solana Accounts",
+                    "actions": [
+                        {
+                            "name": "Get",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "List",
+                            "required_permission": "view"
+                        },
+                        {
+                            "name": "Create"
+                        },
+                        {
+                            "name": "Update"
+                        },
+                        {
+                            "name": "Sign message"
+                        },
+                        {
+                            "name": "Sign transaction"
+                        }
+                    ]
+                }
+            ]
         }
     ]
 }

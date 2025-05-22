@@ -153,3 +153,28 @@ func createOrderResource(order order) analyzers.Resource {
 		},
 	}
 }
+
+func createWalletResource(wallet wallet) analyzers.Resource {
+	return analyzers.Resource{
+		Name:               wallet.ID,
+		FullyQualifiedName: "wallet/" + wallet.ID,
+		Type:               "wallet",
+		Metadata: map[string]any{
+			"networkID":          wallet.NetworkID,
+			"serverSignerStatus": wallet.ServerSignerStatus,
+		},
+	}
+}
+
+func createAddressResource(address address) analyzers.Resource {
+	return analyzers.Resource{
+		Name:               address.AddressID,
+		FullyQualifiedName: "wallet/" + address.WalletID + "/address/" + address.AddressID,
+		Type:               "address",
+		Metadata: map[string]any{
+			"walletID":  address.WalletID,
+			"networkID": address.NetworkID,
+			"publicKey": address.PublicKey,
+		},
+	}
+}

@@ -1,6 +1,6 @@
 package coinbase
 
-// Advanced Trade API Resources
+// Product API Resources
 
 type account struct {
 	UUID              string `json:"uuid"`
@@ -83,6 +83,46 @@ type paymentMethod struct {
 	UpdatedAt     string `json:"updated_at"`
 }
 
+// CDP API Resources
+
+type wallet struct {
+	ID                 string     `json:"id"`
+	NetworkID          string     `json:"network_id"`
+	DefaultAddress     address    `json:"default_address"`
+	FeatureSet         featureSet `json:"feature_set"`
+	ServerSignerStatus string     `json:"server_signer_status"`
+}
+
+type featureSet struct {
+	Faucet       bool `json:"faucet"`
+	ServerSigner bool `json:"server_signer"`
+	Transfer     bool `json:"transfer"`
+	Trade        bool `json:"trade"`
+	Stake        bool `json:"stake"`
+	GaslessSend  bool `json:"gasless_send"`
+}
+
+type address struct {
+	WalletID  string `json:"wallet_id"`
+	NetworkID string `json:"network_id"`
+	PublicKey string `json:"public_key"`
+	AddressID string `json:"address_id"`
+}
+
+type walletesResponse struct {
+	Data       []wallet `json:"data"`
+	HasMore    bool     `json:"has_more"`
+	NextPage   string   `json:"next_page"`
+	TotalCount int      `json:"total_count"`
+}
+
+type addressesResponse struct {
+	Data       []address `json:"data"`
+	HasMore    bool      `json:"has_more"`
+	NextPage   string    `json:"next_page"`
+	TotalCount int       `json:"total_count"`
+}
+
 // API Response Object Structs
 
 type keyPermissionsResponse struct {
@@ -118,6 +158,8 @@ type secretInfo struct {
 	Orders         []order
 	Portfolios     []portfolio
 	PaymentMethods []paymentMethod
+	Wallets        []wallet
+	Addresses      []address
 	Permissions    map[Permission]struct{}
 }
 
