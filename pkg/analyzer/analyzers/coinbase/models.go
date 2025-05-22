@@ -109,20 +109,6 @@ type address struct {
 	AddressID string `json:"address_id"`
 }
 
-type walletesResponse struct {
-	Data       []wallet `json:"data"`
-	HasMore    bool     `json:"has_more"`
-	NextPage   string   `json:"next_page"`
-	TotalCount int      `json:"total_count"`
-}
-
-type addressesResponse struct {
-	Data       []address `json:"data"`
-	HasMore    bool      `json:"has_more"`
-	NextPage   string    `json:"next_page"`
-	TotalCount int       `json:"total_count"`
-}
-
 // API Response Object Structs
 
 type keyPermissionsResponse struct {
@@ -149,6 +135,20 @@ type portfoliosResponse struct {
 
 type paymentMethodsResponse struct {
 	PaymentMethods []paymentMethod `json:"payment_methods"`
+}
+
+type walletsResponse struct {
+	Data       []wallet `json:"data"`
+	HasMore    bool     `json:"has_more"`
+	NextPage   string   `json:"next_page"`
+	TotalCount int      `json:"total_count"`
+}
+
+type addressesResponse struct {
+	Data       []address `json:"data"`
+	HasMore    bool      `json:"has_more"`
+	NextPage   string    `json:"next_page"`
+	TotalCount int       `json:"total_count"`
 }
 
 // Secret Information struct

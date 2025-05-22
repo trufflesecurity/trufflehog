@@ -263,7 +263,7 @@ func populateWallets(client *http.Client, info *secretInfo, keyID, secret string
 		if err != nil {
 			return err
 		}
-		var walletssResponse walletesResponse
+		var walletssResponse walletsResponse
 		if err := json.Unmarshal(body, &walletssResponse); err != nil {
 			return fmt.Errorf("failed to unmarshal wallets response: %w", err)
 		}
