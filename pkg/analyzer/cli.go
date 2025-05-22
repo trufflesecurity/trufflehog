@@ -147,6 +147,6 @@ func Run(keyType string, secretInfo SecretInfo) {
 	case "databricks":
 		databricks.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["domain"], secretInfo.Parts["token"])
 	case "coinbase":
-		coinbase.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["keyID"], secretInfo.Parts["secret"])
+		coinbase.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["keyName"], secretInfo.Parts["key"])
 	}
 }

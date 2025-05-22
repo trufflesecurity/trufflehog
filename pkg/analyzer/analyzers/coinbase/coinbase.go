@@ -26,28 +26,27 @@ func (a Analyzer) Type() analyzers.AnalyzerType {
 }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	keyID, exist := credInfo["keyID"]
+	keyName, exist := credInfo["keyName"]
 	if !exist {
-		return nil, errors.New("key ID not found in credentials info")
+		return nil, errors.New("keyName not found in credentials info")
 	}
-	secret, exist := credInfo["secret"]
+	key, exist := credInfo["key"]
 	if !exist {
-		return nil, errors.New("secret not found in credentials info")
+		return nil, errors.New("key not found in credentials info")
 	}
 
-	info, err := AnalyzePermissions(a.Cfg, keyID, secret)
+	info, err := AnalyzePermissions(a.Cfg, keyName, key)
 	if err != nil {
 		return nil, err
 	}
 
 	return secretInfoToAnalyzerResult(info), nil
-	// return nil, nil
 }
 
-func AnalyzeAndPrintPermissions(cfg *config.Config, keyID, secret string) {
-	info, err := AnalyzePermissions(cfg, keyID, secret)
+func AnalyzeAndPrintPermissions(cfg *config.Config, keyName, key string) {
+	info, err := AnalyzePermissions(cfg, keyName, key)
 	if err != nil {
-		color.Red("[x] Invalid Coinbase Key ID or Secret\n")
+		color.Red("[x] Invalid Coinbase key name or key\n")
 		color.Red("[x] Error : %s", err.Error())
 		return
 	}
@@ -57,7 +56,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, keyID, secret string) {
 		return
 	}
 
-	color.Green("[i] Valid Coinbase API Key and Secret\n")
+	color.Green("[i] Valid Coinbase API Credentials\n")
 	resourceConfig, err := readInResources()
 	if err != nil {
 		color.Red("[x] Error : %s", "Could not read in resources from json")
@@ -66,13 +65,13 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, keyID, secret string) {
 	printResourcesAndPermissions(info, resourceConfig)
 }
 
-func AnalyzePermissions(cfg *config.Config, keyID, secret string) (*secretInfo, error) {
+func AnalyzePermissions(cfg *config.Config, keyName, key string) (*secretInfo, error) {
 	client := analyzers.NewAnalyzeClient(cfg)
 	secretInfo := &secretInfo{}
-	if err := testAllPermissions(client, secretInfo, keyID, secret); err != nil {
+	if err := testAllPermissions(client, secretInfo, keyName, key); err != nil {
 		return nil, err
 	}
-	if err := populateResources(client, secretInfo, keyID, secret); err != nil {
+	if err := populateResources(client, secretInfo, keyName, key); err != nil {
 		return nil, err
 	}
 

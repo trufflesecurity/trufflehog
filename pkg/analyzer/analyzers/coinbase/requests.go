@@ -21,9 +21,9 @@ const (
 
 // Coinbase API requires the credentials encoded in a JWT token
 // The JWT token is signed with the private key and expires in 2 minutes
-func buildJWT(method, endpoint, keyID, secret string) (string, error) {
+func buildJWT(method, endpoint, keyName, key string) (string, error) {
 	// Decode the PEM key
-	pemStr := strings.ReplaceAll(secret, `\n`, "\n")
+	pemStr := strings.ReplaceAll(key, `\n`, "\n")
 	block, _ := pem.Decode([]byte(pemStr))
 	if block == nil || block.Type != "EC PRIVATE KEY" {
 		return "", fmt.Errorf("failed to decode PEM block containing EC private key")
@@ -36,7 +36,7 @@ func buildJWT(method, endpoint, keyID, secret string) (string, error) {
 
 	now := time.Now().Unix()
 	claims := jwt.MapClaims{
-		"sub": keyID,
+		"sub": keyName,
 		"iss": "cdp",
 		"nbf": now,
 		"exp": now + 120,
@@ -44,7 +44,7 @@ func buildJWT(method, endpoint, keyID, secret string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-	token.Header["kid"] = keyID
+	token.Header["kid"] = keyName
 	token.Header["nonce"] = fmt.Sprintf("%x", makeNonce())
 
 	signedToken, err := token.SignedString(privateKey)
@@ -95,9 +95,9 @@ func makeAPIRequest(client *http.Client, method, endpoint, jwtToken string) ([]b
 	}
 }
 
-func testAllPermissions(client *http.Client, info *secretInfo, keyID string, secret string) error {
+func testAllPermissions(client *http.Client, info *secretInfo, keyName, key string) error {
 	permissionEndpoint := "/api/v3/brokerage/key_permissions"
-	jwt, err := buildJWT(http.MethodGet, permissionEndpoint, keyID, secret)
+	jwt, err := buildJWT(http.MethodGet, permissionEndpoint, keyName, key)
 	if err != nil {
 		return err
 	}
@@ -122,30 +122,30 @@ func testAllPermissions(client *http.Client, info *secretInfo, keyID string, sec
 	return nil
 }
 
-func populateResources(client *http.Client, info *secretInfo, keyID string, secret string) error {
-	if err := populateAccounts(client, info, keyID, secret); err != nil {
+func populateResources(client *http.Client, info *secretInfo, keyName, key string) error {
+	if err := populateAccounts(client, info, keyName, key); err != nil {
 		return err
 	}
-	if err := populateOrders(client, info, keyID, secret); err != nil {
+	if err := populateOrders(client, info, keyName, key); err != nil {
 		return err
 	}
-	if err := populatePortfolios(client, info, keyID, secret); err != nil {
+	if err := populatePortfolios(client, info, keyName, key); err != nil {
 		return err
 	}
-	if err := populatePaymentMethods(client, info, keyID, secret); err != nil {
+	if err := populatePaymentMethods(client, info, keyName, key); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func populateAccounts(client *http.Client, info *secretInfo, keyID string, secret string) error {
+func populateAccounts(client *http.Client, info *secretInfo, keyName, key string) error {
 	limit := 250
 	maxPageLimit := 50 // Safety: stop after 50 pages
 	endpoint := "/api/v3/brokerage/accounts"
 	params := fmt.Sprintf("?limit=%d", limit)
 
-	jwt, err := buildJWT(http.MethodGet, endpoint, keyID, secret)
+	jwt, err := buildJWT(http.MethodGet, endpoint, keyName, key)
 	if err != nil {
 		return err
 	}
@@ -169,13 +169,13 @@ func populateAccounts(client *http.Client, info *secretInfo, keyID string, secre
 	return nil
 }
 
-func populateOrders(client *http.Client, info *secretInfo, keyID string, secret string) error {
+func populateOrders(client *http.Client, info *secretInfo, keyName, key string) error {
 	limit := 100
 	maxPageLimit := 50
 	endpoint := "/api/v3/brokerage/orders/historical/batch"
 	params := fmt.Sprintf("?limit=%d", limit)
 
-	jwt, err := buildJWT(http.MethodGet, endpoint, keyID, secret)
+	jwt, err := buildJWT(http.MethodGet, endpoint, keyName, key)
 	if err != nil {
 		return err
 	}
@@ -199,9 +199,9 @@ func populateOrders(client *http.Client, info *secretInfo, keyID string, secret 
 	return nil
 }
 
-func populatePaymentMethods(client *http.Client, info *secretInfo, keyID string, secret string) error {
+func populatePaymentMethods(client *http.Client, info *secretInfo, keyName, key string) error {
 	endpoint := "/api/v3/brokerage/payment_methods"
-	jwt, err := buildJWT(http.MethodGet, endpoint, keyID, secret)
+	jwt, err := buildJWT(http.MethodGet, endpoint, keyName, key)
 	if err != nil {
 		return err
 	}
@@ -218,9 +218,9 @@ func populatePaymentMethods(client *http.Client, info *secretInfo, keyID string,
 	return nil
 }
 
-func populatePortfolios(client *http.Client, info *secretInfo, keyID string, secret string) error {
+func populatePortfolios(client *http.Client, info *secretInfo, keyName, key string) error {
 	endpoint := "/api/v3/brokerage/portfolios"
-	jwt, err := buildJWT(http.MethodGet, endpoint, keyID, secret)
+	jwt, err := buildJWT(http.MethodGet, endpoint, keyName, key)
 	if err != nil {
 		return err
 	}

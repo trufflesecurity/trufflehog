@@ -24,20 +24,20 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	keyID := testSecrets.MustGetField("COINBASE_KEY")
-	secret := testSecrets.MustGetField("COINBASE_SECRET")
+	keyName := testSecrets.MustGetField("COINBASE_KEY_NAME")
+	key := testSecrets.MustGetField("COINBASE_KEY")
 
 	tests := []struct {
 		name    string
-		keyID   string
-		secret  string
+		keyName string
+		key     string
 		want    string
 		wantErr bool
 	}{
 		{
 			name:    "valid coinbase credentials",
-			keyID:   keyID,
-			secret:  secret,
+			keyName: keyName,
+			key:     key,
 			want:    string(expectedOutput),
 			wantErr: false,
 		},
@@ -47,8 +47,8 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{Cfg: &config.Config{}}
 			got, err := a.Analyze(ctx, map[string]string{
-				"keyID":  tt.keyID,
-				"secret": tt.secret,
+				"keyName": tt.keyName,
+				"key":     tt.key,
 			})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
@@ -96,7 +96,6 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	}
 }
 
-// Helper function to sort bindings
 func sortBindings(bindings []analyzers.Binding) {
 	sort.SliceStable(bindings, func(i, j int) bool {
 		if bindings[i].Resource.FullyQualifiedName == bindings[j].Resource.FullyQualifiedName {
