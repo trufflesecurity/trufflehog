@@ -9,9 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -36,7 +33,8 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 		name                string
 		s                   Scanner
 		args                args
-		want                []detectors.Result
+		wantVerified        bool // Instead of expecting exact results, check if any result is verified
+		wantResultCount     int  // Expected number of results
 		wantErr             bool
 		wantVerificationErr bool
 	}{
@@ -48,12 +46,8 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a stripepaymentintent secret %s and payment intent: %s within", secret, paymentIntent)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_StripePaymentIntent,
-					Verified:     true,
-				},
-			},
+			wantVerified:        true, // At least one result should be verified
+			wantResultCount:     1,    // 1 client secret × 1 key = 1 result
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
@@ -65,12 +59,8 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 				data:   []byte(fmt.Sprintf("You can find a stripepaymentintent secret %s and payment intent %s within but not valid", secretInactive, paymentIntent)),
 				verify: true,
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_StripePaymentIntent,
-					Verified:     false,
-				},
-			},
+			wantVerified:        false, // No results should be verified
+			wantResultCount:     1,     // 1 client secret × 1 key = 1 result
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
@@ -82,7 +72,8 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 				data:   []byte("You cannot find the secret within"),
 				verify: true,
 			},
-			want:                nil,
+			wantVerified:        false,
+			wantResultCount:     0, // No results expected
 			wantErr:             false,
 			wantVerificationErr: false,
 		},
@@ -94,17 +85,45 @@ func TestStripepaymentintent_FromChunk(t *testing.T) {
 				t.Errorf("Stripepaymentintent.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			// Check result count
+			if len(got) != tt.wantResultCount {
+				t.Errorf("Stripepaymentintent.FromData() got %d results, want %d", len(got), tt.wantResultCount)
+				return
+			}
+
+			// Check each result
+			hasVerified := false
 			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
+				// Check that all results have the correct detector type
+				if got[i].DetectorType != detectorspb.DetectorType_StripePaymentIntent {
+					t.Errorf("Stripepaymentintent.FromData() result %d has wrong DetectorType", i)
 				}
+
+				// Check that raw secret is present
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no raw secret present in result %d: \n %+v", i, got[i])
+				}
+
+				// Check that RawV2 is present (should contain client secret + key)
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no rawV2 present in result %d: \n %+v", i, got[i])
+				}
+
+				// Check verification error expectation
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
+
+				// Track if any result is verified
+				if got[i].Verified {
+					hasVerified = true
+				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Stripepaymentintent.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+
+			// Check verification expectation
+			if hasVerified != tt.wantVerified {
+				t.Errorf("Stripepaymentintent.FromData() hasVerified = %v, want %v", hasVerified, tt.wantVerified)
 			}
 		})
 	}

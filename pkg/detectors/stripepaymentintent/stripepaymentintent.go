@@ -44,40 +44,57 @@ func (s Scanner) getClient() *http.Client {
 }
 
 // FromData will find and optionally verify Stripe Payment Intent secrets in a given set of bytes.
-func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	dataStr := string(data)
+
 	clientSecrets := extractMatches(clientSecretPat, dataStr)
 	secretKeys := extractMatches(secretKeyPat, dataStr)
 	publishableKeys := extractMatches(publishableKeyPat, dataStr)
 
+	// Only proceed if we have client secrets AND at least one key
+	totalKeys := len(secretKeys) + len(publishableKeys)
+	if len(clientSecrets) == 0 || totalKeys == 0 {
+		return nil, nil
+	}
+
+	results := make([]detectors.Result, 0, len(clientSecrets)*totalKeys)
+	client := s.getClient()
+
+	// Process each client secret against all keys
 	for clientSecret := range clientSecrets {
-		result := createResult(clientSecret, false, nil)
+		clientSecretBytes := []byte(clientSecret)
 
-		if verify {
-			client := s.getClient()
-
-			for secretKey := range secretKeys {
-				isVerified, verificationErr := verifyPaymentIntentWithSecretKey(ctx, client, clientSecret, secretKey)
-				result.Verified = isVerified
-				result.SetVerificationError(verificationErr)
-				if result.Verified {
-					break
-				}
+		for key := range secretKeys {
+			result := detectors.Result{
+				DetectorType: detectorspb.DetectorType_StripePaymentIntent,
+				Raw:          clientSecretBytes,
+				RawV2:        []byte(clientSecret + key),
 			}
 
-			if !result.Verified {
-				for publishableKey := range publishableKeys {
-					isVerified, verificationErr := verifyPaymentIntentWithPublishableKey(ctx, client, clientSecret, publishableKey)
-					result.Verified = isVerified
-					result.SetVerificationError(verificationErr)
-					if result.Verified {
-						break
-					}
-				}
+			if verify {
+				verified, err := verifyPaymentIntentWithSecretKey(ctx, client, clientSecret, key)
+				result.Verified = verified
+				result.SetVerificationError(err)
 			}
+
+			results = append(results, result)
 		}
 
-		results = append(results, result)
+		for key := range publishableKeys {
+			result := detectors.Result{
+				DetectorType: detectorspb.DetectorType_StripePaymentIntent,
+				Raw:          clientSecretBytes,
+				RawV2:        []byte(clientSecret + key),
+			}
+
+			if verify {
+				verified, err := verifyPaymentIntentWithPublishableKey(ctx, client, clientSecret, key)
+				result.Verified = verified
+				result.SetVerificationError(err)
+			}
+
+			results = append(results, result)
+		}
 	}
 
 	return results, nil
@@ -92,20 +109,6 @@ func extractMatches(pattern *regexp.Regexp, data string) map[string]struct{} {
 		if len(match) >= 2 {
 			result[match[1]] = struct{}{}
 		}
-	}
-
-	return result
-}
-
-func createResult(clientSecret string, verified bool, verificationErr error) detectors.Result {
-	result := detectors.Result{
-		DetectorType: detectorspb.DetectorType_StripePaymentIntent,
-		Raw:          []byte(clientSecret),
-		Verified:     verified,
-	}
-
-	if verificationErr != nil {
-		result.SetVerificationError(verificationErr, clientSecret)
 	}
 
 	return result
