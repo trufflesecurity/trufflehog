@@ -2,10 +2,12 @@ package zerobounce
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -45,23 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.zerobounce.net/v1/activity?email=testemail@email.com&api_key="+resMatch, nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-
-				if strings.Contains(body, "found") {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyZeroBounceKey(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -76,4 +64,39 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Zerobounce is an email validation and verification service. Zerobounce API keys can be used to access and utilize this service."
+}
+
+func verifyZeroBounceKey(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.zerobounce.net/v2/activity?email=testemail@email.com&api_key="+key, http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+
+		if strings.Contains(string(bodyBytes), "found") {
+			return true, nil
+		}
+
+		return false, nil
+	case http.StatusUnauthorized, http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

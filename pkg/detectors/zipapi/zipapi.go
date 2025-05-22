@@ -2,8 +2,8 @@ package zipapi
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -25,7 +25,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"zipapi"}) + `\b([0-9a-z]{32})\b`)
+	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"zipapi"}) + `\b([A-Z0-9a-z]{32})\b`)
 	emailPat = regexp.MustCompile(common.EmailPattern)
 	pwordPat = regexp.MustCompile(detectors.PrefixRegex([]string{"zipapi"}) + `\b([a-zA-Z0-9!=@#$%^]{7,})`)
 )
@@ -62,21 +62,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					data := fmt.Sprintf("%s:%s", emailMatch, passMatch)
-					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://service.zipapi.us/zipcode/90210/?X-API-KEY=%s", keyMatch), nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Content-Type", "application/json")
-					req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-						}
-					}
+					isVerified, verificationErr := verifyZipAPI(ctx, client, emailMatch, keyMatch, passMatch)
+					s1.Verified = isVerified
+					s1.SetVerificationError(verificationErr, keyMatch)
 				}
 
 				results = append(results, s1)
@@ -93,4 +81,33 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "ZipAPI is a service used to retrieve ZIP code information. ZipAPI keys can be used to access and retrieve this information from their API."
+}
+
+func verifyZipAPI(ctx context.Context, client *http.Client, email, key, password string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://service.zipapi.us/zipcode/90210/?X-API-KEY=%s", key), http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.SetBasicAuth(email, password)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
