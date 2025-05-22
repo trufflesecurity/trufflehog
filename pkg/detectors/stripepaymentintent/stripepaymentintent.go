@@ -58,21 +58,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 	}
 
 	results := make([]detectors.Result, 0, len(clientSecrets)*totalKeys)
-	client := s.getClient()
 
 	// Process each client secret against all keys
 	for clientSecret := range clientSecrets {
-		clientSecretBytes := []byte(clientSecret)
-
 		for key := range secretKeys {
 			result := detectors.Result{
 				DetectorType: detectorspb.DetectorType_StripePaymentIntent,
-				Raw:          clientSecretBytes,
+				Raw:          []byte(clientSecret),
 				RawV2:        []byte(clientSecret + key),
 			}
 
 			if verify {
-				verified, err := verifyPaymentIntentWithSecretKey(ctx, client, clientSecret, key)
+				verified, err := verifyPaymentIntentWithSecretKey(ctx, s.getClient(), clientSecret, key)
 				result.Verified = verified
 				result.SetVerificationError(err)
 			}
@@ -83,12 +80,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 		for key := range publishableKeys {
 			result := detectors.Result{
 				DetectorType: detectorspb.DetectorType_StripePaymentIntent,
-				Raw:          clientSecretBytes,
+				Raw:          []byte(clientSecret),
 				RawV2:        []byte(clientSecret + key),
 			}
 
 			if verify {
-				verified, err := verifyPaymentIntentWithPublishableKey(ctx, client, clientSecret, key)
+				verified, err := verifyPaymentIntentWithPublishableKey(ctx, s.getClient(), clientSecret, key)
 				result.Verified = verified
 				result.SetVerificationError(err)
 			}
