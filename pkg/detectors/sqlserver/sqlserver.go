@@ -85,7 +85,7 @@ var ping = func(ctx context.Context, config msdsn.Config) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	tcpConn.Close()
+	defer tcpConn.Close()
 
 	cleanConfig := msdsn.Config{}
 	cleanConfig.Host = config.Host
