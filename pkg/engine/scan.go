@@ -22,7 +22,7 @@ func (e *Engine) ScanConfig(ctx context.Context, configuredSources ...sources.Co
 		// Postman needs special initialization to set Keywords from
 		// the engine.
 		if postmanSource, ok := source.(*postman.Source); ok {
-			e.setPostmanKeywords(postmanSource)
+			postmanSource.DetectorKeywords = e.AhoCorasickCoreKeywords()
 		}
 
 		// Start the scan.
