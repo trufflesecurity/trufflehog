@@ -41,7 +41,6 @@ const (
     MoveIssues Permission = iota
     ResolveIssues Permission = iota
     ScheduleIssues Permission = iota
-    ServicedeskAgent Permission = iota
     SetIssueSecurity Permission = iota
     SystemAdmin Permission = iota
     TransitionIssues Permission = iota
@@ -52,7 +51,6 @@ const (
     ViewReadonlyWorkflow Permission = iota
     ViewVotersAndWatchers Permission = iota
     WorkOnIssues Permission = iota
-    ComAtlassianAtlasJiraJiraTownsquareLinkUnconnectedIssueGlanceViewPermission Permission = iota
 )
 
 var (
@@ -91,7 +89,6 @@ var (
         MoveIssues: "move_issues",
         ResolveIssues: "resolve_issues",
         ScheduleIssues: "schedule_issues",
-        ServicedeskAgent: "servicedesk_agent",
         SetIssueSecurity: "set_issue_security",
         SystemAdmin: "system_admin",
         TransitionIssues: "transition_issues",
@@ -102,7 +99,6 @@ var (
         ViewReadonlyWorkflow: "view_readonly_workflow",
         ViewVotersAndWatchers: "view_voters_and_watchers",
         WorkOnIssues: "work_on_issues",
-        ComAtlassianAtlasJiraJiraTownsquareLinkUnconnectedIssueGlanceViewPermission: "com.atlassian.atlas.jira__jira-townsquare-link-unconnected-issue-glance-view-permission",
     }
 
     StringToPermission = map[string]Permission{
@@ -140,7 +136,6 @@ var (
         "move_issues": MoveIssues,
         "resolve_issues": ResolveIssues,
         "schedule_issues": ScheduleIssues,
-        "servicedesk_agent": ServicedeskAgent,
         "set_issue_security": SetIssueSecurity,
         "system_admin": SystemAdmin,
         "transition_issues": TransitionIssues,
@@ -151,7 +146,6 @@ var (
         "view_readonly_workflow": ViewReadonlyWorkflow,
         "view_voters_and_watchers": ViewVotersAndWatchers,
         "work_on_issues": WorkOnIssues,
-        "com.atlassian.atlas.jira__jira-townsquare-link-unconnected-issue-glance-view-permission": ComAtlassianAtlasJiraJiraTownsquareLinkUnconnectedIssueGlanceViewPermission,
     }
 
     PermissionIDs = map[Permission]int{
@@ -189,18 +183,16 @@ var (
         MoveIssues: 32,
         ResolveIssues: 33,
         ScheduleIssues: 34,
-        ServicedeskAgent: 35,
-        SetIssueSecurity: 36,
-        SystemAdmin: 37,
-        TransitionIssues: 38,
-        UnarchiveIssues: 39,
-        UserPicker: 40,
-        ViewAggregatedData: 41,
-        ViewDevTools: 42,
-        ViewReadonlyWorkflow: 43,
-        ViewVotersAndWatchers: 44,
-        WorkOnIssues: 45,
-        ComAtlassianAtlasJiraJiraTownsquareLinkUnconnectedIssueGlanceViewPermission: 46,
+        SetIssueSecurity: 35,
+        SystemAdmin: 36,
+        TransitionIssues: 37,
+        UnarchiveIssues: 38,
+        UserPicker: 39,
+        ViewAggregatedData: 40,
+        ViewDevTools: 41,
+        ViewReadonlyWorkflow: 42,
+        ViewVotersAndWatchers: 43,
+        WorkOnIssues: 44,
     }
 
     IdToPermission = map[int]Permission{
@@ -238,18 +230,16 @@ var (
         32: MoveIssues,
         33: ResolveIssues,
         34: ScheduleIssues,
-        35: ServicedeskAgent,
-        36: SetIssueSecurity,
-        37: SystemAdmin,
-        38: TransitionIssues,
-        39: UnarchiveIssues,
-        40: UserPicker,
-        41: ViewAggregatedData,
-        42: ViewDevTools,
-        43: ViewReadonlyWorkflow,
-        44: ViewVotersAndWatchers,
-        45: WorkOnIssues,
-        46: ComAtlassianAtlasJiraJiraTownsquareLinkUnconnectedIssueGlanceViewPermission,
+        35: SetIssueSecurity,
+        36: SystemAdmin,
+        37: TransitionIssues,
+        38: UnarchiveIssues,
+        39: UserPicker,
+        40: ViewAggregatedData,
+        41: ViewDevTools,
+        42: ViewReadonlyWorkflow,
+        43: ViewVotersAndWatchers,
+        44: WorkOnIssues,
     }
 )
 
