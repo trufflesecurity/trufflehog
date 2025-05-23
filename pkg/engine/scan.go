@@ -10,7 +10,7 @@ import (
 // sources and returns their job references. If there is an error during
 // initialization or starting of the scan, an error is returned along with the
 // references that successfully started up to that point.
-func (e *Engine) ScanConfig(ctx context.Context, configuredSources ...sources.ConfigurableSource) ([]sources.JobProgressRef, error) {
+func (e *Engine) ScanConfig(ctx context.Context, configuredSources ...sources.ConfiguredSource) ([]sources.JobProgressRef, error) {
 	var refs []sources.JobProgressRef
 	for _, configuredSource := range configuredSources {
 		sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, configuredSource.Name, configuredSource.SourceType())

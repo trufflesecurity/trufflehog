@@ -23,7 +23,7 @@ import (
 
 // Config holds user supplied configuration.
 type Config struct {
-	Sources   []sources.ConfigurableSource
+	Sources   []sources.ConfiguredSource
 	Detectors []detectors.Detector
 }
 
@@ -55,14 +55,13 @@ func NewYAML(input []byte) (*Config, error) {
 	}
 
 	// Convert to configured sources.
-	var sourceConfigs []sources.ConfigurableSource
+	var sourceConfigs []sources.ConfiguredSource
 	for _, pbSource := range inputYAML.Sources {
 		s, err := instantiateSourceFromType(pbSource.GetType())
 		if err != nil {
 			return nil, err
 		}
-		src := sources.NewConfigurableSource(s)
-		src.Configure(pbSource)
+		src := sources.NewConfiguredSource(s, pbSource)
 
 		sourceConfigs = append(sourceConfigs, src)
 	}

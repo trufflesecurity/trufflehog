@@ -105,48 +105,43 @@ type SourceUnitEnumerator interface {
 	Enumerate(ctx context.Context, reporter UnitReporter) error
 }
 
-// ConfigurableSource is a Source with most of it's initialization values
-// pre-configured and exposes a simplified Init() method. A ConfigurableSource
-// can only be configured multiple times but only initialized once.
-type ConfigurableSource struct {
+// ConfiguredSource is a Source with most of it's initialization values
+// pre-configured and exposes a simplified Init() method. A ConfiguredSource
+// can be only initialized once.
+type ConfiguredSource struct {
 	Name     string
 	source   Source
 	initFunc func(context.Context, SourceID, JobID) error
 }
 
-// NewConfigurableSource wraps an instantiated Source object.
-func NewConfigurableSource(s Source) ConfigurableSource {
-	return ConfigurableSource{source: s}
-}
-
-// Configure registers the initialization arguments from the protobuf and sets
-// the Name attribute if available in the config.
-func (c *ConfigurableSource) Configure(config *sourcespb.LocalSource) {
-	// Use the configured name if it exists.
-	if name := config.GetName(); name != "" {
-		c.Name = name
-	}
-	c.initFunc = func(ctx context.Context, sourceID SourceID, jobID JobID) error {
-		return c.source.Init(
-			ctx,
-			config.GetName(),
-			jobID,
-			sourceID,
-			config.GetVerify(),
-			config.GetConnection(),
-			runtime.NumCPU(),
-		)
+// NewConfiguredSource pre-configures an instantiated Source object with the
+// provided protobuf configuration.
+func NewConfiguredSource(s Source, config *sourcespb.LocalSource) ConfiguredSource {
+	return ConfiguredSource{
+		source: s,
+		Name:   config.GetName(),
+		initFunc: func(ctx context.Context, sourceID SourceID, jobID JobID) error {
+			return s.Init(
+				ctx,
+				config.GetName(),
+				jobID,
+				sourceID,
+				config.GetVerify(),
+				config.GetConnection(),
+				runtime.NumCPU(),
+			)
+		},
 	}
 }
 
 // SourceType exposes the underlying source type.
-func (c *ConfigurableSource) SourceType() sourcespb.SourceType {
+func (c *ConfiguredSource) SourceType() sourcespb.SourceType {
 	return c.source.Type()
 }
 
-// Init returns the initialized Source. The ConfigurableSource is unusable after
+// Init returns the initialized Source. The ConfiguredSource is unusable after
 // calling this method.
-func (c *ConfigurableSource) Init(ctx context.Context, sourceID SourceID, jobID JobID) (Source, error) {
+func (c *ConfiguredSource) Init(ctx context.Context, sourceID SourceID, jobID JobID) (Source, error) {
 	if c.source == nil {
 		return nil, errors.New("source already initialized")
 	}
