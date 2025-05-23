@@ -39,12 +39,6 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sour
 		return sources.JobProgressRef{}, errors.New("no path to locally exported data or API token provided")
 	}
 
-	// Turn AhoCorasick keywordsToDetectors into a map of keywords
-	keywords := make(map[string]struct{})
-	for key := range e.AhoCorasickCore.KeywordsToDetectors() {
-		keywords[key] = struct{}{}
-	}
-
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {
@@ -55,11 +49,22 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sour
 	sourceName := "trufflehog - postman"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, postman.SourceType)
 
-	postmanSource := &postman.Source{
-		DetectorKeywords: keywords,
-	}
+	postmanSource := &postman.Source{}
+	e.setPostmanKeywords(postmanSource)
+
 	if err := postmanSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
 		return sources.JobProgressRef{}, err
 	}
 	return e.sourceManager.EnumerateAndScan(ctx, sourceName, postmanSource)
+}
+
+// setPostmanKeywords sets the keywords from the engine's AhoCorasickCore in
+// the postman source.
+func (e *Engine) setPostmanKeywords(source *postman.Source) {
+	// Turn AhoCorasick keywordsToDetectors into a map of keywords
+	keywords := make(map[string]struct{})
+	for key := range e.AhoCorasickCore.KeywordsToDetectors() {
+		keywords[key] = struct{}{}
+	}
+	source.DetectorKeywords = keywords
 }
