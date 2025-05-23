@@ -369,6 +369,12 @@ trufflehog huggingface --org <orgname> --user <username>
 trufflehog huggingface --model <model_id> --include-discussions --include-prs
 ```
 
+## 18. Scan stdin Input
+
+```bash
+aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
@@ -411,6 +417,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - postman
 - jenkins
 - elasticsearch
+- stdin
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
