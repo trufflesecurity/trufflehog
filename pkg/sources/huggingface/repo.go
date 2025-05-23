@@ -61,7 +61,7 @@ func (s *Source) cloneRepo(
 			return "", nil, err
 		}
 	case *sourcespb.Huggingface_Token:
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.huggingfaceToken, repoURL, "")
+		path, repo, err = git.CloneRepoUsingToken(ctx, s.huggingfaceToken, repoURL, "", true)
 		if err != nil {
 			return "", nil, err
 		}

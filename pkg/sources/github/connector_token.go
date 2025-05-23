@@ -20,11 +20,12 @@ type tokenConnector struct {
 	handleRateLimit    func(context.Context, error) bool
 	user               string
 	userMu             sync.Mutex
+	authInUrl          bool
 }
 
 var _ Connector = (*tokenConnector)(nil)
 
-func NewTokenConnector(apiEndpoint string, token string, handleRateLimit func(context.Context, error) bool) (Connector, error) {
+func NewTokenConnector(apiEndpoint string, token string, authInUrl bool, handleRateLimit func(context.Context, error) bool) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
@@ -43,6 +44,7 @@ func NewTokenConnector(apiEndpoint string, token string, handleRateLimit func(co
 		token:              token,
 		isGitHubEnterprise: !strings.EqualFold(apiEndpoint, cloudEndpoint),
 		handleRateLimit:    handleRateLimit,
+		authInUrl:          authInUrl,
 	}, nil
 }
 
@@ -54,7 +56,8 @@ func (c *tokenConnector) Clone(ctx context.Context, repoURL string, args ...stri
 	if err := c.setUserIfUnset(ctx); err != nil {
 		return "", nil, err
 	}
-	return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.user, args...)
+
+	return git.CloneRepoUsingToken(ctx, c.token, repoURL, c.user, c.authInUrl, args...)
 }
 
 func (c *tokenConnector) IsGithubEnterprise() bool {

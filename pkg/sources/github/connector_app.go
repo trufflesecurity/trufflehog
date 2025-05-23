@@ -88,7 +88,7 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string
 		return "", nil, fmt.Errorf("could not create installation token: %w", err)
 	}
 
-	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token", args...)
+	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token", true, args...)
 }
 
 func (c *appConnector) InstallationClient() *github.Client {
