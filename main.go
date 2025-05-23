@@ -252,7 +252,8 @@ var (
 	huggingfaceIncludeDiscussions = huggingfaceScan.Flag("include-discussions", "Include discussions in scan.").Bool()
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
-	scanScan = cli.Command("scan", "Find credentials in multiple sources defined in configuration.")
+	stdinInputScan = cli.Command("stdin", "Find credentials from stdin.")
+	scanScan       = cli.Command("scan", "Find credentials in multiple sources defined in configuration.")
 
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
@@ -993,6 +994,11 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("failed to scan via config: %w", err)
 		} else {
 			refs = append(refs, rs...)
+		}
+	case stdinInputScan.FullCommand():
+		cfg := sources.StdinConfig{}
+		if ref, err = eng.ScanStdinInput(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan stdin input: %v", err)
 		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
