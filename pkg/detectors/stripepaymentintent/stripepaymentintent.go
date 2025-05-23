@@ -2,6 +2,7 @@ package stripepaymentintent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -47,17 +48,16 @@ func (s Scanner) getClient() *http.Client {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]detectors.Result, error) {
 	dataStr := string(data)
 
+	// Stripe client secrets can't be verified on their own, they must be paired with a secret or publishable key.
+	// Secret keys are preferred for verification, but in some real-world cases only publishable keys are present.
+	// While typically used client-side, publishable keys can still confirm certain PaymentIntents.
+	// To avoid missing valid detections, we verify using both key types.
+	// If no keys are found, we skip detection since client secrets alone are not actionable.
 	clientSecrets := extractMatches(clientSecretPat, dataStr)
 	secretKeys := extractMatches(secretKeyPat, dataStr)
 	publishableKeys := extractMatches(publishableKeyPat, dataStr)
 
-	// Only proceed if we have client secrets AND at least one key
-	totalKeys := len(secretKeys) + len(publishableKeys)
-	if len(clientSecrets) == 0 || totalKeys == 0 {
-		return nil, nil
-	}
-
-	results := make([]detectors.Result, 0, len(clientSecrets)*totalKeys)
+	results := make([]detectors.Result, 0, len(clientSecrets)*(len(secretKeys)+len(publishableKeys)))
 
 	// Process each client secret against all keys
 	for clientSecret := range clientSecrets {
@@ -66,6 +66,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 				DetectorType: detectorspb.DetectorType_StripePaymentIntent,
 				Raw:          []byte(clientSecret),
 				RawV2:        []byte(clientSecret + key),
+				ExtraData: map[string]string{
+					"key_type": "secret",
+				},
 			}
 
 			if verify {
@@ -82,6 +85,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) ([]dete
 				DetectorType: detectorspb.DetectorType_StripePaymentIntent,
 				Raw:          []byte(clientSecret),
 				RawV2:        []byte(clientSecret + key),
+				ExtraData: map[string]string{
+					"key_type": "publishable",
+				},
 			}
 
 			if verify {
@@ -125,13 +131,14 @@ func (s Scanner) Description() string {
 func verifyPaymentIntentWithSecretKey(ctx context.Context, client *http.Client, clientSecret, secretKey string) (bool, error) {
 	url := fmt.Sprintf("https://api.stripe.com/v1/payment_intents/%s", extractIntentID(clientSecret))
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false, fmt.Errorf("error creating request: %v", err)
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", secretKey))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("request failed: %v", err)
@@ -144,11 +151,11 @@ func verifyPaymentIntentWithSecretKey(ctx context.Context, client *http.Client, 
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return true, nil
+		return isClientSecretValid(resp.Body, clientSecret)
 	case http.StatusUnauthorized, http.StatusNotFound:
 		return false, nil
 	default:
-		return false, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }
 
@@ -167,7 +174,7 @@ func verifyPaymentIntentWithPublishableKey(ctx context.Context, client *http.Cli
 	url = url + fmt.Sprintf("?key=%s", publishableKey)
 	url = url + fmt.Sprintf("&client_secret=%s", clientSecret)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false, fmt.Errorf("error creating request: %v", err)
 	}
@@ -183,11 +190,11 @@ func verifyPaymentIntentWithPublishableKey(ctx context.Context, client *http.Cli
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return true, nil
+		return isClientSecretValid(resp.Body, clientSecret)
 	case http.StatusUnauthorized, http.StatusNotFound:
 		return false, nil
 	default:
-		return false, fmt.Errorf("unknown error, status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }
 
@@ -197,4 +204,16 @@ func extractIntentID(clientSecret string) string {
 		return ""
 	}
 	return parts[0]
+}
+
+func isClientSecretValid(body io.Reader, expectedSecret string) (bool, error) {
+	var respBody struct {
+		ClientSecret string `json:"client_secret"`
+	}
+
+	if err := json.NewDecoder(body).Decode(&respBody); err != nil {
+		return false, fmt.Errorf("failed to decode response body: %v", err)
+	}
+
+	return respBody.ClientSecret == expectedSecret, nil
 }
