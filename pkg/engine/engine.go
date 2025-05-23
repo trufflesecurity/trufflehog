@@ -99,6 +99,7 @@ type Config struct {
 	// also serves as a multiplier for other worker types (e.g., detector workers, notifier workers)
 	Concurrency int
 
+	ConfiguredSources             []sources.ConfigurableSource
 	Decoders                      []decoders.Decoder
 	Detectors                     []detectors.Detector
 	DetectorVerificationOverrides map[config.DetectorID]bool
