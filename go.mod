@@ -83,6 +83,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.5
 	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/repeale/fp-go v0.11.1
 	github.com/sassoftware/go-rpmutils v0.4.0
 	github.com/schollz/progressbar/v3 v3.17.1
 	github.com/sendgrid/sendgrid-go v3.16.0+incompatible

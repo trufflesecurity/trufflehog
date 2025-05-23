@@ -57,6 +57,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyDropboxToken(ctx, client, key)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
+			if s1.Verified {
+				s1.AnalysisInfo = map[string]string{"token": key}
+			}
 		}
 
 		results = append(results, s1)
