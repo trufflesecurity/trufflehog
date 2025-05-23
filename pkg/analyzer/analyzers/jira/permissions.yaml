@@ -33,7 +33,6 @@ permissions:
   - move_issues
   - resolve_issues
   - schedule_issues
-  - servicedesk_agent
   - set_issue_security
   - system_admin
   - transition_issues
@@ -44,4 +43,3 @@ permissions:
   - view_readonly_workflow
   - view_voters_and_watchers
   - work_on_issues
-  - com.atlassian.atlas.jira__jira-townsquare-link-unconnected-issue-glance-view-permission
