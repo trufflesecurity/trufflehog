@@ -1,6 +1,8 @@
 package sources
 
 import (
+	"errors"
+	"runtime"
 	"sync"
 
 	"google.golang.org/protobuf/types/known/anypb"
@@ -101,6 +103,60 @@ type SourceUnitEnumerator interface {
 	// errors returned by the reporter. All other errors related to unit
 	// enumeration are tracked by the UnitReporter.
 	Enumerate(ctx context.Context, reporter UnitReporter) error
+}
+
+// ConfigurableSource is a Source with most of it's initialization values
+// pre-configured and exposes a simplified Init() method. A ConfigurableSource
+// can only be configured multiple times but only initialized once.
+type ConfigurableSource struct {
+	Name     string
+	source   Source
+	initFunc func(context.Context, SourceID, JobID) error
+}
+
+// NewConfigurableSource wraps an instantiated Source object.
+func NewConfigurableSource(s Source) ConfigurableSource {
+	return ConfigurableSource{source: s}
+}
+
+// Configure registers the initialization arguments from the protobuf and sets
+// the Name attribute if available in the config.
+func (c *ConfigurableSource) Configure(config *sourcespb.LocalSource) {
+	// Use the configured name if it exists.
+	if name := config.GetName(); name != "" {
+		c.Name = name
+	}
+	c.initFunc = func(ctx context.Context, sourceID SourceID, jobID JobID) error {
+		return c.source.Init(
+			ctx,
+			config.GetName(),
+			jobID,
+			sourceID,
+			config.GetVerify(),
+			config.GetConnection(),
+			runtime.NumCPU(),
+		)
+	}
+}
+
+// SourceType exposes the underlying source type.
+func (c *ConfigurableSource) SourceType() sourcespb.SourceType {
+	return c.source.Type()
+}
+
+// Init returns the initialized Source. The ConfigurableSource is unusable after
+// calling this method.
+func (c *ConfigurableSource) Init(ctx context.Context, sourceID SourceID, jobID JobID) (Source, error) {
+	if c.source == nil {
+		return nil, errors.New("source already initialized")
+	}
+	if c.initFunc == nil {
+		return nil, errors.New("source not configured")
+	}
+	err := c.initFunc(ctx, sourceID, jobID)
+	src := c.source
+	c.source = nil
+	return src, err
 }
 
 // BaseUnitReporter is a helper struct that implements the UnitReporter interface
