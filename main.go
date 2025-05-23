@@ -997,8 +997,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 	case stdinInputScan.FullCommand():
 		cfg := sources.StdinConfig{}
-		if ref, err = eng.ScanStdinInput(ctx, cfg); err != nil {
+		if ref, err := eng.ScanStdinInput(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan stdin input: %v", err)
+		} else {
+			refs = append(refs, ref)
 		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
