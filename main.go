@@ -539,6 +539,16 @@ func run(state overseer.State) {
 		engConf.VerificationResultCache = simple.NewCache[detectors.Result]()
 	}
 
+	// Check that there are no sources defined for non-scan subcommands. If
+	// there are, return an error as it is ambiguous what the user is
+	// trying to do.
+	if cmd != scanScan.FullCommand() && len(conf.Sources) > 0 {
+		logFatal(
+			fmt.Errorf("ambiguous configuration"),
+			"sources should only be defined in configuration for the 'scan' command",
+		)
+	}
+
 	if *compareDetectionStrategies {
 		if err := compareScans(ctx, cmd, engConf); err != nil {
 			logFatal(err, "error comparing detection strategies")
