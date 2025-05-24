@@ -1,3 +1,5 @@
+//go:build !no_tui
+
 package common
 
 var scopeToPermissions = map[string][]string{
