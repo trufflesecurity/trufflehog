@@ -1,14 +1,16 @@
 package snowflake
 
 import (
+	"bytes"
 	"context"
-	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 	"unicode"
 
-	_ "github.com/snowflakedb/gosnowflake"
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -24,15 +26,31 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
+	// accountIdentifierPat matches Snowflake account identifiers in the format: XXXXXXX-XXXXX
+	// Example: ABC1234-EXAMPLE
 	accountIdentifierPat = regexp.MustCompile(detectors.PrefixRegex([]string{"account"}) + `\b([a-zA-Z]{7}-[0-9a-zA-Z-_]{1,255}(.privatelink)?)\b`)
+	// usernameExclusionPat defines characters that should not be present in usernames
 	usernameExclusionPat = `!@#$%^&*{}:<>,.;?()/\+=\s\n`
 )
 
 const (
-	database                  = "SNOWFLAKE"
-	retrieveAllDatabasesQuery = "SHOW DATABASES"
-	timeout                   = 3
+	timeout           = 3 * time.Second
+	minPasswordLength = 8
 )
+
+// loginRequest represents the payload for Snowflake's login endpoint.
+// Note: This endpoint is undocumented in Snowflake's public API documentation.
+type loginRequest struct {
+	Data struct {
+		LoginName   string `json:"LOGIN_NAME"`
+		Password    string `json:"PASSWORD"`
+		AccountName string `json:"ACCOUNT_NAME"`
+	} `json:"data"`
+}
+
+type loginResponse struct {
+	Success bool `json:"success"`
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -40,15 +58,17 @@ func (s Scanner) Keywords() []string {
 	return []string{"snowflake"}
 }
 
+// meetsSnowflakePasswordRequirements checks if a password meets Snowflake's requirements:
+// - Minimum length of 8 characters
+// - Contains at least one lowercase letter
+// - Contains at least one uppercase letter
+// - Contains at least one number
 func meetsSnowflakePasswordRequirements(password string) (string, bool) {
-	var hasLower, hasUpper, hasNumber, minLen bool
-
-	if len(password) < 8 {
-		minLen = false
-	} else {
-		minLen = true
+	if len(password) < minPasswordLength {
+		return "", false
 	}
 
+	var hasLower, hasUpper, hasNumber bool
 	for _, char := range password {
 		switch {
 		case unicode.IsLower(char):
@@ -59,7 +79,7 @@ func meetsSnowflakePasswordRequirements(password string) (string, bool) {
 			hasNumber = true
 		}
 
-		if hasLower && hasUpper && hasNumber && minLen {
+		if hasLower && hasUpper && hasNumber {
 			return password, true
 		}
 	}
@@ -71,28 +91,35 @@ func meetsSnowflakePasswordRequirements(password string) (string, bool) {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
+	// Find all unique account identifiers
 	uniqueAccountMatches := make(map[string]struct{})
 	for _, match := range accountIdentifierPat.FindAllStringSubmatch(dataStr, -1) {
 		uniqueAccountMatches[strings.TrimSpace(match[1])] = struct{}{}
 	}
 
+	if len(uniqueAccountMatches) == 0 {
+		return nil, nil
+	}
+
 	usernameRegexState := common.UsernameRegexCheck(usernameExclusionPat)
 	usernameMatches := usernameRegexState.Matches(data)
+	if len(usernameMatches) == 0 {
+		return nil, nil
+	}
 
-	passwordRegexState := common.PasswordRegexCheck(" ") // No explicit character exclusions by Snowflake for passwords
+	passwordRegexState := common.PasswordRegexCheck(" \r\n") // Exclude spaces, carriage returns, and line feeds
 	passwordMatches := passwordRegexState.Matches(data)
+	if len(passwordMatches) == 0 {
+		return nil, nil
+	}
 
 	for resAccountMatch := range uniqueAccountMatches {
 		for _, resUsernameMatch := range usernameMatches {
 			for _, resPasswordMatch := range passwordMatches {
 				_, metPasswordRequirements := meetsSnowflakePasswordRequirements(resPasswordMatch)
-
 				if !metPasswordRequirements {
 					continue
 				}
-
-				// Override default timeout of 60 seconds to 3 seconds to prevent long scan times/improve performance.
-				uri := fmt.Sprintf("%s:%s@%s/%s?loginTimeout=%d", resUsernameMatch, resPasswordMatch, resAccountMatch, database, timeout)
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Snowflake,
@@ -103,56 +130,68 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					},
 				}
 
-				if verify {
-					// Open a connection to Snowflake
-					db, err := sql.Open("snowflake", uri) // Needs the snowflake driver from gosnowflake
-					if err != nil {
-						return nil, err
-					}
-					defer db.Close()
-
-					if ctx == nil {
-						ctx = context.Background()
-					}
-
-					// Disable pool + retries to prevent flooding the server with failed login attempts.
-					db.SetConnMaxLifetime(time.Second)
-					db.SetMaxOpenConns(1)
-
-					err = db.PingContext(ctx)
-					if err != nil {
-						if strings.Contains(err.Error(), "Incorrect username or password was specified") {
-							s1.Verified = false
-						} else {
-							s1.SetVerificationError(err, resPasswordMatch)
-						}
-					} else {
-						rows, err := db.Query(retrieveAllDatabasesQuery)
-						if err != nil {
-							s1.ExtraData["Snowflake Querying Error on a Valid Credential"] = fmt.Sprintf("unable to query Snowflake %+v", err)
-							continue
-						}
-						defer rows.Close()
-
-						var databases []string
-						for rows.Next() {
-							var name, createdOn, isDefault, isCurrent, origin, owner, comment, option, retentionTime, kind string
-							err := rows.Scan(&createdOn, &name, &isDefault, &isCurrent, &origin, &owner, &comment, &option, &retentionTime, &kind)
-							if err != nil {
-								s1.ExtraData["Snowflake Querying Error on a Valid Credential"] = fmt.Sprintf("unable to finish querying Snowflake to enrich secret ExtraData %+v", err)
-							}
-							databases = append(databases, name)
-						}
-						s1.ExtraData["databases"] = strings.Join(databases, ", ")
-
-						if s1.VerificationError() == nil {
-							s1.Verified = true
-						}
-					}
+				if !verify {
+					results = append(results, s1)
+					continue
 				}
 
-				results = append(results, s1)
+				loginReq := loginRequest{}
+				loginReq.Data.LoginName = resUsernameMatch
+				loginReq.Data.Password = resPasswordMatch
+				loginReq.Data.AccountName = resAccountMatch
 
+				jsonData, err := json.Marshal(loginReq)
+				if err != nil {
+					s1.SetVerificationError(fmt.Errorf("failed to marshal login request: %w", err), resPasswordMatch)
+					results = append(results, s1)
+					continue
+				}
+
+				// Note: This endpoint is undocumented in Snowflake's public API documentation
+				// According to LLM, it has been reverse engineered from the Snowflake web app,
+				// Referenced in community posts and used internally by JDBC and other SDKs.
+				url := fmt.Sprintf("https://%s.snowflakecomputing.com/session/v1/login-request", resAccountMatch)
+				req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+				if err != nil {
+					s1.SetVerificationError(fmt.Errorf("failed to create request: %w", err), resPasswordMatch)
+					results = append(results, s1)
+					continue
+				}
+
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Accept", "application/json")
+				req.Header.Set("X-Snowflake-Authorization-Token-Type", "BASIC")
+
+				client := &http.Client{Timeout: timeout}
+				resp, err := client.Do(req)
+				if err != nil {
+					s1.SetVerificationError(fmt.Errorf("failed to send request: %w", err), resPasswordMatch)
+					results = append(results, s1)
+					continue
+				}
+				defer resp.Body.Close()
+
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					s1.SetVerificationError(fmt.Errorf("failed to read response body: %w", err), resPasswordMatch)
+					results = append(results, s1)
+					continue
+				}
+
+				if resp.StatusCode != http.StatusOK {
+					results = append(results, s1)
+					continue
+				}
+
+				var loginResp loginResponse
+				if err := json.Unmarshal(body, &loginResp); err != nil {
+					s1.SetVerificationError(fmt.Errorf("failed to parse response: %w", err), resPasswordMatch)
+					results = append(results, s1)
+					continue
+				}
+
+				s1.Verified = loginResp.Success
+				results = append(results, s1)
 			}
 		}
 	}
