@@ -1,6 +1,8 @@
 package sources
 
 import (
+	"errors"
+	"runtime"
 	"sync"
 
 	"google.golang.org/protobuf/types/known/anypb"
@@ -101,6 +103,55 @@ type SourceUnitEnumerator interface {
 	// errors returned by the reporter. All other errors related to unit
 	// enumeration are tracked by the UnitReporter.
 	Enumerate(ctx context.Context, reporter UnitReporter) error
+}
+
+// ConfiguredSource is a Source with most of it's initialization values
+// pre-configured and exposes a simplified Init() method. A ConfiguredSource
+// can be only initialized once.
+type ConfiguredSource struct {
+	Name     string
+	source   Source
+	initFunc func(context.Context, SourceID, JobID) error
+}
+
+// NewConfiguredSource pre-configures an instantiated Source object with the
+// provided protobuf configuration.
+func NewConfiguredSource(s Source, config *sourcespb.LocalSource) ConfiguredSource {
+	return ConfiguredSource{
+		source: s,
+		Name:   config.GetName(),
+		initFunc: func(ctx context.Context, sourceID SourceID, jobID JobID) error {
+			return s.Init(
+				ctx,
+				config.GetName(),
+				jobID,
+				sourceID,
+				config.GetVerify(),
+				config.GetConnection(),
+				runtime.NumCPU(),
+			)
+		},
+	}
+}
+
+// SourceType exposes the underlying source type.
+func (c *ConfiguredSource) SourceType() sourcespb.SourceType {
+	return c.source.Type()
+}
+
+// Init returns the initialized Source. The ConfiguredSource is unusable after
+// calling this method.
+func (c *ConfiguredSource) Init(ctx context.Context, sourceID SourceID, jobID JobID) (Source, error) {
+	if c.source == nil {
+		return nil, errors.New("source already initialized")
+	}
+	if c.initFunc == nil {
+		return nil, errors.New("source not configured")
+	}
+	err := c.initFunc(ctx, sourceID, jobID)
+	src := c.source
+	c.source = nil
+	return src, err
 }
 
 // BaseUnitReporter is a helper struct that implements the UnitReporter interface
