@@ -1,9 +1,11 @@
 package jiratoken
 
 import (
+	"bytes"
 	"context"
-	b64 "encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -29,20 +31,22 @@ var (
 	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + `\b((?:[a-zA-Z0-9-]{1,24}\.)+[a-zA-Z0-9-]{2,24}\.[a-zA-Z0-9-]{2,16})\b`)
-	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"jira"}) + common.EmailPattern)
+	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "confluence", "jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
+	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "confluence", "jira"}) + `\b((?:[a-zA-Z0-9-]{1,24}\.)+[a-zA-Z0-9-]{2,24}\.[a-zA-Z0-9-]{2,16})\b`)
+	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "confluence", "jira"}) + common.EmailPattern)
 )
 
-const (
-	failedAuth           = "AUTHENTICATED_FAILED"
-	loginReasonHeaderKey = "X-Seraph-LoginReason"
-)
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"jira"}
+	return []string{"atlassian", "confluence", "jira"}
 }
 
 // FromData will find and optionally verify JiraToken secrets in a given set of bytes.
@@ -63,6 +67,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueEmails[strings.ToLower(email[1])] = struct{}{}
 	}
 
+	if len(uniqueDomains) == 0 {
+		// reason: https://community.atlassian.com/forums/Jira-Product-Discovery-questions/Authorization-issues-with-GRAPHQL/qaq-p/2640943
+		// In case we don't find any domain matches we can use this as the graphql API works with this domain if our authentication is valid
+		uniqueDomains["api.atlassian.com"] = struct{}{}
+	}
+
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {
 			for domain := range uniqueDomains {
@@ -78,7 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					client := s.getClient()
-					isVerified, verificationErr := verifyJiratoken(ctx, client, email, domain, token)
+					isVerified, verificationErr := VerifyJiraToken(ctx, client, email, domain, token)
 					s1.Verified = isVerified
 					s1.SetVerificationError(verificationErr, token)
 				}
@@ -91,40 +101,47 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) getClient() *http.Client {
-	if s.client != nil {
-		return s.client
+func VerifyJiraToken(ctx context.Context, client *http.Client, email, domain, token string) (bool, error) {
+	// wrap the query in a JSON body
+	body := map[string]string{
+		"query": `verify { me { user {name}}}`,
 	}
-	return defaultClient
-}
 
-func verifyJiratoken(ctx context.Context, client *http.Client, email, domain, token string) (bool, error) {
-	data := fmt.Sprintf("%s:%s", email, token)
-	sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domain+"/rest/api/3/dashboard", nil)
+	// encode the body as JSON
+	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return false, err
 	}
+
+	// api docs: https://developer.atlassian.com/platform/atlassian-graphql-api/graphql/#authentication
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+domain+"/gateway/api/graphql", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return false, err
+	}
+
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-	res, err := client.Do(req)
+	req.Header.Add("Content-Type", "application/json")
+	req.SetBasicAuth(email, token)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
 
-	// If the request is successful and the login reason is not failed authentication, then the token is valid.
-	// This is because Jira returns a 200 status code even if the token is invalid.
-	// Jira returns a default dashboard page.
-	if !(res.StatusCode >= 200 && res.StatusCode < 300) {
-		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	if res.Header.Get(loginReasonHeaderKey) != failedAuth {
+	// the API returns 200 if the token is valid
+	switch resp.StatusCode {
+	case http.StatusOK:
 		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
-
-	return false, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
