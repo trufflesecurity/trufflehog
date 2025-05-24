@@ -72,6 +72,9 @@ type Source interface {
 	// ChunkingTarget parameters, the caller can direct the function to retrieve
 	// specific chunks of data. This targeted approach allows for efficient and
 	// intentional data processing, beneficial when verifying or rechecking specific data points.
+	//
+	// Deprecated: sources should be migrated to use SourceUnitEnumChunker instead.
+	// https://github.com/trufflesecurity/trufflehog/pull/3298#issuecomment-2510010947
 	Chunks(ctx context.Context, chunksChan chan *Chunk, targets ...ChunkingTarget) error
 	// GetProgress is the completion progress (percentage) for Scanned Source.
 	GetProgress() *Progress
