@@ -25,7 +25,9 @@ var (
 		"method": "GET",
 		"deprecated": false
 	}]`
-	secret = "oXCt4JT2wf1_WlZl2OVG"
+	secret        = "oXCt4JT2wf1_WlZl2OVG"
+	validPattern2 = "GITLAB_TOKEN=ABc123456789dEFghIJK"
+	secret2       = "ABc123456789dEFghIJK"
 )
 
 func TestGitLab_Pattern(t *testing.T) {
@@ -41,6 +43,11 @@ func TestGitLab_Pattern(t *testing.T) {
 			name:  "valid pattern",
 			input: validPattern,
 			want:  []string{secret},
+		},
+		{
+			name:  "valid pattern (with = before secret)",
+			input: validPattern2,
+			want:  []string{secret2},
 		},
 	}
 

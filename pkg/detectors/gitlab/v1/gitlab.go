@@ -33,7 +33,7 @@ func (Scanner) CloudEndpoint() string { return "https://gitlab.com" }
 
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9\-=_]{20,22})\b`)
+	keyPat        = regexp.MustCompile(detectors.PrefixRegex([]string{"gitlab"}) + `\b([a-zA-Z0-9][a-zA-Z0-9\-=_]{19,21})\b`)
 
 	BlockedUserMessage = "403 Forbidden - Your account has been blocked"
 )
