@@ -1,0 +1,4 @@
+permissions:
+  - view
+  - trade
+  - transfer
