@@ -160,7 +160,7 @@ func (a AnalyzerType) String() string {
 	return "Unknown"
 }
 
-// GetSortedAnalyzerTypes returns a sorted slice of AnalyzerType strings, skipping "Invalid".
+// AvailableAnalyzers returns a sorted slice of AnalyzerType strings, skipping "Invalid".
 func AvailableAnalyzers() []string {
 	var analyzerStrings []string
 
