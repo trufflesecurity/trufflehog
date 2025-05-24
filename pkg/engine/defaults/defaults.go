@@ -920,7 +920,7 @@ func buildDetectorList() []detectors.Detector {
 		&azureappconfigconnectionstring.Scanner{},
 		&azure_cosmosdb.Scanner{},
 		&azurecontainerregistry.Scanner{},
-		&azuredevopspersonalaccesstoken.Scanner{},
+		&azure_devops.Scanner{},
 		&azuredirectmanagementkey.Scanner{},
 		// &azurefunctionkey.Scanner{}, // detector is throwing some FPs
 		&azure_openai.Scanner{},
