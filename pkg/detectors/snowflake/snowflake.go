@@ -135,67 +135,64 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					continue
 				}
 
-				loginReq := loginRequest{}
-				loginReq.Data.LoginName = resUsernameMatch
-				loginReq.Data.Password = resPasswordMatch
-				loginReq.Data.AccountName = resAccountMatch
-
-				jsonData, err := json.Marshal(loginReq)
+				verified, err := verifyMatch(ctx, resAccountMatch, resUsernameMatch, resPasswordMatch)
 				if err != nil {
-					s1.SetVerificationError(fmt.Errorf("failed to marshal login request: %w", err), resPasswordMatch)
+					s1.SetVerificationError(err, resPasswordMatch)
 					results = append(results, s1)
 					continue
 				}
-
-				// Note: This endpoint is undocumented in Snowflake's public API documentation
-				// According to LLM, it has been reverse engineered from the Snowflake web app,
-				// Referenced in community posts and used internally by JDBC and other SDKs.
-				url := fmt.Sprintf("https://%s.snowflakecomputing.com/session/v1/login-request", resAccountMatch)
-				req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
-				if err != nil {
-					s1.SetVerificationError(fmt.Errorf("failed to create request: %w", err), resPasswordMatch)
-					results = append(results, s1)
-					continue
-				}
-
-				req.Header.Set("Content-Type", "application/json")
-				req.Header.Set("Accept", "application/json")
-				req.Header.Set("X-Snowflake-Authorization-Token-Type", "BASIC")
-
-				client := &http.Client{Timeout: timeout}
-				resp, err := client.Do(req)
-				if err != nil {
-					s1.SetVerificationError(fmt.Errorf("failed to send request: %w", err), resPasswordMatch)
-					results = append(results, s1)
-					continue
-				}
-				defer resp.Body.Close()
-
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					s1.SetVerificationError(fmt.Errorf("failed to read response body: %w", err), resPasswordMatch)
-					results = append(results, s1)
-					continue
-				}
-
-				if resp.StatusCode != http.StatusOK {
-					results = append(results, s1)
-					continue
-				}
-
-				var loginResp loginResponse
-				if err := json.Unmarshal(body, &loginResp); err != nil {
-					s1.SetVerificationError(fmt.Errorf("failed to parse response: %w", err), resPasswordMatch)
-					results = append(results, s1)
-					continue
-				}
-
-				s1.Verified = loginResp.Success
+				s1.Verified = verified
 				results = append(results, s1)
 			}
 		}
 	}
 	return results, nil
+}
+
+// verifyMatch attempts to verify a Snowflake credential by making a login request.
+func verifyMatch(ctx context.Context, account, username, password string) (bool, error) {
+	loginReq := loginRequest{}
+	loginReq.Data.LoginName = username
+	loginReq.Data.Password = password
+	loginReq.Data.AccountName = account
+
+	jsonData, err := json.Marshal(loginReq)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal login request: %w", err)
+	}
+
+	url := fmt.Sprintf("https://%s.snowflakecomputing.com/session/v1/login-request", account)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return false, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("X-Snowflake-Authorization-Token-Type", "BASIC")
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	if err != nil {
+		return false, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return false, nil
+	}
+
+	var loginResp loginResponse
+	if err := json.Unmarshal(body, &loginResp); err != nil {
+		return false, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return loginResp.Success, nil
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
