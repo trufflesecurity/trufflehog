@@ -295,6 +295,29 @@ type GitlabConfig struct {
 	ExcludeRepos []string
 }
 
+// HuggingFaceConfig represents the configuration for HuggingFace.
+type HuggingfaceConfig struct {
+	Endpoint           string
+	Models             []string
+	Spaces             []string
+	Datasets           []string
+	Organizations      []string
+	Users              []string
+	IncludeModels      []string
+	IgnoreModels       []string
+	IncludeSpaces      []string
+	IgnoreSpaces       []string
+	IncludeDatasets    []string
+	IgnoreDatasets     []string
+	SkipAllModels      bool
+	SkipAllSpaces      bool
+	SkipAllDatasets    bool
+	IncludeDiscussions bool
+	IncludePrs         bool
+	Token              string
+	Concurrency        int
+}
+
 // FilesystemConfig defines the optional configuration for a filesystem source.
 type FilesystemConfig struct {
 	// Paths is the list of files and directories to scan.
@@ -303,6 +326,14 @@ type FilesystemConfig struct {
 	IncludePathsFile string
 	// ExcludePathsFile is the path to a file containing a list of regexps to exclude from the scan.
 	ExcludePathsFile string
+}
+
+type JenkinsConfig struct {
+	Endpoint              string
+	Username              string
+	Password              string
+	Header                string
+	InsecureSkipVerifyTLS bool
 }
 
 // S3Config defines the optional configuration for an S3 source.
