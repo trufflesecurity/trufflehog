@@ -153,11 +153,12 @@ func populateAccounts(client *http.Client, info *secretInfo, keyName, key string
 	uri := fmt.Sprintf("https://%s%s", requestHostProductAPI, endpoint)
 	params := fmt.Sprintf("?limit=%d", limit)
 
-	jwt, err := buildJWT(http.MethodGet, requestHostProductAPI, endpoint, keyName, key)
-	if err != nil {
-		return err
-	}
 	for i := 0; i < maxPageLimit; i++ {
+		// Rebuilding JWT for each request to avoid expiration issues
+		jwt, err := buildJWT(http.MethodGet, requestHostProductAPI, endpoint, keyName, key)
+		if err != nil {
+			return err
+		}
 		body, err := makeAPIRequest(client, http.MethodGet, uri+params, jwt)
 		if err != nil {
 			return err
@@ -184,11 +185,12 @@ func populateOrders(client *http.Client, info *secretInfo, keyName, key string) 
 	uri := fmt.Sprintf("https://%s%s", requestHostProductAPI, endpoint)
 	params := fmt.Sprintf("?limit=%d", limit)
 
-	jwt, err := buildJWT(http.MethodGet, requestHostProductAPI, endpoint, keyName, key)
-	if err != nil {
-		return err
-	}
 	for i := 0; i < maxPageLimit; i++ {
+		// Rebuilding JWT for each request to avoid expiration issues
+		jwt, err := buildJWT(http.MethodGet, requestHostProductAPI, endpoint, keyName, key)
+		if err != nil {
+			return err
+		}
 		body, err := makeAPIRequest(client, http.MethodGet, uri+params, jwt)
 		if err != nil {
 			return err
@@ -248,17 +250,18 @@ func populatePortfolios(client *http.Client, info *secretInfo, keyName, key stri
 	return nil
 }
 
-func populateWallets(client *http.Client, info *secretInfo, keyID, secret string) error {
+func populateWallets(client *http.Client, info *secretInfo, keyName, key string) error {
 	limit := 100
 	maxPageLimit := 25
 	endpoint := "/platform/v1/wallets"
 	uri := fmt.Sprintf("https://%s%s", requestHostCDPAPI, endpoint)
 	params := fmt.Sprintf("?limit=%d", limit)
-	jwt, err := buildJWT(http.MethodGet, requestHostCDPAPI, endpoint, keyID, secret)
-	if err != nil {
-		return err
-	}
 	for i := 0; i < maxPageLimit; i++ {
+		// Rebuilding JWT for each request to avoid expiration issues
+		jwt, err := buildJWT(http.MethodGet, requestHostCDPAPI, endpoint, keyName, key)
+		if err != nil {
+			return err
+		}
 		body, err := makeAPIRequest(client, http.MethodGet, uri+params, jwt)
 		if err != nil {
 			return err
@@ -278,18 +281,19 @@ func populateWallets(client *http.Client, info *secretInfo, keyID, secret string
 	return nil
 }
 
-func populateAddresses(client *http.Client, info *secretInfo, keyID, secret string) error {
+func populateAddresses(client *http.Client, info *secretInfo, keyName, key string) error {
 	limit := 100
 	maxPageLimit := 25
 	for _, wallet := range info.Wallets {
 		endpoint := fmt.Sprintf("/platform/v1/wallets/%s/addresses", wallet.ID)
 		uri := fmt.Sprintf("https://%s%s", requestHostCDPAPI, endpoint)
 		params := fmt.Sprintf("?limit=%d", limit)
-		jwt, err := buildJWT(http.MethodGet, requestHostCDPAPI, endpoint, keyID, secret)
-		if err != nil {
-			return err
-		}
 		for i := 0; i < maxPageLimit; i++ {
+			// Rebuilding JWT for each request to avoid expiration issues
+			jwt, err := buildJWT(http.MethodGet, requestHostCDPAPI, endpoint, keyName, key)
+			if err != nil {
+				return err
+			}
 			body, err := makeAPIRequest(client, http.MethodGet, uri+params, jwt)
 			if err != nil {
 				return err
