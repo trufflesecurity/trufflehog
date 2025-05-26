@@ -168,7 +168,7 @@ func populateAccounts(client *http.Client, info *secretInfo, keyName, key string
 		}
 		info.Accounts = append(info.Accounts, accountsResponse.Accounts...)
 		if accountsResponse.HasNext {
-			uri = fmt.Sprintf("?limit=%d&cursor=%s", limit, accountsResponse.Cursor)
+			params = fmt.Sprintf("?limit=%d&cursor=%s", limit, accountsResponse.Cursor)
 		} else {
 			break
 		}
@@ -199,7 +199,7 @@ func populateOrders(client *http.Client, info *secretInfo, keyName, key string) 
 		}
 		info.Orders = append(info.Orders, ordersResponse.Orders...)
 		if ordersResponse.HasNext {
-			endpoint = fmt.Sprintf("?limit=%d&cursor=%s", limit, ordersResponse.Cursor)
+			params = fmt.Sprintf("?limit=%d&cursor=%s", limit, ordersResponse.Cursor)
 		} else {
 			break
 		}
@@ -263,13 +263,13 @@ func populateWallets(client *http.Client, info *secretInfo, keyID, secret string
 		if err != nil {
 			return err
 		}
-		var walletssResponse walletsResponse
-		if err := json.Unmarshal(body, &walletssResponse); err != nil {
+		var walletsResponse walletsResponse
+		if err := json.Unmarshal(body, &walletsResponse); err != nil {
 			return fmt.Errorf("failed to unmarshal wallets response: %w", err)
 		}
-		info.Wallets = append(info.Wallets, walletssResponse.Data...)
-		if walletssResponse.HasMore {
-			uri = fmt.Sprintf("?limit=%d&page=%s", limit, walletssResponse.NextPage)
+		info.Wallets = append(info.Wallets, walletsResponse.Data...)
+		if walletsResponse.HasMore {
+			params = fmt.Sprintf("?limit=%d&page=%s", limit, walletsResponse.NextPage)
 		} else {
 			break
 		}
@@ -300,7 +300,7 @@ func populateAddresses(client *http.Client, info *secretInfo, keyID, secret stri
 			}
 			info.Addresses = append(info.Addresses, addressesResponse.Data...)
 			if addressesResponse.HasMore {
-				uri = fmt.Sprintf("?limit=%d&page=%s", limit, addressesResponse.NextPage)
+				params = fmt.Sprintf("?limit=%d&page=%s", limit, addressesResponse.NextPage)
 			} else {
 				break
 			}
