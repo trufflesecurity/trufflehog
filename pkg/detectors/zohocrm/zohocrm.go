@@ -73,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	endpoint := "https://www.zohoapis.com/crm/v7/Leads?fields=Email&per_page=1"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		return false, err
 	}

@@ -124,7 +124,7 @@ func (r AnalyzerRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	return resp, nil
 }
 
-// methodIsSafe is a helper method to check whether the HTTP method is safe according to MDN Web Docs.
+// IsMethodSafe is a helper method to check whether the HTTP method is safe according to MDN Web Docs.
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods#safe_idempotent_and_cacheable_request_methods
 func IsMethodSafe(method string) bool {
 	switch strings.ToUpper(method) {
