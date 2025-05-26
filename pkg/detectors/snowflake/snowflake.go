@@ -63,9 +63,9 @@ func (s Scanner) Keywords() []string {
 // - Contains at least one lowercase letter
 // - Contains at least one uppercase letter
 // - Contains at least one number
-func meetsSnowflakePasswordRequirements(password string) (string, bool) {
+func meetsSnowflakePasswordRequirements(password string) bool {
 	if len(password) < minPasswordLength {
-		return "", false
+		return false
 	}
 
 	var hasLower, hasUpper, hasNumber bool
@@ -80,11 +80,11 @@ func meetsSnowflakePasswordRequirements(password string) (string, bool) {
 		}
 
 		if hasLower && hasUpper && hasNumber {
-			return password, true
+			return true
 		}
 	}
 
-	return "", false
+	return false
 }
 
 // FromData will find and optionally verify Snowflake secrets in a given set of bytes.
@@ -116,7 +116,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for resAccountMatch := range uniqueAccountMatches {
 		for _, resUsernameMatch := range usernameMatches {
 			for _, resPasswordMatch := range passwordMatches {
-				_, metPasswordRequirements := meetsSnowflakePasswordRequirements(resPasswordMatch)
+				metPasswordRequirements := meetsSnowflakePasswordRequirements(resPasswordMatch)
 				if !metPasswordRequirements {
 					continue
 				}
@@ -136,11 +136,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				verified, err := verifyMatch(ctx, resAccountMatch, resUsernameMatch, resPasswordMatch)
-				if err != nil {
-					s1.SetVerificationError(err, resPasswordMatch)
-					results = append(results, s1)
-					continue
-				}
+				s1.SetVerificationError(err, resPasswordMatch)
 				s1.Verified = verified
 				results = append(results, s1)
 			}
@@ -178,7 +174,7 @@ func verifyMatch(ctx context.Context, account, username, password string) (bool,
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false, fmt.Errorf("failed to read response body: %w", err)
 	}
