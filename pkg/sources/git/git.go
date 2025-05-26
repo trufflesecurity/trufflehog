@@ -427,6 +427,9 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 			"-c",
 			"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
 	}
+	if len(feature.UserAgentSuffix.Load()) > 0 {
+		gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.userAgent=%s", "TruffleHog " + feature.UserAgentSuffix.Load()))
+	} 
 	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
