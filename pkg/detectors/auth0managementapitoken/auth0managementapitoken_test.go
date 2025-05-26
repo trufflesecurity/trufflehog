@@ -106,6 +106,11 @@ func generateRandomString() string {
 
 	for i := 0; i < length; i++ {
 		randomChar := charset[random.Intn(len(charset))]
+		// ensure last character is not boundary character
+		if i == length-1 && (randomChar == '.' || randomChar == '-') {
+			i--
+			continue
+		}
 		builder.WriteByte(randomChar)
 	}
 
