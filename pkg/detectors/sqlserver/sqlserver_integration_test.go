@@ -5,6 +5,7 @@ package sqlserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/microsoft/go-mssqldb/msdsn"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mssql"
 

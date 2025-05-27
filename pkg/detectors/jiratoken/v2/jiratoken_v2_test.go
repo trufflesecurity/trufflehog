@@ -3,6 +3,7 @@ package jiratoken
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,7 +13,7 @@ import (
 )
 
 var (
-	validTokenPattern    = "9nsCADa7812Z7VoIsYJ0K4rFWLBfk=1rhOsLAW"
+	validTokenPattern    = "ATATT9nsCADa7812Z7VoIsYJ0K4rFWLBfk=1rhOsLAW"
 	invalidTokenPattern  = "9nsCA?a7812Z7VoI%YJ0K4rFWLBfk91rhOsLAW"
 	validDomainPattern   = "hereisavalidsubdomain.heresalongdomain.com"
 	validDomainPattern2  = "jira.hereisavalidsubdomain.heresalongdomain.com"
@@ -33,12 +34,12 @@ func TestJiraToken_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword jira",
 			input: fmt.Sprintf("%s %s          \n%s %s\n%s %s", keyword, validTokenPattern, keyword, validDomainPattern, keyword, validEmailPattern),
-			want:  []string{validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern},
+			want:  []string{strings.ToLower(validEmailPattern) + ":" + validTokenPattern + ":" + validDomainPattern},
 		},
 		{
 			name:  "valid pattern - with multiple subdomains",
 			input: fmt.Sprintf("%s %s          \n%s %s\n%s %s", keyword, validTokenPattern, keyword, validDomainPattern2, keyword, validEmailPattern),
-			want:  []string{validEmailPattern + ":" + validTokenPattern + ":" + validDomainPattern2},
+			want:  []string{strings.ToLower(validEmailPattern) + ":" + validTokenPattern + ":" + validDomainPattern2},
 		},
 		{
 			name:  "valid pattern - key out of prefix range",
