@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -44,6 +45,14 @@ type callerIdentity struct {
 	ServiceToken    bool   `json:"serviceToken"`
 }
 
+func (s Scanner) getClient() *http.Client {
+	if s.client == nil {
+		return defaultClient
+	}
+
+	return s.client
+}
+
 // We are not including "mob-" because client keys are not sensitive.
 // They are expected to be public.
 func (s Scanner) Keywords() []string {
@@ -66,54 +75,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.launchdarkly.com/api/v2/caller-identity", nil)
-			if err != nil {
-				continue
-			}
-			client := s.client
-			if client == nil {
-				client = defaultClient
-			}
-			req.Header.Add("Authorization", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-					var callerIdentity callerIdentity
-					if err := json.NewDecoder(res.Body).Decode(&callerIdentity); err == nil { // no error in parsing
-						s1.ExtraData["type"] = callerIdentity.TokenKind
-						s1.ExtraData["account_id"] = callerIdentity.AccountId
-						s1.ExtraData["environment_id"] = callerIdentity.EnvironmentId
-						s1.ExtraData["project_id"] = callerIdentity.ProjectId
-						s1.ExtraData["environment_name"] = callerIdentity.EnvironmentName
-						s1.ExtraData["project_name"] = callerIdentity.ProjectName
-						s1.ExtraData["auth_kind"] = callerIdentity.AuthKind
-						s1.ExtraData["token_kind"] = callerIdentity.TokenKind
-						s1.ExtraData["client_id"] = callerIdentity.ClientID
-						s1.ExtraData["token_name"] = callerIdentity.TokenName
-						s1.ExtraData["member_id"] = callerIdentity.MemberId
-						if callerIdentity.TokenKind == "auth" {
-							if callerIdentity.ServiceToken {
-								s1.ExtraData["token_type"] = "service"
-							} else {
-								s1.ExtraData["token_type"] = "personal"
-							}
-						}
-					}
+			extraData, isVerified, verificationErr := verifyLaunchDarklyKey(ctx, s.getClient(), resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
+			s1.ExtraData = extraData
 
-					s1.AnalysisInfo = map[string]string{
-						"key": resMatch,
-					}
-
-				} else if res.StatusCode == 401 {
-					// 401 is expected for an invalid token, so there is nothing to do here.
-				} else {
-					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					s1.SetVerificationError(err, resMatch)
+			// only api keys can be analyzed
+			if strings.HasPrefix(resMatch, "api-") {
+				s1.AnalysisInfo = map[string]string{
+					"key": resMatch,
 				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
 			}
 		}
 
@@ -129,4 +100,58 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "LaunchDarkly is a feature management platform that allows teams to control the visibility of features to users. LaunchDarkly API keys can be used to access and modify feature flags and other resources within a LaunchDarkly account."
+}
+
+func verifyLaunchDarklyKey(ctx context.Context, client *http.Client, key string) (map[string]string, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://app.launchdarkly.com/api/v2/caller-identity", http.NoBody)
+	if err != nil {
+		return nil, false, err
+	}
+
+	req.Header.Add("Authorization", key)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var callerIdentity callerIdentity
+		var extraData = make(map[string]string)
+
+		if err := json.NewDecoder(resp.Body).Decode(&callerIdentity); err != nil {
+			return nil, false, err
+		}
+
+		extraData["type"] = callerIdentity.AccountId
+		extraData["account"] = callerIdentity.AccountId
+		extraData["environment_id"] = callerIdentity.EnvironmentId
+		extraData["project_id"] = callerIdentity.ProjectId
+		extraData["environment_name"] = callerIdentity.EnvironmentName
+		extraData["project_name"] = callerIdentity.ProjectName
+		extraData["auth_kind"] = callerIdentity.AuthKind
+		extraData["token_kind"] = callerIdentity.TokenKind
+		extraData["client_id"] = callerIdentity.ClientID
+		extraData["token_name"] = callerIdentity.TokenName
+		extraData["member_id"] = callerIdentity.MemberId
+		if callerIdentity.TokenKind == "auth" {
+			if callerIdentity.ServiceToken {
+				extraData["token_type"] = "service"
+			} else {
+				extraData["token_type"] = "personal"
+			}
+		}
+
+		return extraData, true, nil
+	case http.StatusUnauthorized:
+		return nil, false, nil
+	default:
+		return nil, false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

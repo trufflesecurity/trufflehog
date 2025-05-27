@@ -33,7 +33,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "valid LauncgDarkly token",
+			name:    "valid LaunchDarkly token",
 			key:     key,
 			want:    expectedOutput,
 			wantErr: false,
