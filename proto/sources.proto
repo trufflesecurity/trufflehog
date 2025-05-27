@@ -230,6 +230,7 @@ message GitLab {
   bool skip_archives = 8;
   repeated string include_repos = 9;
   bool exclude_projects_shared_into_groups = 10;
+  bool remove_auth_in_url = 11;
 }
 
 message GitHub {
@@ -255,6 +256,7 @@ message GitHub {
   bool skip_archives = 18;
   bool include_wikis = 19;
   uint32 comments_timeframe_days = 20;
+  bool remove_auth_in_url = 21;
 }
 
 message GitHubExperimental {
