@@ -74,6 +74,8 @@ type Source struct {
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+
+	useAuthInUrl bool // pass credentials in the repository urls for cloning
 }
 
 // --------------------------------------------------------------------------------
@@ -226,6 +228,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
+	// configuration uses the inverse logic of the `useAuthInUrl` flag.
+	s.useAuthInUrl = !s.conn.RemoveAuthInUrl
+
 	connector, err := newConnector(s)
 	if err != nil {
 		return fmt.Errorf("could not create connector: %w", err)
@@ -290,6 +295,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 			}
 		},
 		UseCustomContentWriter: s.useCustomContentWriter,
+		AuthInUrl:              s.useAuthInUrl,
 	}
 	s.git = git.NewGit(cfg)
 
@@ -298,7 +304,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 // Validate is used by enterprise CLI to validate the GitHub config file.
 func (s *Source) Validate(ctx context.Context) []error {
-	if _, _, err := s.connector.APIClient().Users.Get(ctx, ""); err != nil {
+	/*
+		Uses the rate limit API (docs: https://docs.github.com/en/rest/rate-limit) because:
+		- Works with all auth types: user tokens, PATs, App credentials, and unauthenticated requests
+		- Returns 401 for invalid credentials but works with no auth (as unauthenticated)
+		- Doesn't consume API quota when called
+	*/
+	if _, _, err := s.connector.APIClient().RateLimit.Get(ctx); err != nil {
 		return []error{err}
 	}
 
@@ -1591,7 +1603,7 @@ func newConnector(source *Source) (Connector, error) {
 		return NewBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		log.RedactGlobally(cred.Token)
-		return NewTokenConnector(apiEndpoint, cred.Token, func(c context.Context, err error) bool {
+		return NewTokenConnector(apiEndpoint, cred.Token, source.useAuthInUrl, func(c context.Context, err error) bool {
 			return source.handleRateLimit(c, err)
 		})
 	case *sourcespb.GitHub_Unauthenticated:

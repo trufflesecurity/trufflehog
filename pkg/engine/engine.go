@@ -1048,7 +1048,14 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 	defer common.Recover(ctx)
 
-	ctx = context.WithValue(ctx, "detector", data.detector.Key.Loggable())
+	ctx = context.WithValues(ctx,
+		"detector", data.detector.Key.Loggable(),
+		"decoder_type", data.decoder.String(),
+		"chunk_source_name", data.chunk.SourceName,
+		"chunk_source_id", data.chunk.SourceID,
+		"chunk_source_metadata", data.chunk.SourceMetadata.String())
+
+	ctx.Logger().V(5).Info("Starting to detect chunk")
 
 	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
@@ -1119,6 +1126,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 
 	matchesPerChunk.Observe(float64(matchCount))
+
+	ctx.Logger().V(5).Info("Finished detecting chunk")
 
 	data.wgDoneFn()
 }
@@ -1254,11 +1263,18 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	before, after, found := bytes.Cut(chunk.Data, result.Raw)
+	// get the primary secret value from the result if set
+	secret := result.GetPrimarySecretValue()
+	if secret == "" {
+		secret = string(result.Raw)
+	}
+
+	before, after, found := bytes.Cut(chunk.Data, []byte(secret))
 	if !found {
 		return 0, false
 	}
 	lineNumber := int64(bytes.Count(before, []byte("\n")))
+	result.SetPrimarySecretLine(lineNumber)
 	// If the line contains the ignore tag, we should ignore the result.
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
