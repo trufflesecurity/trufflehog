@@ -153,7 +153,7 @@ func TestTwitch_FromChunk(t *testing.T) {
 					t.Errorf("Twitch.FromData() verificationError = %v, wantVerificationErr %v", got[i].VerificationError(), tt.wantVerificationErr)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Twitch.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

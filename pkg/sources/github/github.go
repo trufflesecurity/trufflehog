@@ -74,6 +74,8 @@ type Source struct {
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+
+	useAuthInUrl bool // pass credentials in the repository urls for cloning
 }
 
 // --------------------------------------------------------------------------------
@@ -226,6 +228,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
+	// configuration uses the inverse logic of the `useAuthInUrl` flag.
+	s.useAuthInUrl = !s.conn.RemoveAuthInUrl
+
 	connector, err := newConnector(s)
 	if err != nil {
 		return fmt.Errorf("could not create connector: %w", err)
@@ -290,6 +295,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 			}
 		},
 		UseCustomContentWriter: s.useCustomContentWriter,
+		AuthInUrl:              s.useAuthInUrl,
 	}
 	s.git = git.NewGit(cfg)
 
@@ -1597,7 +1603,7 @@ func newConnector(source *Source) (Connector, error) {
 		return NewBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		log.RedactGlobally(cred.Token)
-		return NewTokenConnector(apiEndpoint, cred.Token, func(c context.Context, err error) bool {
+		return NewTokenConnector(apiEndpoint, cred.Token, source.useAuthInUrl, func(c context.Context, err error) bool {
 			return source.handleRateLimit(c, err)
 		})
 	case *sourcespb.GitHub_Unauthenticated:

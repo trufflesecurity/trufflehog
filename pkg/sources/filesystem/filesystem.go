@@ -201,38 +201,16 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // filepath or a directory.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
-		fileInfo, err := os.Lstat(filepath.Clean(path))
+		_, err := os.Lstat(filepath.Clean(path))
 		if err != nil {
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
 			continue
 		}
-		if !fileInfo.IsDir() {
-			item := sources.CommonSourceUnit{ID: path}
-			if err := reporter.UnitOk(ctx, item); err != nil {
-				return err
-			}
-			continue
-		}
-		err = fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return reporter.UnitErr(ctx, err)
-			}
-			if d.IsDir() {
-				return nil
-			}
-			fullPath := filepath.Join(path, relativePath)
-			if s.filter != nil && !s.filter.Pass(fullPath) {
-				return nil
-			}
-			item := sources.CommonSourceUnit{ID: fullPath}
-			return reporter.UnitOk(ctx, item)
-		})
-		if err != nil {
-			if err := reporter.UnitErr(ctx, err); err != nil {
-				return err
-			}
+		item := sources.CommonSourceUnit{ID: path}
+		if err := reporter.UnitOk(ctx, item); err != nil {
+			return err
 		}
 	}
 	return nil
