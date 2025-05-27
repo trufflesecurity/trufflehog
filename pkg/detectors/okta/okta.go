@@ -3,7 +3,9 @@ package okta
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -72,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyOktaToken(ctx context.Context, client *http.Client, domain string, token string) (bool, error) {
+func verifyOktaToken(ctx context.Context, client *http.Client, domain, token string) (bool, error) {
 	// curl -v -X GET \
 	// -H "Accept: application/json" \
 	// -H "Content-Type: application/json" \
@@ -96,8 +98,9 @@ func verifyOktaToken(ctx context.Context, client *http.Client, domain string, to
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return true, nil
-	case http.StatusUnauthorized, http.StatusForbidden:
+		body, _ := io.ReadAll(resp.Body)
+		return strings.Contains(string(body), "\"activated\":"), nil
+	case http.StatusUnauthorized:
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
