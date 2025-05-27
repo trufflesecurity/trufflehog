@@ -46,7 +46,7 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
 	if isSDKKey(token) {
-		color.Yellow("\n[!] The Provided key is an SDK Key. SDK Keys are senstive but used to configure LaunchDarkly SDKs")
+		color.Yellow("\n[!] The Provided key is an SDK Key. SDK Keys are sensitive but used to configure LaunchDarkly SDKs")
 		color.Green("\n[i] Docs: https://launchdarkly.com/docs/home/account/environment/settings#copy-and-reset-sdk-credentials-for-an-environment")
 
 		return
