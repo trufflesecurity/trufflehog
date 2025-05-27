@@ -78,10 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			extraData, isVerified, verificationErr := verifyLaunchDarklyKey(ctx, s.getClient(), resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
-
-			if extraData != nil {
-				s1.ExtraData = extraData
-			}
+			s1.ExtraData = extraData
 
 			// only api keys can be analyzed
 			if strings.HasPrefix(resMatch, "api-") {
