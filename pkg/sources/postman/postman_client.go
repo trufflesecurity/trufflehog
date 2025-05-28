@@ -8,9 +8,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"golang.org/x/time/rate"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
 
@@ -214,7 +215,10 @@ func NewClient(postmanToken string, metrics *metrics) *Client {
 	}
 
 	c := &Client{
-		HTTPClient:                        http.DefaultClient,
+		// Requests for large objects (usually collections) take a long time.  While we don't think that _every_
+		// request will take this long, some might take 5 seconds or more.  This seems reasonable, but we should
+		// be very cautious about bumping it further
+		HTTPClient:                        common.RetryableHTTPClientTimeout(30),
 		Headers:                           bh,
 		WorkspaceAndCollectionRateLimiter: rate.NewLimiter(rate.Every(time.Second), 1),
 		GeneralRateLimiter:                rate.NewLimiter(rate.Every(time.Second/5), 1),
