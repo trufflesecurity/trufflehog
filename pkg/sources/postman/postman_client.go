@@ -2,9 +2,11 @@ package postman
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -259,6 +261,8 @@ func checkResponseStatus(r *http.Response) error {
 
 // getPostmanResponseBodyBytes makes a request to the Postman API and returns the response body as bytes.
 func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString string, headers map[string]string) ([]byte, error) {
+	ctx = trContext.WithValues(ctx, "url", urlString)
+
 	req, err := c.NewRequest(urlString, headers)
 	if err != nil {
 		return nil, err
@@ -266,6 +270,12 @@ func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString st
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
+		// HTTPClient.Do returns a err which will always be a url.Error
+		// see docs: https://pkg.go.dev/net/http#Client.Do
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) && urlErr.Timeout() {
+			ctx.Logger().Error(urlErr, "postman API timed out.  Are we requesting an especially large item from the Postman API?")
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
