@@ -254,8 +254,8 @@ func checkResponseStatus(r *http.Response) error {
 }
 
 // getPostmanResponseBodyBytes makes a request to the Postman API and returns the response body as bytes.
-func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
-	req, err := c.NewRequest(url, headers)
+func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, urlString string, headers map[string]string) ([]byte, error) {
+	req, err := c.NewRequest(urlString, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, url string, he
 	}
 	defer resp.Body.Close()
 
-	c.Metrics.apiRequests.WithLabelValues(url).Inc()
+	c.Metrics.apiRequests.WithLabelValues(urlString).Inc()
 
 	rateLimitRemainingMonthValue := resp.Header.Get("RateLimit-Remaining-Month")
 	if rateLimitRemainingMonthValue == "" {
