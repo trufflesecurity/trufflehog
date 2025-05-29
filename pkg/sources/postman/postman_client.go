@@ -11,7 +11,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	trContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 )
 
@@ -258,7 +258,7 @@ func checkResponseStatus(r *http.Response) error {
 }
 
 // getPostmanResponseBodyBytes makes a request to the Postman API and returns the response body as bytes.
-func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, urlString string, headers map[string]string) ([]byte, error) {
+func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString string, headers map[string]string) ([]byte, error) {
 	req, err := c.NewRequest(urlString, headers)
 	if err != nil {
 		return nil, err
@@ -305,7 +305,7 @@ func (c *Client) getPostmanResponseBodyBytes(ctx context.Context, urlString stri
 
 // EnumerateWorkspaces returns the workspaces for a given user (both private, public, team and personal).
 // Consider adding additional flags to support filtering.
-func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
+func (c *Client) EnumerateWorkspaces(ctx trContext.Context) ([]Workspace, error) {
 	ctx.Logger().V(2).Info("enumerating workspaces")
 	workspacesObj := struct {
 		Workspaces []Workspace `json:"workspaces"`
@@ -339,7 +339,7 @@ func (c *Client) EnumerateWorkspaces(ctx context.Context) ([]Workspace, error) {
 }
 
 // GetWorkspace returns the workspace for a given workspace
-func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Workspace, error) {
+func (c *Client) GetWorkspace(ctx trContext.Context, workspaceUUID string) (Workspace, error) {
 	ctx.Logger().V(2).Info("getting workspace", "workspace", workspaceUUID)
 	obj := struct {
 		Workspace Workspace `json:"workspace"`
@@ -361,7 +361,7 @@ func (c *Client) GetWorkspace(ctx context.Context, workspaceUUID string) (Worksp
 }
 
 // GetEnvironmentVariables returns the environment variables for a given environment
-func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid string) (VariableData, error) {
+func (c *Client) GetEnvironmentVariables(ctx trContext.Context, environment_uuid string) (VariableData, error) {
 	ctx.Logger().V(3).Info("getting environment variables", "environment_uuid", environment_uuid)
 	obj := struct {
 		VariableData VariableData `json:"environment"`
@@ -383,7 +383,7 @@ func (c *Client) GetEnvironmentVariables(ctx context.Context, environment_uuid s
 }
 
 // GetCollection returns the collection for a given collection
-func (c *Client) GetCollection(ctx context.Context, collection_uuid string) (Collection, error) {
+func (c *Client) GetCollection(ctx trContext.Context, collection_uuid string) (Collection, error) {
 	ctx.Logger().V(3).Info("getting collection", "collection_uuid", collection_uuid)
 	obj := struct {
 		Collection Collection `json:"collection"`
