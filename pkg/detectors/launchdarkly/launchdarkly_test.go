@@ -2,19 +2,12 @@ package launchdarkly
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "sdk-5gykyl1b-wgrq-41lc-z6q1-h7zn5fdlcybw"
-	invalidPattern = "sdk-5gykyl1b-wgrq-41lc-z6q1-h7zn5fdlcyb"
-	keyword        = "launchdarkly"
 )
 
 func TestLaunchDarkly_Pattern(t *testing.T) {
@@ -26,13 +19,23 @@ func TestLaunchDarkly_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword launchdarkly",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			name:  "valid pattern - launchdarkly api key",
+			input: `api-5gykyl1b-wgrq-41lc-z6q1-h7zn5fdlcybw`,
+			want:  []string{"api-5gykyl1b-wgrq-41lc-z6q1-h7zn5fdlcybw"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			name:  "valid pattern - launchdarkly sdk key",
+			input: `sdk-5gykyl1b-wgrq-41lc-z6q1-h7zn5fdlcybw`,
+			want:  []string{"sdk-5gykyl1b-wgrq-41lc-z6q1-h7zn5fdlcybw"},
+		},
+		{
+			name:  "invalid pattern - invalid length",
+			input: `sdk-5gykyl1b-wgrq-41lc-z6q1-h7zn5fdlcyb`,
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern - invalid character",
+			input: `api-5Gykyl1b-Wgrq-41lC-z6q1-h7zn5fdlcybw`,
 			want:  []string{},
 		},
 	}

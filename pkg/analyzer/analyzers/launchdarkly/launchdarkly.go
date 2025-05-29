@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -31,6 +32,10 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 		return nil, errors.New("key not found in credentials info")
 	}
 
+	if isSDKKey(key) {
+		return nil, errors.New("sdk keys cannot be analyzed")
+	}
+
 	info, err := AnalyzePermissions(a.Cfg, key)
 	if err != nil {
 		return nil, err
@@ -40,6 +45,13 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, token string) {
+	if isSDKKey(token) {
+		color.Yellow("\n[!] The Provided key is an SDK Key. SDK Keys are sensitive but used to configure LaunchDarkly SDKs")
+		color.Green("\n[i] Docs: https://launchdarkly.com/docs/home/account/environment/settings#copy-and-reset-sdk-credentials-for-an-environment")
+
+		return
+	}
+
 	info, err := AnalyzePermissions(cfg, token)
 	if err != nil {
 		// just print the error in cli and continue as a partial success
@@ -86,7 +98,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	}
 
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzers.AnalyzerTypeElevenLabs,
+		AnalyzerType: analyzers.AnalyzerTypeLaunchDarkly,
 		Metadata:     map[string]any{},
 		Bindings:     make([]analyzers.Binding, 0),
 	}
@@ -201,4 +213,9 @@ func printResources(resources []Resource) {
 		callerTable.AppendRow(table.Row{color.GreenString(resource.Name), color.GreenString(resource.Type)})
 	}
 	callerTable.Render()
+}
+
+// isSDKKey check if the key provided is an SDK Key or not
+func isSDKKey(key string) bool {
+	return strings.HasPrefix(key, "sdk-")
 }
