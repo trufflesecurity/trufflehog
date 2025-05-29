@@ -111,27 +111,29 @@ type SourceUnitEnumerator interface {
 // struct is not necessary for running sources, but it helps simplify gathering
 // all of the necessary information to call the [Source.Init] method.
 type ConfiguredSource struct {
-	Name     string
-	source   Source
-	initFunc func(context.Context, SourceID, JobID) error
+	Name       string
+	source     Source
+	initParams struct {
+		verify      bool
+		conn        *anypb.Any
+		concurrency int
+	}
 }
 
 // NewConfiguredSource pre-configures an instantiated Source object with the
 // provided protobuf configuration.
 func NewConfiguredSource(s Source, config *sourcespb.LocalSource) ConfiguredSource {
 	return ConfiguredSource{
-		source: s,
 		Name:   config.GetName(),
-		initFunc: func(ctx context.Context, sourceID SourceID, jobID JobID) error {
-			return s.Init(
-				ctx,
-				config.GetName(),
-				jobID,
-				sourceID,
-				config.GetVerify(),
-				config.GetConnection(),
-				runtime.NumCPU(),
-			)
+		source: s,
+		initParams: struct {
+			verify      bool
+			conn        *anypb.Any
+			concurrency int
+		}{
+			verify:      config.GetVerify(),
+			conn:        config.GetConnection(),
+			concurrency: runtime.NumCPU(),
 		},
 	}
 }
@@ -147,11 +149,8 @@ func (c *ConfiguredSource) Init(ctx context.Context, sourceID SourceID, jobID Jo
 	if c.source == nil {
 		return nil, errors.New("source already initialized")
 	}
-	if c.initFunc == nil {
-		return nil, errors.New("source not configured")
-	}
-	err := c.initFunc(ctx, sourceID, jobID)
 	src := c.source
+	err := src.Init(ctx, c.Name, jobID, sourceID, c.initParams.verify, c.initParams.conn, c.initParams.concurrency)
 	c.source = nil
 	return src, err
 }
