@@ -1558,7 +1558,7 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 
 	if meta.GetFile() == "" && meta.GetCommit() != "" {
 		ctx.Logger().Info("no file detected; scanning commit %s metadata", meta.GetCommit())
-		return s.scanCommitMetadata(ctx, segments[1], segments[2], meta, &chunkSkel, reporter)
+		return s.scanCommitMetadata(context.WithValues(ctx, "commit", meta.GetCommit()), segments[1], segments[2], meta, &chunkSkel, reporter)
 	}
 
 	// else try downloading the file content to scan
@@ -1609,7 +1609,7 @@ func (s *Source) scanCommitMetadata(ctx context.Context, owner, repo string, met
 	sb.WriteString(commit.GetCommit().GetMessage())
 
 	content := strings.NewReader(sb.String())
-	return handlers.HandleFile(context.WithValues(ctx, "commit", commit.GetSHA()), io.NopCloser(content), chunkSkel, reporter)
+	return handlers.HandleFile(ctx, io.NopCloser(content), chunkSkel, reporter)
 }
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
