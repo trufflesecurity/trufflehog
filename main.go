@@ -253,7 +253,7 @@ var (
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
 	stdinInputScan = cli.Command("stdin", "Find credentials from stdin.")
-	scanScan       = cli.Command("scan", "Find credentials in multiple sources defined in configuration.")
+	multiScanScan  = cli.Command("multi-scan", "Find credentials in multiple sources defined in configuration.")
 
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
@@ -543,10 +543,10 @@ func run(state overseer.State) {
 	// Check that there are no sources defined for non-scan subcommands. If
 	// there are, return an error as it is ambiguous what the user is
 	// trying to do.
-	if cmd != scanScan.FullCommand() && len(conf.Sources) > 0 {
+	if cmd != multiScanScan.FullCommand() && len(conf.Sources) > 0 {
 		logFatal(
 			fmt.Errorf("ambiguous configuration"),
-			"sources should only be defined in configuration for the 'scan' command",
+			"sources should only be defined in configuration for the 'multi-scan' command",
 		)
 	}
 
@@ -986,7 +986,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		} else {
 			refs = append(refs, ref)
 		}
-	case scanScan.FullCommand():
+	case multiScanScan.FullCommand():
 		if *configFilename == "" {
 			return scanMetrics, fmt.Errorf("missing required flag: --config")
 		}
