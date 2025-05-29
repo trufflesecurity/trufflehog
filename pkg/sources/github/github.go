@@ -1556,8 +1556,8 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("invalid GitHub URL")
 	}
 
-	// scan commit metadata if the source meta has no file
 	if meta.GetFile() == "" && meta.GetCommit() != "" {
+		ctx.Logger().Info("no file detected; scanning commit %s metadata", meta.GetCommit())
 		return s.scanCommitMetadata(ctx, segments[1], segments[2], meta, &chunkSkel, reporter)
 	}
 
