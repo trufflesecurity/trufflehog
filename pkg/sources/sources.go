@@ -67,7 +67,7 @@ type Source interface {
 	SourceID() SourceID
 	// JobID returns the initialized job ID used for tracking relationships in the DB.
 	JobID() JobID
-	// Init initializes the source.
+	// Init initializes the source. Calling this method more than once is undefined behavior.
 	Init(aCtx context.Context, name string, jobId JobID, sourceId SourceID, verify bool, connection *anypb.Any, concurrency int) error
 	// Chunks emits data over a channel which is then decoded and scanned for secrets.
 	// By default, data is obtained indiscriminately. However, by providing one or more
@@ -106,8 +106,10 @@ type SourceUnitEnumerator interface {
 }
 
 // ConfiguredSource is a Source with most of it's initialization values
-// pre-configured and exposes a simplified Init() method. A ConfiguredSource
-// can be only initialized once.
+// pre-configured from a [sourcespb.LocalSource] configuration struct. It
+// exposes a simplified Init() method and can be only initialized once. This
+// struct is not necessary for running sources, but it helps simplify gathering
+// all of the necessary information to call the [Source.Init] method.
 type ConfiguredSource struct {
 	Name     string
 	source   Source
@@ -140,7 +142,7 @@ func (c *ConfiguredSource) SourceType() sourcespb.SourceType {
 }
 
 // Init returns the initialized Source. The ConfiguredSource is unusable after
-// calling this method.
+// calling this method because initializing a [Source] more than once is undefined.
 func (c *ConfiguredSource) Init(ctx context.Context, sourceID SourceID, jobID JobID) (Source, error) {
 	if c.source == nil {
 		return nil, errors.New("source already initialized")
