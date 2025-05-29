@@ -39,7 +39,6 @@ const (
 )
 
 // loginRequest represents the payload for Snowflake's login endpoint.
-// Note: This endpoint is undocumented in Snowflake's public API documentation.
 type loginRequest struct {
 	Data struct {
 		LoginName   string `json:"LOGIN_NAME"`
@@ -157,6 +156,7 @@ func verifyMatch(ctx context.Context, account, username, password string) (bool,
 		return false, fmt.Errorf("failed to marshal login request: %w", err)
 	}
 
+	// Note: This endpoint is undocumented in Snowflake's public API documentation.
 	url := fmt.Sprintf("https://%s.snowflakecomputing.com/session/v1/login-request", account)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
