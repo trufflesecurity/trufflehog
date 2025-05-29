@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package config;
+
+option go_package = "github.com/trufflesecurity/trufflehog/v3/pkg/pb/configpb";
+
+import "sources.proto";
+import "custom_detectors.proto";
+
+message Config {
+    repeated sources.LocalSource sources = 9;
+    repeated custom_detectors.CustomRegex detectors = 13;
+}
