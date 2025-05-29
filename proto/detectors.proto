@@ -1036,6 +1036,7 @@ enum DetectorType {
   AzureDirectManagementKey = 1024;
   AzureAppConfigConnectionString = 1025;
   DeepSeek = 1026;
+  StripePaymentIntent = 1027;
 }
 
 message Result {
