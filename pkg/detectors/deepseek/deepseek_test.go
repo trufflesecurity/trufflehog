@@ -1,4 +1,4 @@
-package gitlab
+package deepseek
 
 import (
 	"context"
@@ -10,27 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `[{
-		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
-		"name": "Gitlab",
-		"type": "Detector",
-		"api": true,
-		"authentication_type": "",
-		"verification_url": "https://api.example.com/example",
-		"test_secrets": {
-			"gitlab_secret": "oXCt4JT2wf1_WlZl2OVG"
-		},
-		"expected_response": "200",
-		"method": "GET",
-		"deprecated": false
-	}]`
-	secret        = "oXCt4JT2wf1_WlZl2OVG"
-	validPattern2 = "GITLAB_TOKEN=ABc123456789dEFghIJK"
-	secret2       = "ABc123456789dEFghIJK"
-)
-
-func TestGitLab_Pattern(t *testing.T) {
+func TestDeepseek_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -40,14 +20,19 @@ func TestGitLab_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
+			name: "valid pattern",
+			input: `
+				other.code()
+				deepseek.Apikey = sk-abc123def456ghi789jkl012mno345pq
+			`,
+			want: []string{
+				"sk-abc123def456ghi789jkl012mno345pq",
+			},
 		},
 		{
-			name:  "valid pattern (with = before secret)",
-			input: validPattern2,
-			want:  []string{secret2},
+			name:  "invalid pattern",
+			input: "deepseek.key = sk-abc123invalid",
+			want:  nil,
 		},
 	}
 

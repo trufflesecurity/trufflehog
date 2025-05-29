@@ -28,6 +28,7 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 		IncludeWikis:               c.IncludeWikis,
 		SkipBinaries:               c.SkipBinaries,
 		CommentsTimeframeDays:      c.CommentsTimeframeDays,
+		RemoveAuthInUrl:            !c.AuthInUrl, // configuration uses the opposite field in proto to keep credentials in the URL by default.
 	}
 	if len(c.Token) > 0 {
 		connection.Credential = &sourcespb.GitHub_Token{

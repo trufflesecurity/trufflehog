@@ -44,5 +44,5 @@ func (c *basicAuthConnector) APIClient() *github.Client {
 }
 
 func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
-	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.username, args...)
+	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.username, true, args...)
 }
