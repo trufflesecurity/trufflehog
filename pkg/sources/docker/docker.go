@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common/glob"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -31,14 +31,14 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_DOCKER
 
 type Source struct {
-	name           string
-	sourceId       sources.SourceID
-	jobId          sources.JobID
-	verify         bool
-	concurrency    int
-	conn           sourcespb.Docker
-	excludePaths   []string
-	excludeRegexes []*regexp.Regexp
+	name         string
+	sourceId     sources.SourceID
+	jobId        sources.JobID
+	verify       bool
+	concurrency  int
+	conn         sourcespb.Docker
+	excludePaths []string
+	globFilter   *glob.Filter
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -80,16 +80,10 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 	// Extract exclude paths from connection and compile regexes
 	if paths := s.conn.GetExcludePaths(); len(paths) > 0 {
 		s.excludePaths = paths
-		s.excludeRegexes = make([]*regexp.Regexp, len(paths))
-		for i, path := range paths {
-			// Convert wildcard pattern to regex
-			pattern := strings.ReplaceAll(path, "*", ".*")
-			pattern = "^" + pattern + "$"
-			regex, err := regexp.Compile(pattern)
-			if err != nil {
-				return fmt.Errorf("error compiling exclude path regex for path %q (pattern %q): %w", path, pattern, err)
-			}
-			s.excludeRegexes[i] = regex
+		var err error
+		s.globFilter, err = glob.NewGlobFilter(glob.WithExcludeGlobs(paths...))
+		if err != nil {
+			return fmt.Errorf("error creating glob filter for exclude paths: %w", err)
 		}
 	}
 
@@ -411,20 +405,18 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 
 // isExcluded checks if a given filePath should be excluded based on the configured excludePaths and excludeRegexes.
 func (s *Source) isExcluded(ctx context.Context, filePath string) bool {
-	ctx.Logger().V(2).Info("checking file against exclude paths", "file", filePath, "exclude_paths", s.excludePaths)
-	for i, excludePath := range s.excludePaths {
-		// Check for exact path match first (no regex needed)
-		if filePath == excludePath {
-			ctx.Logger().V(2).Info("skipping file: matches exclude path exactly", "file", filePath, "exclude_path", excludePath)
-			return true
-		}
-		// Then check against pre-compiled regex
-		if s.excludeRegexes[i].MatchString(filePath) {
-			ctx.Logger().V(2).Info("skipping file: matches exclude pattern", "file", filePath, "exclude_path", excludePath, "regex", s.excludeRegexes[i].String())
-			return true
-		}
+	if s.globFilter == nil {
+		return false // No filter configured, so nothing is excluded.
 	}
-	return false
+	// globFilter.ShouldInclude returns true if it's NOT excluded by an exclude glob or if it IS included by an include glob.
+	// If ShouldInclude is true (passes the filter), it means it was NOT matched by an exclude glob, so it's NOT excluded.
+	// If ShouldInclude is false (fails the filter), it means it WAS matched by an exclude glob, so it IS excluded.
+	isIncluded := s.globFilter.ShouldInclude(filePath)
+
+	if !isIncluded {
+		ctx.Logger().V(2).Info("skipping file: matches an exclude pattern", "file", filePath, "configured_exclude_paths", s.excludePaths)
+	}
+	return !isIncluded
 }
 
 func (s *Source) remoteOpts() ([]remote.Option, error) {
