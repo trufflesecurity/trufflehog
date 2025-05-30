@@ -87,7 +87,7 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 			pattern = "^" + pattern + "$"
 			regex, err := regexp.Compile(pattern)
 			if err != nil {
-				return fmt.Errorf("error compiling exclude path regex for %q: %w", path, err)
+				return fmt.Errorf("error compiling exclude path regex for path %q (pattern %q): %w", path, pattern, err)
 			}
 			s.excludeRegexes[i] = regex
 		}
@@ -370,18 +370,8 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 
 	// Check if the file should be excluded
 	filePath := "/" + info.name
-	ctx.Logger().V(2).Info("checking file against exclude paths", "file", filePath, "exclude_paths", s.excludePaths)
-	for i, excludePath := range s.excludePaths {
-		// Check for exact path match first (no regex needed)
-		if filePath == excludePath {
-			ctx.Logger().V(2).Info("skipping file: matches exclude path exactly", "file", filePath, "exclude_path", excludePath)
-			return nil
-		}
-		// Then check against pre-compiled regex
-		if s.excludeRegexes[i].MatchString(filePath) {
-			ctx.Logger().V(2).Info("skipping file: matches exclude pattern", "file", filePath, "exclude_path", excludePath)
-			return nil
-		}
+	if s.isExcluded(ctx, filePath) {
+		return nil
 	}
 
 	chunkReader := sources.NewChunkReader()
@@ -417,6 +407,24 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 	}
 
 	return nil
+}
+
+// isExcluded checks if a given filePath should be excluded based on the configured excludePaths and excludeRegexes.
+func (s *Source) isExcluded(ctx context.Context, filePath string) bool {
+	ctx.Logger().V(2).Info("checking file against exclude paths", "file", filePath, "exclude_paths", s.excludePaths)
+	for i, excludePath := range s.excludePaths {
+		// Check for exact path match first (no regex needed)
+		if filePath == excludePath {
+			ctx.Logger().V(2).Info("skipping file: matches exclude path exactly", "file", filePath, "exclude_path", excludePath)
+			return true
+		}
+		// Then check against pre-compiled regex
+		if s.excludeRegexes[i].MatchString(filePath) {
+			ctx.Logger().V(2).Info("skipping file: matches exclude pattern", "file", filePath, "exclude_path", excludePath, "regex", s.excludeRegexes[i].String())
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Source) remoteOpts() ([]remote.Option, error) {
