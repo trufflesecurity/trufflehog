@@ -105,11 +105,6 @@ func AnalyzePermissions(cfg *config.Config, token, domain, email string) (*Secre
 		return nil, fmt.Errorf("domain not found: %s", domain)
 	}
 
-	// capture the token details
-	// if err := captureTokenInfo(client, token, domain, email, secretInfo); err != nil {
-	// 	return nil, err
-	// }
-
 	body, _, err := checkAllJiraPermissions(client, domain, email, token)
 	if err != nil {
 		return secretInfo, fmt.Errorf("failed to check permissions: %w", err)

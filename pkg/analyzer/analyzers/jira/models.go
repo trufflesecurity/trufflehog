@@ -3,8 +3,9 @@ package jira
 import "sync"
 
 const (
-	ResourceTypeProject = "project"
-	ResourceTypeBoard   = "board"
+	ResourceTypeProject = "Project"
+	ResourceTypeBoard   = "Board"
+	ResourceTypeGroup   = "Group"
 )
 
 type SecretInfo struct {
@@ -25,6 +26,7 @@ type JiraUser struct {
 	Active       bool   `json:"active"`
 	TimeZone     string `json:"timeZone"`
 	Locale       string `json:"locale"`
+	Self         string `json:"self"`
 }
 
 type JiraResource struct {
@@ -134,4 +136,55 @@ type JiraBoard struct {
 			Name           string `json:"name"`
 		} `json:"location"`
 	} `json:"values"`
+}
+
+type JiraGroup struct {
+	Total  int `json:"total"`
+	Groups []struct {
+		Name    string `json:"name"`
+		HTML    string `json:"html"`
+		GroupID string `json:"groupId"`
+		Labels  []struct {
+			Text  string `json:"text"`
+			Title string `json:"title"`
+			Type  string `json:"type"`
+		} `json:"labels"`
+	} `json:"groups"`
+}
+
+type AuditRecord struct {
+	Offset  int `json:"offset"`
+	Limit   int `json:"limit"`
+	Total   int `json:"total"`
+	Records []struct {
+		ID            int    `json:"id"`
+		Summary       string `json:"summary"`
+		Created       string `json:"created"`
+		Category      string `json:"category"`
+		EventSource   string `json:"eventSource"`
+		RemoteAddress string `json:"remoteAddress,omitempty"`
+		AuthorKey     string `json:"authorKey,omitempty"`
+		AuthorAccount string `json:"authorAccountId,omitempty"`
+
+		ObjectItem struct {
+			ID         string `json:"id,omitempty"`
+			Name       string `json:"name"`
+			TypeName   string `json:"typeName"`
+			ParentID   string `json:"parentId,omitempty"`
+			ParentName string `json:"parentName,omitempty"`
+		} `json:"objectItem"`
+
+		AssociatedItems []struct {
+			ID         string `json:"id"`
+			Name       string `json:"name"`
+			TypeName   string `json:"typeName"`
+			ParentID   string `json:"parentId"`
+			ParentName string `json:"parentName"`
+		} `json:"associatedItems"`
+
+		ChangedValues []struct {
+			FieldName string `json:"fieldName"`
+			ChangedTo string `json:"changedTo"`
+		} `json:"changedValues"`
+	} `json:"records"`
 }
