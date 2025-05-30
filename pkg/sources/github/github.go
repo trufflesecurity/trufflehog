@@ -1557,8 +1557,10 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 	}
 
 	if meta.GetFile() == "" && meta.GetCommit() != "" {
-		ctx.Logger().Info("no file detected; scanning commit %s metadata", meta.GetCommit())
-		return s.scanCommitMetadata(context.WithValues(ctx, "commit", meta.GetCommit()), segments[1], segments[2], meta, &chunkSkel, reporter)
+		ctx := context.WithValues(ctx, "commit_hash", meta.GetCommit())
+		ctx.Logger().V(2).Info("secret metadata has no file; scanning commit metadata instead")
+
+		return s.scanCommitMetadata(ctx, segments[1], segments[2], meta, &chunkSkel, reporter)
 	}
 
 	// else try downloading the file content to scan
