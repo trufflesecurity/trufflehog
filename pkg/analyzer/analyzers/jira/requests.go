@@ -23,6 +23,8 @@ const (
 	searchIssues
 	getAllBoards
 	getAllUsers
+	findGroups
+	getAuditRecords
 )
 
 var (
@@ -30,12 +32,14 @@ var (
 
 	// endpoints contain Jira API endpoints
 	endpoints = map[endpoint]string{
-		mySelf:         "myself",
-		myPermissions:  "mypermissions",
-		searchIssues:   "search/jql",
-		getAllProjects: "project/search",
-		getAllBoards:   "board",
-		getAllUsers:    "users/search",
+		mySelf:          "myself",
+		myPermissions:   "mypermissions",
+		searchIssues:    "search/jql",
+		getAllProjects:  "project/search",
+		getAllBoards:    "board",
+		getAllUsers:     "users/search",
+		findGroups:      "groups/picker",
+		getAuditRecords: "auditing/record",
 	}
 )
 
@@ -116,11 +120,11 @@ func captureResources(client *http.Client, domain, email, token string, secretIn
 		}()
 	}
 
-	launchTask(func() error {
-		return captureProjects(client, domain, email, token, secretInfo)
-	})
+	launchTask(func() error { return captureProjects(client, domain, email, token, secretInfo) })
 	launchTask(func() error { return captureBoards(client, domain, email, token, secretInfo) })
 	launchTask(func() error { return captureUsers(client, domain, email, token, secretInfo) })
+	launchTask(func() error { return captureGroups(client, domain, email, token, secretInfo) })
+	launchTask(func() error { return captureAuditLogs(client, domain, email, token, secretInfo) })
 
 	wg.Wait()
 	close(errChan)
@@ -131,35 +135,6 @@ func captureResources(client *http.Client, domain, email, token string, secretIn
 	}
 
 	return nil
-}
-
-// captureTokenInfo calls `/tokens/self` API and capture the token information in secretInfo
-func captureTokenInfo(client *http.Client, token, domain, email string, secretInfo *SecretInfo) error {
-	respBody, statusCode, err := makeJiraRequest(client, fmt.Sprintf(baseURL, domain)+endpoints[mySelf], email, token)
-	if err != nil {
-		return err
-	}
-
-	switch statusCode {
-	case http.StatusOK:
-		var token SelfToken
-
-		if err := json.Unmarshal(respBody, &token); err != nil {
-			return err
-		}
-
-		if token.ExpiresAt == "" {
-			token.ExpiresAt = "never"
-		}
-
-		// secretInfo.TokenInfo = token
-
-		return nil
-	case http.StatusUnauthorized:
-		return fmt.Errorf("invalid/expired api key")
-	default:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoints[mySelf])
-	}
 }
 
 // captureUserInfo calls `/myself` API and store the current user information in secretInfo
@@ -194,8 +169,14 @@ func captureProjects(client *http.Client, domain, email, token string, secretInf
 		return err
 	}
 
-	if statusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoints[getAllProjects])
+	switch {
+	case statusCode == http.StatusOK:
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+		return nil
+	case statusCode >= 500:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
+	default:
+		return nil
 	}
 
 	var resp ProjectSearchResponse
@@ -236,8 +217,14 @@ func captureIssues(client *http.Client, domain, email, token, projectKey string,
 		return err
 	}
 
-	if statusCode != http.StatusOK {
+	switch {
+	case statusCode == http.StatusOK:
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+		return nil
+	case statusCode >= 500:
 		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
+	default:
+		return nil
 	}
 
 	var issueResp JiraIssue
@@ -270,8 +257,14 @@ func captureBoards(client *http.Client, domain, email, token string, secretInfo 
 		return err
 	}
 
-	if statusCode != http.StatusOK {
+	switch {
+	case statusCode == http.StatusOK:
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+		return nil
+	case statusCode >= 500:
 		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
+	default:
+		return nil
 	}
 
 	var boardResp JiraBoard
@@ -310,19 +303,17 @@ func captureUsers(client *http.Client, domain, email, token string, secretInfo *
 		return err
 	}
 
-	if statusCode != http.StatusOK {
+	switch {
+	case statusCode == http.StatusOK:
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+		return nil
+	case statusCode >= 500:
 		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
+	default:
+		return nil
 	}
 
-	var users []struct {
-		AccountID    string `json:"accountId"`
-		DisplayName  string `json:"displayName"`
-		Active       bool   `json:"active"`
-		EmailAddress string `json:"emailAddress"`
-		AccountType  string `json:"accountType"`
-		Self         string `json:"self"`
-	}
-
+	var users []JiraUser
 	if err := json.Unmarshal(body, &users); err != nil {
 		return fmt.Errorf("failed to unmarshal user response: %w", err)
 	}
@@ -343,6 +334,116 @@ func captureUsers(client *http.Client, domain, email, token string, secretInfo *
 			secretInfo.appendResource(userResource)
 		}
 
+	}
+
+	return nil
+}
+
+func captureGroups(client *http.Client, domain, email, token string, secretInfo *SecretInfo) error {
+	endpoint := fmt.Sprintf("%s/api/3/%s", fmt.Sprintf(baseURL, domain), endpoints[findGroups])
+
+	body, statusCode, err := makeJiraRequest(client, endpoint, email, token)
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case statusCode == http.StatusOK:
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+		return nil
+	case statusCode >= 500:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
+	default:
+		return nil
+	}
+
+	var groupResp JiraGroup
+	if err := json.Unmarshal(body, &groupResp); err != nil {
+		return fmt.Errorf("failed to unmarshal group response: %w", err)
+	}
+
+	for _, group := range groupResp.Groups {
+		metadata := map[string]string{
+			"HTML": group.HTML,
+		}
+		if len(group.Labels) > 0 {
+			for i, label := range group.Labels {
+				metadata[fmt.Sprintf("Label%d_Text", i)] = label.Text
+				metadata[fmt.Sprintf("Label%d_Title", i)] = label.Title
+				metadata[fmt.Sprintf("Label%d_Type", i)] = label.Type
+			}
+		}
+
+		groupResource := JiraResource{
+			ID:       group.GroupID,
+			Name:     group.Name,
+			Type:     ResourceTypeGroup,
+			Metadata: metadata,
+		}
+
+		secretInfo.appendResource(groupResource)
+	}
+
+	return nil
+}
+
+func captureAuditLogs(client *http.Client, domain, email, token string, secretInfo *SecretInfo) error {
+	endpoint := fmt.Sprintf("%s/api/3/%s", fmt.Sprintf(baseURL, domain), endpoints[getAuditRecords])
+
+	body, statusCode, err := makeJiraRequest(client, endpoint, email, token)
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case statusCode == http.StatusOK:
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+		return nil
+	case statusCode >= 500:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
+	default:
+		return nil
+	}
+
+	var auditResp AuditRecord
+	if err := json.Unmarshal(body, &auditResp); err != nil {
+		return fmt.Errorf("failed to unmarshal audit logs: %w", err)
+	}
+
+	for _, record := range auditResp.Records {
+		metadata := map[string]string{
+			"Summary":  record.Summary,
+			"Created":  record.Created,
+			"Category": record.Category,
+			"Type":     record.ObjectItem.TypeName,
+			"Object":   record.ObjectItem.Name,
+		}
+
+		if record.AuthorAccount != "" {
+			metadata["AuthorAccountID"] = record.AuthorAccount
+		}
+		if record.RemoteAddress != "" {
+			metadata["RemoteAddress"] = record.RemoteAddress
+		}
+
+		for i, item := range record.AssociatedItems {
+			metadata[fmt.Sprintf("AssociatedItem%d_Name", i)] = item.Name
+			metadata[fmt.Sprintf("AssociatedItem%d_Type", i)] = item.TypeName
+		}
+
+		for i, change := range record.ChangedValues {
+			metadata[fmt.Sprintf("ChangedField%d_Name", i)] = change.FieldName
+			metadata[fmt.Sprintf("ChangedField%d_To", i)] = change.ChangedTo
+		}
+
+		resource := JiraResource{
+			ID:       fmt.Sprintf("%d", record.ID),
+			Name:     record.Summary,
+			Type:     "AuditRecord",
+			Metadata: metadata,
+		}
+
+		secretInfo.appendResource(resource)
 	}
 
 	return nil
