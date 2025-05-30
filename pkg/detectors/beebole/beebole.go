@@ -2,8 +2,8 @@ package beebole
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -47,22 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			data := fmt.Sprintf("%s:X", resMatch)
-			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-			payload := strings.NewReader(`{"service": "custom_field.list"}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://beebole-apps.com/api/v2", payload)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyBeebole(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -77,4 +64,36 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Beebole is a time tracking and business management tool. Beebole API keys can be used to access and manage time tracking data and other business-related information."
+}
+
+// docs: https://beebole.com/help/api/
+func verifyBeebole(ctx context.Context, client *http.Client, key string) (bool, error) {
+	payload := strings.NewReader(`{"service": "custom_field.list"}`)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://beebole-apps.com/api/v2", payload)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.SetBasicAuth(key, "x")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

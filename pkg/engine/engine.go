@@ -785,7 +785,7 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
 
 			if decoded == nil {
-				ctx.Logger().V(5).Info("decoder not applicable for chunk", "decoder", decoder.Type().String(), "chunk", chunk)
+				// This means that the decoder didn't understand this chunk and isn't applicable to it.
 				continue
 			}
 
@@ -937,7 +937,7 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 				results, err := detector.FromData(ctx, false, match)
 				cancel()
 				if err != nil {
-					ctx.Logger().V(2).Error(
+					ctx.Logger().Error(
 						err, "error finding results in chunk during verification overlap",
 						"detector", detector.Key.Type().String(),
 					)

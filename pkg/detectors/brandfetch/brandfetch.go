@@ -2,6 +2,8 @@ package brandfetch
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -45,22 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := strings.NewReader(`{
-				"domain": "www.example.com"
-				}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://api.brandfetch.io/v1/color", payload)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("x-api-key", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyBrandFetch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
 		}
 
 		results = append(results, s1)
@@ -75,4 +64,38 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Brandfetch is a service that provides brand data, including logos, colors, fonts, and more. Brandfetch API keys can be used to access this data."
+}
+
+// docs: https://docs.brandfetch.com/docs/brand-api#overview
+func verifyBrandFetch(ctx context.Context, client *http.Client, key string) (bool, error) {
+	payload := strings.NewReader(`{
+		"domain": "www.example.com"
+		}`)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.brandfetch.io/v1/color", payload)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("x-api-key", key)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
