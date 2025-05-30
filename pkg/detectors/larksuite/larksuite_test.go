@@ -2,10 +2,11 @@ package larksuite
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-	"testing"
 )
 
 func TestLarksuite_Pattern(t *testing.T) {
@@ -30,6 +31,11 @@ func TestLarksuite_Pattern(t *testing.T) {
 			name:  "app token pattern",
 			input: "larksuite_token = 'a-KkBmh6TUBIcyFAp20XXa'",
 			want:  []string{"a-KkBmh6TUBIcyFAp20XXa"},
+		},
+		{
+			name:  "invalid token pattern",
+			input: "larksuite_token = 'hello-a-KkBmh6TUBIcyFAp20XXa'",
+			want:  []string{},
 		},
 	}
 
