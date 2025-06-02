@@ -691,6 +691,11 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	var ref sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
+		// validate the commit
+		if *gitScanSinceCommit != "" && !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
+			ctx.Logger().Info("Warning: The provided commit hash appears to be invalid.")
+		}
+
 		gitCfg := sources.GitConfig{
 			URI:              *gitScanURI,
 			IncludePathsFile: *gitScanIncludePaths,
@@ -1022,5 +1027,24 @@ func printAverageDetectorTime(e *engine.Engine) {
 	)
 	for detectorName, duration := range e.GetDetectorsMetrics() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
+	}
+}
+
+// Function to check if the commit is valid
+func isValidCommit(uri, commit string) bool {
+	if strings.HasPrefix(uri, "file") {
+		// handle file:// urls
+		repoPath, _ := strings.CutPrefix(uri, "file://") // remove the prefix to validate against the repo path
+		output, err := exec.Command("git", "-C", repoPath, "cat-file", "-t", commit).Output()
+		if err != nil {
+			return false
+		}
+
+		return strings.TrimSpace(string(output)) == "commit"
+	} else if strings.HasPrefix(uri, "https") {
+		// handle https:// urls
+		return false
+	} else {
+		return false
 	}
 }
