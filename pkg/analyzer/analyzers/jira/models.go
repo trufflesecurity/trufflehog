@@ -1,19 +1,86 @@
 package jira
 
-import "sync"
+import (
+	"sync"
+)
 
 const (
-	ResourceTypeProject = "Project"
-	ResourceTypeBoard   = "Board"
-	ResourceTypeGroup   = "Group"
+	ResourceTypeProject     = "Project"
+	ResourceTypeBoard       = "Board"
+	ResourceTypeGroup       = "Group"
+	ResourceTypeIssue       = "Issue"
+	ResourceTypeUser        = "User"
+	ResourceTypeAuditRecord = "AuditRecord"
 )
+
+var ResourcePermissions = map[string][]Permission{
+	ResourceTypeProject: {
+		BrowseProjects,
+		AdministerProjects,
+		CreateProject,
+		EditIssueLayout,
+		ViewDevTools,
+		ViewAggregatedData,
+		SystemAdmin,
+	},
+	ResourceTypeIssue: {
+		AddComments,
+		AssignIssues,
+		CloseIssues,
+		CreateAttachments,
+		CreateIssues,
+		DeleteIssues,
+		DeleteAllAttachments,
+		DeleteAllComments,
+		DeleteAllWorklogs,
+		DeleteOwnAttachments,
+		DeleteOwnComments,
+		DeleteOwnWorklogs,
+		EditAllComments,
+		EditAllWorklogs,
+		EditIssues,
+		EditOwnComments,
+		EditOwnWorklogs,
+		LinkIssues,
+		ManageWatchers,
+		ModifyReporter,
+		MoveIssues,
+		ResolveIssues,
+		ScheduleIssues,
+		SetIssueSecurity,
+		TransitionIssues,
+		UnarchiveIssues,
+		ViewVotersAndWatchers,
+		WorkOnIssues,
+		SystemAdmin,
+	},
+	ResourceTypeBoard: {
+		ManageSprintsPermission,
+		BrowseProjects,
+		ViewAggregatedData,
+		SystemAdmin,
+	},
+	ResourceTypeUser: {
+		AssignableUser,
+		UserPicker,
+		SystemAdmin,
+	},
+	ResourceTypeGroup: {
+		SystemAdmin,
+		Administer,
+	},
+	ResourceTypeAuditRecord: {
+		Administer,
+		SystemAdmin,
+	},
+}
 
 type SecretInfo struct {
 	mu sync.RWMutex
 
 	UserInfo    JiraUser
 	Permissions []string
-	Resources []JiraResource
+	Resources   []JiraResource
 }
 
 // JiraUser represents the response from /myself API
@@ -29,17 +96,25 @@ type JiraUser struct {
 }
 
 type JiraResource struct {
-	ID       string
-	Name     string
-	Type     string
-	Metadata map[string]string
-	Parent   *JiraResource
+	ID          string
+	Name        string
+	Type        string
+	Metadata    map[string]string
+	Parent      *JiraResource
+	Permissions []string
 }
 
-// AppendResource append resource to secret info resource list
-func (s *SecretInfo) appendResource(resource JiraResource) {
+func (s *SecretInfo) appendResource(resource JiraResource, resourceType string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if perms, ok := ResourcePermissions[resourceType]; ok {
+		for _, p := range perms {
+			if userPerms[p] {
+				resource.Permissions = append(resource.Permissions, PermissionStrings[p])
+			}
+		}
+	}
 
 	s.Resources = append(s.Resources, resource)
 }

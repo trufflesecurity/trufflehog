@@ -82,8 +82,6 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, domain, email, token string)
 	if noInfo {
 		color.Yellow("[i] No information found for the provided token")
 	}
-
-	// color.Yellow("\n[i] Expires: %s", info.TokenInfo.ExpiresAt)
 }
 
 func AnalyzePermissions(cfg *config.Config, token, domain, email string) (*SecretInfo, error) {
@@ -125,7 +123,7 @@ func AnalyzePermissions(cfg *config.Config, token, domain, email string) (*Secre
 	secretInfo.Permissions = grantedPermissions
 
 	// capture the resources
-	if err := captureResources(client, domain, email, token, secretInfo); err != nil {
+	if err := captureResources(client, domain, email, token, secretInfo, grantedPermissions); err != nil {
 		// return secretInfo as well in case of error for partial success
 		return secretInfo, err
 	}
@@ -145,21 +143,21 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		Bindings:     make([]analyzers.Binding, 0),
 	}
 
-	// extract information from resource to create bindings and append to result bindings
 	for _, resource := range info.Resources {
-		binding := analyzers.Binding{
-			Resource:   *secretInfoResourceToAnalyzerResource(resource),
-			Permission: analyzers.Permission{
-				// Value: info.TokenInfo.Scope,
-			},
+		for _, perm := range resource.Permissions {
+			binding := analyzers.Binding{
+				Resource: *secretInfoResourceToAnalyzerResource(resource),
+				Permission: analyzers.Permission{
+					Value: perm,
+				},
+			}
+
+			if resource.Parent != nil {
+				binding.Resource.Parent = secretInfoResourceToAnalyzerResource(*resource.Parent)
+			}
+
+			result.Bindings = append(result.Bindings, binding)
 		}
-
-		if resource.Parent != nil {
-			binding.Resource.Parent = secretInfoResourceToAnalyzerResource(*resource.Parent)
-		}
-
-		result.Bindings = append(result.Bindings, binding)
-
 	}
 
 	return &result

@@ -22,7 +22,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -47,7 +47,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -72,7 +72,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -97,7 +97,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -122,7 +122,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -147,7 +147,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -172,7 +172,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -197,7 +197,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -222,7 +222,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -247,7 +247,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -272,7 +272,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -297,7 +297,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -322,7 +322,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -347,7 +347,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -372,7 +372,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -397,7 +397,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -422,7 +422,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -447,7 +447,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -472,7 +472,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -491,7 +491,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -510,7 +510,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -535,7 +535,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -560,7 +560,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -585,7 +585,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -608,7 +608,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -633,7 +633,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -656,7 +656,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -681,7 +681,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -706,7 +706,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -731,7 +731,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -754,7 +754,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -779,7 +779,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -802,7 +802,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -827,7 +827,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -850,7 +850,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -873,7 +873,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -896,7 +896,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -919,7 +919,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -944,7 +944,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -969,7 +969,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -994,7 +994,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1019,7 +1019,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1039,7 +1039,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1059,7 +1059,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1079,7 +1079,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1099,7 +1099,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1125,7 +1125,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1151,7 +1151,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1177,7 +1177,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1196,7 +1196,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1215,7 +1215,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1234,7 +1234,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1253,7 +1253,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1272,7 +1272,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1291,7 +1291,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1312,7 +1312,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1333,7 +1333,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1356,7 +1356,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1380,7 +1380,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1404,7 +1404,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1424,7 +1424,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1446,7 +1446,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1468,7 +1468,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1490,7 +1490,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1512,7 +1512,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1534,7 +1534,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1556,7 +1556,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1580,7 +1580,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1600,7 +1600,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1622,7 +1622,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1646,7 +1646,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1666,7 +1666,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1690,7 +1690,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1710,7 +1710,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1742,7 +1742,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1768,7 +1768,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1791,7 +1791,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1814,7 +1814,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1836,7 +1836,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1859,7 +1859,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1882,7 +1882,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1904,7 +1904,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1927,7 +1927,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1950,7 +1950,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1972,7 +1972,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -1995,7 +1995,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2018,7 +2018,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2040,7 +2040,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2062,7 +2062,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2085,7 +2085,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2108,7 +2108,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2130,7 +2130,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2153,7 +2153,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2176,7 +2176,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2198,7 +2198,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2219,7 +2219,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2242,7 +2242,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2265,7 +2265,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2287,7 +2287,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2310,7 +2310,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2333,7 +2333,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2354,7 +2354,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2377,7 +2377,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2399,7 +2399,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2421,7 +2421,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2444,7 +2444,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2467,7 +2467,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2490,7 +2490,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2512,7 +2512,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2536,7 +2536,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2559,7 +2559,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2582,7 +2582,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2603,7 +2603,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2626,7 +2626,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2648,7 +2648,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2670,7 +2670,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2692,7 +2692,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2715,7 +2715,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2738,7 +2738,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2760,7 +2760,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2783,7 +2783,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2806,7 +2806,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2828,7 +2828,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2850,7 +2850,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2873,7 +2873,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2898,7 +2898,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2921,7 +2921,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2946,7 +2946,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2970,7 +2970,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -2994,7 +2994,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3018,7 +3018,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3042,7 +3042,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3066,7 +3066,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3090,7 +3090,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3114,7 +3114,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3138,7 +3138,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3162,7 +3162,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3186,7 +3186,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3210,7 +3210,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3234,7 +3234,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3258,7 +3258,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3282,7 +3282,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3306,7 +3306,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3329,7 +3329,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3352,7 +3352,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3375,7 +3375,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3399,7 +3399,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3423,7 +3423,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3446,7 +3446,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3469,7 +3469,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3493,7 +3493,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3516,7 +3516,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3540,7 +3540,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3563,7 +3563,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3587,7 +3587,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3611,7 +3611,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3635,7 +3635,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3658,7 +3658,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3681,7 +3681,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3704,7 +3704,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3727,7 +3727,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3751,7 +3751,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3774,7 +3774,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3797,7 +3797,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3820,7 +3820,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3843,7 +3843,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3866,7 +3866,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3887,7 +3887,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3908,7 +3908,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3929,7 +3929,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3950,7 +3950,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3971,7 +3971,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -3992,7 +3992,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -4015,7 +4015,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -4036,7 +4036,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -4059,7 +4059,30 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "browse_projects",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM board",
+          "FullyQualifiedName": "Board/1",
+          "Type": "Board",
+          "Metadata": {
+            "AvatarURI": "https://shaider.atlassian.net/rest/api/2/universal_avatar/view/type/project/avatar/10425?size=small",
+            "BoardSelfURL": "https://shaider.atlassian.net/rest/agile/1.0/board/1",
+            "BoardType": "simple",
+            "DisplayName": "My Scrum Project (SCRUM)",
+            "IsPrivate": "false",
+            "ProjectID": "10000",
+            "ProjectKey": "SCRUM",
+            "ProjectName": "My Scrum Project",
+            "ProjectType": "software"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_sprints_permission",
           "Parent": null
         }
       },
@@ -4082,7 +4105,30 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "browse_projects",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "(Learn) Jira Premium benefits in 5 min",
+          "FullyQualifiedName": "Board/2",
+          "Type": "Board",
+          "Metadata": {
+            "AvatarURI": "https://shaider.atlassian.net/rest/api/2/universal_avatar/view/type/project/avatar/10411?size=small",
+            "BoardSelfURL": "https://shaider.atlassian.net/rest/agile/1.0/board/2",
+            "BoardType": "simple",
+            "DisplayName": "(Learn) Jira Premium benefits in 5 min 👋 (LEARNJIRA)",
+            "IsPrivate": "false",
+            "ProjectID": "10001",
+            "ProjectKey": "LEARNJIRA",
+            "ProjectName": "(Learn) Jira Premium benefits in 5 min 👋",
+            "ProjectType": "software"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_sprints_permission",
           "Parent": null
         }
       },
@@ -4099,7 +4145,466 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-2",
+          "FullyQualifiedName": "Epic/10034",
+          "Type": "Epic",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Notification Service"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4114,7 +4619,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -4126,13 +4631,13 @@
           "Metadata": {
             "HTML": "jira-users-shaider",
             "Label0_Text": "Jira Software",
-            "Label0_Title": "Users added to this group will be given access to <strong>Jira Software</strong>",
+            "Label0_Title": "Users added to this group will be given access to \u003cstrong\u003eJira Software\u003c/strong\u003e",
             "Label0_Type": "SINGLE"
           },
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -4147,7 +4652,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -4165,7 +4670,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -4180,7 +4685,7 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -4195,13 +4700,13 @@
             "Label0_Title": "Users added to this group will be given administrative access",
             "Label0_Type": "ADMIN",
             "Label1_Text": "Jira Software",
-            "Label1_Title": "Users added to this group will be given access to <strong>Jira Software</strong>",
+            "Label1_Title": "Users added to this group will be given access to \u003cstrong\u003eJira Software\u003c/strong\u003e",
             "Label1_Type": "SINGLE"
           },
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer",
           "Parent": null
         }
       },
@@ -4219,7 +4724,79 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer_projects",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "My Scrum Project",
+          "FullyQualifiedName": "Project/10000",
+          "Type": "Project",
+          "Metadata": {
+            "Key": "SCRUM",
+            "Private": "false",
+            "TypeKey": "software",
+            "UUID": "6fc39a42-a49a-4ba6-8fe0-d0e23787eb39"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "browse_projects",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "My Scrum Project",
+          "FullyQualifiedName": "Project/10000",
+          "Type": "Project",
+          "Metadata": {
+            "Key": "SCRUM",
+            "Private": "false",
+            "TypeKey": "software",
+            "UUID": "6fc39a42-a49a-4ba6-8fe0-d0e23787eb39"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_project",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "My Scrum Project",
+          "FullyQualifiedName": "Project/10000",
+          "Type": "Project",
+          "Metadata": {
+            "Key": "SCRUM",
+            "Private": "false",
+            "TypeKey": "software",
+            "UUID": "6fc39a42-a49a-4ba6-8fe0-d0e23787eb39"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issue_layout",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "My Scrum Project",
+          "FullyQualifiedName": "Project/10000",
+          "Type": "Project",
+          "Metadata": {
+            "Key": "SCRUM",
+            "Private": "false",
+            "TypeKey": "software",
+            "UUID": "6fc39a42-a49a-4ba6-8fe0-d0e23787eb39"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_dev_tools",
           "Parent": null
         }
       },
@@ -4237,7 +4814,79 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "administer_projects",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "(Learn) Jira Premium benefits in 5 min 👋",
+          "FullyQualifiedName": "Project/10001",
+          "Type": "Project",
+          "Metadata": {
+            "Key": "LEARNJIRA",
+            "Private": "false",
+            "TypeKey": "software",
+            "UUID": "05b93f07-2de4-4a25-82ce-0ec40b666b3b"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "browse_projects",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "(Learn) Jira Premium benefits in 5 min 👋",
+          "FullyQualifiedName": "Project/10001",
+          "Type": "Project",
+          "Metadata": {
+            "Key": "LEARNJIRA",
+            "Private": "false",
+            "TypeKey": "software",
+            "UUID": "05b93f07-2de4-4a25-82ce-0ec40b666b3b"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_project",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "(Learn) Jira Premium benefits in 5 min 👋",
+          "FullyQualifiedName": "Project/10001",
+          "Type": "Project",
+          "Metadata": {
+            "Key": "LEARNJIRA",
+            "Private": "false",
+            "TypeKey": "software",
+            "UUID": "05b93f07-2de4-4a25-82ce-0ec40b666b3b"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issue_layout",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "(Learn) Jira Premium benefits in 5 min 👋",
+          "FullyQualifiedName": "Project/10001",
+          "Type": "Project",
+          "Metadata": {
+            "Key": "LEARNJIRA",
+            "Private": "false",
+            "TypeKey": "software",
+            "UUID": "05b93f07-2de4-4a25-82ce-0ec40b666b3b"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_dev_tools",
           "Parent": null
         }
       },
@@ -4254,7 +4903,466 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-6",
+          "FullyQualifiedName": "Story/10038",
+          "Type": "Story",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Story"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4271,7 +5379,466 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-5",
+          "FullyQualifiedName": "Subtask/10037",
+          "Type": "Subtask",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "In Progress",
+            "Summary": "first sub-task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4283,12 +5850,471 @@
           "Metadata": {
             "Project": "LEARNJIRA",
             "Status": "To Do",
-            "Summary": "Security & permissions: How to control who can edit or or manage projects 🚧"
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
           },
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-1",
+          "FullyQualifiedName": "Task/10000",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Security \u0026 permissions: How to control who can edit or or manage projects 🚧"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4305,7 +6331,466 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-2",
+          "FullyQualifiedName": "Task/10001",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Plans: How to use detailed roadmaps to plan out your work 📍"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4322,7 +6807,466 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "LEARNJIRA-3",
+          "FullyQualifiedName": "Task/10002",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "LEARNJIRA",
+            "Status": "To Do",
+            "Summary": "Atlassian Intelligence: How to work smarter with AI 🤖"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4339,7 +7283,466 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-1",
+          "FullyQualifiedName": "Task/10033",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "My First Task"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4356,7 +7759,466 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-3",
+          "FullyQualifiedName": "Task/10035",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "backend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4373,7 +8235,466 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-4",
+          "FullyQualifiedName": "Task/10036",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "frontend functionality for Notification feature"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4390,7 +8711,466 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "add_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "assign_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "close_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "create_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_attachments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "delete_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_all_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_comments",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "edit_own_worklogs",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "link_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "manage_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "modify_reporter",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "move_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "resolve_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "schedule_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "set_issue_security",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "transition_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "unarchive_issues",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "view_voters_and_watchers",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "SCRUM-7",
+          "FullyQualifiedName": "Task/10039",
+          "Type": "Task",
+          "Metadata": {
+            "Project": "SCRUM",
+            "Status": "To Do",
+            "Summary": "Issue created via API"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "work_on_issues",
           "Parent": null
         }
       },
@@ -4408,11 +9188,31 @@
           "Parent": null
         },
         "Permission": {
-          "Value": "",
+          "Value": "assignable_user",
+          "Parent": null
+        }
+      },
+      {
+        "Resource": {
+          "Name": "Shahzad Haider",
+          "FullyQualifiedName": "User/712020:71808a62-5c16-479c-9ebd-35742afb57fa",
+          "Type": "User",
+          "Metadata": {
+            "AccountType": "atlassian",
+            "Active": "true",
+            "Email": "shahzadhaider@folio3.com",
+            "SelfURL": "https://shaider.atlassian.net/rest/api/3/user?accountId=712020:71808a62-5c16-479c-9ebd-35742afb57fa"
+          },
+          "Parent": null
+        },
+        "Permission": {
+          "Value": "user_picker",
           "Parent": null
         }
       }
     ],
     "UnboundedResources": null,
-    "Metadata": {}
+    "Metadata": {
+      
+    }
   }

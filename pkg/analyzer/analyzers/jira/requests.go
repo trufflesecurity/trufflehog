@@ -41,6 +41,8 @@ var (
 		findGroups:      "groups/picker",
 		getAuditRecords: "auditing/record",
 	}
+
+	userPerms = make(map[Permission]bool)
 )
 
 // buildBasicAuthHeader constructs the Basic Auth header
@@ -93,7 +95,11 @@ func checkAllJiraPermissions(client *http.Client, domain, email, token string) (
 }
 
 // captureResources try to capture all the resource that the key can access
-func captureResources(client *http.Client, domain, email, token string, secretInfo *SecretInfo) error {
+func captureResources(client *http.Client, domain, email, token string, secretInfo *SecretInfo, grantedPermissions []string) error {
+	for _, p := range grantedPermissions {
+		userPerms[StringToPermission[strings.ToLower(p)]] = true
+	}
+
 	var (
 		wg             sync.WaitGroup
 		errAggWg       sync.WaitGroup
@@ -109,7 +115,6 @@ func captureResources(client *http.Client, domain, email, token string, secretIn
 		}
 	}()
 
-	// helper to launch tasks concurrently.
 	launchTask := func(task func() error) {
 		wg.Add(1)
 		go func() {
@@ -196,7 +201,7 @@ func captureProjects(client *http.Client, domain, email, token string, secretInf
 				"TypeKey": proj.ProjectTypeKey,
 			},
 		}
-		secretInfo.appendResource(resource)
+		secretInfo.appendResource(resource, ResourceTypeProject)
 
 		// Fetch issues for the project
 		if err := captureIssues(client, domain, email, token, proj.Key, secretInfo); err != nil {
@@ -243,7 +248,8 @@ func captureIssues(client *http.Client, domain, email, token, projectKey string,
 				"Project": projectKey,
 			},
 		}
-		secretInfo.appendResource(issueResource)
+
+		secretInfo.appendResource(issueResource, ResourceTypeIssue)
 	}
 
 	return nil
@@ -289,7 +295,7 @@ func captureBoards(client *http.Client, domain, email, token string, secretInfo 
 				"BoardSelfURL": board.Self,
 			},
 		}
-		secretInfo.appendResource(boardResource)
+		secretInfo.appendResource(boardResource, ResourceTypeBoard)
 	}
 
 	return nil
@@ -322,7 +328,7 @@ func captureUsers(client *http.Client, domain, email, token string, secretInfo *
 		userResource := JiraResource{
 			ID:   user.AccountID,
 			Name: user.DisplayName,
-			Type: "User",
+			Type: ResourceTypeUser,
 			Metadata: map[string]string{
 				"Email":       user.EmailAddress,
 				"AccountType": user.AccountType,
@@ -331,7 +337,7 @@ func captureUsers(client *http.Client, domain, email, token string, secretInfo *
 			},
 		}
 		if user.AccountType != "app" {
-			secretInfo.appendResource(userResource)
+			secretInfo.appendResource(userResource, ResourceTypeUser)
 		}
 
 	}
@@ -381,7 +387,7 @@ func captureGroups(client *http.Client, domain, email, token string, secretInfo 
 			Metadata: metadata,
 		}
 
-		secretInfo.appendResource(groupResource)
+		secretInfo.appendResource(groupResource, ResourceTypeGroup)
 	}
 
 	return nil
@@ -439,11 +445,11 @@ func captureAuditLogs(client *http.Client, domain, email, token string, secretIn
 		resource := JiraResource{
 			ID:       fmt.Sprintf("%d", record.ID),
 			Name:     record.Summary,
-			Type:     "AuditRecord",
+			Type:     ResourceTypeAuditRecord,
 			Metadata: metadata,
 		}
 
-		secretInfo.appendResource(resource)
+		secretInfo.appendResource(resource, ResourceTypeAuditRecord)
 	}
 
 	return nil
