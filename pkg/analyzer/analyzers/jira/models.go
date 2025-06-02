@@ -15,6 +15,7 @@ const (
 
 var ResourcePermissions = map[string][]Permission{
 	ResourceTypeProject: {
+		Administer,
 		BrowseProjects,
 		AdministerProjects,
 		CreateProject,
@@ -24,6 +25,7 @@ var ResourcePermissions = map[string][]Permission{
 		SystemAdmin,
 	},
 	ResourceTypeIssue: {
+		Administer,
 		AddComments,
 		AssignIssues,
 		CloseIssues,
@@ -48,26 +50,27 @@ var ResourcePermissions = map[string][]Permission{
 		ResolveIssues,
 		ScheduleIssues,
 		SetIssueSecurity,
+		SystemAdmin,
 		TransitionIssues,
 		UnarchiveIssues,
 		ViewVotersAndWatchers,
 		WorkOnIssues,
-		SystemAdmin,
 	},
 	ResourceTypeBoard: {
+		Administer,
 		ManageSprintsPermission,
 		BrowseProjects,
-		ViewAggregatedData,
 		SystemAdmin,
+		ViewAggregatedData,
 	},
 	ResourceTypeUser: {
 		AssignableUser,
-		UserPicker,
 		SystemAdmin,
+		UserPicker,
 	},
 	ResourceTypeGroup: {
-		SystemAdmin,
 		Administer,
+		SystemAdmin,
 	},
 	ResourceTypeAuditRecord: {
 		Administer,

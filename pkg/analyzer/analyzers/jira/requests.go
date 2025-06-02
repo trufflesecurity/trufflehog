@@ -80,7 +80,7 @@ func makeJiraRequest(client *http.Client, endpoint, email, token string) ([]byte
 	return responseBodyByte, resp.StatusCode, nil
 }
 
-func checkAllJiraPermissions(client *http.Client, domain, email, token string) ([]byte, int, error) {
+func capturePermissions(client *http.Client, domain, email, token string) ([]byte, int, error) {
 	var allPermissions []string
 	for _, key := range PermissionStrings {
 		allPermissions = append(allPermissions, strings.ToUpper(key))
@@ -125,7 +125,17 @@ func captureResources(client *http.Client, domain, email, token string, secretIn
 		}()
 	}
 
-	launchTask(func() error { return captureProjects(client, domain, email, token, secretInfo) })
+	projects, err := captureProjects(client, domain, email, token, secretInfo)
+	if err != nil {
+		return fmt.Errorf("failed to capture projects: %w", err)
+	}
+	if projects != nil {
+		for _, proj := range projects.Values {
+			launchTask(func() error {
+				return captureIssues(client, domain, email, token, proj.Key, secretInfo)
+			})
+		}
+	}
 	launchTask(func() error { return captureBoards(client, domain, email, token, secretInfo) })
 	launchTask(func() error { return captureUsers(client, domain, email, token, secretInfo) })
 	launchTask(func() error { return captureGroups(client, domain, email, token, secretInfo) })
@@ -143,11 +153,11 @@ func captureResources(client *http.Client, domain, email, token string, secretIn
 }
 
 // captureUserInfo calls `/myself` API and store the current user information in secretInfo
-func captureUserInfo(client *http.Client, token, domain, email string, secretInfo *SecretInfo) (int, error) {
+func captureUserInfo(client *http.Client, token, domain, email string, secretInfo *SecretInfo) error {
 	endPoint := fmt.Sprintf("%s/api/3/%s", fmt.Sprintf(baseURL, domain), endpoints[mySelf])
 	respBody, statusCode, err := makeJiraRequest(client, endPoint, email, token)
 	if err != nil {
-		return statusCode, err
+		return err
 	}
 
 	switch statusCode {
@@ -155,38 +165,34 @@ func captureUserInfo(client *http.Client, token, domain, email string, secretInf
 		var user JiraUser
 
 		if err := json.Unmarshal(respBody, &user); err != nil {
-			return statusCode, err
+			return err
 		}
 
 		secretInfo.UserInfo = user
-		return statusCode, nil
-	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
-		return statusCode, nil
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return fmt.Errorf("invalid email or api token")
+	case http.StatusNotFound:
+		return fmt.Errorf("domain not found: %s", domain)
 	default:
-		return statusCode, fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoints[mySelf])
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoints[mySelf])
 	}
 }
 
-func captureProjects(client *http.Client, domain, email, token string, secretInfo *SecretInfo) error {
+func captureProjects(client *http.Client, domain, email, token string, secretInfo *SecretInfo) (*ProjectSearchResponse, error) {
 	endpoint := fmt.Sprintf("%s/api/3/%s", fmt.Sprintf(baseURL, domain), endpoints[getAllProjects])
 	body, statusCode, err := makeJiraRequest(client, endpoint, email, token)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	switch {
-	case statusCode == http.StatusOK:
-	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
-		return nil
-	case statusCode >= 500:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
-	default:
-		return nil
+	if err := handleStatusCode(statusCode, endpoint); err != nil {
+		return nil, err
 	}
 
 	var resp ProjectSearchResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return fmt.Errorf("failed to unmarshal project response: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal project response: %w", err)
 	}
 
 	for _, proj := range resp.Values {
@@ -201,15 +207,11 @@ func captureProjects(client *http.Client, domain, email, token string, secretInf
 				"TypeKey": proj.ProjectTypeKey,
 			},
 		}
-		secretInfo.appendResource(resource, ResourceTypeProject)
 
-		// Fetch issues for the project
-		if err := captureIssues(client, domain, email, token, proj.Key, secretInfo); err != nil {
-			return fmt.Errorf("failed to capture issues for project %s: %w", proj.Key, err)
-		}
+		secretInfo.appendResource(resource, ResourceTypeProject)
 	}
 
-	return nil
+	return &resp, nil
 }
 
 func captureIssues(client *http.Client, domain, email, token, projectKey string, secretInfo *SecretInfo) error {
@@ -222,14 +224,8 @@ func captureIssues(client *http.Client, domain, email, token, projectKey string,
 		return err
 	}
 
-	switch {
-	case statusCode == http.StatusOK:
-	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
-		return nil
-	case statusCode >= 500:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
-	default:
-		return nil
+	if err := handleStatusCode(statusCode, endpoint); err != nil {
+		return err
 	}
 
 	var issueResp JiraIssue
@@ -263,14 +259,8 @@ func captureBoards(client *http.Client, domain, email, token string, secretInfo 
 		return err
 	}
 
-	switch {
-	case statusCode == http.StatusOK:
-	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
-		return nil
-	case statusCode >= 500:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
-	default:
-		return nil
+	if err := handleStatusCode(statusCode, endpoint); err != nil {
+		return err
 	}
 
 	var boardResp JiraBoard
@@ -309,14 +299,8 @@ func captureUsers(client *http.Client, domain, email, token string, secretInfo *
 		return err
 	}
 
-	switch {
-	case statusCode == http.StatusOK:
-	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
-		return nil
-	case statusCode >= 500:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
-	default:
-		return nil
+	if err := handleStatusCode(statusCode, endpoint); err != nil {
+		return err
 	}
 
 	var users []JiraUser
@@ -353,14 +337,8 @@ func captureGroups(client *http.Client, domain, email, token string, secretInfo 
 		return err
 	}
 
-	switch {
-	case statusCode == http.StatusOK:
-	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
-		return nil
-	case statusCode >= 500:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
-	default:
-		return nil
+	if err := handleStatusCode(statusCode, endpoint); err != nil {
+		return err
 	}
 
 	var groupResp JiraGroup
@@ -401,14 +379,8 @@ func captureAuditLogs(client *http.Client, domain, email, token string, secretIn
 		return err
 	}
 
-	switch {
-	case statusCode == http.StatusOK:
-	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
-		return nil
-	case statusCode >= 500:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
-	default:
-		return nil
+	if err := handleStatusCode(statusCode, endpoint); err != nil {
+		return err
 	}
 
 	var auditResp AuditRecord
@@ -453,4 +425,20 @@ func captureAuditLogs(client *http.Client, domain, email, token string, secretIn
 	}
 
 	return nil
+}
+
+func handleStatusCode(statusCode int, endpoint string) error {
+	switch {
+	case statusCode == http.StatusOK:
+		return nil
+	case statusCode == http.StatusBadRequest:
+		return fmt.Errorf("bad request for API: %s", endpoint)
+	case statusCode == http.StatusUnauthorized, statusCode == http.StatusForbidden,
+		statusCode == http.StatusNotFound, statusCode == http.StatusConflict:
+		return nil
+	case statusCode >= 500:
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
+	default:
+		return nil
+	}
 }

@@ -39,18 +39,15 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 		return nil, fmt.Errorf("email not found in credential info")
 	}
 
-	// analyze permissions
 	info, err := AnalyzePermissions(a.Cfg, token, domain, email)
 	if err != nil {
 		return nil, err
 	}
 
-	// secret info to analyzer
 	return secretInfoToAnalyzerResult(info), nil
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, domain, email, token string) {
-	noInfo := true
 	info, err := AnalyzePermissions(cfg, token, domain, email)
 	if err != nil {
 		// just print the error in cli and continue as a partial success
@@ -64,24 +61,9 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, domain, email, token string)
 		return
 	}
 
-	if info.UserInfo.AccountID != "" {
-		noInfo = false
-		printUserInfo(info.UserInfo)
-	}
-
-	if len(info.Permissions) > 0 {
-		noInfo = false
-		printPermissions(info.Permissions)
-	}
-
-	if len(info.Resources) > 0 {
-		noInfo = false
-		printResources(info.Resources)
-	}
-
-	if noInfo {
-		color.Yellow("[i] No information found for the provided token")
-	}
+	printUserInfo(info.UserInfo)
+	printPermissions(info.Permissions)
+	printResources(info.Resources)
 }
 
 func AnalyzePermissions(cfg *config.Config, token, domain, email string) (*SecretInfo, error) {
@@ -91,19 +73,11 @@ func AnalyzePermissions(cfg *config.Config, token, domain, email string) (*Secre
 	var secretInfo = &SecretInfo{}
 
 	// capture the user information
-	statusCode, err := captureUserInfo(client, token, domain, email, secretInfo)
-	if err != nil {
+	if err := captureUserInfo(client, token, domain, email, secretInfo); err != nil {
 		return nil, err
 	}
 
-	switch statusCode {
-	case 401:
-		return nil, fmt.Errorf("invalid email or api token")
-	case 404:
-		return nil, fmt.Errorf("domain not found: %s", domain)
-	}
-
-	body, _, err := checkAllJiraPermissions(client, domain, email, token)
+	body, _, err := capturePermissions(client, domain, email, token)
 	if err != nil {
 		return secretInfo, fmt.Errorf("failed to check permissions: %w", err)
 	}
@@ -182,6 +156,10 @@ func secretInfoResourceToAnalyzerResource(resource JiraResource) *analyzers.Reso
 
 // cli print functions
 func printUserInfo(user JiraUser) {
+	if user.AccountID == "" {
+		color.Red("[x] No user information found")
+		return
+	}
 	color.Yellow("[i] User Information:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
@@ -191,18 +169,26 @@ func printUserInfo(user JiraUser) {
 	t.Render()
 }
 
-func printPermissions(scopes []string) {
+func printPermissions(permissions []string) {
+	if len(permissions) == 0 {
+		color.Red("[x] No permissions found")
+		return
+	}
 	color.Yellow("[i] Permissions:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Permission"})
-	for _, scope := range scopes {
+	for _, scope := range permissions {
 		t.AppendRow(table.Row{color.GreenString(scope)})
 	}
 	t.Render()
 }
 
 func printResources(resources []JiraResource) {
+	if len(resources) == 0 {
+		color.Red("[x] No resources found")
+		return
+	}
 	color.Yellow("[i] Resources:")
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)

@@ -44,6 +44,14 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			want:    expectedOutput,
 			wantErr: false,
 		},
+		{
+			name:    "invalid jira token",
+			domain:  jiraDomain,
+			email:   jiraEmail,
+			token:   "invalid",
+			want:    nil,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -52,6 +60,13 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			got, err := a.Analyze(ctx, map[string]string{"token": tt.token, "domain": tt.domain, "email": tt.email})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				if got != nil {
+					t.Errorf("Analyzer.Analyze() got = %v, want nil", got)
+				}
 				return
 			}
 
