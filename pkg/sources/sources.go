@@ -105,7 +105,7 @@ type SourceUnitEnumerator interface {
 	Enumerate(ctx context.Context, reporter UnitReporter) error
 }
 
-// ConfiguredSource is a Source with most of it's initialization values
+// ConfiguredSource is a Source with most of its initialization values
 // pre-configured from a [sourcespb.LocalSource] configuration struct. It
 // exposes a simplified Init() method and can be only initialized once. This
 // struct is not necessary for running sources, but it helps simplify gathering
