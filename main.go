@@ -728,7 +728,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case githubScan.FullCommand():
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
@@ -759,7 +759,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanGitHub(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case githubExperimentalScan.FullCommand():
 		cfg := sources.GitHubExperimentalConfig{
@@ -772,7 +772,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanGitHubExperimental(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan using Github Experimental: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case gitlabScan.FullCommand():
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
@@ -791,7 +791,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanGitLab(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case filesystemScan.FullCommand():
 		if len(*filesystemDirectories) > 0 {
@@ -808,7 +808,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanFileSystem(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
@@ -824,7 +824,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanS3(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case syslogScan.FullCommand():
 		cfg := sources.SyslogConfig{
@@ -838,19 +838,19 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanSyslog(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan syslog: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case circleCiScan.FullCommand():
 		if ref, err := eng.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan CircleCI: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case travisCiScan.FullCommand():
 		if ref, err := eng.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan TravisCI: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case gcsScan.FullCommand():
 		cfg := sources.GCSConfig{
@@ -869,7 +869,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanGCS(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GCS: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case dockerScan.FullCommand():
 		cfg := sources.DockerConfig{
@@ -880,7 +880,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanDocker(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case postmanScan.FullCommand():
 		// handle deprecated flag
@@ -919,7 +919,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanPostman(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Postman: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case elasticsearchScan.FullCommand():
 		cfg := sources.ElasticsearchConfig{
@@ -937,7 +937,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanElasticsearch(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Elasticsearch: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case jenkinsScan.FullCommand():
 		cfg := engine.JenkinsConfig{
@@ -949,7 +949,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanJenkins(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case huggingfaceScan.FullCommand():
 		if *huggingfaceEndpoint != "" {
@@ -984,7 +984,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if ref, err := eng.ScanHuggingface(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan HuggingFace: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	case multiScanScan.FullCommand():
 		if *configFilename == "" {
@@ -993,14 +993,14 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if rs, err := eng.ScanConfig(ctx, cfg.ConfiguredSources...); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan via config: %w", err)
 		} else {
-			refs = append(refs, rs...)
+			refs = rs
 		}
 	case stdinInputScan.FullCommand():
 		cfg := sources.StdinConfig{}
 		if ref, err := eng.ScanStdinInput(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan stdin input: %v", err)
 		} else {
-			refs = append(refs, ref)
+			refs = []sources.JobProgressRef{ref}
 		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
