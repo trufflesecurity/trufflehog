@@ -13,7 +13,6 @@ type SecretInfo struct {
 
 	UserInfo    JiraUser
 	Permissions []string
-	// TokenInfo   SelfToken
 	Resources []JiraResource
 }
 
@@ -45,23 +44,6 @@ func (s *SecretInfo) appendResource(resource JiraResource) {
 	s.Resources = append(s.Resources, resource)
 }
 
-// listResourceByType returns a list of resources matching the given type.
-func (s *SecretInfo) listResourceByType(resourceType string) []JiraResource {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	resources := make([]JiraResource, 0, len(s.Resources))
-	for _, resource := range s.Resources {
-		if resource.Type == resourceType {
-			resources = append(resources, resource)
-		}
-	}
-
-	return resources
-}
-
-// API Response models
-
 type JiraPermissionsResponse struct {
 	Permissions map[string]JiraPermission `json:"permissions"`
 }
@@ -73,18 +55,6 @@ type JiraPermission struct {
 	Type           string `json:"type"`
 	Description    string `json:"description"`
 	HavePermission bool   `json:"havePermission"`
-}
-
-// SelfToken is /tokens/self API Response
-type SelfToken struct {
-	ID         string   `json:"id"`
-	UserID     string   `json:"user_id"`
-	Name       string   `json:"name"`
-	LastUsedAt string   `json:"last_used_at"`
-	ExpiresAt  string   `json:"expires_at"`
-	Scope      string   `json:"scope"`
-	Scopes     []string `json:"scopes"`
-	Services   []string `json:"services"`
 }
 
 type ProjectSearchResponse struct {
