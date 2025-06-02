@@ -30,9 +30,9 @@ var (
 
 	// https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/
 	// Tokens created after Jan 18 2023 use a variable length
-	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "confluence", "jira"}) + `\b(ATATT[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})\b`)
-	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "confluence", "jira"}) + `\b((?:[a-zA-Z0-9-]{1,24}\.)+[a-zA-Z0-9-]{2,24}\.[a-zA-Z0-9-]{2,16})\b`)
-	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "confluence", "jira"}) + common.EmailPattern)
+	tokenPat  = regexp.MustCompile(`\b(ATATT[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})\b`)
+	domainPat = regexp.MustCompile(`\b((?:[a-zA-Z0-9-]{1,24}\.)+[a-zA-Z0-9-]{2,24}\.[a-zA-Z0-9-]{2,16})\b`)
+	emailPat  = regexp.MustCompile(common.EmailPattern)
 )
 
 func (s Scanner) getClient() *http.Client {

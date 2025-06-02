@@ -776,6 +776,24 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			wantChunks: 607,
 		},
 		{
+			name: "targeted scan, commit metadata",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/trufflesecurity/trufflehog.git",
+							Link:       "https://github.com/trufflesecurity/trufflehog/commit/1c51106e35c3b3c327fe12e358177c03079bb771",
+							Commit:     "1c51106e35c3b3c327fe12e358177c03079bb771",
+							File:       "", // no file
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+		{
 			name: "no file in commit",
 			init: init{
 				name:       "test source",
