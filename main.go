@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -692,9 +691,11 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	var ref sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
-		// validate the commit
-		if *gitScanSinceCommit != "" && !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
-			ctx.Logger().Info("Warning: The provided commit hash appears to be invalid.")
+		// validate the commit for local repository only
+		if *gitScanSinceCommit != "" && strings.HasPrefix(*gitScanURI, "file") {
+			if !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
+				ctx.Logger().Info("Warning: The provided commit hash appears to be invalid.")
+			}
 		}
 
 		gitCfg := sources.GitConfig{
@@ -1033,46 +1034,9 @@ func printAverageDetectorTime(e *engine.Engine) {
 
 // Function to check if the commit is valid
 func isValidCommit(uri, commit string) bool {
-	if strings.HasPrefix(uri, "file") {
-		// handle file:// urls
-		repoPath, _ := strings.CutPrefix(uri, "file://") // remove the prefix to validate against the repo path
-		output, err := exec.Command("git", "-C", repoPath, "cat-file", "-t", commit).Output()
-		if err != nil {
-			return false
-		}
-
-		return strings.TrimSpace(string(output)) == "commit"
-	} else if strings.HasPrefix(uri, "https") {
-		return isValidCommitRemote(uri, commit)
-	} else {
-		return false
-	}
-}
-
-func isValidCommitRemote(repoURL, commit string) bool {
-	// create temporary directory
-	tempDir, err := os.MkdirTemp("", "git-verify-*")
-	if err != nil {
-		return false
-	}
-	defer os.RemoveAll(tempDir)
-
-	// clone with blob filter, no checkout, and bare repository
-	repoPath := filepath.Join(tempDir, "repo.git")
-	cloneCmd := exec.Command("git", "clone",
-		"--filter=blob:none",
-		"--no-checkout",
-		"--bare",
-		repoURL,
-		repoPath)
-
-	if err := cloneCmd.Run(); err != nil {
-		return false
-	}
-
-	// verify the commit using --git-dir since it's a bare repository
-	cmd := exec.Command("git", "--git-dir", repoPath, "cat-file", "-t", commit)
-	output, err := cmd.Output()
+	// handle file:// urls
+	repoPath, _ := strings.CutPrefix(uri, "file://") // remove the prefix to validate against the repo path
+	output, err := exec.Command("git", "-C", repoPath, "cat-file", "-t", commit).Output()
 	if err != nil {
 		return false
 	}
