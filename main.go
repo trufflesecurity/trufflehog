@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kingpin/v2"
+	"github.com/fatih/color"
 	"github.com/felixge/fgprof"
 	"github.com/go-logr/logr"
 	"github.com/jpillora/overseer"
@@ -58,6 +59,8 @@ var (
 	noVerification      = cli.Flag("no-verification", "Don't verify the results.").Bool()
 	onlyVerified        = cli.Flag("only-verified", "Only output verified results.").Hidden().Bool()
 	results             = cli.Flag("results", "Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to verified,unverified,unknown.").String()
+	noColor             = cli.Flag("no-color", "Disable colorized output").Bool()
+	noColour            = cli.Flag("no-colour", "Alias for --no-color").Hidden().Bool()
 
 	allowVerificationOverlap   = cli.Flag("allow-verification-overlap", "Allow verification of similar credentials across detectors").Bool()
 	filterUnverified           = cli.Flag("filter-unverified", "Only output first unverified result per chunk per detector if there are more than one results.").Bool()
@@ -116,6 +119,7 @@ var (
 	githubScanPRComments        = githubScan.Flag("pr-comments", "Include pull request descriptions and comments in scan.").Bool()
 	githubScanGistComments      = githubScan.Flag("gist-comments", "Include gist comments in scan.").Bool()
 	githubCommentsTimeframeDays = githubScan.Flag("comments-timeframe", "Number of days in the past to review when scanning issue, PR, and gist comments.").Uint32()
+	githubAuthInUrl             = githubScan.Flag("auth-in-url", "Embed authentication credentials in repository URLs instead of using secure HTTP headers").Bool()
 
 	// GitHub Cross Fork Object Reference Experimental Feature
 	githubExperimentalScan = cli.Command("github-experimental", "Run an experimental GitHub scan. Must specify at least one experimental sub-module to run: object-discovery.")
@@ -136,6 +140,7 @@ var (
 	gitlabScanExcludePaths = gitlabScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 	gitlabScanIncludeRepos = gitlabScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
 	gitlabScanExcludeRepos = gitlabScan.Flag("exclude-repos", `Repositories to exclude in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/driftwood", "trufflesecurity/d*"`).Strings()
+	gitlabAuthInUrl        = gitlabScan.Flag("auth-in-url", "Embed authentication credentials in repository URLs instead of using secure HTTP headers").Bool()
 
 	filesystemScan  = cli.Command("filesystem", "Find credentials in a filesystem.")
 	filesystemPaths = filesystemScan.Arg("path", "Path to file or directory to scan.").Strings()
@@ -249,6 +254,8 @@ var (
 	huggingfaceIncludeDiscussions = huggingfaceScan.Flag("include-discussions", "Include discussions in scan.").Bool()
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
+	stdinInputScan = cli.Command("stdin", "Find credentials from stdin.")
+
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
 )
@@ -317,6 +324,10 @@ func init() {
 		} else {
 			log.SetLevel(l)
 		}
+	}
+
+	if *noColor || *noColour {
+		color.NoColor = true // disables colorized output
 	}
 }
 
@@ -732,6 +743,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludeGistComments:        *githubScanGistComments,
 			CommentsTimeframeDays:      *githubCommentsTimeframeDays,
 			Filter:                     filter,
+			AuthInUrl:                  *githubAuthInUrl,
 		}
 		if ref, err = eng.ScanGitHub(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)
@@ -760,6 +772,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludeRepos: *gitlabScanIncludeRepos,
 			ExcludeRepos: *gitlabScanExcludeRepos,
 			Filter:       filter,
+			AuthInUrl:    *gitlabAuthInUrl,
 		}
 		if ref, err = eng.ScanGitLab(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)
@@ -934,6 +947,11 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 		if ref, err = eng.ScanHuggingface(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan HuggingFace: %v", err)
+		}
+	case stdinInputScan.FullCommand():
+		cfg := sources.StdinConfig{}
+		if ref, err = eng.ScanStdinInput(ctx, cfg); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan stdin input: %v", err)
 		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)

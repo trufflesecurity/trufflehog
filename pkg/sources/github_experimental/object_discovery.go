@@ -595,7 +595,7 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 	}
 
 	// download the repo
-	path, repo, err := git.CloneRepoUsingToken(ctx, ghToken, repoURL, ghUser)
+	path, repo, err := git.CloneRepoUsingToken(ctx, ghToken, repoURL, ghUser, true)
 	if err != nil {
 		return fmt.Errorf("failed to clone the repository: %w", err)
 	}

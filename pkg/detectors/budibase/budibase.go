@@ -3,6 +3,7 @@ package budibase
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -52,31 +53,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			// URL: https://docs.budibase.com/reference/appsearch
-			// API searches for the app with given name, since we only need to check api key, sending any appname will work.
-			payload := strings.NewReader(`{"name":"qwerty"}`)
-
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://budibase.app/api/public/v1/applications/search", payload)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("x-budibase-api-key", resMatch)
-
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else if res.StatusCode == 401 {
-					// The secret is determinately not verified (nothing to do)
-				} else {
-					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					s1.SetVerificationError(err, resMatch)
-				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
-			}
+			isVerified, verificationErr := verifyBudibase(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
 		}
 
 		results = append(results, s1)
@@ -91,4 +70,38 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Budibase is a low-code platform for creating internal tools. Budibase API keys can be used to access and modify applications and data within the platform."
+}
+
+// docs: https://docs.budibase.com/docs/rest
+func verifyBudibase(ctx context.Context, client *http.Client, key string) (bool, error) {
+	// URL: https://docs.budibase.com/reference/appsearch
+	// API searches for the app with given name, since we only need to check api key, sending any appname will work.
+	payload := strings.NewReader(`{"name":"qwerty"}`)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://budibase.app/api/public/v1/applications/search", payload)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("x-budibase-api-key", key)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

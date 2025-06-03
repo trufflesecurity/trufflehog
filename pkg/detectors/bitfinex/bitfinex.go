@@ -43,50 +43,34 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	apiKeyMatches := apiKeyPat.FindAllStringSubmatch(dataStr, -1)
-	apiSecretMatches := apiSecretPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueAPIKeys, uniqueAPISecrets = make(map[string]struct{}), make(map[string]struct{})
 
-	for _, apiKeyMatch := range apiKeyMatches {
-		apiKeyRes := strings.TrimSpace(apiKeyMatch[1])
+	for _, apiKey := range apiKeyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueAPIKeys[apiKey[1]] = struct{}{}
+	}
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Bitfinex,
-			Raw:          []byte(apiKeyRes),
-		}
+	for _, apiSecret := range apiSecretPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueAPISecrets[apiSecret[1]] = struct{}{}
+	}
 
-		for _, apiSecretMatch := range apiSecretMatches {
-			apiSecretRes := strings.TrimSpace(apiSecretMatch[1])
-
-			if apiKeyRes == apiSecretRes {
+	for apiKey := range uniqueAPIKeys {
+		for apiSecret := range uniqueAPISecrets {
+			// as both patterns are same, avoid verifying same string for both
+			if apiKey == apiSecret {
 				continue
 			}
 
-			if verify {
-				// thankfully official golang examples exist but you just need to dig their many repos https://github.com/bitfinexcom/bitfinex-api-go/blob/master/examples/v2/rest-orders/main.go
-				key := apiKeyRes
-				secret := apiSecretRes
-				http.DefaultClient = client // filed https://github.com/bitfinexcom/bitfinex-api-go/issues/238 to improve this
-				c := rest.NewClientWithURL(*api).Credentials(key, secret)
-
-				isValid := true // assume valid
-				_, err = c.Orders.AllHistory()
-				if err != nil {
-					if strings.HasPrefix(err.Error(), "POST https://") { // eg POST https://api-pub.bitfinex.com/v2/auth/r/orders/hist: 500 apikey: digest invalid (10100)
-						isValid = false
-					}
-				}
-
-				s1.Verified = isValid
-				// If there is a valid one, we need to stop iterating now and return the valid result
-				if isValid {
-					break
-				}
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Bitfinex,
+				Raw:          []byte(apiKey),
 			}
-		}
 
-		// By appending results in the outer loop we can reduce false positives if there are multiple
-		// combinations of secrets and IDs found.
-		if len(apiSecretMatches) > 0 {
+			if verify {
+				isVerified, verificationErr := verifyBitfinex(apiKey, apiSecret)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr)
+			}
+
 			results = append(results, s1)
 		}
 	}
@@ -100,4 +84,20 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Bitfinex is a cryptocurrency exchange offering various trading options. Bitfinex API keys can be used to access and manage trading accounts."
+}
+
+// docs: https://docs.bitfinex.com/docs/introduction
+func verifyBitfinex(key, secret string) (bool, error) {
+	// thankfully official golang examples exist but you just need to dig their many repos https://github.com/bitfinexcom/bitfinex-api-go/blob/master/examples/v2/rest-orders/main.go
+	http.DefaultClient = client
+	c := rest.NewClientWithURL(*api).Credentials(key, secret)
+
+	_, err := c.Orders.AllHistory()
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "POST https://") { // eg POST https://api-pub.bitfinex.com/v2/auth/r/orders/hist: 500 apikey: digest invalid (10100)
+			return false, nil
+		}
+	}
+
+	return true, nil
 }

@@ -3,9 +3,11 @@ package kontent
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -19,9 +21,12 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
-
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kontent"}) + `\b([a-z0-9-]{36})\b`)
+	apiKeyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"kontent"}) + common.BuildRegexJWT("30,34", "200,400", "40,43"))
+	envIDPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"kontent", "env"}) + common.UUIDPattern)
+
+	// API return this error when the environment does not exist or the api key does not have the persmission to access that environment
+	envErr = "The specified API key does not provide the permissions required to access the environment"
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,31 +39,40 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueAPIKeys, uniqueEnvIDs = make(map[string]struct{}), make(map[string]struct{})
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	for _, apiKey := range apiKeyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueAPIKeys[apiKey[1]] = struct{}{}
+	}
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Kontent,
-			Raw:          []byte(resMatch),
+	for _, envID := range envIDPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEnvIDs[envID[1]] = struct{}{}
+	}
+
+	for envID := range uniqueEnvIDs {
+		if _, ok := detectors.UuidFalsePositives[detectors.FalsePositive(envID)]; ok {
+			continue
 		}
 
-		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://deliver.kontent.ai/%s/items", resMatch), nil)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+		if detectors.StringShannonEntropy(envID) < 3 {
+			continue
 		}
 
-		results = append(results, s1)
+		for apiKey := range uniqueAPIKeys {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_Kontent,
+				Raw:          []byte(envID),
+				RawV2:        []byte(envID + apiKey),
+			}
+
+			if verify {
+				isVerified, verificationErr := verifyKontentAPIKey(client, envID, apiKey)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr)
+			}
+
+			results = append(results, s1)
+		}
 	}
 
 	return results, nil
@@ -70,4 +84,44 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Kontent is a headless CMS (Content Management System) that allows users to manage and deliver content to any device or application. Kontent API keys can be used to access and manage this content."
+}
+
+// api docs: https://kontent.ai/learn/docs/apis/openapi/management-api-v2/#operation/retrieve-environment-information
+func verifyKontentAPIKey(client *http.Client, envID, apiKey string) (bool, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://manage.kontent.ai/v2/projects/%s", envID), nil)
+	if err != nil {
+		return false, nil
+	}
+
+	req.Header.Add("Authorization", "Bearer "+apiKey)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusForbidden:
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+
+		if strings.Contains(string(bodyBytes), envErr) {
+			return true, nil
+		}
+
+		return false, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

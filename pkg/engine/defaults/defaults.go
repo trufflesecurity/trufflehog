@@ -2,9 +2,10 @@ package defaults
 
 import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abbysale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abuseipdb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/abyssale"
+	accuweatherv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather/v1"
+	accuweatherv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/accuweather/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adafruitio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/adzuna"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aeroworkflow"
@@ -67,14 +68,18 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aylien"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ayrshare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_batch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_cosmosdb"
 	azure_entra_refreshtoken "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/refreshtoken"
 	azure_entra_serviceprincipal_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v1"
 	azure_entra_serviceprincipal_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_entra/serviceprincipal/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_openai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure_storage"
 	azurerepositorykey "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azureapimanagement/repositorykey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azureapimanagementsubscriptionkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azureappconfigconnectionstring"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azurecontainerregistry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredevopspersonalaccesstoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredirectmanagementkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresastoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
@@ -86,6 +91,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/besttime"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/betterstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
@@ -204,6 +210,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/datagov"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepgram"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deepseek"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/delighted"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/demio"
 	denodeploy "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/deno"
@@ -220,6 +227,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/disqus"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ditto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dnscheck"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docker"
 	dockerhubv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v1"
 	dockerhubv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docparser"
@@ -336,6 +344,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gumroad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gyazo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harness"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
@@ -395,6 +404,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kraken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kylas"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/langfuse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/languagelayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/larksuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/larksuiteapikey"
@@ -465,7 +475,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myfreshworks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/myintervals"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/nethunt"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify"
+	netlifyv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify/v1"
+	netlifyv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netlify/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/netsuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/neutrinoapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/newrelicpersonalapikey"
@@ -694,6 +705,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/strava"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/streak"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripe"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripepaymentintent"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stripo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/stytch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sugester"
@@ -805,6 +817,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldcoinindex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/worldweather"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/wrike"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/xai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yandex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/yelp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/youneedabudget"
@@ -830,10 +843,11 @@ import (
 
 func buildDetectorList() []detectors.Detector {
 	return []detectors.Detector{
-		&abbysale.Scanner{},
+		&abyssale.Scanner{},
 		// &abstract.Scanner{},
 		&abuseipdb.Scanner{},
-		&accuweather.Scanner{},
+		&accuweatherv1.Scanner{},
+		&accuweatherv2.Scanner{},
 		&adafruitio.Scanner{},
 		// &adobeio.Scanner{},
 		&adzuna.Scanner{},
@@ -900,12 +914,16 @@ func buildDetectorList() []detectors.Detector {
 		&axonaut.Scanner{},
 		&aylien.Scanner{},
 		&ayrshare.Scanner{},
+		&azureapimanagementsubscriptionkey.Scanner{},
 		&azure_entra_refreshtoken.Scanner{},
 		&azure_entra_serviceprincipal_v1.Scanner{},
 		&azure_entra_serviceprincipal_v2.Scanner{},
 		&azure_batch.Scanner{},
+		&azureappconfigconnectionstring.Scanner{},
+		&azure_cosmosdb.Scanner{},
 		&azurecontainerregistry.Scanner{},
 		&azuredevopspersonalaccesstoken.Scanner{},
+		&azuredirectmanagementkey.Scanner{},
 		// &azurefunctionkey.Scanner{}, // detector is throwing some FPs
 		&azure_openai.Scanner{},
 		&azuresastoken.Scanner{},
@@ -921,6 +939,7 @@ func buildDetectorList() []detectors.Detector {
 		&besttime.Scanner{},
 		&betterstack.Scanner{},
 		&billomat.Scanner{},
+		&bingsubscriptionkey.Scanner{},
 		&bitbar.Scanner{},
 		&bitcoinaverage.Scanner{},
 		&bitfinex.Scanner{},
@@ -1042,6 +1061,7 @@ func buildDetectorList() []detectors.Detector {
 		// &debounce.Scanner{},
 		&deepai.Scanner{},
 		&deepgram.Scanner{},
+		&deepseek.Scanner{},
 		&delighted.Scanner{},
 		&demio.Scanner{},
 		&denodeploy.Scanner{},
@@ -1058,6 +1078,7 @@ func buildDetectorList() []detectors.Detector {
 		&disqus.Scanner{},
 		&ditto.Scanner{},
 		&dnscheck.Scanner{},
+		&docker.Scanner{},
 		&dockerhubv1.Scanner{},
 		&dockerhubv2.Scanner{},
 		&docparser.Scanner{},
@@ -1177,6 +1198,7 @@ func buildDetectorList() []detectors.Detector {
 		&gumroad.Scanner{},
 		&gyazo.Scanner{},
 		&happyscribe.Scanner{},
+		&harness.Scanner{},
 		&harvest.Scanner{},
 		&hellosign.Scanner{},
 		&helpcrunch.Scanner{},
@@ -1238,6 +1260,7 @@ func buildDetectorList() []detectors.Detector {
 		&kraken.Scanner{},
 		&kucoin.Scanner{},
 		&kylas.Scanner{},
+		&langfuse.Scanner{},
 		&languagelayer.Scanner{},
 		&larksuite.Scanner{},
 		&larksuiteapikey.Scanner{},
@@ -1314,7 +1337,8 @@ func buildDetectorList() []detectors.Detector {
 		&myintervals.Scanner{},
 		// &nasdaqdatalink.Scanner{},
 		&nethunt.Scanner{},
-		&netlify.Scanner{},
+		&netlifyv1.Scanner{},
+		&netlifyv2.Scanner{},
 		&netsuite.Scanner{},
 		&neutrinoapi.Scanner{},
 		&newrelicpersonalapikey.Scanner{},
@@ -1660,6 +1684,7 @@ func buildDetectorList() []detectors.Detector {
 		&workstack.Scanner{},
 		&worldcoinindex.Scanner{},
 		&worldweather.Scanner{},
+		&xai.Scanner{},
 		&wrike.Scanner{},
 		&yandex.Scanner{},
 		&yelp.Scanner{},
@@ -1682,6 +1707,7 @@ func buildDetectorList() []detectors.Detector {
 		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
+		&stripepaymentintent.Scanner{},
 	}
 }
 

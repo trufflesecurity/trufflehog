@@ -8,6 +8,9 @@ import (
 
 var subRe = regexp.MustCompile(`\{\{[^{}]+\}\}`)
 
+// DefaultMaxRecursionDepth is the default maximum recursion depth for variable substitution
+const DefaultMaxRecursionDepth = 2
+
 type VariableInfo struct {
 	value    string
 	Metadata Metadata
@@ -47,11 +50,14 @@ func (s *Source) formatAndInjectKeywords(data []string) string {
 	return strings.Join(ret, "")
 }
 
-func (s *Source) buildSubstituteSet(metadata Metadata, data string) []string {
+// buildSubstituteSet creates a set of substitutions for the given data
+// maxRecursionDepth is the maximum recursion depth to use for variable substitution
+func (s *Source) buildSubstituteSet(metadata Metadata, data string, maxRecursionDepth int) []string {
 	var ret []string
 	combos := make(map[string]struct{})
 
-	s.buildSubstitution(data, metadata, &combos)
+	// Call buildSubstitution with initial depth of 0 and the maxRecursionDepth
+	s.buildSubstitution(data, metadata, &combos, 0, maxRecursionDepth)
 
 	for combo := range combos {
 		ret = append(ret, combo)
@@ -63,26 +69,61 @@ func (s *Source) buildSubstituteSet(metadata Metadata, data string) []string {
 	return ret
 }
 
-func (s *Source) buildSubstitution(data string, metadata Metadata, combos *map[string]struct{}) {
+// buildSubstitution performs variable substitution with a maximum recursion depth
+// depth is the current recursion depth
+// maxRecursionDepth is the maximum recursion depth to use for variable substitution
+func (s *Source) buildSubstitution(
+	data string,
+	metadata Metadata,
+	combos *map[string]struct{},
+	depth int,
+	maxRecursionDepth int,
+) {
+	// Limit recursion depth to prevent stack overflow
+	if depth > maxRecursionDepth {
+		(*combos)[data] = struct{}{}
+		return
+	}
+
 	matches := removeDuplicateStr(subRe.FindAllString(data, -1))
+	if len(matches) == 0 {
+		// No more substitutions to make, add to combos
+		(*combos)[data] = struct{}{}
+		return
+	}
+
+	substitutionMade := false
 	for _, match := range matches {
-		for _, slice := range s.sub.variables[strings.Trim(match, "{}")] {
-			if slice.Metadata.CollectionInfo.PostmanID != "" && slice.Metadata.CollectionInfo.PostmanID != metadata.CollectionInfo.PostmanID {
+		varName := strings.Trim(match, "{}")
+		slices := s.sub.variables[varName]
+		if len(slices) == 0 {
+			continue
+		}
+
+		for _, slice := range slices {
+			if slice.Metadata.CollectionInfo.PostmanID != "" &&
+				slice.Metadata.CollectionInfo.PostmanID != metadata.CollectionInfo.PostmanID {
 				continue
 			}
 
-			// to ensure we don't infinitely recurse, we will trim all `{{}}` from the values before replacement.
-			// this is to prevent the case where a variable is replaced with a value that contains the same variable causing
-			// an infinite loop
-			removedBrackets := strings.ReplaceAll(strings.ReplaceAll(slice.value, "{{", ""), "}}", "")
+			// Prevent self-referential variables
+			if strings.Contains(slice.value, match) {
+				continue
+			}
 
-			d := strings.ReplaceAll(data, match, removedBrackets)
-			s.buildSubstitution(d, metadata, combos)
+			// Use the actual value for substitution, not just the stripped version
+			d := strings.ReplaceAll(data, match, slice.value)
+
+			// Only mark substitution as made if we actually changed something
+			if d != data {
+				substitutionMade = true
+				s.buildSubstitution(d, metadata, combos, depth+1, maxRecursionDepth)
+			}
 		}
 	}
 
-	if len(matches) == 0 {
-		// add to combos
+	// If no substitutions were made, add the current data
+	if !substitutionMade {
 		(*combos)[data] = struct{}{}
 	}
 }

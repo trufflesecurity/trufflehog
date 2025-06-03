@@ -3,6 +3,7 @@ package github
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"net/http"
 	"net/url"
@@ -74,6 +75,8 @@ type Source struct {
 
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
+
+	useAuthInUrl bool // pass credentials in the repository urls for cloning
 }
 
 // --------------------------------------------------------------------------------
@@ -226,6 +229,9 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 	}
 	s.conn = &conn
 
+	// configuration uses the inverse logic of the `useAuthInUrl` flag.
+	s.useAuthInUrl = !s.conn.RemoveAuthInUrl
+
 	connector, err := newConnector(s)
 	if err != nil {
 		return fmt.Errorf("could not create connector: %w", err)
@@ -290,6 +296,7 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 			}
 		},
 		UseCustomContentWriter: s.useCustomContentWriter,
+		AuthInUrl:              s.useAuthInUrl,
 	}
 	s.git = git.NewGit(cfg)
 
@@ -298,7 +305,13 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 
 // Validate is used by enterprise CLI to validate the GitHub config file.
 func (s *Source) Validate(ctx context.Context) []error {
-	if _, _, err := s.connector.APIClient().Users.Get(ctx, ""); err != nil {
+	/*
+		Uses the rate limit API (docs: https://docs.github.com/en/rest/rate-limit) because:
+		- Works with all auth types: user tokens, PATs, App credentials, and unauthenticated requests
+		- Returns 401 for invalid credentials but works with no auth (as unauthenticated)
+		- Doesn't consume API quota when called
+	*/
+	if _, _, err := s.connector.APIClient().RateLimit.Get(ctx); err != nil {
 		return []error{err}
 	}
 
@@ -1519,6 +1532,18 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 	}
 	meta := metaType.Github
 
+	chunkSkel := sources.Chunk{
+		SourceType: s.Type(),
+		SourceName: s.name,
+		SourceID:   s.SourceID(),
+		JobID:      s.JobID(),
+		SecretID:   target.SecretID,
+		SourceMetadata: &source_metadatapb.MetaData{
+			Data: &source_metadatapb.MetaData_Github{Github: meta},
+		},
+		Verify: s.verify,
+	}
+
 	u, err := url.Parse(meta.GetLink())
 	if err != nil {
 		return fmt.Errorf("unable to parse GitHub URL: %w", err)
@@ -1531,6 +1556,14 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("invalid GitHub URL")
 	}
 
+	if meta.GetFile() == "" && meta.GetCommit() != "" {
+		ctx := context.WithValues(ctx, "commit_hash", meta.GetCommit())
+		ctx.Logger().V(2).Info("secret metadata has no file; scanning commit metadata instead")
+
+		return s.scanCommitMetadata(ctx, segments[1], segments[2], meta, &chunkSkel, reporter)
+	}
+
+	// else try downloading the file content to scan
 	readCloser, resp, err := s.connector.APIClient().Repositories.DownloadContents(
 		ctx,
 		segments[1],
@@ -1549,19 +1582,36 @@ func (s *Source) scanTarget(ctx context.Context, target sources.ChunkingTarget, 
 		return fmt.Errorf("unexpected HTTP response status when trying to download file for scan: %v", resp.Status)
 	}
 
-	chunkSkel := sources.Chunk{
-		SourceType: s.Type(),
-		SourceName: s.name,
-		SourceID:   s.SourceID(),
-		JobID:      s.JobID(),
-		SecretID:   target.SecretID,
-		SourceMetadata: &source_metadatapb.MetaData{
-			Data: &source_metadatapb.MetaData_Github{Github: meta},
-		},
-		Verify: s.verify,
-	}
 	fileCtx := context.WithValues(ctx, "path", meta.GetFile())
 	return handlers.HandleFile(fileCtx, readCloser, &chunkSkel, reporter)
+}
+
+func (s *Source) scanCommitMetadata(ctx context.Context, owner, repo string, meta *source_metadatapb.Github, chunkSkel *sources.Chunk, reporter sources.ChunkReporter) error {
+	// fetch the commit
+	commit, resp, err := s.connector.APIClient().Repositories.GetCommit(ctx, owner, repo, meta.GetCommit(), nil)
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		return fmt.Errorf("could not fetch commit for metadata scan: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected HTTP response status when fetching commit: %v", resp.Status)
+	}
+
+	// create the string with the exact format we use in Git.ScanCommits()
+	// author email + "\n" + committer + "\n" + commit message
+	var sb strings.Builder
+
+	sb.WriteString(commit.GetCommit().Author.GetEmail())
+	sb.WriteString("\n")
+	sb.WriteString(commit.GetCommitter().GetEmail())
+	sb.WriteString("\n")
+	sb.WriteString(commit.GetCommit().GetMessage())
+
+	content := strings.NewReader(sb.String())
+	return handlers.HandleFile(ctx, io.NopCloser(content), chunkSkel, reporter)
 }
 
 func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporter sources.ChunkReporter) error {
@@ -1591,7 +1641,7 @@ func newConnector(source *Source) (Connector, error) {
 		return NewBasicAuthConnector(apiEndpoint, cred.BasicAuth)
 	case *sourcespb.GitHub_Token:
 		log.RedactGlobally(cred.Token)
-		return NewTokenConnector(apiEndpoint, cred.Token, func(c context.Context, err error) bool {
+		return NewTokenConnector(apiEndpoint, cred.Token, source.useAuthInUrl, func(c context.Context, err error) bool {
 			return source.handleRateLimit(c, err)
 		})
 	case *sourcespb.GitHub_Unauthenticated:

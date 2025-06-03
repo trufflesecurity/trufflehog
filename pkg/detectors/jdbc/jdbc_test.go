@@ -2,7 +2,6 @@ package jdbc
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 
@@ -10,12 +9,6 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "jdbc:mysql:localhost:3306/mydatabase"
-	invalidPattern = "jdbc:my?ql:localhost:3306/my database"
-	keyword        = "jdbc"
 )
 
 func TestJdbc_Pattern(t *testing.T) {
@@ -27,14 +20,73 @@ func TestJdbc_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
-			want:  []string{validPattern},
+			// examples from: https://github.com/trufflesecurity/trufflehog/issues/3704
+			name: "valid patterns",
+			input: `
+				<?xml version="1.0" encoding="UTF-8"?>
+					<project version="4">
+						<component name="DataSourceManagerImpl" format="xml" multifile-model="true">
+							<data-source source="LOCAL" name="PostgreSQL - postgres@localhost" uuid="18f0f64d-b804-471d-9351-e98a67c8389f">
+							<driver-ref>postgresql</driver-ref>
+							<synchronize>true</synchronize>
+							<jdbc-driver>org.postgresql.Driver</jdbc-driver>
+							<jdbc-url>jdbc:postgresql://localhost:5432/postgres</jdbc-url>
+							<jdbc-url>jdbc:sqlserver:</jdbc-url>
+							<jdbc-url>jdbc:postgresql://#{uri.host}#{uri.path}?user=#{uri.user}</jdbc-url>
+							<jdbc-url>postgresql://postgres:postgres@<your-connection-ip-address>:5432</jdbc-url>
+							<jdbc-url>jdbc:mysql:localhost:3306/mydatabase</jdbc-url>
+							<jdbc-url>jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false</jdbc-url>
+							<jdbc-url>jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks</jdbc-url>
+							<working-dir>$ProjectFileDir$</working-dir>
+							</data-source>
+						</component>
+					</project>
+			`,
+			want: []string{
+				"jdbc:postgresql://localhost:5432/postgres",
+				"jdbc:mysql:localhost:3306/mydatabase",
+				"jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false",
+				"jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks",
+			},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
-			want:  []string{},
+			name: "valid pattern - true positives",
+			input: `
+				{
+					"detector": "jdbc",
+					"potential_matches": [
+						"jdbc:postgresql://localhost:5432/mydb",
+						"jdbc:mysql://user:pass@host:3306/db?param=1",
+						"jdbc:sqlite:/data/test.db",
+						"jdbc:oracle:thin:@host:1521:db",
+						"jdbc:mysql://host:3306/db,other_param",
+						"jdbc:db2://host:50000/db?param=1"
+					]
+				}`,
+			want: []string{
+				"jdbc:postgresql://localhost:5432/mydb",
+				"jdbc:mysql://user:pass@host:3306/db?param=1",
+				"jdbc:sqlite:/data/test.db",
+				"jdbc:oracle:thin:@host:1521:db",
+				"jdbc:mysql://host:3306/db",
+				"jdbc:db2://host:50000/db?param=1",
+			},
+		},
+		{
+			name: "invalid pattern - false positives",
+			input: `
+				{
+					"detector": "jdbc",
+					"false_positives": [
+						"jdbc:xyz:short",
+						"somejdbc:mysql://host/db",
+						"jdbc:invalid_driver:test",
+						"jdbc:mysql://host/db>next",
+						"adjdbc:mysql://host/db",
+						"jdbc:my?ql:localhost:3306/my database"
+					]
+				}`,
+			want: []string{},
 		},
 	}
 
