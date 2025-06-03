@@ -31,14 +31,13 @@ import (
 const SourceType = sourcespb.SourceType_SOURCE_TYPE_DOCKER
 
 type Source struct {
-	name         string
-	sourceId     sources.SourceID
-	jobId        sources.JobID
-	verify       bool
-	concurrency  int
-	conn         sourcespb.Docker
-	excludePaths []string
-	globFilter   *glob.Filter
+	name        string
+	sourceId    sources.SourceID
+	jobId       sources.JobID
+	verify      bool
+	concurrency int
+	conn        sourcespb.Docker
+	globFilter  *glob.Filter
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -79,7 +78,6 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 	// Extract exclude paths from connection and compile regexes
 	if paths := s.conn.GetExcludePaths(); len(paths) > 0 {
-		s.excludePaths = paths
 		var err error
 		s.globFilter, err = glob.NewGlobFilter(glob.WithExcludeGlobs(paths...))
 		if err != nil {
@@ -414,7 +412,7 @@ func (s *Source) isExcluded(ctx context.Context, filePath string) bool {
 	isIncluded := s.globFilter.ShouldInclude(filePath)
 
 	if !isIncluded {
-		ctx.Logger().V(2).Info("skipping file: matches an exclude pattern", "file", filePath, "configured_exclude_paths", s.excludePaths)
+		ctx.Logger().V(2).Info("skipping file: matches an exclude pattern", "file", filePath, "configured_exclude_paths", s.conn.GetExcludePaths())
 	}
 	return !isIncluded
 }
