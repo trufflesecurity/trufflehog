@@ -436,9 +436,7 @@ func handleStatusCode(statusCode int, endpoint string) error {
 	case statusCode == http.StatusUnauthorized, statusCode == http.StatusForbidden,
 		statusCode == http.StatusNotFound, statusCode == http.StatusConflict:
 		return nil
-	case statusCode >= 500:
-		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
 	default:
-		return nil
+		return fmt.Errorf("unexpected status code: %d for API: %s", statusCode, endpoint)
 	}
 }
