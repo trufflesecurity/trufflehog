@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -1042,9 +1043,39 @@ func isValidCommit(uri, commit string) bool {
 
 		return strings.TrimSpace(string(output)) == "commit"
 	} else if strings.HasPrefix(uri, "https") {
-		// handle https:// urls
-		return false
+		return isValidCommitRemote(uri, commit)
 	} else {
 		return false
 	}
+}
+
+func isValidCommitRemote(repoURL, commit string) bool {
+	// create temporary directory
+	tempDir, err := os.MkdirTemp("", "git-verify-*")
+	if err != nil {
+		return false
+	}
+	defer os.RemoveAll(tempDir)
+
+	// clone with blob filter, no checkout, and bare repository
+	repoPath := filepath.Join(tempDir, "repo.git")
+	cloneCmd := exec.Command("git", "clone",
+		"--filter=blob:none",
+		"--no-checkout",
+		"--bare",
+		repoURL,
+		repoPath)
+
+	if err := cloneCmd.Run(); err != nil {
+		return false
+	}
+
+	// verify the commit using --git-dir since it's a bare repository
+	cmd := exec.Command("git", "--git-dir", repoPath, "cat-file", "-t", commit)
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+
+	return strings.TrimSpace(string(output)) == "commit"
 }
