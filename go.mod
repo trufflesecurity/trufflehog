@@ -11,6 +11,8 @@ replace github.com/coinbase/waas-client-library-go => github.com/trufflesecurity
 
 replace github.com/Microsoft/go-winio => github.com/microsoft/go-winio v0.6.2
 
+replace github.com/Microsoft/go-mssqldb => github.com/microsoft/go-mssqldb v1.8.2
+
 require (
 	cloud.google.com/go/secretmanager v1.14.7
 	cloud.google.com/go/storage v1.50.0
