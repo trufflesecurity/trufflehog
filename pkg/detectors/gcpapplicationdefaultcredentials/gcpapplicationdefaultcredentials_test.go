@@ -30,6 +30,17 @@ func TestGcpapplicationdefaultcredentials_Pattern(t *testing.T) {
 				"191375729402-oiuj2498ry3497gjveoierj8294jfj411//0_joijgor3i4ut98579862709342j3kjJOIE02834jijfewoifjowiejfhghyzznfoiwejfwnvuhewiufnwinciwu_-o2i3jjfcc",
 			},
 		},
+		{
+			name: "invalid json",
+			input: `{
+				"ptc_client_secret": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6",
+				"android_id": "a1b2c3d4e5f6g7h8",
+				"service": "audience:server:client_id:123456789012-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com",
+				"client_sig": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t",
+				"gmaps_key": "AIzaSyA1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8"
+			}`,
+			want: []string{},
+		},
 	}
 
 	for _, test := range tests {
