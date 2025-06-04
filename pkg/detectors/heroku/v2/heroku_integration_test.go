@@ -19,12 +19,12 @@ import (
 func TestHeroku_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("HEROKU")
-	inactiveSecret := testSecrets.MustGetField("HEROKU_INACTIVE")
+	secret := testSecrets.MustGetField("HEROKU_V2_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("HEROKU_V2_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
