@@ -820,13 +820,11 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 
 		scanBytesPerChunk.Observe(dataSize)
 		jobBytesScanned.WithLabelValues(
-			strconv.Itoa(int(chunk.JobID)),
 			chunk.SourceType.String(),
 			chunk.SourceName,
 		).Add(dataSize)
 		chunksScannedLatency.Observe(float64(time.Since(startTime).Microseconds()))
 		jobChunksScanned.WithLabelValues(
-			strconv.Itoa(int(chunk.JobID)),
 			chunk.SourceType.String(),
 			chunk.SourceName,
 		).Inc()
