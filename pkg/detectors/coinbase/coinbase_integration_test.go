@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package coinbase
 
 import (
@@ -19,7 +22,7 @@ import (
 func TestCoinbase_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "analyzers1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
