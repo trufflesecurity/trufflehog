@@ -10,16 +10,16 @@ inputs:
   base:
     description: Start scanning from here (usually main branch).
     required: false
-    default: ''
+    default: ""
   head:
     description: Scan commits until here (usually dev branch).
     required: false
   extra_args:
-    default: ''
+    default: ""
     description: Extra args to be passed to the trufflehog cli.
     required: false
   version:
-    default: 'latest'
+    default: "latest"
     description: Scan with this trufflehog cli version.
     required: false
 branding:
@@ -29,71 +29,78 @@ branding:
 runs:
   using: "composite"
   steps:
-  - shell: bash
-    working-directory: ${{ inputs.path }}
-    env:
-      BASE: ${{ inputs.base }}
-      HEAD: ${{ inputs.head }}
-      ARGS: ${{ inputs.extra_args }}
-      COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
-      VERSION: ${{ inputs.version }}
-    run: |
-      ##########################################
-      ## ADVANCED USAGE                       ##
-      ## Scan by BASE & HEAD user inputs      ##
-      ## If BASE == HEAD, exit with error     ##
-      ##########################################
-      git status >/dev/null  # make sure we are in a git repository
-      if [ -n "$BASE" ] || [ -n "$HEAD" ]; then
-        if [ -n "$BASE" ]; then
-          base_commit=$(git rev-parse "$BASE" 2>/dev/null) || true
-        else
-          base_commit=""
+    - shell: bash
+      working-directory: ${{ inputs.path }}
+      env:
+        BASE: ${{ inputs.base }}
+        HEAD: ${{ inputs.head }}
+        ARGS: ${{ inputs.extra_args }}
+        COMMIT_IDS: ${{ toJson(github.event.commits.*.id) }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        ##########################################
+        ## ADVANCED USAGE                       ##
+        ## Scan by BASE & HEAD user inputs      ##
+        ## If BASE == HEAD, exit with error     ##
+        ##########################################
+        # Check if jq is installed, if not, install it
+        if ! command -v jq &> /dev/null
+        then
+          echo "jq could not be found, installing..."
+          apt-get -y update && apt-get install -y jq
         fi
-        if [ -n "$HEAD" ]; then
-          head_commit=$(git rev-parse "$HEAD" 2>/dev/null) || true
-        else
-          head_commit=""
-        fi
-        if [ "$base_commit" == "$head_commit" ] ; then
-          echo "::error::BASE and HEAD commits are the same. TruffleHog won't scan anything. Please see documentation (https://github.com/trufflesecurity/trufflehog#octocat-trufflehog-github-action)."
-          exit 1
-        fi
-      ##########################################
-      ## Scan commits based on event type     ##
-      ##########################################
-      else
-        if [ "${{ github.event_name }}" == "push" ]; then
-          COMMIT_LENGTH=$(printenv COMMIT_IDS | jq length)
-          if [ $COMMIT_LENGTH == "0" ]; then
-            echo "No commits to scan"
-            exit 0
-          fi
-          HEAD=${{ github.event.after }}
-          if [ ${{ github.event.before }} == "0000000000000000000000000000000000000000" ]; then
-            BASE=""
+
+        git status >/dev/null  # make sure we are in a git repository
+        if [ -n "$BASE" ] || [ -n "$HEAD" ]; then
+          if [ -n "$BASE" ]; then
+            base_commit=$(git rev-parse "$BASE" 2>/dev/null) || true
           else
-            BASE=${{ github.event.before }}
+            base_commit=""
           fi
-        elif [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "schedule" ]; then
-          BASE=""
-          HEAD=""
-        elif [ "${{ github.event_name }}" == "pull_request" ]; then
-          BASE=${{github.event.pull_request.base.sha}}
-          HEAD=${{github.event.pull_request.head.sha}}
+          if [ -n "$HEAD" ]; then
+            head_commit=$(git rev-parse "$HEAD" 2>/dev/null) || true
+          else
+            head_commit=""
+          fi
+          if [ "$base_commit" == "$head_commit" ] ; then
+            echo "::error::BASE and HEAD commits are the same. TruffleHog won't scan anything. Please see documentation (https://github.com/trufflesecurity/trufflehog#octocat-trufflehog-github-action)."
+            exit 1
+          fi
+        ##########################################
+        ## Scan commits based on event type     ##
+        ##########################################
+        else
+          if [ "${{ github.event_name }}" == "push" ]; then
+            COMMIT_LENGTH=$(printenv COMMIT_IDS | jq length)
+            if [ $COMMIT_LENGTH == "0" ]; then
+              echo "No commits to scan"
+              exit 0
+            fi
+            HEAD=${{ github.event.after }}
+            if [ ${{ github.event.before }} == "0000000000000000000000000000000000000000" ]; then
+              BASE=""
+            else
+              BASE=${{ github.event.before }}
+            fi
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "schedule" ]; then
+            BASE=""
+            HEAD=""
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE=${{github.event.pull_request.base.sha}}
+            HEAD=${{github.event.pull_request.head.sha}}
+          fi
         fi
-      fi
-      ##########################################
-      ##          Run TruffleHog              ##
-      ##########################################
-      docker run --rm -v .:/tmp -w /tmp \
-      ghcr.io/trufflesecurity/trufflehog:${VERSION} \
-      git file:///tmp/ \
-      --since-commit \
-      ${BASE:-''} \
-      --branch \
-      ${HEAD:-''} \
-      --fail \
-      --no-update \
-      --github-actions \
-      ${ARGS:-''}
+        ##########################################
+        ##          Run TruffleHog              ##
+        ##########################################
+        docker run --rm -v .:/tmp -w /tmp \
+        ghcr.io/trufflesecurity/trufflehog:${VERSION} \
+        git file:///tmp/ \
+        --since-commit \
+        ${BASE:-''} \
+        --branch \
+        ${HEAD:-''} \
+        --fail \
+        --no-update \
+        --github-actions \
+        ${ARGS:-''}
