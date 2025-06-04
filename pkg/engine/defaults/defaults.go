@@ -107,6 +107,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boxoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/braintreepayments"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brevo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browserstack"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/browshot"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bscscan"
@@ -641,7 +642,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendbird"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendbirdorganizationapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendgrid"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sendinbluev2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentryorgtoken"
 	sentrytokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentrytoken/v1"
 	sentrytokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sentrytoken/v2"
@@ -1506,7 +1506,7 @@ func buildDetectorList() []detectors.Detector {
 		&sendbird.Scanner{},
 		&sendbirdorganizationapi.Scanner{},
 		&sendgrid.Scanner{},
-		&sendinbluev2.Scanner{},
+		&brevo.Scanner{},
 		&sentrytokenv1.Scanner{},
 		&sentrytokenv2.Scanner{},
 		&sentryorgtoken.Scanner{},
