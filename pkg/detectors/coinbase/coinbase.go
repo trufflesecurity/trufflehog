@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -130,6 +131,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, keyName, privateKey string) (bool, error) {
 	jwtToken, err := buildJWT(verificationMethod, apiHost, verificationEndpoint, keyName, privateKey)
+	if err != nil {
+		return false, err
+	}
 	req, err := http.NewRequestWithContext(ctx, verificationMethod, verificationURI, http.NoBody)
 	if err != nil {
 		return false, err
@@ -139,6 +143,10 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, keyName, 
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
 	switch res.StatusCode {
 	case http.StatusOK:
