@@ -351,7 +351,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpscout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hereapi"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heroku"
+	heroku_v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heroku/v1"
+	heroku_v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heroku/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hiveage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/holidayapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/holistic"
@@ -1204,7 +1205,8 @@ func buildDetectorList() []detectors.Detector {
 		&helpcrunch.Scanner{},
 		&helpscout.Scanner{},
 		&hereapi.Scanner{},
-		&heroku.Scanner{},
+		&heroku_v1.Scanner{},
+		&heroku_v2.Scanner{},
 		// &hive.Scanner{},
 		&hiveage.Scanner{},
 		&holidayapi.Scanner{},
