@@ -10,24 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `[{
-		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
-		"name": "Heroku",
-		"type": "Detector",
-		"api": true,
-		"authentication_type": "",
-		"verification_url": "https://api.example.com/example",
-		"test_secrets": {
-			"heroku_secret": "bAf8bA7d-7088-07ce-3f87-7ec21653297d"
-		},
-		"expected_response": "200",
-		"method": "GET",
-		"deprecated": false
-	}]`
-	secret = "bAf8bA7d-7088-07ce-3f87-7ec21653297d"
-)
-
 func TestHeroku_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -38,9 +20,22 @@ func TestHeroku_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
+			name: "valid pattern",
+			input: `[{
+					"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
+					"name": "Heroku",
+					"type": "Detector",
+					"api": true,
+					"authentication_type": "",
+					"verification_url": "https://api.example.com/example",
+					"test_secrets": {
+						"heroku_secret": "bAf8bA7d-7088-07ce-3f87-7ec21653297d"
+					},
+					"expected_response": "200",
+					"method": "GET",
+					"deprecated": false
+				}]`,
+			want: []string{"bAf8bA7d-7088-07ce-3f87-7ec21653297d"},
 		},
 	}
 
