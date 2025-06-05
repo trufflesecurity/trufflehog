@@ -2,6 +2,7 @@ package artifactory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -29,12 +31,16 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(`\b([a-zA-Z0-9]{64,73})\b`)
 	URLPat = regexp.MustCompile(`\b([A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])\.jfrog\.io)`)
+
+	invalidHosts = simple.NewCache[struct{}]()
+
+	errNoHost = errors.New("no such host")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"artifactory"}
+	return []string{"artifactory", "jfrog.io"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -62,11 +68,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	// add found + configured endpoints to the list
 	for _, endpoint := range s.Endpoints(foundUrls...) {
+		// if any configured endpoint has `https://` remove it because we append that during verification
+		endpoint = strings.TrimPrefix(endpoint, "https://")
 		uniqueUrls[endpoint] = struct{}{}
 	}
 
 	for token := range uniqueTokens {
 		for url := range uniqueUrls {
+			if invalidHosts.Exists(url) {
+				delete(uniqueUrls, url)
+				continue
+			}
+
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_ArtifactoryAccessToken,
 				Raw:          []byte(token),
@@ -76,7 +89,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if verify {
 				isVerified, verificationErr := verifyArtifactory(ctx, s.getClient(), url, token)
 				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr, token)
+				if verificationErr != nil {
+					if errors.Is(verificationErr, errNoHost) {
+						invalidHosts.Set(url, struct{}{})
+						continue
+					}
+
+					s1.SetVerificationError(verificationErr, token)
+				}
 			}
 
 			results = append(results, s1)
@@ -97,6 +117,11 @@ func verifyArtifactory(ctx context.Context, client *http.Client, resURLMatch, re
 
 	resp, err := client.Do(req)
 	if err != nil {
+		// lookup foo.jfrog.io: no such host
+		if strings.Contains(err.Error(), "no such host") {
+			return false, errNoHost
+		}
+
 		return false, err
 	}
 
