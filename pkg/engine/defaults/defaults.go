@@ -404,6 +404,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kraken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kylas"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/lambdatest"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/langfuse"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/languagelayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/larksuite"
@@ -1260,6 +1261,7 @@ func buildDetectorList() []detectors.Detector {
 		&kraken.Scanner{},
 		&kucoin.Scanner{},
 		&kylas.Scanner{},
+		&lambdatest.Scanner{},
 		&langfuse.Scanner{},
 		&languagelayer.Scanner{},
 		&larksuite.Scanner{},
