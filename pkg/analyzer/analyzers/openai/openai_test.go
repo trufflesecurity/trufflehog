@@ -1,6 +1,7 @@
 package openai
 
 import (
+	_ "embed"
 	"encoding/json"
 	"testing"
 	"time"
@@ -10,6 +11,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+//go:embed result_output.json
+var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -22,59 +26,13 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	tests := []struct {
 		name    string
 		key     string
-		want    string // JSON string
+		want    []byte
 		wantErr bool
 	}{
 		{
-			name: "valid OpenAI key",
-			key:  testSecrets.MustGetField("OPENAI_VERIFIED"),
-			want: `{
-             "AnalyzerType": 0,
-             "Bindings": [
-              {
-               "Resource": {
-                "Name": "Truffle Security Co",
-                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
-                "Type": "organization",
-                "Metadata": {
-                 "description": "Personal org for dustin@trufflesec.com",
-                 "user": "truffle-security-co"
-                },
-                "Parent": null
-               },
-               "Permission": {
-                "Value": "full_access",
-                "AccessLevel": "",
-                "Parent": null
-               }
-              },
-              {
-               "Resource": {
-                "Name": "Personal",
-                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
-                "Type": "organization",
-                "Metadata": {
-                 "description": "Personal org for dustin@trufflesec.com",
-                 "user": "user-ohfap0ky8lkatw97iskuhghv"
-                },
-                "Parent": null
-               },
-               "Permission": {
-                "Value": "full_access",
-                "AccessLevel": "",
-                "Parent": null
-               }
-              }
-             ],
-             "UnboundedResources": null,
-             "Metadata": {
-              "email": "dustin@trufflesec.com",
-              "is_admin": "true",
-              "is_restricted": "false",
-              "mfa": "true",
-              "user": "Dustin Decker"
-             }
-            }`,
+			name:    "valid OpenAI key",
+			key:     testSecrets.MustGetField("OPENAI_VERIFIED"),
+			want:    expectedOutput,
 			wantErr: false,
 		},
 	}
