@@ -37,6 +37,8 @@ var (
 	errNoHost = errors.New("no such host")
 )
 
+func (Scanner) CloudEndpoint() string { return "" }
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
