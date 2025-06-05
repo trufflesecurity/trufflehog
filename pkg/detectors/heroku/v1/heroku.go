@@ -3,6 +3,7 @@ package heroku
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -17,6 +18,7 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -24,6 +26,10 @@ var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"heroku"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
+
+func (s Scanner) Version() int {
+	return 1
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -46,19 +52,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.heroku.com/apps", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Accept", "application/vnd.heroku+json; version=3")
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := VerifyHerokuAPIKey(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr)
 		}
 
 		results = append(results, s1)
@@ -73,4 +69,33 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Heroku is a cloud platform that lets companies build, deliver, monitor and scale apps. Heroku API keys can be used to access and manage Heroku applications and services."
+}
+
+func VerifyHerokuAPIKey(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.heroku.com/account", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Accept", "application/vnd.heroku+json; version=3")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
