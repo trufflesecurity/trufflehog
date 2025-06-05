@@ -67,11 +67,8 @@ func isValidECPrivateKey(pemKey []byte) bool {
 	}
 
 	// Check the key type
-	if _, ok := key.Public().(*ecdsa.PublicKey); !ok {
-		return false
-	}
-
-	return true
+	_, ok := key.Public().(*ecdsa.PublicKey)
+        return ok
 }
 
 func (s Scanner) getClient() *http.Client {
