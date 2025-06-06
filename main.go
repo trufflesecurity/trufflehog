@@ -372,17 +372,6 @@ func main() {
 	}
 }
 
-// Function to check if the commit is valid
-func isValidCommit(commit string) bool {
-	cmd := exec.Command("git", "cat-file", "-t", commit)
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-
-	return strings.TrimSpace(string(output)) == "commit"
-}
-
 func run(state overseer.State) {
 
 	ctx, cancel := context.WithCancelCause(context.Background())
@@ -423,9 +412,6 @@ func run(state overseer.State) {
 	// When setting a base commit, chunks must be scanned in order.
 	if *gitScanSinceCommit != "" {
 		*concurrency = 1
-		if !isValidCommit(*gitScanSinceCommit) {
-			logger.Info("Warning: The provided commit hash appears to be invalid.")
-		}
 	}
 
 	if *profile {
@@ -717,6 +703,13 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 	var refs []sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
+		// validate the commit for local repository only
+		if *gitScanSinceCommit != "" && strings.HasPrefix(*gitScanURI, "file") {
+			if !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
+				ctx.Logger().Info("Warning: The provided commit hash appears to be invalid.")
+			}
+		}
+
 		gitCfg := sources.GitConfig{
 			URI:              *gitScanURI,
 			IncludePathsFile: *gitScanIncludePaths,
@@ -1096,4 +1089,16 @@ func printAverageDetectorTime(e *engine.Engine) {
 	for detectorName, duration := range e.GetDetectorsMetrics() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
+}
+
+// Function to check if the commit is valid
+func isValidCommit(uri, commit string) bool {
+	// handle file:// urls
+	repoPath, _ := strings.CutPrefix(uri, "file://") // remove the prefix to validate against the repo path
+	output, err := exec.Command("git", "-C", repoPath, "cat-file", "-t", commit).Output()
+	if err != nil {
+		return false
+	}
+
+	return strings.TrimSpace(string(output)) == "commit"
 }
