@@ -117,6 +117,21 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Key:      "domain",
 			Required: true,
 		}}
+	case "jira":
+		inputs = []textinputs.InputConfig{{
+			Label:    "Domain",
+			Key:      "domain",
+			Required: true,
+		}, {
+			Label:    "Email",
+			Key:      "email",
+			Required: true,
+		}, {
+			Label:       "Token",
+			Key:         "token",
+			Required:    true,
+			RedactInput: true,
+		}}
 	default:
 		inputs = []textinputs.InputConfig{{
 			Label:       "Secret",
