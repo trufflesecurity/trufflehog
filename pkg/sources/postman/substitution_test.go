@@ -229,9 +229,9 @@ func TestSource_BuildSubstitution_RecursionLimit(t *testing.T) {
 
 			// Use custom maxDepth if provided, otherwise use default
 			if tc.maxDepth > 0 {
-				s.buildSubstitution(tc.data, metadata, &combos, 0, tc.maxDepth)
+				s.buildSubstitution(tc.data, metadata, combos, 0, tc.maxDepth)
 			} else {
-				s.buildSubstitution(tc.data, metadata, &combos, 0, DefaultMaxRecursionDepth)
+				s.buildSubstitution(tc.data, metadata, combos, 0, DefaultMaxRecursionDepth)
 			}
 
 			var result []string

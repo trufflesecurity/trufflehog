@@ -57,7 +57,7 @@ func (s *Source) buildSubstituteSet(metadata Metadata, data string, maxRecursion
 	combos := make(map[string]struct{})
 
 	// Call buildSubstitution with initial depth of 0 and the maxRecursionDepth
-	s.buildSubstitution(data, metadata, &combos, 0, maxRecursionDepth)
+	s.buildSubstitution(data, metadata, combos, 0, maxRecursionDepth)
 
 	for combo := range combos {
 		ret = append(ret, combo)
@@ -75,20 +75,20 @@ func (s *Source) buildSubstituteSet(metadata Metadata, data string, maxRecursion
 func (s *Source) buildSubstitution(
 	data string,
 	metadata Metadata,
-	combos *map[string]struct{},
+	combos map[string]struct{},
 	depth int,
 	maxRecursionDepth int,
 ) {
 	// Limit recursion depth to prevent stack overflow
 	if depth > maxRecursionDepth {
-		(*combos)[data] = struct{}{}
+		combos[data] = struct{}{}
 		return
 	}
 
 	matches := removeDuplicateStr(subRe.FindAllString(data, -1))
 	if len(matches) == 0 {
 		// No more substitutions to make, add to combos
-		(*combos)[data] = struct{}{}
+		combos[data] = struct{}{}
 		return
 	}
 
@@ -124,7 +124,7 @@ func (s *Source) buildSubstitution(
 
 	// If no substitutions were made, add the current data
 	if !substitutionMade {
-		(*combos)[data] = struct{}{}
+		combos[data] = struct{}{}
 	}
 }
 
