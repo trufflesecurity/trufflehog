@@ -99,6 +99,7 @@ type Config struct {
 	// also serves as a multiplier for other worker types (e.g., detector workers, notifier workers)
 	Concurrency int
 
+	ConfiguredSources             []sources.ConfiguredSource
 	Decoders                      []decoders.Decoder
 	Detectors                     []detectors.Detector
 	DetectorVerificationOverrides map[config.DetectorID]bool
@@ -545,6 +546,17 @@ func (r *verificationOverlapTracker) increment() {
 }
 
 const ignoreTag = "trufflehog:ignore"
+
+// AhoCorasickCoreKeywords returns a set of keywords that the engine's
+// AhoCorasickCore is using.
+func (e *Engine) AhoCorasickCoreKeywords() map[string]struct{} {
+	// Turn AhoCorasick keywordsToDetectors into a map of keywords
+	keywords := make(map[string]struct{})
+	for key := range e.AhoCorasickCore.KeywordsToDetectors() {
+		keywords[key] = struct{}{}
+	}
+	return keywords
+}
 
 // HasFoundResults returns true if any results are found.
 func (e *Engine) HasFoundResults() bool {
