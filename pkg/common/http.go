@@ -47,7 +47,7 @@ oyi3B43njTOQ5yOf+1CceWxG1bQVs5ZufpsMljq4Ui0/1lvh+wjChP4kqKOJ2qxq
 4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA
 mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
 emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
------END CERTIFICATE-----	
+-----END CERTIFICATE-----
 `,
 	// 	CN = ISRG Root X2
 	// TODO: Expires September 17, 2040 at 9:00:00 AM Pacific Daylight Time
@@ -189,6 +189,7 @@ func RetryableHTTPClient(opts ...ClientOption) *http.Client {
 	return httpClient.StandardClient()
 }
 
+// RetryableHTTPClientTimeout returns a new http client with a specified timeout and RoundTripper transport
 func RetryableHTTPClientTimeout(timeOutSeconds int64, opts ...ClientOption) *http.Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.RetryMax = 3
@@ -199,7 +200,10 @@ func RetryableHTTPClientTimeout(timeOutSeconds int64, opts ...ClientOption) *htt
 	for _, opt := range opts {
 		opt(httpClient)
 	}
-	return httpClient.StandardClient()
+
+	standardClient := httpClient.StandardClient()
+	standardClient.Timeout = httpClient.HTTPClient.Timeout
+	return standardClient
 }
 
 const DefaultResponseTimeout = 5 * time.Second

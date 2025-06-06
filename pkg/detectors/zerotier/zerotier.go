@@ -3,9 +3,11 @@ package zerotier
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -46,30 +48,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			// API docs: https://docs.zerotier.com/central/v1/
 			client := s.client
 			if client == nil {
 				client = defaultClient
 			}
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.zerotier.com/api/v1/network", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("token %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else if res.StatusCode == 401 {
-					// The secret is determinately not verified (nothing to do)
-				} else {
-					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-					s1.SetVerificationError(err, resMatch)
-				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
-			}
+
+			isVerified, verificationErr := verifyZerotierKey(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
@@ -84,4 +70,32 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "ZeroTier is a network virtualization technology that provides secure and flexible network connections. ZeroTier API keys can be used to manage and control these network connections."
+}
+
+// API docs: https://docs.zerotier.com/central/v1/
+func verifyZerotierKey(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.zerotier.com/api/v1/network", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("token %s", key))
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

@@ -141,7 +141,7 @@ func TestSnowflake_FromChunk(t *testing.T) {
 
 				got[i].ExtraData = newMap(got[i].ExtraData, keysToCopy)
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Snowflake.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

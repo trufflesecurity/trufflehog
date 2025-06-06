@@ -129,6 +129,7 @@ func TestLaunchDarkly_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].AnalysisInfo = nil
 
 				// Do we expect to be comparing the ExtraData?
 				got[i].ExtraData = nil

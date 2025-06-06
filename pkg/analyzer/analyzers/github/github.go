@@ -37,6 +37,7 @@ func secretInfoToAnalyzerResult(info *common.SecretInfo) *analyzers.AnalyzerResu
 		return nil
 	}
 	result := &analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeGitHub,
 		Metadata: map[string]any{
 			"owner":      info.Metadata.User.Login,
 			"type":       info.Metadata.Type,

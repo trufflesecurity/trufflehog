@@ -34,9 +34,9 @@ const (
 var (
 	defaultClient = common.SaneHttpClient()
 	tokenPats     = map[tokenType]*regexp.Regexp{
-		TenantAccessToken: regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "tenant"}) + `\b(t-[a-z0-9A-Z_.]{14,50})\b`),
-		UserAccessToken:   regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "user"}) + `\b(u-[a-z0-9A-Z_.]{14,50})\b`),
-		AppAccessToken:    regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "app"}) + `\b(a-[a-z0-9A-Z_.]{14,50})\b`),
+		TenantAccessToken: regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "tenant"}) + `(?:^|[^-])\b(t-[a-z0-9A-Z_.]{14,50})\b(?:[^-]|$)`),
+		UserAccessToken:   regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "user"}) + `(?:^|[^-])\b(u-[a-z0-9A-Z_.]{14,50})\b(?:[^-]|$)`),
+		AppAccessToken:    regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "app"}) + `(?:^|[^-])\b(a-[a-z0-9A-Z_.]{14,50})\b(?:[^-]|$)`),
 	}
 
 	verificationUrls = map[tokenType]string{

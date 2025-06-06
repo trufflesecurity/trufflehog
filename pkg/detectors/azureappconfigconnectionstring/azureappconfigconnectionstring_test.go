@@ -1,4 +1,4 @@
-package heroku
+package azureappconfigconnectionstring
 
 import (
 	"context"
@@ -11,24 +11,11 @@ import (
 )
 
 var (
-	validPattern = `[{
-		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
-		"name": "Heroku",
-		"type": "Detector",
-		"api": true,
-		"authentication_type": "",
-		"verification_url": "https://api.example.com/example",
-		"test_secrets": {
-			"heroku_secret": "bAf8bA7d-7088-07ce-3f87-7ec21653297d"
-		},
-		"expected_response": "200",
-		"method": "GET",
-		"deprecated": false
-	}]`
-	secret = "bAf8bA7d-7088-07ce-3f87-7ec21653297d"
+	validPattern   = `Endpoint=https://trufflesecurity.azconfig.io;Id=u+De;Secret=80DtxZkndXpM2mV2J1JjX2vL1x4gm1hHn8Y3JeFJ4N0PPLSO5D70JQQJ99BBAC1i4FpQkb5wAAACAAZC26dr`
+	invalidPattern = `Endpoint=https://trufflesecurity.azconfig.io;Secret=80DtxZkndXpMTmV2J3JjX2vL1x4gm1hHn8Y3KeFV4N0PPLSO5D70JQQJ79BBAC1i4FpRkb5wAAACAAZC26dr`
 )
 
-func TestHeroku_Pattern(t *testing.T) {
+func TestAzureAppConfigConnectionString_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -40,7 +27,12 @@ func TestHeroku_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: validPattern,
-			want:  []string{secret},
+			want:  []string{"Endpoint=https://trufflesecurity.azconfig.io;Id=u+De;Secret=80DtxZkndXpM2mV2J1JjX2vL1x4gm1hHn8Y3JeFJ4N0PPLSO5D70JQQJ99BBAC1i4FpQkb5wAAACAAZC26dr"},
+		},
+		{
+			name:  "invalid pattern",
+			input: invalidPattern,
+			want:  nil,
 		},
 	}
 
