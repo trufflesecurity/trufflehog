@@ -97,6 +97,7 @@ const (
 	AnalyzerTypeNetlify
 	AnalyzerTypeFastly
 	AnalyzerTypeMonday
+	AnalyzerTypeDatadog
 	AnalyzerTypeNgrok
 	AnalyzerTypeMux
 	AnalyzerTypePosthog
@@ -145,6 +146,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeNetlify:       "Netlify",
 	AnalyzerTypeFastly:        "Fastly",
 	AnalyzerTypeMonday:        "Monday",
+	AnalyzerTypeDatadog:       "Datadog",
 	AnalyzerTypeNgrok:         "Ngrok",
 	AnalyzerTypeMux:           "Mux",
 	AnalyzerTypePosthog:       "Posthog",
