@@ -66,15 +66,15 @@ func ParseDetectors(input string) ([]DetectorID, error) {
 		if item == "" {
 			continue
 		}
-		detectors, ok := specialGroups[strings.ToLower(item)]
+		allDetectors, ok := specialGroups[strings.ToLower(item)]
 		if !ok {
 			var err error
-			detectors, err = asRange(item)
+			allDetectors, err = asRange(item)
 			if err != nil {
 				return nil, err
 			}
 		}
-		for _, d := range detectors {
+		for _, d := range allDetectors {
 			if _, ok := seenDetector[d]; ok {
 				continue
 			}
@@ -127,7 +127,7 @@ func (id DetectorID) String() string {
 	return fmt.Sprintf("%s.v%d", name, id.Version)
 }
 
-// allDetectors reutrns an ordered slice of all detector types.
+// allDetectors returns an ordered slice of all detector types.
 func allDetectors() []DetectorID {
 	all := make([]DetectorID, 0, len(dpb.DetectorType_name))
 	for id := range dpb.DetectorType_name {

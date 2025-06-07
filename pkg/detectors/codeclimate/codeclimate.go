@@ -2,10 +2,12 @@ package codeclimate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -30,6 +32,12 @@ func (s Scanner) Keywords() []string {
 	return []string{"codeclimate"}
 }
 
+type response struct {
+	Data struct {
+		Id string `json:"id"`
+	} `json:"data"`
+}
+
 // FromData will find and optionally verify Codeclimate secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -37,9 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -58,11 +63,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
+					var r response
+					if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+						s1.SetVerificationError(err, resMatch)
 						continue
+					}
+					if r.Data.Id != "" {
+						s1.Verified = true
 					}
 				}
 			}
@@ -76,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Codeclimate
+}
+
+func (s Scanner) Description() string {
+	return "Codeclimate is a tool for automated code review and analysis. Codeclimate tokens can be used to access and manage repositories and their analysis results."
 }

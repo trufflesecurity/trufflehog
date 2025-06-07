@@ -2,21 +2,22 @@ package githubapp
 
 import (
 	"context"
-
-	// b64 "encoding/base64"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -43,19 +44,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	appMatches := appPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 
 		resMatch := strings.TrimSpace(match[1])
 		for _, appMatch := range appMatches {
-			if len(appMatch) != 2 {
-				continue
-			}
 			appResMatch := strings.TrimSpace(appMatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_GitHubApp,
 				Raw:          []byte(resMatch),
+			}
+			s1.ExtraData = map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/github/",
 			}
 
 			if verify {
@@ -105,4 +103,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GitHubApp
+}
+
+func (s Scanner) Description() string {
+	return "GitHub Apps allow you to automate and improve your workflow. GitHub App keys can be used to authenticate and interact with the GitHub API on behalf of the app."
 }

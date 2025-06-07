@@ -2,21 +2,34 @@ package ftp
 
 import (
 	"context"
+	"errors"
+	"net/textproto"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/jlaffaye/ftp"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+const (
+	// https://datatracker.ietf.org/doc/html/rfc959
+	ftpNotLoggedIn = 530
+
+	defaultVerificationTimeout = 5 * time.Second
+)
+
+type Scanner struct {
+	// Verification timeout. Defaults to 5 seconds if unset.
+	verificationTimeout time.Duration
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	keyPat = regexp.MustCompile(`\bftp://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
@@ -58,50 +71,69 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		rawURL.Path = ""
 		redact := strings.TrimSpace(strings.Replace(rawURL.String(), password, "********", -1))
 
-		s := detectors.Result{
+		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_FTP,
 			Raw:          []byte(rawURL.String()),
 			Redacted:     redact,
 		}
 
 		if verify {
-			s.Verified = verifyFTP(ctx, parsedURL)
+			timeout := s.verificationTimeout
+			if timeout == 0 {
+				timeout = defaultVerificationTimeout
+			}
+			verificationErr := verifyFTP(timeout, parsedURL)
+			s1.Verified = verificationErr == nil
+			if !isErrDeterminate(verificationErr) {
+				s1.SetVerificationError(verificationErr, password)
+			}
 		}
 
-		if !s.Verified {
+		if !s1.Verified {
 			// Skip unverified findings where the password starts with a `$` - it's almost certainly a variable.
 			if strings.HasPrefix(password, "$") {
 				continue
 			}
 		}
 
-		if detectors.IsKnownFalsePositive(string(s.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false) {
-			continue
-		}
-
-		results = append(results, s)
+		results = append(results, s1)
 	}
 
 	return results, nil
 }
 
-func verifyFTP(ctx context.Context, u *url.URL) bool {
+var ftpFalsePositives = map[detectors.FalsePositive]struct{}{
+	detectors.FalsePositive("@ftp.freebsd.org"): {},
+}
+
+func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
+	return detectors.IsKnownFalsePositive(string(result.Raw), ftpFalsePositives, false)
+}
+
+func isErrDeterminate(e error) bool {
+	ftpErr := &textproto.Error{}
+	return errors.As(e, &ftpErr) && ftpErr.Code == ftpNotLoggedIn
+}
+
+func verifyFTP(timeout time.Duration, u *url.URL) error {
 	host := u.Host
 	if !strings.Contains(host, ":") {
 		host = host + ":21"
 	}
 
-	c, err := ftp.Dial(host, ftp.DialWithTimeout(5*time.Second))
+	c, err := ftp.Dial(host, ftp.DialWithTimeout(timeout))
 	if err != nil {
-		return false
+		return err
 	}
 
 	password, _ := u.User.Password()
-	err = c.Login(u.User.Username(), password)
-
-	return err == nil
+	return c.Login(u.User.Username(), password)
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FTP
+}
+
+func (s Scanner) Description() string {
+	return "FTP is a protocol for reading and writing files. An FTP password can be used to read and sometimes write files."
 }

@@ -987,11 +987,38 @@ func (m *AWSSessionTokenSecret) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Key
+	if utf8.RuneCountInString(m.GetKey()) < 1 {
+		err := AWSSessionTokenSecretValidationError{
+			field:  "Key",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Secret
+	if utf8.RuneCountInString(m.GetSecret()) < 1 {
+		err := AWSSessionTokenSecretValidationError{
+			field:  "Secret",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for SessionToken
+	if utf8.RuneCountInString(m.GetSessionToken()) < 1 {
+		err := AWSSessionTokenSecretValidationError{
+			field:  "SessionToken",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return AWSSessionTokenSecretMultiError(errors)
@@ -1094,9 +1121,27 @@ func (m *AWS) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Key
+	if utf8.RuneCountInString(m.GetKey()) < 1 {
+		err := AWSValidationError{
+			field:  "Key",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Secret
+	if utf8.RuneCountInString(m.GetSecret()) < 1 {
+		err := AWSValidationError{
+			field:  "Secret",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	// no validation rules for Region
 

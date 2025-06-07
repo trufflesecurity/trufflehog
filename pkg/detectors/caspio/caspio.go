@@ -4,21 +4,23 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"caspio"}) + `\b([a-z0-9]{50})\b`)
@@ -41,22 +43,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			for _, domainMatch := range domainMatches {
-				if len(domainMatch) != 2 {
-					continue
-				}
 
 				resDomainMatch := strings.TrimSpace(domainMatch[1])
 
@@ -68,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if verify {
 					payload := strings.NewReader(fmt.Sprintf(`grant_type=client_credentials&client_id=%s&client_secret=%s`, resIdMatch, resMatch))
-					req, err := http.NewRequest("POST", fmt.Sprintf("https://%s.caspio.com/oauth/token", resDomainMatch), payload)
+					req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://%s.caspio.com/oauth/token", resDomainMatch), payload)
 					if err != nil {
 						continue
 					}
@@ -78,11 +71,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						defer res.Body.Close()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
-						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}
@@ -97,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Caspio
+}
+
+func (s Scanner) Description() string {
+	return "Caspio is a cloud platform for building custom database applications. Caspio credentials can be used to access and manage these applications."
 }

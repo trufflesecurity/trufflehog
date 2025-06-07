@@ -3,11 +3,11 @@ package couchbase
 import (
 	"context"
 	"fmt"
-	"log"
-	"regexp"
 	"strings"
 	"time"
 	"unicode"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/couchbase/gocb/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -15,7 +15,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -26,7 +28,7 @@ var (
 	connectionStringPat = regexp.MustCompile(`\bcb\.[a-z0-9]+\.cloud\.couchbase\.com\b`)
 	usernamePat         = `?()/\+=\s\n`
 	passwordPat         = `^<>;.*&|£\n\s`
-	//passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
+	// passwordPat         = regexp.MustCompile(`(?i)(?:pass|pwd)(?:.|[\n\r]){0,15}(\b[^<>;.*&|£\n\s]{8,100}$)`)
 	// passwordPat = regexp.MustCompile(`(?im)(?:pass|pwd)\S{0,40}?[:=\s]{1,3}[ '"=]{0,1}([^:?()/\+=\s\n]{4,40})\b`)
 )
 
@@ -107,7 +109,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// when accessing Capella from a different Wide Area Network
 					// or Availability Zone (e.g. your laptop).
 					if err := options.ApplyProfile(gocb.ClusterConfigProfileWanDevelopment); err != nil {
-						log.Fatal("apply profile err", err)
+						continue
 					}
 
 					// Initialize the Connection
@@ -130,11 +132,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							if pingEndpoint.State == gocb.PingStateOk {
 								s1.Verified = true
 								break
-							} else {
-								// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-								if detectors.IsKnownFalsePositive(resPasswordMatch, detectors.DefaultFalsePositives, true) {
-									continue
-								}
 							}
 						}
 					}
@@ -149,4 +146,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Couchbase
+}
+
+func (s Scanner) Description() string {
+	return "Couchbase is a distributed NoSQL cloud database. Couchbase credentials can be used to access and modify data within the Couchbase database."
 }

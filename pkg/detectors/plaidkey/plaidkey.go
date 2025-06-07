@@ -2,16 +2,20 @@ package plaidkey
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -20,8 +24,9 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-z0-9]{30})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-z0-9]{24})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-f0-9]{30})\b`)
+	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b([a-f0-9]{24})\b`)
+	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"plaid"}) + `\b(access-(sandbox|production)-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,56 +39,99 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	// find all the matching keys and ids in the data and make a unique maps for both.
+	uniqueSecrets, uniqueIds, uniqueTokens := make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
 
-	for _, match := range matches {
-		if len(match) != 2 {
+	for _, foundKey := range secretPat.FindAllStringSubmatch(dataStr, -1) {
+		key := foundKey[1]
+		if detectors.StringShannonEntropy(key) < 3 {
 			continue
 		}
-		resMatch := strings.TrimSpace(match[1])
 
-		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
-			idresMatch := strings.TrimSpace(idMatch[1])
+		uniqueSecrets[key] = struct{}{}
+	}
 
-			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_PlaidKey,
-				Raw:          []byte(resMatch),
-			}
+	for _, foundId := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		id := foundId[1]
+		if detectors.StringShannonEntropy(id) < 3 {
+			continue
+		}
 
-			if verify {
-				payload := strings.NewReader(`{"client_id":"` + idresMatch + `","secret":"` + resMatch + `","user":{"client_user_id":"60e3ee4019a2660010f8bc54","phone_number_verified_time":"0001-01-01T00:00:00Z","email_address_verified_time":"0001-01-01T00:00:00Z"},"client_name":"Plaid Test App","products":["auth","transactions"],"country_codes":["US"],"webhook":"https://webhook-uri.com","account_filters":{"depository":{"account_subtypes":["checking","savings"]}},"language":"en","link_customization_name":"default"}`)
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://development.plaid.com/link/token/create", payload)
-				if err != nil {
-					continue
+		uniqueIds[id] = struct{}{}
+	}
+
+	for _, foundToken := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
+		token := foundToken[1]
+		if detectors.StringShannonEntropy(token) < 3 {
+			continue
+		}
+
+		uniqueTokens[token] = struct{}{}
+	}
+
+	for secret := range uniqueSecrets {
+		for id := range uniqueIds {
+			for token := range uniqueTokens {
+				s1 := detectors.Result{
+					DetectorType: detectorspb.DetectorType_PlaidKey,
+					Raw:          []byte(secret),
+					RawV2:        []byte(fmt.Sprintf(`%s:%s:%s`, secret, id, token)),
 				}
-				req.Header.Add("Content-Type", "application/json")
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
+
+				if verify {
+					environment := "sandbox"
+					if strings.Contains(token, "production") {
+						environment = "production"
+					}
+					isVerified, _, verificationErr := verifyMatch(ctx, client, id, secret, token, environment)
+					s1.Verified = isVerified
+					s1.ExtraData = map[string]string{"environment": fmt.Sprintf("https://%s.plaid.com", environment)}
+					s1.SetVerificationError(verificationErr, id, secret)
+					if s1.Verified {
+						s1.AnalysisInfo = map[string]string{
+							"secret": secret,
+							"id":     id,
+							"token":  token,
 						}
 					}
 				}
+				results = append(results, s1)
 			}
-
-			results = append(results, s1)
-
 		}
-
 	}
 
-	return results, nil
+	return
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, id string, secret string, token string, env string) (bool, map[string]string, error) {
+	payload := strings.NewReader(`{"client_id":"` + id + `","secret":"` + secret + `","access_token":"` + token + `"}`)
+	url := "https://" + env + ".plaid.com/item/get"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, payload)
+	if err != nil {
+		return false, nil, nil
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	defer res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil, nil
+	case http.StatusBadRequest:
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PlaidKey
+}
+
+func (s Scanner) Description() string {
+	return "Plaid is a financial services company that provides a way to connect applications to users' bank accounts. Plaid API keys can be used to access and manage financial data."
 }

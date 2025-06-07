@@ -13,7 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -60,11 +63,12 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 		verify bool
 	}
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name                string
+		s                   Scanner
+		args                args
+		want                []detectors.Result
+		wantErr             bool
+		wantVerificationErr bool
 	}{
 		{
 			name: "found with URI and separate user+password usage, verified",
@@ -153,6 +157,119 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "inaccessible host",
+			s:    Scanner{},
+			args: args{
+				ctx: context.Background(),
+				data: []byte(`
+		ldap://badhost:1389
+		binddn="cn=admin,dc=example,dc=org"
+		pass="P@55w0rd"`),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_LDAP,
+					Verified:     false,
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
+		},
+		{
+			name: "not found",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("You cannot find the secret within"),
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Scanner{}
+			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Ldap.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for i := range got {
+				if len(got[i].Raw) == 0 {
+					t.Fatalf("no raw secret present: \n %+v", got[i])
+				}
+				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
+				}
+			}
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+				t.Errorf("Ldap.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
+var containerID string
+
+func startOpenLDAP() error {
+	cmd := exec.Command(
+		"docker", "run", "--rm", "-p", "1389:1389",
+		"-e", "LDAP_ROOT=dc=example,dc=org",
+		"-e", "LDAP_ADMIN_USERNAME=admin",
+		"-e", "LDAP_ADMIN_PASSWORD=P@55w0rd",
+		"-d", "bitnami/openldap:latest",
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+	containerID = string(bytes.TrimSpace(out))
+	select {
+	case <-dockerLogLine(containerID, "slapd starting"):
+		return nil
+	case <-time.After(30 * time.Second):
+		stopOpenLDAP()
+		return errors.New("timeout waiting for ldap service to be ready")
+	}
+}
+
+func stopOpenLDAP() {
+	exec.Command("docker", "kill", containerID).Run()
+}
+
+func TestLdap_FromChunk(t *testing.T) {
+	type args struct {
+		ctx    context.Context
+		data   []byte
+		verify bool
+	}
+	tests := []struct {
+		name    string
+		s       Scanner
+		args    args
+		want    []detectors.Result
+		wantErr bool
+	}{
+		{
+			name: "found with IAD lib usage, unverified",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(`Set ou = dso.OpenDSObject("LDAP://DC.business.com/OU=IT,DC=Business,DC=com", "Business\administrator", "Pa$$word01", 1)`),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_LDAP,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "not found",
 			s:    Scanner{},
 			args: args{
@@ -185,30 +302,18 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 	}
 }
 
-var containerID string
-
-func startOpenLDAP() error {
-	cmd := exec.Command(
-		"docker", "run", "--rm", "-p", "1389:1389",
-		"-e", "LDAP_ROOT=dc=example,dc=org",
-		"-e", "LDAP_ADMIN_USERNAME=admin",
-		"-e", "LDAP_ADMIN_PASSWORD=P@55w0rd",
-		"-d", "bitnami/openldap:latest",
-	)
-	out, err := cmd.Output()
-	if err != nil {
-		return err
+func BenchmarkFromData(benchmark *testing.B) {
+	ctx := context.Background()
+	s := Scanner{}
+	for name, data := range detectors.MustGetBenchmarkData() {
+		benchmark.Run(name, func(b *testing.B) {
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				_, err := s.FromData(ctx, false, data)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
-	containerID = string(bytes.TrimSpace(out))
-	select {
-	case <-dockerLogLine(containerID, "slapd starting"):
-		return nil
-	case <-time.After(30 * time.Second):
-		stopOpenLDAP()
-		return errors.New("timeout waiting for postgres database to be ready")
-	}
-}
-
-func stopOpenLDAP() {
-	exec.Command("docker", "kill", containerID).Run()
 }

@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
-	_ "github.com/lib/pq"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+
+	"github.com/lib/pq"
 )
 
 type postgresJDBC struct {
@@ -14,37 +17,34 @@ type postgresJDBC struct {
 	params map[string]string
 }
 
-func (s *postgresJDBC) ping(ctx context.Context) bool {
-	// try the provided connection string directly
-	if ping(ctx, "postgres", s.conn) {
-		return true
-	}
-	// try as a URL
-	if ping(ctx, "postgres", "postgres://"+s.conn) {
-		return true
-	}
-	// build a connection string
-	data := map[string]string{
-		// default user
-		"user": "postgres",
-	}
-	for key, val := range s.params {
-		if key == "host" {
-			if h, p, found := strings.Cut(val, ":"); found {
-				data["host"] = h
-				data["port"] = p
-				continue
-			}
+func (s *postgresJDBC) ping(ctx context.Context) pingResult {
+	// It is crucial that we try to build a connection string ourselves before using the one we found. This is because
+	// if the found connection string doesn't include a username, the driver will attempt to connect using the current
+	// user's name, which will fail in a way that looks like a determinate failure, thus terminating the waterfall. In
+	// contrast, when we build a connection string ourselves, if there's no username, we try 'postgres' instead, which
+	// actually has a chance of working.
+	return ping(ctx, "postgres", isPostgresErrorDeterminate,
+		buildPostgresConnectionString(s.params, true),
+		buildPostgresConnectionString(s.params, false),
+	)
+}
+
+func isPostgresErrorDeterminate(err error) bool {
+	// Postgres codes from https://www.postgresql.org/docs/current/errcodes-appendix.html
+	if pqErr, isPostgresError := err.(*pq.Error); isPostgresError {
+		switch pqErr.Code {
+		case "28P01":
+			// Invalid username/password
+			return true
+		case "3D000":
+			// Unknown database
+			return false // "Indeterminate" so that other connection variations will be tried
+		case "3F000":
+			// Unknown schema
+			return false // "Indeterminate" so that other connection variations will be tried
 		}
-		data[key] = val
 	}
-	if ping(ctx, "postgres", joinKeyValues(data, " ")) {
-		return true
-	}
-	if s.params["dbname"] != "" {
-		delete(s.params, "dbname")
-		return s.ping(ctx)
-	}
+
 	return false
 }
 
@@ -59,23 +59,78 @@ func joinKeyValues(m map[string]string, sep string) string {
 	return strings.Join(data, sep)
 }
 
-func parsePostgres(subname string) (jdbc, error) {
-	// expected form: //HOST/DB?key=value&key=value
-	hostAndDB, paramString, _ := strings.Cut(subname, "?")
-	if !strings.HasPrefix(hostAndDB, "//") {
+func parsePostgres(_ logContext.Context, subname string) (jdbc, error) {
+	// expected form: [subprotocol:]//[user:password@]HOST[/DB][?key=val[&key=val]]
+
+	if !strings.HasPrefix(subname, "//") {
 		return nil, errors.New("expected host to start with //")
 	}
-	hostAndDB = strings.TrimPrefix(hostAndDB, "//")
-	host, database, _ := strings.Cut(hostAndDB, "/")
+
+	u, err := url.Parse(subname)
+	if err != nil {
+		return nil, err
+	}
+
+	dbName := strings.TrimPrefix(u.Path, "/")
+	if dbName == "" {
+		dbName = "postgres"
+	}
 
 	params := map[string]string{
-		"host":   host,
-		"dbname": database,
+		"host":            u.Host,
+		"dbname":          dbName,
+		"connect_timeout": "5",
 	}
-	for _, param := range strings.Split(paramString, "&") {
-		key, val, _ := strings.Cut(param, "=")
-		params[key] = val
+
+	if u.User != nil {
+		params["user"] = u.User.Username()
+		pass, set := u.User.Password()
+		if set {
+			params["password"] = pass
+		}
+	}
+
+	if v := u.Query()["sslmode"]; len(v) > 0 {
+		switch v[0] {
+		// https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
+		case "disable", "allow", "prefer",
+			"require", "verify-ca", "verify-full":
+			params["sslmode"] = v[0]
+		}
+	}
+
+	if v := u.Query().Get("user"); v != "" {
+		params["user"] = v
+	}
+
+	if v := u.Query().Get("password"); v != "" {
+		params["password"] = v
 	}
 
 	return &postgresJDBC{subname[2:], params}, nil
+}
+
+func buildPostgresConnectionString(params map[string]string, includeDbName bool) string {
+	data := map[string]string{
+		// default user
+		"user": "postgres",
+	}
+	for key, val := range params {
+		if key == "host" {
+			if h, p, found := strings.Cut(val, ":"); found {
+				data["host"] = h
+				data["port"] = p
+				continue
+			}
+		}
+		data[key] = val
+	}
+
+	if !includeDbName {
+		data["dbname"] = "postgres"
+	}
+
+	connStr := joinKeyValues(data, " ")
+
+	return connStr
 }

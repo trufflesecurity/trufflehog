@@ -10,16 +10,16 @@ import (
 	"sync"
 
 	"cloud.google.com/go/storage"
-	diskbufferreader "github.com/bill-rich/disk-buffer-reader"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -28,7 +28,11 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
-const defaultCachePersistIncrement = 2500
+const (
+	SourceType = sourcespb.SourceType_SOURCE_TYPE_GCS
+
+	defaultCachePersistIncrement = 2500
+)
 
 // Ensure the Source satisfies the interfaces at compile time.
 var _ sources.Source = (*Source)(nil)
@@ -37,16 +41,16 @@ var _ sources.SourceUnitUnmarshaller = (*Source)(nil)
 // Type returns the type of source.
 // It is used for matching source types in configuration and job input.
 func (s *Source) Type() sourcespb.SourceType {
-	return sourcespb.SourceType_SOURCE_TYPE_GCS
+	return SourceType
 }
 
 // SourceID number for GCS Source.
-func (s *Source) SourceID() int64 {
+func (s *Source) SourceID() sources.SourceID {
 	return s.sourceId
 }
 
 // JobID number for GCS Source.
-func (s *Source) JobID() int64 {
+func (s *Source) JobID() sources.JobID {
 	return s.jobId
 }
 
@@ -58,8 +62,8 @@ type objectManager interface {
 // Source represents a GCS source.
 type Source struct {
 	name        string
-	jobId       int64
-	sourceId    int64
+	jobId       sources.JobID
+	sourceId    sources.SourceID
 	concurrency int
 	verify      bool
 
@@ -78,11 +82,11 @@ type Source struct {
 // at given increments.
 type persistableCache struct {
 	persistIncrement int
-	cache.Cache
+	cache.Cache[string]
 	*sources.Progress
 }
 
-func newPersistableCache(increment int, cache cache.Cache, p *sources.Progress) *persistableCache {
+func newPersistableCache(increment int, cache cache.Cache[string], p *sources.Progress) *persistableCache {
 	return &persistableCache{
 		persistIncrement: increment,
 		Cache:            cache,
@@ -92,7 +96,7 @@ func newPersistableCache(increment int, cache cache.Cache, p *sources.Progress) 
 
 // Set overrides the cache Set method of the cache to enable the persistence
 // of the cache contents the Progress of the source at given increments.
-func (c *persistableCache) Set(key, val string) {
+func (c *persistableCache) Set(key string, val string) {
 	c.Cache.Set(key, val)
 	if ok, contents := c.shouldPersist(); ok {
 		c.Progress.EncodedResumeInfo = contents
@@ -107,7 +111,7 @@ func (c *persistableCache) shouldPersist() (bool, string) {
 }
 
 // Init returns an initialized GCS source.
-func (s *Source) Init(aCtx context.Context, name string, id int64, sourceID int64, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(aCtx context.Context, name string, id sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	s.log = aCtx.Logger()
 
 	s.name = name
@@ -146,6 +150,7 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 	switch conn.Credential.(type) {
 	case *sourcespb.GCS_ApiKey:
 		gcsManagerAuthOption = withAPIKey(aCtx, conn.GetApiKey())
+		log.RedactGlobally(conn.GetApiKey())
 	case *sourcespb.GCS_ServiceAccountFile:
 		b, err := os.ReadFile(conn.GetServiceAccountFile())
 		if err != nil {
@@ -248,7 +253,7 @@ func (s *Source) enumerate(ctx context.Context) error {
 }
 
 // Chunks emits chunks of bytes over a channel.
-func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) error {
+func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	persistableCache := s.setupCache(ctx)
 
 	objectCh, err := s.gcsManager.ListObjects(ctx)
@@ -260,7 +265,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 
 	var wg sync.WaitGroup
 	for obj := range objectCh {
-		obj := obj
 		o, ok := obj.(object)
 		if !ok {
 			ctx.Logger().Error(fmt.Errorf("unexpected object type: %T", obj), "GCS source unexpected object type", "name", s.name)
@@ -290,11 +294,18 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk) err
 }
 
 func (s *Source) setupCache(ctx context.Context) *persistableCache {
-	var c cache.Cache
+	var c cache.Cache[string]
 	if s.Progress.EncodedResumeInfo != "" {
-		c = memory.NewWithData(ctx, strings.Split(s.Progress.EncodedResumeInfo, ","))
+		keys := strings.Split(s.Progress.EncodedResumeInfo, ",")
+		entries := make([]simple.CacheEntry[string], len(keys))
+		for i, val := range keys {
+			entries[i] = simple.CacheEntry[string]{Key: val, Value: val}
+		}
+
+		c = simple.NewCacheWithData[string](entries)
+		ctx.Logger().V(3).Info("Loaded cache", "num_entries", len(entries))
 	} else {
-		c = memory.New()
+		c = simple.NewCache[string]()
 	}
 
 	// TODO (ahrav): Make this configurable via conn.
@@ -302,7 +313,7 @@ func (s *Source) setupCache(ctx context.Context) *persistableCache {
 	return persistCache
 }
 
-func (s *Source) setProgress(ctx context.Context, md5, objName string, cache cache.Cache) {
+func (s *Source) setProgress(ctx context.Context, md5, objName string, cache cache.Cache[string]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -324,6 +335,7 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 	chunkSkel := &sources.Chunk{
 		SourceName: s.name,
 		SourceType: s.Type(),
+		JobID:      s.JobID(),
 		SourceID:   s.sourceId,
 		Verify:     s.verify,
 		SourceMetadata: &source_metadatapb.MetaData{
@@ -342,48 +354,5 @@ func (s *Source) processObject(ctx context.Context, o object) error {
 		},
 	}
 
-	data, err := s.readObjectData(ctx, o, chunkSkel)
-	if err != nil {
-		return fmt.Errorf("error reading object data: %w", err)
-	}
-
-	// If data is nil, it means that the file was handled by a handler.
-	if data == nil {
-		return nil
-	}
-
-	chunkSkel.Data = data
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case s.chunksCh <- chunkSkel:
-	}
-
-	return nil
-}
-
-func (s *Source) readObjectData(ctx context.Context, o object, chunk *sources.Chunk) ([]byte, error) {
-	reader, err := diskbufferreader.New(o)
-	if err != nil {
-		return nil, fmt.Errorf("error creating disk buffer reader: %w", err)
-	}
-	defer reader.Close()
-
-	if handlers.HandleFile(ctx, reader, chunk, s.chunksCh) {
-		ctx.Logger().V(3).Info("File was handled", "name", s.name, "bucket", o.bucket, "object", o.name)
-		return nil, nil
-	}
-
-	if err := reader.Reset(); err != nil {
-		return nil, fmt.Errorf("error resetting reader: %w", err)
-	}
-
-	reader.Stop()
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("error reading object: %w", err)
-	}
-
-	return data, nil
+	return handlers.HandleFile(ctx, io.NopCloser(o), chunkSkel, sources.ChanReporter{Ch: s.chunksCh})
 }

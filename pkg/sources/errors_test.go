@@ -1,11 +1,13 @@
 package sources
 
 import (
+	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 	"testing"
 )
+
+var testError = fmt.Errorf("simulated failure")
 
 func TestNewScanErrors(t *testing.T) {
 	testCases := []struct {
@@ -40,7 +42,7 @@ func TestNewScanErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := NewScanErrors()
 
-			if !reflect.DeepEqual(got, tc.want) {
+			if !errors.Is(got.Errors(), tc.want.Errors()) {
 				t.Errorf("got %+v, want %+v", got, tc.want)
 			}
 		})
@@ -84,7 +86,7 @@ func TestScanErrorsAdd(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					for j := 0; j < tc.wantErr/tc.concurrency; j++ {
-						se.Add(nil)
+						se.Add(testError)
 					}
 					wg.Done()
 				}()
@@ -135,7 +137,7 @@ func TestScanErrorsCount(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					for j := 0; j < tc.wantErrCnt/tc.concurrency; j++ {
-						se.Add(nil)
+						se.Add(testError)
 					}
 					wg.Done()
 				}()
@@ -151,8 +153,8 @@ func TestScanErrorsCount(t *testing.T) {
 
 func TestScanErrorsString(t *testing.T) {
 	se := NewScanErrors()
-	se.Add(nil)
-	want := "[<nil>]"
+	se.Add(testError)
+	want := `["` + testError.Error() + `"]`
 	if got := fmt.Sprintf("%v", se); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

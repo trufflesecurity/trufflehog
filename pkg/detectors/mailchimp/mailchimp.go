@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -33,14 +34,17 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	//pretty standard regex match
+	// pretty standard regex match
 	matches := keyPat.FindAllString(dataStr, -1)
 
 	for _, match := range matches {
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Mailchimp,
 			Raw:          []byte(match),
+		}
+		result.ExtraData = map[string]string{
+			"rotation_guide": "https://howtorotate.com/docs/tutorials/mailchimp/",
 		}
 
 		if verify {
@@ -57,17 +61,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(match, detectors.DefaultFalsePositives, true) {
-						continue
-					}
+					result.Verified = true
 				}
+			}
+			result.AnalysisInfo = map[string]string{
+				"key": match,
 			}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return results, nil
@@ -75,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Mailchimp
+}
+
+func (s Scanner) Description() string {
+	return "Mailchimp is a marketing automation platform and email marketing service. Mailchimp API keys can be used to access and manage email campaigns, audience data, and other marketing resources."
 }

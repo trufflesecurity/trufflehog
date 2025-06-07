@@ -2,24 +2,34 @@ package braintreepayments
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+	client     *http.Client
+	useTestURL bool
+}
 
 // Ensure the Scanner satisfies the interface at compile time
 var _ detectors.Detector = (*Scanner)(nil)
 
-var (
-	client = common.SaneHttpClient()
+const (
+	verifyURL     = "https://payments.braintree-api.com/graphql"
+	verifyTestURL = "https://payments.sandbox.braintree-api.com/graphql"
+)
 
+var (
+	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"braintree"}) + `\b([0-9a-f]{32})\b`)
 	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"braintree"}) + `\b([0-9a-z]{16})\b`)
@@ -39,16 +49,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
-
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
@@ -57,34 +60,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				payload := strings.NewReader(`{"query": "query { ping }"}`)
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://payments.braintree-api.com/graphql", payload)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("Braintree-Version", "2019-01-01")
-				req.SetBasicAuth(resIdMatch, resMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-
-					bodyString := string(bodyBytes)
-					validResponse := strings.Contains(bodyString, `"data":{`)
-
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
-						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
-					}
-				}
+				client := s.getClient()
+				url := s.getBraintreeURL()
+				isVerified, verificationErr := verifyBraintree(ctx, client, url, resIdMatch, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
 			results = append(results, s1)
@@ -94,6 +74,60 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func (s Scanner) getBraintreeURL() string {
+	if s.useTestURL {
+		return verifyTestURL
+	}
+	return verifyURL
+}
+
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
+func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, privKey string) (bool, error) {
+	payload := strings.NewReader(`{"query": "query { ping }"}`)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, payload)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Braintree-Version", "2019-01-01")
+	req.SetBasicAuth(pubKey, privKey)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	bodyString := string(bodyBytes)
+	if !(res.StatusCode == http.StatusOK) {
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
+
+	validResponse := `"data":{`
+	if strings.Contains(bodyString, validResponse) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BraintreePayments
+}
+
+func (s Scanner) Description() string {
+	return "Braintree is a full-stack payment platform that makes it easy to accept payments in your mobile app or website. Braintree API keys can be used to access and manage payment transactions, customer data, and other payment-related operations."
 }

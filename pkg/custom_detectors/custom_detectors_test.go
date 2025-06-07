@@ -105,7 +105,7 @@ func TestCustomDetectorsParsing(t *testing.T) {
 }
 
 func TestFromData_InvalidRegEx(t *testing.T) {
-	c := &customRegexWebhook{
+	c := &CustomRegexWebhook{
 		&custom_detectorspb.CustomRegex{
 			Name:     "Internal bi tool",
 			Keywords: []string{"secret_v1_", "pat_v2_"},
@@ -199,13 +199,32 @@ func TestDetector(t *testing.T) {
 		// "password" is normally flagged as a false positive, but CustomRegex
 		// should allow the user to decide and report it as a result.
 		Keywords: []string{"password"},
-		Regex:    map[string]string{"regex": "password=.*"},
+		Regex:    map[string]string{"regex": "password=\"(.*)\""},
 	})
 	assert.NoError(t, err)
 	results, err := detector.FromData(context.Background(), false, []byte(`password="123456"`))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
-	assert.Equal(t, results[0].Raw, []byte(`password="123456"`))
+	assert.Equal(t, results[0].Raw, []byte(`123456`))
+}
+
+func TestDetectorPrimarySecret(t *testing.T) {
+	detector, err := NewWebhookCustomRegex(&custom_detectorspb.CustomRegex{
+		Name:             "test",
+		Keywords:         []string{"secret"},
+		Regex:            map[string]string{"id": "id_[A-Z0-9]{10}_yy", "secret": "secret_[A-Z0-9]{10}_yy"},
+		PrimaryRegexName: "secret",
+	})
+	assert.NoError(t, err)
+	results, err := detector.FromData(context.Background(), false, []byte(`
+	// getData returns id and secret
+	func getData()(string, string){
+    	return "id_ALPHA10100_yy", "secret_YI7C90ACY1_yy"
+	}
+	`))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, "secret_YI7C90ACY1_yy", results[0].GetPrimarySecretValue())
 }
 
 func BenchmarkProductIndices(b *testing.B) {

@@ -1,181 +1,15 @@
 package gitlab
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
-
-func TestSource_Scan(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	secret, err := common.GetTestSecret(ctx)
-	if err != nil {
-		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
-	}
-	token := secret.MustGetField("GITLAB_TOKEN")
-	basicUser := secret.MustGetField("GITLAB_USER")
-	basicPass := secret.MustGetField("GITLAB_PASS")
-
-	type init struct {
-		name       string
-		verify     bool
-		connection *sourcespb.GitLab
-	}
-	tests := []struct {
-		name             string
-		init             init
-		wantChunk        *sources.Chunk
-		wantReposScanned int
-		wantErr          bool
-	}{
-		{
-			name: "token auth, enumerate repo, with explicit ignore",
-			init: init{
-				name: "test source",
-				connection: &sourcespb.GitLab{
-					Credential: &sourcespb.GitLab_Token{
-						Token: token,
-					},
-					IgnoreRepos: []string{"tes1188/learn-gitlab"},
-				},
-			},
-			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
-				SourceName: "test source",
-			},
-			wantReposScanned: 2,
-		},
-		{
-			name: "token auth, enumerate repo, with glob ignore",
-			init: init{
-				name: "test source",
-				connection: &sourcespb.GitLab{
-					Credential: &sourcespb.GitLab_Token{
-						Token: token,
-					},
-					IgnoreRepos: []string{"tes1188/*-gitlab"},
-				},
-			},
-			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
-				SourceName: "test source",
-			},
-			wantReposScanned: 2,
-		},
-		{
-			name: "token auth, scoped repo",
-			init: init{
-				name: "test source scoped",
-				connection: &sourcespb.GitLab{
-					Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
-					Credential: &sourcespb.GitLab_Token{
-						Token: token,
-					},
-				},
-			},
-			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
-				SourceName: "test source scoped",
-			},
-			wantReposScanned: 1,
-		},
-		{
-			name: "basic auth, scoped repo",
-			init: init{
-				name: "test source basic auth scoped",
-				connection: &sourcespb.GitLab{
-					Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
-					Credential: &sourcespb.GitLab_BasicAuth{
-						BasicAuth: &credentialspb.BasicAuth{
-							Username: basicUser,
-							Password: basicPass,
-						},
-					},
-				},
-			},
-			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
-				SourceName: "test source basic auth scoped",
-			},
-			wantReposScanned: 1,
-		},
-		{
-			name: "basic auth access token, scoped repo",
-			init: init{
-				name: "test source basic auth access token scoped",
-				connection: &sourcespb.GitLab{
-					Repositories: []string{"https://gitlab.com/testermctestface/testy.git"},
-					Credential: &sourcespb.GitLab_BasicAuth{
-						BasicAuth: &credentialspb.BasicAuth{
-							Username: basicUser,
-							Password: token,
-						},
-					},
-				},
-			},
-			wantChunk: &sources.Chunk{
-				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
-				SourceName: "test source basic auth access token scoped",
-			},
-			wantReposScanned: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Source{}
-
-			conn, err := anypb.New(tt.init.connection)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 10)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Source.Init() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			chunksCh := make(chan *sources.Chunk, 1)
-			go func() {
-				defer close(chunksCh)
-				err = s.Chunks(ctx, chunksCh)
-				if (err != nil) != tt.wantErr {
-					t.Errorf("Source.Chunks() error = %v, wantErr %v", err, tt.wantErr)
-					return
-				}
-			}()
-			var chunkCnt int
-			// Commits don't come in a deterministic order, so remove metadata comparison
-			for gotChunk := range chunksCh {
-				chunkCnt++
-				gotChunk.Data = nil
-				gotChunk.SourceMetadata = nil
-				if diff := pretty.Compare(gotChunk, tt.wantChunk); diff != "" {
-					t.Errorf("Source.Chunks() %s diff: (-got +want)\n%s", tt.name, diff)
-				}
-			}
-
-			assert.Equal(t, tt.wantReposScanned, len(s.repos))
-			if chunkCnt < 1 {
-				t.Errorf("0 chunks scanned.")
-			}
-		})
-	}
-}
 
 func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 	tests := []struct {
@@ -296,6 +130,60 @@ func Test_scanRepos_SetProgressComplete(t *testing.T) {
 			if gotComplete != tc.wantComplete {
 				t.Errorf("got: %v, want: %v", gotComplete, tc.wantComplete)
 			}
+		})
+	}
+}
+
+func Test_normalizeGitlabEndpoint(t *testing.T) {
+	testCases := map[string]struct {
+		inputEndpoint  string
+		outputEndpoint string
+		wantErr        bool
+	}{
+		"the cloud url should return the cloud url": {
+			inputEndpoint:  gitlabBaseURL,
+			outputEndpoint: gitlabBaseURL,
+		},
+		"empty string should return the cloud url": {
+			inputEndpoint:  "",
+			outputEndpoint: gitlabBaseURL,
+		},
+		"no scheme cloud url should return the cloud url": {
+			inputEndpoint:  "gitlab.com",
+			outputEndpoint: gitlabBaseURL,
+		},
+		"no scheme cloud url with trailing slash should return the cloud url": {
+			inputEndpoint:  "gitlab.com/",
+			outputEndpoint: gitlabBaseURL,
+		},
+		"http scheme cloud url with organization should return the cloud url": {
+			inputEndpoint:  "http://gitlab.com/trufflesec",
+			outputEndpoint: gitlabBaseURL,
+		},
+		// On-prem endpoint testing.
+		"on-prem url should be unchanged": {
+			inputEndpoint:  "https://gitlab.trufflesec.com/",
+			outputEndpoint: "https://gitlab.trufflesec.com/",
+		},
+		"on-prem url without trailing slash should have trailing slash added": {
+			inputEndpoint:  "https://gitlab.trufflesec.com",
+			outputEndpoint: "https://gitlab.trufflesec.com/",
+		},
+		"on-prem url with http scheme should return an error": {
+			inputEndpoint: "http://gitlab.trufflesec.com/",
+			wantErr:       true,
+		},
+		"on-prem with gitlab.com should not rewrite to the cloud url": {
+			inputEndpoint:  "https://gitlab.com.trufflesec.com/",
+			outputEndpoint: "https://gitlab.com.trufflesec.com/",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			output, err := normalizeGitlabEndpoint(tc.inputEndpoint)
+			assert.Equal(t, tc.outputEndpoint, output)
+			assert.Equal(t, tc.wantErr, err != nil)
 		})
 	}
 }

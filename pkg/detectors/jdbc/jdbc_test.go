@@ -1,6 +1,3 @@
-//go:build detectors
-// +build detectors
-
 package jdbc
 
 import (
@@ -8,149 +5,129 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestJdbc_FromChunk(t *testing.T) {
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestJdbc_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name    string
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, unverified",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(`jdbc connection string: jdbc:mysql://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=testpassword <-`),
-				verify: false,
+			// examples from: https://github.com/trufflesecurity/trufflehog/issues/3704
+			name: "valid patterns",
+			input: `
+				<?xml version="1.0" encoding="UTF-8"?>
+					<project version="4">
+						<component name="DataSourceManagerImpl" format="xml" multifile-model="true">
+							<data-source source="LOCAL" name="PostgreSQL - postgres@localhost" uuid="18f0f64d-b804-471d-9351-e98a67c8389f">
+							<driver-ref>postgresql</driver-ref>
+							<synchronize>true</synchronize>
+							<jdbc-driver>org.postgresql.Driver</jdbc-driver>
+							<jdbc-url>jdbc:postgresql://localhost:5432/postgres</jdbc-url>
+							<jdbc-url>jdbc:sqlserver:</jdbc-url>
+							<jdbc-url>jdbc:postgresql://#{uri.host}#{uri.path}?user=#{uri.user}</jdbc-url>
+							<jdbc-url>postgresql://postgres:postgres@<your-connection-ip-address>:5432</jdbc-url>
+							<jdbc-url>jdbc:mysql:localhost:3306/mydatabase</jdbc-url>
+							<jdbc-url>jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false</jdbc-url>
+							<jdbc-url>jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks</jdbc-url>
+							<working-dir>$ProjectFileDir$</working-dir>
+							</data-source>
+						</component>
+					</project>
+			`,
+			want: []string{
+				"jdbc:postgresql://localhost:5432/postgres",
+				"jdbc:mysql:localhost:3306/mydatabase",
+				"jdbc:sqlserver://x.x.x.x:1433;databaseName=MY-DB;user=MY-USER;password=MY-PASSWORD;encrypt=false",
+				"jdbc:sqlserver://localhost:1433;databaseName=AdventureWorks",
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JDBC,
-					Verified:     false,
-					Redacted:     "jdbc:mysql://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
-				},
-			},
-			wantErr: false,
 		},
 		{
-			name: "found, unverified numeric password",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(`jdbc connection string: jdbc:postgresql://host:5342/testdb?password=123456 <-`),
-				verify: false,
-			},
-			want: []detectors.Result{
+			name: "valid pattern - true positives",
+			input: `
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
-					Verified:     false,
-					Redacted:     "jdbc:postgresql://host:5342/testdb?password=******",
-				},
+					"detector": "jdbc",
+					"potential_matches": [
+						"jdbc:postgresql://localhost:5432/mydb",
+						"jdbc:mysql://user:pass@host:3306/db?param=1",
+						"jdbc:sqlite:/data/test.db",
+						"jdbc:oracle:thin:@host:1521:db",
+						"jdbc:mysql://host:3306/db,other_param",
+						"jdbc:db2://host:50000/db?param=1"
+					]
+				}`,
+			want: []string{
+				"jdbc:postgresql://localhost:5432/mydb",
+				"jdbc:mysql://user:pass@host:3306/db?param=1",
+				"jdbc:sqlite:/data/test.db",
+				"jdbc:oracle:thin:@host:1521:db",
+				"jdbc:mysql://host:3306/db",
+				"jdbc:db2://host:50000/db?param=1",
 			},
-			wantErr: false,
 		},
 		{
-			name: "not found",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: false,
-			},
-			want:    nil,
-			wantErr: false,
-		},
-		{
-			name: "sqlite unverified",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("jdbc:sqlite::memory:"),
-				verify: true,
-			},
-			want: []detectors.Result{
+			name: "invalid pattern - false positives",
+			input: `
 				{
-					DetectorType: detectorspb.DetectorType_JDBC,
-					Verified:     false,
-					Redacted:     "jdbc:sqlite::memory:",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found double quoted string, unverified",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(`CONN="jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=testpassword"`),
-				verify: false,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JDBC,
-					Verified:     false,
-					Redacted:     "jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found single quoted string, unverified",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(`CONN='jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=testpassword'`),
-				verify: false,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JDBC,
-					Verified:     false,
-					Redacted:     "jdbc:postgres://hello.test.us-east-1.rds.amazonaws.com:3306/testdb?password=************",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "sqlserver, unverified",
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(`jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=super-secret-password`),
-				verify: false,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JDBC,
-					Verified:     false,
-					Redacted:     "jdbc:sqlserver://a.b.c.net;database=database-name;spring.datasource.password=*********************",
-				},
-			},
-			wantErr: false,
+					"detector": "jdbc",
+					"false_positives": [
+						"jdbc:xyz:short",
+						"somejdbc:mysql://host/db",
+						"jdbc:invalid_driver:test",
+						"jdbc:mysql://host/db>next",
+						"adjdbc:mysql://host/db",
+						"jdbc:my?ql:localhost:3306/my database"
+					]
+				}`,
+			want: []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Jdbc.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			if os.Getenv("FORCE_PASS_DIFF") == "true" {
+
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
-				got[i].Raw = nil
+				return
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Jdbc.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}
@@ -202,21 +179,6 @@ func TestJdbc_FromDataWithIgnorePattern(t *testing.T) {
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Jdbc.FromDataWithConfig() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
-
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
-				}
 			}
 		})
 	}

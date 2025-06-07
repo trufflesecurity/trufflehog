@@ -6,11 +6,7 @@ labels: bug, needs triage
 assignees: trufflesecurity/product-eng
 ---
 
-### Community Note
-
-* Please vote on this issue by adding a 👍 [reaction](https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/) to the original issue to help the community and maintainers prioritize this request
-* Please do not leave "+1" or other comments that do not add relevant new information or questions, they generate extra noise for issue followers and do not help prioritize the request
-* If you are interested in working on this issue or have submitted a pull request, please leave a comment
+Please review the [Community Note](https://github.com/trufflesecurity/trufflehog/blob/main/.github/community_note.md) before submitting
 
 ### TruffleHog Version
 <!--- Please run `trufflehog --version` to show the version. If you are not running the latest version, please upgrade because your issue may have already been fixed. --->
@@ -20,7 +16,7 @@ assignees: trufflesecurity/product-eng
 <!---
 Please provide a link to a GitHub Gist containing the complete debug output. Please do NOT paste the debug output in the issue; just paste a link to the Gist.
 
-To obtain the trace output, run trufflehog with the --trace flag.
+To obtain the trace output, run trufflehog with the --log-level=5 flag.
 --->
 
 ### Expected Behavior

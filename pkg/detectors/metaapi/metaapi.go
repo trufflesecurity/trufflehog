@@ -3,9 +3,9 @@ package metaapi
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -13,7 +13,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -40,15 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	spellMatches := spellPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, spellMatch := range spellMatches {
-		if len(spellMatch) != 2 {
-			continue
-		}
 		resSpellMatch := strings.TrimSpace(spellMatch[1])
 
 		for _, match := range matches {
-			if len(match) != 2 {
-				continue
-			}
 			resMatch := strings.TrimSpace(match[1])
 
 			s1 := detectors.Result{
@@ -57,7 +53,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequest("GET", fmt.Sprintf("https://api.meta-api.io/api/spells/%s/runSync", resSpellMatch), nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.meta-api.io/api/spells/%s/runSync", resSpellMatch), nil)
 				if err != nil {
 					continue
 				}
@@ -73,11 +69,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && strings.Contains(bodyStr, `"success":true`) {
 							s1.Verified = true
-						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}
@@ -92,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MetaAPI
+}
+
+func (s Scanner) Description() string {
+	return "Detects MetaAPI credentials, which are typically API keys used for accessing the MetaAPI service."
 }

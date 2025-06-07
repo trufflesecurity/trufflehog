@@ -6,26 +6,47 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-github/v42/github"
+	"github.com/google/go-github/v67/github"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
+
+func createPrivateKey() string {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+
+	data := x509.MarshalPKCS1PrivateKey(key)
+	var pemKey bytes.Buffer
+	if err := pem.Encode(&pemKey, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: data,
+	}); err != nil {
+		panic(err)
+	}
+	return pemKey.String()
+}
 
 func createTestSource(src *sourcespb.GitHub) (*Source, *anypb.Any) {
 	s := &Source{}
@@ -41,8 +62,10 @@ func initTestSource(src *sourcespb.GitHub) *Source {
 	if err := s.Init(context.Background(), "test - github", 0, 1337, false, conn, 1); err != nil {
 		panic(err)
 	}
-	s.apiClient = github.NewClient(s.httpClient)
-	gock.InterceptClient(s.httpClient)
+	gock.InterceptClient(s.connector.APIClient().Client())
+	if appConnector, ok := s.connector.(*appConnector); ok {
+		gock.InterceptClient(appConnector.InstallationClient().Client())
+	}
 	return s
 }
 
@@ -75,15 +98,16 @@ func TestAddReposByOrg(t *testing.T) {
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IncludeRepos: nil,
-		IgnoreRepos:  []string{"secret/super-*-repo2"},
+		Repositories:          nil,
+		IgnoreRepos:           []string{"secret/super-*-repo2"},
+		CommentsTimeframeDays: 10,
 	})
-	// gock works here because github.NewClient is using the default HTTP Transport
-	err := s.getReposByOrg(context.Background(), "super-secret-org")
+	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("super-secret-repo")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -93,27 +117,27 @@ func TestAddReposByOrg_IncludeRepos(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
-		JSON([]map[string]string{
-			{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "secret/super-secret-repo"},
-			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
-			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/not-super-secret-repo"},
-		})
+		JSON(`[
+			{"full_name": "super-secret-org/super-secret-repo", "clone_url": "https://github.com/super-secret-org/super-secret-repo.git", "size": 1},
+			{"full_name": "super-secret-org/super-secret-repo2", "clone_url": "https://github.com/super-secret-org/super-secret-repo2.git", "size": 1},
+			{"full_name": "super-secret-org/not-super-secret-repo", "clone_url": "https://github.com/super-secret-org/not-super-secret-repo.git", "size": 1}
+		]`)
 
 	s := initTestSource(&sourcespb.GitHub{
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IncludeRepos:  []string{"secret/super*"},
+		IncludeRepos:  []string{"super-secret-org/super*"},
 		Organizations: []string{"super-secret-org"},
 	})
-	// gock works here because github.NewClient is using the default HTTP Transport
-	err := s.getReposByOrg(context.Background(), "super-secret-org")
+	err := s.getReposByOrg(context.Background(), "super-secret-org", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("secret/super-secret-repo")
+	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
 	assert.True(t, ok)
-	ok = s.filteredRepoCache.Exists("secret/super-secret-repo2")
+	ok = s.filteredRepoCache.Exists("super-secret-org/super-secret-repo2")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -124,21 +148,22 @@ func TestAddReposByUser(t *testing.T) {
 		Get("/users/super-secret-user/repos").
 		Reply(200).
 		JSON([]map[string]string{
-			{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"},
-			{"clone_url": "https://github.com/super-secret-repo2.git", "full_name": "secret/super-secret-repo2"},
+			{"full_name": "super-secret-user/super-secret-repo", "clone_url": "https://github.com/super-secret-user/super-secret-repo.git"},
+			{"full_name": "super-secret-user/super-secret-repo2", "clone_url": "https://github.com/super-secret-user/super-secret-repo2.git"},
 		})
 
 	s := initTestSource(&sourcespb.GitHub{
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
-		IgnoreRepos: []string{"secret/super-secret-repo2"},
+		IgnoreRepos: []string{"super-secret-user/super-secret-repo2"},
 	})
-	err := s.getReposByUser(context.Background(), "super-secret-user")
+	err := s.getReposByUser(context.Background(), "super-secret-user", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-repo")
+	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -148,14 +173,15 @@ func TestAddGistsByUser(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://githug.com/super-secret-gist.git", "id": "super-secret-gist"}})
+		JSON([]map[string]string{{"id": "aa5a315d61ae9438b18d", "git_pull_url": "https://gist.github.com/aa5a315d61ae9438b18d.git"}})
 
-	s := initTestSource(nil)
-	err := s.addUserGistsToCache(context.Background(), "super-secret-user")
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	err := s.addUserGistsToCache(context.Background(), "super-secret-user", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-gist")
+	ok := s.filteredRepoCache.Exists("aa5a315d61ae9438b18d")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -170,37 +196,87 @@ func TestAddMembersByOrg(t *testing.T) {
 			{"login": "testman2"},
 		})
 
-	s := initTestSource(nil)
-	err := s.addMembersByOrg(context.Background(), "org1")
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	err := s.addMembersByOrg(context.Background(), "org1", noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(s.memberCache))
 	_, ok := s.memberCache["testman1"]
 	assert.True(t, ok)
 	_, ok = s.memberCache["testman2"]
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
+func TestAddMembersByOrg_AuthFailure(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/org1/members").
+		Reply(401).
+		JSON([]map[string]string{{
+			"message":           "Bad credentials",
+			"documentation_url": "https://docs.github.com/rest",
+			"status":            "401",
+		}})
+
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	err := s.addMembersByOrg(context.Background(), "org1", noopReporter())
+	assert.True(t, strings.HasPrefix(err.Error(), "could not list organization"))
+	assert.False(t, gock.HasUnmatchedRequest())
+	assert.True(t, gock.IsDone())
+}
+
+func TestAddMembersByOrg_NoMembers(t *testing.T) {
+	defer gock.Off()
+
+	gock.New("https://api.github.com").
+		Get("/orgs/org1/members").
+		Reply(200).
+		JSON([]map[string]string{})
+
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	err := s.addMembersByOrg(context.Background(), "org1", noopReporter())
+
+	assert.Equal(t, fmt.Sprintf("organization (%q) had 0 members: account may not have access to list organization members", "org1"), err.Error())
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
 func TestAddMembersByApp(t *testing.T) {
 	defer gock.Off()
 
+	privateKey := createPrivateKey()
+
 	gock.New("https://api.github.com").
 		Get("/app/installations").
 		Reply(200).
-		JSON([]map[string]interface{}{
+		JSON([]map[string]any{
 			{"account": map[string]string{"login": "super-secret-org", "type": "Organization"}},
 		})
 	gock.New("https://api.github.com").
+		Post("/app/installations/1337/access_tokens").
+		Reply(200).
+		JSON(map[string]string{"token": "dontlook"})
+	gock.New("https://api.github.com").
 		Get("/orgs/super-secret-org/members").
 		Reply(200).
-		JSON([]map[string]interface{}{
+		JSON([]map[string]any{
 			{"login": "ssm1"},
 			{"login": "ssm2"},
 			{"login": "ssm3"},
 		})
 
-	s := initTestSource(nil)
-	err := s.addMembersByApp(context.Background(), github.NewClient(nil))
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
+		}})
+	err := s.addMembersByApp(context.Background(), s.connector.(*appConnector).InstallationClient(), noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(s.memberCache))
 	_, ok := s.memberCache["ssm1"]
@@ -209,6 +285,7 @@ func TestAddMembersByApp(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = s.memberCache["ssm3"]
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -218,21 +295,22 @@ func TestAddReposByApp(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/installation/repositories").
 		Reply(200).
-		JSON(map[string]interface{}{
+		JSON(map[string]any{
 			"repositories": []map[string]string{
 				{"clone_url": "https://github/ssr1.git", "full_name": "ssr1"},
 				{"clone_url": "https://github/ssr2.git", "full_name": "ssr2"},
 			},
 		})
 
-	s := initTestSource(nil)
-	err := s.getReposByApp(context.Background())
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	err := s.getReposByApp(context.Background(), noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
 	ok := s.filteredRepoCache.Exists("ssr1")
 	assert.True(t, ok)
 	ok = s.filteredRepoCache.Exists("ssr2")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -244,15 +322,16 @@ func TestAddOrgsByUser(t *testing.T) {
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
 		Reply(200).
-		JSON([]map[string]interface{}{
+		JSON([]map[string]any{
 			{"login": "sso2"},
 		})
 
-	s := initTestSource(nil)
-	s.addOrgsByUser(context.Background(), "super-secret-user")
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	s.addOrgsByUser(context.Background(), "super-secret-user", noopReporter())
 	assert.Equal(t, 1, s.orgsCache.Count())
 	ok := s.orgsCache.Exists("sso2")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -301,7 +380,7 @@ func TestNormalizeRepos(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			defer gock.Off()
 			tt.setup()
-			s := initTestSource(nil)
+			s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
 
 			got, err := s.normalizeRepo(tt.repos[0])
 			if (err != nil) != tt.wantErr {
@@ -326,31 +405,63 @@ func TestNormalizeRepos(t *testing.T) {
 }
 
 func TestHandleRateLimit(t *testing.T) {
-	s := initTestSource(nil)
-	assert.False(t, s.handleRateLimit(nil, nil))
+	s := initTestSource(&sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}})
+	ctx := context.Background()
+	assert.False(t, s.handleRateLimit(ctx, nil))
 
-	err := &github.RateLimitError{}
-	res := &github.Response{Response: &http.Response{Header: make(http.Header)}}
+	// Request
+	reqUrl, _ := url.Parse("https://github.com/trufflesecurity/trufflehog")
+	res := &github.Response{
+		Response: &http.Response{
+			StatusCode: 429,
+			Header:     make(http.Header),
+			Request: &http.Request{
+				Method: "GET",
+				URL:    reqUrl,
+			},
+		},
+	}
 	res.Header.Set("x-ratelimit-remaining", "0")
 	res.Header.Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Unix()+1, 10))
-	assert.True(t, s.handleRateLimit(err, res))
+
+	// Error
+	resetTime := github.Timestamp{
+		Time: time.Now().Add(time.Millisecond),
+	}
+	err := &github.RateLimitError{
+		Rate: github.Rate{
+			Limit:     5000,
+			Remaining: 0,
+			Reset:     resetTime,
+		},
+		Response: res.Response,
+		Message:  "Too Many Requests",
+	}
+
+	assert.True(t, s.handleRateLimit(ctx, err))
 }
 
 func TestEnumerateUnauthenticated(t *testing.T) {
 	defer gock.Off()
 
-	gock.New("https://api.github.com").
+	apiEndpoint := "https://api.github.com"
+	gock.New(apiEndpoint).
 		Get("/orgs/super-secret-org/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
+		JSON([]map[string]string{{"full_name": "super-secret-org/super-secret-repo", "clone_url": "https://github.com/super-secret-org/super-secret-repo.git"}})
 
-	s := initTestSource(nil)
-	s.orgsCache = memory.New()
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint:   apiEndpoint,
+		Credential: &sourcespb.GitHub_Unauthenticated{},
+	})
+	s.orgsCache = simple.NewCache[string]()
 	s.orgsCache.Set("super-secret-org", "super-secret-org")
-	s.enumerateUnauthenticated(context.Background())
+	// s.enumerateUnauthenticated(context.Background(), apiEndpoint)
+	s.enumerateUnauthenticated(context.Background(), noopReporter())
 	assert.Equal(t, 1, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-repo")
+	ok := s.filteredRepoCache.Exists("super-secret-org/super-secret-repo")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -364,28 +475,35 @@ func TestEnumerateWithToken(t *testing.T) {
 
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
+		MatchParam("per_page", "100").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "full_name": "super-secret-user/super-secret-repo"}})
 
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
 		MatchParam("per_page", "100").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
+		JSON(`[]`)
 
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git", "id": "super-secret-gist"}})
+		JSON([]map[string]string{{"id": "super-secret-gist", "git_pull_url": "https://gist.github.com/super-secret-gist.git"}})
 
-	s := initTestSource(nil)
-	err := s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+	})
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 2, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-repo")
+	ok := s.filteredRepoCache.Exists("super-secret-user/super-secret-repo")
 	assert.True(t, ok)
 	ok = s.filteredRepoCache.Exists("super-secret-gist")
 	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -413,51 +531,110 @@ func BenchmarkEnumerateWithToken(b *testing.B) {
 		Reply(200).
 		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git"}})
 
-	s := initTestSource(nil)
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+	})
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
+		_ = s.enumerateWithToken(context.Background(), false, noopReporter())
 	}
 }
 
 func TestEnumerate(t *testing.T) {
 	defer gock.Off()
 
+	// Arrange
 	gock.New("https://api.github.com").
 		Get("/user").
 		Reply(200).
 		JSON(map[string]string{"login": "super-secret-user"})
 
+	//
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/repos").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
+		JSON(`[{"name": "super-secret-repo", "full_name": "super-secret-user/super-secret-repo", "owner": {"login": "super-secret-user"}, "clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "has_wiki": false, "size": 1}]`)
 
 	gock.New("https://api.github.com").
 		Get("/user/orgs").
 		MatchParam("per_page", "100").
 		Reply(200).
-		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-repo.git", "full_name": "super-secret-repo"}})
+		JSON([]map[string]string{{"clone_url": "https://github.com/super-secret-user/super-secret-repo.git", "full_name": "super-secret-user/super-secret-repo"}})
 
 	gock.New("https://api.github.com").
 		Get("/users/super-secret-user/gists").
 		Reply(200).
-		JSON([]map[string]string{{"git_pull_url": "https://github.com/super-secret-gist.git", "id": "super-secret-gist"}})
+		JSON(`[{"git_pull_url": "https://gist.github.com/2801a2b0523099d0614a951579d99ba9.git", "id": "2801a2b0523099d0614a951579d99ba9"}]`)
 
 	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
 		Credential: &sourcespb.GitHub_Token{
 			Token: "super secret token",
 		},
 	})
 
-	_, err := s.enumerate(context.Background(), "https://api.github.com")
+	// Manually cache a repository to ensure that enumerate
+	// doesn't make duplicate API calls.
+	// See https://github.com/trufflesecurity/trufflehog/pull/2625
+	repo := func() *github.Repository {
+		var (
+			name     = "cached-repo"
+			fullName = "cached-user/cached-repo"
+			login    = "cached-user"
+			cloneUrl = "https://github.com/cached-user/cached-repo.git"
+			owner    = &github.User{
+				Login: &login,
+			}
+			hasWiki = false
+			size    = 1234
+		)
+		return &github.Repository{
+			Name:     &name,
+			FullName: &fullName,
+			Owner:    owner,
+			HasWiki:  &hasWiki,
+			Size:     &size,
+			CloneURL: &cloneUrl,
+		}
+	}()
+	s.cacheRepoInfo(repo)
+	s.filteredRepoCache.Set(repo.GetFullName(), repo.GetCloneURL())
+
+	var reportedRepos []string
+	reporter := sources.VisitorReporter{
+		VisitUnit: func(ctx context.Context, su sources.SourceUnit) error {
+			url, _ := su.SourceUnitID()
+			reportedRepos = append(reportedRepos, url)
+			return nil
+		},
+	}
+
+	// Act
+	err := s.Enumerate(context.Background(), reporter)
+	slices.Sort(reportedRepos)
+
+	// Assert
 	assert.Nil(t, err)
-	assert.Equal(t, 2, s.filteredRepoCache.Count())
-	ok := s.filteredRepoCache.Exists("super-secret-repo")
+	// Enumeration found all repos.
+	assert.Equal(t, 3, s.filteredRepoCache.Count())
+	assert.True(t, s.filteredRepoCache.Exists("super-secret-user/super-secret-repo"))
+	assert.True(t, s.filteredRepoCache.Exists("cached-user/cached-repo"))
+	assert.True(t, s.filteredRepoCache.Exists("2801a2b0523099d0614a951579d99ba9"))
+	assert.Equal(t, 3, len(s.repos))
+	assert.Equal(t, s.repos, reportedRepos)
+	// Enumeration cached all repos.
+	assert.Equal(t, 3, len(s.repoInfoCache.cache))
+	_, ok := s.repoInfoCache.get("https://github.com/super-secret-user/super-secret-repo.git")
 	assert.True(t, ok)
-	ok = s.filteredRepoCache.Exists("super-secret-gist")
+	_, ok = s.repoInfoCache.get("https://github.com/cached-user/cached-repo.git")
 	assert.True(t, ok)
+	_, ok = s.repoInfoCache.get("https://gist.github.com/2801a2b0523099d0614a951579d99ba9.git")
+	assert.True(t, ok)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -505,6 +682,7 @@ func mockGists() []map[string]string {
 func BenchmarkEnumerate(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		s := initTestSource(&sourcespb.GitHub{
+			Endpoint: "https://api.github.com",
 			Credential: &sourcespb.GitHub_Token{
 				Token: "super secret token",
 			},
@@ -512,7 +690,7 @@ func BenchmarkEnumerate(b *testing.B) {
 		setupMocks(b)
 
 		b.StartTimer()
-		_, _ = s.enumerate(context.Background(), "https://api.github.com")
+		_ = s.Enumerate(context.Background(), noopReporter())
 	}
 }
 
@@ -524,36 +702,26 @@ func TestEnumerateWithToken_IncludeRepos(t *testing.T) {
 		Reply(200).
 		JSON(map[string]string{"login": "super-secret-user"})
 
-	s := initTestSource(nil)
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_Token{
+			Token: "token",
+		},
+	})
 	s.repos = []string{"some-special-repo"}
 
-	err := s.enumerateWithToken(context.Background(), "https://api.github.com", "token")
+	err := s.enumerateWithToken(context.Background(), false, noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(s.repos))
 	assert.Equal(t, []string{"some-special-repo"}, s.repos)
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
 func TestEnumerateWithApp(t *testing.T) {
 	defer gock.Off()
 
-	// generate a private key (it just needs to be in the right format)
-	privateKey := func() string {
-		key, err := rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			panic(err)
-		}
-
-		data := x509.MarshalPKCS1PrivateKey(key)
-		var pemKey bytes.Buffer
-		if err := pem.Encode(&pemKey, &pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: data,
-		}); err != nil {
-			panic(err)
-		}
-		return pemKey.String()
-	}()
+	privateKey := createPrivateKey()
 
 	gock.New("https://api.github.com").
 		Post("/app/installations/1337/access_tokens").
@@ -565,19 +733,20 @@ func TestEnumerateWithApp(t *testing.T) {
 		Reply(200).
 		JSON(map[string]string{})
 
-	s := initTestSource(nil)
-	_, err := s.enumerateWithApp(
-		context.Background(),
-		"https://api.github.com",
-		&credentialspb.GitHubApp{
-			InstallationId: "1337",
-			AppId:          "4141",
-			PrivateKey:     privateKey,
+	s := initTestSource(&sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
+		Credential: &sourcespb.GitHub_GithubApp{
+			GithubApp: &credentialspb.GitHubApp{
+				PrivateKey:     privateKey,
+				InstallationId: "1337",
+				AppId:          "4141",
+			},
 		},
-	)
+	})
+	err := s.enumerateWithApp(context.Background(), s.connector.(*appConnector).InstallationClient(), noopReporter())
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(s.repos))
-
+	assert.False(t, gock.HasUnmatchedRequest())
 	assert.True(t, gock.IsDone())
 }
 
@@ -602,7 +771,6 @@ func Test_setProgressCompleteWithRepo_resumeInfo(t *testing.T) {
 
 	s := &Source{
 		repos: []string{},
-		log:   logr.Discard(),
 	}
 
 	for _, tt := range tests {
@@ -653,7 +821,6 @@ func Test_setProgressCompleteWithRepo_Progress(t *testing.T) {
 	for _, tt := range tests {
 		s := &Source{
 			repos: tt.repos,
-			log:   logr.Discard(),
 		}
 
 		s.setProgressCompleteWithRepo(tt.index, tt.offset, "")
@@ -683,7 +850,7 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 		},
 		{
 			name:         "one valid repo",
-			repos:        []string{"a"},
+			repos:        []string{"https://github.com/super-secret-user/super-secret-repo.git"},
 			wantComplete: true,
 			wantErr:      true,
 		},
@@ -693,10 +860,11 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			src := initTestSource(&sourcespb.GitHub{
 				Repositories: tc.repos,
+				Credential:   &sourcespb.GitHub_Unauthenticated{},
 			})
 			src.jobPool = &errgroup.Group{}
 
-			_ = src.scan(context.Background(), nil, nil)
+			_ = src.scan(context.Background(), nil)
 			if !tc.wantErr {
 				assert.Equal(t, "", src.GetProgress().EncodedResumeInfo)
 			}
@@ -706,5 +874,95 @@ func Test_scan_SetProgressComplete(t *testing.T) {
 				t.Errorf("got: %v, want: %v", gotComplete, tc.wantComplete)
 			}
 		})
+	}
+}
+
+func TestGetRepoURLParts(t *testing.T) {
+	repoURLs := []string{
+		"https://github.com/trufflesecurity/trufflehog.git",
+		"git+https://github.com/trufflesecurity/trufflehog.git",
+		"ssh://github.com/trufflesecurity/trufflehog.git",
+		"ssh://git@github.com/trufflesecurity/trufflehog.git",
+		"git+ssh://git@github.com/trufflesecurity/trufflehog.git",
+		"git://github.com/trufflesecurity/trufflehog.git",
+	}
+	expected := []string{"github.com", "trufflesecurity", "trufflehog"}
+	for _, tt := range repoURLs {
+		_, parts, err := getRepoURLParts(tt)
+		if err != nil {
+			t.Fatalf("failed: %v", err)
+		}
+		assert.Equal(t, expected, parts)
+	}
+
+	gistURLs := map[string][]string{
+		// Gists
+		"ssh://github.com/6df198861306313246466d23aa4102aa.git":                           nil,
+		"ssh://gist.github.com/6df198861306313246466d23aa4102aa.git":                      {"gist.github.com", "6df198861306313246466d23aa4102aa"},
+		"https://gist.github.com/6df198861306313246466d23aa4102aa.git":                    {"gist.github.com", "6df198861306313246466d23aa4102aa"},
+		"https://gist.github.com/john-smith/6df198861306313246466d23aa4102aa.git":         {"gist.github.com", "john-smith", "6df198861306313246466d23aa4102aa"},
+		"ssh://github.contoso.com/gist/6df198861306313246466d23aa4102aa.git":              {"github.contoso.com", "gist", "6df198861306313246466d23aa4102aa"},
+		"https://github.contoso.com/gist/6df198861306313246466d23aa4102aa.git":            {"github.contoso.com", "gist", "6df198861306313246466d23aa4102aa"},
+		"https://github.contoso.com/gist/john-smith/6df198861306313246466d23aa4102aa.git": {"github.contoso.com", "gist", "john-smith", "6df198861306313246466d23aa4102aa"},
+		"https://github.com/gist/john-smith/6df198861306313246466d23aa4102aa.git":         nil,
+	}
+	for tt, expected := range gistURLs {
+		_, parts, err := getRepoURLParts(tt)
+		if err != nil {
+			if expected == nil {
+				continue
+			}
+			t.Fatalf("failed: %v", err)
+		}
+		assert.Equal(t, expected, parts)
+	}
+}
+
+func TestGetGistID(t *testing.T) {
+	tests := []struct {
+		trimmedURL []string
+		expected   string
+	}{
+		{[]string{"https://gist.github.com", "12345"}, "12345"},
+		{[]string{"https://gist.github.com", "owner", "12345"}, "12345"},
+	}
+
+	for _, tt := range tests {
+		got := extractGistID(tt.trimmedURL)
+		assert.Equal(t, tt.expected, got)
+	}
+}
+
+// This isn't really a GitHub test, but GitHub is the only source that supports scan targeting right now, so this is
+// where I've put this targeted scan test.
+func Test_ScanMultipleTargets_MultipleErrors(t *testing.T) {
+	s := &Source{conn: &sourcespb.GitHub{}} // This test doesn't require initialization
+	ctx := context.Background()
+	chunksChan := make(chan *sources.Chunk)
+
+	targets := []sources.ChunkingTarget{
+		{SecretID: 1},
+		{SecretID: 2},
+	}
+
+	// The specific error text doesn't matter for the test, but it has to match what the source generates
+	want := []*sources.TargetedScanError{
+		{SecretID: 1, Err: errors.New("unable to cast metadata type for targeted scan")},
+		{SecretID: 2, Err: errors.New("unable to cast metadata type for targeted scan")},
+	}
+
+	err := s.Chunks(ctx, chunksChan, targets...)
+	unwrappable, ok := err.(interface{ Unwrap() []error })
+	if assert.True(t, ok, "returned error was not unwrappable") {
+		got := unwrappable.Unwrap()
+		assert.ElementsMatch(t, got, want)
+	}
+}
+
+func noopReporter() sources.UnitReporter {
+	return sources.VisitorReporter{
+		VisitUnit: func(context.Context, sources.SourceUnit) error {
+			return nil
+		},
 	}
 }

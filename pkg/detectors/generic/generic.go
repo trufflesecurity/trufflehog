@@ -6,8 +6,9 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -24,14 +25,14 @@ func New() Scanner {
 		`\b([/]{0,1}([\w]+[/])+[\w\.]*)\b`,                 // filepath
 		`([0-9A-F]{2}[:-]){5}([0-9A-F]{2})`,                // MAC addr
 		`\d{4}[-/]{1}([0]\d|1[0-2])[-/]{1}([0-2]\d|3[01])`, // date
-		`[v|\-]\d\.\d`, //version
-		`\d\.\d\.\d-`,  //version
+		`[v|\-]\d\.\d`, // version
+		`\d\.\d\.\d-`,  // version
 		`[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}`,      // IPs and OIDs
 		`[A-Fa-f0-9x]{2}:[A-Fa-f0-9x]{2}:[A-Fa-f0-9x]{2}`, // hex encoding
-		`[\w]+\([\w, ]+\)`,                                // function
+		`[\w]+\([\w, ]+\)`, // function
 	}
 
-	excludeMatchers := []*regexp.Regexp{}
+	var excludeMatchers []*regexp.Regexp
 	for _, pat := range excludePatterns {
 		excludeMatchers = append(excludeMatchers, regexp.MustCompile(pat))
 	}
@@ -74,10 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		// Least expensive-> most expensive filters.
 		// Substrings, then patterns.
 
-		if detectors.IsKnownFalsePositive(token, detectors.DefaultFalsePositives, true) {
-			continue
-		}
-
 		// toss any that match regexes
 		if hasReMatch(s.excludeMatchers, token) {
 			continue
@@ -113,26 +110,10 @@ func hasReMatch(matchers []*regexp.Regexp, token string) bool {
 	return false
 }
 
-// func hasDictWord(wordList []string, token string) bool {
-// 	lower := strings.ToLower(token)
-// 	for _, word := range wordList {
-// 		if strings.Contains(lower, word) {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }
-
-// func bytesToCleanWordList(data []byte) []string {
-// 	words := []string{}
-// 	for _, word := range strings.Split(string(data), "\n") {
-// 		if strings.TrimSpace(word) != "" {
-// 			words = append(words, strings.TrimSpace(strings.ToLower(word)))
-// 		}
-// 	}
-// 	return words
-// }
-
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Generic
+}
+
+func (s Scanner) Description() string {
+	return "Generic secret key that may provide access to sensitive data or systems."
 }

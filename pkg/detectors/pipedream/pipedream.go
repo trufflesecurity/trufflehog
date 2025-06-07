@@ -3,8 +3,8 @@ package pipedream
 import (
 	"context"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -38,9 +38,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -51,7 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if verify {
 			timeout := 15 * time.Second
 			client.Timeout = timeout
-			req, err := http.NewRequest("GET", "https://api.pipedream.com/v1/users/me", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.pipedream.com/v1/users/me", nil)
 			if err != nil {
 				continue
 			}
@@ -61,11 +58,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
@@ -78,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Pipedream
+}
+
+func (s Scanner) Description() string {
+	return "Pipedream is an integration platform for developers to build and run workflows that integrate apps, data, and APIs. Pipedream API keys can be used to access and modify these workflows and data."
 }

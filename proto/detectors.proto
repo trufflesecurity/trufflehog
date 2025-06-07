@@ -9,6 +9,7 @@ enum DecoderType {
   PLAIN = 1;
   BASE64 = 2;
   UTF16 = 3;
+  ESCAPED_UNICODE = 4;
 }
 
 enum DetectorType {
@@ -77,7 +78,7 @@ enum DetectorType {
   DigitalOceanToken = 64;
   DiscordBotToken = 65;
   DiscordWebhook = 66;
-  EtsyApiKey = 67;
+  EtsyApiKey = 67 [deprecated = true];
   FastlyPersonalToken = 68;
   GoogleOauth2 = 69;
   ReCAPTCHA = 70; // Didn't do
@@ -138,7 +139,7 @@ enum DetectorType {
   AirbrakeProjectKey = 125;
   AirbrakeUserKey = 126;
   PendoIntegrationKey = 127;
-  SplunkOberservabilityToken  = 128;
+  SplunkOberservabilityToken = 128;
   LokaliseToken = 129;
   Calendarific = 130;
   Jumpcloud = 131;
@@ -231,7 +232,7 @@ enum DetectorType {
   Duda = 219;
   Yext = 220;
   ContentStack = 221;
-  Storyblok = 222;
+  StoryblokAccessToken = 222;
   GraphCMS = 223;
   Checkmarket = 224;
   Convertkit = 225;
@@ -248,19 +249,19 @@ enum DetectorType {
   ZonkaFeedback = 236;
   Delighted = 237;
   Feedier = 238;
-  Abbysale = 239;
+  Abyssale = 239;
   Magnetic = 240;
-  Nytimes = 241;
+  Nytimes = 241 [deprecated = true];
   Polygon = 242;
   Powrbot = 243;
-  ProspectIO = 244;
+  ProspectIO = 244 [deprecated = true];
   Skrappio = 245;
   Monday = 246;
   Smartsheets = 247;
   Wrike = 248;
   Float = 249;
   Imagekit = 250;
-  Integromat = 251;
+  Integromat = 251 [deprecated = true];
   Salesblink = 252;
   Bored = 253;
   Campayn = 254;
@@ -313,7 +314,7 @@ enum DetectorType {
   Alconost = 301;
   Blogger = 302;
   Accuweather = 303;
-  Opengraphr = 304;
+  Opengraphr = 304 [deprecated = true];
   Rawg = 305;
   Riotgames = 306;
   RoninApp = 307;
@@ -361,7 +362,7 @@ enum DetectorType {
   Imagga = 349;
   SMSApi = 350;
   Distribusion = 351;
-  Blablabus = 352;
+  Blablabus = 352 [deprecated = true];
   WordsApi = 353;
   Currencylayer = 354;
   Html2Pdf = 355;
@@ -376,7 +377,7 @@ enum DetectorType {
   Nutritionix = 364;
   Swell = 365;
   ClickupPersonalToken = 366;
-  Nitro = 367;
+  Nitro = 367 [deprecated = true];
   Rev = 368;
   RunRunIt = 369;
   Typeform = 370;
@@ -417,7 +418,7 @@ enum DetectorType {
   FinancialModelingPrep = 406;
   Geocodio = 407;
   HereAPI = 408;
-  Macaddress = 409;
+  Macaddress = 409 [deprecated = true];
   OOPSpam = 410;
   ProtocolsIO = 411;
   ScraperAPI = 412;
@@ -443,7 +444,7 @@ enum DetectorType {
   BitcoinAverage = 432;
   CommerceJS = 433;
   DetectLanguage = 434;
-  FakeJSON = 435;
+  FakeJSON = 435 [deprecated = true];
   Graphhopper = 436;
   Lexigram = 437;
   LinkPreview = 438;
@@ -455,7 +456,7 @@ enum DetectorType {
   Mixcloud = 444;
   TatumIO = 445;
   Tmetric = 446;
-  Lastfm = 447;
+  Lastfm = 447 [deprecated = true];
   Browshot = 448;
   JSONbin = 449;
   LocationIQ = 450;
@@ -471,7 +472,7 @@ enum DetectorType {
   KakaoTalk = 460;
   RiteKit = 461;
   Shutterstock = 462;
-  Text2Data = 463;
+  Text2Data = 463 [deprecated = true];;
   YouNeedABudget = 464;
   Cricket = 465;
   Filestack = 466;
@@ -496,10 +497,10 @@ enum DetectorType {
   Aylien = 485;
   Geocode = 486;
   IconFinder = 487;
-  Ipify = 488;
+  Ipify = 488 [deprecated = true];
   LanguageLayer = 489;
   Lob = 490;
-  OnWaterIO = 491;
+  OnWaterIO = 491 [deprecated = true];
   Pastebin = 492;
   PdfLayer = 493;
   Pixabay = 494;
@@ -566,7 +567,7 @@ enum DetectorType {
   Gitter = 555;
   Host = 556;
   Iexcloud = 557;
-  Restpack = 558;
+  Restpack = 558 [deprecated = true];
   ScraperBox = 559;
   ScrapingAnt = 560;
   SerpStack = 561;
@@ -582,13 +583,13 @@ enum DetectorType {
   Hive = 571;
   Hiveage = 572;
   Kickbox = 573;
-  Passbase = 574;
+  Passbase = 574 [deprecated = true];
   PostageApp = 575;
   PureStake = 576;
   Qubole = 577;
   CarbonInterface = 578;
   Intrinio = 579;
-  QuickMetrics = 580;
+  QuickMetrics = 580 [deprecated = true];
   ScrapeStack = 581;
   TechnicalAnalysisApi = 582;
   Urlscan = 583;
@@ -628,13 +629,13 @@ enum DetectorType {
   Nylas = 617;
   Squareup = 618;
   Dandelion = 619;
-  DataFire = 620;
+  DataFire = 620 [deprecated = true];
   DeepAI = 621;
   MeaningCloud = 622;
   NeutrinoApi = 623;
   Storecove = 624;
   Shipday = 625;
-  Sentiment = 626;
+  Sentiment = 626 [deprecated = true];
   StreamChatMessaging = 627;
   TeamworkCRM = 628;
   TeamworkDesk = 629;
@@ -642,7 +643,7 @@ enum DetectorType {
   TheOddsApi = 631;
   Apacta = 632;
   GetSandbox = 633;
-  Happi = 634;
+  Happi = 634 [deprecated = true];
   Oanda = 635;
   FastForex = 636;
   APIMatic = 637;
@@ -653,7 +654,7 @@ enum DetectorType {
   Flightstats = 642;
   ChecIO = 643;
   Manifest = 644;
-  ApiScience = 645;
+  ApiScience = 645 [deprecated = true];
   AppSynergy = 646;
   Caflou = 647;
   Caspio = 648;
@@ -667,7 +668,7 @@ enum DetectorType {
   Meistertask = 656;
   Mindmeister = 657;
   PeopleDataLabs = 658;
-  ScraperSite = 659;
+  ScraperSite = 659  [deprecated = true];
   Scrapfly = 660;
   SimplyNoted = 661;
   TravelPayouts = 662;
@@ -680,7 +681,7 @@ enum DetectorType {
   Moderation = 669;
   Opendatasoft = 670;
   Podio = 671;
-  Rockset = 672;
+  Rockset = 672 [deprecated = true];
   Rownd = 673;
   Shotstack = 674;
   Swiftype = 675;
@@ -703,18 +704,18 @@ enum DetectorType {
   Chatfule = 692;
   Aeroworkflow = 693;
   Emailoctopus = 694;
-  Fusebill = 695;
+  Fusebill = 695 [deprecated = true];
   Geckoboard = 696;
   Gosquared = 697;
   Moonclerk = 698;
   Paymoapp = 699;
   Mixmax = 700;
   Processst = 701;
-  Repairshopr  = 702;
+  Repairshopr = 702;
   Goshippo = 703;
   Sigopt = 704;
   Sugester = 705;
-  Viewneo = 706; 
+  Viewneo = 706;
   BoostNote = 707;
   CaptainData = 708;
   Checkvist = 709;
@@ -765,7 +766,7 @@ enum DetectorType {
   Image4 = 754;
   Pinata = 755;
   BrowserStack = 756;
-  CrossBrowserTesting = 757;
+  CrossBrowserTesting = 757 [deprecated = true];
   Loadmill = 758;
   TestingBot = 759;
   KnapsackPro = 760;
@@ -780,7 +781,7 @@ enum DetectorType {
   ConversionTools = 769;
   CraftMyPDF = 770;
   ExportSDK = 771;
-  GlitterlyAPI = 772;
+  GlitterlyAPI = 772 [deprecated = true];
   Hybiscus = 773;
   Miro = 774;
   Statuspage = 775;
@@ -789,7 +790,7 @@ enum DetectorType {
   TimeCamp = 778;
   Userflow = 779;
   Wistia = 780;
-  SportRadar = 781;
+  SportRadar = 781 [deprecated = true];;
   UptimeRobot = 782;
   Codequiry = 783;
   ExtractorAPI = 784;
@@ -799,7 +800,7 @@ enum DetectorType {
   Apilayer = 788;
   Disqus = 789;
   Woopra = 790;
-  Paperform =791;
+  Paperform = 791;
   Gumroad = 792;
   Paydirtapp = 793;
   Detectify = 794;
@@ -814,8 +815,8 @@ enum DetectorType {
   Parsehub = 803;
   PackageCloud = 804;
   Cloudsmith = 805;
-  Flowdash = 806;
-  Flowdock = 807;
+  Flowdash = 806 [deprecated = true];
+  Flowdock = 807 [deprecated = true];
   Fibery = 808;
   Typetalk = 809;
   VoodooSMS = 810;
@@ -877,7 +878,7 @@ enum DetectorType {
   Copyscape = 866;
   Besnappy = 867;
   Salesmate = 868;
-  Heatmapapi = 869;
+  Heatmapapi = 869 [deprecated = true];;
   Websitepulse = 870;
   Uclassify = 871;
   Convert = 872;
@@ -919,7 +920,7 @@ enum DetectorType {
   BlockNative = 908;
   Moralis = 909;
   BscScan = 910;
-  CoinMarketCap = 911;
+  CoinMarketCap = 911 [deprecated = true];
   Percy = 912;
   TinesWebhook = 913;
   Pulumi = 914;
@@ -929,7 +930,113 @@ enum DetectorType {
   Prefect = 918;
   Docusign = 919;
   Couchbase = 920;
-  BitbucketAppPassword = 921;
+  Dockerhub = 921;
+  TrufflehogEnterprise = 922;
+  EnvoyApiKey = 923;
+  GitHubOauth2 = 924;
+  Salesforce = 925;
+  HuggingFace = 926;
+  Snowflake = 927;
+  Sourcegraph = 928;
+  Tailscale = 929;
+  Web3Storage = 930;
+  AzureStorage = 931;
+  PlanetScaleDb = 932;
+  Anthropic = 933;
+  Ramp = 934;
+  Klaviyo = 935;
+  SourcegraphCody = 936;
+  Voiceflow = 937;
+  Privacy = 938;
+  IPInfo = 939;
+  Ip2location = 940;
+  Instamojo = 941;
+  Portainer = 942;
+  PortainerToken = 943;
+  Loggly = 944;
+  OpenVpn = 945;
+  VagrantCloudPersonalToken = 946;
+  BetterStack = 947;
+  ZeroTier = 948;
+  AppOptics = 949;
+  Metabase = 950;
+  CoinbaseWaaS = 951;
+  LemonSqueezy = 952;
+  Budibase = 953;
+  DenoDeploy = 954;
+  Stripo = 955;
+  ReplyIO = 956;
+  AzureBatch = 957;
+  AzureContainerRegistry = 958;
+  AWSSessionKey = 959;
+  Coda = 960;
+  LogzIO = 961;
+  Eventbrite = 962;
+  GrafanaServiceAccount = 963;
+  RequestFinance = 964;
+  Overloop = 965;
+  Ngrok = 966;
+  Replicate = 967;
+  Postgres = 968;
+  AzureActiveDirectoryApplicationSecret = 969;
+  AzureCacheForRedisAccessKey = 970;
+  AzureCosmosDBKeyIdentifiable = 971;
+  AzureDevopsPersonalAccessToken = 972;
+  AzureFunctionKey = 973;
+  AzureMLWebServiceClassicIdentifiableKey = 974;
+  AzureSasToken = 975;
+  AzureSearchAdminKey = 976;
+  AzureSearchQueryKey = 977;
+  AzureManagementCertificate = 978;
+  AzureSQL = 979;
+  FlyIO = 980;
+  BuiltWith = 981;
+  JupiterOne = 982;
+  GCPApplicationDefaultCredentials = 983;
+  Wiz = 984;
+  Pagarme = 985;
+  Onfleet = 986;
+  Intra42 = 987;
+  Groq = 988;
+  TwitterConsumerkey = 989;
+  Eraser = 990;
+  LarkSuite = 991;
+  LarkSuiteApiKey = 992;
+  EndorLabs = 993;
+  ElevenLabs = 994;
+  Netsuite = 995;
+  RobinhoodCrypto = 996;
+  NVAPI = 997;
+  PyPI = 998;
+  RailwayApp = 999;
+  Meraki = 1000;
+  SaladCloudApiKey = 1001;
+  Box = 1002;
+  BoxOauth = 1003;
+  ApiMetrics = 1004;
+  WeightsAndBiases = 1005;
+  ZohoCRM = 1006;
+  AzureOpenAI = 1007;
+  GoDaddy = 1008;
+  Flexport = 1009;
+  TwitchAccessToken = 1010;
+  TwilioApiKey = 1011;
+  Sanity = 1012;
+  AzureRefreshToken = 1013;
+  AirtableOAuth = 1014;
+  AirtablePersonalAccessToken = 1015;
+  StoryblokPersonalAccessToken = 1016;
+  SentryOrgToken = 1017;
+  AzureApiManagementRepositoryKey = 1018;
+  AzureAPIManagementSubscriptionKey = 1019;
+  Harness = 1020;
+  Langfuse = 1021;
+  BingSubscriptionKey = 1022;
+  XAI = 1023;
+  AzureDirectManagementKey = 1024;
+  AzureAppConfigConnectionString = 1025;
+  DeepSeek = 1026;
+  StripePaymentIntent = 1027;
 }
 
 message Result {
@@ -945,6 +1052,13 @@ message Result {
   // This field should only be populated if the verification process itself failed in a way that provides no information
   // about the verification status of the candidate secret, such as if the verification request timed out.
   string verification_error_message = 10;
+
+  FalsePositiveInfo false_positive_info = 11;
+}
+
+message FalsePositiveInfo {
+  bool word_match = 1;
+  bool low_entropy = 2;
 }
 
 message StructuredData {

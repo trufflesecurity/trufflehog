@@ -9,16 +9,19 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 const (
 	baseURL       = "https://api.gemini.com"
@@ -44,16 +47,13 @@ func (s Scanner) Keywords() []string {
 }
 
 // FromData will find and optionally verify Gemini secrets in a given set of bytes.
-func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	idMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range idMatches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, secretMatch := range secretMatches {
@@ -66,7 +66,7 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 			}
 
 			if verify {
-				req, err := constructRequest(resSecretMatch, resMatch)
+				req, err := constructRequest(ctx, resSecretMatch, resMatch)
 				if err != nil {
 					continue
 				}
@@ -76,10 +76,6 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 					defer res.Body.Close()
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
-					} else {
-						if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -90,13 +86,13 @@ func (s Scanner) FromData(_ context.Context, verify bool, data []byte) (results 
 	return results, nil
 }
 
-func constructRequest(secret, keyID string) (*http.Request, error) {
-	req, err := http.NewRequest("POST", baseURL+accountDetail, &bytes.Buffer{})
+func constructRequest(ctx context.Context, secret, keyID string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", baseURL+accountDetail, &bytes.Buffer{})
 	if err != nil {
 		return nil, err
 	}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"request": accountDetail,
 		"nonce":   time.Now().UnixNano(),
 	}
@@ -135,4 +131,8 @@ func constructSignature(payload string, resSecretMatch string) string {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gemini
+}
+
+func (s Scanner) Description() string {
+	return "Gemini is a cryptocurrency exchange platform. API keys can be used to access and manage account details and perform transactions."
 }

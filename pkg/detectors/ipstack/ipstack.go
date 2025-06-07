@@ -2,9 +2,9 @@ package ipstack
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -37,9 +37,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_IpStack,
@@ -63,10 +60,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				if validResponse {
 					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 
@@ -80,4 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_IpStack
+}
+
+func (s Scanner) Description() string {
+	return "IpStack provides a REST API for IP geolocation services. IpStack API keys can be used to access geolocation data for IP addresses."
 }

@@ -3,20 +3,29 @@ package ldap
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"net"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+
+func init() {
+	ldap.DefaultTimeout = 5 * time.Second
+}
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -63,7 +72,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					s1.Verified = verifyLDAP(ctx, username[1], password[1], ldapURL)
+					verificationErr := verifyLDAP(username[1], password[1], ldapURL)
+					s1.Verified = verificationErr == nil
+					if !isErrDeterminate(verificationErr) {
+						s1.SetVerificationError(verificationErr, password[1])
+					}
 				}
 
 				results = append(results, s1)
@@ -89,7 +102,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			s1.Verified = verifyLDAP(ctx, username, password, ldapURL)
+			verificationError := verifyLDAP(username, password, ldapURL)
+
+			s1.Verified = verificationError == nil
+			if !isErrDeterminate(verificationError) {
+				s1.SetVerificationError(verificationError, password)
+			}
 		}
 
 		results = append(results, s1)
@@ -98,10 +116,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL) bool {
-	// Tests with non-TLS, TLS, and STARTTLS
+func isErrDeterminate(err error) bool {
+	switch e := err.(type) {
+	case *ldap.Error:
+		switch e.Err.(type) {
+		case *net.OpError:
+			return false
+		}
+	}
 
-	ldap.DefaultTimeout = 5 * time.Second
+	return true
+}
+
+func verifyLDAP(username, password string, ldapURL *url.URL) error {
+	// Tests with non-TLS, TLS, and STARTTLS
 
 	uri := ldapURL.String()
 
@@ -109,40 +137,42 @@ func verifyLDAP(ctx context.Context, username, password string, ldapURL *url.URL
 	case "ldap":
 		// Non-TLS dial
 		l, err := ldap.DialURL(uri)
-		if err == nil {
-			defer l.Close()
-			// Non-TLS verify
-			err = l.Bind(username, password)
-			if err == nil {
-				return true
-			}
-
-			// STARTTLS
-			err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
-			if err == nil {
-				// STARTTLS verify
-				err = l.Bind(username, password)
-				if err == nil {
-					return true
-				}
-			}
+		if err != nil {
+			return err
 		}
+		defer l.Close()
+		// Non-TLS verify
+		err = l.Bind(username, password)
+		if err == nil {
+			return nil
+		}
+
+		// STARTTLS
+		err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return err
+		}
+		// STARTTLS verify
+		return l.Bind(username, password)
 	case "ldaps":
 		// TLS dial
-		l, err := ldap.DialTLS("tcp", uri, &tls.Config{InsecureSkipVerify: true})
-		if err == nil {
-			defer l.Close()
-			// TLS verify
-			err = l.Bind(username, password)
-			if err == nil {
-				return true
-			}
+		l, err := ldap.DialURL(uri, ldap.DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+		if err != nil {
+			return err
 		}
+		defer l.Close()
+		// TLS verify
+		return l.Bind(username, password)
+	default:
+		return fmt.Errorf("unknown ldap scheme %q", ldapURL.Scheme)
 	}
 
-	return false
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LDAP
+}
+
+func (s Scanner) Description() string {
+	return "LDAP (Lightweight Directory Access Protocol) is an open, vendor-neutral, industry standard application protocol for accessing and maintaining distributed directory information services over an Internet Protocol (IP) network."
 }

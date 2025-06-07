@@ -8,10 +8,10 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-errors/errors"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (
@@ -34,14 +34,19 @@ func main() {
 	case "detector":
 		mustWriteTemplates([]templateJob{
 			{
-				TemplatePath:  "pkg/detectors/heroku/heroku.go",
+				TemplatePath:  "pkg/detectors/alchemy/alchemy.go",
 				WritePath:     filepath.Join(folderPath(), nameLower+".go"),
-				ReplaceString: []string{"heroku"},
+				ReplaceString: []string{"alchemy"},
 			},
 			{
-				TemplatePath:  "pkg/detectors/heroku/heroku_test.go",
+				TemplatePath:  "pkg/detectors/alchemy/alchemy_test.go",
 				WritePath:     filepath.Join(folderPath(), nameLower+"_test.go"),
-				ReplaceString: []string{"heroku"},
+				ReplaceString: []string{"alchemy"},
+			},
+			{
+				TemplatePath:  "pkg/detectors/alchemy/alchemy_integration_test.go",
+				WritePath:     filepath.Join(folderPath(), nameLower+"_integration_test.go"),
+				ReplaceString: []string{"alchemy"},
 			},
 		})
 		// case "source":
@@ -85,8 +90,10 @@ func mustWriteTemplates(jobs []templateJob) {
 		tmplRaw := string(tmplBytes)
 
 		for _, rplString := range job.ReplaceString {
+			rplTitle := cases.Title(language.AmericanEnglish).String(rplString)
+			tmplRaw = strings.ReplaceAll(tmplRaw, "DetectorType_"+rplTitle, "DetectorType_<<.Name>>")
 			tmplRaw = strings.ReplaceAll(tmplRaw, strings.ToLower(rplString), "<<.NameLower>>")
-			tmplRaw = strings.ReplaceAll(tmplRaw, cases.Title(language.AmericanEnglish).String(rplString), "<<.NameTitle>>")
+			tmplRaw = strings.ReplaceAll(tmplRaw, rplTitle, "<<.NameTitle>>")
 			tmplRaw = strings.ReplaceAll(tmplRaw, strings.ToUpper(rplString), "<<.NameUpper>>")
 		}
 
@@ -98,6 +105,7 @@ func mustWriteTemplates(jobs []templateJob) {
 			log.Fatal(err)
 		}
 		err = tmpl.Execute(f, templateData{
+			Name:      *name,
 			NameTitle: nameTitle,
 			NameLower: nameLower,
 			NameUpper: nameUpper,
@@ -109,6 +117,7 @@ func mustWriteTemplates(jobs []templateJob) {
 }
 
 type templateData struct {
+	Name      string
 	NameTitle string
 	NameLower string
 	NameUpper string

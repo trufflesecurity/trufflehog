@@ -1,0 +1,17 @@
+permissions:
+  - account_management:read
+  - account_management:write
+  - subaccount_configuration:read
+  - subaccount_configuration:write
+  - key_management:read
+  - key_management:write
+  - service_verification:read
+  - service_verification:write
+  - sms:read
+  - sms:write
+  - voice:read
+  - voice:write
+  - messaging:read
+  - messaging:write
+  - call_management:read
+  - call_management:write

@@ -2,8 +2,9 @@ package common
 
 import (
 	"bufio"
-	"bytes"
+	"crypto/rand"
 	"io"
+	"math/big"
 	"strings"
 )
 
@@ -25,18 +26,6 @@ func RemoveStringSliceItem(item string, slice *[]string) {
 	}
 }
 
-func MinInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func BytesEqual(a, b []byte, numBytes int) bool {
-	limit := MinInt(numBytes, MinInt(len(a), len(b))-1)
-	return bytes.Equal(a[:limit], b[:limit])
-}
-
 func ResponseContainsSubstring(reader io.ReadCloser, target string) (bool, error) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -48,4 +37,36 @@ func ResponseContainsSubstring(reader io.ReadCloser, target string) (bool, error
 		return false, err
 	}
 	return false, nil
+}
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+// RandomID returns a random string of the given length.
+func RandomID(length int) string {
+	b := make([]rune, length)
+	for i := range b {
+		randInt, _ := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		b[i] = letters[randInt.Int64()]
+	}
+
+	return string(b)
+}
+
+// SliceContainsString searches a slice to determine if it contains a specified string.
+// Returns the index of the first match in the slice.
+func SliceContainsString(origTargetString string, stringSlice []string, ignoreCase bool) (bool, string, int) {
+	targetString := origTargetString
+	if ignoreCase {
+		targetString = strings.ToLower(origTargetString)
+	}
+	for i, origStringFromSlice := range stringSlice {
+		stringFromSlice := origStringFromSlice
+		if ignoreCase {
+			stringFromSlice = strings.ToLower(origStringFromSlice)
+		}
+		if targetString == stringFromSlice {
+			return true, targetString, i
+		}
+	}
+	return false, "", 0
 }

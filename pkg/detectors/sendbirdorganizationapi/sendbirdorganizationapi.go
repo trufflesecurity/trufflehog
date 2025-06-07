@@ -2,22 +2,26 @@ package sendbirdorganizationapi
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	client *http.Client
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sendbird"}) + `\b([0-9a-f]{24})\b`)
@@ -36,9 +40,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -47,21 +48,26 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
+			client := s.client
+			if client == nil {
+				client = defaultClient
+			}
+
 			req, err := http.NewRequestWithContext(ctx, "GET", "https://gate.sendbird.com/api/v2/applications", nil)
 			if err != nil {
-				continue
+				s1.SetVerificationError(err, resMatch)
 			}
 			req.Header.Add("SENDBIRDORGANIZATIONAPITOKEN", resMatch)
 			res, err := client.Do(req)
-			if err == nil {
+			if err != nil {
+				s1.SetVerificationError(err, resMatch)
+			} else {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
+				} else if res.StatusCode != http.StatusForbidden {
+					err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+					s1.SetVerificationError(err, resMatch)
 				}
 			}
 		}
@@ -74,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SendbirdOrganizationAPI
+}
+
+func (s Scanner) Description() string {
+	return "Sendbird is a chat and messaging platform. Sendbird API tokens can be used to access and manage Sendbird applications and services."
 }

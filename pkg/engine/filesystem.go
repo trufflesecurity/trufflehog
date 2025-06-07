@@ -1,14 +1,11 @@
 package engine
 
 import (
-	"fmt"
 	"runtime"
 
-	"github.com/go-errors/errors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
@@ -16,35 +13,25 @@ import (
 )
 
 // ScanFileSystem scans a given file system.
-func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig) error {
+func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Filesystem{
-		Paths: c.Paths,
+		Paths:            c.Paths,
+		IncludePathsFile: c.IncludePathsFile,
+		ExcludePathsFile: c.ExcludePathsFile,
 	}
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal filesystem connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
-	fileSystemSource := filesystem.Source{}
+	sourceName := "trufflehog - filesystem"
+	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, filesystem.SourceType)
 
-	ctx = context.WithValues(ctx,
-		"source_type", fileSystemSource.Type().String(),
-		"source_name", "filesystem",
-	)
-	err = fileSystemSource.Init(ctx, "trufflehog - filesystem", 0, int64(sourcespb.SourceType_SOURCE_TYPE_FILESYSTEM), true, &conn, runtime.NumCPU())
-	if err != nil {
-		return errors.WrapPrefix(err, "could not init filesystem source", 0)
+	fileSystemSource := &filesystem.Source{}
+	if err := fileSystemSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
+		return sources.JobProgressRef{}, err
 	}
-	fileSystemSource.WithFilter(c.Filter)
-	e.sourcesWg.Go(func() error {
-		defer common.RecoverWithExit(ctx)
-		err := fileSystemSource.Chunks(ctx, e.ChunksChan())
-		if err != nil {
-			return fmt.Errorf("error scanning filesystem: %w", err)
-		}
-		return nil
-	})
-	return nil
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, fileSystemSource)
 }

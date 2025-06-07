@@ -4,18 +4,24 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sync"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 var dedupeCache = make(map[string]struct{})
 
-func PrintGitHubActionsOutput(r *detectors.ResultWithMetadata) error {
+// GitHubActionsPrinter is a printer that prints results in GitHub Actions format.
+type GitHubActionsPrinter struct{ mu sync.Mutex }
+
+func (p *GitHubActionsPrinter) Print(_ context.Context, r *detectors.ResultWithMetadata) error {
 	out := gitHubActionsOutputFormat{
-		DetectorType: r.Result.DetectorType.String(),
-		DecoderType:  r.Result.DecoderType.String(),
-		Verified:     r.Result.Verified,
+		DetectorType:        r.Result.DetectorType.String(),
+		DetectorDescription: r.DetectorDescription,
+		DecoderType:         r.DecoderType.String(),
+		Verified:            r.Result.Verified,
 	}
 
 	meta, err := structToMap(r.SourceMetadata.Data)
@@ -47,14 +53,21 @@ func PrintGitHubActionsOutput(r *detectors.ResultWithMetadata) error {
 	h := sha256.New()
 	h.Write([]byte(key))
 	key = hex.EncodeToString(h.Sum(nil))
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if _, ok := dedupeCache[key]; ok {
 		return nil
 	}
 	dedupeCache[key] = struct{}{}
 
-	message := fmt.Sprintf("Found %s %s result 🐷🔑\n", verifiedStatus, out.DetectorType)
-	if r.Result.DecoderType != detectorspb.DecoderType_PLAIN {
-		message = fmt.Sprintf("Found %s %s result with %s encoding 🐷🔑\n", verifiedStatus, out.DetectorType, out.DecoderType)
+	name := ""
+	if nameValue, ok := r.Result.ExtraData["name"]; ok {
+		name = fmt.Sprintf(" (%s)", nameValue)
+	}
+
+	message := fmt.Sprintf("Found %s %s%s result 🐷🔑\n", verifiedStatus, out.DetectorType, name)
+	if r.DecoderType != detectorspb.DecoderType_PLAIN {
+		message = fmt.Sprintf("Found %s %s%s result with %s encoding 🐷🔑\n", verifiedStatus, out.DetectorType, name, out.DecoderType)
 	}
 
 	fmt.Printf("::warning file=%s,line=%d,endLine=%d::%s",
@@ -64,9 +77,10 @@ func PrintGitHubActionsOutput(r *detectors.ResultWithMetadata) error {
 }
 
 type gitHubActionsOutputFormat struct {
-	DetectorType,
-	DecoderType string
-	Verified  bool
-	StartLine int64
-	Filename  string
+	DetectorType        string
+	DetectorDescription string
+	DecoderType         string
+	Verified            bool
+	StartLine           int64
+	Filename            string
 }

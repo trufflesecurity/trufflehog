@@ -9,19 +9,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/memory"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
 )
 
 func TestSource_Token(t *testing.T) {
@@ -42,7 +41,8 @@ func TestSource_Token(t *testing.T) {
 	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
 	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
 
-	conn := &sourcespb.GitHub{
+	src := &sourcespb.GitHub{
+		Endpoint: "https://api.github.com",
 		Credential: &sourcespb.GitHub_GithubApp{
 			GithubApp: &credentialspb.GitHubApp{
 				PrivateKey:     githubPrivateKeyNew,
@@ -51,37 +51,28 @@ func TestSource_Token(t *testing.T) {
 			},
 		},
 	}
+	conn, err := anypb.New(src)
+	if err != nil {
+		panic(err)
+	}
 
 	s := Source{
-		conn:        conn,
-		httpClient:  common.SaneHttpClient(),
-		log:         logr.Discard(),
-		memberCache: map[string]struct{}{},
-		repoSizes:   newRepoSize(),
+		conn:          src,
+		memberCache:   map[string]struct{}{},
+		repoInfoCache: newRepoInfoCache(),
 	}
-	s.filteredRepoCache = s.newFilteredRepoCache(memory.New(), nil, nil)
+	s.Init(ctx, "github integration test source", 0, 0, false, conn, 1)
+	s.filteredRepoCache = s.newFilteredRepoCache(ctx, simple.NewCache[string](), nil, nil)
 
-	installationClient, err := s.enumerateWithApp(ctx, "https://api.github.com", conn.GetGithubApp())
+	err = s.enumerateWithApp(ctx, s.connector.(*appConnector).InstallationClient(), noopReporter())
 	assert.NoError(t, err)
 
-	user, token, err := s.userAndToken(ctx, installationClient)
-	assert.NotEmpty(t, token)
-	assert.NoError(t, err)
-
-	// user provided
-	_, _, err = git.CloneRepoUsingToken(ctx, token, "https://github.com/truffle-test-integration-org/another-test-repo.git", user)
-	assert.NoError(t, err)
-
-	// no user provided
-	_, _, err = git.CloneRepoUsingToken(ctx, token, "https://github.com/truffle-test-integration-org/another-test-repo.git", "")
-	assert.Error(t, err)
-
-	_, _, err = s.cloneRepo(ctx, "https://github.com/truffle-test-integration-org/another-test-repo.git", installationClient)
+	_, _, err = s.cloneRepo(ctx, "https://github.com/truffle-test-integration-org/another-test-repo.git")
 	assert.NoError(t, err)
 }
 
 func TestSource_ScanComments(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	secret, err := common.GetTestSecret(ctx)
@@ -92,8 +83,8 @@ func TestSource_ScanComments(t *testing.T) {
 	// For the personal access token test
 	githubToken := secret.MustGetField("GITHUB_TOKEN")
 
-	const totalPRChunks = 2
-	const totalIssueChunks = 1
+	const totalPRChunks = 3
+	const totalIssueChunks = 2
 
 	type init struct {
 		name       string
@@ -129,7 +120,7 @@ func TestSource_ScanComments(t *testing.T) {
 				SourceMetadata: &source_metadatapb.MetaData{
 					Data: &source_metadatapb.MetaData_Github{
 						Github: &source_metadatapb.Github{
-							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/issues/1#issuecomment-1603436833",
+							Link:      "https://github.com/truffle-test-integration-org/another-test-repo/issues/1",
 							Username:  "truffle-sandbox",
 							Timestamp: "2023-06-22 23:33:46 +0000 UTC",
 						},
@@ -190,7 +181,7 @@ func TestSource_ScanComments(t *testing.T) {
 				return
 			}
 
-			chunksCh := make(chan *sources.Chunk, 5)
+			chunksCh := make(chan *sources.Chunk, 1)
 			go func() {
 				// Close the channel
 				defer close(chunksCh)
@@ -223,6 +214,77 @@ func TestSource_ScanComments(t *testing.T) {
 	}
 }
 
+func TestSource_ScanChunks(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	// For the personal access token test.
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+
+	type init struct {
+		name       string
+		verify     bool
+		connection *sourcespb.GitHub
+	}
+	tests := []struct {
+		name       string
+		init       init
+		wantChunks int
+	}{
+		{
+			name: "token authenticated, 4 repos",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{
+						"https://github.com/truffle-test-integration-org/another-test-repo.git",
+						"https://github.com/trufflesecurity/trufflehog.git",
+						"https://github.com/Akash-goyal-github/Inventory-Management-System.git",
+						"https://github.com/R1ck404/Crypto-Exchange-Example.git",
+						"https://github.com/Stability-AI/generative-models.git",
+						"https://github.com/bloomberg/blazingmq.git",
+						"https://github.com/Kong/kong.git",
+					},
+					Credential: &sourcespb.GitHub_Token{Token: githubToken},
+				},
+			},
+			wantChunks: 20000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.init.connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			assert.Nil(t, err)
+
+			chunksCh := make(chan *sources.Chunk, 1)
+			go func() {
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh)
+				assert.Nil(t, err)
+			}()
+
+			i := 0
+			for range chunksCh {
+				i++
+			}
+			assert.GreaterOrEqual(t, i, tt.wantChunks)
+		})
+	}
+}
+
 func TestSource_Scan(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
@@ -244,16 +306,6 @@ func TestSource_Scan(t *testing.T) {
 	githubPrivateKeyNew := string(githubPrivateKeyBytesNew)
 	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
 	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
-
-	// OLD app for breaking app change tests
-	// githubPrivateKeyB64 := secret.MustGetField("GITHUB_PRIVATE_KEY")
-	// githubPrivateKeyBytes, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// githubPrivateKey := string(githubPrivateKeyBytes)
-	// githubInstallationID := secret.MustGetField("GITHUB_INSTALLATION_ID")
-	// githubAppID := secret.MustGetField("GITHUB_APP_ID")
 
 	type init struct {
 		name       string
@@ -332,117 +384,78 @@ func TestSource_Scan(t *testing.T) {
 			wantChunk: nil,
 			wantErr:   false,
 			minRepo:   1,
+			minOrg:    1,
+		},
+		{
+			name: "token authenticated, username in org",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Organizations: []string{"truffle-sandbox"},
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   2,
+			minOrg:    1,
+		},
+		{
+			name: "token authenticated, no org or user (enum)",
+			// This configuration currently will only find gists from the user. No repos or orgs will be scanned.
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Credential: &sourcespb.GitHub_Token{
+						Token: githubToken,
+					},
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   2,
 			minOrg:    0,
 		},
-		// {
-		// 	name: "token authenticated, username in org",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Organizations: []string{"truffle-sandbox"},
-		// 			Credential: &sourcespb.GitHub_Token{
-		// 				Token: githubToken,
-		// 			},
-		// 		},
-		// 	},
-		// 	wantChunk: nil,
-		// 	wantErr:   false,
-		// 	minRepo:   0, // I think enumerating users with the org API does not work for newer users! Or maybe just newer users with a `-` in their name?
-		// 	// See also: https://github.com/trufflesecurity/trufflehog/issues/874
-		// 	minOrg: 0,
-		// },
-		// {
-		// 	name: "token authenticated, org in repo",
-		// 	// I do not think that this is a supported case, but adding the test to specify there is no requirement.
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Repositories: []string{"truffle-test-integration-org"},
-		// 			Credential: &sourcespb.GitHub_Token{
-		// 				Token: githubToken,
-		// 			},
-		// 		},
-		// 	},
-		// 	wantChunk: nil,
-		// 	wantErr:   false,
-		// 	minRepo:   0,
-		// 	minOrg:    0,
-		// },
-		/*
-			{
-				name: "token authenticated, no org or user (enum)",
-				// This configuration currently will only find gists from the user. No repos or orgs will be scanned.
-				init: init{
-					name: "test source",
-					connection: &sourcespb.GitHub{
-						Credential: &sourcespb.GitHub_Token{
-							Token: githubToken,
+		{
+			name: "unauthenticated, single org",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Organizations: []string{"trufflesecurity"},
+					Credential:    &sourcespb.GitHub_Unauthenticated{},
+					IncludeForks:  true,
+				},
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			minRepo:   40,
+			minOrg:    1,
+		},
+		{
+			name: "unauthenticated, single repo",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
+					Credential:   &sourcespb.GitHub_Unauthenticated{},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
+				SourceName: "test source",
+				SourceMetadata: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/trufflesecurity/driftwood.git",
 						},
 					},
 				},
-				wantChunk: nil,
-				wantErr:   false,
-				minRepo:   0,
-				minOrg:    0,
+				Verify: false,
 			},
-			{
-				name: "app authenticated (old), no repo or org (enum)",
-				init: init{
-					name: "test source",
-					connection: &sourcespb.GitHub{
-						ScanUsers: false,
-						Credential: &sourcespb.GitHub_GithubApp{
-							GithubApp: &credentialspb.GitHubApp{
-								PrivateKey:     githubPrivateKey,
-								InstallationId: githubInstallationID,
-								AppId:          githubAppID,
-							},
-						},
-					},
-				},
-				wantChunk: nil,
-				wantErr:   false,
-				minRepo:   3,
-				minOrg:    0,
-			},
-		*/
-		// {
-		// 	name: "unauthenticated, single org",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Organizations: []string{"trufflesecurity"},
-		// 			Credential:    &sourcespb.GitHub_Unauthenticated{},
-		// 		},
-		// 	},
-		// 	wantChunk: nil,
-		// 	wantErr:   false,
-		// 	minRepo:   3,
-		// 	minOrg:    1,
-		// },
-		// {
-		// 	name: "unauthenticated, single repo",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
-		// 			Credential:   &sourcespb.GitHub_Unauthenticated{},
-		// 		},
-		// 	},
-		// 	wantChunk: &sources.Chunk{
-		// 		SourceType: sourcespb.SourceType_SOURCE_TYPE_GITHUB,
-		// 		SourceName: "test source",
-		// 		SourceMetadata: &source_metadatapb.MetaData{
-		// 			Data: &source_metadatapb.MetaData_Github{
-		// 				Github: &source_metadatapb.Github{
-		// 					Repository: "https://github.com/trufflesecurity/driftwood.git",
-		// 				},
-		// 			},
-		// 		},
-		// 		Verify: false,
-		// 	},
-		// 	wantErr: false,
-		// },
+			wantErr: false,
+		},
 		{
 			name: "app authenticated, no repo or org",
 			init: init{
@@ -460,7 +473,7 @@ func TestSource_Scan(t *testing.T) {
 			},
 			wantChunk: nil,
 			wantErr:   false,
-			minRepo:   1,
+			minRepo:   32,
 			minOrg:    0,
 		},
 		{
@@ -552,19 +565,6 @@ func TestSource_paginateGists(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	secret, err := common.GetTestSecret(ctx)
-	if err != nil {
-		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
-	}
-	// For the  NEW github app test (+Member enum)
-	githubPrivateKeyB64New := secret.MustGetField("GITHUB_PRIVATE_KEY_NEW")
-	githubPrivateKeyBytesNew, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64New)
-	if err != nil {
-		t.Fatal(err)
-	}
-	githubPrivateKeyNew := string(githubPrivateKeyBytesNew)
-	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
-	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
 	type init struct {
 		name       string
 		verify     bool
@@ -583,13 +583,7 @@ func TestSource_paginateGists(t *testing.T) {
 			init: init{
 				name: "test source",
 				connection: &sourcespb.GitHub{
-					Credential: &sourcespb.GitHub_GithubApp{
-						GithubApp: &credentialspb.GitHubApp{
-							PrivateKey:     githubPrivateKeyNew,
-							InstallationId: githubInstallationIDNew,
-							AppId:          githubAppIDNew,
-						},
-					},
+					Credential: &sourcespb.GitHub_Unauthenticated{},
 				},
 			},
 			wantChunk: &sources.Chunk{
@@ -607,54 +601,19 @@ func TestSource_paginateGists(t *testing.T) {
 			user:     "truffle-sandbox",
 			minRepos: 1,
 		},
-		// {
-		// 	name: "get multiple pages of gists",
-		// 	init: init{
-		// 		name: "test source",
-		// 		connection: &sourcespb.GitHub{
-		// 			Credential: &sourcespb.GitHub_GithubApp{
-		// 				GithubApp: &credentialspb.GitHubApp{
-		// 					PrivateKey:     githubPrivateKeyNew,
-		// 					InstallationId: githubInstallationIDNew,
-		// 					AppId:          githubAppIDNew,
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	wantChunk: nil,
-		// 	wantErr:   false,
-		// 	user:      "andrew",
-		// 	minRepos:  101,
-		// },
-		/*		{
-					name: "get multiple pages of gists",
-					init: init{
-						name: "test source",
-						connection: &sourcespb.GitHub{
-							Credential: &sourcespb.GitHub_GithubApp{
-								GithubApp: &credentialspb.GitHubApp{
-									PrivateKey:     githubPrivateKeyNew,
-									InstallationId: githubInstallationIDNew,
-									AppId:          githubAppIDNew,
-								},
-							},
-						},
-					},
-					wantChunk: &sources.Chunk{
-						SourceName: "test source",
-						SourceMetadata: &source_metadatapb.MetaData{
-							Data: &source_metadatapb.MetaData_Github{
-								Github: &source_metadatapb.Github{
-									Repository: "https://gist.github.com/872df3b78b9ec3e7dbe597fb5a202121.git",
-								},
-							},
-						},
-						Verify: false,
-					},
-					wantErr: false,
-					user:    "andrew",
+		{
+			name: "get multiple pages of gists",
+			init: init{
+				name: "test source",
+				connection: &sourcespb.GitHub{
+					Credential: &sourcespb.GitHub_Unauthenticated{},
 				},
-		*/
+			},
+			wantChunk: nil,
+			wantErr:   false,
+			user:      "andrew",
+			minRepos:  101,
+		},
 	}
 
 	for _, tt := range tests {
@@ -673,7 +632,7 @@ func TestSource_paginateGists(t *testing.T) {
 			}
 			chunksCh := make(chan *sources.Chunk, 5)
 			go func() {
-				s.addUserGistsToCache(ctx, tt.user)
+				assert.NoError(t, s.addUserGistsToCache(ctx, tt.user, noopReporter()))
 				chunksCh <- &sources.Chunk{}
 			}()
 			var wantedRepo string
@@ -739,31 +698,287 @@ func githubCommentCheckFunc(gotChunk, wantChunk *sources.Chunk, i int, t *testin
 	}
 }
 
-// func TestSource_paginateRepos(t *testing.T) {
-// 	type args struct {
-// 		ctx       context.Context
-// 		apiClient *github.Client
-// 	}
-// 	tests := []struct {
-// 		name string
-// 		org  string
-// 		args args
-// 	}{
-// 		{
-// 			org: "fakeNetflix",
-// 			args: args{
-// 				ctx:       context.Background(),
-// 				apiClient: github.NewClient(common.SaneHttpClient()),
-// 			},
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			s := &Source{httpClient: common.SaneHttpClient()}
-// 			s.paginateRepos(tt.args.ctx, tt.args.apiClient, tt.org)
-// 			if len(s.repos) < 101 {
-// 				t.Errorf("expected > 100 repos, got %d", len(s.repos))
-// 			}
-// 		})
-// 	}
-// }
+func TestSource_Chunks_TargetedScan(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3000)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+
+	type init struct {
+		name          string
+		verify        bool
+		connection    *sourcespb.GitHub
+		queryCriteria *source_metadatapb.MetaData
+	}
+	tests := []struct {
+		name       string
+		init       init
+		wantChunks int
+		wantErr    bool
+	}{
+		{
+			name: "targeted scan, one file in small commit",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "test-secrets",
+							Link:       "https://github.com/truffle-sandbox/test-secrets/blob/0416560b1330d8ac42045813251d85c688717eaf/new_key#L2",
+							Commit:     "0416560b1330d8ac42045813251d85c688717eaf",
+							File:       "new_key",
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+		{
+			name: "targeted scan, one file in med commit",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/trufflesecurity/trufflehog.git",
+							Link:       "https://github.com/trufflesecurity/trufflehog/blob/33eed42e17fda8b1a66feaeafcd57efccff26c11/pkg/sources/s3/s3_test.go#L78",
+							Commit:     "33eed42e17fda8b1a66feaeafcd57efccff26c11",
+							File:       "pkg/sources/s3/s3_test.go",
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+		{
+			name: "targeted scan, binary file",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/truffle-sandbox/test-secrets.git",
+							Link:       "https://github.com/truffle-sandbox/test-secrets/blob/70bef8590f87257c0992eecc7db529827a12b801/null_text_w_ptp.ipynb",
+							Commit:     "70bef8590f87257c0992eecc7db529827a12b801",
+							File:       "null_text_w_ptp.ipynb",
+						},
+					},
+				},
+			},
+			wantChunks: 607,
+		},
+		{
+			name: "targeted scan, commit metadata",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/trufflesecurity/trufflehog.git",
+							Link:       "https://github.com/trufflesecurity/trufflehog/commit/1c51106e35c3b3c327fe12e358177c03079bb771",
+							Commit:     "1c51106e35c3b3c327fe12e358177c03079bb771",
+							File:       "", // no file
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+		{
+			name: "no file in commit",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "test_keys",
+							Link:       "https://github.com/trufflesecurity/test_keys/blob/fbc14303ffbf8fb1c2c1914e8dda7d0121633aca/keys#L4",
+							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
+							File:       "not-the-file",
+						},
+					},
+				},
+			},
+			wantChunks: 0,
+			wantErr:    true,
+		},
+		{
+			name: "invalid query criteria, malformed link",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "test_keys",
+							Link:       "malformed-link",
+							Commit:     "fbc14303ffbf8fb1c2c1914e8dda7d0121633aca",
+							File:       "not-the-file",
+						},
+					},
+				},
+			},
+			wantChunks: 0,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Source{}
+
+			conn, err := anypb.New(tt.init.connection)
+			assert.Nil(t, err)
+
+			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 8)
+			assert.Nil(t, err)
+
+			chunksCh := make(chan *sources.Chunk, 1)
+			go func() {
+				defer close(chunksCh)
+				err = s.Chunks(ctx, chunksCh, sources.ChunkingTarget{QueryCriteria: tt.init.queryCriteria})
+				if tt.wantErr {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
+			}()
+
+			i := 0
+			for range chunksCh {
+				i++
+			}
+			assert.Equal(t, tt.wantChunks, i)
+		})
+	}
+}
+
+func TestChunkUnit(t *testing.T) {
+	ctx := context.Background()
+	conn, _ := anypb.New(&sourcespb.GitHub{
+		Repositories: []string{"https://github.com/trufflesecurity/driftwood.git"},
+		Credential:   &sourcespb.GitHub_Unauthenticated{},
+	})
+	s := Source{}
+	if err := s.Init(ctx, "github integration test source", 0, 0, false, conn, 1); err != nil {
+		t.Errorf("Init() failed: %v", err)
+	}
+
+	unit := RepoUnit{Name: "driftwood", URL: "https://github.com/trufflesecurity/driftwood.git"}
+	reporter := &countChunkReporter{}
+	if err := s.ChunkUnit(ctx, unit, reporter); err != nil {
+		t.Errorf("ChunkUnit() failed: %v", err)
+	}
+	assert.GreaterOrEqual(t, reporter.chunkCount, 65)
+	assert.Equal(t, 0, reporter.errCount)
+}
+
+func TestSource_Validate(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+	githubPrivateKeyB64New := secret.MustGetField("GITHUB_PRIVATE_KEY_NEW")
+	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
+	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
+
+	githubPrivateKeyBytesNew, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64New)
+	if err != nil {
+		t.Fatal(err)
+	}
+	githubPrivateKeyNew := string(githubPrivateKeyBytesNew)
+
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name         string
+		args         args
+		sourceConfig *Source
+		wantErr      bool
+	}{
+		{
+			name:         "success - validate - unauthenticated",
+			args:         args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}}},
+			wantErr:      false,
+		},
+		{
+			name:         "success - validate - token authentication",
+			args:         args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}}},
+			wantErr:      false,
+		},
+		{
+			name: "sucess- validate - app token authentication",
+			args: args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_GithubApp{
+				GithubApp: &credentialspb.GitHubApp{
+					PrivateKey:     githubPrivateKeyNew,
+					InstallationId: githubInstallationIDNew,
+					AppId:          githubAppIDNew,
+				},
+			}}},
+			wantErr: false,
+		},
+		{
+			name:         "fail - validate - token authentication",
+			args:         args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken + "fake"}}},
+			wantErr:      true,
+		},
+		{
+			name: "fail- validate - app token authentication",
+			args: args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_GithubApp{
+				GithubApp: &credentialspb.GitHubApp{
+					PrivateKey:     githubPrivateKeyNew + "fake",
+					InstallationId: githubInstallationIDNew + "0",
+					AppId:          githubAppIDNew,
+				},
+			}}},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			connector, err := newConnector(tt.sourceConfig)
+			require.NoError(t, err)
+			tt.sourceConfig.connector = connector
+
+			if err := tt.sourceConfig.Validate(tt.args.ctx); err != nil && !tt.wantErr {
+				t.Errorf("Source.Validate() = %v, wantErr %t", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+type countChunkReporter struct {
+	chunkCount int
+	errCount   int
+}
+
+func (m *countChunkReporter) ChunkOk(ctx context.Context, chunk sources.Chunk) error {
+	m.chunkCount++
+	return nil
+}
+
+func (m *countChunkReporter) ChunkErr(ctx context.Context, err error) error {
+	m.errCount++
+	return nil
+}

@@ -2,8 +2,8 @@ package pivotaltracker
 
 import (
 	"context"
+	regexp "github.com/wasilibs/go-re2"
 	"net/http"
-	"regexp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -35,13 +35,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for _, match := range matches {
 
 		// First match is entire regex, second is the first group.
-		if len(match) != 2 {
-			continue
-		}
 
 		token := match[1]
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_PivotalTracker,
 			Raw:          []byte(token),
 		}
@@ -60,16 +57,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res.Body.Close() // The request body is unused.
 
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s.Verified = true
+					result.Verified = true
 				}
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-			continue
-		}
-
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return results, nil
@@ -77,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PivotalTracker
+}
+
+func (s Scanner) Description() string {
+	return "PivotalTracker is a project management tool. PivotalTracker tokens can be used to access and manage projects and data within PivotalTracker."
 }

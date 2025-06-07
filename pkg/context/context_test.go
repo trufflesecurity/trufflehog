@@ -3,6 +3,7 @@ package context
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -158,7 +159,7 @@ func TestWithValues(t *testing.T) {
 	assert.NotContains(t, logs[6], `what does this do?`)
 }
 
-func TestDiscardLogger(t *testing.T) {
+func TestDefaultLogger(t *testing.T) {
 	var panicked bool
 	defer func() {
 		if r := recover(); r != nil {
@@ -170,45 +171,17 @@ func TestDiscardLogger(t *testing.T) {
 	ctx.Logger().Info("this shouldn't panic")
 }
 
-func TestErrCallstack(t *testing.T) {
-	c, cancel := WithCancel(Background())
-	ctx := c.(logCtx)
+func TestRace(t *testing.T) {
+	ctx, cancel := WithCancel(Background())
+	go cancel()
+	go func() { _ = ctx.Err() }()
 	cancel()
-	select {
-	case <-ctx.Done():
-		assert.Contains(t, ctx.Err().Error(), "TestErrCallstack")
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "context should be done")
-	}
+	_ = ctx.Err()
 }
 
-func TestErrCallstackTimeout(t *testing.T) {
-	ctx, cancel := WithTimeout(Background(), 10*time.Millisecond)
-	defer cancel()
-
-	select {
-	case <-ctx.Done():
-		// Deadline exceeded errors will not have a callstack from the cancel
-		// function.
-		assert.NotContains(t, ctx.Err().Error(), "TestErrCallstackTimeout")
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "context should be done")
-	}
-}
-
-func TestErrCallstackTimeoutCancel(t *testing.T) {
-	ctx, cancel := WithTimeout(Background(), 10*time.Millisecond)
-
-	var err error
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "context should be done")
-	}
-
-	// Calling cancel after deadline exceeded should not overwrite the original
-	// error.
-	cancel()
-	assert.Equal(t, err, ctx.Err())
+func TestCause(t *testing.T) {
+	ctx, cancel := WithCancelCause(Background())
+	err := fmt.Errorf("oh no")
+	cancel(err)
+	assert.Equal(t, err, Cause(ctx))
 }

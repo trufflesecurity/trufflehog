@@ -4,92 +4,140 @@
 package jdbc
 
 import (
-	"bytes"
 	"context"
-	"errors"
-	"os/exec"
+	"fmt"
+	"log"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-)
-
-const (
-	postgresUser = "postgres"
-	postgresPass = "23201dabb56ca236f3dc6736c0f9afad"
+	"github.com/brianvoe/gofakeit/v7"
+	"github.com/google/go-cmp/cmp"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func TestPostgres(t *testing.T) {
+	type result struct {
+		ParseErr        bool
+		PingOk          bool
+		PingDeterminate bool
+	}
+
+	user := gofakeit.Username()
+	pass := gofakeit.Password(true, true, true, false, false, 32)
+	dbName := gofakeit.Word()
+
+	t.Log("user: ", user)
+	t.Log("dbName: ", dbName)
+
+	ctx := context.Background()
+	postgresContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:13-alpine"),
+		postgres.WithDatabase(dbName),
+		postgres.WithUsername(user),
+		postgres.WithPassword(pass),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	host, err := postgresContainer.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := postgresContainer.MappedPort(ctx, "5432")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err != nil {
+		log.Fatalf("failed to start container: %s", err)
+	}
+	defer postgresContainer.Terminate(ctx)
+
 	tests := []struct {
-		input    string
-		wantErr  bool
-		wantPing bool
+		name  string
+		input string
+		want  result
 	}{
 		{
-			input:    "//localhost:5432/foo?sslmode=disable&password=" + postgresPass,
-			wantPing: true,
+			name:  "invalid password",
+			input: fmt.Sprintf("//%s:%s/foo?sslmode=disable&password=foo", host, port.Port()),
+			want:  result{PingOk: false, PingDeterminate: true},
 		},
 		{
-			input:    "//localhost:5432/foo?sslmode=disable&user=" + postgresUser + "&password=" + postgresPass,
-			wantPing: true,
+			name:  "valid password - no user name",
+			input: fmt.Sprintf("//%s:%s/foo?sslmode=disable&password=%s", host, port.Port(), pass),
+			want:  result{PingOk: false, PingDeterminate: true},
 		},
 		{
-			input:    "//localhost/foo?sslmode=disable&port=5432&password=" + postgresPass,
-			wantPing: true,
+			name:  "exact username and password, wrong db",
+			input: fmt.Sprintf("//%s:%s@%s:%s/foo?sslmode=disable", user, pass, host, port.Port()),
+			want:  result{PingOk: true, PingDeterminate: true},
 		},
 		{
-			input:    "//localhost:5432/foo?password=" + postgresPass,
-			wantPing: false,
+			name:  "exact username and password, no db",
+			input: fmt.Sprintf("//%s:%s@%s:%s?sslmode=disable", user, pass, host, port.Port()),
+			want:  result{PingOk: true, PingDeterminate: true},
 		},
 		{
-			input:    "//localhost:5432/foo?sslmode=disable&password=foo",
-			wantPing: false,
+			name:  "invalid user name",
+			input: fmt.Sprintf("//%s:%s/foo?sslmode=disable&user=foo&password=%s", host, port.Port(), pass),
+			want:  result{PingOk: false, PingDeterminate: true},
 		},
 		{
-			input:    "//localhost:5432/foo?sslmode=disable&user=foo&password=" + postgresPass,
-			wantPing: false,
+			name:  "invalid hostname",
+			input: fmt.Sprintf("//badhost:%s/foo?sslmode=disable&user=foo&password=%s", port.Port(), pass),
+			want:  result{PingOk: false, PingDeterminate: false},
 		},
 		{
-			input:   "invalid",
-			wantErr: true,
+			name:  "no username, password",
+			input: fmt.Sprintf("//%s:%s/foo?password=%s", host, port.Port(), pass),
+			want:  result{PingOk: false, PingDeterminate: false},
+		},
+		{
+			name:  "db, password - no username",
+			input: fmt.Sprintf("//%s:%s/foo?sslmode=disable&password=%s", host, port.Port(), pass),
+			want:  result{PingOk: false, PingDeterminate: true},
+		},
+		{
+			name:  "invalid format",
+			input: "invalid",
+			want:  result{ParseErr: true},
+		},
+		{
+			name:  "normal connect with generated username and password",
+			input: fmt.Sprintf("//%s:%s@%s:%s/%s?sslmode=disable", user, pass, host, port.Port(), dbName),
+			want:  result{PingOk: true, PingDeterminate: true},
 		},
 	}
+
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			j, err := parsePostgres(tt.input)
-			if tt.wantErr {
-				assert.Error(t, err)
+			if err != nil {
+				got := result{ParseErr: true}
+
+				if diff := cmp.Diff(tt.want, got); diff != "" {
+					t.Errorf("%s: (-want +got)\n%s", tt.name, diff)
+					t.Errorf("error is: %v", err)
+				}
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantPing, j.ping(context.Background()))
+
+			pr := j.ping(ctx)
+
+			got := result{PingOk: pr.err == nil, PingDeterminate: pr.determinate}
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("%s: (-want +got)\n%s", tt.name, diff)
+				t.Errorf("error is: %v", pr.err)
+			}
 		})
 	}
-}
-
-var postgresDockerHash string
-
-func startPostgres() error {
-	cmd := exec.Command(
-		"docker", "run", "--rm", "-p", "5432:5432",
-		"-e", "POSTGRES_PASSWORD="+postgresPass,
-		"-e", "POSTGRES_USER="+postgresUser,
-		"-d", "postgres",
-	)
-	out, err := cmd.Output()
-	if err != nil {
-		return err
-	}
-	postgresDockerHash = string(bytes.TrimSpace(out))
-	select {
-	case <-dockerLogLine(postgresDockerHash, "PostgreSQL init process complete; ready for start up."):
-		return nil
-	case <-time.After(30 * time.Second):
-		stopPostgres()
-		return errors.New("timeout waiting for postgres database to be ready")
-	}
-}
-
-func stopPostgres() {
-	exec.Command("docker", "kill", postgresDockerHash).Run()
 }

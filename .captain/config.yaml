@@ -1,0 +1,11 @@
+test-suites:
+  detectors:
+    command: gotestsum --jsonfile tmp/go-test.json --raw-command -- go test -tags=detectors -timeout=15m -json -count=1 -vet=off ./pkg/detectors/...
+    results:
+      path: tmp/go-test.json
+    output:
+      print-summary: true
+    ## No retries right now
+    # retries:
+    #   attempts: 3
+    #   command: gotestsum --raw-command --jsonfile tmp/go-test.json -- go test -tags=detectors -timeout=15m -json -count=1 -vet=off {{ package }} -run '{{ run }}'

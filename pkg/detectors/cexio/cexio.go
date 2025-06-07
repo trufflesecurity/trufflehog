@@ -9,17 +9,20 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -48,21 +51,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	userIdMatches := userIdPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, userIdMatch := range userIdMatches {
-		if len(userIdMatch) != 2 {
-			continue
-		}
 		resUserIdMatch := strings.TrimSpace(userIdMatch[1])
 
 		for _, keyMatch := range keyMatches {
-			if len(keyMatch) != 2 {
-				continue
-			}
 			resKeyMatch := strings.TrimSpace(keyMatch[1])
 
 			for _, secretMatch := range secretMatches {
-				if len(secretMatch) != 2 {
-					continue
-				}
 				resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 				s1 := detectors.Result{
@@ -105,19 +99,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && validResponse {
 							s1.Verified = true
-						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resUserIdMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
-
-							if detectors.IsKnownFalsePositive(resKeyMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
-
-							if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}
@@ -145,4 +126,8 @@ func getCexIOPassphrase(apiSecret string, apiKey string, nonce string, userId st
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CexIO
+}
+
+func (s Scanner) Description() string {
+	return "CexIO is a cryptocurrency exchange platform. CexIO API keys can be used to access and manage cryptocurrency accounts and transactions."
 }

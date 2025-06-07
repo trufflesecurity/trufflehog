@@ -2,9 +2,11 @@ package sources
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
+	"fmt"
 	"io"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 const (
@@ -12,35 +14,152 @@ const (
 	ChunkSize = 10 * 1024
 	// PeekSize is the size of the peek into the previous chunk.
 	PeekSize = 3 * 1024
+	// TotalChunkSize is the total size of a chunk with peek data.
+	TotalChunkSize = ChunkSize + PeekSize
 )
 
-// Chunker takes a chunk and splits it into chunks of ChunkSize.
-func Chunker(originalChunk *Chunk) chan *Chunk {
-	chunkChan := make(chan *Chunk)
+type chunkReaderConfig struct {
+	chunkSize int
+	totalSize int
+	peekSize  int
+}
+
+// ConfigOption is a function that configures a chunker.
+type ConfigOption func(*chunkReaderConfig)
+
+// WithChunkSize sets the chunk size.
+func WithChunkSize(size int) ConfigOption {
+	return func(c *chunkReaderConfig) {
+		c.chunkSize = size
+	}
+}
+
+// WithPeekSize sets the peek size.
+func WithPeekSize(size int) ConfigOption {
+	return func(c *chunkReaderConfig) {
+		c.peekSize = size
+	}
+}
+
+// ChunkResult is the output unit of a ChunkReader,
+// it contains the data and error of a chunk.
+type ChunkResult struct {
+	data []byte
+	err  error
+}
+
+// Bytes for a ChunkResult.
+func (cr ChunkResult) Bytes() []byte {
+	return cr.data
+}
+
+// Error for a ChunkResult.
+func (cr ChunkResult) Error() error {
+	return cr.err
+}
+
+// ChunkReader reads chunks from a reader and returns a channel of chunks and a channel of errors.
+// The channel of chunks is closed when the reader is closed.
+// This should be used whenever a large amount of data is read from a reader.
+// Ex: reading attachments, archives, etc.
+type ChunkReader func(ctx context.Context, reader io.Reader) <-chan ChunkResult
+
+// NewChunkReader returns a ChunkReader with the given options.
+func NewChunkReader(opts ...ConfigOption) ChunkReader {
+	config := applyOptions(opts)
+	return createReaderFn(config)
+}
+
+func applyOptions(opts []ConfigOption) *chunkReaderConfig {
+	// Set defaults.
+	config := &chunkReaderConfig{
+		chunkSize: ChunkSize, // default
+		peekSize:  PeekSize,  // default
+	}
+
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	config.totalSize = config.chunkSize + config.peekSize
+
+	return config
+}
+
+func createReaderFn(config *chunkReaderConfig) ChunkReader {
+	return func(ctx context.Context, reader io.Reader) <-chan ChunkResult {
+		return readInChunks(ctx, reader, config)
+	}
+}
+
+func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConfig) <-chan ChunkResult {
+	const channelSize = 64
+	chunkReader := bufio.NewReaderSize(reader, config.chunkSize)
+	chunkResultChan := make(chan ChunkResult, channelSize)
+
 	go func() {
-		defer close(chunkChan)
-		if len(originalChunk.Data) <= ChunkSize+PeekSize {
-			chunkChan <- originalChunk
-			return
-		}
-		r := bytes.NewReader(originalChunk.Data)
-		reader := bufio.NewReaderSize(bufio.NewReader(r), ChunkSize)
+		defer close(chunkResultChan)
+
+		// Defer a panic recovery to handle any panics that occur while reading, which can sometimes unavoidably happen
+		// due to third-party library bugs.
+		defer func() {
+			if r := recover(); r != nil {
+				var panicErr error
+				if e, ok := r.(error); ok {
+					panicErr = e
+				} else {
+					panicErr = fmt.Errorf("panic occurred: %v", r)
+				}
+				chunkResultChan <- ChunkResult{
+					err: fmt.Errorf("panic error: %w", panicErr),
+				}
+			}
+		}()
+
 		for {
-			chunkBytes := make([]byte, ChunkSize)
-			chunk := *originalChunk
-			n, err := reader.Read(chunkBytes)
-			if err != nil && !errors.Is(err, io.EOF) {
-				break
-			}
-			peekData, _ := reader.Peek(PeekSize)
-			chunk.Data = append(chunkBytes[:n], peekData...)
+			chunkRes := ChunkResult{}
+			chunkBytes := make([]byte, config.totalSize)
+			chunkBytes = chunkBytes[:config.chunkSize]
+			n, err := io.ReadFull(chunkReader, chunkBytes)
 			if n > 0 {
-				chunkChan <- &chunk
+				peekData, _ := chunkReader.Peek(config.totalSize - n)
+				chunkBytes = append(chunkBytes[:n], peekData...)
+				chunkRes.data = chunkBytes
 			}
-			if errors.Is(err, io.EOF) {
-				break
+
+			// If there is an error other than EOF, or if we have read some bytes, send the chunk.
+			// io.ReadFull will only return io.EOF when n == 0.
+			switch {
+			case isErrAndNotEOF(err):
+				ctx.Logger().Error(err, "error reading chunk")
+				chunkRes.err = err
+			case n > 0:
+				chunkRes.err = nil
+			default:
+				return
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case chunkResultChan <- chunkRes:
+			}
+
+			if err != nil {
+				return
 			}
 		}
 	}()
-	return chunkChan
+	return chunkResultChan
+}
+
+// reportableErr checks whether the error is one we are interested in flagging.
+func isErrAndNotEOF(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return false
+	}
+	return true
 }

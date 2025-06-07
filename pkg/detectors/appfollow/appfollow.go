@@ -2,11 +2,10 @@ package appfollow
 
 import (
 	"context"
-	b64 "encoding/base64"
-	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -22,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appfollow"}) + `\b([0-9A-Za-z]{20})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"appfollow"}) + `\b(eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9\.[0-9A-Za-z]{74}\.[0-9A-Z-a-z\-_]{43})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -38,9 +37,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -49,23 +45,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			data := fmt.Sprintf("%s:", resMatch)
-			sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.appfollow.io/test", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.appfollow.io/api/v2/account/users", nil)
 			if err != nil {
 				continue
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
+			req.Header.Add("X-AppFollow-API-Token", resMatch)
 			res, err := client.Do(req)
 			if err == nil {
 				defer res.Body.Close()
 				if res.StatusCode >= 200 && res.StatusCode < 300 {
 					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
@@ -78,4 +67,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Appfollow
+}
+
+func (s Scanner) Description() string {
+	return "Appfollow is a service used for app monitoring and analytics. Appfollow API tokens can be used to access and manage app data and analytics."
 }
