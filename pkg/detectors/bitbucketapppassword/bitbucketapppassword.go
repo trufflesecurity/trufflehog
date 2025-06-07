@@ -42,7 +42,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"ATBB"}
+	return []string{"bitbucketapppassword", "ATBB"}
 }
 
 // FromData will find and optionally verify Bitbucket App Password secrets in a given set of bytes.
@@ -95,4 +95,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BitbucketAppPassword
+}
+
+func (s Scanner) Description() string {
+	return "Bitbucket is a Git repository hosting service by Atlassian. Bitbucket App Passwords are used to authenticate to the Bitbucket API."
 }
