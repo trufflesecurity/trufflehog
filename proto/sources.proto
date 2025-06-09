@@ -112,6 +112,8 @@ message Bitbucket {
   bool skip_binaries = 7;
   bool skip_archives = 8;
   BitbucketInstallationType installation_type = 9;
+  string oauth_authorization_endpoint = 10;
+  string oauth_token_endpoint = 11;
 }
 
 message CircleCI {
