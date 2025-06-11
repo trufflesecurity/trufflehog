@@ -114,6 +114,7 @@ message Bitbucket {
   BitbucketInstallationType installation_type = 9;
   string oauth_authorization_endpoint = 10;
   string oauth_token_endpoint = 11;
+  repeated string oauth_scopes = 12;
 }
 
 message CircleCI {
