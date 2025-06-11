@@ -140,6 +140,7 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 				"hub_username": username,
 				"hub_email":    claims.HubClaims.Email,
 				"hub_scope":    claims.Scope,
+				"version":      fmt.Sprintf("%d", s.Version()),
 			}
 			return true, extraData, nil
 		}
@@ -148,13 +149,15 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 		// Valid credentials can still return a 401 status code if 2FA is enabled
 		var mfaRes mfaRequiredResponse
 		if err := json.Unmarshal(body, &mfaRes); err != nil || mfaRes.MfaToken == "" {
-			return false, nil, nil
+			return false, map[string]string{"version": fmt.Sprintf("%d", s.Version())}, nil
 		}
 
 		extraData := map[string]string{
 			"hub_username": username,
 			"2fa_required": "true",
+			"version":      fmt.Sprintf("%d", s.Version()),
 		}
+
 		return true, extraData, nil
 	} else {
 		return false, nil, fmt.Errorf("unexpected response status %d", res.StatusCode)

@@ -29,11 +29,14 @@ var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	// Can use email or username for login.
-	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `(?im)(?:user|usr|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
+	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `(?im)(?:user|usr|username|-u|id)\s{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9][a-zA-Z0-9_-]{3,39})\b`)
 	emailPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + common.EmailPattern)
 
 	// Can use password or personal access token (PAT) for login, but this scanner will only check for PATs.
-	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `\b([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
+	accessTokenPat = regexp.MustCompile(`(?i)(?:docker[-_]?(?:token|pat|password|access[-_]?token))\s{0,10}?[:=\s]{1,3}[ '"=]?([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
+
+	// Pattern to exclude Docker protocol headers
+	excludeHeaderPat = regexp.MustCompile(`(?i)(?:docker[-_]?upload[-_]?uuid|x[-_]?docker[-_]?upload[-_]?uuid|docker[-_]?content[-_]?digest)\s*:\s*([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -46,17 +49,30 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	// Deduplicate results.
+	// First, find and exclude Docker protocol headers to avoid false positives
+	excludedTokens := make(map[string]struct{})
+	for _, matches := range excludeHeaderPat.FindAllStringSubmatch(dataStr, -1) {
+		excludedTokens[matches[1]] = struct{}{}
+	}
+
+	// Deduplicate results and filter out excluded tokens.
 	tokens := make(map[string]struct{})
 	for _, matches := range accessTokenPat.FindAllStringSubmatch(dataStr, -1) {
-		tokens[matches[1]] = struct{}{}
+		// Skip if this token was found in a Docker protocol header
+		if _, excluded := excludedTokens[matches[1]]; !excluded {
+			tokens[matches[1]] = struct{}{}
+		}
 	}
 	if len(tokens) == 0 {
 		return
 	}
+
 	usernames := make(map[string]struct{})
 	for _, matches := range usernamePat.FindAllStringSubmatch(dataStr, -1) {
-		usernames[matches[1]] = struct{}{}
+		// Additional validation: ensure username doesn't look like part of a UUID
+		if !isLikelyUUIDFragment(matches[1]) {
+			usernames[matches[1]] = struct{}{}
+		}
 	}
 	for _, matches := range emailPat.FindAllStringSubmatch(dataStr, -1) {
 		usernames[matches[1]] = struct{}{}
@@ -104,6 +120,19 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
+// Helper function to detect if a string looks like a UUID fragment
+func isLikelyUUIDFragment(s string) bool {
+	// Check if it's all digits (common in correlation IDs)
+	if regexp.MustCompile(`^\d+$`).MatchString(s) {
+		return true
+	}
+	// Check if it looks like the first part of a UUID (8 hex chars)
+	if regexp.MustCompile(`^[a-f0-9]{8}$`).MatchString(strings.ToLower(s)) {
+		return true
+	}
+	return false
+}
+
 func (s Scanner) verifyMatch(ctx context.Context, username string, password string) (bool, map[string]string, error) {
 	payload := strings.NewReader(fmt.Sprintf(`{"username": "%s", "password": "%s"}`, username, password))
 
@@ -140,6 +169,7 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 				"hub_username": username,
 				"hub_email":    claims.HubClaims.Email,
 				"hub_scope":    claims.Scope,
+				"version":      fmt.Sprintf("%d", s.Version()),
 			}
 			return true, extraData, nil
 		}
@@ -148,12 +178,13 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 		// Valid credentials can still return a 401 status code if 2FA is enabled
 		var mfaRes mfaRequiredResponse
 		if err := json.Unmarshal(body, &mfaRes); err != nil || mfaRes.MfaToken == "" {
-			return false, nil, nil
+			return false, map[string]string{"version": fmt.Sprintf("%d", s.Version())}, nil
 		}
 
 		extraData := map[string]string{
 			"hub_username": username,
 			"2fa_required": "true",
+			"version":      fmt.Sprintf("%d", s.Version()),
 		}
 		return true, extraData, nil
 	} else {
