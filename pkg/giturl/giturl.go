@@ -118,16 +118,18 @@ func NormalizeOrgRepoURL(provider provider, repoURL string) (string, error) {
 // Supports GitHub, GitLab, Bitbucket, and Azure Repos.
 // If the provider supports hyperlinks to specific lines, the line number will be included.
 func GenerateLink(repo, commit, file string, line int64) string {
-	// Some paths contain '%' which breaks |url.Parse| if not encoded.
+	// Some paths contain special characters which breaks |url.Parse| if not encoded. PathEscape encodes them.
 	// https://developer.mozilla.org/en-US/docs/Glossary/Percent-encoding
-	file = strings.ReplaceAll(file, "%", "%25")
+	escRepo := url.PathEscape(repo)
+	escCommit := url.PathEscape(commit)
+	escFile := url.PathEscape(file)
 
 	switch determineProvider(repo) {
 	case providerBitbucket:
-		return repo[:len(repo)-4] + "/commits/" + commit
+		return escRepo[:len(escRepo)-4] + "/commits/" + escCommit
 
 	case providerAzure:
-		baseLink := repo + "/commit/" + commit + "/" + file
+		baseLink := escRepo + "/commit/" + escCommit + "/" + escFile
 		if line > 0 {
 			baseLink += "?line=" + strconv.FormatInt(line, 10)
 		}
@@ -144,11 +146,11 @@ func GenerateLink(repo, commit, file string, line int64) string {
 		if strings.HasPrefix(repo, "https://gist.github.com") {
 			baseLink = repo[:len(repo)-4] + "/"
 			if commit != "" {
-				baseLink += commit + "/"
+				baseLink += escCommit + "/"
 			}
 			if file != "" {
 				cleanedFileName := strings.ReplaceAll(file, ".", "-")
-				baseLink += "#file-" + cleanedFileName
+				baseLink += "#file-" + url.PathEscape(cleanedFileName)
 			}
 			if line > 0 {
 				if strings.Contains(baseLink, "#") {
@@ -158,9 +160,9 @@ func GenerateLink(repo, commit, file string, line int64) string {
 				}
 			}
 		} else if file == "" {
-			baseLink = repo[:len(repo)-4] + "/commit/" + commit
+			baseLink = escRepo[:len(escRepo)-4] + "/commit/" + escCommit
 		} else {
-			baseLink = repo[:len(repo)-4] + "/blob/" + commit + "/" + file
+			baseLink = escRepo[:len(escRepo)-4] + "/blob/" + escCommit + "/" + escFile
 			if line > 0 {
 				baseLink += "#L" + strconv.FormatInt(line, 10)
 			}
