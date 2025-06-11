@@ -134,9 +134,9 @@ func isLikelyUUIDFragment(s string) bool {
 }
 
 func (s Scanner) verifyMatch(ctx context.Context, username string, password string) (bool, map[string]string, error) {
-	payload := strings.NewReader(fmt.Sprintf(`{"username": "%s", "password": "%s"}`, username, password))
+	payload := strings.NewReader(fmt.Sprintf(`{"identifier": "%s", "secret": "%s"}`, username, password))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://hub.docker.com/v2/users/login", payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://hub.docker.com/v2/auth/token", payload)
 	if err != nil {
 		return false, nil, err
 	}
@@ -159,7 +159,7 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 		}
 
 		parser := jwt.NewParser()
-		token, _, err := parser.ParseUnverified(tokenRes.Token, &hubJwtClaims{})
+		token, _, err := parser.ParseUnverified(tokenRes.AccessToken, &hubJwtClaims{})
 		if err != nil {
 			return true, nil, err
 		}
@@ -193,7 +193,7 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 }
 
 type tokenResponse struct {
-	Token string `json:"token"`
+	AccessToken string `json:"access_token"`
 }
 
 type userClaims struct {
