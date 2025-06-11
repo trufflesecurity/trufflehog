@@ -26,13 +26,13 @@ var (
 	// https://support.atlassian.com/bitbucket-cloud/docs/using-app-passwords/, as well as for other general cases.
 
 	// Covers 'username:appPassword' pattern
-	usernamePat1 = regexp.MustCompile(`\b([A-Za-z0-9-_]{1,30}):ATBB[A-Za-z0-9_=.-]+[A-Z0-9]{8}\b`)
+	credentialPairPattern = regexp.MustCompile(`\b([A-Za-z0-9-_]{1,30}):ATBB[A-Za-z0-9_=.-]+[A-Z0-9]{8}\b`)
 	// Covers assignment of username to variable
-	usernamePat2 = regexp.MustCompile(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9-_]{1,30})\b`)
+	usernameAssignmentPattern = regexp.MustCompile(`(?im)(?:user|usr)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9-_]{1,30})\b`)
 	// Covers 'https://username@bitbucket.org' pattern
-	usernamePat3 = regexp.MustCompile(`https://([a-zA-Z0-9-_]{1,30})@bitbucket.org`)
+	usernameUrlPattern = regexp.MustCompile(`https://([a-zA-Z0-9-_]{1,30})@bitbucket.org`)
 	// Covers '("username", "password")' pattern, used for HTTP Basic Auth
-	usernamePat4 = regexp.MustCompile(`"([a-zA-Z0-9-_]{1,30})",(?: )?"ATBB[A-Za-z0-9_=.-]+[A-Z0-9]{8}"`)
+	httpBasicAuthPattern = regexp.MustCompile(`"([a-zA-Z0-9-_]{1,30})",(?: )?"ATBB[A-Za-z0-9_=.-]+[A-Z0-9]{8}"`)
 
 	usernamePatterns = []*regexp.Regexp{usernamePat1, usernamePat2, usernamePat3, usernamePat4}
 
@@ -69,7 +69,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.bitbucket.org/2.0/user", nil)
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.bitbucket.org/2.0/user", nil)
 				if err != nil {
 					continue
 				}
