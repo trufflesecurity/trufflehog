@@ -123,7 +123,8 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 		return false, nil, err
 	}
 
-	if res.StatusCode == http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusOK:
 		var tokenRes tokenResponse
 		if err := json.Unmarshal(body, &tokenRes); (err != nil || tokenRes == tokenResponse{}) {
 			return false, nil, err
@@ -145,7 +146,7 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 			return true, extraData, nil
 		}
 		return true, nil, nil
-	} else if res.StatusCode == http.StatusUnauthorized {
+	case http.StatusUnauthorized:
 		// Valid credentials can still return a 401 status code if 2FA is enabled
 		var mfaRes mfaRequiredResponse
 		if err := json.Unmarshal(body, &mfaRes); err != nil || mfaRes.MfaToken == "" {
@@ -159,7 +160,16 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 		}
 
 		return true, extraData, nil
-	} else {
+	case http.StatusTooManyRequests:
+		extraData := map[string]string{
+			"verification": "rate_limited",
+			"status_code":  "429",
+			"version":      fmt.Sprintf("%d", s.Version()),
+			"retry_after":  res.Header.Get("X-Retry-After"),
+		}
+
+		return false, extraData, fmt.Errorf("rate limited (429) - verification unavailable")
+	default:
 		return false, nil, fmt.Errorf("unexpected response status %d", res.StatusCode)
 	}
 }
