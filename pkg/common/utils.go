@@ -73,7 +73,7 @@ func SliceContainsString(origTargetString string, stringSlice []string, ignoreCa
 }
 
 // GoFakeIt Password generator does not guarantee inclusion of characters.
-// Using a custom random password gennerator with guaranteed inclusions (atleast) of lower, upper, numeric and special characters
+// Using a custom random password generator with guaranteed inclusions (atleast) of lower, upper, numeric and special characters
 func GenerateRandomPassword(lower, upper, numeric, special bool, length int) string {
 	if length < 1 {
 		return ""
