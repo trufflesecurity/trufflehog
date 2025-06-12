@@ -183,9 +183,10 @@ var (
 	circleCiScan      = cli.Command("circleci", "Scan CircleCI")
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
 
-	dockerScan       = cli.Command("docker", "Scan Docker Image")
-	dockerScanImages = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
-	dockerScanToken  = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
+	dockerScan         = cli.Command("docker", "Scan Docker Image")
+	dockerScanImages   = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+	dockerScanToken    = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
+	dockerExcludePaths = dockerScan.Flag("exclude-paths", "Comma separated list of paths to exclude from scan").String()
 
 	travisCiScan      = cli.Command("travisci", "Scan TravisCI")
 	travisCiScanToken = travisCiScan.Flag("token", "TravisCI token. Can also be provided with environment variable").Envar("TRAVISCI_TOKEN").Required().String()
@@ -255,6 +256,7 @@ var (
 	huggingfaceIncludePrs         = huggingfaceScan.Flag("include-prs", "Include pull requests in scan.").Bool()
 
 	stdinInputScan = cli.Command("stdin", "Find credentials from stdin.")
+	multiScanScan  = cli.Command("multi-scan", "Find credentials in multiple sources defined in configuration.")
 
 	analyzeCmd = analyzer.Command(cli)
 	usingTUI   = false
@@ -371,17 +373,6 @@ func main() {
 	}
 }
 
-// Function to check if the commit is valid
-func isValidCommit(commit string) bool {
-	cmd := exec.Command("git", "cat-file", "-t", commit)
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-
-	return strings.TrimSpace(string(output)) == "commit"
-}
-
 func run(state overseer.State) {
 
 	ctx, cancel := context.WithCancelCause(context.Background())
@@ -422,9 +413,6 @@ func run(state overseer.State) {
 	// When setting a base commit, chunks must be scanned in order.
 	if *gitScanSinceCommit != "" {
 		*concurrency = 1
-		if !isValidCommit(*gitScanSinceCommit) {
-			logger.Info("Warning: The provided commit hash appears to be invalid.")
-		}
 	}
 
 	if *profile {
@@ -515,7 +503,8 @@ func run(state overseer.State) {
 	verificationCacheMetrics := verificationcache.InMemoryMetrics{}
 
 	engConf := engine.Config{
-		Concurrency: *concurrency,
+		Concurrency:       *concurrency,
+		ConfiguredSources: conf.Sources,
 		// The engine must always be configured with the list of
 		// default detectors, which can be further filtered by the
 		// user. The filters are applied by the engine and are only
@@ -538,6 +527,16 @@ func run(state overseer.State) {
 
 	if !*noVerificationCache {
 		engConf.VerificationResultCache = simple.NewCache[detectors.Result]()
+	}
+
+	// Check that there are no sources defined for non-scan subcommands. If
+	// there are, return an error as it is ambiguous what the user is
+	// trying to do.
+	if cmd != multiScanScan.FullCommand() && len(conf.Sources) > 0 {
+		logFatal(
+			fmt.Errorf("ambiguous configuration"),
+			"sources should only be defined in configuration for the 'multi-scan' command",
+		)
 	}
 
 	if *compareDetectionStrategies {
@@ -702,9 +701,16 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 	}()
 
-	var ref sources.JobProgressRef
+	var refs []sources.JobProgressRef
 	switch cmd {
 	case gitScan.FullCommand():
+		// validate the commit for local repository only
+		if *gitScanSinceCommit != "" && strings.HasPrefix(*gitScanURI, "file") {
+			if !isValidCommit(*gitScanURI, *gitScanSinceCommit) {
+				ctx.Logger().Info("Warning: The provided commit hash appears to be invalid.")
+			}
+		}
+
 		gitCfg := sources.GitConfig{
 			URI:              *gitScanURI,
 			IncludePathsFile: *gitScanIncludePaths,
@@ -715,8 +721,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Bare:             *gitScanBare,
 			ExcludeGlobs:     *gitScanExcludeGlobs,
 		}
-		if ref, err = eng.ScanGit(ctx, gitCfg); err != nil {
+		if ref, err := eng.ScanGit(ctx, gitCfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Git: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case githubScan.FullCommand():
 		filter, err := common.FilterFromFiles(*githubScanIncludePaths, *githubScanExcludePaths)
@@ -725,6 +733,9 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
 			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization or repository")
+		}
+		if len(*githubScanOrgs) > 0 && len(*githubScanRepos) > 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both organizations and repositories at the same time")
 		}
 
 		cfg := sources.GithubConfig{
@@ -745,8 +756,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Filter:                     filter,
 			AuthInUrl:                  *githubAuthInUrl,
 		}
-		if ref, err = eng.ScanGitHub(ctx, cfg); err != nil {
+		if ref, err := eng.ScanGitHub(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Github: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case githubExperimentalScan.FullCommand():
 		cfg := sources.GitHubExperimentalConfig{
@@ -756,8 +769,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CollisionThreshold: *githubExperimentalCollisionThreshold,
 			DeleteCachedData:   *githubExperimentalDeleteCache,
 		}
-		if ref, err = eng.ScanGitHubExperimental(ctx, cfg); err != nil {
+		if ref, err := eng.ScanGitHubExperimental(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan using Github Experimental: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case gitlabScan.FullCommand():
 		filter, err := common.FilterFromFiles(*gitlabScanIncludePaths, *gitlabScanExcludePaths)
@@ -774,8 +789,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Filter:       filter,
 			AuthInUrl:    *gitlabAuthInUrl,
 		}
-		if ref, err = eng.ScanGitLab(ctx, cfg); err != nil {
+		if ref, err := eng.ScanGitLab(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GitLab: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case filesystemScan.FullCommand():
 		if len(*filesystemDirectories) > 0 {
@@ -789,8 +806,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludePathsFile: *filesystemScanIncludePaths,
 			ExcludePathsFile: *filesystemScanExcludePaths,
 		}
-		if ref, err = eng.ScanFileSystem(ctx, cfg); err != nil {
+		if ref, err := eng.ScanFileSystem(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan filesystem: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case s3Scan.FullCommand():
 		cfg := sources.S3Config{
@@ -803,8 +822,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			CloudCred:     *s3ScanCloudEnv,
 			MaxObjectSize: int64(*s3ScanMaxObjectSize),
 		}
-		if ref, err = eng.ScanS3(ctx, cfg); err != nil {
+		if ref, err := eng.ScanS3(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan S3: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case syslogScan.FullCommand():
 		cfg := sources.SyslogConfig{
@@ -815,16 +836,22 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			KeyPath:     *syslogTLSKey,
 			Concurrency: *concurrency,
 		}
-		if ref, err = eng.ScanSyslog(ctx, cfg); err != nil {
+		if ref, err := eng.ScanSyslog(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan syslog: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case circleCiScan.FullCommand():
-		if ref, err = eng.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
+		if ref, err := eng.ScanCircleCI(ctx, *circleCiScanToken); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan CircleCI: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case travisCiScan.FullCommand():
-		if ref, err = eng.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
+		if ref, err := eng.ScanTravisCI(ctx, *travisCiScanToken); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan TravisCI: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case gcsScan.FullCommand():
 		cfg := sources.GCSConfig{
@@ -840,17 +867,22 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Concurrency:    *concurrency,
 			MaxObjectSize:  int64(*gcsMaxObjectSize),
 		}
-		if ref, err = eng.ScanGCS(ctx, cfg); err != nil {
+		if ref, err := eng.ScanGCS(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan GCS: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case dockerScan.FullCommand():
 		cfg := sources.DockerConfig{
 			BearerToken:       *dockerScanToken,
 			Images:            *dockerScanImages,
 			UseDockerKeychain: *dockerScanToken == "",
+			ExcludePaths:      strings.Split(*dockerExcludePaths, ","),
 		}
-		if ref, err = eng.ScanDocker(ctx, cfg); err != nil {
+		if ref, err := eng.ScanDocker(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Docker: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case postmanScan.FullCommand():
 		// handle deprecated flag
@@ -886,8 +918,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			WorkspacePaths:      *postmanWorkspacePaths,
 			EnvironmentPaths:    *postmanEnvironmentPaths,
 		}
-		if ref, err = eng.ScanPostman(ctx, cfg); err != nil {
+		if ref, err := eng.ScanPostman(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Postman: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case elasticsearchScan.FullCommand():
 		cfg := sources.ElasticsearchConfig{
@@ -902,8 +936,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			SinceTimestamp: *elasticsearchSinceTimestamp,
 			BestEffortScan: *elasticsearchBestEffortScan,
 		}
-		if ref, err = eng.ScanElasticsearch(ctx, cfg); err != nil {
+		if ref, err := eng.ScanElasticsearch(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Elasticsearch: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case jenkinsScan.FullCommand():
 		cfg := engine.JenkinsConfig{
@@ -912,8 +948,10 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			Username:              *jenkinsUsername,
 			Password:              *jenkinsPassword,
 		}
-		if ref, err = eng.ScanJenkins(ctx, cfg); err != nil {
+		if ref, err := eng.ScanJenkins(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan Jenkins: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	case huggingfaceScan.FullCommand():
 		if *huggingfaceEndpoint != "" {
@@ -945,13 +983,26 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludePrs:         *huggingfaceIncludePrs,
 			Concurrency:        *concurrency,
 		}
-		if ref, err = eng.ScanHuggingface(ctx, cfg); err != nil {
+		if ref, err := eng.ScanHuggingface(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan HuggingFace: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
+		}
+	case multiScanScan.FullCommand():
+		if *configFilename == "" {
+			return scanMetrics, fmt.Errorf("missing required flag: --config")
+		}
+		if rs, err := eng.ScanConfig(ctx, cfg.ConfiguredSources...); err != nil {
+			return scanMetrics, fmt.Errorf("failed to scan via config: %w", err)
+		} else {
+			refs = rs
 		}
 	case stdinInputScan.FullCommand():
 		cfg := sources.StdinConfig{}
-		if ref, err = eng.ScanStdinInput(ctx, cfg); err != nil {
+		if ref, err := eng.ScanStdinInput(ctx, cfg); err != nil {
 			return scanMetrics, fmt.Errorf("failed to scan stdin input: %v", err)
+		} else {
+			refs = []sources.JobProgressRef{ref}
 		}
 	default:
 		return scanMetrics, fmt.Errorf("invalid command: %s", cmd)
@@ -962,13 +1013,19 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		return scanMetrics, fmt.Errorf("engine failed to finish execution: %v", err)
 	}
 
-	// Print any errors reported during the scan.
-	if errs := ref.Snapshot().Errors; len(errs) > 0 {
-		errMsgs := make([]string, len(errs))
-		for i := 0; i < len(errs); i++ {
-			errMsgs[i] = errs[i].Error()
+	// Print any non-fatal errors reported during the scan.
+	for _, ref := range refs {
+		if errs := ref.Snapshot().Errors; len(errs) > 0 {
+			errMsgs := make([]string, len(errs))
+			for i := 0; i < len(errs); i++ {
+				errMsgs[i] = errs[i].Error()
+			}
+			ctx.Logger().Error(nil, "encountered errors during scan",
+				"job", ref.JobID,
+				"source_name", ref.SourceName,
+				"errors", errMsgs,
+			)
 		}
-		ctx.Logger().Error(nil, "encountered errors during scan", "errors", errMsgs)
 	}
 
 	if *printAvgDetectorTime {
@@ -1037,4 +1094,16 @@ func printAverageDetectorTime(e *engine.Engine) {
 	for detectorName, duration := range e.GetDetectorsMetrics() {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", detectorName, duration)
 	}
+}
+
+// Function to check if the commit is valid
+func isValidCommit(uri, commit string) bool {
+	// handle file:// urls
+	repoPath, _ := strings.CutPrefix(uri, "file://") // remove the prefix to validate against the repo path
+	output, err := exec.Command("git", "-C", repoPath, "cat-file", "-t", commit).Output()
+	if err != nil {
+		return false
+	}
+
+	return strings.TrimSpace(string(output)) == "commit"
 }

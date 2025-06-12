@@ -24,7 +24,7 @@
 
 **...and more**
 
-To learn more about about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
+To learn more about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
 
 </div>
 
@@ -418,6 +418,7 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - jenkins
 - elasticsearch
 - stdin
+- multi-scan
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
@@ -480,6 +481,33 @@ For example, to scan a `git` repository, start with
 ```
 trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
+
+## Configuration
+
+TruffleHog supports defining [custom regex detectors](#regex-detector-alpha)
+and multiple sources in a configuration file provided via the `--config` flag.
+The regex detectors can be used with any subcommand, while the sources defined
+in configuration are only for the `multi-scan` subcommand.
+
+The configuration format for sources can be found on Truffle Security's
+[source configuration documentation page](https://docs.trufflesecurity.com/scan-data-for-secrets).
+
+Example GitHub source configuration and [options reference](https://docs.trufflesecurity.com/github#Fvm1I):
+
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.GitHub
+    repositories:
+    - https://github.com/trufflesecurity/test_keys.git
+    unauthenticated: {}
+  name: example config scan
+  type: SOURCE_TYPE_GITHUB
+  verify: true
+```
+
+You may define multiple connections under the `sources` key (see above), and
+TruffleHog will scan all of the sources concurrently.
 
 ## S3
 

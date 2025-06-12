@@ -1,6 +1,8 @@
 package sources
 
 import (
+	"errors"
+	"runtime"
 	"sync"
 
 	"google.golang.org/protobuf/types/known/anypb"
@@ -65,7 +67,7 @@ type Source interface {
 	SourceID() SourceID
 	// JobID returns the initialized job ID used for tracking relationships in the DB.
 	JobID() JobID
-	// Init initializes the source.
+	// Init initializes the source. Calling this method more than once is undefined behavior.
 	Init(aCtx context.Context, name string, jobId JobID, sourceId SourceID, verify bool, connection *anypb.Any, concurrency int) error
 	// Chunks emits data over a channel which is then decoded and scanned for secrets.
 	// By default, data is obtained indiscriminately. However, by providing one or more
@@ -101,6 +103,56 @@ type SourceUnitEnumerator interface {
 	// errors returned by the reporter. All other errors related to unit
 	// enumeration are tracked by the UnitReporter.
 	Enumerate(ctx context.Context, reporter UnitReporter) error
+}
+
+// ConfiguredSource is a Source with most of its initialization values
+// pre-configured from a [sourcespb.LocalSource] configuration struct. It
+// exposes a simplified Init() method and can be only initialized once. This
+// struct is not necessary for running sources, but it helps simplify gathering
+// all of the necessary information to call the [Source.Init] method.
+type ConfiguredSource struct {
+	Name       string
+	source     Source
+	initParams struct {
+		verify      bool
+		conn        *anypb.Any
+		concurrency int
+	}
+}
+
+// NewConfiguredSource pre-configures an instantiated Source object with the
+// provided protobuf configuration.
+func NewConfiguredSource(s Source, config *sourcespb.LocalSource) ConfiguredSource {
+	return ConfiguredSource{
+		Name:   config.GetName(),
+		source: s,
+		initParams: struct {
+			verify      bool
+			conn        *anypb.Any
+			concurrency int
+		}{
+			verify:      config.GetVerify(),
+			conn:        config.GetConnection(),
+			concurrency: runtime.NumCPU(),
+		},
+	}
+}
+
+// SourceType exposes the underlying source type.
+func (c *ConfiguredSource) SourceType() sourcespb.SourceType {
+	return c.source.Type()
+}
+
+// Init returns the initialized Source. The ConfiguredSource is unusable after
+// calling this method because initializing a [Source] more than once is undefined.
+func (c *ConfiguredSource) Init(ctx context.Context, sourceID SourceID, jobID JobID) (Source, error) {
+	if c.source == nil {
+		return nil, errors.New("source already initialized")
+	}
+	src := c.source
+	err := src.Init(ctx, c.Name, jobID, sourceID, c.initParams.verify, c.initParams.conn, c.initParams.concurrency)
+	c.source = nil
+	return src, err
 }
 
 // BaseUnitReporter is a helper struct that implements the UnitReporter interface
@@ -175,6 +227,8 @@ type DockerConfig struct {
 	BearerToken string
 	// UseDockerKeychain determines whether to use the Docker keychain.
 	UseDockerKeychain bool
+	// ExcludePaths is a list of paths to exclude from scanning.
+	ExcludePaths []string
 }
 
 // GCSConfig defines the optional configuration for a GCS source.
