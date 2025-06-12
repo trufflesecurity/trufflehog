@@ -3,65 +3,14 @@ package snowflake
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v7"
 	"github.com/google/go-cmp/cmp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
-
-// GoFakeIt Password generator does not guarantee inclusion of characters.
-// Using a custom Password gennerator with guaranteed inclusions (atleast) of lower, upper and numeric characters
-func generatePassword(lower, upper, numeric bool, length int) string {
-	if length < 1 {
-		return ""
-	}
-
-	var password []rune
-	var required []rune
-	var allowed []rune
-
-	lowerChars := []rune("abcdefghijklmnopqrstuvwxyz")
-	upperChars := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	numberChars := []rune("0123456789")
-
-	// Ensure inclusion from each requested category
-	if lower {
-		ch := lowerChars[rand.Intn(len(lowerChars))]
-		required = append(required, ch)
-		allowed = append(allowed, lowerChars...)
-	}
-	if upper {
-		ch := upperChars[rand.Intn(len(upperChars))]
-		required = append(required, ch)
-		allowed = append(allowed, upperChars...)
-	}
-	if numeric {
-		ch := numberChars[rand.Intn(len(numberChars))]
-		required = append(required, ch)
-		allowed = append(allowed, numberChars...)
-	}
-
-	if len(allowed) == 0 {
-		return "" // No character sets enabled
-	}
-
-	// Fill the rest of the password
-	for i := 0; i < length-len(required); i++ {
-		ch := allowed[rand.Intn(len(allowed))]
-		password = append(password, ch)
-	}
-
-	// Combine required and random characters, then shuffle
-	password = append(password, required...)
-	rand.Shuffle(len(password), func(i, j int) {
-		password[i], password[j] = password[j], password[i]
-	})
-
-	return string(password)
-}
 
 func TestSnowflake_Pattern(t *testing.T) {
 
@@ -71,7 +20,7 @@ func TestSnowflake_Pattern(t *testing.T) {
 	validUsername := gofakeit.Username()
 	invalidUsername := "Spencer@5091.com" // special characters not allowed
 
-	validPassword := generatePassword(true, true, true, 10)
+	validPassword := common.GenerateRandomPassword(true, true, true, false, 10)
 	invalidPassword := "!12" // invalid length
 
 	d := Scanner{}
