@@ -53,11 +53,11 @@ func Normalize(raw string) string {
 	// Canonicalize escape sequences in one pass.
 	raw = escapeReplacer.Replace(raw)
 
-	// Normalize per-line whitespace and discard blank lines.
-	lines := strings.Split(raw, "\n")
 	var result strings.Builder
 	result.Grow(len(raw))
 
+	// Normalize per-line whitespace and discard blank lines.
+	lines := strings.Split(raw, "\n")
 	for _, line := range lines {
 		if trimmed := strings.TrimSpace(line); trimmed != "" {
 			result.WriteString(trimmed)
