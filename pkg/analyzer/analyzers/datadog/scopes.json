@@ -1,0 +1,818 @@
+[
+  {
+    "name": "dashboards_read",
+    "title": "Dashboards Read",
+    "description": "View dashboards.",
+    "resource": "Dashboards",
+    "test": {
+      "endpoint": "/v1/dashboard",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "dashboards_write",
+    "title": "Dashboards Write",
+    "description": "Create and change dashboards.",
+    "resource": "Dashboards",
+    "test": {
+      "endpoint": "/v1/dashboard",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "dashboards_public_share",
+    "title": "Dashboards Public Share",
+    "description": "Create, modify and delete shared dashboards with share type 'Public'. These dashboards can be accessed by anyone on the internet.",
+    "resource": "Dashboards",
+    "test": {
+      "endpoint": "/v1/dashboard/public",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "monitors_read",
+    "title": "Monitors Read",
+    "description": "View monitors.",
+    "resource": "Monitors",
+    "test": {
+      "endpoint": "/v1/monitor",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "monitors_write",
+    "title": "Monitors Write",
+    "description": "Edit and delete individual monitors.",
+    "resource": "Monitors",
+    "test": {
+      "endpoint": "/v1/monitor",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "logs_modify_indexes",
+    "title": "Logs Modify Indexes",
+    "description": "Read and modify all indexes in your account.",
+    "resource": "Logs",
+    "test": {
+      "endpoint": "/v1/logs/config/indexes/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "logs_write_pipelines",
+    "title": "Logs Write Pipelines",
+    "description": "Add and change log pipeline configurations.",
+    "resource": "Logs",
+    "test": {
+      "endpoint": "/v1/logs/config/pipelines/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "logs_write_archives",
+    "title": "Logs Write Archives",
+    "description": "Add and edit Log Archives.",
+    "resource": "Logs",
+    "test": {
+      "endpoint": "/v2/logs/config/archives/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "logs_generate_metrics",
+    "title": "Logs Generate Metrics",
+    "description": "Create custom metrics from logs.",
+    "resource": "Logs",
+    "test": {
+      "endpoint": "/v2/logs/config/metrics",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "monitors_downtime",
+    "title": "Manage Downtimes",
+    "description": "Set downtimes to suppress alerts from any monitor in an organization.",
+    "resource": "Monitors",
+    "test": {
+      "endpoint": "/v1/downtime",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "logs_read_data",
+    "title": "Logs Read Data",
+    "description": "Read log data. In order to read log data, a user must have both this permission and Logs Read Index Data.",
+    "resource": "Logs",
+    "test": {
+      "endpoint": "/v2/logs/events",
+      "method": "GET",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "logs_read_archives",
+    "title": "Logs Read Archives",
+    "description": "Read Log Archives location and use it for rehydration.",
+    "resource": "Logs",
+    "test": {
+      "endpoint": "/v2/logs/config/archives",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "security_monitoring_rules_read",
+    "title": "Security Rules Read",
+    "description": "Read Detection Rules.",
+    "resource": "Security Monitoring",
+    "test": {
+      "endpoint": "/v2/cloud_security_management/custom_frameworks/must/not-exist",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "security_monitoring_rules_write",
+    "title": "Security Rules Write",
+    "description": "Create and edit Detection Rules.",
+    "resource": "Security Monitoring",
+    "test": {
+      "endpoint": "/v2/security_monitoring/rules",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "security_monitoring_signals_read",
+    "title": "Security Signals Read",
+    "description": "View Security Signals.",
+    "resource": "Security Monitoring",
+    "test": {
+      "endpoint": "/v2/security_monitoring/signals",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "security_monitoring_signals_write",
+    "title": "Security Signals Write",
+    "description": "Modify Security Signals.",
+    "resource": "Security Monitoring",
+    "test": {
+      "endpoint": "/v1/security_analytics/signals/must-not-exist/add_to_incident",
+      "method": "PATCH",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "user_access_invite",
+    "title": "User Access Invite",
+    "description": "Invite other users to your organization.",
+    "resource": "Users",
+    "test": {
+      "endpoint": "/v2/user_invitations/does-not-exist",
+      "method": "GET",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "title": "User App Keys",
+    "name": "user_app_keys",
+    "description": "View and manage Application Keys owned by the user.",
+    "resource": "Key Management",
+    "test": {
+      "endpoint": "/v2/current_user/application_keys/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "org_app_keys_read",
+    "title": "Org App Keys Read",
+    "description": "View Application Keys owned by all users in the organization.",
+    "resource": "Key Management",
+    "test": {
+      "endpoint": "/v2/application_keys",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "org_app_keys_write",
+    "title": "Org App Keys Write",
+    "description": "Manage Application Keys owned by all users in the organization.",
+    "resource": "Key Management",
+    "test": {
+      "endpoint": "/v2/application_keys/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "user_access_manage",
+    "title": "User Access Manage",
+    "description": "Disable users, manage user roles, manage SAML-to-role mappings, and configure logs restriction queries.",
+    "resource": "Users",
+    "test": {
+      "endpoint": "/v2/users/does-not-exist",
+      "method": "PATCH",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "synthetics_private_location_read",
+    "title": "Synthetics Private Locations Read",
+    "description": "View, search, and use Synthetics private locations.",
+    "resource": "Synthetics",
+    "test": {
+      "endpoint": "/v1/synthetics/private-locations/does-not-exit",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "synthetics_private_location_write",
+    "title": "Synthetics Private Locations Write",
+    "description": "Create and delete private locations in addition to having access to the associated installation guidelines.",
+    "resource": "Synthetics",
+    "test": {
+      "endpoint": "/v1/synthetics/private-locations/does-not-exit",
+      "method": "PUT",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "usage_read",
+    "title": "Usage Read",
+    "description": "View your organization's usage and usage attribution.",
+    "resource": "Usage Metering",
+    "test": {
+      "endpoint": "/v2/usage/hourly_usage",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "metric_tags_write",
+    "title": "Metric Tags Write",
+    "description": "Edit and save tag configurations for custom metrics.",
+    "resource": "Metrics",
+    "test": {
+      "endpoint": "/v2/metrics/does-not-exit/tags",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "audit_logs_read",
+    "title": "Audit Trail Read",
+    "description": "View Audit Trail in your organization.",
+    "resource": "Audit",
+    "test": {
+      "endpoint": "/v2/audit/events",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "api_keys_read",
+    "title": "API Keys Read",
+    "description": "List and retrieve the key values of all API Keys in your organization.",
+    "resource": "Key Management",
+    "test": {
+      "endpoint": "/v2/api_keys",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "api_keys_write",
+    "title": "API Keys Write",
+    "description": "Create and rename API Keys for your organization.",
+    "resource": "Key Management",
+    "test": {
+      "endpoint": "/v2/api_keys/does-not-exist",
+      "method": "PATCH",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "synthetics_global_variable_read",
+    "title": "Synthetics Global Variable Read",
+    "description": "View, search, and use Synthetics global variables.",
+    "resource": "Synthetics",
+    "test": {
+      "endpoint": "/v1/synthetics/variables",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "synthetics_global_variable_write",
+    "title": "Synthetics Global Variable Write",
+    "description": "Create, edit, and delete global variables for Synthetics.",
+    "resource": "Synthetics",
+    "test": {
+      "endpoint": "/v1/synthetics/variables",
+      "method": "POST",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "synthetics_read",
+    "title": "Synthetics Read",
+    "description": "List and view configured Synthetic tests and test results.",
+    "resource": "Synthetics",
+    "test": {
+      "endpoint": "/v1/synthetics/tests",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "synthetics_write",
+    "title": "Synthetics Write",
+    "description": "Create, edit, and delete Synthetic tests.",
+    "resource": "Synthetics",
+    "test": {
+      "endpoint": "/v1/synthetics/tests/mobile/does-not-exit",
+      "method": "PUT",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "synthetics_default_settings_read",
+    "title": "Synthetics Default Settings Read",
+    "description": "View the default settings for Synthetic Monitoring.",
+    "resource": "Synthetics",
+    "test": {
+      "endpoint": "/v1/synthetics/settings/default_locations",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "service_account_write",
+    "title": "Service Account Write",
+    "description": "Create, disable, and use Service Accounts in your organization.",
+    "resource": "Service Accounts",
+    "test": {
+      "endpoint": "/v2/service_accounts/does-not-exist/application_keys",
+      "method": "POST",
+      "valid_statuses": [200, 400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "apm_read",
+    "title": "APM Read",
+    "description": "Read and query APM and Trace Analytics.",
+    "resource": "APM",
+    "test": {
+      "endpoint": "/v2/apm/config/metrics",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "apm_retention_filter_read",
+    "title": "APM Retention Filters Read",
+    "description": "Read trace retention filters. A user with this permission can view the retention filters page, list of filters, their statistics, and creation info.",
+    "resource": "APM",
+    "test": {
+      "endpoint": "/v2/apm/config/retention-filters/should-not-exist",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "apm_retention_filter_write",
+    "title": "APM Retention Filters Write",
+    "description": "Create, edit, and delete trace retention filters. A user with this permission can create new retention filters, and update or delete to existing retention filters.",
+    "resource": "APM",
+    "test": {
+      "endpoint": "/v2/apm/config/retention-filters/should-not-exit",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "rum_apps_write",
+    "title": "RUM Apps Write",
+    "description": "Create, edit, and delete RUM applications. Creating a RUM application automatically generates a Client Token. In order to create Client Tokens directly, a user needs the Client Tokens Write permission.",
+    "resource": "RUM",
+    "test": {
+      "endpoint": "/v2/rum/applications/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "data_scanner_read",
+    "title": "Data Scanner Read",
+    "description": "View Sensitive Data Scanner configurations and scanning results.",
+    "resource": "Sensitive Data Scanner",
+    "test": {
+      "endpoint": "/v2/sensitive-data-scanner/config/standard-patterns",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "data_scanner_write",
+    "title": "Data Scanner Write",
+    "description": "Edit Sensitive Data Scanner configurations.",
+    "resource": "Sensitive Data Scanner",
+    "test": {
+      "endpoint": "/v2/sensitive-data-scanner/config/groups/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "org_management",
+    "title": "Org Management",
+    "description": "Edit org configurations, including authentication and certain security preferences such as configuring SAML, renaming an org, configuring allowed login methods, creating child orgs, subscribing & unsubscribing from apps in the marketplace, and enabling & disabling Remote Configuration for the entire organization.",
+    "resource": "Organizations",
+    "test": {
+      "endpoint": "/v1/org",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "security_monitoring_filters_read",
+    "title": "Security Filters Read",
+    "description": "Read Security Filters.",
+    "resource": "Security Monitoring",
+    "test": {
+      "endpoint": "/v2/security_monitoring/configuration/security_filters",
+      "method": "GET",
+      "valid_statuses": [200, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "security_monitoring_filters_write",
+    "title": "Security Filters Write",
+    "description": "Create, edit, and delete Security Filters.",
+    "resource": "Security Monitoring",
+    "test": {
+      "endpoint": "/v2/security_monitoring/configuration/security_filters/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "incident_read",
+    "title": "Incidents Read",
+    "description": "View incidents in Datadog.",
+    "resource": "Incidents",
+    "test": {
+      "endpoint": "/v2/incidents",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "incident_write",
+    "title": "Incidents Write",
+    "description": "Create, view, and manage incidents in Datadog.",
+    "resource": "Incidents",
+    "test": {
+      "endpoint": "/v2/incidents/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "incident_settings_write",
+    "title": "Incident Settings Write",
+    "description": "Configure Incident Settings.",
+    "resource": "Incidents",
+    "test": {
+      "endpoint": "/v2/incidents/config/types/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "rum_apps_read",
+    "title": "RUM Apps Read",
+    "description": "View RUM Applications data.",
+    "resource": "RUM",
+    "test": {
+      "endpoint": "/v2/rum/applications",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "security_monitoring_notification_profiles_read",
+    "title": "Security Notification Rules Read",
+    "description": "Read Notification Rules.",
+    "resource": "Security Monitoring",
+    "test": {
+      "endpoint": "/v2/security/signals/notification_rules",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "security_monitoring_notification_profiles_write",
+    "title": "Security Notification Rules Write",
+    "description": "Create, edit, and delete Notification Rules.",
+    "resource": "Security Monitoring",
+    "test": {
+      "endpoint": "/v2/security/signals/notification_rules/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "apm_generate_metrics",
+    "title": "APM Generate Metrics",
+    "description": "Create custom metrics from spans.",
+    "resource": "APM",
+    "test": {
+      "endpoint": "/v2/apm/config/metrics/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "apm_pipelines_write",
+    "title": "APM Pipelines Write",
+    "description": "Add and change APM pipeline configurations.",
+    "resource": "APM",
+    "test": {
+      "endpoint": "/v2/apm/config/retention-filters/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "apm_pipelines_read",
+    "title": "APM Pipelines Read",
+    "description": "View APM pipeline configurations.",
+    "resource": "APM",
+    "test": {
+      "endpoint": "/v2/apm/config/retention-filters",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "observability_pipelines_read",
+    "title": "Observability Pipelines Read",
+    "description": "View pipelines in your organization.",
+    "resource": "Observability Pipelines",
+    "test": {
+      "endpoint": "/v2/remote_config/products/obs_pipelines/pipelines",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "workflows_read",
+    "title": "Workflows Read",
+    "description": "View workflows.",
+    "resource": "Workflows",
+    "test": {
+      "endpoint": "/v2/workflows/does-not-exist",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "workflows_write",
+    "title": "Workflows Write",
+    "description": "Create, edit, and delete workflows.",
+    "resource": "Workflows",
+    "test": {
+      "endpoint": "/v2/workflows/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "workflows_run",
+    "title": "Workflows Run",
+    "description": "Run workflows.",
+    "resource": "Workflows",
+    "test": {
+      "endpoint": "/v2/workflows/should-not-exist/instances",
+      "method": "POST",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "connections_read",
+    "title": "Connections Read",
+    "description": "List and view available connections. Connections contain secrets that cannot be revealed.",
+    "resource": "Connections",
+    "test": {
+      "endpoint": "/v2/actions/connections/does-not-exist",
+      "method": "GET",
+      "valid_statuses": [200, 400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "connections_write",
+    "title": "Connections Write",
+    "description": "Create and delete connections.",
+    "resource": "Connections",
+    "test": {
+      "endpoint": "/v2/actions/connections/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "notebooks_read",
+    "title": "Notebooks Read",
+    "description": "View notebooks.",
+    "resource": "Notebooks",
+    "test": {
+      "endpoint": "/v1/notebooks",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "notebooks_write",
+    "title": "Notebooks Write",
+    "description": "Create and change notebooks.",
+    "resource": "Notebooks",
+    "test": {
+      "endpoint": "/v1/notebooks/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "aws_configurations_manage",
+    "title": "AWS Configurations Manage",
+    "description": "Add or remove but not edit AWS integration configurations.",
+    "resource": "Integrations",
+    "test": {
+      "endpoint": "/v2/integration/aws/accounts/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "azure_configurations_manage",
+    "title": "Azure Configurations Manage",
+    "description": "Add or remove but not edit Azure integration configurations.",
+    "resource": "Integrations",
+    "test": {
+      "endpoint": "/v1/integration/azure",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "gcp_configurations_manage",
+    "title": "GCP Configurations Manage",
+    "description": "Add or remove but not edit GCP integration configurations.",
+    "resource": "Integrations",
+    "test": {
+      "endpoint": "/v2/integration/gcp/accounts/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "manage_integrations",
+    "title": "Integrations Manage",
+    "description": "Install, uninstall, and configure integrations.",
+    "resource": "Integrations",
+    "test": {
+      "endpoint": "/v2/integrations/cloudflare/accounts/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "slos_read",
+    "title": "SLOs Read",
+    "description": "View SLOs and status corrections.",
+    "resource": "SLOs",
+    "test": {
+      "endpoint": "/v1/slo",
+      "method": "GET",
+      "valid_statuses": [200, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "slos_write",
+    "title": "SLOs Write",
+    "description": "Create, edit, and delete SLOs.",
+    "resource": "SLOs",
+    "test": {
+      "endpoint": "/v1/slo/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [404, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "slos_corrections",
+    "title": "SLOs Status Corrections",
+    "description": "Apply, edit, and delete SLO status corrections. A user with this permission can make status corrections, even if they do not have permission to edit those SLOs.",
+    "resource": "SLOs",
+    "test": {
+      "endpoint": "/v1/slo/correction",
+      "method": "POST",
+      "valid_statuses": [400, 429],
+      "invalid_statuses": [403]
+    }
+  },
+  {
+    "name": "monitor_config_policy_write",
+    "title": "Monitor Configuration Policy Write",
+    "description": "Create, update, and delete monitor configuration policies.",
+    "resource": "Monitors",
+    "test": {
+      "endpoint": "/v2/monitor/policy/does-not-exist",
+      "method": "DELETE",
+      "valid_statuses": [400, 404, 429],
+      "invalid_statuses": [403]
+    }
+  }
+]

@@ -1,8 +1,9 @@
-package openai
+package jira
 
 import (
 	_ "embed"
 	"encoding/json"
+	"sort"
 	"testing"
 	"time"
 
@@ -16,35 +17,61 @@ import (
 var expectedOutput []byte
 
 func TestAnalyzer_Analyze(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "analyzers1")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
+	jiraDomain := testSecrets.MustGetField("JIRA_DOMAIN_ANALYZE")
+	jiraEmail := testSecrets.MustGetField("JIRA_EMAIL_ANALYZE")
+	jiraToken := testSecrets.MustGetField("JIRA_TOKEN_ANALYZE")
+
 	tests := []struct {
 		name    string
-		key     string
+		domain  string
+		email   string
+		token   string
 		want    []byte
 		wantErr bool
 	}{
 		{
-			name:    "valid OpenAI key",
-			key:     testSecrets.MustGetField("OPENAI_VERIFIED"),
+			name:    "valid jira token",
+			domain:  jiraDomain,
+			email:   jiraEmail,
+			token:   jiraToken,
 			want:    expectedOutput,
 			wantErr: false,
+		},
+		{
+			name:    "invalid jira token",
+			domain:  jiraDomain,
+			email:   jiraEmail,
+			token:   "invalid",
+			want:    nil,
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{Cfg: &config.Config{}}
-			got, err := a.Analyze(ctx, map[string]string{"key": tt.key})
+			got, err := a.Analyze(ctx, map[string]string{"token": tt.token, "domain": tt.domain, "email": tt.email})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			if tt.wantErr {
+				if got != nil {
+					t.Errorf("Analyzer.Analyze() got = %v, want nil", got)
+				}
+				return
+			}
+
+			// Bindings need to be in the same order to be comparable
+			sortBindings(got.Bindings)
 
 			// Marshal the actual result to JSON
 			gotJSON, err := json.Marshal(got)
@@ -57,6 +84,9 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			if err := json.Unmarshal([]byte(tt.want), &wantObj); err != nil {
 				t.Fatalf("could not unmarshal want JSON string: %s", err)
 			}
+
+			// Bindings need to be in the same order to be comparable
+			sortBindings(wantObj.Bindings)
 
 			// Marshal the expected result to JSON (to normalize)
 			wantJSON, err := json.Marshal(wantObj)
@@ -80,4 +110,14 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Helper function to sort bindings
+func sortBindings(bindings []analyzers.Binding) {
+	sort.SliceStable(bindings, func(i, j int) bool {
+		if bindings[i].Resource.FullyQualifiedName == bindings[j].Resource.FullyQualifiedName {
+			return bindings[i].Permission.Value < bindings[j].Permission.Value
+		}
+		return bindings[i].Resource.FullyQualifiedName < bindings[j].Resource.FullyQualifiedName
+	})
 }

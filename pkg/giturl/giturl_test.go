@@ -305,6 +305,14 @@ func TestUpdateLinkLineNumber(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "Encode brackets",
+			args: args{
+				link:    "https://github.com/coinbase/cbpay-js/blob/abcdefg/folder/[name]/file",
+				newLine: int64(0),
+			},
+			want: "https://github.com/coinbase/cbpay-js/blob/abcdefg/folder/%5Bname%5D/file",
+		},
 	}
 
 	for _, tt := range tests {

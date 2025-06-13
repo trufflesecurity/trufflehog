@@ -232,8 +232,8 @@ func NewClient(postmanToken string, metrics *metrics) *Client {
 
 // NewRequest creates an API request (Only GET needed for our interaction w/ Postman)
 // If specified, the map provided by headers will be used to update request headers.
-func (c *Client) NewRequest(urlStr string, headers map[string]string) (*http.Request, error) {
-	req, err := http.NewRequest("GET", urlStr, nil)
+func (c *Client) NewRequest(ctx trContext.Context, urlStr string, headers map[string]string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func checkResponseStatus(r *http.Response) error {
 func (c *Client) getPostmanResponseBodyBytes(ctx trContext.Context, urlString string, headers map[string]string) ([]byte, error) {
 	ctx = trContext.WithValues(ctx, "url", urlString)
 
-	req, err := c.NewRequest(urlString, headers)
+	req, err := c.NewRequest(ctx, urlString, headers)
 	if err != nil {
 		return nil, err
 	}
