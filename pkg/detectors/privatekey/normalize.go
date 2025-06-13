@@ -59,8 +59,7 @@ func Normalize(raw string) string {
 	result.Grow(len(raw))
 
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
 			result.WriteString(trimmed)
 			result.WriteByte('\n')
 		}
