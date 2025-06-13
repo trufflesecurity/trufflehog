@@ -40,10 +40,6 @@ type gcpApplicationDefaultCredentials struct {
 	Type         string `json:"type"`
 }
 
-func (g gcpApplicationDefaultCredentials) isValid() bool {
-	return g.ClientID != "" && g.ClientSecret != "" && g.RefreshToken != "" && g.Type != ""
-}
-
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
@@ -73,10 +69,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		creds := gcpApplicationDefaultCredentials{}
 		err := json.Unmarshal([]byte(key), &creds)
 		if err != nil {
-			continue
-		}
-
-		if !creds.isValid() {
 			continue
 		}
 

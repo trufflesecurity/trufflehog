@@ -15,7 +15,7 @@ import (
 
 var (
 	DefaultFalsePositives = map[FalsePositive]struct{}{
-		"example": {}, "xxxxxx": {}, "aaaaaa": {}, "abcde": {}, "00000": {}, "sample": {}, "*****": {},
+		"example": {}, "xxxxxx": {}, "aaaaaa": {}, "abcde": {}, "00000": {}, "sample": {}, "*****": {}, "": {},
 	}
 	UuidFalsePositives map[FalsePositive]struct{}
 )
