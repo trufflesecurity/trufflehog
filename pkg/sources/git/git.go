@@ -411,7 +411,7 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, authI
 }
 
 // executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
-// clonePath. It then opens the cloned repository, returning a git.Repository object.
+// clonePath. command using --mirror. It then opens the cloned repository, returning a git.Repository object.
 func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
 	cloneURL, err := GitURLParse(params.gitURL)
 	if err != nil {
@@ -427,31 +427,34 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 	} else { // default
 		cloneURL.User = nil // remove user information from the url
 
-		pass, ok := params.userInfo.Password()
-		if ok {
-			/*
-				Sources:
-					- https://medium.com/%40szpytfire/authenticating-with-github-via-a-personal-access-token-7c639a979eb3
-					- https://trinhngocthuyen.com/posts/tech/50-shades-of-git-remotes-and-authentication/#using-httpextraheader-config
-			*/
-			authHeader := base64.StdEncoding.EncodeToString(fmt.Appendf([]byte(""), "%s:%s", params.userInfo.Username(), pass))
-			gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", authHeader))
+		if params.userInfo == nil {
+			if pass, ok := params.userInfo.Password(); ok {
+				/*
+					Sources:
+						- https://medium.com/%40szpytfire/authenticating-with-github-via-a-personal-access-token-7c639a979eb3
+						- https://trinhngocthuyen.com/posts/tech/50-shades-of-git-remotes-and-authentication/#using-httpextraheader-config
+				*/
+				authHeader := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", params.userInfo.Username(), pass)))
+				gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", authHeader))
+			}
 		}
 	}
 
-	if !feature.SkipAdditionalRefs.Load() {
-		gitArgs = append(gitArgs,
-			"-c",
-			"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
-	}
-
-	gitArgs = append(gitArgs, "clone",
-		cloneURL.String(),
-		params.clonePath,
+	// append clone argument
+	gitArgs = append(gitArgs,
+		"clone",
 		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
+		"--mirror",
+	)
+	gitArgs = append(gitArgs, params.args...)
+
+	dstGitDir := filepath.Join(params.clonePath, gitDirName) // <tmp>/.git
+
+	gitArgs = append(gitArgs,
+		cloneURL.String(),
+		dstGitDir,
 	)
 
-	gitArgs = append(gitArgs, params.args...)
 	cloneCmd := exec.Command("git", gitArgs...)
 
 	safeURL, secretForRedaction, err := stripPassword(params.gitURL)

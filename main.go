@@ -85,10 +85,9 @@ var (
 	noVerificationCache = cli.Flag("no-verification-cache", "Disable verification caching").Bool()
 
 	// Add feature flags
-	forceSkipBinaries  = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
-	forceSkipArchives  = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
-	skipAdditionalRefs = cli.Flag("skip-additional-refs", "Skip additional references.").Bool()
-	userAgentSuffix    = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
+	forceSkipBinaries = cli.Flag("force-skip-binaries", "Force skipping binaries.").Bool()
+	forceSkipArchives = cli.Flag("force-skip-archives", "Force skipping archives.").Bool()
+	userAgentSuffix   = cli.Flag("user-agent-suffix", "Suffix to add to User-Agent.").String()
 
 	gitScan             = cli.Command("git", "Find credentials in git repositories.")
 	gitScanURI          = gitScan.Arg("uri", "Git repository URL. https://, file://, or ssh:// schema expected.").Required().String()
@@ -436,10 +435,6 @@ func run(state overseer.State) {
 
 	if *forceSkipArchives {
 		feature.ForceSkipArchives.Store(true)
-	}
-
-	if *skipAdditionalRefs {
-		feature.SkipAdditionalRefs.Store(true)
 	}
 
 	if *userAgentSuffix != "" {
