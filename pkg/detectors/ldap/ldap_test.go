@@ -144,31 +144,53 @@ func TestCartesianProductExplosion(t *testing.T) {
 // the N³ theoretical combination space.  This guards against accidental
 // performance regressions that would re-introduce the Cartesian explosion.
 func BenchmarkCartesianProductExplosion(b *testing.B) {
-	const N = 20
-
-	var sb strings.Builder
-	for i := range N {
-		sb.WriteString(fmt.Sprintf("ldap://host%d:389\n", i))
+	tests := []struct {
+		name      string
+		uriCount  int
+		userCount int
+		passCount int
+	}{
+		{"Small_1x1x1", 1, 1, 1},
+		{"Medium_5x5x5", 5, 5, 5},
+		{"Large_10x10x10", 10, 10, 10},
+		{"ManyURIs_15x5x5", 15, 5, 5},      // 375 combinations
+		{"ManyUsers_5x15x5", 5, 15, 5},     // 375 combinations
+		{"ManyPasswords_5x5x15", 5, 5, 15}, // 375 combinations
+		{"Asymmetric_15x10x5", 15, 10, 5},
+		{"VeryLarge_25x25x25", 25, 25, 25},
 	}
-	for i := range N {
-		letter := 'A' + rune(i%26)
-		sb.WriteString(fmt.Sprintf(`bind="cn=user%c,dc=example,dc=org"`+"\n", letter))
-	}
-	for i := range N {
-		sb.WriteString(fmt.Sprintf(`pass="P@ssw0rd%02d"`+"\n", i))
-	}
-	payload := []byte(sb.String())
 
 	scanner := Scanner{}
 	ctx := context.Background()
 
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.SetBytes(int64(len(payload)))
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			var sb strings.Builder
 
-	for range b.N {
-		if _, err := scanner.FromData(ctx, false, payload); err != nil {
-			b.Fatalf("FromData error: %v", err)
-		}
+			for i := range tt.uriCount {
+				sb.WriteString(fmt.Sprintf("ldap://host%d:389\n", i))
+			}
+
+			for i := range tt.userCount {
+				letter := 'A' + rune(i%26)
+				sb.WriteString(fmt.Sprintf(`bind="cn=user%c%d,dc=example,dc=org"`+"\n", letter, i))
+			}
+
+			for i := range tt.passCount {
+				sb.WriteString(fmt.Sprintf(`pass="P@ssw0rd%02d"`+"\n", i))
+			}
+
+			payload := []byte(sb.String())
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			b.SetBytes(int64(len(payload)))
+
+			for range b.N {
+				if _, err := scanner.FromData(ctx, false, payload); err != nil {
+					b.Fatalf("FromData error: %v", err)
+				}
+			}
+		})
 	}
 }
