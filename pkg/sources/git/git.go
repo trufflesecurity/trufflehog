@@ -410,8 +410,8 @@ func CloneRepo(ctx context.Context, userInfo *url.Userinfo, gitURL string, authI
 	return clonePath, repo, nil
 }
 
-// executeClone prepares the Git URL, constructs, and executes the git clone command using the provided
-// clonePath. It then opens the cloned repository, returning a git.Repository object.
+// executeClone prepares the Git URL, constructs, and executes the git clone
+// command using --mirror. It then opens the repository from the parent folder.
 func executeClone(ctx context.Context, params cloneParams) (*git.Repository, error) {
 	cloneURL, err := GitURLParse(params.gitURL)
 	if err != nil {
@@ -420,81 +420,55 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 
 	var gitArgs []string
 
+	// ---------------- auth handling (unchanged) ----------------
 	if params.authInUrl {
 		if cloneURL.User == nil {
 			cloneURL.User = params.userInfo
 		}
-	} else { // default
-		cloneURL.User = nil // remove user information from the url
-
-		pass, ok := params.userInfo.Password()
-		if ok {
-			/*
-				Sources:
-					- https://medium.com/%40szpytfire/authenticating-with-github-via-a-personal-access-token-7c639a979eb3
-					- https://trinhngocthuyen.com/posts/tech/50-shades-of-git-remotes-and-authentication/#using-httpextraheader-config
-			*/
-			authHeader := base64.StdEncoding.EncodeToString(fmt.Appendf([]byte(""), "%s:%s", params.userInfo.Username(), pass))
-			gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", authHeader))
+	} else {
+		cloneURL.User = nil
+		if params.userInfo != nil {
+			if pass, ok := params.userInfo.Password(); ok {
+				h := base64.StdEncoding.EncodeToString(
+					[]byte(fmt.Sprintf("%s:%s", params.userInfo.Username(), pass)),
+				)
+				gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", h))
+			}
 		}
 	}
 
-	if !feature.SkipAdditionalRefs.Load() {
-		gitArgs = append(gitArgs,
-			"-c",
-			"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
+	// ---------------- build mirror-clone command ----------------
+	dstGitDir := filepath.Join(params.clonePath, gitDirName) // <tmp>/.git
+	gitArgs = append(gitArgs, "clone", "--quiet", "--mirror")
+	gitArgs = append(gitArgs, params.args...)            // e.g. --shallow-since
+	gitArgs = append(gitArgs, cloneURL.String(), dstGitDir)
+
+	cmd := exec.Command("git", gitArgs...)
+
+	safeURL, secret, _ := stripPassword(params.gitURL)
+	log := ctx.Logger().WithValues("subcommand", "git clone", "repo", safeURL, "dst", dstGitDir)
+
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+	if secret != "" {
+		output = strings.ReplaceAll(output, secret, "<secret>")
 	}
-
-	gitArgs = append(gitArgs, "clone",
-		cloneURL.String(),
-		params.clonePath,
-		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
-	)
-
-	gitArgs = append(gitArgs, params.args...)
-	cloneCmd := exec.Command("git", gitArgs...)
-
-	safeURL, secretForRedaction, err := stripPassword(params.gitURL)
 	if err != nil {
-		ctx.Logger().V(1).Info("error stripping password from git url", "error", err)
+		return nil, fmt.Errorf("git clone error: %w\n%s", err, output)
 	}
-	logger := ctx.Logger().WithValues(
-		"subcommand", "git clone",
-		"repo", safeURL,
-		"path", params.clonePath,
-		"args", params.args,
-	)
+	log.V(3).Info("mirror clone finished")
 
-	// Execute command and wait for the stdout / stderr.
-	outputBytes, err := cloneCmd.CombinedOutput()
-	var output string
-	if secretForRedaction != "" {
-		output = strings.ReplaceAll(string(outputBytes), secretForRedaction, "<secret>")
-	} else {
-		output = string(outputBytes)
-	}
-
-	if err != nil {
-		err = fmt.Errorf("error executing git clone: %w, %s", err, output)
-	}
-	logger.V(3).Info("git subcommand finished", "output", output)
-
-	if cloneCmd.ProcessState == nil {
-		return nil, fmt.Errorf("clone command exited with no output")
-	} else if cloneCmd.ProcessState.ExitCode() != 0 {
-		logger.V(1).Info("git clone failed", "error", err)
-		return nil, fmt.Errorf("could not clone repo: %s, %w", safeURL, err)
-	}
-
-	options := &git.PlainOpenOptions{DetectDotGit: true, EnableDotGitCommonDir: true}
-	repo, err := git.PlainOpenWithOptions(params.clonePath, options)
+	// Open *parent* dir; go-git will find the .git we just created.
+	repo, err := git.PlainOpenWithOptions(params.clonePath, &git.PlainOpenOptions{
+		DetectDotGit:       true,
+		EnableDotGitCommonDir: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not open cloned repo: %w", err)
 	}
-	logger.V(1).Info("successfully cloned repo")
-
 	return repo, nil
 }
+
 
 // PingRepoUsingToken executes git ls-remote on a repo and returns any error that occurs. It can be used to validate
 // that a repo actually exists and is reachable.
