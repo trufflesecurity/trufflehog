@@ -3,11 +3,10 @@ package feature
 import "sync/atomic"
 
 var (
-	ForceSkipBinaries  atomic.Bool
-	ForceSkipArchives  atomic.Bool
-	SkipAdditionalRefs atomic.Bool
-	EnableAPKHandler   atomic.Bool
-	UserAgentSuffix    AtomicString
+	ForceSkipBinaries atomic.Bool
+	ForceSkipArchives atomic.Bool
+	EnableAPKHandler  atomic.Bool
+	UserAgentSuffix   AtomicString
 )
 
 type AtomicString struct {
