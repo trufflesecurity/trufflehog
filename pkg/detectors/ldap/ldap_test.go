@@ -124,7 +124,7 @@ func TestCartesianProductExplosion(t *testing.T) {
 
 	payload := []byte(b.String())
 
-	results, err := (Scanner{}).FromData(t.Context(), false, payload)
+	results, err := (Scanner{}).FromData(context.Background(), false, payload)
 	if err != nil {
 		t.Fatalf("FromData error: %v", err)
 	}
@@ -166,7 +166,7 @@ func BenchmarkCartesianProductExplosion(b *testing.B) {
 	b.ResetTimer()
 	b.SetBytes(int64(len(payload)))
 
-	for b.Loop() {
+	for range b.N {
 		if _, err := scanner.FromData(ctx, false, payload); err != nil {
 			b.Fatalf("FromData error: %v", err)
 		}
