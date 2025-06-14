@@ -326,7 +326,7 @@ const (
 
 	// maxProximity is the maximum character distance between credential components
 	// to consider them related. Larger values increase false positives.
-	maxProximity = 300
+	maxProximity = 200
 
 	// maxResults is a safety limit for proximity combinations only.
 	// High-confidence patterns are not subject to this limit.
