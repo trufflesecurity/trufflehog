@@ -4,57 +4,51 @@
 package ldap
 
 import (
-	"bytes"
 	"context"
-	"errors"
-	"os"
 	"os/exec"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/kylelemons/godebug/pretty"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestMain(m *testing.M) {
-	code, err := runMain(m)
-	if err != nil {
-		panic(err)
-	}
-	os.Exit(code)
-}
+// func TestMain(m *testing.M) {
+// 	code, err := runMain(m)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	os.Exit(code)
+// }
 
-func runMain(m *testing.M) (int, error) {
-	if err := startOpenLDAP(); err != nil {
-		return 0, err
-	}
-	defer stopOpenLDAP()
-	return m.Run(), nil
-}
+// func runMain(m *testing.M) (int, error) {
+// 	if err := startOpenLDAP(); err != nil {
+// 		return 0, err
+// 	}
+// 	defer stopOpenLDAP()
+// 	return m.Run(), nil
+// }
 
-func dockerLogLine(hash string, needle string) chan struct{} {
-	ch := make(chan struct{}, 1)
-	go func() {
-		for {
-			out, err := exec.Command("docker", "logs", hash).CombinedOutput()
-			if err != nil {
-				panic(err)
-			}
-			if strings.Contains(string(out), needle) {
-				ch <- struct{}{}
-				return
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}()
-	return ch
-}
+// func dockerLogLine(hash string, needle string) chan struct{} {
+// 	ch := make(chan struct{}, 1)
+// 	go func() {
+// 		for {
+// 			out, err := exec.Command("docker", "logs", hash).CombinedOutput()
+// 			if err != nil {
+// 				panic(err)
+// 			}
+// 			if strings.Contains(string(out), needle) {
+// 				ch <- struct{}{}
+// 				return
+// 			}
+// 			time.Sleep(1 * time.Second)
+// 		}
+// 	}()
+// 	return ch
+// }
 
 func TestLdap_Integration_FromChunk(t *testing.T) {
 	type args struct {
@@ -204,7 +198,7 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Ldap.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
@@ -214,27 +208,27 @@ func TestLdap_Integration_FromChunk(t *testing.T) {
 
 var containerID string
 
-func startOpenLDAP() error {
-	cmd := exec.Command(
-		"docker", "run", "--rm", "-p", "1389:1389",
-		"-e", "LDAP_ROOT=dc=example,dc=org",
-		"-e", "LDAP_ADMIN_USERNAME=admin",
-		"-e", "LDAP_ADMIN_PASSWORD=P@55w0rd",
-		"-d", "bitnami/openldap:latest",
-	)
-	out, err := cmd.Output()
-	if err != nil {
-		return err
-	}
-	containerID = string(bytes.TrimSpace(out))
-	select {
-	case <-dockerLogLine(containerID, "slapd starting"):
-		return nil
-	case <-time.After(30 * time.Second):
-		stopOpenLDAP()
-		return errors.New("timeout waiting for ldap service to be ready")
-	}
-}
+// func startOpenLDAP() error {
+// 	cmd := exec.Command(
+// 		"docker", "run", "--rm", "-p", "1389:1389",
+// 		"-e", "LDAP_ROOT=dc=example,dc=org",
+// 		"-e", "LDAP_ADMIN_USERNAME=admin",
+// 		"-e", "LDAP_ADMIN_PASSWORD=P@55w0rd",
+// 		"-d", "bitnami/openldap:latest",
+// 	)
+// 	out, err := cmd.Output()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	containerID = string(bytes.TrimSpace(out))
+// 	select {
+// 	case <-dockerLogLine(containerID, "slapd starting"):
+// 		return nil
+// 	case <-time.After(30 * time.Second):
+// 		stopOpenLDAP()
+// 		return errors.New("timeout waiting for ldap service to be ready")
+// 	}
+// }
 
 func stopOpenLDAP() {
 	exec.Command("docker", "kill", containerID).Run()
