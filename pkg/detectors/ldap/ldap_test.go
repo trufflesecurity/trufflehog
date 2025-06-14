@@ -88,8 +88,7 @@ func TestLdap_Pattern(t *testing.T) {
 
 // TestCartesianProductExplosion constructs N distinct URIs, usernames and
 // passwords.  A naïve triple-nested loop inside the detector would produce
-// N³ candidate combinations and quickly blow up.  The refactored detector
-// now
+// N³ candidate combinations and quickly blow up.
 //  1. scores combinations by textual proximity,
 //  2. keeps only the best few (maxCombinations), and
 //  3. applies an overall safety-cap (maxResults),
@@ -153,9 +152,9 @@ func BenchmarkCartesianProductExplosion(b *testing.B) {
 		{"Small_1x1x1", 1, 1, 1},
 		{"Medium_5x5x5", 5, 5, 5},
 		{"Large_10x10x10", 10, 10, 10},
-		{"ManyURIs_15x5x5", 15, 5, 5},      // 375 combinations
-		{"ManyUsers_5x15x5", 5, 15, 5},     // 375 combinations
-		{"ManyPasswords_5x5x15", 5, 5, 15}, // 375 combinations
+		{"ManyURIs_15x5x5", 15, 5, 5},
+		{"ManyUsers_5x15x5", 5, 15, 5},
+		{"ManyPasswords_5x5x15", 5, 5, 15},
 		{"Asymmetric_15x10x5", 15, 10, 5},
 		{"VeryLarge_25x25x25", 25, 25, 25},
 	}
@@ -173,7 +172,7 @@ func BenchmarkCartesianProductExplosion(b *testing.B) {
 
 			for i := range tt.userCount {
 				letter := 'A' + rune(i%26)
-				sb.WriteString(fmt.Sprintf(`bind="cn=user%c%d,dc=example,dc=org"`+"\n", letter, i))
+				sb.WriteString(fmt.Sprintf(`bind="cn=user%c,dc=example,dc=org"`+"\n", letter))
 			}
 
 			for i := range tt.passCount {
