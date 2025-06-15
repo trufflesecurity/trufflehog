@@ -1132,6 +1132,7 @@ const (
 	DetectorType_AzureAppConfigConnectionString          DetectorType = 1025
 	DetectorType_DeepSeek                                DetectorType = 1026
 	DetectorType_StripePaymentIntent                     DetectorType = 1027
+	DetectorType_BitbucketAppPassword                    DetectorType = 1028
 )
 
 // Enum value maps for DetectorType.
@@ -2161,6 +2162,7 @@ var (
 		1025: "AzureAppConfigConnectionString",
 		1026: "DeepSeek",
 		1027: "StripePaymentIntent",
+		1028: "BitbucketAppPassword",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3187,6 +3189,7 @@ var (
 		"AzureAppConfigConnectionString":    1025,
 		"DeepSeek":                          1026,
 		"StripePaymentIntent":               1027,
+		"BitbucketAppPassword":              1028,
 	}
 )
 
