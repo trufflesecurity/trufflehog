@@ -50,6 +50,9 @@ func TestBannerbear_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Bannerbear,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"version": fmt.Sprintf("%d", 1),
+					},
 				},
 			},
 			wantErr: false,
@@ -66,6 +69,9 @@ func TestBannerbear_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Bannerbear,
 					Verified:     false,
+					ExtraData: map[string]string{
+						"version": fmt.Sprintf("%d", 1),
+					},
 				},
 			},
 			wantErr: false,
