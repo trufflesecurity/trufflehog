@@ -31,7 +31,7 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.14.0
 	github.com/brianvoe/gofakeit/v7 v7.2.1
 	github.com/charmbracelet/bubbles v0.18.0
-	github.com/charmbracelet/bubbletea v1.3.4
+	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/charmbracelet/glamour v0.7.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/coinbase/waas-client-library-go v1.0.8
