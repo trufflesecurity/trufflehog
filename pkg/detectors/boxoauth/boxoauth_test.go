@@ -7,15 +7,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/brianvoe/gofakeit/v7"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
 var (
-	clientId            = gofakeit.Password(true, true, true, false, false, 32)
-	clientSecret        = gofakeit.Password(true, true, true, false, false, 32)
-	invalidClientSecret = gofakeit.Password(true, true, true, true, false, 32)
+	clientId            = common.GenerateRandomPassword(true, true, true, false, 32)
+	clientSecret        = common.GenerateRandomPassword(true, true, true, false, 32)
+	invalidClientSecret = common.GenerateRandomPassword(true, true, true, true, 32)
 )
 
 func TestBoxOauth_Pattern(t *testing.T) {
