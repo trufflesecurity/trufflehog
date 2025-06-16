@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 var subRe = regexp.MustCompile(`\{\{[^{}]+\}\}`)
@@ -52,12 +54,17 @@ func (s *Source) formatAndInjectKeywords(data []string) string {
 
 // buildSubstituteSet creates a set of substitutions for the given data
 // maxRecursionDepth is the maximum recursion depth to use for variable substitution
-func (s *Source) buildSubstituteSet(metadata Metadata, data string, maxRecursionDepth int) []string {
+func (s *Source) buildSubstituteSet(
+	ctx context.Context,
+	metadata Metadata,
+	data string,
+	maxRecursionDepth int,
+) []string {
 	var ret []string
 	combos := make(map[string]struct{})
 
 	// Call buildSubstitution with initial depth of 0 and the maxRecursionDepth
-	s.buildSubstitution(data, metadata, combos, 0, maxRecursionDepth)
+	s.buildSubstitution(ctx, data, metadata, combos, 0, maxRecursionDepth)
 
 	for combo := range combos {
 		ret = append(ret, combo)
@@ -73,6 +80,7 @@ func (s *Source) buildSubstituteSet(metadata Metadata, data string, maxRecursion
 // depth is the current recursion depth
 // maxRecursionDepth is the maximum recursion depth to use for variable substitution
 func (s *Source) buildSubstitution(
+	ctx context.Context,
 	data string,
 	metadata Metadata,
 	combos map[string]struct{},
@@ -81,6 +89,9 @@ func (s *Source) buildSubstitution(
 ) {
 	// Limit recursion depth to prevent stack overflow
 	if depth > maxRecursionDepth {
+		ctx.Logger().V(2).Info("Limited recursion depth",
+			"depth", depth,
+		)
 		combos[data] = struct{}{}
 		return
 	}
@@ -117,7 +128,7 @@ func (s *Source) buildSubstitution(
 			// Only mark substitution as made if we actually changed something
 			if d != data {
 				substitutionMade = true
-				s.buildSubstitution(d, metadata, combos, depth+1, maxRecursionDepth)
+				s.buildSubstitution(ctx, d, metadata, combos, depth+1, maxRecursionDepth)
 			}
 		}
 	}
