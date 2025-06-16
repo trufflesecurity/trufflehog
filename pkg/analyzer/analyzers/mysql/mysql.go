@@ -5,7 +5,9 @@ package mysql
 import (
 	"database/sql"
 	"fmt"
+	"net"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -356,6 +359,29 @@ func parseConnectionStr(connection string) (*dburl.URL, error) {
 }
 
 func createConnection(u *dburl.URL) (*sql.DB, error) {
+	hostname := u.Hostname()
+
+	// Only perform SSRF check if there's a hostname to check
+	if hostname != "" {
+		ips, err := net.LookupIP(hostname)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve hostname '%s': %w", hostname, err)
+		}
+
+		if len(ips) == 0 {
+			return nil, fmt.Errorf("'%s' resolved to no IP addresses", hostname)
+		}
+
+		// Check if at least one IP is routable (not local)
+		hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+			return !common.IsLocalIP(ip)
+		})
+
+		if !hasRoutableIP {
+			return nil, fmt.Errorf("mysql.go: tried to connect to '%s', [%w]", hostname, common.ErrNoLocalIP)
+		}
+	}
+
 	// Connect to the MySQL database
 	db, err := sql.Open("mysql", u.DSN)
 	if err != nil {
