@@ -3,12 +3,15 @@ package redis
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"net"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/go-redis/redis"
+	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -121,6 +124,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyRedis(ctx context.Context, u *url.URL) bool {
+	// SSRF protection: check if the host resolves to local IPs
+	hostname := u.Hostname()
+	if hostname != "" {
+		ips, err := net.LookupIP(hostname)
+		if err != nil {
+			return false
+		}
+
+		if len(ips) > 0 {
+			// Check if at least one IP is routable (not local)
+			hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+				return !common.IsLocalIP(ip)
+			})
+
+			if !hasRoutableIP {
+				// All IPs are local, don't verify
+				return false
+			}
+		}
+	}
+
 	opt, err := redis.ParseURL(u.String())
 	if err != nil {
 		return false
