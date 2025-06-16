@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/fatih/color"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -318,6 +321,30 @@ func createConnection(params map[string]string, database string) (*sql.DB, error
 		// pq doesn't support 'allow' or 'prefer'. If we find either of them, we'll just ignore it. This will trigger
 		// the same logic that is run if no sslmode is set at all (which mimics 'prefer', which is the default).
 		delete(params, pg_sslmode)
+	}
+
+	// Check for SSRF before connecting
+	if hostname, exists := params[pg_host]; exists && hostname != "" {
+		// Skip SSRF check for Unix socket connections
+		if !strings.HasPrefix(hostname, "/") && !strings.HasPrefix(hostname, ".") {
+			ips, err := net.LookupIP(hostname)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve hostname '%s': %w", hostname, err)
+			}
+
+			if len(ips) == 0 {
+				return nil, fmt.Errorf("'%s' resolved to no IP addresses", hostname)
+			}
+
+			// Check if at least one IP is routable (not local)
+			hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+				return !common.IsLocalIP(ip)
+			})
+
+			if !hasRoutableIP {
+				return nil, fmt.Errorf("postgres: tried to connect to '%s', [%w]", hostname, common.ErrNoLocalIP)
+			}
+		}
 	}
 
 	var connStr string
