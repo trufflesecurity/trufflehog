@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
+	"slices"
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/lib/pq"
@@ -18,6 +21,34 @@ type postgresJDBC struct {
 }
 
 func (s *postgresJDBC) ping(ctx context.Context) pingResult {
+	// SSRF protection: check if the host resolves to local IPs
+	if hostVal, exists := s.params["host"]; exists && hostVal != "" {
+		// Extract hostname from host:port format if present
+		hostname := hostVal
+		if h, _, found := strings.Cut(hostVal, ":"); found {
+			hostname = h
+		}
+
+		// Skip SSRF check for Unix socket connections
+		if !strings.HasPrefix(hostname, "/") && !strings.HasPrefix(hostname, ".") {
+			ips, err := net.LookupIP(hostname)
+			if err != nil {
+				return pingResult{err, false}
+			}
+
+			if len(ips) > 0 {
+				// Check if at least one IP is routable (not local)
+				hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+					return !common.IsLocalIP(ip)
+				})
+
+				if !hasRoutableIP {
+					return pingResult{fmt.Errorf("jdbc postgres: tried to connect to '%s', [%w]", hostname, common.ErrNoLocalIP), true}
+				}
+			}
+		}
+	}
+
 	// It is crucial that we try to build a connection string ourselves before using the one we found. This is because
 	// if the found connection string doesn't include a username, the driver will attempt to connect using the current
 	// user's name, which will fail in a way that looks like a determinate failure, thus terminating the waterfall. In

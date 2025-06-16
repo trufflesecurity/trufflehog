@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
+	"slices"
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	mssql "github.com/microsoft/go-mssqldb"
@@ -66,6 +69,25 @@ func parseSqlServer(ctx logContext.Context, subname string) (jdbc, error) {
 			host = value
 		case "port":
 			port = value
+		}
+	}
+
+	// SSRF protection: check if the host resolves to local IPs
+	if host != "" {
+		ips, err := net.LookupIP(host)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve hostname '%s': %w", host, err)
+		}
+
+		if len(ips) > 0 {
+			// Check if at least one IP is routable (not local)
+			hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+				return !common.IsLocalIP(ip)
+			})
+
+			if !hasRoutableIP {
+				return nil, fmt.Errorf("jdbc sqlserver: tried to connect to '%s', [%w]", host, common.ErrNoLocalIP)
+			}
 		}
 	}
 

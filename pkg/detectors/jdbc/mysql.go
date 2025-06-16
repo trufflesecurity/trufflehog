@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
+	"slices"
 	"strings"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 
 	"github.com/go-sql-driver/mysql"
@@ -20,6 +23,37 @@ type mysqlJDBC struct {
 }
 
 func (s *mysqlJDBC) ping(ctx context.Context) pingResult {
+	// Extract hostname for SSRF check
+	// host format is "tcp(hostname:port)"
+	if strings.HasPrefix(s.host, "tcp(") && strings.HasSuffix(s.host, ")") {
+		hostPort := strings.TrimPrefix(s.host, "tcp(")
+		hostPort = strings.TrimSuffix(hostPort, ")")
+
+		hostname, _, err := net.SplitHostPort(hostPort)
+		if err != nil {
+			// If SplitHostPort fails, try using the whole string as hostname
+			hostname = hostPort
+		}
+
+		if hostname != "" {
+			ips, err := net.LookupIP(hostname)
+			if err != nil {
+				return pingResult{err, false}
+			}
+
+			if len(ips) > 0 {
+				// Check if at least one IP is routable (not local)
+				hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+					return !common.IsLocalIP(ip)
+				})
+
+				if !hasRoutableIP {
+					return pingResult{fmt.Errorf("jdbc mysql: tried to connect to '%s', [%w]", hostname, common.ErrNoLocalIP), true}
+				}
+			}
+		}
+	}
+
 	return ping(ctx, "mysql", isMySQLErrorDeterminate,
 		buildMySQLConnectionString(s.host, "", s.userPass, s.params))
 }
