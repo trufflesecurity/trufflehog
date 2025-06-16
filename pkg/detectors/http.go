@@ -2,12 +2,12 @@ package detectors
 
 import (
 	"context"
-	"errors"
 	"net"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 )
 
@@ -44,13 +44,11 @@ var overrideOnce sync.Once
 // It is guaranteed to only run once, subsequent calls will have no effect.
 // This should be called before any scans are started.
 func OverrideDetectorTimeout(timeout time.Duration) {
-    overrideOnce.Do(func() {
-        DetectorHttpClientWithLocalAddresses.Timeout = timeout
-        DetectorHttpClientWithNoLocalAddresses.Timeout = timeout
-    })
+	overrideOnce.Do(func() {
+		DetectorHttpClientWithLocalAddresses.Timeout = timeout
+		DetectorHttpClientWithNoLocalAddresses.Timeout = timeout
+	})
 }
-
-
 
 // ClientOption defines a function type that modifies an http.Client.
 type ClientOption func(*http.Client)
@@ -93,16 +91,6 @@ func NewDetectorTransport(T http.RoundTripper) http.RoundTripper {
 	return &detectorTransport{T: T}
 }
 
-func isLocalIP(ip net.IP) bool {
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsPrivate() {
-		return true
-	}
-
-	return false
-}
-
-var ErrNoLocalIP = errors.New("dialing local IP addresses is not allowed")
-
 func WithNoLocalIP() ClientOption {
 	return func(c *http.Client) {
 		if c.Transport == nil {
@@ -140,8 +128,8 @@ func WithNoLocalIP() ClientOption {
 			}
 
 			for _, ip := range ips {
-				if isLocalIP(ip) {
-					return nil, ErrNoLocalIP
+				if common.IsLocalIP(ip) {
+					return nil, common.ErrNoLocalIP
 				}
 			}
 
