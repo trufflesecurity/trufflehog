@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 func TestWithNoLocalIP(t *testing.T) {
@@ -19,7 +20,7 @@ func TestWithNoLocalIP(t *testing.T) {
 
 		_, err := transport.DialContext(context.Background(), "tcp", "127.0.0.1:8080")
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, ErrNoLocalIP)
+		assert.ErrorIs(t, err, common.ErrNoLocalIP)
 	})
 
 	t.Run("Allows dialing non-local host", func(t *testing.T) {
@@ -87,7 +88,7 @@ func TestIsLocalIP(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := isLocalIP(tc.ip)
+			result := common.IsLocalIP(tc.ip)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
