@@ -4,12 +4,14 @@ import (
 	"context"
 	"net"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -39,13 +41,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	for urlMatch, password := range uniqueMatches {
-		// Skip common test hosts.
-		if strings.Contains(urlMatch, "127.0.0.1") ||
-			strings.Contains(urlMatch, "localhost") ||
-			strings.Contains(urlMatch, "contoso.com") ||
-			strings.Contains(urlMatch, "example.com") {
-			continue
-		}
 		// Skip findings where the password only has "*" characters, this is a redacted password
 		if strings.Trim(password, "*") == "" {
 			continue
@@ -57,6 +52,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		if _, ok := parsedURL.User.Password(); !ok {
 			continue
+		}
+
+		// Perform SSRF check
+		hostname := parsedURL.Hostname()
+		if hostname != "" {
+			ips, err := net.LookupIP(hostname)
+			if err == nil && len(ips) > 0 {
+				// Check if at least one IP is routable (not local)
+				hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+					return !common.IsLocalIP(ip)
+				})
+
+				if !hasRoutableIP {
+					// Skip local addresses
+					continue
+				}
+			}
 		}
 
 		r := detectors.Result{

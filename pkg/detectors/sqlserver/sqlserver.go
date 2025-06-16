@@ -3,7 +3,9 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net"
+	"slices"
 	"strconv"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/microsoft/go-mssqldb/msdsn"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -74,6 +77,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 var ping = func(ctx context.Context, config msdsn.Config) (bool, error) {
+	// SSRF protection: check if the host resolves to local IPs
+	if config.Host != "" {
+		ips, err := net.LookupIP(config.Host)
+		if err != nil {
+			return false, err
+		}
+
+		if len(ips) == 0 {
+			return false, fmt.Errorf("'%s' resolved to no IP addresses", config.Host)
+		}
+
+		// Check if at least one IP is routable (not local)
+		hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+			return !common.IsLocalIP(ip)
+		})
+
+		if !hasRoutableIP {
+			return false, fmt.Errorf("sqlserver: tried to connect to '%s', [%w]", config.Host, common.ErrNoLocalIP)
+		}
+	}
+
 	// TCP connectivity check to prevent indefinite hangs
 	address := net.JoinHostPort(config.Host, strconv.Itoa(int(config.Port)))
 

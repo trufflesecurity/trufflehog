@@ -3,6 +3,9 @@ package couchbase
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -97,6 +100,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
+					// SSRF protection: check if the host resolves to local IPs
+					parsedURL, err := url.Parse(resConnectionStringMatch)
+					if err == nil && parsedURL.Host != "" {
+						hostname := parsedURL.Hostname()
+						if hostname != "" {
+							ips, err := net.LookupIP(hostname)
+							if err == nil && len(ips) > 0 {
+								// Check if at least one IP is routable (not local)
+								hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+									return !common.IsLocalIP(ip)
+								})
+
+								if !hasRoutableIP {
+									// All IPs are local, skip this credential
+									continue
+								}
+							}
+						}
+					}
 
 					options := gocb.ClusterOptions{
 						Authenticator: gocb.PasswordAuthenticator{
