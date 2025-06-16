@@ -3,14 +3,17 @@ package ftp
 import (
 	"context"
 	"errors"
+	"net"
 	"net/textproto"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/jlaffaye/ftp"
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -119,6 +122,31 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 	host := u.Host
 	if !strings.Contains(host, ":") {
 		host = host + ":21"
+	}
+
+	// SSRF protection: check if the host resolves to local IPs
+	hostname, _, err := net.SplitHostPort(host)
+	if err != nil {
+		// If SplitHostPort fails, use the whole host as hostname
+		hostname = host
+	}
+
+	if hostname != "" {
+		ips, err := net.LookupIP(hostname)
+		if err != nil {
+			return err
+		}
+
+		if len(ips) > 0 {
+			// Check if at least one IP is routable (not local)
+			hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+				return !common.IsLocalIP(ip)
+			})
+
+			if !hasRoutableIP {
+				return errors.New("ftp: connection to local IP addresses is not allowed")
+			}
+		}
 	}
 
 	c, err := ftp.Dial(host, ftp.DialWithTimeout(timeout))
