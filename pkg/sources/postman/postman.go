@@ -329,10 +329,13 @@ func (s *Source) scanWorkspace(ctx context.Context, chunksChan chan *sources.Chu
 // scanCollection scans a collection and all its items, folders, and requests.
 // locally scoped Metadata is updated as we drill down into the collection.
 func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Chunk, metadata Metadata, collection Collection) {
-	ctx.Logger().V(2).Info("starting to scan collection",
+	ctx = context.WithValues(ctx,
 		"collection_name", collection.Info.Name,
 		"collection_uuid", collection.Info.Uid,
-		"variable_count", len(collection.Variables))
+	)
+	ctx.Logger().V(2).Info("starting to scan collection",
+		"variable_count", len(collection.Variables),
+	)
 	metadata.CollectionInfo = collection.Info
 	metadata.Type = COLLECTION_TYPE
 	s.attemptToAddKeyword(collection.Info.Name)
@@ -354,7 +357,6 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	s.scanAuth(ctx, chunksChan, metadata, collection.Auth, URL{})
 
 	ctx.Logger().V(3).Info("Scanning events in collection",
-		"collection_uid", collection.Info.Uid,
 		"event_count", len(collection.Events),
 	)
 	for _, event := range collection.Events {
@@ -362,24 +364,27 @@ func (s *Source) scanCollection(ctx context.Context, chunksChan chan *sources.Ch
 	}
 
 	ctx.Logger().V(3).Info("Scanning items in collection",
-		"collection_uid", collection.Info.Uid,
 		"item_ids", fp.Map(func(i Item) string { return i.Id })(collection.Items),
 	)
 	for _, item := range collection.Items {
-		s.scanItem(ctx, chunksChan, collection, metadata, item, "")
+		seenItemIds := make(map[string]struct{})
+		s.scanItem(ctx, chunksChan, collection, metadata, item, "", seenItemIds)
 	}
-
 }
 
-func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item, parentItemId string) {
+func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, collection Collection, metadata Metadata, item Item, parentItemId string, seenItemIds map[string]struct{}) {
+	ctx = context.WithValue(ctx, "item_uid", item.Uid)
+
 	ctx.Logger().V(3).Info("Starting to scan item",
-		"item_uid", item.Uid,
 		"item_parent_item_id", parentItemId,
 		"item_descendent_item_uids", fp.Map(func(i Item) string { return i.Uid })(item.Items),
 		"item_event_count", len(item.Events),
 		"item_response_count", len(item.Response),
 		"item_variable_count", len(item.Variable),
 	)
+
+	seenItemIds[item.Uid] = struct{}{}
+
 	s.attemptToAddKeyword(item.Name)
 
 	// override the base collection metadata with item-specific metadata
@@ -397,7 +402,13 @@ func (s *Source) scanItem(ctx context.Context, chunksChan chan *sources.Chunk, c
 	}
 	// recurse through the folders
 	for _, subItem := range item.Items {
-		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.Uid)
+		if _, ok := seenItemIds[subItem.Uid]; ok {
+			ctx.Logger().Info("Skipping already-seen item",
+				"seen_item_id", subItem.Uid,
+			)
+			continue
+		}
+		s.scanItem(ctx, chunksChan, collection, metadata, subItem, item.Uid, seenItemIds)
 	}
 
 	// The assignment of the folder ID to be the current item UID is due to wanting to assume that your current item is a folder unless you have request data inside of your item.
@@ -463,7 +474,8 @@ func (s *Source) scanEvent(ctx context.Context, chunksChan chan *sources.Chunk, 
 		metadata.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_SCRIPT
 	}
 
-	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, data, DefaultMaxRecursionDepth)), metadata)
+	ctx = context.WithValue(ctx, "event_listen", event.Listen)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(ctx, metadata, data, DefaultMaxRecursionDepth)), metadata)
 	metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
@@ -561,7 +573,7 @@ func (s *Source) scanAuth(ctx context.Context, chunksChan chan *sources.Chunk, m
 	} else if strings.Contains(m.Type, COLLECTION_TYPE) {
 		m.LocationType = source_metadatapb.PostmanLocationType_COLLECTION_AUTHORIZATION
 	}
-	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, authData, DefaultMaxRecursionDepth)), m)
+	s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(ctx, m, authData, DefaultMaxRecursionDepth)), m)
 	m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 }
 
@@ -591,7 +603,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		metadata.Type = originalType + " > header"
 		metadata.Link = metadata.Link + "?tab=headers"
 		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_HEADER
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, strings.Join(r.HeaderString, " "), DefaultMaxRecursionDepth)), metadata)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(ctx, metadata, strings.Join(r.HeaderString, " "), DefaultMaxRecursionDepth)), metadata)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -600,7 +612,7 @@ func (s *Source) scanHTTPRequest(ctx context.Context, chunksChan chan *sources.C
 		// Note: query parameters are handled separately
 		u := fmt.Sprintf("%s://%s/%s", r.URL.Protocol, strings.Join(r.URL.Host, "."), strings.Join(r.URL.Path, "/"))
 		metadata.LocationType = source_metadatapb.PostmanLocationType_REQUEST_URL
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(metadata, u, DefaultMaxRecursionDepth)), metadata)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(ctx, metadata, u, DefaultMaxRecursionDepth)), metadata)
 		metadata.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -655,13 +667,13 @@ func (s *Source) scanRequestBody(ctx context.Context, chunksChan chan *sources.C
 		m.Type = originalType + " > raw"
 		data := b.Raw
 		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_RAW
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data, DefaultMaxRecursionDepth)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(ctx, m, data, DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	case "graphql":
 		m.Type = originalType + " > graphql"
 		data := b.GraphQL.Query + " " + b.GraphQL.Variables
 		m.LocationType = source_metadatapb.PostmanLocationType_REQUEST_BODY_GRAPHQL
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, data, DefaultMaxRecursionDepth)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(ctx, m, data, DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 }
@@ -687,7 +699,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 		m.Type = originalType + " > response header"
 		// TODO Note: for now, links to Postman responses do not include a more granular tab for the params/header/body, but when they do, we will need to update the metadata.Link info
 		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_HEADER
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, strings.Join(response.HeaderString, " "), DefaultMaxRecursionDepth)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(ctx, m, strings.Join(response.HeaderString, " "), DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -695,7 +707,7 @@ func (s *Source) scanHTTPResponse(ctx context.Context, chunksChan chan *sources.
 	if response.Body != "" {
 		m.Type = originalType + " > response body"
 		m.LocationType = source_metadatapb.PostmanLocationType_RESPONSE_BODY
-		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(m, response.Body, DefaultMaxRecursionDepth)), m)
+		s.scanData(ctx, chunksChan, s.formatAndInjectKeywords(s.buildSubstituteSet(ctx, m, response.Body, DefaultMaxRecursionDepth)), m)
 		m.LocationType = source_metadatapb.PostmanLocationType_UNKNOWN_POSTMAN
 	}
 
@@ -728,7 +740,7 @@ func (s *Source) scanVariableData(ctx context.Context, chunksChan chan *sources.
 		if valStr == "" {
 			continue
 		}
-		values = append(values, s.buildSubstituteSet(m, valStr, DefaultMaxRecursionDepth)...)
+		values = append(values, s.buildSubstituteSet(ctx, m, valStr, DefaultMaxRecursionDepth)...)
 	}
 
 	m.FieldType = m.Type + " variables"
