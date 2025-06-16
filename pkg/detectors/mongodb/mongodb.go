@@ -3,10 +3,14 @@ package mongodb
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -123,6 +127,46 @@ func isErrDeterminate(err error) bool {
 }
 
 func verifyUri(ctx context.Context, connStr string, timeout time.Duration) (bool, error) {
+	// Parse the connection string to check for SSRF
+	parsed, err := url.Parse(connStr)
+	if err != nil {
+		return false, err
+	}
+
+	// MongoDB can have multiple hosts in the connection string (for replica sets)
+	// Format: mongodb://user:pass@host1:port1,host2:port2,host3:port3/database
+	hostPart := parsed.Host
+	if hostPart != "" {
+		hosts := strings.Split(hostPart, ",")
+		for _, hostPort := range hosts {
+			host, _, err := net.SplitHostPort(hostPort)
+			if err != nil {
+				// If SplitHostPort fails, it might be just a hostname without port
+				host = hostPort
+			}
+
+			if host != "" && !strings.HasPrefix(host, "/") && !strings.HasPrefix(host, ".") {
+				ips, err := net.LookupIP(host)
+				if err != nil {
+					return false, err
+				}
+
+				if len(ips) == 0 {
+					return false, fmt.Errorf("'%s' resolved to no IP addresses", host)
+				}
+
+				// Check if at least one IP is routable (not local)
+				hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+					return !common.IsLocalIP(ip)
+				})
+
+				if !hasRoutableIP {
+					return false, fmt.Errorf("mongodb: tried to connect to '%s', [%w]", host, common.ErrNoLocalIP)
+				}
+			}
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
