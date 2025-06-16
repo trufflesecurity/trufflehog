@@ -3,16 +3,20 @@ package planetscaledb
 import (
 	"context"
 	"database/sql"
-	regexp "github.com/wasilibs/go-re2"
+	"net"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
+	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -47,6 +51,27 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
+					// SSRF protection: check if the host resolves to local IPs
+					if host != "" {
+						ips, err := net.LookupIP(host)
+						if err != nil {
+							// DNS lookup failed, skip this credential
+							continue
+						}
+
+						if len(ips) > 0 {
+							// Check if at least one IP is routable (not local)
+							hasRoutableIP := slices.ContainsFunc(ips, func(ip net.IP) bool {
+								return !common.IsLocalIP(ip)
+							})
+
+							if !hasRoutableIP {
+								// All IPs are local, skip this credential
+								continue
+							}
+						}
+					}
+
 					cfg := mysql.Config{
 						User:                 username[0],
 						Passwd:               password[0],
@@ -54,7 +79,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						Addr:                 host,
 						TLSConfig:            "true", // assuming SSL is required
 						AllowNativePasswords: true,
+						Timeout:              3 * time.Second,
 					}
+
 					db, err := sql.Open("mysql", cfg.FormatDSN())
 					if err != nil {
 						s1.SetVerificationError(err, password[0])
