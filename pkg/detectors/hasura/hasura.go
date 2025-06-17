@@ -128,9 +128,7 @@ func (s Scanner) verifyHasura(ctx context.Context, client *http.Client, domain, 
 		_ = resp.Body.Close()
 	}()
 
-	extraData := map[string]string{
-		"domain": domain,
-	}
+	extraData := map[string]string{"domain": domain}
 
 	// Since the API returns 200 OK for both valid and invalid keys, we MUST parse the body.
 	bodyBytes, err := io.ReadAll(resp.Body)
@@ -138,16 +136,12 @@ func (s Scanner) verifyHasura(ctx context.Context, client *http.Client, domain, 
 		return false, extraData, err
 	}
 
-	// First, handle unexpected non-200 status codes. These are errors.
+	// Handle non-200 status codes
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusInternalServerError {
-			// If it's the specific "Project not reachable" page, treat it as a definitive
-			// "not verified" result, NOT a system error.
-			if isHasuraProjectUnavailable(bodyBytes) {
-				return false, extraData, nil
-			}
+		// Special case: Project not reachable is a definitive "not verified", not an error
+		if resp.StatusCode == http.StatusInternalServerError && isHasuraProjectUnavailable(bodyBytes) {
+			return false, extraData, nil
 		}
-
 		return false, extraData, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -161,17 +155,17 @@ func (s Scanner) verifyHasura(ctx context.Context, client *http.Client, domain, 
 		return false, extraData, fmt.Errorf("failed to unmarshal json response: %w", err)
 	}
 
-	// The key is VERIFIED only if the response contains a "data" field and NO "errors".
-	if len(response.Errors) == 0 && response.Data != nil {
-		return true, extraData, nil
-	}
-
-	// The key is NOT VERIFIED if the response contains an "errors" field.
-	if len(response.Errors) > 0 {
+	// Key is not verified if we have errors or no data
+	if len(response.Errors) > 0 || response.Data == nil {
 		return false, extraData, nil
 	}
 
-	// Catch any other case where the response is 200 OK but inconclusive.
+	// Key is verified if we have data and no errors
+	if response.Data != nil && len(response.Errors) == 0 {
+		return true, extraData, nil
+	}
+
+	// This should never be reached, but just in case
 	return false, extraData, fmt.Errorf("api returned 200 OK but response was inconclusive")
 }
 
