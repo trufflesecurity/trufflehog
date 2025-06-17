@@ -1,6 +1,3 @@
-//go:build detectors
-// +build detectors
-
 package hasura
 
 import (
@@ -18,14 +15,13 @@ import (
 )
 
 func TestHasura_FromData(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-
-	// Fetch secrets from GCP for live integration tests.
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
+
 	secret := testSecrets.MustGetField("HASURA")
 	inactiveSecret := testSecrets.MustGetField("HASURA_INACTIVE")
 	domain := testSecrets.MustGetField("HASURA_DOMAIN")
