@@ -612,6 +612,8 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
     base:
     # Scan commits until here (usually dev branch).
     head: # optional
+    # Docker image to use for scanning, defaults to ghcr.io/trufflesecurity/trufflehog.
+    image: # optional
     # Extra args to be passed to the trufflehog cli.
     extra_args: --log-level=2 --results=verified,unknown
 ```
@@ -672,7 +674,7 @@ TruffleHog will send a JSON POST request containing the regex matches to a
 configured webhook endpoint. If the endpoint responds with a `200 OK` response
 status code, the secret is considered verified.
 
-Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret, 
+Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret,
 and excluded word lists checked against the secret (captured group if present, entire match if capture group is not present). Note that if
 your custom detector has multiple `regex` set (in this example `hogID`, and `hogToken`), then the filters get applied to each regex. [Here](examples/generic_with_filters.yml) is an example of a custom detector using these filters.
 
