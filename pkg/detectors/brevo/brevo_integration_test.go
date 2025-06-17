@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package sendinbluev2
+package brevo
 
 import (
 	"context"
@@ -16,15 +16,15 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestSendinBlueV2_FromChunk(t *testing.T) {
+func TestBrevo_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SENDINBLUEV2_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("SENDINBLUEV2_INACTIVE")
+	secret := testSecrets.MustGetField("BREVO_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("BREVO_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -43,12 +43,12 @@ func TestSendinBlueV2_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sendinbluev2 secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a brevo secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SendinBlueV2,
+					DetectorType: detectorspb.DetectorType_Brevo,
 					Verified:     true,
 				},
 			},
@@ -59,12 +59,12 @@ func TestSendinBlueV2_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a sendinbluev2 secret %s within but unverified", inactiveSecret)),
+				data:   []byte(fmt.Sprintf("You can find a brevo secret %s within but unverified", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_SendinBlueV2,
+					DetectorType: detectorspb.DetectorType_Brevo,
 					Verified:     false,
 				},
 			},
@@ -87,7 +87,7 @@ func TestSendinBlueV2_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("SendinBlueV2.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Brevo.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -97,7 +97,7 @@ func TestSendinBlueV2_FromChunk(t *testing.T) {
 				got[i].Raw = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("SendinBlueV2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Brevo.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

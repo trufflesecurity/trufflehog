@@ -97,7 +97,7 @@ enum DetectorType {
   PubNubSubscriptionKey = 83;
   PusherChannelKey = 84;
   ScalewayKey = 85;
-  SendinBlueV2 = 86;
+  Brevo = 86;
   SentryToken = 87;
   ShodanKey = 88;
   SnykKey = 89;

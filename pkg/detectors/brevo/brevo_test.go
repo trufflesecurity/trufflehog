@@ -1,4 +1,4 @@
-package sendinbluev2
+package brevo
 
 import (
 	"context"
@@ -14,10 +14,10 @@ import (
 var (
 	validPattern   = "xkeysib-C6S1LXk_u4mw_uIss4MGmJpH8yrOwFep2aN5YLALYVpAb4buJ7uvxqYfrb3kZL5ao2JvUEFb1vRk79IXj"
 	invalidPattern = "xkeysib-C6S1LXk_u4mw_uIss4MGmJpH8yrOwFep2aN5?LALYVpAb4buJ7uvxqYfrb3kZL5ao2JvUEFb1vRk79IXj"
-	keyword        = "sendinbluev2"
+	keyword        = "brevo"
 )
 
-func TestSendinBlueV2_Pattern(t *testing.T) {
+func TestBrevo_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
@@ -26,7 +26,7 @@ func TestSendinBlueV2_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword sendinbluev2",
+			name:  "valid pattern - with keyword brevo",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
 			want:  []string{validPattern},
 		},
