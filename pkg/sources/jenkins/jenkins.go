@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/roundtripper"
@@ -411,13 +412,7 @@ func (s *Source) chunkBuild(
 			buildLogURL.String())
 	}
 
-	buildLog, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("error reading build log response body from %q: %w", buildLogURL.String(), err)
-	}
-
-	ctx.Logger().V(4).Info("scanning build log")
-	chunksChan <- &sources.Chunk{
+	chunkSkel := &sources.Chunk{
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
 		SourceType: s.Type(),
@@ -431,11 +426,11 @@ func (s *Source) chunkBuild(
 				},
 			},
 		},
-		Data:   buildLog,
 		Verify: s.verify,
 	}
 
-	return nil
+	ctx.Logger().V(4).Info("scanning build log")
+	return handlers.HandleFile(ctx, resp.Body, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 }
 
 type JenkinsJobResponse struct {
