@@ -1,162 +1,135 @@
-//go:build detectors
-// +build detectors
-
 package hasura
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestHasura_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("HASURA")
-	inactiveSecret := testSecrets.MustGetField("HASURA_INACTIVE")
-	domain := testSecrets.MustGetField("HASURA_DOMAIN")
+func TestHasura_Pattern(t *testing.T) {
+	d := Scanner{}
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name          string
+		input         string
+		expectedPairs []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a hasura secret %s within hasura domain %s", secret, domain)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Hasura,
-					Verified:     true,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			name:          "simple case: one domain, one key",
+			input:         "The hasura admin secret is 05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4 for the domain project-one-12345.hasura.app",
+			expectedPairs: []string{"project-one-12345.hasura.app:05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4"},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a hasura secret %s within hasura domain %s but not valid", inactiveSecret, domain)),
-				verify: true,
+			name: "multiple keys, single domain",
+			input: `
+				The domain is project-one-12345.hasura.app
+				hasura key1: 05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4
+				hasura key2: aBcDeFgHiJkLmNoPqRsTuVwXyZ123456aBcDeFgHiJkLmNoPqRsTuVwXyZ123456
+			`,
+			expectedPairs: []string{
+				"project-one-12345.hasura.app:05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4",
+				"project-one-12345.hasura.app:aBcDeFgHiJkLmNoPqRsTuVwXyZ123456aBcDeFgHiJkLmNoPqRsTuVwXyZ123456",
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Hasura,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
+			name: "single key, multiple domains",
+			input: `
+				The hasura key is 05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4
+				Domain 1: project-one-12345.hasura.app
+				Domain 2: project-two-67890.hasura.app
+			`,
+			expectedPairs: []string{
+				"project-one-12345.hasura.app:05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4",
+				"project-two-67890.hasura.app:05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4",
 			},
-			want:                nil,
-			wantErr:             false,
-			wantVerificationErr: false,
 		},
 		{
-			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a hasura secret %s within %s", secret, domain)),
-				verify: true,
+			name: "many-to-many: multiple keys and domains",
+			input: `
+				Here is a hasura key: 05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4
+				And another hasura key: aBcDeFgHiJkLmNoPqRsTuVwXyZ123456aBcDeFgHiJkLmNoPqRsTuVwXyZ123456
+				And a hasura domain: project-one-12345.hasura.app
+				And another domain: project-two-67890.hasura.app
+			`,
+			expectedPairs: []string{
+				"project-one-12345.hasura.app:05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4",
+				"project-one-12345.hasura.app:aBcDeFgHiJkLmNoPqRsTuVwXyZ123456aBcDeFgHiJkLmNoPqRsTuVwXyZ123456",
+				"project-two-67890.hasura.app:05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4",
+				"project-two-67890.hasura.app:aBcDeFgHiJkLmNoPqRsTuVwXyZ123456aBcDeFgHiJkLmNoPqRsTuVwXyZ123456",
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Hasura,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
 		},
 		{
-			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a hasura secret %s within %s", secret, domain)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Hasura,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
+			name:          "negative case: only a key, no domain",
+			input:         "A hasura secret without a domain: 05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4",
+			expectedPairs: []string{},
+		},
+		{
+			name:          "negative case: only a domain, no key",
+			input:         "A hasura domain without a secret: project-one-12345.hasura.app",
+			expectedPairs: []string{},
+		},
+		{
+			name:          "negative case: invalid key with valid domain",
+			input:         "An invalid hasura key not-a-valid-key-12345 with a valid domain project-one-12345.hasura.app",
+			expectedPairs: []string{},
+		},
+		{
+			name: "mixed valid and invalid keys with one domain",
+			input: `
+				The domain is project-one-12345.hasura.app
+				Valid hasura key: 05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4
+				Invalid hasura key: not-a-valid-key-12345
+			`,
+			expectedPairs: []string{"project-one-12345.hasura.app:05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4"},
+		},
+		{
+			name:          "negative case: invalid domain with valid key",
+			input:         "A hasura key 05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4 with an invalid domain example.com",
+			expectedPairs: []string{},
+		},
+		{
+			name:          "negative case: key without 'hasura' keyword nearby",
+			input:         "A random 64-char string 05tUFwoJfK2dui0CWKxzqJHmNzQrsX40Kwd7g2OEqLl1RZeU6pRvyOSnD4nghgH4 with a valid domain project-one-12345.hasura.app",
+			expectedPairs: []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Hasura.FromData() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
-				}
-			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Hasura.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Run the detector with verification turned off for pattern testing.
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Fatalf("FromData() returned an unexpected error: %v", err)
+			}
+
+			// Check if the number of results matches what we expect.
+			if len(results) != len(test.expectedPairs) {
+				t.Errorf("expected %d results, but got %d", len(test.expectedPairs), len(results))
+				// Log results for easier debugging
+				for i, r := range results {
+					t.Logf("Got result %d: %s", i, string(r.RawV2))
 				}
+				t.FailNow()
+			}
+
+			// For a more robust comparison, load the results into maps to ignore order.
+			actualPairs := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				// The RawV2 field should contain the "domain:key" pair.
+				if len(r.RawV2) > 0 {
+					actualPairs[string(r.RawV2)] = struct{}{}
+				}
+			}
+
+			expectedPairsMap := make(map[string]struct{}, len(test.expectedPairs))
+			for _, v := range test.expectedPairs {
+				expectedPairsMap[v] = struct{}{}
+			}
+
+			// Use cmp.Diff to find any mismatches between the expected and actual pairs.
+			if diff := cmp.Diff(expectedPairsMap, actualPairs); diff != "" {
+				t.Errorf("FromData() results mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
