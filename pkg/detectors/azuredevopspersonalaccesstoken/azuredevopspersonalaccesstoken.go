@@ -13,13 +13,13 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type KeyPatScanner struct {
+type Scanner struct {
 	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
-// Ensure the KeyPatScanner satisfies the interface at compile time.
-var _ detectors.Detector = (*KeyPatScanner)(nil)
+// Ensure the Scanner satisfies the interface at compile time.
+var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -28,12 +28,12 @@ var (
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
-func (s KeyPatScanner) Keywords() []string {
+func (s Scanner) Keywords() []string {
 	return []string{"azure", "token", "pat", "vsce"}
 }
 
 // FromData will find and optionally verify AzureDevopsPersonalAccessToken secrets in a given set of bytes.
-func (s KeyPatScanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -64,7 +64,6 @@ func (s KeyPatScanner) FromData(ctx context.Context, verify bool, data []byte) (
 				res, err := client.Do(req)
 				if err == nil {
 					defer res.Body.Close()
-					fmt.Printf("Debug: HTTP Status Code: %d\n", res.StatusCode)
 					if res.StatusCode >= 200 && res.StatusCode < 300 {
 						s1.Verified = true
 					} else if res.StatusCode == 401 {
@@ -85,10 +84,10 @@ func (s KeyPatScanner) FromData(ctx context.Context, verify bool, data []byte) (
 	return results, nil
 }
 
-func (s KeyPatScanner) Type() detectorspb.DetectorType {
+func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureDevopsPersonalAccessToken
 }
 
-func (s KeyPatScanner) Description() string {
+func (s Scanner) Description() string {
 	return "Azure DevOps is a suite of development tools provided by Microsoft. Personal Access Tokens (PATs) are used to authenticate and authorize access to Azure DevOps services and resources."
 }

@@ -11,7 +11,7 @@ import (
 )
 
 func TestKeyPatScanner_EndToEnd(t *testing.T) {
-	scanner := KeyPatScanner{}
+	scanner := Scanner{}
 
 	// Mock HTTP client to simulate successful verification
 	scanner.client = &http.Client{
