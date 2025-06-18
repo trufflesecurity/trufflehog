@@ -23,7 +23,7 @@ func TestOpenVSXDetector_FromData(t *testing.T) {
 			data:        "VSX Token: 12345678-abcd-1234-abcd-1234567890ab",
 			expected: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Generic,
+					DetectorType: detectorspb.DetectorType_OpenVSX,
 					Raw:          []byte("12345678-abcd-1234-abcd-1234567890ab"),
 					RawV2:        []byte("12345678-abcd-1234-abcd-1234567890ab"),
 					Redacted:     "12345678-abcd-1234-abcd-1234567890ab",
@@ -35,7 +35,7 @@ func TestOpenVSXDetector_FromData(t *testing.T) {
 			data:        "VSIX EXTENSION ID: 98765432-dcba-4321-dcba-ba0987654321",
 			expected: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Generic,
+					DetectorType: detectorspb.DetectorType_OpenVSX,
 					Raw:          []byte("98765432-dcba-4321-dcba-ba0987654321"),
 					RawV2:        []byte("98765432-dcba-4321-dcba-ba0987654321"),
 					Redacted:     "98765432-dcba-4321-dcba-ba0987654321",
@@ -47,7 +47,7 @@ func TestOpenVSXDetector_FromData(t *testing.T) {
 			data:        "OPENVSX PUBLISHER ID=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 			expected: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Generic,
+					DetectorType: detectorspb.DetectorType_OpenVSX,
 					Raw:          []byte("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
 					RawV2:        []byte("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
 					Redacted:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -59,7 +59,7 @@ func TestOpenVSXDetector_FromData(t *testing.T) {
 			data:        "npx ovsx publish test.vsix -p 5248a297-bd54-433d-9216-7abe57ecd5d0",
 			expected: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Generic,
+					DetectorType: detectorspb.DetectorType_OpenVSX,
 					Raw:          []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					RawV2:        []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					Redacted:     "5248a297-bd54-433d-9216-7abe57ecd5d0",
@@ -71,7 +71,7 @@ func TestOpenVSXDetector_FromData(t *testing.T) {
 			data:        "OVSX_ACCESS_TOKEN=5248a297-bd54-433d-9216-7abe57ecd5d0",
 			expected: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Generic,
+					DetectorType: detectorspb.DetectorType_OpenVSX,
 					Raw:          []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					RawV2:        []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					Redacted:     "5248a297-bd54-433d-9216-7abe57ecd5d0",
@@ -83,7 +83,7 @@ func TestOpenVSXDetector_FromData(t *testing.T) {
 			data:        "ovsx publish test.vsix -p 5248a297-bd54-433d-9216-7abe57ecd5d0",
 			expected: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Generic,
+					DetectorType: detectorspb.DetectorType_OpenVSX,
 					Raw:          []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					RawV2:        []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					Redacted:     "5248a297-bd54-433d-9216-7abe57ecd5d0",
@@ -95,7 +95,7 @@ func TestOpenVSXDetector_FromData(t *testing.T) {
 			data:        "OVSX_PAT=5248a297-bd54-433d-9216-7abe57ecd5d0",
 			expected: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Generic,
+					DetectorType: detectorspb.DetectorType_OpenVSX,
 					Raw:          []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					RawV2:        []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					Redacted:     "5248a297-bd54-433d-9216-7abe57ecd5d0",
@@ -107,7 +107,7 @@ func TestOpenVSXDetector_FromData(t *testing.T) {
 			data:        "OVSX_KEY=5248a297-bd54-433d-9216-7abe57ecd5d0",
 			expected: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Generic,
+					DetectorType: detectorspb.DetectorType_OpenVSX,
 					Raw:          []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					RawV2:        []byte("5248a297-bd54-433d-9216-7abe57ecd5d0"),
 					Redacted:     "5248a297-bd54-433d-9216-7abe57ecd5d0",
