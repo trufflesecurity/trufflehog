@@ -4,39 +4,97 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/google/go-cmp/cmp"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestScanner_FromData(t *testing.T) {
-	scanner := Scanner{}
+var (
+	validPattern = `
+	azure:
+		azure_key: uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
+		azure_org_id: WOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG
+	`
+	validPatternNoOrg = `
+	azure:
+		azure_key: uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
+	`
+	invalidPattern = `
+	azure:
+		azure_key: uie5tff7m5H5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
+		azure_org_id: LOKi
+	`
+)
 
-	// Test case with a valid key
-	data := []byte("azure token: abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz")
-	results, err := scanner.FromData(context.Background(), false, data)
-	assert.NoError(t, err)
-	assert.Len(t, results, 1)
-	assert.Equal(t, "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", string(results[0].Raw))
+func TestAzureDevopsPersonalAccessToken_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
-	// Test case with no key
-	data = []byte("no key here")
-	results, err = scanner.FromData(context.Background(), false, data)
-	assert.NoError(t, err)
-	assert.Len(t, results, 0)
-}
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "valid pattern with org",
+			input: validPattern,
+			want:  []string{
+				"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un", // token only
+				"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8unWOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG", // token + org
+			},
+		},
+		{
+			name:  "valid pattern without org",
+			input: validPatternNoOrg,
+			want:  []string{"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un"}, // token only
+		},
+		{
+			name:  "invalid pattern",
+			input: invalidPattern,
+			want:  nil,
+		},
+	}
 
-func TestScanner_Keywords(t *testing.T) {
-	scanner := Scanner{}
-	keywords := scanner.Keywords()
-	assert.Equal(t, []string{"azure", "token", "pat", "vsce"}, keywords)
-}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				return
+			}
 
-func TestScanner_Type(t *testing.T) {
-	scanner := Scanner{}
-	assert.Equal(t, detectorspb.DetectorType_AzureDevopsPersonalAccessToken, scanner.Type())
-}
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
 
-func TestScanner_Description(t *testing.T) {
-	scanner := Scanner{}
-	assert.Equal(t, "Azure DevOps is a suite of development tools provided by Microsoft. Personal Access Tokens (PATs) are used to authenticate and authorize access to Azure DevOps services and resources.", scanner.Description())
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
+			}
+		})
+	}
 }
