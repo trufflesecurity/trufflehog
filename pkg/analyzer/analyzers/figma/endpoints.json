@@ -1,0 +1,32 @@
+{
+    "files:read": {
+        "url": "https://api.figma.com/v1/me",
+        "method": "GET",
+        "expected_status_code_with_scope": 200,
+        "expected_status_code_without_scope": 403
+    },
+    "library_analytics:read": {
+        "url": "https://api.figma.com/v1/analytics/libraries/0/component/actions",
+        "method": "GET",
+        "expected_status_code_with_scope": 400,
+        "expected_status_code_without_scope": 403
+    },
+    "file_dev_resources:write": {
+        "url": "https://api.figma.com/v1/dev_resources",
+        "method": "POST",
+        "expected_status_code_with_scope": 400,
+        "expected_status_code_without_scope": 403
+    },
+    "file_variables:read": {
+        "url": "https://api.figma.com/v1/files/0/variables/published",
+        "method": "GET",
+        "expected_status_code_with_scope": 404,
+        "expected_status_code_without_scope": 403
+    },
+    "webhooks:write": {
+        "url": "https://api.figma.com/v2/webhooks",
+        "method": "POST",
+        "expected_status_code_with_scope": 400,
+        "expected_status_code_without_scope": 403
+    }
+}

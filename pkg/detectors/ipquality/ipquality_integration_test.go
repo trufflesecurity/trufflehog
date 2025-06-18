@@ -5,6 +5,7 @@ package ipquality
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -25,6 +26,9 @@ func TestIpquality_FromChunk(t *testing.T) {
 	}
 	secret := testSecrets.MustGetField("IPQUALITY")
 	inactiveSecret := testSecrets.MustGetField("IPQUALITY_INACTIVE")
+
+	invalidResult := detectors.Result{DetectorType: detectorspb.DetectorType_IPQuality, Verified: false}
+	invalidResult.SetVerificationError(errors.New("couldn't verify; API Key has " + insufficientCreditMessage))
 
 	type args struct {
 		ctx    context.Context
@@ -63,10 +67,7 @@ func TestIpquality_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_IPQuality,
-					Verified:     false,
-				},
+				invalidResult,
 			},
 			wantErr: false,
 		},

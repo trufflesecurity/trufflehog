@@ -61,14 +61,6 @@ func TestTwitch_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Twitch,
 					Verified:     true,
 				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
 			},
 			wantErr: false,
 		},
@@ -81,14 +73,6 @@ func TestTwitch_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
 				{
 					DetectorType: detectorspb.DetectorType_Twitch,
 					Verified:     false,
@@ -118,14 +102,6 @@ func TestTwitch_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Twitch,
 					Verified:     false,
 				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
 			},
 			wantErr:             false,
 			wantVerificationErr: true,
@@ -139,14 +115,6 @@ func TestTwitch_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Twitch,
-					Verified:     false,
-				},
 				{
 					DetectorType: detectorspb.DetectorType_Twitch,
 					Verified:     false,
@@ -185,7 +153,7 @@ func TestTwitch_FromChunk(t *testing.T) {
 					t.Errorf("Twitch.FromData() verificationError = %v, wantVerificationErr %v", got[i].VerificationError(), tt.wantVerificationErr)
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Twitch.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

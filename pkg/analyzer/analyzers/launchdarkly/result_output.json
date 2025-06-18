@@ -1,5 +1,5 @@
 {
-    "AnalyzerType": 6,
+    "AnalyzerType": 31,
     "Bindings": [
         {
             "Resource": {
@@ -29,7 +29,10 @@
                 "Name": "Roxanne Tampus",
                 "FullyQualifiedName": "launchdarkly/member/61543c5956be60235562486f",
                 "Type": "Member",
-                "Metadata": {},
+                "Metadata": {
+                    "Email": "knightmoverchan@gmail.com",
+                    "Role": "owner"
+                },
                 "Parent": null
             },
             "Permission": {
@@ -80,7 +83,9 @@
                 "Name": "secretscanner",
                 "FullyQualifiedName": "launchdarkly/proj/default/flag/secretscanner",
                 "Type": "Feature Flags",
-                "Metadata": {},
+                "Metadata": {
+                    "Kind": "boolean"
+                },
                 "Parent": {
                     "Name": "secretscanner",
                     "FullyQualifiedName": "launchdarkly/proj/61543c5956be60235562486e",

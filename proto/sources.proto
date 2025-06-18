@@ -52,6 +52,7 @@ enum SourceType {
   SOURCE_TYPE_GITHUB_EXPERIMENTAL = 37;
   SOURCE_TYPE_SENTRY = 38;
   SOURCE_TYPE_GITHUB_REALTIME = 39;
+  SOURCE_TYPE_STDIN = 40;
 }
 
 message LocalSource {
@@ -92,6 +93,12 @@ message AzureStorage {
   repeated string storage_containers = 5;
 }
 
+enum BitbucketInstallationType {
+  AUTODETECT = 0;
+  CLOUD = 1;
+  DATA_CENTER = 2;
+}
+
 message Bitbucket {
   string endpoint = 1 [(validate.rules).string.uri_ref = true];
   oneof credential {
@@ -104,6 +111,7 @@ message Bitbucket {
   repeated string ignore_repos = 6;
   bool skip_binaries = 7;
   bool skip_archives = 8;
+  BitbucketInstallationType installation_type = 9;
 }
 
 message CircleCI {
@@ -150,6 +158,7 @@ message Docker {
     bool docker_keychain = 4;
   }
   repeated string images = 5;
+  repeated string exclude_paths = 6;
 }
 
 message ECR {
@@ -222,6 +231,7 @@ message GitLab {
   bool skip_archives = 8;
   repeated string include_repos = 9;
   bool exclude_projects_shared_into_groups = 10;
+  bool remove_auth_in_url = 11;
 }
 
 message GitHub {
@@ -247,6 +257,7 @@ message GitHub {
   bool skip_archives = 18;
   bool include_wikis = 19;
   uint32 comments_timeframe_days = 20;
+  bool remove_auth_in_url = 21;
 }
 
 message GitHubExperimental {
@@ -389,6 +400,7 @@ message Teams {
   repeated string channels = 4;
   repeated string ignore_list = 5;
   repeated string team_ids = 6;
+  string tenant_id = 8;
 }
 
 message Syslog {
@@ -487,3 +499,5 @@ message Sentry {
   bool insecure_skip_verify_tls = 5;
   string projects = 6;
 }
+
+message Stdin {}

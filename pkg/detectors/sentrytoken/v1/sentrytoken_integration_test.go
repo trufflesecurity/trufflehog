@@ -52,7 +52,6 @@ func TestSentryToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_SentryToken,
 					Verified:     true,
-					ExtraData:    map[string]string{"orginzation_4508567357947904": "Truffle Security"},
 				},
 			},
 			wantErr: false,

@@ -139,7 +139,7 @@ enum DetectorType {
   AirbrakeProjectKey = 125;
   AirbrakeUserKey = 126;
   PendoIntegrationKey = 127;
-  SplunkOberservabilityToken  = 128;
+  SplunkOberservabilityToken = 128;
   LokaliseToken = 129;
   Calendarific = 130;
   Jumpcloud = 131;
@@ -232,7 +232,7 @@ enum DetectorType {
   Duda = 219;
   Yext = 220;
   ContentStack = 221;
-  Storyblok = 222;
+  StoryblokAccessToken = 222;
   GraphCMS = 223;
   Checkmarket = 224;
   Convertkit = 225;
@@ -249,7 +249,7 @@ enum DetectorType {
   ZonkaFeedback = 236;
   Delighted = 237;
   Feedier = 238;
-  Abbysale = 239;
+  Abyssale = 239;
   Magnetic = 240;
   Nytimes = 241 [deprecated = true];
   Polygon = 242;
@@ -711,7 +711,7 @@ enum DetectorType {
   Paymoapp = 699;
   Mixmax = 700;
   Processst = 701;
-  Repairshopr  = 702;
+  Repairshopr = 702;
   Goshippo = 703;
   Sigopt = 704;
   Sugester = 705;
@@ -800,7 +800,7 @@ enum DetectorType {
   Apilayer = 788;
   Disqus = 789;
   Woopra = 790;
-  Paperform =791;
+  Paperform = 791;
   Gumroad = 792;
   Paydirtapp = 793;
   Detectify = 794;
@@ -1025,7 +1025,19 @@ enum DetectorType {
   AzureRefreshToken = 1013;
   AirtableOAuth = 1014;
   AirtablePersonalAccessToken = 1015;
-  OpenVSX = 1016;
+  StoryblokPersonalAccessToken = 1016;
+  SentryOrgToken = 1017;
+  AzureApiManagementRepositoryKey = 1018;
+  AzureAPIManagementSubscriptionKey = 1019;
+  Harness = 1020;
+  Langfuse = 1021;
+  BingSubscriptionKey = 1022;
+  XAI = 1023;
+  AzureDirectManagementKey = 1024;
+  AzureAppConfigConnectionString = 1025;
+  DeepSeek = 1026;
+  StripePaymentIntent = 1027;
+  OpenVSX = 1028;
 }
 
 message Result {

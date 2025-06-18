@@ -52,6 +52,7 @@ func TestAuth0ManagementApiToken_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
+					RawV2:        []byte(managementApiToken + domain),
 					Redacted:     domain,
 					Verified:     true,
 				},
@@ -69,6 +70,7 @@ func TestAuth0ManagementApiToken_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Auth0ManagementApiToken,
+					RawV2:        []byte(inactiveManagementApiToken + domain),
 					Redacted:     domain,
 					Verified:     false,
 				},

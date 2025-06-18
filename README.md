@@ -24,7 +24,7 @@
 
 **...and more**
 
-To learn more about about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
+To learn more about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
 
 </div>
 
@@ -369,6 +369,12 @@ trufflehog huggingface --org <orgname> --user <username>
 trufflehog huggingface --model <model_id> --include-discussions --include-prs
 ```
 
+## 18. Scan stdin Input
+
+```bash
+aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
+```
+
 # :question: FAQ
 
 - All I see is `🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷` and the program exits, what gives?
@@ -411,6 +417,8 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - postman
 - jenkins
 - elasticsearch
+- stdin
+- multi-scan
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
@@ -473,6 +481,33 @@ For example, to scan a `git` repository, start with
 ```
 trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
+
+## Configuration
+
+TruffleHog supports defining [custom regex detectors](#regex-detector-alpha)
+and multiple sources in a configuration file provided via the `--config` flag.
+The regex detectors can be used with any subcommand, while the sources defined
+in configuration are only for the `multi-scan` subcommand.
+
+The configuration format for sources can be found on Truffle Security's
+[source configuration documentation page](https://docs.trufflesecurity.com/scan-data-for-secrets).
+
+Example GitHub source configuration and [options reference](https://docs.trufflesecurity.com/github#Fvm1I):
+
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.GitHub
+    repositories:
+    - https://github.com/trufflesecurity/test_keys.git
+    unauthenticated: {}
+  name: example config scan
+  type: SOURCE_TYPE_GITHUB
+  verify: true
+```
+
+You may define multiple connections under the `sources` key (see above), and
+TruffleHog will scan all of the sources concurrently.
 
 ## S3
 
@@ -561,7 +596,7 @@ Depending on the event type (push or PR), we calculate the number of commits pre
 
 ### Canary detection
 
-TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/) and lets you know when they're present without setting them off. You can learn more here: [https://trufflesecurity.com/canaries](https://trufflesecurity.com/canaries)
+TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/).
 
 ![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/74ace530-08c5-4eaf-a169-84a73e328f6f)
 
@@ -623,26 +658,7 @@ In the example pipeline above, we're scanning for live secrets in all repository
 
 TruffleHog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
 
-**Key Usage Note:**
-
-- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures TruffleHog analyzes all intended changes.
-- **Avoid using `git commit -am`, as it might bypass pre-commit hook execution for unstaged modifications.**
-
-An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
-
-```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: trufflehog
-        name: TruffleHog
-        description: Detect secrets in your data.
-        entry: bash -c 'trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail'
-        # For running trufflehog in docker, use the following entry instead:
-        # entry: bash -c 'docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --results=verified,unknown --fail'
-        language: system
-        stages: ["commit", "push"]
-```
+See the [pre-commit hook documentation](PreCommit.md) for more information.
 
 ## Regex Detector (alpha)
 
