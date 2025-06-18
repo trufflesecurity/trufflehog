@@ -31,7 +31,7 @@ func TestBannerBear_Pattern(t *testing.T) {
 		},
 		{
 			name:  "invalid pattern",
-			input: "bannerbear credentials: bb_abcdc2b40ef44abcd8cbf3739aabcdef1",
+			input: "bannerbear credentials: bb_pr_abcd",
 			want:  nil,
 		},
 	}

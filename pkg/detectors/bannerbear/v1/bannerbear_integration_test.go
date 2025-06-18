@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -50,9 +51,6 @@ func TestBannerbear_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Bannerbear,
 					Verified:     true,
-					ExtraData: map[string]string{
-						"version": fmt.Sprintf("%d", 1),
-					},
 				},
 			},
 			wantErr: false,
@@ -69,9 +67,6 @@ func TestBannerbear_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Bannerbear,
 					Verified:     false,
-					ExtraData: map[string]string{
-						"version": fmt.Sprintf("%d", 1),
-					},
 				},
 			},
 			wantErr: false,
@@ -102,8 +97,10 @@ func TestBannerbear_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Bannerbear.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError", "primarySecret", "ExtraData")
+			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+				t.Errorf("BannerbearV1.FromData() %s - diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

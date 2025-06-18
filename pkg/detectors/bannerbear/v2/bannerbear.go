@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -33,7 +32,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"bannerbear", "bb_pr_", "bb_ma_"}
+	return []string{"bb_pr_", "bb_ma_"}
 }
 
 // FromData will find and optionally verify Bannerbear secrets in a given set of bytes.
@@ -41,20 +40,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueMatches := make(map[string]struct{}, len(matches))
 
 	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+		uniqueMatches[match[1]] = struct{}{}
+	}
 
+	for match := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Bannerbear,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(match),
 		}
 
 		if verify {
-			isVerified, extraData, verificationErr := s.verifyBannerBear(ctx, client, resMatch)
+			isVerified, extraData, verificationErr := s.verifyBannerBear(ctx, client, match)
 			s1.Verified = isVerified
 			s1.ExtraData = extraData
-			s1.SetVerificationError(verificationErr, resMatch)
+			s1.SetVerificationError(verificationErr, match)
 		}
 
 		results = append(results, s1)
@@ -73,7 +75,7 @@ func (s Scanner) Description() string {
 
 // docs: https://developers.bannerbear.com/
 func (s Scanner) verifyBannerBear(ctx context.Context, client *http.Client, key string) (bool, map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.bannerbear.com/v2/auth", http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.bannerbear.com/v2/auth", http.NoBody)
 	if err != nil {
 		return false, nil, err
 	}
