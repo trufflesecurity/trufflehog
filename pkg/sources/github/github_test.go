@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v67/github"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gopkg.in/h2non/gock.v1"
@@ -916,6 +917,45 @@ func TestGetRepoURLParts(t *testing.T) {
 		}
 		assert.Equal(t, expected, parts)
 	}
+}
+
+func TestGithub_isGistUrl(t *testing.T) {
+	gistURLs := []string{
+		"ssh://gist.github.com/6df198861306313246466d23aa4102aa.git",
+		"https://gist.github.com/6df198861306313246466d23aa4102aa.git",
+		"https://gist.github.com/john-smith/6df198861306313246466d23aa4102aa.git",
+		"ssh://github.contoso.com/gist/6df198861306313246466d23aa4102aa.git",
+		"https://github.contoso.com/gist/6df198861306313246466d23aa4102aa.git",
+		"https://github.contoso.com/gist/john-smith/6df198861306313246466d23aa4102aa.git",
+		"https://ghe.trufflesecurity.net/gist/john-smith/7df198861306313246466d23aa4102aa.git",
+		"https://ghe.trufflesecurity.net/gist/6df19886130631324646.git",
+		"https://ghe.trufflesecurity.net/gist/6df198861306313246466d23aa4102aa.git",
+	}
+
+	for _, url := range gistURLs {
+		_, parts, err := getRepoURLParts(url)
+		require.NoError(t, err, "failed to get parts from URL", url)
+
+		assert.True(t, isGistUrl(parts), "url should be a gist", parts)
+	}
+
+	nonGistURLs := []string{
+		"https://github.com/trufflesecurity/trufflehog.git",
+		"https://github.com/trufflesecurity/trufflehog",
+		"git+https://github.com/trufflesecurity/trufflehog.git",
+		"ssh://github.com/trufflesecurity/trufflehog.git",
+		"ssh://git@github.com/trufflesecurity/trufflehog.git",
+		"git+ssh://git@github.com/trufflesecurity/trufflehog.git",
+		"git://github.com/trufflesecurity/trufflehog.git",
+	}
+
+	for _, url := range nonGistURLs {
+		_, parts, err := getRepoURLParts(url)
+		require.NoError(t, err, "failed to get parts from URL", url)
+
+		assert.False(t, isGistUrl(parts), "url should not be a gist", parts)
+	}
+
 }
 
 func TestGetGistID(t *testing.T) {

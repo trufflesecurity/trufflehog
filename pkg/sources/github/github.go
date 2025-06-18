@@ -1166,7 +1166,28 @@ func extractGistID(urlParts []string) string {
 }
 
 func isGistUrl(urlParts []string) bool {
-	return strings.EqualFold(urlParts[0], "gist.github.com") || (len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist"))
+	switch len(urlParts) {
+	case 2:
+		if strings.EqualFold(urlParts[0], "gist.github.com") {
+			return true
+		}
+	case 3:
+		if strings.EqualFold(urlParts[0], "gist.github.com") {
+			return true
+		}
+
+		if strings.EqualFold(urlParts[1], "gist") {
+			return true
+		}
+	case 4:
+		if strings.EqualFold(urlParts[1], "gist") {
+			return true
+		}
+	default:
+		return false
+	}
+
+	return false
 }
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
