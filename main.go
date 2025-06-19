@@ -449,6 +449,9 @@ func run(state overseer.State) {
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
 
+	// OSS Default Use Git Mirror on
+	feature.UseGitMirror.Store(true)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
