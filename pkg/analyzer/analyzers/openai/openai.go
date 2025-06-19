@@ -38,6 +38,7 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 
 func secretInfoToAnalyzerResult(info *AnalyzerJSON) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeOpenAI,
 		Metadata: map[string]any{
 			"user":          info.me.Name,
 			"email":         info.me.Email,

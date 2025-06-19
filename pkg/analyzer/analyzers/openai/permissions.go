@@ -17,6 +17,10 @@ const (
     FineTuningWrite Permission = iota
     FilesRead Permission = iota
     FilesWrite Permission = iota
+    EvalsRead Permission = iota
+    EvalsWrite Permission = iota
+    ResponsesRead Permission = iota
+    ResponsesWrite Permission = iota
 )
 
 var (
@@ -31,6 +35,10 @@ var (
         FineTuningWrite: "fine_tuning:write",
         FilesRead: "files:read",
         FilesWrite: "files:write",
+        EvalsRead: "evals:read",
+        EvalsWrite: "evals:write",
+        ResponsesRead: "responses:read",
+        ResponsesWrite: "responses:write",
     }
 
     StringToPermission = map[string]Permission{
@@ -44,6 +52,10 @@ var (
         "fine_tuning:write": FineTuningWrite,
         "files:read": FilesRead,
         "files:write": FilesWrite,
+        "evals:read": EvalsRead,
+        "evals:write": EvalsWrite,
+        "responses:read": ResponsesRead,
+        "responses:write": ResponsesWrite,
     }
 
     PermissionIDs = map[Permission]int{
@@ -57,6 +69,10 @@ var (
         FineTuningWrite: 8,
         FilesRead: 9,
         FilesWrite: 10,
+        EvalsRead: 11,
+        EvalsWrite: 12,
+        ResponsesRead: 13,
+        ResponsesWrite: 14,
     }
 
     IdToPermission = map[int]Permission{
@@ -70,6 +86,10 @@ var (
         8: FineTuningWrite,
         9: FilesRead,
         10: FilesWrite,
+        11: EvalsRead,
+        12: EvalsWrite,
+        13: ResponsesRead,
+        14: ResponsesWrite,
     }
 )
 

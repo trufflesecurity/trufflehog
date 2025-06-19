@@ -14,7 +14,10 @@ import (
 
 // ScanDocker scans a given docker connection.
 func (e *Engine) ScanDocker(ctx context.Context, c sources.DockerConfig) (sources.JobProgressRef, error) {
-	connection := &sourcespb.Docker{Images: c.Images}
+	connection := &sourcespb.Docker{
+		Images:       c.Images,
+		ExcludePaths: c.ExcludePaths,
+	}
 
 	switch {
 	case c.UseDockerKeychain:

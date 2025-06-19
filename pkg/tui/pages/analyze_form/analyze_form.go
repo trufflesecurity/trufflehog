@@ -95,6 +95,18 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Required:    true,
 			RedactInput: true,
 		}}
+	case "datadog":
+		inputs = []textinputs.InputConfig{{
+			Label:       "API Key",
+			Key:         "apiKey",
+			Required:    true,
+			RedactInput: true,
+		}, {
+			Label:       "Application Key",
+			Key:         "appKey",
+			Required:    true,
+			RedactInput: true,
+		}}
 	case "mux":
 		inputs = []textinputs.InputConfig{{
 			Label:       "Secret",
@@ -116,6 +128,21 @@ func New(c common.Common, keyType string) *AnalyzeForm {
 			Label:    "Domain",
 			Key:      "domain",
 			Required: true,
+		}}
+	case "jira":
+		inputs = []textinputs.InputConfig{{
+			Label:    "Domain",
+			Key:      "domain",
+			Required: true,
+		}, {
+			Label:    "Email",
+			Key:      "email",
+			Required: true,
+		}, {
+			Label:       "Token",
+			Key:         "token",
+			Required:    true,
+			RedactInput: true,
 		}}
 	default:
 		inputs = []textinputs.InputConfig{{

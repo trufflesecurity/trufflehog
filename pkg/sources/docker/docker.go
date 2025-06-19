@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common/glob"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -36,6 +37,7 @@ type Source struct {
 	verify      bool
 	concurrency int
 	conn        sourcespb.Docker
+	globFilter  *glob.Filter
 	sources.Progress
 	sources.CommonSourceUnitUnmarshaller
 }
@@ -72,6 +74,15 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 	if err := anypb.UnmarshalTo(connection, &s.conn, proto.UnmarshalOptions{}); err != nil {
 		return fmt.Errorf("error unmarshalling connection: %w", err)
+	}
+
+	// Extract exclude paths from connection and compile regexes
+	if paths := s.conn.GetExcludePaths(); len(paths) > 0 {
+		var err error
+		s.globFilter, err = glob.NewGlobFilter(glob.WithExcludeGlobs(paths...))
+		if err != nil {
+			return fmt.Errorf("error creating glob filter for exclude paths: %w", err)
+		}
 	}
 
 	return nil
@@ -349,6 +360,12 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 		return nil
 	}
 
+	// Check if the file should be excluded
+	filePath := "/" + info.name
+	if s.isExcluded(ctx, filePath) {
+		return nil
+	}
+
 	chunkReader := sources.NewChunkReader()
 	chunkResChan := chunkReader(ctx, info.reader)
 
@@ -382,6 +399,22 @@ func (s *Source) processChunk(ctx context.Context, info chunkProcessingInfo, chu
 	}
 
 	return nil
+}
+
+// isExcluded checks if a given filePath should be excluded based on the configured excludePaths and excludeRegexes.
+func (s *Source) isExcluded(ctx context.Context, filePath string) bool {
+	if s.globFilter == nil {
+		return false // No filter configured, so nothing is excluded.
+	}
+	// globFilter.ShouldInclude returns true if it's NOT excluded by an exclude glob or if it IS included by an include glob.
+	// If ShouldInclude is true (passes the filter), it means it was NOT matched by an exclude glob, so it's NOT excluded.
+	// If ShouldInclude is false (fails the filter), it means it WAS matched by an exclude glob, so it IS excluded.
+	isIncluded := s.globFilter.ShouldInclude(filePath)
+
+	if !isIncluded {
+		ctx.Logger().V(2).Info("skipping file: matches an exclude pattern", "file", filePath, "configured_exclude_paths", s.conn.GetExcludePaths())
+	}
+	return !isIncluded
 }
 
 func (s *Source) remoteOpts() ([]remote.Option, error) {

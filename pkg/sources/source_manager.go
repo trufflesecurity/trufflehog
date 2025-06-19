@@ -417,6 +417,7 @@ func (s *SourceManager) scan(ctx context.Context, source Source, report *JobProg
 		}
 	}()
 
+	report.ReportUnit(unit)
 	report.TrackProgress(source.GetProgress())
 	if ctx.Value("job_id") == "" {
 		ctx = context.WithValue(ctx, "job_id", report.JobID)

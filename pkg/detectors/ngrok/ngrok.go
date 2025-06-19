@@ -99,6 +99,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		return true, nil
 	case http.StatusUnauthorized:
 		return false, nil
+	case http.StatusForbidden:
+		return false, nil
 	case http.StatusBadRequest:
 		bodyBytes, err := io.ReadAll(res.Body)
 		if err != nil {

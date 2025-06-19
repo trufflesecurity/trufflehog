@@ -158,6 +158,7 @@ message Docker {
     bool docker_keychain = 4;
   }
   repeated string images = 5;
+  repeated string exclude_paths = 6;
 }
 
 message ECR {
