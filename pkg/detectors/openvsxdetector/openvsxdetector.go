@@ -38,10 +38,8 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{
-		"VSX", "VSIX", "OPENVSX", 
-		"EXTENSION", "PUBLISHER", 
-		"ovsx", "OVSX_TOKEN", "OVSX_ACCESS_TOKEN", 
-		"OVSX_PAT", "OVSX_KEY",
+		"VSX", "VSIX", 
+		"EXTENSION", "PUBLISHER",
 	}
 }
 
