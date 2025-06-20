@@ -48,29 +48,24 @@ func (s Scanner) getClient() *http.Client {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	if len(keyMatches) == 0 {
-		return nil, nil
+	var uniqueKeyMatches, uniqueDomainMatches = make(map[string]struct{}), make(map[string]struct{})
+
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeyMatches[match[1]] = struct{}{}
 	}
 
-	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
-	if len(domainMatches) == 0 {
-		return nil, nil
+	for _, match := range domainPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueDomainMatches[match[1]] = struct{}{}
 	}
 
 	// Logic: For each key, try to verify against each found domain.
 	// Stop and record a verified finding on the first successful match.
-	for _, keyMatch := range keyMatches {
-		key := strings.TrimSpace(keyMatch[1])
-		var verifiedResult *detectors.Result
-
-		for _, domainMatch := range domainMatches {
-			domain := strings.TrimSpace(domainMatch[1])
-
+	for key := range uniqueKeyMatches {
+		for domain := range uniqueDomainMatches {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Hasura,
 				Raw:          []byte(key),
-				RawV2:        []byte(fmt.Sprintf("%s:%s", domain, key)),
+				RawV2:        fmt.Appendf([]byte(""), "%s:%s", domain, key),
 			}
 
 			if verify {
@@ -78,19 +73,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				s1.ExtraData = extraData
 				s1.SetVerificationError(verificationErr, key)
-
-				// If we successfully verified this key with a domain, we don't need to check it against other domains.
-				if isVerified {
-					verifiedResult = &s1
-					break
-				}
 			}
 
 			results = append(results, s1)
-		}
-
-		if verifiedResult != nil {
-			results = append(results, *verifiedResult)
+			// If we successfully verified this key with a domain, we don't need to check it against other domains.
+			if s1.Verified {
+				break
+			}
 		}
 	}
 
