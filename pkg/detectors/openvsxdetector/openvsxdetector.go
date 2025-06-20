@@ -133,11 +133,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if !hasVSXContext {
 			continue
 		}
-		
-		// Skip the last GUID in our test file which should not be detected
-		if resMatch == "11111111-2222-3333-4444-555555555555" {
-			continue
-		}
 
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_OpenVSX, // Using Generic since VSX is not explicitly listed
