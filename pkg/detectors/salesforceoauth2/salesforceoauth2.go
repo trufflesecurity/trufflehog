@@ -26,21 +26,22 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	instancePat       = regexp.MustCompile(`\b(?:https://)?[0-9a-zA-Z-\.]{1,100}\.my\.salesforce\.com\b`)
-	consumerKeyPat    = regexp.MustCompile(`\b3MVG[0-9a-zA-Z._]{81}\b`)
-	consumerSecretPat = regexp.MustCompile(`\b[0-9A-F]{64}\b`)
+	instancePat       = regexp.MustCompile(`\b((?:https?://)?[0-9a-zA-Z\-\.]{1,100}\.my\.salesforce\.com)\b`)
+	consumerKeyPat    = regexp.MustCompile(`\b(3MVG[0-9a-zA-Z._]{81})\b`)
+	consumerSecretPat = regexp.MustCompile(`\b([0-9A-F]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"salesforce"}
+	return []string{"salesforce", "3MVG"}
 }
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
 		return s.client
 	}
+
 	return defaultClient
 }
 
@@ -81,7 +82,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
 					Raw:          []byte(secret),
-					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", domain, key, secret)),
+					RawV2:        fmt.Appendf([]byte{}, "%s:%s:%s", domain, key, secret),
 				}
 
 				if verify {
@@ -165,18 +166,3 @@ func (s Scanner) handleBadRequest(resp *http.Response, extraData map[string]stri
 		return false, nil, fmt.Errorf("unexpected OAuth error: %s - %s", errorResponse.Error, errorResponse.ErrorDescription)
 	}
 }
-
-/*
-
-{
-    "error": "invalid_client_id",
-    "error_description": "client identifier invalid"
-}
-
-{
-    "error": "invalid_client",
-    "error_description": "invalid client credentials"
-}
-
-
-*/
