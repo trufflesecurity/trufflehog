@@ -355,6 +355,10 @@ func (m JobProgressMetrics) PercentComplete() int {
 		// Fallback to the source's self-reported percent complete if
 		// the unit information isn't available.
 		return int(m.SourcePercent)
+	} else if den == 0 {
+		// This should never happen. Return an invalid value so we can
+		// trace it back to here if we ever see it.
+		return -1
 	}
 	return int(num * 100 / den)
 }
