@@ -316,7 +316,7 @@ func (s *Source) scanDirs(ctx context.Context, reporter sources.ChunkReporter) e
 		}
 		if err := s.scanDir(ctx, gitDir, reporter); err != nil {
 			ctx.Logger().Info("error scanning repository", "repo", gitDir, "error", err)
- 			continue
+			continue
 		}
 	}
 	return nil
@@ -347,7 +347,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 
 		return s.git.ScanRepo(ctx, repo, gitDir, s.scanOptions, reporter)
 	}()
-	if err != nil {
+	if err != nil {continue
 		return reporter.ChunkErr(ctx, err)
 	}
 	return nil
