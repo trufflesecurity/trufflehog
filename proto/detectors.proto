@@ -1037,7 +1037,8 @@ enum DetectorType {
   AzureAppConfigConnectionString = 1025;
   DeepSeek = 1026;
   StripePaymentIntent = 1027;
-  BitbucketAppPassword = 1028;
+  LangSmith = 1028;
+  BitbucketAppPassword = 1029;
 }
 
 message Result {
