@@ -610,6 +610,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/robinhoodcrypto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rocketreach"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roninapp"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rootly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/route4me"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rubygems"
@@ -1712,6 +1713,7 @@ func buildDetectorList() []detectors.Detector {
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
 		&stripepaymentintent.Scanner{},
+		&rootly.Scanner{},
 	}
 }
 
