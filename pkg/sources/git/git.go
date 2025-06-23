@@ -347,7 +347,7 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 
 		return s.git.ScanRepo(ctx, repo, gitDir, s.scanOptions, reporter)
 	}()
-	if err != nil {continue
+	if err != nil {
 		return reporter.ChunkErr(ctx, err)
 	}
 	return nil
