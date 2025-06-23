@@ -26,9 +26,9 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	instancePat       = regexp.MustCompile(`\b((?:https?://)?[0-9a-zA-Z\-\.]{1,100}\.my\.salesforce\.com)\b`)
+	instancePat       = regexp.MustCompile(`\b(?:https?://)?([0-9a-zA-Z\-\.]{1,100}\.my\.salesforce\.com)\b`)
 	consumerKeyPat    = regexp.MustCompile(`\b(3MVG[0-9a-zA-Z._+/=]{81,252})`)
-	consumerSecretPat = regexp.MustCompile(`\b([0-9A-F]{64}|[0-9]{19})\b`)
+	consumerSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesforce", "consumer", "secret"}) + `\b([0-9A-F]{64}|[0-9]{19})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -86,9 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 
 				if verify {
-					isVerified, extraData, verificationErr := s.verifyMatch(ctx, s.getClient(), domain, key, secret)
+					isVerified, verificationErr := s.verifyMatch(ctx, s.getClient(), domain, key, secret)
 					s1.Verified = isVerified
-					s1.ExtraData = extraData
 					s1.SetVerificationError(verificationErr, secret)
 				}
 
@@ -101,7 +100,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 // verifyMatch attempts to validate a Salesforce Client Credentials pair.
-func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, domain, key, secret string) (bool, map[string]string, error) {
+func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, domain, key, secret string) (bool, error) {
 	form := url.Values{}
 	form.Set("grant_type", "client_credentials")
 	form.Set("client_id", key)
@@ -110,28 +109,26 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, domain, k
 	authURL := fmt.Sprintf("https://%s/services/oauth2/token", domain)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, authURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		return false, nil, fmt.Errorf("failed to create request: %w", err)
+		return false, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, nil, fmt.Errorf("failed to perform request: %w", err)
+		return false, fmt.Errorf("failed to perform request: %w", err)
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}()
 
-	extraData := map[string]string{"domain": domain}
-
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return true, extraData, nil
+		return true, nil
 	case http.StatusBadRequest:
-		return s.handleBadRequest(resp, extraData)
+		return s.handleBadRequest(resp)
 	default:
-		return false, nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }
 
@@ -142,27 +139,27 @@ type oauthErrorResponse struct {
 }
 
 // handleBadRequest processes 400 responses to determine if credentials are invalid or misconfigured
-func (s Scanner) handleBadRequest(resp *http.Response, extraData map[string]string) (bool, map[string]string, error) {
+func (s Scanner) handleBadRequest(resp *http.Response) (bool, error) {
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, nil, fmt.Errorf("failed to read error response body: %w", err)
+		return false, fmt.Errorf("failed to read error response body: %w", err)
 	}
 
 	var errorResponse oauthErrorResponse
 	if err := json.Unmarshal(bodyBytes, &errorResponse); err != nil {
-		return false, nil, fmt.Errorf("failed to unmarshal error response: %w (body: %s)", err, string(bodyBytes))
+		return false, fmt.Errorf("failed to unmarshal error response: %w (body: %s)", err, string(bodyBytes))
 	}
 
 	switch errorResponse.Error {
 	case "invalid_client_id", "invalid_client":
 		// This definitively means the key is invalid
 		// Or the key is valid but the secret is wrong.
-		return false, extraData, nil
+		return false, nil
 	case "invalid_grant":
 		// This can mean the secret is wrong OR the user isn't configured with the app secret.
 		// We'll treat it as a VerificationError because the key might be valid but misconfigured.
-		return false, extraData, fmt.Errorf("verification failed: %s", errorResponse.ErrorDescription)
+		return false, fmt.Errorf("verification failed: %s", errorResponse.ErrorDescription)
 	default:
-		return false, nil, fmt.Errorf("unexpected OAuth error: %s - %s", errorResponse.Error, errorResponse.ErrorDescription)
+		return false, fmt.Errorf("unexpected OAuth error: %s - %s", errorResponse.Error, errorResponse.ErrorDescription)
 	}
 }
