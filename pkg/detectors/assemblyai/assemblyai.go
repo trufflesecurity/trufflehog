@@ -2,6 +2,7 @@ package assemblyai
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -78,7 +79,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	case http.StatusUnauthorized:
 		return false, nil
 	default:
-		return false, nil
+		return false, fmt.Errorf("unexpected status code %d", res.StatusCode)
 	}
 }
 
