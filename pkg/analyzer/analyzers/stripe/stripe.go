@@ -15,10 +15,9 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"gopkg.in/yaml.v2"
 )
@@ -29,7 +28,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Stripe }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeStripe }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
@@ -49,7 +48,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := &analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_Stripe,
+		AnalyzerType: analyzers.AnalyzerTypeStripe,
 		Metadata: map[string]any{
 			"key_type": info.KeyType,
 			"key_env":  info.KeyEnv,

@@ -1,0 +1,24 @@
+permissions:
+  - data.records:read
+  - data.records:write
+  - data.recordComments:read
+  - data.recordComments:write
+  - schema.bases:read
+  - schema.bases:write
+  - webhook:manage
+  - block:manage
+  - user.email:read
+  - enterprise.groups:read
+  - workspacesAndBases:read
+  - workspacesAndBases:write
+  - workspacesAndBases.shares:manage
+  - enterprise.scim.usersAndGroups:manage
+  - enterprise.auditLogs:read
+  - enterprise.changeEvents:read
+  - enterprise.exports:manage
+  - enterprise.account:read
+  - enterprise.account:write
+  - enterprise.user:read
+  - enterprise.user:write
+  - enterprise.groups:manage
+  - workspacesAndBases:manage

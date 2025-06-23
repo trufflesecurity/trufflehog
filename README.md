@@ -24,7 +24,7 @@
 
 **...and more**
 
-To learn more about about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
+To learn more about TruffleHog and its features and capabilities, visit our [product page](https://trufflesecurity.com/trufflehog?gclid=CjwKCAjwouexBhAuEiwAtW_Zx5IW87JNj97Ci7heFnA5ar6-DuNzT2Y5nIl9DuZ-FOUqx0Qg3vb9nxoClcEQAvD_BwE).
 
 </div>
 
@@ -35,6 +35,26 @@ Are you interested in continuously monitoring **Git, Jira, Slack, Confluence, Mi
 We take the revenue from the enterprise product to fund more awesome open source projects that the whole community can benefit from.
 
 </div>
+
+# What is TruffleHog 🐽
+
+TruffleHog is the most powerful secrets **Discovery, Classification, Validation,** and **Analysis** tool. In this context secret refers to a credential a machine uses to authenticate itself to another machine. This includes API keys, database passwords, private encryption keys, and more...
+
+## Discovery 🔍
+
+TruffleHog can look for secrets in many places including Git, chats, wikis, logs, API testing platforms, object stores, filesystems and more
+
+## Classification 📁
+
+TruffleHog classifies over 800 secret types, mapping them back to the specific identity they belong to. Is it an AWS secret? Stripe secret? Cloudflare secret? Postgres password? SSL Private key? Sometimes its hard to tell looking at it, so TruffleHog classifies everything it finds.
+
+## Validation ✅
+
+For every secret TruffleHog can classify, it can also log in to confirm if that secret is live or not. This step is critical to know if there’s an active present danger or not.
+
+## Analysis 🔬
+
+For the 20 some of the most commonly leaked out credential types, instead of sending one request to check if the secret can log in, TruffleHog can send many requests to learn everything there is to know about the secret. Who created it? What resources can it access? What permissions does it have on those resources?
 
 # :loudspeaker: Join Our Community
 
@@ -165,7 +185,7 @@ This required Cosign binary to be installed prior to running installation script
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --only-verified
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown
 ```
 
 Expected output:
@@ -189,7 +209,7 @@ Timestamp: 2022-06-16 10:17:40 -0700 PDT
 ## 2: Scan a GitHub Org for only verified secrets
 
 ```bash
-trufflehog github --org=trufflesecurity --only-verified
+trufflehog github --org=trufflesecurity --results=verified,unknown
 ```
 
 ## 3: Scan a GitHub Repo for only verified keys and get JSON output
@@ -197,7 +217,7 @@ trufflehog github --org=trufflesecurity --only-verified
 Command:
 
 ```bash
-trufflehog git https://github.com/trufflesecurity/test_keys --only-verified --json
+trufflehog git https://github.com/trufflesecurity/test_keys --results=verified,unknown --json
 ```
 
 Expected output:
@@ -216,7 +236,7 @@ trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-co
 ## 5: Scan an S3 bucket for verified keys
 
 ```bash
-trufflehog s3 --bucket=<bucket name> --only-verified
+trufflehog s3 --bucket=<bucket name> --results=verified,unknown
 ```
 
 ## 6: Scan S3 buckets using IAM Roles
@@ -237,29 +257,41 @@ docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest 
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 9: Scan GCS buckets for verified secrets
+## 9: Scan a local git repo
 
+Clone the git repo. For example [test keys](git@github.com:trufflesecurity/test_keys.git) repo.
 ```bash
-trufflehog gcs --project-id=<project-ID> --cloud-environment --only-verified
+$ git clone git@github.com:trufflesecurity/test_keys.git
 ```
 
-## 10: Scan a Docker image for verified secrets
+Run trufflehog from the parent directory (outside the git repo).
+```bash
+$ trufflehog git file://test_keys --results=verified,unknown
+```
+
+## 10: Scan GCS buckets for verified secrets
+
+```bash
+trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified,unknown
+```
+
+## 11: Scan a Docker image for verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
 ```bash
-trufflehog docker --image trufflesecurity/secrets --only-verified
+trufflehog docker --image trufflesecurity/secrets --results=verified,unknown
 ```
 
-## 11: Scan in CI
+## 12: Scan in CI
 
 Set the `--since-commit` flag to your default branch that people merge into (ex: "main"). Set the `--branch` flag to your PR's branch name (ex: "feature-1"). Depending on the CI/CD platform you use, this value can be pulled in dynamically (ex: [CIRCLE_BRANCH in Circle CI](https://circleci.com/docs/variables/) and [TRAVIS_PULL_REQUEST_BRANCH in Travis CI](https://docs.travis-ci.com/user/environment-variables/)). If the repo is cloned and the target branch is already checked out during the CI/CD workflow, then `--branch HEAD` should be sufficient. The `--fail` flag will return an 183 error code if valid credentials are found.
 
 ```bash
-trufflehog git file://. --since-commit main --branch feature-1 --only-verified --fail
+trufflehog git file://. --since-commit main --branch feature-1 --results=verified,unknown --fail
 ```
 
-## 12: Scan a Postman workspace
+## 13: Scan a Postman workspace
 
 Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
 
@@ -267,13 +299,13 @@ Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple time
 trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
 
-## 13: Scan a Jenkins server
+## 14: Scan a Jenkins server
 
 ```bash
 trufflehog jenkins --url https://jenkins.example.com --username admin --password admin
 ```
 
-## 14: Scan an Elasticsearch server
+## 15: Scan an Elasticsearch server
 
 ### Scan a Local Cluster
 
@@ -301,7 +333,7 @@ trufflehog elasticsearch \
   --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
 ```
 
-## 15. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
+## 16. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
 
 The following command will enumerate deleted and hidden commits on a GitHub repository and then scan them for secrets. This is an alpha release feature.
 
@@ -315,7 +347,7 @@ In addition to the normal TruffleHog output, the `--object-discovery` flag creat
 
 For more information on Cross Fork Object References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github).
 
-## 16. Scan Hugging Face
+## 17. Scan Hugging Face
 
 ### Scan a Hugging Face Model, Dataset or Space
 
@@ -335,6 +367,12 @@ trufflehog huggingface --org <orgname> --user <username>
 
 ```bash
 trufflehog huggingface --model <model_id> --include-discussions --include-prs
+```
+
+## 18. Scan stdin Input
+
+```bash
+aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin
 ```
 
 # :question: FAQ
@@ -379,6 +417,8 @@ TruffleHog has a sub-command for each source of data that you may want to scan:
 - postman
 - jenkins
 - elasticsearch
+- stdin
+- multi-scan
 
 Each subcommand can have options that you can see with the `--help` flag provided to the sub command:
 
@@ -390,15 +430,14 @@ Find credentials in git repositories.
 
 Flags:
   -h, --help                Show context-sensitive help (also try --help-long and --help-man).
-      --debug               Run in debug mode.
-      --trace               Run in trace mode.
+      --log-level=0         Logging verbosity on a scale of 0 (info) to 5 (trace). Can be disabled with "-1".
       --profile             Enables profiling and sets a pprof and fgprof server on :18066.
   -j, --json                Output in JSON format.
       --json-legacy         Use the pre-v3.0 JSON format. Only works with git, gitlab, and github sources.
       --github-actions      Output in GitHub Actions format.
       --concurrency=20           Number of concurrent workers.
       --no-verification     Don't verify the results.
-      --only-verified       Only output verified results.
+      --results=RESULTS          Specifies which type(s) of results to output: verified, unknown, unverified, filtered_unverified. Defaults to all types.
       --allow-verification-overlap
                                  Allow verification of similar credentials across detectors
       --filter-unverified   Only output first unverified result per chunk per detector if there are more than one results.
@@ -442,6 +481,33 @@ For example, to scan a `git` repository, start with
 ```
 trufflehog git https://github.com/trufflesecurity/trufflehog.git
 ```
+
+## Configuration
+
+TruffleHog supports defining [custom regex detectors](#regex-detector-alpha)
+and multiple sources in a configuration file provided via the `--config` flag.
+The regex detectors can be used with any subcommand, while the sources defined
+in configuration are only for the `multi-scan` subcommand.
+
+The configuration format for sources can be found on Truffle Security's
+[source configuration documentation page](https://docs.trufflesecurity.com/scan-data-for-secrets).
+
+Example GitHub source configuration and [options reference](https://docs.trufflesecurity.com/github#Fvm1I):
+
+```yaml
+sources:
+- connection:
+    '@type': type.googleapis.com/sources.GitHub
+    repositories:
+    - https://github.com/trufflesecurity/test_keys.git
+    unauthenticated: {}
+  name: example config scan
+  type: SOURCE_TYPE_GITHUB
+  verify: true
+```
+
+You may define multiple connections under the `sources` key (see above), and
+TruffleHog will scan all of the sources concurrently.
 
 ## S3
 
@@ -495,7 +561,7 @@ jobs:
     - name: Secret Scanning
       uses: trufflesecurity/trufflehog@main
       with:
-        extra_args: --only-verified
+        extra_args: --results=verified,unknown
 ```
 
 In the example config above, we're scanning for live secrets in all PRs and Pushes to `main`. Only code changes in the referenced commits are scanned. If you'd like to scan an entire branch, please see the "Advanced Usage" section below.
@@ -522,7 +588,7 @@ If you're incorporating TruffleHog into a standalone workflow and aren't running
           fetch-depth: ${{env.depth}}
       - uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --only-verified
+          extra_args: --results=verified,unknown
 ...
 ```
 
@@ -530,7 +596,7 @@ Depending on the event type (push or PR), we calculate the number of commits pre
 
 ### Canary detection
 
-TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/) and lets you know when they're present without setting them off. You can learn more here: [https://trufflesecurity.com/canaries](https://trufflesecurity.com/canaries)
+TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.org/).
 
 ![image](https://github.com/trufflesecurity/trufflehog/assets/52866392/74ace530-08c5-4eaf-a169-84a73e328f6f)
 
@@ -547,7 +613,7 @@ TruffleHog statically detects [https://canarytokens.org/](https://canarytokens.o
     # Scan commits until here (usually dev branch).
     head: # optional
     # Extra args to be passed to the trufflehog cli.
-    extra_args: --debug --only-verified
+    extra_args: --log-level=2 --results=verified,unknown
 ```
 
 If you'd like to specify specific `base` and `head` refs, you can use the `base` argument (`--since-commit` flag in TruffleHog CLI) and the `head` argument (`--branch` flag in the TruffleHog CLI). We only recommend using these arguments for very specific use cases, where the default behavior does not work.
@@ -560,7 +626,7 @@ If you'd like to specify specific `base` and `head` refs, you can use the `base`
         with:
           base: ""
           head: ${{ github.ref_name }}
-          extra_args: --only-verified
+          extra_args: --results=verified,unknown
 ```
 
 ## TruffleHog GitLab CI
@@ -581,7 +647,7 @@ security-secrets:
     - apk add --no-cache git curl jq
     - curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
   script:
-    - trufflehog filesystem "$SCAN_PATH" --only-verified --fail --json | jq
+    - trufflehog filesystem "$SCAN_PATH" --results=verified,unknown --fail --json | jq
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 ```
@@ -592,26 +658,7 @@ In the example pipeline above, we're scanning for live secrets in all repository
 
 TruffleHog can be used in a pre-commit hook to prevent credentials from leaking before they ever leave your computer.
 
-**Key Usage Note:**
-
-- **For optimal hook efficacy, execute `git add` followed by `git commit` separately.** This ensures TruffleHog analyzes all intended changes.
-- **Avoid using `git commit -am`, as it might bypass pre-commit hook execution for unstaged modifications.**
-
-An example `.pre-commit-config.yaml` is provided (see [pre-commit.com](https://pre-commit.com/) for installation).
-
-```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: trufflehog
-        name: TruffleHog
-        description: Detect secrets in your data.
-        entry: bash -c 'trufflehog git file://. --since-commit HEAD --only-verified --fail'
-        # For running trufflehog in docker, use the following entry instead:
-        # entry: bash -c 'docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --only-verified --fail'
-        language: system
-        stages: ["commit", "push"]
-```
+See the [pre-commit hook documentation](PreCommit.md) for more information.
 
 ## Regex Detector (alpha)
 
@@ -625,98 +672,15 @@ TruffleHog will send a JSON POST request containing the regex matches to a
 configured webhook endpoint. If the endpoint responds with a `200 OK` response
 status code, the secret is considered verified.
 
+Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret, 
+and excluded word lists checked against the secret (captured group if present, entire match if capture group is not present). Note that if
+your custom detector has multiple `regex` set (in this example `hogID`, and `hogToken`), then the filters get applied to each regex. [Here](examples/generic_with_filters.yml) is an example of a custom detector using these filters.
+
 **NB:** This feature is alpha and subject to change.
 
-## Regex Detector Example
+### Regex Detector Example
+[Here](/pkg/custom_detectors/CUSTOM_DETECTORS.md) is how to setup a custom regex detector with verification server.
 
-```yaml
-# config.yaml
-detectors:
-  - name: HogTokenDetector
-    keywords:
-      - hog
-    regex:
-      hogID: '\b(HOG[0-9A-Z]{17})\b'
-      hogToken: '[^A-Za-z0-9+\/]{0,1}([A-Za-z0-9+\/]{40})[^A-Za-z0-9+\/]{0,1}'
-    verify:
-      - endpoint: http://localhost:8000/
-        # unsafe must be set if the endpoint is HTTP
-        unsafe: true
-        headers:
-          - "Authorization: super secret authorization header"
-```
-
-```
-$ trufflehog filesystem /tmp --config config.yaml --only-verified
-🐷🔑🐷  TruffleHog. Unearth your secrets. 🐷🔑🐷
-
-Found verified result 🐷🔑
-Detector Type: CustomRegex
-Decoder Type: PLAIN
-Raw result: HOGAAIUNNWHAHJJWUQYR
-File: /tmp/hog-facts.txt
-```
-
-Data structure sent to the custom verification server:
-
-```
-{
-    "HogTokenDetector": {
-        "HogID": ["HOGAAIUNNWHAHJJWUQYR"],
-        "HogSecret": ["sD9vzqdSsAOxntjAJ/qZ9sw+8PvEYg0r7D1Hhh0C"],
-    }
-}
-```
-
-## Verification Server Example (Python)
-
-Unless you run a verification server, secrets found by the custom regex
-detector will be unverified. Here is an example Python implementation of a
-verification server for the above `config.yaml` file.
-
-```python
-import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
-AUTH_HEADER = 'super secret authorization header'
-
-
-class Verifier(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(405)
-        self.end_headers()
-
-    def do_POST(self):
-        try:
-            if self.headers['Authorization'] != AUTH_HEADER:
-                self.send_response(401)
-                self.end_headers()
-                return
-
-            # read the body
-            length = int(self.headers['Content-Length'])
-            request = json.loads(self.rfile.read(length))
-            self.log_message("%s", request)
-
-            # check the match, you'll need to implement validateToken, which takes an array of ID's and Secrets
-            if not validateTokens(request['HogTokenDetector']['hogID'], request['HogTokenDetector']['hogSecret']):
-                self.send_response(200)
-                self.end_headers()
-            else:
-                # any other response besides 200
-                self.send_response(406)
-                self.end_headers()
-        except Exception:
-            self.send_response(400)
-            self.end_headers()
-
-
-with HTTPServer(('', 8000), Verifier) as server:
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-```
 
 ## :mag: Analyze
 

@@ -1,7 +1,7 @@
 //go:generate generate_permissions permissions.yaml permissions.go sourcegraph
 package sourcegraph
 
-// ToDo: Add suport for custom domain
+// ToDo: Add support for custom domain
 
 import (
 	"encoding/json"
@@ -12,7 +12,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -22,7 +21,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Sourcegraph }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSourcegraph }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
@@ -46,7 +45,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		permission = PermissionStrings[SiteAdminFull]
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_Sourcegraph,
+		AnalyzerType: analyzers.AnalyzerTypeSourcegraph,
 		Metadata:     nil,
 		Bindings: []analyzers.Binding{
 			{
@@ -99,7 +98,9 @@ type SecretInfo struct {
 func getUserInfo(cfg *config.Config, key string) (UserInfoJSON, error) {
 	var userInfo UserInfoJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	// POST request is considered as non-safe and sourcegraph has graphql APIs. They do not change any state.
+	// We are using unrestricted client to avoid error for non-safe API request.
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	payload := "{\"query\":\"query { currentUser { username, email, siteAdmin, createdAt } }\"}"
 	req, err := http.NewRequest("POST", "https://sourcegraph.com/.api/graphql", strings.NewReader(payload))
 	if err != nil {
@@ -133,7 +134,9 @@ func checkSiteAdmin(cfg *config.Config, key string) (bool, error) {
 	    }
 	}`
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	// POST request is considered as non-safe and sourcegraph has graphql APIs. They do not change any state.
+	// We are using unrestricted client to avoid error for non-safe API request.
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	req, err := http.NewRequest("POST", "https://sourcegraph.com/.api/graphql", strings.NewReader(query))
 	if err != nil {
 		return false, err

@@ -21,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sonar"}) + `\b([0-9a-z]{40})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"sonar"}) + `(?:^|[^@])\b([0-9a-z]{40})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -37,9 +37,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{

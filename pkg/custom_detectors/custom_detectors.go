@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -31,6 +32,7 @@ type CustomRegexWebhook struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*CustomRegexWebhook)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*CustomRegexWebhook)(nil)
+var _ detectors.MaxSecretSizeProvider = (*CustomRegexWebhook)(nil)
 
 // NewWebhookCustomRegex initializes and validates a CustomRegexWebhook. An
 // unexported type is intentionally returned here to ensure the values have
@@ -63,6 +65,28 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	dataStr := string(data)
 	regexMatches := make(map[string][][]string, len(c.GetRegex()))
 
+	// Compile exclude regexes targeting the capture group
+	excludeRegexesCapture := make([]*regexp.Regexp, 0, len(c.GetExcludeRegexesCapture()))
+	for _, exclude := range c.GetExcludeRegexesCapture() {
+		regex, err := regexp.Compile(exclude)
+		if err != nil {
+			// This will only happen if the regex is invalid.
+			return nil, err
+		}
+		excludeRegexesCapture = append(excludeRegexesCapture, regex)
+	}
+
+	// Compile exclude regexes targeting the entire match
+	excludeRegexes := make([]*regexp.Regexp, 0, len(c.GetExcludeRegexesMatch()))
+	for _, exclude := range c.GetExcludeRegexesMatch() {
+		regex, err := regexp.Compile(exclude)
+		if err != nil {
+			// This will only happen if the regex is invalid.
+			return nil, err
+		}
+		excludeRegexes = append(excludeRegexes, regex)
+	}
+
 	// Find all submatches for each regex.
 	for name, regex := range c.GetRegex() {
 		regex, err := regexp.Compile(regex)
@@ -89,8 +113,45 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 
 	// Create result object and test for verification.
 	resultsCh := make(chan detectors.Result, maxTotalMatches)
+
+MatchLoop:
 	for _, match := range matches {
-		match := match
+		for _, values := range match {
+			// attempt to use capture group
+			secret := values[0]
+			if len(values) > 1 {
+				secret = values[1]
+			}
+
+			// check entropy
+			entropy := c.GetEntropy()
+			if entropy > 0.0 && detectors.StringShannonEntropy(secret) < float64(entropy) {
+				continue MatchLoop
+			}
+
+			// check for exclude words
+			for _, excludeWord := range c.GetExcludeWords() {
+				if strings.Contains(strings.ToLower(secret), excludeWord) {
+					continue MatchLoop
+				}
+			}
+
+			// exclude checks
+			for _, excludeMatch := range excludeRegexes {
+				if excludeMatch.MatchString(values[0]) {
+					continue MatchLoop
+				}
+			}
+
+			// exclude secret (capture group), or if no capture group is set,
+			// check against entire match.
+			for _, excludeSecret := range excludeRegexesCapture {
+				if excludeSecret.MatchString(secret) {
+					continue MatchLoop
+				}
+			}
+		}
+
 		g.Go(func() error {
 			return c.createResults(ctx, match, verify, resultsCh)
 		})
@@ -101,10 +162,10 @@ func (c *CustomRegexWebhook) FromData(ctx context.Context, verify bool, data []b
 	close(resultsCh)
 
 	for result := range resultsCh {
-		// NOTE: I don't believe this is being set anywhere else, hence the map assignment.
-		result.ExtraData = map[string]string{
-			"name": c.GetName(),
+		if result.ExtraData != nil {
+			result.ExtraData["name"] = c.GetName()
 		}
+
 		results = append(results, result)
 	}
 
@@ -115,21 +176,39 @@ func (c *CustomRegexWebhook) IsFalsePositive(_ detectors.Result) (bool, string) 
 	return false, ""
 }
 
+// custom max size for custom detector
+func (c *CustomRegexWebhook) MaxSecretSize() int64 {
+	return 1000
+}
+
 func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string][]string, verify bool, results chan<- detectors.Result) error {
 	if common.IsDone(ctx) {
 		// TODO: Log we're possibly leaving out results.
 		return ctx.Err()
 	}
-	var raw string
-	for _, values := range match {
-		// values[0] contains the entire regex match.
-		raw += values[0]
-	}
+
 	result := detectors.Result{
 		DetectorType: detectorspb.DetectorType_CustomRegex,
 		DetectorName: c.GetName(),
-		Raw:          []byte(raw),
+		ExtraData:    map[string]string{},
 	}
+
+	var raw string
+	for key, values := range match {
+		// values[0] contains the entire regex match.
+		secret := values[0]
+		if len(values) > 1 {
+			secret = values[1]
+		}
+		raw += secret
+
+		// if the match is of the primary regex, set it's value as primary secret value in result
+		if c.PrimaryRegexName == key {
+			result.SetPrimarySecretValue(secret)
+		}
+	}
+
+	result.Raw = []byte(raw)
 
 	if !verify {
 		select {
@@ -166,14 +245,34 @@ func (c *CustomRegexWebhook) createResults(ctx context.Context, match map[string
 			}
 			req.Header.Add(key, strings.TrimLeft(value, "\t\n\v\f\r "))
 		}
-		res, err := httpClient.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			continue
 		}
-		// TODO: Read response body.
-		res.Body.Close()
-		if res.StatusCode == http.StatusOK {
+		defer func() {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}()
+
+		if resp.StatusCode == http.StatusOK {
+			// mark the result as verified
 			result.Verified = true
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				continue
+			}
+
+			// TODO: handle different content-type responses seperatly when implement custom detector configurations
+			responseStr := string(body)
+			// truncate to 200 characters if response length exceeds 200
+			if len(responseStr) > 200 {
+				responseStr = responseStr[:200]
+			}
+
+			// store the processed response in ExtraData
+			result.ExtraData["response"] = responseStr
+
 			break
 		}
 	}

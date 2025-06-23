@@ -1,0 +1,8 @@
+permissions:
+  - read_content
+  - update_content
+  - insert_content
+  - read_comments
+  - insert_comments
+  - read_users_with_email
+  - read_users_without_email

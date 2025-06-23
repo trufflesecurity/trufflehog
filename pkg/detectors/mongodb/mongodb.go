@@ -7,15 +7,15 @@ import (
 	"strings"
 	"time"
 
-	regexp "github.com/wasilibs/go-re2"
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 
+	regexp "github.com/wasilibs/go-re2"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
@@ -27,7 +27,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	defaultTimeout = 2 * time.Second
+	defaultTimeout = 5 * time.Second
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	connStrPat = regexp.MustCompile(`\b(mongodb(?:\+srv)?://(?P<username>\S{3,50}):(?P<password>\S{3,88})@(?P<host>[-.%\w]+(?::\d{1,5})?(?:,[-.%\w]+(?::\d{1,5})?)*)(?:/(?P<authdb>[\w-]+)?(?P<options>\?\w+=[\w@/.$-]+(?:&(?:amp;)?\w+=[\w@/.$-]+)*)?)?)(?:\b|$)`)
 	// TODO: Add support for sharded cluster, replica set and Atlas Deployment.
@@ -42,11 +42,11 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify MongoDB secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logger := logContext.AddLogger(ctx).Logger().WithName("mongodb")
 	dataStr := string(data)
 
-	matches := connStrPat.FindAllStringSubmatch(dataStr, -1)
-
-	for _, match := range matches {
+	uniqueMatches := make(map[string]string)
+	for _, match := range connStrPat.FindAllStringSubmatch(dataStr, -1) {
 		// Filter out common placeholder passwords.
 		password := match[3]
 		if password == "" || placeholderPasswordPat.MatchString(password) {
@@ -54,13 +54,40 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		// If the query string contains `&amp;` the options will not be parsed.
-		resMatch := strings.Replace(strings.TrimSpace(match[1]), "&amp;", "&", -1)
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_MongoDB,
-			Raw:          []byte(resMatch),
+		connStr := strings.Replace(strings.TrimSpace(match[1]), "&amp;", "&", -1)
+		connUrl, err := url.Parse(connStr)
+		if err != nil {
+			logger.V(3).Info("Skipping invalid URL", "err", err)
+			continue
 		}
-		s1.ExtraData = map[string]string{
-			"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+
+		params := connUrl.Query()
+		for k, v := range connUrl.Query() {
+			if len(v) > 0 {
+				switch k {
+				case "tls":
+					if v[0] == "false" {
+						params.Set("tls", "false")
+					} else {
+						params.Set("tls", "true")
+					}
+				}
+			}
+		}
+
+		connUrl.RawQuery = params.Encode()
+		connStr = connUrl.String()
+
+		uniqueMatches[connStr] = password
+	}
+
+	for connStr, password := range uniqueMatches {
+		r := detectors.Result{
+			DetectorType: detectorspb.DetectorType_MongoDB,
+			Raw:          []byte(connStr),
+			ExtraData: map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/mongo/",
+			},
 		}
 
 		if verify {
@@ -68,13 +95,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if timeout == 0 {
 				timeout = defaultTimeout
 			}
-			isVerified, verificationErr := verifyUri(ctx, resMatch, timeout)
-			s1.Verified = isVerified
-			if !isErrDeterminate(verificationErr) {
-				s1.SetVerificationError(verificationErr, resMatch)
+
+			isVerified, vErr := verifyUri(ctx, connStr, timeout)
+			r.Verified = isVerified
+			if isErrDeterminate(vErr) {
+				continue
 			}
+			r.SetVerificationError(vErr, password)
 		}
-		results = append(results, s1)
+		results = append(results, r)
 	}
 
 	return results, nil
@@ -93,34 +122,12 @@ func isErrDeterminate(err error) bool {
 	return errors.As(err, &authErr)
 }
 
-func verifyUri(ctx context.Context, uri string, timeout time.Duration) (bool, error) {
-	parsed, err := url.Parse(uri)
-	if err != nil {
-		return false, err
-	}
-
-	params := url.Values{}
-	for k, v := range parsed.Query() {
-		if len(v) > 0 {
-			switch k {
-			case "tls":
-				if v[0] == "false" {
-					params.Set("tls", "false")
-				} else {
-					params.Set("tls", "true")
-				}
-			}
-		}
-	}
-	parsed.RawQuery = params.Encode()
-	parsed.Path = "/"
-	uri = parsed.String()
-
+func verifyUri(ctx context.Context, connStr string, timeout time.Duration) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	clientOptions := options.Client().SetTimeout(timeout).ApplyURI(uri)
-	if err = clientOptions.Validate(); err != nil {
+	clientOptions := options.Client().SetTimeout(timeout).ApplyURI(connStr)
+	if err := clientOptions.Validate(); err != nil {
 		return false, err
 	}
 

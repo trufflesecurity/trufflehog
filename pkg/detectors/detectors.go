@@ -89,9 +89,10 @@ type Result struct {
 	DetectorType detectorspb.DetectorType
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
-	// DecoderType is the type of Decoder.
-	DecoderType detectorspb.DecoderType
-	Verified    bool
+	Verified     bool
+	// VerificationFromCache indicates whether this result's verification result came from the verification cache rather
+	// than an actual remote request.
+	VerificationFromCache bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -111,9 +112,25 @@ type Result struct {
 	// analysis to run. The keys of the map are analyzer specific and
 	// should match what is expected in the corresponding analyzer.
 	AnalysisInfo map[string]string
+
+	// primarySecret is used when a detector has multiple secret patterns.
+	// This secret is designated to determine the line number.
+	// If set, the line number will correspond to this secret.
+	primarySecret struct {
+		Value string
+		Line  int64
+	}
 }
 
-// SetVerificationError is the only way to set a verification error. Any sensitive values should be passed-in as secrets to be redacted.
+// CopyVerificationInfo clones verification info (status and error) from another Result struct. This is used when
+// loading verification info from a verification cache. (A method is necessary because verification errors are not
+// exported, to prevent the accidental storage of sensitive information in them.)
+func (r *Result) CopyVerificationInfo(from *Result) {
+	r.Verified = from.Verified
+	r.verificationError = from.verificationError
+}
+
+// SetVerificationError is the only way to set a new verification error. Any sensitive values should be passed-in as secrets to be redacted.
 func (r *Result) SetVerificationError(err error, secrets ...string) {
 	if err != nil {
 		r.verificationError = redactSecrets(err, secrets...)
@@ -123,6 +140,26 @@ func (r *Result) SetVerificationError(err error, secrets ...string) {
 // Public accessors for the fields could also be provided if needed.
 func (r *Result) VerificationError() error {
 	return r.verificationError
+}
+
+// SetPrimarySecretValue set the value passed as primary secret in the result
+func (r *Result) SetPrimarySecretValue(value string) {
+	if value != "" {
+		r.primarySecret.Value = value
+	}
+}
+
+// SetPrimarySecretLine set the passed line number as primary secret line number
+func (r *Result) SetPrimarySecretLine(line int64) {
+	// line number is only set if value is set for primary secret
+	if r.primarySecret.Value != "" {
+		r.primarySecret.Line = line
+	}
+}
+
+// GetPrimarySecretValue return primary secret match value
+func (r *Result) GetPrimarySecretValue() string {
+	return r.primarySecret.Value
 }
 
 // redactSecrets replaces all instances of the given secrets with [REDACTED] in the error message.
@@ -168,6 +205,10 @@ type ResultWithMetadata struct {
 	Result
 	// Data from the sources.Chunk which this result was emitted for
 	Data []byte
+	// DetectorDescription is the description of the Detector.
+	DetectorDescription string
+	// DecoderType is the type of decoder that was used to generate this result's data.
+	DecoderType detectorspb.DecoderType
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.

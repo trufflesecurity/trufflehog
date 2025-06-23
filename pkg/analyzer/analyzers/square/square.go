@@ -11,10 +11,9 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -24,7 +23,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Square }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSquare }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
@@ -43,7 +42,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType:       analyzerpb.AnalyzerType_Square,
+		AnalyzerType:       analyzers.AnalyzerTypeSquare,
 		UnboundedResources: []analyzers.Resource{},
 		Metadata: map[string]any{
 			"expires_at":  info.Permissions.ExpiresAt,
@@ -153,7 +152,9 @@ type SecretInfo struct {
 func getPermissions(cfg *config.Config, key string) (PermissionsJSON, error) {
 	var permissions PermissionsJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	// POST request is considered as non-safe. Square Post request does not change any state.
+	// We are using unrestricted client to avoid error for non-safe API request.
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	req, err := http.NewRequest("POST", "https://connect.squareup.com/oauth2/token/status", nil)
 	if err != nil {
 		return permissions, err
@@ -184,7 +185,9 @@ func getPermissions(cfg *config.Config, key string) (PermissionsJSON, error) {
 func getUsers(cfg *config.Config, key string) (TeamJSON, error) {
 	var team TeamJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	// POST request is considered as non-safe. Square Post request does not change any state.
+	// We are using unrestricted client to avoid error for non-safe API request.
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	req, err := http.NewRequest("POST", "https://connect.squareup.com/v2/team-members/search", nil)
 	if err != nil {
 		return team, err

@@ -10,13 +10,13 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -26,7 +26,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_OpenAI }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeOpenAI }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	info, err := AnalyzePermissions(a.Cfg, credInfo["key"])
@@ -38,6 +38,7 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 
 func secretInfoToAnalyzerResult(info *AnalyzerJSON) *analyzers.AnalyzerResult {
 	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeOpenAI,
 		Metadata: map[string]any{
 			"user":          info.me.Name,
 			"email":         info.me.Email,
@@ -139,7 +140,9 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string) {
 	}
 	color.Green("[!] Valid OpenAI Token\n\n")
 
-	printUserData(data.me)
+	printAPIKeyType(apiKey)
+	printData(data.me)
+
 	if data.isAdmin {
 		color.Green("[!] Admin API Key. All permissions available.")
 	} else if data.isRestricted {
@@ -256,19 +259,39 @@ func getUserData(cfg *config.Config, key string) (MeJSON, error) {
 	return meJSON, nil
 }
 
-func printUserData(meJSON MeJSON) {
-	color.Green("[i] User: %v", meJSON.Name)
-	color.Green("[i] Email: %v", meJSON.Email)
-	color.Green("[i] Phone: %v", meJSON.Phone)
-	color.Green("[i] MFA Enabled: %v", meJSON.MfaEnabled)
+func printAPIKeyType(apiKey string) {
+	if strings.Contains(apiKey, "-svcacct-") {
+		color.Yellow("[i] Service Account API Key\n")
+	} else if strings.Contains(apiKey, "-admin-") {
+		color.Yellow("[i] Admin API Key\n")
+	} else {
+		color.Yellow("[i] Project/Org API Key\n")
+	}
+}
+func printData(meJSON MeJSON) {
+	if meJSON.Name != "" && meJSON.Email != "" {
+		userTable := table.NewWriter()
+		userTable.SetOutputMirror(os.Stdout)
+		color.Green("[i] User Information")
+		userTable.AppendHeader(table.Row{"UserID", "User", "Email", "Phone", "MFA Enabled"})
+		userTable.AppendRow(table.Row{meJSON.ID, meJSON.Name, meJSON.Email, meJSON.Phone, meJSON.MfaEnabled})
+		userTable.Render()
+	} else {
+		color.Yellow("[!] No User Information Available")
+	}
 
 	if len(meJSON.Orgs.Data) > 0 {
-		color.Green("[i] Organizations:")
+		orgTable := table.NewWriter()
+		orgTable.SetOutputMirror(os.Stdout)
+		color.Green("[i] Organizations Information")
+		orgTable.AppendHeader(table.Row{"Org ID", "Title", "User", "Default", "Role"})
 		for _, org := range meJSON.Orgs.Data {
-			color.Green("  - %v", org.Title)
+			orgTable.AppendRow(table.Row{org.ID, fmt.Sprintf("%s (%s)", org.Title, org.Description), org.User, org.Default, org.Role})
 		}
+		orgTable.Render()
+	} else {
+		color.Yellow("[!] No Organizations Information Available")
 	}
-	fmt.Print("\n\n")
 }
 
 func stringifyPermissionStatus(scope OpenAIScope) ([]Permission, analyzers.PermissionType) {
