@@ -37,12 +37,12 @@ func utf16ToUTF8(b []byte) ([]byte, error) {
 	var bufBE, bufLE bytes.Buffer
 	for i := 0; i < len(b)-1; i += 2 {
 		if r := rune(binary.BigEndian.Uint16(b[i:])); b[i] == 0 && utf8.ValidRune(r) {
-			if isValidByte(byte(r)) {
+			if isPrintableByte(byte(r)) {
 				bufBE.WriteRune(r)
 			}
 		}
 		if r := rune(binary.LittleEndian.Uint16(b[i:])); b[i+1] == 0 && utf8.ValidRune(r) {
-			if isValidByte(byte(r)) {
+			if isPrintableByte(byte(r)) {
 				bufLE.WriteRune(r)
 			}
 		}

@@ -13,7 +13,7 @@ import (
 )
 
 // ScanGit scans any git source.
-func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
+func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Git{
 		Head:             c.HeadRef,
 		Base:             c.BaseRef,
@@ -28,7 +28,7 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 	var conn anypb.Any
 	if err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{}); err != nil {
 		ctx.Logger().Error(err, "failed to marshal git connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - git"
@@ -36,9 +36,8 @@ func (e *Engine) ScanGit(ctx context.Context, c sources.GitConfig) error {
 
 	gitSource := &git.Source{}
 	if err := gitSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
-	_, err := e.sourceManager.Run(ctx, sourceName, gitSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gitSource)
 }

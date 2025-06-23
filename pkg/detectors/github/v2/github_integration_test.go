@@ -205,6 +205,8 @@ func TestGitHub_FromChunk(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Scanner{}
+			s.UseCloudEndpoint(true)
+			s.SetCloudEndpoint(s.CloudEndpoint())
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GitHub.FromData() error = %v, wantErr %v", err, tt.wantErr)
@@ -215,6 +217,7 @@ func TestGitHub_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				got[i].AnalysisInfo = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("GitHub.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

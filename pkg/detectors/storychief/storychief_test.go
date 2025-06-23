@@ -1,119 +1,90 @@
-//go:build detectors
-// +build detectors
-
 package storychief
 
 import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestStorychief_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("STORYCHIEF")
-	inactiveSecret := testSecrets.MustGetField("STORYCHIEF_INACTIVE")
+var (
+	validPattern   = "OjhRmEboKs5kYVWJOrpTrloSRsAdkEl8PK-eHrSID5TRR.59-m5ezCY1dcJqJCxbV.2.LeGuqnhuouYkaiJ-iq90X-XX0J3IcT-ReLn.lAU0FfkvHOoOFp4k8w0-nDKAI8irzT5.pi7bmathhUdZO40-Rb59B6M0h40LbAkcvW49YP_-xXqGV_s.tCRbbzeUWt.Y9cFzfrQfRaVlTTqF5AC4mTEF4UxCSHK7uEE3OdzKhRehslviyKozUqer9HEZQ941rCqeEpt8kDcC0GOZFskrqu-EynCRJRhK6cv682e3HoRqE9x5FtcJ3gPfJEA70yHF5gTT0gh1KYDPKoJ-SQ7cjEBxxn-NbLu_WD3HW8DsjVDu1MgqrjqrnFNQvEAqYM7RI.RurVC38TP-5PioJqzJbvpNzkvwFjDrPpHdcivLgDEJUXS39PkIZPb1WCk.LPMOj5MBAwgn7TuADlV34Tael2FxygTPzA6ZVHBzm4aoUZ94Fwcm1vAkKJPeydsu33lmJ73e55pp7IhFyRO6MdPgLHqm3XkUhleU4yDUAEPWMyhilzOEO1t3nP3plfPjZU1.A1VEgWoOjvhs61qAMj2O6YsVFc7nU-PRlOpqj7yJNRmLWnJGVZW1UQLYwo5urJTb92u8BBPe179Eldzk5-xQ994NnrROnAK5DXkwdw9KII85fVBof8LGei1ocVEzYodTVvVY75iXaVmIP3Sf3dqkumW9Jdik-G-Lz.tvyJMTUSmtbX1oXaByyInng89h0Ah1O7D36nUm-gSOOgjJAssWCF0jiOSb2ps7BCdArjd5BVEOhewpodrtDs.iOncs8dtMSmyA5N7Jhzo2eINenb9dhJ7yQmskzhQcN-jpHKLpiL.w4lqCZ5X.uI_oDjx6V_7bJQK07uWCEB8xiwTRCCnB0mZYmi5q0WpG4sCY2xIW"
+	invalidPattern = "O?hRmEboKs5kYVWJOrpTrloSRsAdkEl8PK-eHrSID5TRR.59-m5ezCY1dcJqJCxbV.2.LeGuqnhuouYkaiJ-iq90X-XX0J3IcT-ReLn.lAU0FfkvHOoOFp4k8w0-nDKAI8irzT5.pi7bmathhUdZO40-Rb59B6M0h40LbAkcvW49YP_-xXqGV_s.tCRbbzeUWt.Y9cFzfrQfRaVlTTqF5AC4mTEF4UxCSHK7uEE3OdzKhRehslviyKozUqer9HEZQ941rCqeEpt8kDcC0GOZFskrqu-EynCRJRhK6cv682e3HoRqE9x5FtcJ3gPfJEA70yHF5gTT0gh1KYDPKoJ-SQ7cjEBxxn-NbLu_WD3HW8DsjVDu1MgqrjqrnFNQvEAqYM7RI.RurVC38TP-5PioJqzJbvpNzkvwFjDrPpHdcivLgDEJUXS39PkIZPb1WCk.LPMOj5MBAwgn7TuADlV34Tael2FxygTPzA6ZVHBzm4aoUZ94Fwcm1vAkKJPeydsu33lmJ73e55pp7IhFyRO6MdPgLHqm3XkUhleU4yDUAEPWMyhilzOEO1t3nP3plfPjZU1.A1VEgWoOjvhs61qAMj2O6YsVFc7nU-PRlOpqj7yJNRmLWnJGVZW1UQLYwo5urJTb92u8BBPe179Eldzk5-xQ994NnrROnAK5DXkwdw9KII85fVBof8LGei1ocVEzYodTVvVY75iXaVmIP3Sf3dqkumW9Jdik-G-Lz.tvyJMTUSmtbX1oXaByyInng89h0Ah1O7D36nUm-gSOOgjJAssWCF0jiOSb2ps7BCdArjd5BVEOhewpodrtDs.iOncs8dtMSmyA5N7Jhzo2eINenb9dhJ7yQmskzhQcN-jpHKLpiL.w4lqCZ5X.uI_oDjx6V_7bJQK07uWCEB8xiwTRCCnB0mZYmi5q0WpG4sCY2xIW"
+	keyword        = "storychief"
+)
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestStorychief_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a storychief secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Storychief,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern - with keyword storychief",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			want:  []string{validPattern},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a storychief secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Storychief,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern - ignore duplicate",
+			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
+			want:  []string{validPattern},
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name:  "valid pattern - key out of prefix range",
+			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern",
+			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Storychief.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
-				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Storychief.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

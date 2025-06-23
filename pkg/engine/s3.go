@@ -15,13 +15,13 @@ import (
 )
 
 // ScanS3 scans S3 buckets.
-func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
+func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) (sources.JobProgressRef, error) {
 	connection := &sourcespb.S3{
 		Credential: &sourcespb.S3_Unauthenticated{},
 	}
 	if c.CloudCred {
 		if len(c.Key) > 0 || len(c.Secret) > 0 || len(c.SessionToken) > 0 {
-			return fmt.Errorf("cannot use cloud environment and static credentials together")
+			return sources.JobProgressRef{}, fmt.Errorf("cannot use cloud environment and static credentials together")
 		}
 		connection.Credential = &sourcespb.S3_CloudEnvironment{}
 	}
@@ -58,7 +58,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal S3 connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - s3"
@@ -66,8 +66,7 @@ func (e *Engine) ScanS3(ctx context.Context, c sources.S3Config) error {
 
 	s3Source := &s3.Source{}
 	if err := s3Source.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, s3Source)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, s3Source)
 }

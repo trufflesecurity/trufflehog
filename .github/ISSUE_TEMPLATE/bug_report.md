@@ -16,7 +16,7 @@ Please review the [Community Note](https://github.com/trufflesecurity/trufflehog
 <!---
 Please provide a link to a GitHub Gist containing the complete debug output. Please do NOT paste the debug output in the issue; just paste a link to the Gist.
 
-To obtain the trace output, run trufflehog with the --trace flag.
+To obtain the trace output, run trufflehog with the --log-level=5 flag.
 --->
 
 ### Expected Behavior

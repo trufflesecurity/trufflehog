@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v67/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -17,9 +17,9 @@ type basicAuthConnector struct {
 	password  string
 }
 
-var _ connector = (*basicAuthConnector)(nil)
+var _ Connector = (*basicAuthConnector)(nil)
 
-func newBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (*basicAuthConnector, error) {
+func NewBasicAuthConnector(apiEndpoint string, cred *credentialspb.BasicAuth) (Connector, error) {
 	const httpTimeoutSeconds = 60
 	httpClient := common.RetryableHTTPClientTimeout(int64(httpTimeoutSeconds))
 	httpClient.Transport = &github.BasicAuthTransport{
@@ -43,6 +43,6 @@ func (c *basicAuthConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 
-func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
-	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.username)
+func (c *basicAuthConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
+	return git.CloneRepoUsingToken(ctx, c.password, repoURL, c.username, true, args...)
 }

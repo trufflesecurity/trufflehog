@@ -6,7 +6,7 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v67/github"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
@@ -19,9 +19,9 @@ type appConnector struct {
 	installationID     int64
 }
 
-var _ connector = (*appConnector)(nil)
+var _ Connector = (*appConnector)(nil)
 
-func newAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (*appConnector, error) {
+func NewAppConnector(apiEndpoint string, app *credentialspb.GitHubApp) (Connector, error) {
 	installationID, err := strconv.ParseInt(app.InstallationId, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse app installation ID %q: %w", app.InstallationId, err)
@@ -78,7 +78,7 @@ func (c *appConnector) APIClient() *github.Client {
 	return c.apiClient
 }
 
-func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogit.Repository, error) {
+func (c *appConnector) Clone(ctx context.Context, repoURL string, args ...string) (string, *gogit.Repository, error) {
 	// TODO: Check rate limit for this call.
 	token, _, err := c.installationClient.Apps.CreateInstallationToken(
 		ctx,
@@ -88,7 +88,7 @@ func (c *appConnector) Clone(ctx context.Context, repoURL string) (string, *gogi
 		return "", nil, fmt.Errorf("could not create installation token: %w", err)
 	}
 
-	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token")
+	return git.CloneRepoUsingToken(ctx, token.GetToken(), repoURL, "x-access-token", true, args...)
 }
 
 func (c *appConnector) InstallationClient() *github.Client {

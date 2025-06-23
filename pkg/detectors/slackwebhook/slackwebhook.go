@@ -45,9 +45,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 		for _, match := range matches {
-			if len(match) != 2 {
-				continue
-			}
 			resMatch := strings.TrimSpace(match[1])
 
 			s1 := detectors.Result{
@@ -90,7 +87,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.Verified = true
 					case res.StatusCode == http.StatusBadRequest && bytes.Equal(bodyBytes, []byte("invalid_payload")):
 						s1.Verified = true
-					case res.StatusCode == http.StatusNotFound:
+					case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusForbidden:
 						// Not a real webhook or the owning app's OAuth token has been revoked or the app has been deleted
 						// You might want to handle this case or log it.
 					default:

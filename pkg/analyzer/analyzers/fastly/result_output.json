@@ -1,0 +1,294 @@
+{
+    "AnalyzerType": 34,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "test",
+                "FullyQualifiedName": "Config Store/Q9uDqi7ODnLUrhMFifFVT4",
+                "Type": "Config Store",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "centrally-decent-lynx.edgecompute.app",
+                "FullyQualifiedName": "Service Version Domain/vInh5jJ0qnGdhiCO04INR7/version/1/domain/centrally-decent-lynx.edgecompute.app",
+                "Type": "Service Version Domain",
+                "Metadata": {},
+                "Parent": {
+                    "Name": "vInh5jJ0qnGdhiCO04INR7/version/1",
+                    "FullyQualifiedName": "Service Version/1",
+                    "Type": "Service Version",
+                    "Metadata": {
+                        "service_id": "vInh5jJ0qnGdhiCO04INR7"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "centrally-decent-lynx.edgecompute.app",
+                "FullyQualifiedName": "Service Version Domain/vInh5jJ0qnGdhiCO04INR7/version/2/domain/centrally-decent-lynx.edgecompute.app",
+                "Type": "Service Version Domain",
+                "Metadata": {},
+                "Parent": {
+                    "Name": "vInh5jJ0qnGdhiCO04INR7/version/2",
+                    "FullyQualifiedName": "Service Version/2",
+                    "Type": "Service Version",
+                    "Metadata": {
+                        "service_id": "vInh5jJ0qnGdhiCO04INR7"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "centrally-decent-lynx.edgecompute.app",
+                "FullyQualifiedName": "Service Version Domain/vInh5jJ0qnGdhiCO04INR7/version/3/domain/centrally-decent-lynx.edgecompute.app",
+                "Type": "Service Version Domain",
+                "Metadata": {},
+                "Parent": {
+                    "Name": "vInh5jJ0qnGdhiCO04INR7/version/3",
+                    "FullyQualifiedName": "Service Version/3",
+                    "Type": "Service Version",
+                    "Metadata": {
+                        "service_id": "vInh5jJ0qnGdhiCO04INR7"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Detectors",
+                "FullyQualifiedName": "Service Version Health Check/vInh5jJ0qnGdhiCO04INR7/version/3/healthcheck/Detectors",
+                "Type": "Service Version Health Check",
+                "Metadata": {},
+                "Parent": {
+                    "Name": "vInh5jJ0qnGdhiCO04INR7/version/3",
+                    "FullyQualifiedName": "Service Version/3",
+                    "Type": "Service Version",
+                    "Metadata": {
+                        "service_id": "vInh5jJ0qnGdhiCO04INR7"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "yja0K1GNPRDNTA6vizIFK4/version/1",
+                "FullyQualifiedName": "Service Version/1",
+                "Type": "Service Version",
+                "Metadata": {
+                    "service_id": "yja0K1GNPRDNTA6vizIFK4"
+                },
+                "Parent": {
+                    "Name": "Truffle Security's website",
+                    "FullyQualifiedName": "Service/yja0K1GNPRDNTA6vizIFK4",
+                    "Type": "Service",
+                    "Metadata": {
+                        "Service Type": "vcl"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "vInh5jJ0qnGdhiCO04INR7/version/1",
+                "FullyQualifiedName": "Service Version/1",
+                "Type": "Service Version",
+                "Metadata": {
+                    "service_id": "vInh5jJ0qnGdhiCO04INR7"
+                },
+                "Parent": {
+                    "Name": "this is a test service",
+                    "FullyQualifiedName": "Service/vInh5jJ0qnGdhiCO04INR7",
+                    "Type": "Service",
+                    "Metadata": {
+                        "Service Type": "wasm"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "vInh5jJ0qnGdhiCO04INR7/version/2",
+                "FullyQualifiedName": "Service Version/2",
+                "Type": "Service Version",
+                "Metadata": {
+                    "service_id": "vInh5jJ0qnGdhiCO04INR7"
+                },
+                "Parent": {
+                    "Name": "this is a test service",
+                    "FullyQualifiedName": "Service/vInh5jJ0qnGdhiCO04INR7",
+                    "Type": "Service",
+                    "Metadata": {
+                        "Service Type": "wasm"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "vInh5jJ0qnGdhiCO04INR7/version/3",
+                "FullyQualifiedName": "Service Version/3",
+                "Type": "Service Version",
+                "Metadata": {
+                    "service_id": "vInh5jJ0qnGdhiCO04INR7"
+                },
+                "Parent": {
+                    "Name": "this is a test service",
+                    "FullyQualifiedName": "Service/vInh5jJ0qnGdhiCO04INR7",
+                    "Type": "Service",
+                    "Metadata": {
+                        "Service Type": "wasm"
+                    },
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "this is a test service",
+                "FullyQualifiedName": "Service/vInh5jJ0qnGdhiCO04INR7",
+                "Type": "Service",
+                "Metadata": {
+                    "Service Type": "wasm"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security's website",
+                "FullyQualifiedName": "Service/yja0K1GNPRDNTA6vizIFK4",
+                "Type": "Service",
+                "Metadata": {
+                    "Service Type": "vcl"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "test-user-global",
+                "FullyQualifiedName": "User Token/24K13teXo9GhmaUGhwBS2V",
+                "Type": "User Token",
+                "Metadata": {
+                    "Expires At": "2025-12-31T19:00:00Z",
+                    "Role": "",
+                    "Scope": "global"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "test-user-purge-select",
+                "FullyQualifiedName": "User Token/2782vHUyFqralr1GKmWmVF",
+                "Type": "User Token",
+                "Metadata": {
+                    "Expires At": "",
+                    "Role": "",
+                    "Scope": "purge_select"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "test",
+                "FullyQualifiedName": "User Token/278C9jIudzPv9NC6BvZT4z",
+                "Type": "User Token",
+                "Metadata": {
+                    "Expires At": "2025-07-22T19:00:00Z",
+                    "Role": "",
+                    "Scope": "global:read global"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "integration-test",
+                "FullyQualifiedName": "User Token/2ICO7ArmhY8OMiiOyNpXfc",
+                "Type": "User Token",
+                "Metadata": {
+                    "Expires At": "",
+                    "Role": "",
+                    "Scope": "global:read global"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "global:read global",
+                "Parent": null
+            }
+        }
+    ],
+    "UnboundedResources": null,
+    "Metadata": {}
+}

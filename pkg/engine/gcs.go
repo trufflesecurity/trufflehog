@@ -13,10 +13,10 @@ import (
 )
 
 // ScanGCS with the provided options.
-func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
+func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) (sources.JobProgressRef, error) {
 	// Project ID is required if using any authenticated access.
 	if c.ProjectID == "" && !c.WithoutAuth {
-		return fmt.Errorf("project ID is required")
+		return sources.JobProgressRef{}, fmt.Errorf("project ID is required")
 	}
 
 	// If using unauthenticated access, the project ID is not used.
@@ -35,13 +35,13 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 
 	// Make sure only one auth method is selected.
 	if !isAuthValid(ctx, c, connection) {
-		return fmt.Errorf("multiple auth methods selected, please select only one")
+		return sources.JobProgressRef{}, fmt.Errorf("multiple auth methods selected, please select only one")
 	}
 
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to marshal GCS connection: %w", err)
+		return sources.JobProgressRef{}, fmt.Errorf("failed to marshal GCS connection: %w", err)
 	}
 
 	sourceName := "trufflehog - gcs"
@@ -49,10 +49,9 @@ func (e *Engine) ScanGCS(ctx context.Context, c sources.GCSConfig) error {
 
 	gcsSource := &gcs.Source{}
 	if err := gcsSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, int(c.Concurrency)); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, gcsSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gcsSource)
 }
 
 func isAuthValid(ctx context.Context, c sources.GCSConfig, connection *sourcespb.GCS) bool {

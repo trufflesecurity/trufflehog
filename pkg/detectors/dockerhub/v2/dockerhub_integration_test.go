@@ -6,6 +6,7 @@ package dockerhub
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,6 +54,10 @@ func TestDockerhub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Dockerhub,
 					Verified:     true,
+					AnalysisInfo: map[string]string{
+						"username": username,
+						"pat":      pat,
+					},
 				},
 			},
 			wantErr: false,
@@ -69,6 +74,10 @@ func TestDockerhub_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Dockerhub,
 					Verified:     true,
+					AnalysisInfo: map[string]string{
+						"username": strings.Split(email, "-")[0],
+						"pat":      pat,
+					},
 				},
 			},
 			wantErr: false,

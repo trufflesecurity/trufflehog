@@ -44,7 +44,7 @@ sumoKey2 = 'Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK21a0LckgRSCL'`,
 			want: []string{"CzrMhR8zzy1eH1F0XlY1tu5ywqa2yaSFoWGg2cqE43XkfnUVCytnPQfv1enUYrzv", "Khk3i2ugMxMgkb8bIA2auj4I8juZ3HiimDNssjzYdGqfizPZcxHK21a0LckgRSCL"},
 		},
 		{
-			name:  "invald pattern",
+			name:  "invalid pattern",
 			input: "sumoId = 'doDkVYKjXZAwsz'",
 			want:  []string{},
 		},

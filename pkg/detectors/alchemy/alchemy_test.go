@@ -28,7 +28,7 @@ alchemy_token2 = '3aDcDFE56789012245678a0_1a2b3c2d'`,
 			want: []string{"3aBcDFE5678901234567890_1a2b3c4d", "3aDcDFE56789012245678a0_1a2b3c2d"},
 		},
 		{
-			name:  "invald pattern",
+			name:  "invalid pattern",
 			input: "alchemy_token = '1a2b3c4d'",
 			want:  []string{},
 		},

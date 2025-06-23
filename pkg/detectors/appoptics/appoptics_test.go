@@ -27,12 +27,12 @@ func TestAppOptics_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("appoptics credentail: %s", validPattern),
+			input: fmt.Sprintf("appoptics credential: %s", validPattern),
 			want:  []string{"IABJPR08RmvsGrebJhr1TUdo27-KtTn0mLCKkJJqj5lyba-otXPklygO9DK62o3QSPoIJ4E"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("appoptics credentail: %s", invalidPattern),
+			input: fmt.Sprintf("appoptics credential: %s", invalidPattern),
 			want:  nil,
 		},
 	}

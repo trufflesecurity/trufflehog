@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
@@ -13,7 +14,8 @@ import (
 var DetectorHttpClientWithNoLocalAddresses *http.Client
 var DetectorHttpClientWithLocalAddresses *http.Client
 
-const DefaultResponseTimeout = 5 * time.Second
+// DefaultResponseTimeout is the default timeout for HTTP requests.
+const DefaultResponseTimeout = 10 * time.Second
 
 func userAgent() string {
 	if len(feature.UserAgentSuffix.Load()) > 0 {
@@ -35,6 +37,20 @@ func init() {
 		WithNoLocalIP(),
 	)
 }
+
+var overrideOnce sync.Once
+
+// OverrideDetectorTimeout overrides the default timeout for the detector HTTP clients.
+// It is guaranteed to only run once, subsequent calls will have no effect.
+// This should be called before any scans are started.
+func OverrideDetectorTimeout(timeout time.Duration) {
+    overrideOnce.Do(func() {
+        DetectorHttpClientWithLocalAddresses.Timeout = timeout
+        DetectorHttpClientWithNoLocalAddresses.Timeout = timeout
+    })
+}
+
+
 
 // ClientOption defines a function type that modifies an http.Client.
 type ClientOption func(*http.Client)

@@ -10,23 +10,29 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 func TestAuth0oauth_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
 	domain := testSecrets.MustGetField("AUTH0_DOMAIN")
-	clientId := testSecrets.MustGetField("AUTH0_CLIENT_ID") // there is AUTH0_CLIENT_ID2 and AUTH0_CLIENT_SECRET2 pair as well
+	clientId := testSecrets.MustGetField("AUTH0_CLIENT_ID")
 	clientSecret := testSecrets.MustGetField("AUTH0_CLIENT_SECRET")
+
+	domainUnauthorized := testSecrets.MustGetField("AUTH0_DOMAIN_UNAUTHORIZED")
+	clientIdUnauthorized := testSecrets.MustGetField("AUTH0_CLIENT_ID_UNAUTHORIZED")
+	clientSecretUnauthorized := testSecrets.MustGetField("AUTH0_CLIENT_SECRET_UNAUTHORIZED")
+
+	notFoundDomain := testSecrets.MustGetField("AUTH0_DOMAIN_NOT_FOUND")
 	inactiveClientSecret := testSecrets.MustGetField("AUTH0_CLIENT_SECRET_INACTIVE")
 
 	type args struct {
@@ -53,6 +59,23 @@ func TestAuth0oauth_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_Auth0oauth,
 					Redacted:     clientId,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, verified but unauthorized",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a auth0 client id %s client secret %s domain %s", clientIdUnauthorized, clientSecretUnauthorized, domainUnauthorized)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Auth0oauth,
+					Redacted:     clientIdUnauthorized,
 					Verified:     true,
 				},
 			},
@@ -86,6 +109,23 @@ func TestAuth0oauth_FromChunk(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 		},
+		{
+			name: "domain does not exists",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a auth0 client id %s client secret %s domain %s", clientId, clientSecret, notFoundDomain)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Auth0oauth,
+					Redacted:     clientId,
+					Verified:     false,
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -100,6 +140,10 @@ func TestAuth0oauth_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no raw v2 secret present: \n %+v", got[i])
+				}
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Auth0oauth.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

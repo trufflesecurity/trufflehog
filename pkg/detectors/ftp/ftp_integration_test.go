@@ -121,7 +121,15 @@ func TestFTP_FromChunk(t *testing.T) {
 				data:   []byte("ftp://abc:123@ftp.freebsd.org/pub/FreeBSD/doc/tr/articles/explaining-bsd/explaining-bsd_tr.pdf"),
 				verify: true,
 			},
-			wantErr: false,
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_FTP,
+					Verified:     false,
+					Redacted:     "ftp://abc:********@ftp.freebsd.org",
+				},
+			},
+			wantErr:             false,
+			wantVerificationErr: true,
 		},
 	}
 	for _, tt := range tests {

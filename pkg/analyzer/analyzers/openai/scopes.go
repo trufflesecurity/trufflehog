@@ -91,4 +91,26 @@ var SCOPES = []OpenAIScope{
 		ReadPermission:  FilesRead,
 		WritePermission: FilesWrite,
 	},
+	{
+		ReadTests: []analyzers.HttpStatusTest{
+			{URL: BASE_URL + "/v1/evals", Method: "GET", Valid: []int{200}, Invalid: []int{401}, Type: analyzers.READ, Status: analyzers.PermissionStatus{}},
+		},
+		WriteTests: []analyzers.HttpStatusTest{
+			{URL: BASE_URL + "/v1/evals", Method: "POST", Payload: POST_PAYLOAD, Valid: []int{400}, Invalid: []int{401}, Type: analyzers.WRITE, Status: analyzers.PermissionStatus{}},
+		},
+		Endpoints:       []string{"/v1/evals"},
+		ReadPermission:  EvalsRead,
+		WritePermission: EvalsWrite,
+	},
+	{
+		ReadTests: []analyzers.HttpStatusTest{
+			{URL: BASE_URL + "/v1/responses/1", Method: "GET", Valid: []int{400}, Invalid: []int{401}, Type: analyzers.READ, Status: analyzers.PermissionStatus{}},
+		},
+		WriteTests: []analyzers.HttpStatusTest{
+			{URL: BASE_URL + "/v1/responses", Method: "POST", Payload: POST_PAYLOAD, Valid: []int{400}, Invalid: []int{401}, Type: analyzers.WRITE, Status: analyzers.PermissionStatus{}},
+		},
+		Endpoints:       []string{"/v1/responses"},
+		ReadPermission:  ResponsesRead,
+		WritePermission: ResponsesWrite,
+	},
 }

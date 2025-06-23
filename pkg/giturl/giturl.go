@@ -121,6 +121,8 @@ func GenerateLink(repo, commit, file string, line int64) string {
 	// Some paths contain '%' which breaks |url.Parse| if not encoded.
 	// https://developer.mozilla.org/en-US/docs/Glossary/Percent-encoding
 	file = strings.ReplaceAll(file, "%", "%25")
+	file = strings.ReplaceAll(file, "[", "%5B")
+	file = strings.ReplaceAll(file, "]", "%5D")
 
 	switch determineProvider(repo) {
 	case providerBitbucket:
@@ -175,6 +177,8 @@ var linePattern = regexp.MustCompile(`L\d+`)
 // Used post-link generation to refine reported issue locations within large scanned blocks.
 func UpdateLinkLineNumber(ctx context.Context, link string, newLine int64) string {
 	link = strings.Replace(link, "%", "%25", -1)
+	link = strings.Replace(link, "[", "%5B", -1)
+	link = strings.Replace(link, "]", "%5D", -1)
 	parsedURL, err := url.Parse(link)
 	if err != nil {
 		ctx.Logger().Error(err, "unable to parse link to update line number", "link", link)

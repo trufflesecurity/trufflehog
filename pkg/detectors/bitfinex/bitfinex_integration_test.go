@@ -53,6 +53,10 @@ func TestBitfinex_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Bitfinex,
 					Verified:     true,
 				},
+				{
+					DetectorType: detectorspb.DetectorType_Bitfinex,
+					Verified:     false,
+				},
 			},
 			wantErr: false,
 		},
@@ -65,6 +69,10 @@ func TestBitfinex_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Bitfinex,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_Bitfinex,
 					Verified:     false,

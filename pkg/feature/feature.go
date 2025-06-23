@@ -6,6 +6,7 @@ var (
 	ForceSkipBinaries  atomic.Bool
 	ForceSkipArchives  atomic.Bool
 	SkipAdditionalRefs atomic.Bool
+	EnableAPKHandler   atomic.Bool
 	UserAgentSuffix    AtomicString
 )
 

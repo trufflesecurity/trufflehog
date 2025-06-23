@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	gh "github.com/google/go-github/v66/github"
+	gh "github.com/google/go-github/v67/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/classic"
@@ -37,6 +37,7 @@ func secretInfoToAnalyzerResult(info *common.SecretInfo) *analyzers.AnalyzerResu
 		return nil
 	}
 	result := &analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeGitHub,
 		Metadata: map[string]any{
 			"owner":      info.Metadata.User.Login,
 			"type":       info.Metadata.Type,

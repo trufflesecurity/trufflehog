@@ -19,7 +19,7 @@ var (
 	validPattern   = generateRandomString() // this has the exact token string only which can be used in want too
 	validDomain    = "QHHPu7VPj.sI.auth0.com"
 	invalidPattern = `
-		auth0_credentails:
+		auth0_credentials:
 			apiToken: eywT2nGMZwOcbsUVBwfiRPEl8P_wnmo6XfdUoGVwxDfOSjNyqhYqFdi.KojZZOM8Ox
 			domain: QHHPu7VPj.sI.auth0.com
 	`
@@ -97,17 +97,22 @@ func makeFakeTokenString(token, domain string) string {
 // generateRandomString generates exactly 2001 char string for a fake token to by pass the check in detector for testing
 func generateRandomString() string {
 	const length = 2001
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+	const charsetWithBoundaryChars = charset + ".-"
 
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var builder strings.Builder
 	builder.Grow(length)
 
-	for i := 0; i < length; i++ {
-		randomChar := charset[random.Intn(len(charset))]
+	for i := 0; i < length-1; i++ {
+		randomChar := charsetWithBoundaryChars[random.Intn(len(charset))]
 		builder.WriteByte(randomChar)
 	}
+
+	// ensure last character is not boundary character
+	lastChar := charset[random.Intn(len(charset))]
+	builder.WriteByte(lastChar)
 
 	// append ey in start as the token must start with 'ey'
 	return fmt.Sprintf("ey%s", builder.String())

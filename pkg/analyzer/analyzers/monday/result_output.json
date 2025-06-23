@@ -1,0 +1,276 @@
+{
+    "AnalyzerType": 35,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "All Tasks",
+                "FullyQualifiedName": "Board Group/topics",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Bugs Queue",
+                "FullyQualifiedName": "Board/2007387485",
+                "Type": "Board",
+                "Metadata": {
+                    "permissions": "everyone",
+                    "state": "active"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Development Work",
+                "FullyQualifiedName": "Board Group/new_group24572",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Epics",
+                "FullyQualifiedName": "Board/2007387484",
+                "Type": "Board",
+                "Metadata": {
+                    "permissions": "everyone",
+                    "state": "active"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Epics Backlog",
+                "FullyQualifiedName": "Board Group/new_group",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Getting Started",
+                "FullyQualifiedName": "Board/2007387480",
+                "Type": "Board",
+                "Metadata": {
+                    "permissions": "everyone",
+                    "state": "active"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Getting Started",
+                "FullyQualifiedName": "Document/1126907",
+                "Type": "Document",
+                "Metadata": {
+                    "created_by": "Truffle Security Detectors"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Group Title",
+                "FullyQualifiedName": "Board Group/topics",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Incoming  Bugs",
+                "FullyQualifiedName": "Board Group/topics",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Managed in sprints",
+                "FullyQualifiedName": "Board Group/new_group",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "My Team",
+                "FullyQualifiedName": "Workspace/1857558",
+                "Type": "Workspace",
+                "Metadata": {
+                    "workspace_kind": "open"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Q1 2025",
+                "FullyQualifiedName": "Board Group/new_group313",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Resolved",
+                "FullyQualifiedName": "Board Group/group_title",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Retrospectives",
+                "FullyQualifiedName": "Board/2007387481",
+                "Type": "Board",
+                "Metadata": {
+                    "permissions": "everyone",
+                    "state": "active"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Sprint 1",
+                "FullyQualifiedName": "Board Group/group_title",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Sprints",
+                "FullyQualifiedName": "Board Group/topics",
+                "Type": "Board Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Sprints",
+                "FullyQualifiedName": "Board/2007387482",
+                "Type": "Board",
+                "Metadata": {
+                    "permissions": "everyone",
+                    "state": "active"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Sprints order",
+                "FullyQualifiedName": "Board/2007387483",
+                "Type": "Board",
+                "Metadata": {
+                    "permissions": "everyone",
+                    "state": "active"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Team OSS team",
+                "FullyQualifiedName": "Folder/6205823",
+                "Type": "Folder",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        }
+    ],
+    "UnboundedResources": null,
+    "Metadata": {}
+}

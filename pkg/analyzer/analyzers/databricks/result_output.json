@@ -1,0 +1,119 @@
+{
+    "AnalyzerType": 41,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "admins",
+                "FullyQualifiedName": "databricks/Group/601448505198850",
+                "Type": "Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "CAN_MANAGE",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "admins",
+                "FullyQualifiedName": "databricks/Group/601448505198850",
+                "Type": "Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "CAN_USE",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "kashif.khan@trufflesec.com",
+                "FullyQualifiedName": "databricks/Member/8639341364955455",
+                "Type": "Member",
+                "Metadata": {
+                    "active": "true"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "CAN_MANAGE",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "kashif.khan@trufflesec.com",
+                "FullyQualifiedName": "databricks/Member/8639341364955455",
+                "Type": "Member",
+                "Metadata": {
+                    "active": "true"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "CAN_USE",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "kashifkhan",
+                "FullyQualifiedName": "databricks/Git Credential/",
+                "Type": "Git Credential",
+                "Metadata": {
+                    "provider": "gitHub"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "CAN_MANAGE",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "kashifkhan",
+                "FullyQualifiedName": "databricks/Git Credential/",
+                "Type": "Git Credential",
+                "Metadata": {
+                    "provider": "gitHub"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "CAN_USE",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "users",
+                "FullyQualifiedName": "databricks/Group/1000729253926373",
+                "Type": "Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "CAN_MANAGE",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "users",
+                "FullyQualifiedName": "databricks/Group/1000729253926373",
+                "Type": "Group",
+                "Metadata": {},
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "CAN_USE",
+                "Parent": null
+            }
+        }
+    ],
+    "UnboundedResources": null,
+    "Metadata": {}
+}

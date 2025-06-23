@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	gh "github.com/google/go-github/v66/github"
+	gh "github.com/google/go-github/v67/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	analyzerCommon "github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/github/common"

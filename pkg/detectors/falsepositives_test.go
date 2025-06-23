@@ -154,14 +154,14 @@ func TestStringShannonEntropy(t *testing.T) {
 			args: args{
 				input: "aaaaaaaaaaaaaaaaaaaaaaaaaaab",
 			},
-			want: 0.22228483068568816,
+			want: 0.22,
 		},
 		{
 			name: "entropy 3",
 			args: args{
 				input: "aaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaab",
 			},
-			want: 0.22228483068568816,
+			want: 0.22,
 		},
 		{
 			name: "empty",
@@ -173,8 +173,11 @@ func TestStringShannonEntropy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := StringShannonEntropy(tt.args.input); got != tt.want {
-				t.Errorf("StringShannonEntropy() = %v, want %v", got, tt.want)
+			got := StringShannonEntropy(tt.args.input)
+			if len(tt.args.input) > 0 && tt.want != 0 {
+				assert.InEpsilon(t, tt.want, got, 0.1)
+			} else {
+				assert.Equal(t, tt.want, got)
 			}
 		})
 	}

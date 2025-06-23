@@ -1,0 +1,24 @@
+permissions:
+  - text_to_speech
+  - speech_to_speech
+  # - sound_generation
+  - audio_isolation
+  # - voice_generation
+  - dubbing_read
+  - dubbing_write
+  - projects_read
+  - projects_write
+  - audio_native_read
+  - audio_native_write
+  - pronunciation_dictionaries_read
+  - pronunciation_dictionaries_write
+  - voices_read
+  - voices_write
+  - models_read
+  # - models_write
+  - speech_history_read
+  - speech_history_write
+  - user_read
+  # - user_write
+  - workspace_read
+  - workspace_write

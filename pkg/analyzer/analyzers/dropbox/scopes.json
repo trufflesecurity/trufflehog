@@ -1,0 +1,147 @@
+{
+    "scopes": {
+        "account_info.write": {
+            "test_endpoint": "/2/account/set_profile_photo",
+            "actions": [
+                "Set a user's profile photo"
+            ]
+        },
+        "account_info.read": {
+            "test_endpoint": "/2/account/set_profile_photo",
+            "actions": [
+                "Validate user access token",
+                "Get a list of feature values for the current account",
+                "Get information about the current user's account",
+                "Get the space usage information for the current user's account"
+            ]
+        },
+        "files.metadata.write": {
+            "test_endpoint": "/2/file_properties/properties/add",
+            "implied_scopes": [
+                "files.metadata.read"
+            ],
+            "actions": [
+                "Add, update or remove property groups associated with files",
+                "Add, update or remove properties associated with files and templates",
+                "Add, update or remove templates associated with a user",
+                "Add or remove tags from items"
+            ]
+        },
+        "files.metadata.read": {
+            "test_endpoint": "/2/file_properties/properties/search",
+            "actions": [
+                "Search across property templates for particular property field values",
+                "Get the schema for a specified template",
+                "Get the template identifiers for a team",
+                "Get the metadata for a file or folder",
+                "Get files, revisions, and folder contents",
+                "Monitor for file changes",
+                "Get tags from items",
+                "Get file metadata",
+                "Get user templates",
+                "Get user Paper docs"
+            ]
+        },
+        "files.content.write": {
+            "test_endpoint": "/2/files/copy_v2",
+            "implied_scopes": [
+                "files.metadata.read"
+            ],
+            "actions": [
+                "Add, update, move, or remove files",
+                "Add, update, move, or remove folders",
+                "Upload file content",
+                "Lock/unlock files for writing",
+                "Restore files to previous versions",
+                "Add, update, or archive Paper docs",
+                "Save URLs to Dropbox"
+            ]
+        },
+        "files.content.read": {
+            "test_endpoint": "/2/files/get_file_lock_batch",
+            "actions": [
+                "Export or download files",
+                "Get lock information for files and folders",
+                "Get file previews",
+                "Stream file content",
+                "Get image file thumbnails",
+                "Export or download Paper docs"
+            ]
+        },
+        "sharing.write": {
+            "test_endpoint": "/2/sharing/add_file_member",
+            "implied_scopes": [
+                "sharing.read"
+            ],
+            "actions": [
+                "Add, update, or remove file members",
+                "Add, update, or remove folder members",
+                "Get status of all asynchronous jobs",
+                "Add, update, or remove shared links",
+                "Share or unshare folders",
+                "Add, update, or remove shared folder access policies",
+                "Mount or unmount folders",
+                "Add or remove users from Paper docs"
+            ]
+        },
+        "sharing.read": {
+            "test_endpoint": "/2/sharing/get_file_metadata",
+            "actions": [
+                "Get file metadata",
+                "Get folder metadata",
+                "Get shared link metadata",
+                "Get file members",
+                "Get folder members",
+                "Get shared files",
+                "Get shared folders",
+                "Get mountable shared folders",
+                "Get shared links",
+                "Get information about the user's account",
+                "Get file and folder information for Paper doc",
+                "Get all users with Paper doc access"
+            ]
+        },
+        "file_requests.write": {
+            "test_endpoint": "/2/file_requests/update",
+            "implied_scopes": [
+                "file_requests.read"
+            ],
+            "actions": [
+                "Add, update, or remove file requests"
+            ]
+        },
+        "file_requests.read": {
+            "test_endpoint": "/2/file_requests/list/continue",
+            "actions": [
+                "Get file requests",
+                "Get file request count"
+            ]
+        },
+        "contacts.write": {
+            "test_endpoint": "/2/contacts/delete_manual_contacts_batch",
+            "implied_scopes": [
+                "contacts.read"
+            ],
+            "actions": [
+                "Remove manually added contacts"
+            ]
+        },
+        "contacts.read": {},
+        "openid": {
+            "test_endpoint": "/2/openid/userinfo",
+            "actions": [
+                "Get OpenID Connect user info"
+            ]
+        },
+        "profile": {
+            "actions": [
+                "Get name in user info"
+            ]
+        },
+        "email": {
+            "actions": [
+                "Get email address in user info"
+            ]
+        }
+    }
+}

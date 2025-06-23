@@ -41,9 +41,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	endpointMatches := endpointPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, endpointMatch := range endpointMatches {
@@ -51,6 +48,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			u, err := detectors.ParseURLAndStripPathAndParams(resEndpointMatch)
 			if err != nil {
+				fmt.Printf("\nINVALID URL\n")
 				// if the URL is invalid just move onto the next one
 				continue
 			}

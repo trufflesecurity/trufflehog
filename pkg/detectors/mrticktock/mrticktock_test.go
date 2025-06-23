@@ -12,35 +12,42 @@ import (
 )
 
 var (
-	validPattern   = "abc123!@#^()def456GHijk$% / testuser1005@example.com"
-	invalidPattern = "abcde12345-67890fghijklmnopqrs#tuvwxyz/testing@go"
+	validEmailPattern      = "example@email.com"
+	invalidEmailPattern    = "example.@email.com"
+	validPasswordPattern   = "eZu6BQuoDbeUH3upVw9tF1u"
+	invalidPasswordPattern = "?Zu6BQuoDbeUH3upVw9tF1u"
+	keyword                = "mrticktock"
 )
 
-func TestMrTickTock_Pattern(t *testing.T) {
+func TestMrticktock_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("mrticktock: %s", validPattern),
-			want:  []string{"testuser1005@example.com"},
+			name:  "valid pattern - with keyword mrticktock",
+			input: fmt.Sprintf("%s %s %s", validEmailPattern, keyword, validPasswordPattern),
+			want:  []string{validEmailPattern},
+		},
+		{
+			name:  "valid pattern - key out of prefix range",
+			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPasswordPattern),
+			want:  []string{},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("mrticktock: %s", invalidPattern),
-			want:  nil,
+			input: fmt.Sprintf("%s key = '%s' url = '%s'", keyword, invalidEmailPattern, invalidPasswordPattern),
+			want:  []string{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			if len(matchedDetectors) == 0 && test.want != nil {
+			if len(matchedDetectors) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
@@ -52,7 +59,11 @@ func TestMrTickTock_Pattern(t *testing.T) {
 			}
 
 			if len(results) != len(test.want) {
-				t.Errorf("expected %d results, got %d", len(test.want), len(results))
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
 				return
 			}
 

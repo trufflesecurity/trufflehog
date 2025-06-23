@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fatih/color"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -61,8 +62,11 @@ const (
 const (
 	AnalyzerTypeInvalid AnalyzerType = iota
 	AnalyzerTypeAirbrake
+	AnalyzerAnthropic
 	AnalyzerTypeAsana
 	AnalyzerTypeBitbucket
+	AnalyzerTypeDockerHub
+	AnalyzerTypeElevenLabs
 	AnalyzerTypeGitHub
 	AnalyzerTypeGitLab
 	AnalyzerTypeHuggingFace
@@ -80,32 +84,75 @@ const (
 	AnalyzerTypeSquare
 	AnalyzerTypeStripe
 	AnalyzerTypeTwilio
+	AnalyzerTypePrivateKey
+	AnalyzerTypeNotion
+	AnalyzerTypeDigitalOcean
+	AnalyzerTypePlanetScale
+	AnalyzerTypeAirtableOAuth
+	AnalyzerTypeAirtablePat
+	AnalyzerTypeGroq
+	AnalyzerTypeLaunchDarkly
+	AnalyzerTypeFigma
+	AnalyzerTypePlaid
+	AnalyzerTypeNetlify
+	AnalyzerTypeFastly
+	AnalyzerTypeMonday
+	AnalyzerTypeDatadog
+	AnalyzerTypeNgrok
+	AnalyzerTypeMux
+	AnalyzerTypePosthog
+	AnalyzerTypeDropbox
+	AnalyzerTypeDataBricks
+	AnalyzerTypeJira
 	// Add new items here with AnalyzerType prefix
 )
 
 // analyzerTypeStrings maps the enum to its string representation.
 var analyzerTypeStrings = map[AnalyzerType]string{
-	AnalyzerTypeInvalid:     "Invalid",
-	AnalyzerTypeAirbrake:    "Airbrake",
-	AnalyzerTypeAsana:       "Asana",
-	AnalyzerTypeBitbucket:   "Bitbucket",
-	AnalyzerTypeGitHub:      "GitHub",
-	AnalyzerTypeGitLab:      "GitLab",
-	AnalyzerTypeHuggingFace: "HuggingFace",
-	AnalyzerTypeMailchimp:   "Mailchimp",
-	AnalyzerTypeMailgun:     "Mailgun",
-	AnalyzerTypeMySQL:       "MySQL",
-	AnalyzerTypeOpenAI:      "OpenAI",
-	AnalyzerTypeOpsgenie:    "Opsgenie",
-	AnalyzerTypePostgres:    "Postgres",
-	AnalyzerTypePostman:     "Postman",
-	AnalyzerTypeSendgrid:    "Sendgrid",
-	AnalyzerTypeShopify:     "Shopify",
-	AnalyzerTypeSlack:       "Slack",
-	AnalyzerTypeSourcegraph: "Sourcegraph",
-	AnalyzerTypeSquare:      "Square",
-	AnalyzerTypeStripe:      "Stripe",
-	AnalyzerTypeTwilio:      "Twilio",
+	AnalyzerTypeInvalid:       "Invalid",
+	AnalyzerTypeAirbrake:      "Airbrake",
+	AnalyzerAnthropic:         "Anthropic",
+	AnalyzerTypeAsana:         "Asana",
+	AnalyzerTypeBitbucket:     "Bitbucket",
+	AnalyzerTypeDigitalOcean:  "DigitalOcean",
+	AnalyzerTypeDockerHub:     "DockerHub",
+	AnalyzerTypeElevenLabs:    "ElevenLabs",
+	AnalyzerTypeGitHub:        "GitHub",
+	AnalyzerTypeGitLab:        "GitLab",
+	AnalyzerTypeHuggingFace:   "HuggingFace",
+	AnalyzerTypeMailchimp:     "Mailchimp",
+	AnalyzerTypeMailgun:       "Mailgun",
+	AnalyzerTypeMySQL:         "MySQL",
+	AnalyzerTypeOpenAI:        "OpenAI",
+	AnalyzerTypeOpsgenie:      "Opsgenie",
+	AnalyzerTypePostgres:      "Postgres",
+	AnalyzerTypePostman:       "Postman",
+	AnalyzerTypeSendgrid:      "Sendgrid",
+	AnalyzerTypeShopify:       "Shopify",
+	AnalyzerTypeSlack:         "Slack",
+	AnalyzerTypeSourcegraph:   "Sourcegraph",
+	AnalyzerTypeSquare:        "Square",
+	AnalyzerTypeStripe:        "Stripe",
+	AnalyzerTypeTwilio:        "Twilio",
+	AnalyzerTypePrivateKey:    "PrivateKey",
+	AnalyzerTypeNotion:        "Notion",
+	AnalyzerTypePlanetScale:   "PlanetScale",
+	AnalyzerTypeAirtableOAuth: "AirtableOAuth",
+	AnalyzerTypeAirtablePat:   "AirtablePat",
+	AnalyzerTypeGroq:          "Groq",
+	AnalyzerTypeLaunchDarkly:  "LaunchDarkly",
+	AnalyzerTypeFigma:         "Figma",
+	AnalyzerTypePlaid:         "Plaid",
+	AnalyzerTypeNetlify:       "Netlify",
+	AnalyzerTypeFastly:        "Fastly",
+	AnalyzerTypeMonday:        "Monday",
+	AnalyzerTypeDatadog:       "Datadog",
+	AnalyzerTypeNgrok:         "Ngrok",
+	AnalyzerTypeMux:           "Mux",
+	AnalyzerTypePosthog:       "Posthog",
+	AnalyzerTypeDropbox:       "Dropbox",
+	AnalyzerTypeDataBricks:    "DataBricks",
+	AnalyzerTypeJira:          "Jira",
 	// Add new mappings here
 }
 
@@ -117,7 +164,7 @@ func (a AnalyzerType) String() string {
 	return "Unknown"
 }
 
-// GetSortedAnalyzerTypes returns a sorted slice of AnalyzerType strings, skipping "Invalid".
+// AvailableAnalyzers returns a sorted slice of AnalyzerType strings, skipping "Invalid".
 func AvailableAnalyzers() []string {
 	var analyzerStrings []string
 

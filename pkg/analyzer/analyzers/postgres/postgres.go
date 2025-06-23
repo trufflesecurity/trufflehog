@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/lib/pq"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
@@ -54,11 +54,11 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	userResource, userBindings := bakeUserBindings(info)
 	result.Bindings = append(result.Bindings, userBindings...)
 
-	// add user's database priviliges to bindings
+	// add user's database privileges to bindings
 	dbNameToResourceMap, dbBindings := bakeDatabaseBindings(userResource, info)
 	result.Bindings = append(result.Bindings, dbBindings...)
 
-	// add user's table priviliges to bindings
+	// add user's table privileges to bindings
 	tableBindings := bakeTableBindings(dbNameToResourceMap, info)
 	result.Bindings = append(result.Bindings, tableBindings...)
 

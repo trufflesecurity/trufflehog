@@ -56,7 +56,7 @@ func (f *Footer) View() string {
 	if f.keymap == nil {
 		return ""
 	}
-	s := f.common.Styles.Footer.Copy().
+	s := f.common.Styles.Footer.
 		Width(f.common.Width)
 	helpView := f.help.View(f.keymap)
 	return f.common.Zone.Mark(

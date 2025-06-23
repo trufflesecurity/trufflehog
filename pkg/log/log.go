@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"log/slog"
 	"time"
 
 	"github.com/TheZeroSlave/zapsentry"
@@ -182,6 +184,16 @@ func WithGlobalRedaction() func(*sinkConfig) {
 	return func(conf *sinkConfig) {
 		conf.redactor = globalRedactor
 	}
+}
+
+// ToLogger converts the logr.Logger into a legacy *log.Logger.
+func ToLogger(l logr.Logger) *log.Logger {
+	return slog.NewLogLogger(logr.ToSlogHandler(l), slog.LevelInfo)
+}
+
+// ToSlogger converts the logr.Logger into a *slog.Logger.
+func ToSlogger(l logr.Logger) *slog.Logger {
+	return slog.New(logr.ToSlogHandler(l))
 }
 
 // firstErrorFunc is a helper function that returns a function that executes

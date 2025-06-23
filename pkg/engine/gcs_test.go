@@ -8,6 +8,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -72,7 +73,7 @@ func TestScanGCS(t *testing.T) {
 			conf := Config{
 				Concurrency:   1,
 				Decoders:      decoders.DefaultDecoders(),
-				Detectors:     DefaultDetectors(),
+				Detectors:     defaults.DefaultDetectors(),
 				Verify:        false,
 				SourceManager: sourceManager,
 				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
@@ -90,7 +91,7 @@ func TestScanGCS(t *testing.T) {
 				}
 			}()
 
-			err = e.ScanGCS(ctx, test.gcsConfig)
+			_, err = e.ScanGCS(ctx, test.gcsConfig)
 			if err != nil && !test.wantErr && !strings.Contains(err.Error(), "googleapi: Error 400: Bad Request") {
 				t.Errorf("ScanGCS() got: %v, want: %v", err, nil)
 				return

@@ -1,0 +1,2 @@
+permissions:
+  - full_access # by default groq api key has full access

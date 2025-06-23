@@ -11,6 +11,7 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
@@ -775,6 +776,24 @@ func TestSource_Chunks_TargetedScan(t *testing.T) {
 			wantChunks: 607,
 		},
 		{
+			name: "targeted scan, commit metadata",
+			init: init{
+				name:       "test source",
+				connection: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}},
+				queryCriteria: &source_metadatapb.MetaData{
+					Data: &source_metadatapb.MetaData_Github{
+						Github: &source_metadatapb.Github{
+							Repository: "https://github.com/trufflesecurity/trufflehog.git",
+							Link:       "https://github.com/trufflesecurity/trufflehog/commit/1c51106e35c3b3c327fe12e358177c03079bb771",
+							Commit:     "1c51106e35c3b3c327fe12e358177c03079bb771",
+							File:       "", // no file
+						},
+					},
+				},
+			},
+			wantChunks: 1,
+		},
+		{
 			name: "no file in commit",
 			init: init{
 				name:       "test source",
@@ -862,6 +881,91 @@ func TestChunkUnit(t *testing.T) {
 	}
 	assert.GreaterOrEqual(t, reporter.chunkCount, 65)
 	assert.Equal(t, 0, reporter.errCount)
+}
+
+func TestSource_Validate(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	githubToken := secret.MustGetField("GITHUB_TOKEN")
+	githubPrivateKeyB64New := secret.MustGetField("GITHUB_PRIVATE_KEY_NEW")
+	githubInstallationIDNew := secret.MustGetField("GITHUB_INSTALLATION_ID_NEW")
+	githubAppIDNew := secret.MustGetField("GITHUB_APP_ID_NEW")
+
+	githubPrivateKeyBytesNew, err := base64.StdEncoding.DecodeString(githubPrivateKeyB64New)
+	if err != nil {
+		t.Fatal(err)
+	}
+	githubPrivateKeyNew := string(githubPrivateKeyBytesNew)
+
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name         string
+		args         args
+		sourceConfig *Source
+		wantErr      bool
+	}{
+		{
+			name:         "success - validate - unauthenticated",
+			args:         args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Unauthenticated{}}},
+			wantErr:      false,
+		},
+		{
+			name:         "success - validate - token authentication",
+			args:         args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken}}},
+			wantErr:      false,
+		},
+		{
+			name: "sucess- validate - app token authentication",
+			args: args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_GithubApp{
+				GithubApp: &credentialspb.GitHubApp{
+					PrivateKey:     githubPrivateKeyNew,
+					InstallationId: githubInstallationIDNew,
+					AppId:          githubAppIDNew,
+				},
+			}}},
+			wantErr: false,
+		},
+		{
+			name:         "fail - validate - token authentication",
+			args:         args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_Token{Token: githubToken + "fake"}}},
+			wantErr:      true,
+		},
+		{
+			name: "fail- validate - app token authentication",
+			args: args{ctx: context.Background()},
+			sourceConfig: &Source{conn: &sourcespb.GitHub{Credential: &sourcespb.GitHub_GithubApp{
+				GithubApp: &credentialspb.GitHubApp{
+					PrivateKey:     githubPrivateKeyNew + "fake",
+					InstallationId: githubInstallationIDNew + "0",
+					AppId:          githubAppIDNew,
+				},
+			}}},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			connector, err := newConnector(tt.sourceConfig)
+			require.NoError(t, err)
+			tt.sourceConfig.connector = connector
+
+			if err := tt.sourceConfig.Validate(tt.args.ctx); err != nil && !tt.wantErr {
+				t.Errorf("Source.Validate() = %v, wantErr %t", err, tt.wantErr)
+			}
+		})
+	}
 }
 
 type countChunkReporter struct {

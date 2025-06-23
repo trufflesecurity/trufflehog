@@ -1,0 +1,47 @@
+[
+    {
+        "name": "read_content",
+        "test": {
+            "endpoint": "https://api.notion.com/v1/pages/`nowaythiscanexist",
+            "method": "GET",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "update_content",
+        "test": {
+            "endpoint": "https://api.notion.com/v1/pages/`nowaythiscanexist",
+            "method": "PATCH",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "insert_content",
+        "test": {
+            "endpoint": "https://api.notion.com/v1/pages",
+            "method": "POST",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "read_comments",
+        "test": {
+            "endpoint": "https://api.notion.com/v1/comments",
+            "method": "GET",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+	{
+        "name": "insert_comments",
+        "test": {
+            "endpoint": "https://api.notion.com/v1/comments",
+            "method": "POST",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    }
+]

@@ -102,6 +102,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						// https://api.slack.com/methods/auth.test) (Per
 						// https://slack.com/help/articles/360000446446-Manage-deactivated-members-apps-and-integrations,
 						// reactivating a bot regenerates its tokens, so this candidate is determinately unverified.)
+					} else if authResponse.Error == "token_revoked" {
+						// "Authentication token is for a deleted user or workspace, or the app has been removed when using a user token."
+						// This indicates the token is no longer valid and determinately unverified.
+						// https://api.slack.com/methods/auth.test
 					} else {
 						err = fmt.Errorf("unexpected error auth response %+v", authResponse.Error)
 						s1.SetVerificationError(err, token)

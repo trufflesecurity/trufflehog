@@ -1,0 +1,668 @@
+{
+    "general_scopes": [
+        {
+            "name": "organization",
+            "test": {
+                "read": {
+                    "endpoint": "/api/organizations",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/organizations",
+                    "method": "POST",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        }
+    ],
+    "organization_scopes": [
+        {
+            "name": "batch_export",
+            "test": {
+                "read": {
+                    "endpoint": "/api/organizations/%s/batch_exports",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/organizations/%s/batch_exports",
+                    "method": "POST",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "organization_member",
+            "test": {
+                "read": {
+                    "endpoint": "/api/organizations/%s/members",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/organizations/%s/members/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        500
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "project",
+            "test": {
+                "read": {
+                    "endpoint": "/api/organizations/%s/projects",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/organizations/%s/projects/`nowaythiscanexist",
+                    "method": "DELETE",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        }
+    ],
+    "project_scopes": [
+        {
+            "name": "action",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/actions",
+                    "method": "GET",
+                    "valid_status_code": [200],
+                    "invalid_status_code": [403]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/actions",
+                    "method": "POST",
+                    "valid_status_code": [500],
+                    "invalid_status_code": [403]
+                }
+            }
+        },
+        {
+            "name": "activity_log",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/activity_log",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/activity_log",
+                    "method": "POST",
+                    "valid_status_code": [
+                        500
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "annotation",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/annotations",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/annotations/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "cohort",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/cohorts",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/cohorts/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "dashboard",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/dashboards",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/dashboards/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        500
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "dashboard_template",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/dashboard_templates",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/dashboard_templates/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "early_access_feature",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/early_access_feature",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/early_access_feature",
+                    "method": "POST",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "event_definition",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/event_definitions",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/event_definitions/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        500
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "experiment",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/experiments",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/experiments",
+                    "method": "POST",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "export",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/exports",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/exports",
+                    "method": "POST",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "feature_flag",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/feature_flags",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/feature_flags",
+                    "method": "POST",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "group",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/groups",
+                    "method": "GET",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/groups/update_property",
+                    "method": "POST",
+                    "valid_status_code": [
+                        500
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "hog_function",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/hog_functions",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/hog_functions/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "insight",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/insights",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/insights/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "notebook",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/notebooks",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/notebooks/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "person",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/persons",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/persons/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "plugin",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/plugin_configs",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/plugin_configs",
+                    "method": "POST",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "property_definition",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/property_definitions",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/property_definitions/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        500
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "query",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/query/`nowaythiscanexist",
+                    "method": "GET",
+                    "valid_status_code": [
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "session_recording",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/session_recordings",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/session_recordings/`nowaythisexists",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "session_recording_playlist",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/session_recording_playlists",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/session_recording_playlists/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "subscription",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/subscriptions",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200,
+                        402
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/subscriptions/`nowaythiscanexist",
+                    "method": "PATCH",
+                    "valid_status_code": [
+                        402,
+                        404
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        },
+        {
+            "name": "survey",
+            "test": {
+                "read": {
+                    "endpoint": "/api/projects/%d/surveys",
+                    "method": "GET",
+                    "valid_status_code": [
+                        200
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                },
+                "write": {
+                    "endpoint": "/api/projects/%d/surveys",
+                    "method": "POST",
+                    "valid_status_code": [
+                        400
+                    ],
+                    "invalid_status_code": [
+                        403
+                    ]
+                }
+            }
+        }
+    ]
+    
+}

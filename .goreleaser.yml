@@ -1,13 +1,26 @@
 version: 2
 builds:
-  - binary: trufflehog
+  - id: trufflehog-upx
+    binary: trufflehog
     ldflags:
       - -s -w -X 'github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}'
     env: [CGO_ENABLED=0]
     goos:
     - linux
-    - windows
+    goarch:
+    - amd64
+    - arm64
+    hooks:
+      post:
+        - upx -q "{{ .Path }}"
+  - id: trufflehog
+    binary: trufflehog
+    ldflags:
+      - -X 'github.com/trufflesecurity/trufflehog/v3/pkg/version.BuildVersion={{ .Version }}'
+    env: [CGO_ENABLED=0]
+    goos:
     - darwin
+    - windows
     goarch:
     - amd64
     - arm64

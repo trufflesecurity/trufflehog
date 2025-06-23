@@ -1,215 +1,97 @@
-//go:build detectors
-// +build detectors
-
 package privatekey
 
 import (
 	"context"
 	"fmt"
-	"os"
-	"reflect"
 	"testing"
-	"time"
 
-	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestPrivatekey_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors4")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secretTLS := testSecrets.MustGetField("PRIVATEKEY_TLS")
-	secretGitHub := testSecrets.MustGetField("PRIVATEKEY_GITHUB")
-	secretGitHubEncrypted := testSecrets.MustGetField("PRIVATEKEY_GITHUB_ENCRYPTED")
-	secretInactive := testSecrets.MustGetField("PRIVATEKEY_UNVERIFIED")
+var (
+	validPattern = `-----BEGIN RSA PRIVATE KEY-----
+MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu
+KUpRKfFLfRYC9AIKjbJTWit+CqvjWYzvQwECAwEAAQJAIJLixBy2qpFoS4DSmoEm
+o3qGy0t6z09AIJtH+5OeRV1be+N4cDYJKffGzDa88vQENZiRm0GRq6a+HPGQMd2k
+TQIhAKMSvzIBnni7ot/OSie2TmJLY4SwTQAevXysE2RbFDYdAiEBCUEaRQnMnbp7
+9mxDXDf6AU0cN/RPBjb9qSHDcWZHGzUCIG2Es59z8ugGrDY+pxLQnwfotadxd+Uy
+v/Ow5T0q5gIJAiEAyS4RaI9YG8EWx/2w0T67ZUVAw8eOMB6BIUg0Xcu+3okCIBOs
+/5OiPgoTdSy7bcF9IGpSE8ZgGKzgYQVZeN97YE00
+-----END RSA PRIVATE KEY-----
+`
+	invalidPattern = `-----BEGIN?RSA?PRIVATE?KEY-----
+MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu
+KUpRKfFLfRYC9AIKjbJTWit+CqvjWYzvQwECAwEAAQJAIJLixBy2qpFoS4DSmoEm
+o3qGy0t6z09AIJtH+5OeRV1be+N4cDYJKffGzDa88vQENZiRm0GRq6a+HPGQMd2k
+TQIhAKMSvzIBnni7ot/OSie2TmJLY4SwTQAevXysE2RbFDYdAiEBCUEaRQnMnbp7
+9mxDXDf6AU0cN/RPBjb9qSHDcWZHGzUCIG2Es59z8ugGrDY+pxLQnwfotadxd+Uy
+v/Ow5T0q5gIJAiEAyS4RaI9YG8EWx/2w0T67ZUVAw8eOMB6BIUg0Xcu+3okCIBOs
+/5OiPgoTdSy7bcF9IGpSE8ZgGKzgYQVZeN97YE00
+-----END RSA PRIVATE KEY-----`
+	keyword = "privatekey"
+)
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
-
+func TestPrivatekey_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find privatekey secret %s within", secretInactive)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
-					Verified:     false,
-					Redacted:     "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYw",
-				},
-				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
-					Verified:     false,
-					Redacted:     "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgw",
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern - with keyword privatekey",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			want:  []string{validPattern},
 		},
 		{
-			name: "found TLS private key, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(secretTLS),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
-					Verified:     true,
-					Redacted:     "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgw",
-					ExtraData: map[string]string{
-						"certificate_urls": "https://crt.sh/?q=1e20c40deb44a8539dd3ac3e8c53b72750cb19f9, https://crt.sh/?q=0e9de31fb2ee16465a4d5d93b227d54f870326d1",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found GitHub SSH private key, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(secretGitHub),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
-					Verified:     true,
-					Redacted:     "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5v",
-					ExtraData: map[string]string{
-						"github_user": "sirdetectsalot",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found encrypted GitHub SSH private key, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(secretGitHubEncrypted),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_PrivateKey,
-					Verified:     true,
-					Redacted:     "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAACmFl",
-					ExtraData: map[string]string{
-						"github_user":                   "sirdetectsalot",
-						"encrypted":                     "true",
-						"cracked_encryption_passphrase": "true",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name:  "invalid pattern",
+			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{IncludeExpired: true}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("PrivatekeyCI.FromData() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if os.Getenv("FORCE_PASS_DIFF") == "true" {
-				return
-			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
-				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("PrivatekeyCI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				return
+			}
+
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
 				}
 			}
-		})
-	}
-}
-
-func Test_lookupFingerprint(t *testing.T) {
-	tests := []struct {
-		name                      string
-		publicKeyFingerprintInHex string
-		wantFingerprints          bool
-		wantErr                   bool
-		includeExpired            bool
-	}{
-		{
-			name:                      "got some",
-			publicKeyFingerprintInHex: "4c5da06caa1c81df9c8e1abe43bac385de1bda76",
-			wantFingerprints:          true,
-			wantErr:                   false,
-			includeExpired:            true,
-		},
-		{
-			name:                      "got some",
-			publicKeyFingerprintInHex: "none",
-			wantFingerprints:          false,
-			wantErr:                   false,
-			includeExpired:            true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotFingerprints, err := lookupFingerprint(context.TODO(), tt.publicKeyFingerprintInHex, tt.includeExpired)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("lookupFingerprint() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
 			}
-			if !reflect.DeepEqual(gotFingerprints != nil && len(gotFingerprints.CertificateURLs) > 0, tt.wantFingerprints) {
-				t.Errorf("lookupFingerprint() = %v, want %v", gotFingerprints, tt.wantFingerprints)
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

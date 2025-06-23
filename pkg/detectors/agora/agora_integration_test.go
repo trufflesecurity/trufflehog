@@ -51,15 +51,7 @@ func TestAgora_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Agora,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Agora,
 					Verified:     true,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Agora,
-					Verified:     false,
 				},
 				{
 					DetectorType: detectorspb.DetectorType_Agora,
@@ -82,7 +74,7 @@ func TestAgora_FromChunk(t *testing.T) {
 					Verified:     false,
 				}
 				r.SetVerificationError(context.DeadlineExceeded)
-				return []detectors.Result{r, r, r, r}
+				return []detectors.Result{r, r}
 			}(),
 			wantErr: false,
 		},
@@ -100,7 +92,7 @@ func TestAgora_FromChunk(t *testing.T) {
 					Verified:     false,
 				}
 				r.SetVerificationError(fmt.Errorf("unexpected HTTP response status 500"))
-				return []detectors.Result{r, r, r, r}
+				return []detectors.Result{r, r}
 			}(),
 			wantErr: false,
 		},
@@ -113,14 +105,6 @@ func TestAgora_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Agora,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Agora,
-					Verified:     false,
-				},
 				{
 					DetectorType: detectorspb.DetectorType_Agora,
 					Verified:     false,

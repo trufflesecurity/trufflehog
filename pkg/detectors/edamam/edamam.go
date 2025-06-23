@@ -42,14 +42,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, idMatch := range idMatches {
-			if len(match) != 2 {
-				continue
-			}
 			resId := strings.TrimSpace(idMatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Edamam,

@@ -3,6 +3,8 @@ package sqlserver
 import (
 	"context"
 	"database/sql"
+	"net"
+	"strconv"
 	"time"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -52,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, err := ping(paramsUnsafe)
+			isVerified, err := ping(ctx, paramsUnsafe)
 
 			s1.Verified = isVerified
 
@@ -71,7 +73,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-var ping = func(config msdsn.Config) (bool, error) {
+var ping = func(ctx context.Context, config msdsn.Config) (bool, error) {
+	// TCP connectivity check to prevent indefinite hangs
+	address := net.JoinHostPort(config.Host, strconv.Itoa(int(config.Port)))
+
+	dialer := &net.Dialer{
+		Timeout: 3 * time.Second,
+	}
+
+	tcpConn, err := dialer.DialContext(ctx, "tcp", address) // respects context timeout
+	if err != nil {
+		return false, err
+	}
+	defer tcpConn.Close()
+
 	cleanConfig := msdsn.Config{}
 	cleanConfig.Host = config.Host
 	cleanConfig.Port = config.Port
@@ -97,7 +112,7 @@ var ping = func(config msdsn.Config) (bool, error) {
 		_ = conn.Close()
 	}()
 
-	err = conn.Ping()
+	err = conn.PingContext(ctx) // this doesn't seem to respect the context timeout
 	if err != nil {
 		return false, err
 	}

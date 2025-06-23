@@ -3,6 +3,7 @@ package sources
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -98,6 +99,22 @@ func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConf
 
 	go func() {
 		defer close(chunkResultChan)
+
+		// Defer a panic recovery to handle any panics that occur while reading, which can sometimes unavoidably happen
+		// due to third-party library bugs.
+		defer func() {
+			if r := recover(); r != nil {
+				var panicErr error
+				if e, ok := r.(error); ok {
+					panicErr = e
+				} else {
+					panicErr = fmt.Errorf("panic occurred: %v", r)
+				}
+				chunkResultChan <- ChunkResult{
+					err: fmt.Errorf("panic error: %w", panicErr),
+				}
+			}
+		}()
 
 		for {
 			chunkRes := ChunkResult{}

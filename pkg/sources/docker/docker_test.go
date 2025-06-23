@@ -166,3 +166,72 @@ func isHistoryChunk(t *testing.T, chunk *sources.Chunk) bool {
 	return metadata != nil &&
 		strings.HasPrefix(metadata.File, "image-metadata:history:")
 }
+
+func TestDockerScanWithExclusions(t *testing.T) {
+	dockerConn := &sourcespb.Docker{
+		Credential: &sourcespb.Docker_Unauthenticated{
+			Unauthenticated: &credentialspb.Unauthenticated{},
+		},
+		Images:       []string{"trufflesecurity/secrets@sha256:864f6d41209462d8e37fc302ba1532656e265f7c361f11e29fed6ca1f4208e11"},
+		ExcludePaths: []string{"/aws", "/gcp*", "/exactmatch"},
+	}
+
+	conn := &anypb.Any{}
+	err := conn.MarshalFrom(dockerConn)
+	assert.NoError(t, err)
+
+	s := &Source{}
+	err = s.Init(context.TODO(), "test source", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	// Test cases for exclusion logic
+	testCases := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		{"excluded_exact", "/aws", true},
+		{"excluded_wildcard", "/gcp/something", true},
+		{"excluded_exact_match_file", "/exactmatch", true},
+		{"not_excluded", "/azure", false},
+		{"gcp_root_should_be_excluded_by_gcp_star", "/gcp", true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, s.isExcluded(context.TODO(), tc.path))
+		})
+	}
+
+	// Keep the original test structure to ensure Chunks processing respects exclusions
+	var wg sync.WaitGroup
+	chunksChan := make(chan *sources.Chunk, 1)
+	foundExcludedPath := false
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for chunk := range chunksChan {
+			// Skip history chunks
+			if isHistoryChunk(t, chunk) {
+				continue
+			}
+
+			metadata := chunk.SourceMetadata.GetDocker()
+			assert.NotNil(t, metadata)
+
+			// Check if we found a chunk with the excluded path
+			if metadata.File == "/aws" {
+				foundExcludedPath = true
+			}
+		}
+	}()
+
+	err = s.Chunks(context.TODO(), chunksChan)
+	assert.NoError(t, err)
+
+	close(chunksChan)
+	wg.Wait()
+
+	assert.False(t, foundExcludedPath, "Found a chunk that should have been excluded")
+}

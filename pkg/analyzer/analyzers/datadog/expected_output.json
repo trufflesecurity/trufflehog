@@ -1,0 +1,1045 @@
+{
+  "AnalyzerType": 37,
+  "Bindings": [
+    {
+      "Resource": {
+        "Name": "Dashboards Read",
+        "FullyQualifiedName": "Dashboards Read",
+        "Type": "Dashboards",
+        "Metadata": { "Resource": "Dashboards" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "dashboards_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Dashboards Write",
+        "FullyQualifiedName": "Dashboards Write",
+        "Type": "Dashboards",
+        "Metadata": { "Resource": "Dashboards" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "dashboards_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Dashboards Public Share",
+        "FullyQualifiedName": "Dashboards Public Share",
+        "Type": "Dashboards",
+        "Metadata": { "Resource": "Dashboards" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "dashboards_public_share", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Monitors Read",
+        "FullyQualifiedName": "Monitors Read",
+        "Type": "Monitors",
+        "Metadata": { "Resource": "Monitors" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "monitors_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Monitors Write",
+        "FullyQualifiedName": "Monitors Write",
+        "Type": "Monitors",
+        "Metadata": { "Resource": "Monitors" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "monitors_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Logs Modify Indexes",
+        "FullyQualifiedName": "Logs Modify Indexes",
+        "Type": "Logs",
+        "Metadata": { "Resource": "Logs" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "logs_modify_indexes", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Logs Write Pipelines",
+        "FullyQualifiedName": "Logs Write Pipelines",
+        "Type": "Logs",
+        "Metadata": { "Resource": "Logs" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "logs_write_pipelines", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Logs Write Archives",
+        "FullyQualifiedName": "Logs Write Archives",
+        "Type": "Logs",
+        "Metadata": { "Resource": "Logs" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "logs_write_archives", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Logs Generate Metrics",
+        "FullyQualifiedName": "Logs Generate Metrics",
+        "Type": "Logs",
+        "Metadata": { "Resource": "Logs" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "logs_generate_metrics", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Manage Downtimes",
+        "FullyQualifiedName": "Manage Downtimes",
+        "Type": "Monitors",
+        "Metadata": { "Resource": "Monitors" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "monitors_downtime", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Logs Read Data",
+        "FullyQualifiedName": "Logs Read Data",
+        "Type": "Logs",
+        "Metadata": { "Resource": "Logs" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "logs_read_data", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Logs Read Archives",
+        "FullyQualifiedName": "Logs Read Archives",
+        "Type": "Logs",
+        "Metadata": { "Resource": "Logs" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "logs_read_archives", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Security Rules Read",
+        "FullyQualifiedName": "Security Rules Read",
+        "Type": "Security Monitoring",
+        "Metadata": { "Resource": "Security Monitoring" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "security_monitoring_rules_read",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "Security Signals Read",
+        "FullyQualifiedName": "Security Signals Read",
+        "Type": "Security Monitoring",
+        "Metadata": { "Resource": "Security Monitoring" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "security_monitoring_signals_read",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "Security Signals Write",
+        "FullyQualifiedName": "Security Signals Write",
+        "Type": "Security Monitoring",
+        "Metadata": { "Resource": "Security Monitoring" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "security_monitoring_signals_write",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "User Access Invite",
+        "FullyQualifiedName": "User Access Invite",
+        "Type": "Users",
+        "Metadata": { "Resource": "Users" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "user_access_invite", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "User App Keys",
+        "FullyQualifiedName": "User App Keys",
+        "Type": "Key Management",
+        "Metadata": { "Resource": "Key Management" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "user_app_keys", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Org App Keys Read",
+        "FullyQualifiedName": "Org App Keys Read",
+        "Type": "Key Management",
+        "Metadata": { "Resource": "Key Management" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "org_app_keys_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Org App Keys Write",
+        "FullyQualifiedName": "Org App Keys Write",
+        "Type": "Key Management",
+        "Metadata": { "Resource": "Key Management" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "org_app_keys_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "User Access Manage",
+        "FullyQualifiedName": "User Access Manage",
+        "Type": "Users",
+        "Metadata": { "Resource": "Users" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "user_access_manage", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Synthetics Private Locations Read",
+        "FullyQualifiedName": "Synthetics Private Locations Read",
+        "Type": "Synthetics",
+        "Metadata": { "Resource": "Synthetics" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "synthetics_private_location_read",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "Synthetics Private Locations Write",
+        "FullyQualifiedName": "Synthetics Private Locations Write",
+        "Type": "Synthetics",
+        "Metadata": { "Resource": "Synthetics" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "synthetics_private_location_write",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "Usage Read",
+        "FullyQualifiedName": "Usage Read",
+        "Type": "Usage Metering",
+        "Metadata": { "Resource": "Usage Metering" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "usage_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Metric Tags Write",
+        "FullyQualifiedName": "Metric Tags Write",
+        "Type": "Metrics",
+        "Metadata": { "Resource": "Metrics" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "metric_tags_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Audit Trail Read",
+        "FullyQualifiedName": "Audit Trail Read",
+        "Type": "Audit",
+        "Metadata": { "Resource": "Audit" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "audit_logs_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "API Keys Read",
+        "FullyQualifiedName": "API Keys Read",
+        "Type": "Key Management",
+        "Metadata": { "Resource": "Key Management" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "api_keys_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "API Keys Write",
+        "FullyQualifiedName": "API Keys Write",
+        "Type": "Key Management",
+        "Metadata": { "Resource": "Key Management" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "api_keys_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Synthetics Global Variable Read",
+        "FullyQualifiedName": "Synthetics Global Variable Read",
+        "Type": "Synthetics",
+        "Metadata": { "Resource": "Synthetics" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "synthetics_global_variable_read",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "Synthetics Global Variable Write",
+        "FullyQualifiedName": "Synthetics Global Variable Write",
+        "Type": "Synthetics",
+        "Metadata": { "Resource": "Synthetics" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "synthetics_global_variable_write",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "Synthetics Read",
+        "FullyQualifiedName": "Synthetics Read",
+        "Type": "Synthetics",
+        "Metadata": { "Resource": "Synthetics" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "synthetics_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Synthetics Write",
+        "FullyQualifiedName": "Synthetics Write",
+        "Type": "Synthetics",
+        "Metadata": { "Resource": "Synthetics" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "synthetics_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Synthetics Default Settings Read",
+        "FullyQualifiedName": "Synthetics Default Settings Read",
+        "Type": "Synthetics",
+        "Metadata": { "Resource": "Synthetics" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "synthetics_default_settings_read",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "Service Account Write",
+        "FullyQualifiedName": "Service Account Write",
+        "Type": "Service Accounts",
+        "Metadata": { "Resource": "Service Accounts" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "service_account_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "APM Read",
+        "FullyQualifiedName": "APM Read",
+        "Type": "APM",
+        "Metadata": { "Resource": "APM" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "apm_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "APM Retention Filters Read",
+        "FullyQualifiedName": "APM Retention Filters Read",
+        "Type": "APM",
+        "Metadata": { "Resource": "APM" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "apm_retention_filter_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "APM Retention Filters Write",
+        "FullyQualifiedName": "APM Retention Filters Write",
+        "Type": "APM",
+        "Metadata": { "Resource": "APM" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "apm_retention_filter_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "RUM Apps Write",
+        "FullyQualifiedName": "RUM Apps Write",
+        "Type": "RUM",
+        "Metadata": { "Resource": "RUM" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "rum_apps_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Data Scanner Read",
+        "FullyQualifiedName": "Data Scanner Read",
+        "Type": "Sensitive Data Scanner",
+        "Metadata": { "Resource": "Sensitive Data Scanner" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "data_scanner_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Data Scanner Write",
+        "FullyQualifiedName": "Data Scanner Write",
+        "Type": "Sensitive Data Scanner",
+        "Metadata": { "Resource": "Sensitive Data Scanner" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "data_scanner_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Org Management",
+        "FullyQualifiedName": "Org Management",
+        "Type": "Organizations",
+        "Metadata": { "Resource": "Organizations" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "org_management", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Security Filters Read",
+        "FullyQualifiedName": "Security Filters Read",
+        "Type": "Security Monitoring",
+        "Metadata": { "Resource": "Security Monitoring" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "security_monitoring_filters_read",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "Security Filters Write",
+        "FullyQualifiedName": "Security Filters Write",
+        "Type": "Security Monitoring",
+        "Metadata": { "Resource": "Security Monitoring" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": {
+        "Value": "security_monitoring_filters_write",
+        "Parent": null
+      }
+    },
+    {
+      "Resource": {
+        "Name": "Incidents Read",
+        "FullyQualifiedName": "Incidents Read",
+        "Type": "Incidents",
+        "Metadata": { "Resource": "Incidents" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "incident_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Incidents Write",
+        "FullyQualifiedName": "Incidents Write",
+        "Type": "Incidents",
+        "Metadata": { "Resource": "Incidents" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "incident_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Incident Settings Write",
+        "FullyQualifiedName": "Incident Settings Write",
+        "Type": "Incidents",
+        "Metadata": { "Resource": "Incidents" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "incident_settings_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "RUM Apps Read",
+        "FullyQualifiedName": "RUM Apps Read",
+        "Type": "RUM",
+        "Metadata": { "Resource": "RUM" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "rum_apps_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "APM Generate Metrics",
+        "FullyQualifiedName": "APM Generate Metrics",
+        "Type": "APM",
+        "Metadata": { "Resource": "APM" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "apm_generate_metrics", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "APM Pipelines Write",
+        "FullyQualifiedName": "APM Pipelines Write",
+        "Type": "APM",
+        "Metadata": { "Resource": "APM" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "apm_pipelines_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "APM Pipelines Read",
+        "FullyQualifiedName": "APM Pipelines Read",
+        "Type": "APM",
+        "Metadata": { "Resource": "APM" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "apm_pipelines_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Workflows Read",
+        "FullyQualifiedName": "Workflows Read",
+        "Type": "Workflows",
+        "Metadata": { "Resource": "Workflows" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "workflows_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Workflows Write",
+        "FullyQualifiedName": "Workflows Write",
+        "Type": "Workflows",
+        "Metadata": { "Resource": "Workflows" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "workflows_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Connections Read",
+        "FullyQualifiedName": "Connections Read",
+        "Type": "Connections",
+        "Metadata": { "Resource": "Connections" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "connections_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Connections Write",
+        "FullyQualifiedName": "Connections Write",
+        "Type": "Connections",
+        "Metadata": { "Resource": "Connections" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "connections_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Notebooks Read",
+        "FullyQualifiedName": "Notebooks Read",
+        "Type": "Notebooks",
+        "Metadata": { "Resource": "Notebooks" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "notebooks_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Notebooks Write",
+        "FullyQualifiedName": "Notebooks Write",
+        "Type": "Notebooks",
+        "Metadata": { "Resource": "Notebooks" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "notebooks_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "AWS Configurations Manage",
+        "FullyQualifiedName": "AWS Configurations Manage",
+        "Type": "Integrations",
+        "Metadata": { "Resource": "Integrations" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "aws_configurations_manage", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Azure Configurations Manage",
+        "FullyQualifiedName": "Azure Configurations Manage",
+        "Type": "Integrations",
+        "Metadata": { "Resource": "Integrations" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "azure_configurations_manage", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "GCP Configurations Manage",
+        "FullyQualifiedName": "GCP Configurations Manage",
+        "Type": "Integrations",
+        "Metadata": { "Resource": "Integrations" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "gcp_configurations_manage", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Integrations Manage",
+        "FullyQualifiedName": "Integrations Manage",
+        "Type": "Integrations",
+        "Metadata": { "Resource": "Integrations" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "manage_integrations", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "SLOs Read",
+        "FullyQualifiedName": "SLOs Read",
+        "Type": "SLOs",
+        "Metadata": { "Resource": "SLOs" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "slos_read", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "SLOs Write",
+        "FullyQualifiedName": "SLOs Write",
+        "Type": "SLOs",
+        "Metadata": { "Resource": "SLOs" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "slos_write", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "SLOs Status Corrections",
+        "FullyQualifiedName": "SLOs Status Corrections",
+        "Type": "SLOs",
+        "Metadata": { "Resource": "SLOs" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "slos_corrections", "Parent": null }
+    },
+    {
+      "Resource": {
+        "Name": "Monitor Configuration Policy Write",
+        "FullyQualifiedName": "Monitor Configuration Policy Write",
+        "Type": "Monitors",
+        "Metadata": { "Resource": "Monitors" },
+        "Parent": {
+          "Name": "Truffle Sec",
+          "FullyQualifiedName": "",
+          "Type": "user",
+          "Metadata": { "email": "detectors@trufflesec.com" },
+          "Parent": null
+        }
+      },
+      "Permission": { "Value": "monitor_config_policy_write", "Parent": null }
+    }
+  ],
+  "UnboundedResources": null,
+  "Metadata": {}
+}

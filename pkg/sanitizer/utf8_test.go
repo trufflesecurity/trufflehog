@@ -19,14 +19,14 @@ func TestUTF8(t *testing.T) {
 			want: "hello123",
 		},
 		{
-			name: "santized",
+			name: "sanitized",
 			args: args{
 				in: "Gr\351gory Smith",
 			},
 			want: "Gr❗gory Smith",
 		},
 		{
-			name: "santized",
+			name: "sanitized",
 			args: args{
 				in: "no \x00 nulls because postgres does not support it in text fields",
 			},

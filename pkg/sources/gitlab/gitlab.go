@@ -4,16 +4,14 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sanitizer"
@@ -22,8 +20,8 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/gobwas/glob"
-	"github.com/xanzy/go-gitlab"
-	"golang.org/x/exp/slices"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -48,6 +46,10 @@ type Source struct {
 	ignoreRepos  []string
 	includeRepos []string
 
+	// This is an experimental flag used to investigate some suspicious behavior we've seen with very large GitLab
+	// organizations that have lots of group sharing.
+	enumerateSharedProjects bool
+
 	useCustomContentWriter bool
 	git                    *git.Git
 	scanOptions            *git.ScanOptions
@@ -58,6 +60,8 @@ type Source struct {
 
 	jobPool *errgroup.Group
 	sources.CommonSourceUnitUnmarshaller
+
+	useAuthInUrl bool
 }
 
 // WithCustomContentWriter sets the useCustomContentWriter flag on the source.
@@ -155,6 +159,10 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	s.repos = conn.GetRepositories()
 	s.ignoreRepos = conn.GetIgnoreRepos()
 	s.includeRepos = conn.GetIncludeRepos()
+	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
+
+	// configuration uses the inverse logic of the `useAuthInUrl` flag.
+	s.useAuthInUrl = !conn.RemoveAuthInUrl
 
 	ctx.Logger().V(3).Info("setting ignore repos patterns", "patterns", s.ignoreRepos)
 	ctx.Logger().V(3).Info("setting include repos patterns", "patterns", s.includeRepos)
@@ -210,6 +218,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 			}
 		},
 		UseCustomContentWriter: s.useCustomContentWriter,
+		AuthInUrl:              s.useAuthInUrl,
 	}
 	s.git = git.NewGit(cfg)
 
@@ -577,6 +586,7 @@ func (s *Source) getAllProjectRepos(
 			ListOptions:      listOpts,
 			OrderBy:          gitlab.Ptr(orderBy),
 			IncludeSubGroups: gitlab.Ptr(true),
+			WithShared:       gitlab.Ptr(s.enumerateSharedProjects),
 		}
 		for {
 			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
@@ -649,7 +659,8 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) 
 				if user == "" {
 					user = "placeholder"
 				}
-				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
+
+				path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user, s.useAuthInUrl)
 			}
 			if err != nil {
 				scanErrs.Add(err)
@@ -685,7 +696,7 @@ func (s *Source) setProgressCompleteWithRepo(index int, offset int, repoURL stri
 
 	// Add the repoURL to the resume info slice.
 	s.resumeInfoSlice = append(s.resumeInfoSlice, repoURL)
-	sort.Strings(s.resumeInfoSlice)
+	slices.Sort(s.resumeInfoSlice)
 
 	// Make the resume info string from the slice.
 	encodedResumeInfo := sources.EncodeResumeInfo(s.resumeInfoSlice)
@@ -832,7 +843,8 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		if user == "" {
 			user = "placeholder"
 		}
-		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user)
+
+		path, repo, err = git.CloneRepoUsingToken(ctx, s.token, repoURL, user, s.useAuthInUrl)
 	}
 	if err != nil {
 		return err

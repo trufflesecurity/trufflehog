@@ -30,7 +30,7 @@ var (
 				Foreground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["fern"]}).
 				Padding(0, 0, 0, 1)
 
-	selectedDescription = selectedSourceItemStyle.Copy().
+	selectedDescription = selectedSourceItemStyle.
 				Foreground(lipgloss.AdaptiveColor{Dark: styles.Colors["sprout"], Light: styles.Colors["sprout"]})
 )
 

@@ -35,7 +35,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			key:     analyzerSecrets.MustGetField("GITHUB_FINEGRAINED_ALLREPOS_ACTIONS_RW_CONTENTS_RW_ISSUES_RW"),
 			wantErr: false,
 			want: `{
-              "AnalyzerType": 0,
+              "AnalyzerType": 7,
               "Bindings": [
                 {
                   "Resource": {
@@ -240,7 +240,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			name: "v2 ghp",
 			key:  testSecrets.MustGetField("GITHUB_VERIFIED_GHP"),
 			want: `{
-              "AnalyzerType": 0,
+              "AnalyzerType": 7,
               "Bindings": [
                 {
                   "Resource": {

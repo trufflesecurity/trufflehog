@@ -2,15 +2,12 @@
 package mailgun
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"net/http"
 	"os"
 	"strconv"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -20,6 +17,15 @@ var _ analyzers.Analyzer = (*Analyzer)(nil)
 
 type Analyzer struct {
 	Cfg *config.Config
+}
+
+type SecretInfo struct {
+	ID        string // key id
+	UserName  string
+	Type      string // type of key
+	Role      string // key role
+	ExpiresAt string // key expiry time if any
+	Domains   []Domain
 }
 
 func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeMailgun }
@@ -34,19 +40,20 @@ func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analy
 	if err != nil {
 		return nil, err
 	}
+
 	return secretInfoToAnalyzerResult(info), nil
 }
 
-func secretInfoToAnalyzerResult(info *DomainsJSON) *analyzers.AnalyzerResult {
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	if info == nil {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
 		AnalyzerType: analyzers.AnalyzerTypeMailgun,
-		Bindings:     make([]analyzers.Binding, len(info.Items)),
+		Bindings:     make([]analyzers.Binding, len(info.Domains)),
 	}
 
-	for idx, domain := range info.Items {
+	for idx, domain := range info.Domains {
 		result.Bindings[idx] = analyzers.Binding{
 			Resource: analyzers.Resource{
 				Name:               domain.URL,
@@ -59,6 +66,7 @@ func secretInfoToAnalyzerResult(info *DomainsJSON) *analyzers.AnalyzerResult {
 					"is_disabled": domain.IsDisabled,
 				},
 			},
+
 			Permission: analyzers.Permission{
 				Value: PermissionStrings[FullAccess],
 			},
@@ -67,87 +75,60 @@ func secretInfoToAnalyzerResult(info *DomainsJSON) *analyzers.AnalyzerResult {
 	return &result
 }
 
-type Domain struct {
-	ID         string `json:"id"`
-	URL        string `json:"name"`
-	IsDisabled bool   `json:"is_disabled"`
-	Type       string `json:"type"`
-	State      string `json:"state"`
-	CreatedAt  string `json:"created_at"`
-}
-
-type DomainsJSON struct {
-	Items      []Domain `json:"items"`
-	TotalCount int      `json:"total_count"`
-}
-
-func getDomains(cfg *config.Config, apiKey string) (DomainsJSON, int, error) {
-	var domainsJSON DomainsJSON
-
-	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://api.mailgun.net/v4/domains", nil)
-	if err != nil {
-		return domainsJSON, -1, err
-	}
-
-	req.SetBasicAuth("api", apiKey)
-	resp, err := client.Do(req)
-	if err != nil {
-		return domainsJSON, -1, err
-	}
-
-	if resp.StatusCode != 200 {
-		return domainsJSON, resp.StatusCode, nil
-	}
-
-	defer resp.Body.Close()
-
-	err = json.NewDecoder(resp.Body).Decode(&domainsJSON)
-	if err != nil {
-		return domainsJSON, resp.StatusCode, err
-	}
-	return domainsJSON, resp.StatusCode, nil
-}
-
 func AnalyzeAndPrintPermissions(cfg *config.Config, apiKey string) {
-	data, err := AnalyzePermissions(cfg, apiKey)
+	info, err := AnalyzePermissions(cfg, apiKey)
 	if err != nil {
 		color.Red("[x] %s", err.Error())
 		return
 	}
 
-	printMetadata(data)
-}
-
-func AnalyzePermissions(cfg *config.Config, apiKey string) (*DomainsJSON, error) {
-	// Get the domains associated with the API key
-	domains, statusCode, err := getDomains(cfg, apiKey)
-	if err != nil {
-		return nil, fmt.Errorf("Error getting domains: %s", err)
-	}
-
-	if statusCode != 200 {
-		return nil, fmt.Errorf("Invalid Mailgun API key.")
-	}
 	color.Green("[i] Valid Mailgun API key\n\n")
-	color.Green("[i] Permissions: Full Access\n\n")
-
-	return &domains, nil
+	printKeyInfo(info)
+	printDomains(info.Domains)
+	color.Yellow("[i] Permissions: Full Access\n\n")
 }
 
-func printMetadata(domains *DomainsJSON) {
-	if domains.TotalCount == 0 {
+func AnalyzePermissions(cfg *config.Config, apiKey string) (*SecretInfo, error) {
+	var secretInfo SecretInfo
+
+	var client = analyzers.NewAnalyzeClient(cfg)
+
+	if err := getDomains(client, apiKey, &secretInfo); err != nil {
+		return &secretInfo, err
+	}
+
+	if err := getKeys(client, apiKey, &secretInfo); err != nil {
+		return &secretInfo, err
+	}
+
+	return &secretInfo, nil
+}
+
+func printKeyInfo(info *SecretInfo) {
+	if info.ID == "" {
+		color.Red("[i] Key information not found")
+		return
+	}
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Key ID", "UserName/Requester", "Key Type", "Expires At", "Role"})
+	t.AppendRow(table.Row{info.ID, info.UserName, info.Type, info.ExpiresAt, info.Role})
+	t.Render()
+}
+func printDomains(domains []Domain) {
+	if len(domains) == 0 {
 		color.Red("[i] No domains found")
 		return
 	}
-	color.Yellow("[i] Found %d domain(s)", domains.TotalCount)
+
+	color.Yellow("[i] Found %d domain(s)", len(domains))
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Domain", "Type", "State", "Created At", "Disabled"})
 
-	for _, domain := range domains.Items {
-
+	for _, domain := range domains {
 		var colorFunc func(format string, a ...interface{}) string
 		switch {
 		case domain.IsDisabled:
@@ -166,5 +147,6 @@ func printMetadata(domains *DomainsJSON) {
 			colorFunc(strconv.FormatBool(domain.IsDisabled)),
 		})
 	}
+
 	t.Render()
 }

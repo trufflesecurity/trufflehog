@@ -27,7 +27,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	defaultTimeout = 2 * time.Second
+	defaultTimeout = 5 * time.Second
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	connStrPat = regexp.MustCompile(`\b(mongodb(?:\+srv)?://(?P<username>\S{3,50}):(?P<password>\S{3,88})@(?P<host>[-.%\w]+(?::\d{1,5})?(?:,[-.%\w]+(?::\d{1,5})?)*)(?:/(?P<authdb>[\w-]+)?(?P<options>\?\w+=[\w@/.$-]+(?:&(?:amp;)?\w+=[\w@/.$-]+)*)?)?)(?:\b|$)`)
 	// TODO: Add support for sharded cluster, replica set and Atlas Deployment.

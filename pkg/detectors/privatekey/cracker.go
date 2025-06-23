@@ -21,7 +21,7 @@ var (
 	ErrUncrackable = errors.New("unable to crack encryption")
 )
 
-func crack(in []byte) (any, string, error) {
+func Crack(in []byte) (any, string, error) {
 	for _, passphrase := range passphrases {
 		parsed, err := ssh.ParseRawPrivateKeyWithPassphrase(in, passphrase)
 		if err != nil {

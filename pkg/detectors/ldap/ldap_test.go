@@ -1,91 +1,85 @@
-//go:build detectors
-// +build detectors
-
 package ldap
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
-	"github.com/kylelemons/godebug/pretty"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/google/go-cmp/cmp"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestLdap_FromChunk(t *testing.T) {
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+var (
+	validUriPattern        = "ldaps://127.0.0.1:389"
+	invalidUriPattern      = "idaps://127.0.0.1:389"
+	validUsernamePattern   = "cCOfHuyrVdDdcWCAbKLCSAlospWAdCmfKwr="
+	invalidUsernamePattern = "0fHuy2VdDdcWCAbKLC412lospWAdCmfKwr9="
+	validPasswordPattern   = "A:J$NL9~6:u:L$_:VO4tf))h#v0i}O"
+	invalidPasswordPattern = "A:J$NL9~6:u:L$_:VO4tf))h#v0i}O"
+	validIadPattern        = "OpenDSObject(\"ldaps://www\", \"ABC\", \"XYZ\", 123)"
+	invalidIadPattern      = "OpenDSObject(\"ldaps://www\", \"ABC\", \"XYZ\", ?)"
+)
+
+func TestLdap_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found with IAD lib usage, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(`Set ou = dso.OpenDSObject("LDAP://DC.business.com/OU=IT,DC=Business,DC=com", "Business\administrator", "Pa$$word01", 1)`),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_LDAP,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern",
+			input: fmt.Sprintf("%s bind '%s' pass '%s' %s", validUriPattern, validIadPattern, validPasswordPattern, validUsernamePattern),
+			want:  []string{"ldaps://www\tABC\tXYZ"},
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name:  "invalid pattern",
+			input: fmt.Sprintf("%s key = bind '%s' pass '%s %s", invalidUriPattern, invalidUsernamePattern, invalidPasswordPattern, invalidIadPattern),
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Ldap.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Ldap.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

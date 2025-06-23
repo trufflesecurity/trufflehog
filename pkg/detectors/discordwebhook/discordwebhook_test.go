@@ -31,6 +31,27 @@ var (
 		# - The above credentials should only be used in a secure environment.
 	`
 	secret = "https://discord.com/api/webhooks/144147826297622273/Rz9B09dB7cXxtldzXXfmJY0opIzgeANtGJw08vx5PXrP8BpbOeE5lZ7wx8vVcyacYkEl"
+
+	validPattern19Digits = `
+		# Configuration File: config.yaml
+		database:
+			host: $DB_HOST
+			port: $DB_PORT
+			username: $DB_USERNAME
+			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
+
+		api:
+			auth_type: ""
+			in: ""
+			discord_hook: "https://discord.com/api/webhooks/1369248176954937405/Q7bFGgbEMoZ-tRHuA4QHk3xTNC7nrrSmTm8IPjFvkp-ChRj4gi2C9lzvJiUcVlnE48X2"
+			base_url: ""
+			response_code: 200
+
+		# Notes:
+		# - Remember to rotate the secret every 90 days.
+		# - The above credentials should only be used in a secure environment.
+    `
+	secret19Digits = "https://discord.com/api/webhooks/1369248176954937405/Q7bFGgbEMoZ-tRHuA4QHk3xTNC7nrrSmTm8IPjFvkp-ChRj4gi2C9lzvJiUcVlnE48X2"
 )
 
 func TestDiscordWebHook_Pattern(t *testing.T) {
@@ -46,6 +67,11 @@ func TestDiscordWebHook_Pattern(t *testing.T) {
 			name:  "valid pattern",
 			input: validPattern,
 			want:  []string{secret},
+		},
+		{
+			name:  "valid pattern with 19-digit ID",
+			input: validPattern19Digits,
+			want:  []string{secret19Digits},
 		},
 	}
 

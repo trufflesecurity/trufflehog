@@ -15,8 +15,8 @@ var (
 	focusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	blurredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	noStyle      = lipgloss.NewStyle()
-	helpStyle    = blurredStyle.Copy()
-	// cursorStyle         = focusedStyle.Copy()
+	helpStyle    = blurredStyle
+	// cursorStyle         = focusedStyle.
 	// cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
 	focusedSkipButton = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render("[ Run with defaults ]")

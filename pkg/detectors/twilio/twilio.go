@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -23,7 +24,6 @@ var _ detectors.Detector = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
-	identifierPat = regexp.MustCompile(`(?i)sid.{0,20}AC[0-9a-f]{32}`) // Should we have this? Seems restrictive.
 	sidPat        = regexp.MustCompile(`\bAC[0-9a-f]{32}\b`)
 	keyPat        = regexp.MustCompile(`\b[0-9a-f]{32}\b`)
 )
@@ -38,21 +38,23 @@ type service struct {
 	AccountSID   string `json:"account_sid"`   // account sid
 }
 
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+
+	return defaultClient
+}
+
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"sid"}
+	return []string{"sid", "twilio"}
 }
 
 // FromData will find and optionally verify Twilio secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
-	identifierMatches := identifierPat.FindAllString(dataStr, -1)
-
-	if len(identifierMatches) == 0 {
-		return
-	}
 
 	keyMatches := keyPat.FindAllString(dataStr, -1)
 	sidMatches := sidPat.FindAllString(dataStr, -1)
@@ -71,46 +73,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				client := s.client
-				if client == nil {
-					client = defaultClient
+				extraData, isVerified, verificationErr := verifyTwilio(ctx, s.getClient(), key, sid)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr)
+
+				for key, value := range extraData {
+					s1.ExtraData[key] = value
 				}
 
-				req, err := http.NewRequestWithContext(
-					ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				req.Header.Add("Accept", "*/*")
-				req.SetBasicAuth(sid, key)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-						s1.AnalysisInfo = map[string]string{"key": key, "sid": sid}
-						var serviceResponse serviceResponse
-						if err := json.NewDecoder(res.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have at least one service
-							service := serviceResponse.Services[0]
-							s1.ExtraData["friendly_name"] = service.FriendlyName
-							s1.ExtraData["account_sid"] = service.AccountSID
-						}
-					} else if res.StatusCode == 401 || res.StatusCode == 403 {
-						// The secret is determinately not verified (nothing to do)
-					} else {
-						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-						s1.SetVerificationError(err, key)
-					}
-				} else {
-					s1.SetVerificationError(err, key)
+				if s1.Verified {
+					s1.AnalysisInfo = map[string]string{"key": key, "sid": sid}
 				}
 			}
 
-			if len(keyMatches) > 0 {
-				results = append(results, s1)
-			}
+			results = append(results, s1)
 		}
 	}
 
@@ -123,4 +99,41 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Twilio is a cloud communications platform that allows software developers to programmatically make and receive phone calls, send and receive text messages, and perform other communication functions using its web service APIs."
+}
+
+func verifyTwilio(ctx context.Context, client *http.Client, key, sid string) (map[string]string, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://verify.twilio.com/v2/Services", nil)
+	if err != nil {
+		return nil, false, nil
+	}
+
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Accept", "*/*")
+	req.SetBasicAuth(sid, key)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, false, nil
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		extraData := make(map[string]string)
+		var serviceResponse serviceResponse
+
+		if err := json.NewDecoder(resp.Body).Decode(&serviceResponse); err == nil && len(serviceResponse.Services) > 0 { // no error in parsing and have at least one service
+			service := serviceResponse.Services[0]
+			extraData["friendly_name"] = service.FriendlyName
+			extraData["account_sid"] = service.AccountSID
+		}
+
+		return extraData, true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil, false, nil
+	default:
+		return nil, false, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
+	}
 }

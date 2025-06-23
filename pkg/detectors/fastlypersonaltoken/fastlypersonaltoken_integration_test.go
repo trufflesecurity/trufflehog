@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -51,10 +52,10 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_FastlyPersonalToken,
 					Verified:     true,
 					ExtraData: map[string]string{
-						"token_id":         "2GUTBVFzHG2zVOMGtEpi9q",
-						"user_id":          "2j1UhHmRhefRMNNrlxcyf5",
+						"token_id":         "2ICO7ArmhY8OMiiOyNpXfc",
+						"user_id":          "7anDA1ct17E8pkFAE0tJkk",
 						"token_expires_at": "never",
-						"token_scope":      "global:read",
+						"token_scope":      "global:read global",
 					},
 				},
 			},
@@ -72,7 +73,7 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 				{
 					DetectorType: detectorspb.DetectorType_FastlyPersonalToken,
 					Verified:     false,
-					ExtraData:    map[string]string{},
+					ExtraData:    nil,
 				},
 			},
 			wantErr: false,
@@ -91,8 +92,7 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("FastlyPersonalToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -101,9 +101,9 @@ func TestFastlyPersonalToken_FromChunk(t *testing.T) {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("FastlyPersonalToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})

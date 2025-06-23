@@ -6,6 +6,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/huggingface"
 )
 
@@ -33,7 +34,7 @@ type HuggingfaceConfig struct {
 }
 
 // ScanGitHub scans HuggingFace with the provided options.
-func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) error {
+func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) (sources.JobProgressRef, error) {
 	connection := sourcespb.Huggingface{
 		Endpoint:           c.Endpoint,
 		Models:             c.Models,
@@ -65,7 +66,7 @@ func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) error
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal huggingface connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - huggingface"
@@ -73,8 +74,7 @@ func (e *Engine) ScanHuggingface(ctx context.Context, c HuggingfaceConfig) error
 
 	huggingfaceSource := &huggingface.Source{}
 	if err := huggingfaceSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, huggingfaceSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, huggingfaceSource)
 }

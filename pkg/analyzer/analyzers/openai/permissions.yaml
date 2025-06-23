@@ -9,3 +9,7 @@ permissions:
 - fine_tuning:write
 - files:read
 - files:write
+- evals:read
+- evals:write
+- responses:read
+- responses:write

@@ -25,17 +25,19 @@ func TestEmailRegexCheck(t *testing.T) {
 		hyphen domain      = info@my-site.net
 		service email      = contact@web-service.io
 		underscore email   = example_user@domain.info
-		departement email  = first.last@department.company.edu
+		department email   = first.last@department.company.edu
 		alphanumeric email = user1234@domain.co
 		local server email = admin@local-server.local
 		dot email          = test.email@my-email-service.xyz
 		special char email = special@characters.com
 		support email      = support@customer-service.org
+		insenstive email   = ADMIN@example.com
+		insenstive domain  = ADMIN@COMPANY.COM
+		mix email          = USER123xyz@local-Server.local
 
 		// negative cases
 		not an email       = abc.123@z
 		looks like email   = test@user <- no domain
-		email but not      = user12@service.COM <- capital letters not supported for domain
 		random text        = here's some information about local-user@edu user
 	`
 
@@ -45,6 +47,7 @@ func TestEmailRegexCheck(t *testing.T) {
 		"info@my-site.net", "contact@web-service.io", "example_user@domain.info",
 		"first.last@department.company.edu", "user1234@domain.co", "admin@local-server.local",
 		"test.email@my-email-service.xyz", "special@characters.com", "support@customer-service.org",
+		"ADMIN@example.com", "ADMIN@COMPANY.COM", "USER123xyz@local-Server.local",
 	}
 
 	emailRegex := regexp.MustCompile(EmailPattern)
@@ -67,10 +70,20 @@ func TestUsernameRegexCheck(t *testing.T) {
 	testString := `username = "johnsmith123"
                    username='johnsmith123'
 				   username:="johnsmith123"
+				   username:="johnsmith123",
+				   username:="johnsmith123";
                    username = johnsmith123
                    username=johnsmith123`
 
-	expectedStr := []string{"johnsmith123", "johnsmith123", "johnsmith123", "johnsmith123", "johnsmith123"}
+	expectedStr := []string{
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+		"johnsmith123",
+	}
 
 	usernameRegexMatches := usernameRegexPat.Matches([]byte(testString))
 
@@ -87,12 +100,24 @@ func TestPasswordRegexCheck(t *testing.T) {
 	testString := `password = "johnsmith123$!"
                    password='johnsmith123$!'
 				   password:="johnsmith123$!"
+				   password:="johnsmith123$!",
+				   password:="johnsmith123$!";
+				   password:="johnsmi',th123$!";
                    password = johnsmith123$!
                    password=johnsmith123$!
 				   PasswordAuthenticator(username, "johnsmith123$!")`
 
-	expectedStr := []string{"johnsmith123$!", "johnsmith123$!", "johnsmith123$!", "johnsmith123$!", "johnsmith123$!",
-		"johnsmith123$!"}
+	expectedStr := []string{
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmi',th123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+		"johnsmith123$!",
+	}
 
 	passwordRegexMatches := passwordRegexPat.Matches([]byte(testString))
 

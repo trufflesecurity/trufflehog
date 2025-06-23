@@ -53,6 +53,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				Raw:          []byte(key + domainRes),
 			}
 
+			// set key as the primary secret for engine to find the line number
+			s1.SetPrimarySecretValue(key)
+
 			if verify {
 				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/admin/oauth/access_scopes.json", nil)
 				if err != nil {

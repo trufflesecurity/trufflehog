@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v67/github"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
@@ -154,6 +154,9 @@ func (s *Source) getReposByOrgOrUser(ctx context.Context, name string, reporter 
 	if err == nil {
 		return organization, nil
 	} else if !isGitHub404Error(err) {
+		if err := reporter.UnitErr(ctx, fmt.Errorf("error getting repos by org: %w", err)); err != nil {
+			return unknown, err
+		}
 		return unknown, err
 	}
 
@@ -181,6 +184,7 @@ func isGitHub404Error(err error) bool {
 	return ghErr.Response.StatusCode == http.StatusNotFound
 }
 
+// processRepos is the main function for getting repositories from a source.
 func (s *Source) processRepos(ctx context.Context, target string, reporter sources.UnitReporter, listRepos repoLister, listOpts repoListOptions) error {
 	logger := ctx.Logger().WithValues("target", target)
 	opts := listOpts.getListOptions()
@@ -192,7 +196,7 @@ func (s *Source) processRepos(ctx context.Context, target string, reporter sourc
 
 	for {
 		someRepos, res, err := listRepos(ctx, target, listOpts)
-		if s.handleRateLimit(ctx, err) {
+		if s.handleRateLimitWithUnitReporter(ctx, reporter, err) {
 			continue
 		}
 		if err != nil {

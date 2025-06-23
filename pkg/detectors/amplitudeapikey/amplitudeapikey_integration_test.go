@@ -54,6 +54,10 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
 					Verified:     true,
 				},
+				{
+					DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
+					Verified:     false,
+				},
 			},
 			wantErr: false,
 		},
@@ -67,6 +71,10 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_AmplitudeApiKey,
 					Verified:     false,
@@ -99,6 +107,10 @@ func TestAmplitudeApiKey_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no rawv2 secret present: \n %+v", got[i])
+				}
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("AmplitudeApiKey.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

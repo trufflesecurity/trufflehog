@@ -1,0 +1,461 @@
+{
+    "AnalyzerType": 13,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "models:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "model_capabilities:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "assistants:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "assistants:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "threads:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "threads:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "fine_tuning:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "fine_tuning:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "files:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "files:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "evals:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "evals:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "responses:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Truffle Security Co",
+                "FullyQualifiedName": "org-n56tuYdSewh06PEGJZC0xWHf",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "truffle-security-co"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "responses:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "models:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "model_capabilities:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "assistants:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "assistants:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "threads:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "threads:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "fine_tuning:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "fine_tuning:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "files:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "files:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "evals:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "evals:write",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "responses:read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Personal",
+                "FullyQualifiedName": "org-S2T2qOGM1KofMLUxb9rt7eV0",
+                "Type": "organization",
+                "Metadata": {
+                    "description": "Personal org for dustin@trufflesec.com",
+                    "user": "user-ohfap0ky8lkatw97iskuhghv"
+                },
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "responses:write",
+                "Parent": null
+            }
+        }
+    ],
+    "UnboundedResources": null,
+    "Metadata": {
+        "email": "dustin@trufflesec.com",
+        "is_admin": "false",
+        "is_restricted": "true",
+        "mfa": "true",
+        "user": "Dustin Decker"
+    }
+}

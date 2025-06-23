@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-func normalize(in string) string {
+func Normalize(in string) string {
 	in = strings.ReplaceAll(in, `"`, "")
 	in = strings.ReplaceAll(in, `'`, "")
 	in = strings.ReplaceAll(in, "\t", "")

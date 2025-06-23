@@ -53,6 +53,10 @@ func TestAppcues_FromChunk(t *testing.T) {
 					DetectorType: detectorspb.DetectorType_Appcues,
 					Verified:     true,
 				},
+				{
+					DetectorType: detectorspb.DetectorType_Appcues,
+					Verified:     false,
+				},
 			},
 			wantErr: false,
 		},
@@ -65,6 +69,10 @@ func TestAppcues_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Appcues,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_Appcues,
 					Verified:     false,
@@ -97,6 +105,10 @@ func TestAppcues_FromChunk(t *testing.T) {
 					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
+				if len(got[i].RawV2) == 0 {
+					t.Fatalf("no rawv2 secret present: \n %+v", got[i])
+				}
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Appcues.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

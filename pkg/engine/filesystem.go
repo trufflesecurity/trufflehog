@@ -13,7 +13,7 @@ import (
 )
 
 // ScanFileSystem scans a given file system.
-func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig) error {
+func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig) (sources.JobProgressRef, error) {
 	connection := &sourcespb.Filesystem{
 		Paths:            c.Paths,
 		IncludePathsFile: c.IncludePathsFile,
@@ -23,7 +23,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal filesystem connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - filesystem"
@@ -31,8 +31,7 @@ func (e *Engine) ScanFileSystem(ctx context.Context, c sources.FilesystemConfig)
 
 	fileSystemSource := &filesystem.Source{}
 	if err := fileSystemSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, fileSystemSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, fileSystemSource)
 }

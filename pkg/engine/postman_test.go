@@ -7,6 +7,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 )
 
@@ -55,7 +56,7 @@ func TestPostmanEngine(t *testing.T) {
 			conf := Config{
 				Concurrency:   1,
 				Decoders:      decoders.DefaultDecoders(),
-				Detectors:     DefaultDetectors(),
+				Detectors:     defaults.DefaultDetectors(),
 				Verify:        false,
 				SourceManager: sourceManager,
 				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
@@ -64,7 +65,7 @@ func TestPostmanEngine(t *testing.T) {
 			e, err := NewEngine(ctx, &conf)
 			assert.NoError(t, err)
 			e.Start(ctx)
-			err = e.ScanPostman(ctx, test.postmanConfig)
+			_, err = e.ScanPostman(ctx, test.postmanConfig)
 			if err != nil && !test.wantErr {
 				t.Errorf("ScanPostman() got: %v, want: %v", err, nil)
 				return

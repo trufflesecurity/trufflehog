@@ -28,9 +28,26 @@ func CreateLogFileName(baseName string) string {
 	return logFileName
 }
 
+// This returns a client that is restricted and filters out unsafe requests returning a success status code.
 func NewAnalyzeClient(cfg *config.Config) *http.Client {
 	client := &http.Client{
 		Transport: AnalyzerRoundTripper{parent: http.DefaultTransport},
+	}
+	if cfg == nil || !cfg.LoggingEnabled {
+		return client
+	}
+	return &http.Client{
+		Transport: LoggingRoundTripper{
+			parent:  client.Transport,
+			logFile: cfg.LogFile,
+		},
+	}
+}
+
+// This returns a client that is unrestricted and does not filter out unsafe requests returning a success status code.
+func NewAnalyzeClientUnrestricted(cfg *config.Config) *http.Client {
+	client := &http.Client{
+		Transport: http.DefaultTransport,
 	}
 	if cfg == nil || !cfg.LoggingEnabled {
 		return client
@@ -97,7 +114,7 @@ type AnalyzerRoundTripper struct {
 
 func (r AnalyzerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := r.parent.RoundTrip(req)
-	if err != nil || methodIsSafe(req.Method) {
+	if err != nil || IsMethodSafe(req.Method) {
 		return resp, err
 	}
 	// Check that unsafe methods did NOT return a valid status code.
@@ -107,9 +124,9 @@ func (r AnalyzerRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	return resp, nil
 }
 
-// methodIsSafe is a helper method to check whether the HTTP method is safe according to MDN Web Docs.
+// IsMethodSafe is a helper method to check whether the HTTP method is safe according to MDN Web Docs.
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods#safe_idempotent_and_cacheable_request_methods
-func methodIsSafe(method string) bool {
+func IsMethodSafe(method string) bool {
 	switch strings.ToUpper(method) {
 	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace:
 		return true

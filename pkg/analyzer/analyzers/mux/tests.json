@@ -1,0 +1,46 @@
+{
+    "tests": [
+        {
+            "resource_type": "video",
+            "permission": "read",
+            "endpoint": "/video/v1/assets?limit=1",
+            "method": "GET",
+            "valid_status_code": 200
+        },
+        {
+            "resource_type": "video",
+            "permission": "write",
+            "endpoint": "/video/v1/assets",
+            "method": "POST",
+            "valid_status_code": 400
+        },
+        {
+            "resource_type": "data",
+            "permission": "read",
+            "endpoint": "/data/v1/annotations?limit=1",
+            "method": "GET",
+            "valid_status_code": 200
+        },
+        {
+            "resource_type": "data",
+            "permission": "write",
+            "endpoint": "/data/v1/annotations",
+            "method": "POST",
+            "valid_status_code": 400
+        },
+        {
+            "resource_type": "system",
+            "permission": "read",
+            "endpoint": "/system/v1/signing-keys?limit=1",
+            "method": "GET",
+            "valid_status_code": 200
+        },
+        {
+            "resource_type": "system",
+            "permission": "write",
+            "endpoint": "/system/v1/signing-keys",
+            "method": "DELETE",
+            "valid_status_code": 400
+        }
+    ]
+}

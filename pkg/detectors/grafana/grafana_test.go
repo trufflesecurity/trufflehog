@@ -19,13 +19,13 @@ var (
 		"authentication_type": "",
 		"verification_url": "https://api.example.com/example",
 		"test_secrets": {
-			"grafana_secret": "glc_gnVF057+C0x9J+QwzC5JXb5uQ/WSzn98X/iIrZXKaA3Hh+lum0XBRcu56qMlW7ZaxXrNt33XoI3CXz7IRPci="
+			"grafana_secret": "glc_eyJF057+C0x9J+QwzC5JXb5uQ/WSzn98X/iIrZXKaA3Hh+lum0XBRcu56qMlW7ZaxXrNt33XoI3CXz7IRPci="
 		},
 		"expected_response": "200",
 		"method": "GET",
 		"deprecated": false
 	}]`
-	secret = "glc_gnVF057+C0x9J+QwzC5JXb5uQ/WSzn98X/iIrZXKaA3Hh+lum0XBRcu56qMlW7ZaxXrNt33XoI3CXz7IRPci="
+	secret = "glc_eyJF057+C0x9J+QwzC5JXb5uQ/WSzn98X/iIrZXKaA3Hh+lum0XBRcu56qMlW7ZaxXrNt33XoI3CXz7IRPci="
 )
 
 func TestGrafana_Pattern(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	validPattern   = "FNdRZCc2qoPLrwrLJIBE6vovy"
+	validPattern   = "sk_nGDJWCkPiFAKE5XFTzUUA"
 	complexPattern = `
 	func main() {
 		url := "https://api.example.com/v1/resource"
@@ -24,7 +24,7 @@ var (
 			return
 		}
 		
-		baremetricsToken := "Bearer FN_RZCc2qoPLrwrLJIBE6vovy"
+		baremetricsToken := "Bearer sk_nGDJWCkPiFAKE5XFTzUUA"
 		req.Header.Set("Authorization", baremetricsToken)
 
 		// Perform the request
@@ -40,7 +40,7 @@ var (
 		}
 	}
 	`
-	invalidPattern = "FNdRZCc-qoPLrwrLJIBE6vovyu"
+	invalidPattern = "sk_nGDJWC_io8Q025XFTzUUA"
 )
 
 func TestBareMetrics_Pattern(t *testing.T) {
@@ -55,12 +55,12 @@ func TestBareMetrics_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: fmt.Sprintf("baremetrics credentials: %s", validPattern),
-			want:  []string{"FNdRZCc2qoPLrwrLJIBE6vovy"},
+			want:  []string{"sk_nGDJWCkPiFAKE5XFTzUUA"},
 		},
 		{
 			name:  "valid pattern - complex",
 			input: complexPattern,
-			want:  []string{"FN_RZCc2qoPLrwrLJIBE6vovy"},
+			want:  []string{"sk_nGDJWCkPiFAKE5XFTzUUA"},
 		},
 		{
 			name:  "invalid pattern",

@@ -1,116 +1,91 @@
-//go:build detectors
-// +build detectors
-
 package livestorm
 
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
-	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestLivestorm_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("LIVESTORM")
-	inactiveSecret := testSecrets.MustGetField("LIVESTORM_INACTIVE")
+var (
+	validPattern   = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhcGkubGl2ZXN0b3JtLmNvIiwianRpIjoiOaFI2p8Vo2dnHiy5OxrjkJ8wRE1LW4rTyWzChczEu3lAmcD1maSawW7xKeZ1GEfjJRSelieqydpF8eVp619RMtYPGwY3XmOPrBatssI2RSBDM5srACqiTOcg3sQgkeBBtA4bUJ.O6UuKenKIAUh60CeGWQRTMVAA2JcFlvz1GRTliyZ448 "
+	invalidPattern = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhcGkubGl2ZXN0b3JtLmNvIiwianRpIjoiOaFI2p8Vo2dnHiy5OxrjkJ8wRE1LW4rTyWzChczEu3lAmcD1maSawW7xKeZ1GEfjJRSelieqydpF8eVp619RMtYPGwY3XmOPrBatssI2RSBDM5srACqiTOcg3sQgkeBBtA4bUJ.O6UuKenKIAUh60CeGWQRTMVAA2JcFlvz1GRTliyZ448"
+	keyword        = "livestorm"
+)
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestLivestorm_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name    string
-		s       Scanner
-		args    args
-		want    []detectors.Result
-		wantErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a livestorm secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Livestorm,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern - with keyword livestorm",
+			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			want:  []string{strings.TrimSpace(validPattern)},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a livestorm secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Livestorm,
-					Verified:     false,
-				},
-			},
-			wantErr: false,
+			name:  "valid pattern - ignore duplicate",
+			input: fmt.Sprintf("%s token = '%s' | '%s'", keyword, validPattern, validPattern),
+			want:  []string{strings.TrimSpace(validPattern)},
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
+			name:  "valid pattern - key out of prefix range",
+			input: fmt.Sprintf("%s keyword is not close to the real key in the data\n = '%s'", keyword, validPattern),
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern",
+			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Livestorm.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Livestorm.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				s.FromData(ctx, false, data)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

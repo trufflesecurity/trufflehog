@@ -27,12 +27,12 @@ func TestAppFollow_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: fmt.Sprintf("appfollow credentail: %s", validPattern),
+			input: fmt.Sprintf("appfollow credential: %s", validPattern),
 			want:  []string{"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.333HbjEo1oxVUFcASR0sQ8cMuIJRLcMd5H9iJWDbovCw6ESjNtuoEMQQGPN9aSoxponxrTPvn1.btADhgNetsaUBuwoyHo5ip0Jab6N6MEBnSaT6CHiO6z"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("appfollow credentail: %s", invalidPattern),
+			input: fmt.Sprintf("appfollow credential: %s", invalidPattern),
 			want:  nil,
 		},
 	}

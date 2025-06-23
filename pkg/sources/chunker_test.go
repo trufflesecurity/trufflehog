@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bytes"
+	"io"
 	"math/rand"
 	"runtime"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
@@ -119,6 +121,21 @@ func TestNewChunkedReader(t *testing.T) {
 			}
 		})
 	}
+}
+
+type panicReader struct{}
+
+var _ io.Reader = (*panicReader)(nil)
+
+func (_ panicReader) Read([]byte) (int, error) {
+	panic("panic for testing")
+}
+
+func TestChunkReader_UnderlyingReaderPanics_DoesNotPanic(t *testing.T) {
+	require.NotPanics(t, func() {
+		for range NewChunkReader()(context.Background(), &panicReader{}) {
+		}
+	})
 }
 
 func BenchmarkChunkReader(b *testing.B) {
