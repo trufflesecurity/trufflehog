@@ -12,6 +12,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
 	"google.golang.org/protobuf/proto"
@@ -149,6 +150,7 @@ func configureGCSManager(aCtx context.Context, conn *sourcespb.GCS, concurrency 
 	switch conn.Credential.(type) {
 	case *sourcespb.GCS_ApiKey:
 		gcsManagerAuthOption = withAPIKey(aCtx, conn.GetApiKey())
+		log.RedactGlobally(conn.GetApiKey())
 	case *sourcespb.GCS_ServiceAccountFile:
 		b, err := os.ReadFile(conn.GetServiceAccountFile())
 		if err != nil {
@@ -263,7 +265,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 	var wg sync.WaitGroup
 	for obj := range objectCh {
-		obj := obj
 		o, ok := obj.(object)
 		if !ok {
 			ctx.Logger().Error(fmt.Errorf("unexpected object type: %T", obj), "GCS source unexpected object type", "name", s.name)

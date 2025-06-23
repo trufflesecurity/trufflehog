@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	regexp "github.com/wasilibs/go-re2"
-
-	"github.com/golang-jwt/jwt"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -45,15 +44,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	appMatches := appPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 
 		resMatch := strings.TrimSpace(match[1])
 		for _, appMatch := range appMatches {
-			if len(appMatch) != 2 {
-				continue
-			}
 			appResMatch := strings.TrimSpace(appMatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_GitHubApp,

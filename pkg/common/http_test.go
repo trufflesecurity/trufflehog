@@ -5,12 +5,12 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/slices"
 )
 
 func TestRetryableHTTPClientCheckRetry(t *testing.T) {
@@ -64,7 +64,6 @@ func TestRetryableHTTPClientCheckRetry(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			var retryCount int
@@ -137,7 +136,6 @@ func TestRetryableHTTPClientMaxRetry(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			var retryCount int
@@ -202,7 +200,6 @@ func TestRetryableHTTPClientBackoff(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -240,6 +237,35 @@ func TestRetryableHTTPClientBackoff(t *testing.T) {
 					assert.Less(t, math.Abs(float64(actualBackoffs[i]-expectedBackoff)), float64(15*time.Millisecond), "Unexpected backoff duration")
 				}
 			}
+		})
+	}
+}
+
+func TestRetryableHTTPClientTimeout(t *testing.T) {
+	testCases := []struct {
+		name            string
+		timeoutSeconds  int64
+		expectedTimeout time.Duration
+	}{
+		{
+			name:            "5 second timeout",
+			timeoutSeconds:  5,
+			expectedTimeout: 5 * time.Second,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			// Call the function with the test timeout value
+			client := RetryableHTTPClientTimeout(tc.timeoutSeconds)
+
+			// Verify that the timeout is set correctly
+			assert.Equal(t, tc.expectedTimeout, client.Timeout, "HTTP client timeout does not match expected value")
+
+			// Verify that the transport is a custom transport
+			_, isRoundTripperTransport := client.Transport.(*retryablehttp.RoundTripper)
+			assert.True(t, isRoundTripperTransport, "HTTP client transport is not a retryablehttp.RoundTripper")
 		})
 	}
 }

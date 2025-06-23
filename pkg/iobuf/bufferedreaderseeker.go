@@ -1,3 +1,9 @@
+// Package iobuf provides a buffered reading interface with seeking capabilities.
+//
+// For small amounts of data, it uses an in-memory buffer (bytes.Buffer) to store
+// read bytes. When the amount of data exceeds a specified threshold, it switches
+// to disk-based buffering using a temporary file. This approach balances memory
+// usage and performance, allowing efficient handling of both small and large data streams.
 package iobuf
 
 import (
@@ -33,6 +39,9 @@ func init() { defaultBufferPool = pool.NewBufferPool(defaultBufferSize) }
 // If the underlying reader is seekable, direct seeking operations are performed
 // on it. For non-seekable readers, seeking is emulated using the buffer or
 // temporary file.
+//
+// The caller MUST call Close() when done using the BufferedReadSeeker to clean up
+// resources like temporary files and buffers.
 type BufferedReadSeeker struct {
 	reader io.Reader
 	seeker io.Seeker // If the reader supports seeking, it's stored here for direct access
@@ -73,6 +82,9 @@ func asSeeker(r io.Reader) io.Seeker {
 // NewBufferedReaderSeeker creates and initializes a BufferedReadSeeker.
 // It takes an io.Reader and checks if it supports seeking.
 // If the reader supports seeking, it is stored in the seeker field.
+//
+// The caller MUST call Close() when done using the returned BufferedReadSeeker
+// to clean up resources like temporary files and buffers.
 func NewBufferedReaderSeeker(r io.Reader) *BufferedReadSeeker {
 	const defaultThreshold = 1 << 24 // 16MB threshold for switching to file buffering
 
@@ -161,12 +173,12 @@ func (br *BufferedReadSeeker) Read(out []byte) (int, error) {
 	}
 
 	// If we still need to read more data.
-	var raderBytes int
-	raderBytes, err = br.reader.Read(out)
-	totalBytesRead += raderBytes
-	br.index += int64(raderBytes)
+	var readerBytes int
+	readerBytes, err = br.reader.Read(out)
+	totalBytesRead += readerBytes
+	br.index += int64(readerBytes)
 
-	if writeErr := br.writeData(out[:raderBytes]); writeErr != nil {
+	if writeErr := br.writeData(out[:readerBytes]); writeErr != nil {
 		return totalBytesRead, writeErr
 	}
 
@@ -266,6 +278,10 @@ func (br *BufferedReadSeeker) readToEnd() error {
 }
 
 func (br *BufferedReadSeeker) writeData(data []byte) error {
+	if br.buf == nil {
+		br.buf = br.bufPool.Get()
+	}
+
 	_, err := br.buf.Write(data)
 	if err != nil {
 		return err

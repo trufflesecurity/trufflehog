@@ -2,9 +2,10 @@ package hive
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -40,16 +41,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range idMatches {
-		if len(match) != 2 {
-			continue
-		}
 
 		idMatch := strings.TrimSpace(match[1])
 
 		for _, match := range keyMatches {
-			if len(match) != 2 {
-				continue
-			}
 			keyMatch := strings.TrimSpace(match[1])
 
 			s1 := detectors.Result{

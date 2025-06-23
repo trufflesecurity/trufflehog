@@ -3,16 +3,17 @@ package facebookoauth
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -41,15 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	apiSecretMatches := apiSecretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, apiIdMatch := range apiIdMatches {
-		if len(apiIdMatch) != 2 {
-			continue
-		}
 		apiIdRes := strings.TrimSpace(apiIdMatch[1])
 
 		for _, apiSecretMatch := range apiSecretMatches {
-			if len(apiSecretMatch) != 2 {
-				continue
-			}
 			apiSecretRes := strings.TrimSpace(apiSecretMatch[1])
 
 			s1 := detectors.Result{

@@ -3,15 +3,16 @@ package browserstack
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"strings"
 
+	regexp "github.com/wasilibs/go-re2"
+	"golang.org/x/net/publicsuffix"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-	"golang.org/x/net/publicsuffix"
 )
 
 type Scanner struct {
@@ -54,15 +55,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	userMatches := userPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, userMatch := range userMatches {
-			if len(userMatch) != 2 {
-				continue
-			}
 
 			resUserMatch := strings.TrimSpace(userMatch[1])
 

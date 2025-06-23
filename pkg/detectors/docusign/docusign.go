@@ -4,17 +4,18 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/go-errors/errors"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	"github.com/go-errors/errors"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -47,15 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, idMatch := range idMatches {
-		if len(idMatch) != 2 {
-			continue
-		}
 		resIDMatch := strings.TrimSpace(idMatch[1])
 
 		for _, secretMatch := range secretMatches {
-			if len(secretMatch) != 2 {
-				continue
-			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{

@@ -3,16 +3,17 @@ package cloudelements
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -41,15 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	orgMatches := orgPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, orgMatch := range orgMatches {
-			if len(orgMatch) != 2 {
-				continue
-			}
 
 			resOrgMatch := strings.TrimSpace(orgMatch[1])
 

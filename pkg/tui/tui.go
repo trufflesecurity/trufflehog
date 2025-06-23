@@ -8,9 +8,13 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	zone "github.com/lrstanley/bubblezone"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/components/selector"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/keymap"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/analyze_form"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/analyze_keys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/contact_enterprise"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_configure"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/tui/pages/source_select"
@@ -27,6 +31,8 @@ const (
 	sourceConfigurePage
 	viewOSSProjectPage
 	contactEnterprisePage
+	analyzeKeysPage
+	analyzeFormPage
 )
 
 type sessionState int
@@ -39,20 +45,31 @@ const (
 
 // TUI is the main TUI model.
 type TUI struct {
-	common     common.Common
-	pages      []common.Component
-	activePage page
-	state      sessionState
-	args       []string
+	common      common.Common
+	pages       []common.Component
+	pageHistory []page
+	state       sessionState
+	args        []string
+
+	// Analyzer specific values that are only set if running an analysis.
+	analyzerType string
+	analyzerInfo analyzer.SecretInfo
 }
 
 // New returns a new TUI model.
-func New(c common.Common) *TUI {
+func New(c common.Common, args []string) *TUI {
 	ui := &TUI{
-		common:     c,
-		pages:      make([]common.Component, 5),
-		activePage: wizardIntroPage,
-		state:      startState,
+		common:      c,
+		pages:       make([]common.Component, 7),
+		pageHistory: []page{wizardIntroPage},
+		state:       startState,
+		args:        args,
+	}
+	switch {
+	case len(args) == 0:
+		return ui
+	case len(args) == 1 && args[0] == "analyze":
+		ui.pageHistory = []page{wizardIntroPage, analyzeKeysPage}
 	}
 	return ui
 }
@@ -69,11 +86,28 @@ func (ui *TUI) SetSize(width, height int) {
 
 // Init implements tea.Model.
 func (ui *TUI) Init() tea.Cmd {
+
 	ui.pages[wizardIntroPage] = wizard_intro.New(ui.common)
 	ui.pages[sourceSelectPage] = source_select.New(ui.common)
 	ui.pages[sourceConfigurePage] = source_configure.New(ui.common)
 	ui.pages[viewOSSProjectPage] = view_oss.New(ui.common)
 	ui.pages[contactEnterprisePage] = contact_enterprise.New(ui.common)
+	ui.pages[analyzeKeysPage] = analyze_keys.New(ui.common)
+
+	if len(ui.args) > 1 && ui.args[0] == "analyze" {
+		analyzerArg := strings.ToLower(ui.args[1])
+		ui.pages[analyzeFormPage] = analyze_form.New(ui.common, analyzerArg)
+		ui.setActivePage(analyzeKeysPage)
+
+		for _, analyzer := range analyzers.AvailableAnalyzers() {
+			if strings.ToLower(analyzer) == analyzerArg {
+				ui.setActivePage(analyzeFormPage)
+			}
+		}
+	} else {
+		ui.pages[analyzeFormPage] = analyze_form.New(ui.common, "this is a bug")
+	}
+
 	ui.SetSize(ui.common.Width, ui.common.Height)
 	cmds := make([]tea.Cmd, 0)
 	cmds = append(cmds,
@@ -82,6 +116,8 @@ func (ui *TUI) Init() tea.Cmd {
 		ui.pages[sourceConfigurePage].Init(),
 		ui.pages[viewOSSProjectPage].Init(),
 		ui.pages[contactEnterprisePage].Init(),
+		ui.pages[analyzeKeysPage].Init(),
+		ui.pages[analyzeFormPage].Init(),
 	)
 	ui.state = loadedState
 	ui.SetSize(ui.common.Width, ui.common.Height)
@@ -106,12 +142,12 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, ui.common.KeyMap.Help):
-			case key.Matches(msg, ui.common.KeyMap.CmdQuit) && ui.activePage != sourceConfigurePage:
+			case key.Matches(msg, ui.common.KeyMap.CmdQuit) && ui.activePage() != sourceConfigurePage:
 				return ui, tea.Quit
 			case key.Matches(msg, ui.common.KeyMap.Quit):
 				return ui, tea.Quit
-			case ui.activePage > 0 && key.Matches(msg, ui.common.KeyMap.Back):
-				ui.activePage -= 1
+			case ui.activePage() > 0 && key.Matches(msg, ui.common.KeyMap.Back):
+				_ = ui.popHistory()
 				return ui, nil
 			}
 		}
@@ -120,37 +156,45 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case selector.SelectMsg:
 		switch item := msg.IdentifiableItem.(type) {
 		case wizard_intro.Item:
+
 			switch item {
 			case wizard_intro.Quit:
 				cmds = append(cmds, tea.Quit)
 			case wizard_intro.ViewOSSProject:
-				ui.activePage = viewOSSProjectPage
+				ui.setActivePage(viewOSSProjectPage)
 			case wizard_intro.ViewHelpDocs:
 				ui.args = []string{"--help"}
-
 				return ui, tea.Quit
 			case wizard_intro.EnterpriseInquire:
-				ui.activePage = contactEnterprisePage
+				ui.setActivePage(contactEnterprisePage)
 			case wizard_intro.ScanSourceWithWizard:
-				ui.activePage = sourceSelectPage
+				ui.setActivePage(sourceSelectPage)
 			case wizard_intro.AnalyzeSecret:
-				ui.args = []string{"analyze"}
-				return ui, tea.Quit
+				ui.setActivePage(analyzeKeysPage)
 			}
 		case source_select.SourceItem:
-			ui.activePage = sourceConfigurePage
+			ui.setActivePage(sourceConfigurePage)
 			cmds = append(cmds, func() tea.Msg {
 				return source_configure.SetSourceMsg{Source: item.ID()}
+			})
+		case analyze_keys.KeyTypeItem:
+			ui.setActivePage(analyzeFormPage)
+			cmds = append(cmds, func() tea.Msg {
+				return analyze_form.SetAnalyzerMsg(item.ID())
 			})
 		}
 	case source_configure.SetArgsMsg:
 		ui.args = strings.Split(string(msg), " ")[1:]
 		return ui, tea.Quit
+	case analyze_form.Submission:
+		ui.analyzerType = msg.AnalyzerType
+		ui.analyzerInfo = msg.AnalyzerInfo
+		return ui, tea.Quit
 	}
 
 	if ui.state == loadedState {
-		m, cmd := ui.pages[ui.activePage].Update(msg)
-		ui.pages[ui.activePage] = m.(common.Component)
+		m, cmd := ui.pages[ui.activePage()].Update(msg)
+		ui.pages[ui.activePage()] = m.(common.Component)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -168,7 +212,7 @@ func (ui *TUI) View() string {
 	case startState:
 		view = "Loading..."
 	case loadedState:
-		view = ui.pages[ui.activePage].View()
+		view = ui.pages[ui.activePage()].View()
 	default:
 		view = "Unknown state :/ this is a bug!"
 	}
@@ -177,7 +221,7 @@ func (ui *TUI) View() string {
 	)
 }
 
-func Run() []string {
+func Run(args []string) []string {
 	c := common.Common{
 		Copy:   nil,
 		Styles: styles.DefaultStyles(),
@@ -186,12 +230,36 @@ func Run() []string {
 		Height: 0,
 		Zone:   zone.New(),
 	}
-	m := New(c)
+	m := New(c, args)
 	p := tea.NewProgram(m)
 	// TODO: Print normal help message.
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
+	if m.analyzerType != "" {
+		analyzer.Run(m.analyzerType, m.analyzerInfo)
+		os.Exit(0)
+	}
 	return m.args
+}
+
+func (ui *TUI) activePage() page {
+	if len(ui.pageHistory) == 0 {
+		return wizardIntroPage
+	}
+	return ui.pageHistory[len(ui.pageHistory)-1]
+}
+
+func (ui *TUI) popHistory() page {
+	if len(ui.pageHistory) == 0 {
+		return wizardIntroPage
+	}
+	p := ui.activePage()
+	ui.pageHistory = ui.pageHistory[:len(ui.pageHistory)-1]
+	return p
+}
+
+func (ui *TUI) setActivePage(p page) {
+	ui.pageHistory = append(ui.pageHistory, p)
 }

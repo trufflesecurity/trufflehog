@@ -40,15 +40,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	idMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
