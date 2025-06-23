@@ -2,6 +2,8 @@ package aylien
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -12,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -52,19 +54,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				RawV2:        []byte(resMatch + resIdMatch),
 			}
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.aylien.com/news/stories", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("X-AYLIEN-NewsAPI-Application-ID", resIdMatch)
-				req.Header.Add("X-AYLIEN-NewsAPI-Application-Key", resMatch)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, err := verifyMatch(ctx, client, resIdMatch, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(err, resMatch)
 			}
 
 			results = append(results, s1)
@@ -72,6 +64,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, id, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.aylien.com/news/stories", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("X-AYLIEN-NewsAPI-Application-ID", id)
+	req.Header.Add("X-AYLIEN-NewsAPI-Application-Key", key)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
