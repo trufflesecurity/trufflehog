@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -34,7 +36,21 @@ var (
 	tokenPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "confluence", "jira"}) + `\b([a-zA-Z-0-9]{24})\b`)
 	domainPat = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "confluence", "jira"}) + `\b((?:[a-zA-Z0-9-]{1,24}\.)+[a-zA-Z0-9-]{2,24}\.[a-zA-Z0-9-]{2,16})\b`)
 	emailPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"atlassian", "confluence", "jira"}) + common.EmailPattern)
+
+	invalidHosts = simple.NewCache[struct{}]()
+
+	errNoHost = errors.New("no such host")
 )
+
+type JIRAGraphQLResponse struct {
+	Data struct {
+		Me struct {
+			User struct {
+				Name string `json:"name"`
+			} `json:"user"`
+		} `json:"me"`
+	} `json:"data"`
+}
 
 func (s Scanner) getClient() *http.Client {
 	if s.client != nil {
@@ -76,6 +92,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for email := range uniqueEmails {
 		for token := range uniqueTokens {
 			for domain := range uniqueDomains {
+				if invalidHosts.Exists(domain) {
+					delete(uniqueDomains, domain)
+					continue
+				}
+
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_JiraToken,
 					Raw:          []byte(token),
@@ -90,7 +111,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					client := s.getClient()
 					isVerified, verificationErr := VerifyJiraToken(ctx, client, email, domain, token)
 					s1.Verified = isVerified
-					s1.SetVerificationError(verificationErr, token)
+					if verificationErr != nil {
+						if errors.Is(verificationErr, errNoHost) {
+							invalidHosts.Set(domain, struct{}{})
+						}
+
+						s1.SetVerificationError(verificationErr, token)
+					}
 				}
 
 				results = append(results, s1)
@@ -104,7 +131,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func VerifyJiraToken(ctx context.Context, client *http.Client, email, domain, token string) (bool, error) {
 	// wrap the query in a JSON body
 	body := map[string]string{
-		"query": `verify { me { user {name}}}`,
+		"query": `query verify { me { user { name } } }`,
 	}
 
 	// encode the body as JSON
@@ -125,6 +152,11 @@ func VerifyJiraToken(ctx context.Context, client *http.Client, email, domain, to
 
 	resp, err := client.Do(req)
 	if err != nil {
+		// lookup foo.test.net: no such host
+		if strings.Contains(err.Error(), "no such host") {
+			return false, errNoHost
+		}
+
 		return false, err
 	}
 
@@ -136,6 +168,11 @@ func VerifyJiraToken(ctx context.Context, client *http.Client, email, domain, to
 	// the API returns 200 if the token is valid
 	switch resp.StatusCode {
 	case http.StatusOK:
+		var jiraResp JIRAGraphQLResponse
+		if err := json.NewDecoder(resp.Body).Decode(&jiraResp); err != nil {
+			return false, nil // can't decode response in case of 200 OK = not valid JIRA domain
+		}
+
 		return true, nil
 	case http.StatusUnauthorized:
 		return false, nil
