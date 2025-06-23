@@ -27,8 +27,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	instancePat       = regexp.MustCompile(`\b((?:https?://)?[0-9a-zA-Z\-\.]{1,100}\.my\.salesforce\.com)\b`)
-	consumerKeyPat    = regexp.MustCompile(`\b(3MVG[0-9a-zA-Z._]{81})\b`)
-	consumerSecretPat = regexp.MustCompile(`\b([0-9A-F]{64})\b`)
+	consumerKeyPat    = regexp.MustCompile(`\b(3MVG[0-9a-zA-Z._+/=]{81,252})`)
+	consumerSecretPat = regexp.MustCompile(`\b([0-9A-F]{64}|[0-9]{19})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
