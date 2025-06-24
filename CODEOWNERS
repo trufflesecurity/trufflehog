@@ -20,6 +20,8 @@ pkg/detectors/ @trufflesecurity/OSS
 pkg/common/ @trufflesecurity/OSS
 pkg/custom_detectors/ @trufflesecurity/OSS
 pkg/analzyers/ @trufflesecurity/OSS
+pkg/engine/defaults/defaults.go @trufflesecurity/OSS
+pkg/engine/defaults/defaults_test.go @trufflesecurity/OSS
 
 # critical detectors
 pkg/detectors/aws/ @trufflesecurity/backend
