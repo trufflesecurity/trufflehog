@@ -41,15 +41,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	publicMatches := publicKeyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, publicMatch := range publicMatches {
-			if len(publicMatch) != 2 {
-				continue
-			}
 			publicKeyMatch := strings.TrimSpace(publicMatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_UploadCare,

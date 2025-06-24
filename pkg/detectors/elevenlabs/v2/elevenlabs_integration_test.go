@@ -54,7 +54,7 @@ func TestElevenlabs_FromChunk(t *testing.T) {
 					Verified:     true,
 					ExtraData: map[string]string{
 						"version": "2",
-						"Name":    "Ahmed",
+						"Name":    "Trufflesecurity",
 						"Tier":    "free",
 					},
 				},
@@ -150,7 +150,7 @@ func TestElevenlabs_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "AnalysisInfo")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Elevenlabs.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}

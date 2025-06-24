@@ -13,7 +13,7 @@ import (
 var (
 	testEncryptedKeyCorrectPassword   = []byte("123456")
 	testEncryptedKeyIncorrectPassword = []byte("incorrect")
-	testEncryptedKey                  = []byte(normalize(`-----BEGIN OPENSSH PRIVATE KEY-----
+	testEncryptedKey                  = []byte(Normalize(`-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABAjNIZuun
 xgLkM8KuzfmQuRAAAAEAAAAAEAAAGXAAAAB3NzaC1yc2EAAAADAQABAAABgQDe3Al0EMPz
 utVNk5DixaYrGMK56RqUoqGBinke6SWVWmqom1lBcJWzor6HlnMRPPr7YCEsJKL4IpuVwu
@@ -70,7 +70,7 @@ func Test_crack(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, passphrase, err := crack(tt.in)
+			_, passphrase, err := Crack(tt.in)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("crack() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -97,6 +97,6 @@ func BenchmarkParseRightPassword(b *testing.B) {
 
 func BenchmarkCracker(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		crack(testEncryptedKey)
+		Crack(testEncryptedKey)
 	}
 }

@@ -1,8 +1,11 @@
+//go:generate generate_permissions permissions.yaml permissions.go gitlab
+
 package gitlab
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,43 +13,115 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 var _ analyzers.Analyzer = (*Analyzer)(nil)
 
+const (
+	DefaultGitLabHost = "https://gitlab.com"
+)
+
 type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_GitLab }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeGitLab }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
-	_, err := AnalyzePermissions(a.Cfg, credInfo["key"])
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("key not found in credentialInfo")
+	}
+	host, ok := credInfo["host"]
+	if !ok {
+		host = DefaultGitLabHost
+	}
+
+	info, err := AnalyzePermissions(a.Cfg, key, host)
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("not implemented")
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeGitLab,
+		Metadata: map[string]any{
+			"enterprise": info.Metadata.Enterprise,
+		},
+		Bindings: []analyzers.Binding{},
+	}
+
+	// Add user and it's permissions to bindings
+	userFullyQualifiedName := fmt.Sprintf("gitlab.com/user/%d", info.AccessToken.UserID)
+	userResource := analyzers.Resource{
+		Name:               userFullyQualifiedName,
+		FullyQualifiedName: userFullyQualifiedName,
+		Type:               "user",
+		Metadata: map[string]any{
+			"token_name":       info.AccessToken.Name,
+			"token_id":         info.AccessToken.ID,
+			"token_created_at": info.AccessToken.CreatedAt,
+			"token_revoked":    info.AccessToken.Revoked,
+			"token_expires_at": info.AccessToken.ExpiresAt,
+		},
+	}
+
+	for _, scope := range info.AccessToken.Scopes {
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource: userResource,
+			Permission: analyzers.Permission{
+				Value: scope,
+			},
+		})
+	}
+
+	// append project and it's permissions to bindings
+	for _, project := range info.Projects {
+		projectResource := analyzers.Resource{
+			Name:               project.NameWithNamespace,
+			FullyQualifiedName: fmt.Sprintf("gitlab.com/project/%d", project.ID),
+			Type:               "project",
+		}
+
+		accessLevel, ok := access_level_map[project.Permissions.ProjectAccess.AccessLevel]
+		if !ok {
+			continue
+		}
+
+		result.Bindings = append(result.Bindings, analyzers.Binding{
+			Resource: projectResource,
+			Permission: analyzers.Permission{
+				Value: accessLevel,
+			},
+		})
+	}
+
+	return &result
 }
 
 // consider calling /api/v4/metadata to learn about gitlab instance version and whether neterrprises is enabled
 
-// we'll call /api/v4/personal_access_tokens and /api/v4/user and then filter down to scopes.
+// we'll call /api/v4/personal_access_tokens and then filter down to scopes.
 
 type AccessTokenJSON struct {
+	ID         int      `json:"id"`
 	Name       string   `json:"name"`
 	Revoked    bool     `json:"revoked"`
 	CreatedAt  string   `json:"created_at"`
 	Scopes     []string `json:"scopes"`
 	LastUsedAt string   `json:"last_used_at"`
 	ExpiresAt  string   `json:"expires_at"`
+	UserID     int      `json:"user_id"`
 }
 
 type ProjectsJSON struct {
+	ID                int    `json:"id"`
 	NameWithNamespace string `json:"name_with_namespace"`
 	Permissions       struct {
 		ProjectAccess struct {
@@ -65,11 +140,11 @@ type MetadataJSON struct {
 	Enterprise bool   `json:"enterprise"`
 }
 
-func getPersonalAccessToken(cfg *config.Config, key string) (AccessTokenJSON, int, error) {
+func getPersonalAccessToken(cfg *config.Config, key, host string) (AccessTokenJSON, int, error) {
 	var tokens AccessTokenJSON
 
 	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/personal_access_tokens/self", nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v4/personal_access_tokens/self", host), nil)
 	if err != nil {
 		return tokens, -1, err
 	}
@@ -87,11 +162,11 @@ func getPersonalAccessToken(cfg *config.Config, key string) (AccessTokenJSON, in
 	return tokens, resp.StatusCode, nil
 }
 
-func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, error) {
+func getAccessibleProjects(cfg *config.Config, key, host string) ([]ProjectsJSON, error) {
 	var projects []ProjectsJSON
 
 	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/projects", nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v4/projects", host), nil)
 	if err != nil {
 		return projects, err
 	}
@@ -129,11 +204,11 @@ func getAccessibleProjects(cfg *config.Config, key string) ([]ProjectsJSON, erro
 	return projects, nil
 }
 
-func getMetadata(cfg *config.Config, key string) (MetadataJSON, error) {
+func getMetadata(cfg *config.Config, key, host string) (MetadataJSON, error) {
 	var metadata MetadataJSON
 
 	client := analyzers.NewAnalyzeClient(cfg)
-	req, err := http.NewRequest("GET", "https://gitlab.com/api/v4/metadata", nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v4/metadata", host), nil)
 	if err != nil {
 		return metadata, err
 	}
@@ -176,9 +251,9 @@ type SecretInfo struct {
 	Projects    []ProjectsJSON
 }
 
-func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
+func AnalyzePermissions(cfg *config.Config, key string, host string) (*SecretInfo, error) {
 	// get personal_access_tokens accessible
-	token, statusCode, err := getPersonalAccessToken(cfg, key)
+	token, statusCode, err := getPersonalAccessToken(cfg, key, host)
 	if err != nil {
 		return nil, err
 	}
@@ -186,12 +261,12 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 		return nil, fmt.Errorf("Invalid GitLab Access Token")
 	}
 
-	meta, err := getMetadata(cfg, key)
+	meta, err := getMetadata(cfg, key, host)
 	if err != nil {
 		return nil, err
 	}
 
-	projects, err := getAccessibleProjects(cfg, key)
+	projects, err := getAccessibleProjects(cfg, key, host)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +279,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 }
 
 func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
-	info, err := AnalyzePermissions(cfg, key)
+	info, err := AnalyzePermissions(cfg, key, DefaultGitLabHost)
 	if err != nil {
 		color.Red("[x] Error: %s", err)
 		return
@@ -249,6 +324,7 @@ func printTokenInfo(token AccessTokenJSON) {
 	color.Green("Token Name: %s\n", token.Name)
 	color.Green("Created At: %s\n", token.CreatedAt)
 	color.Green("Last Used At: %s\n", token.LastUsedAt)
+	color.Green("User ID: %d\n", token.UserID)
 	color.Green("Expires At: %s  (%v remaining)\n\n", token.ExpiresAt, getRemainingTime(token.ExpiresAt))
 	if token.Revoked {
 		color.Red("Token Revoked: %v\n", token.Revoked)

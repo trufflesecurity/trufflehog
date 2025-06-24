@@ -11,12 +11,11 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/lib/pq"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -26,7 +25,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Postgres }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypePostgres }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	uri, ok := credInfo["connection_string"]
@@ -46,7 +45,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_Postgres,
+		AnalyzerType: analyzers.AnalyzerTypePostgres,
 		Metadata:     nil,
 		Bindings:     []analyzers.Binding{},
 	}
@@ -55,11 +54,11 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 	userResource, userBindings := bakeUserBindings(info)
 	result.Bindings = append(result.Bindings, userBindings...)
 
-	// add user's database priviliges to bindings
+	// add user's database privileges to bindings
 	dbNameToResourceMap, dbBindings := bakeDatabaseBindings(userResource, info)
 	result.Bindings = append(result.Bindings, dbBindings...)
 
-	// add user's table priviliges to bindings
+	// add user's table privileges to bindings
 	tableBindings := bakeTableBindings(dbNameToResourceMap, info)
 	result.Bindings = append(result.Bindings, tableBindings...)
 

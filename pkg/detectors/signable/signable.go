@@ -41,9 +41,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := tokenPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 
 		if isCommonFalsePositive(match[0]) {
 			continue

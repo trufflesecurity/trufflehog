@@ -40,15 +40,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	userTokenMatches := userTokenPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, userTokenMatch := range userTokenMatches {
-			if len(userTokenMatch) != 2 {
-				continue
-			}
 			resUserTokenMatch := strings.TrimSpace(userTokenMatch[1])
 
 			s1 := detectors.Result{

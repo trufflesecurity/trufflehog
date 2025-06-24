@@ -1,132 +1,85 @@
-//go:build detectors
-// +build detectors
-
 package openvpn
 
 import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestOpenvpn_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
+var (
+	validClientID       = "H-IyMCPZj4DJhmri60908NY.TqE0u"
+	invalidClientID     = "H-IyMCPZj4DJhm?i60908NY.TqE0u"
+	validClientSecret   = "KoBB7qmuBIvgqr_uC8OR-lNIm_8SPKRqqUvk-4bAFNNgivl8RFEO9pSbKXxHAmq753QFimSaC-V91h8tlipArc_"
+	invalidClientSecret = "KoBB7qmuBIv?qr_uC8OR-lNIm_8SPKRqqUvk-4bAFNNgivl8RFEO9pSbKXxHAmq753QFimSaC-V91h8tlipArc_"
+	inputDomain         = "pzUwgmXv5iKlMz9voI8gVVmWrtBzi.api"
+	validDomain         = "https://pzUwgmXv5iKlMz9voI8gVVmWrtBzi.api.openvpn.com"
+	invalidDomain       = "https://pzUwgmXv5iKlMz9voI?gVVmWrtBzi.api.openvpn.com"
+	keyword             = "openvpn"
+)
 
-	domain := testSecrets.MustGetField("OPENVPN_DOMAIN")
-	clientId := testSecrets.MustGetField("OPENVPN_CLIENT_ID")
-	clientSecret := testSecrets.MustGetField("OPENVPN_CLIENT_SECRET")
-	inactiveClientSecret := testSecrets.MustGetField("OPENVPN_CLIENT_SECRET_INACTIVE")
-
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestOpenvpn_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a openvpn secret %s openvpn clientId %s and domain %s  within", clientSecret, clientId, domain)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_OpenVpn,
-					Verified:     true,
-					RawV2:        []byte(clientId + clientSecret),
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			name:  "valid pattern - with keyword openvpn",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n", keyword, validClientID, keyword, validClientSecret, keyword, validDomain),
+			want:  []string{validClientID + validClientSecret, inputDomain + validClientSecret},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a openvpn secret %s openvpn clientId %s and domain %s within but not valid", inactiveClientSecret, clientId, domain)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_OpenVpn,
-					Verified:     false,
-					RawV2:        []byte(clientId + inactiveClientSecret),
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
-		},
-		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:                nil,
-			wantErr:             false,
-			wantVerificationErr: false,
+			name:  "invalid pattern",
+			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n%s token - '%s'\n", keyword, invalidClientID, keyword, invalidClientSecret, keyword, invalidDomain),
+			want:  []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Openvpn.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
-				}
-			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Openvpn.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}
