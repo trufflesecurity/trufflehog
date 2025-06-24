@@ -5,15 +5,13 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
-const thinkstMessage = "This is an AWS canary token generated at canarytokens.org, and was not set off; learn more here: https://trufflesecurity.com/canaries"
-const thinkstKnockoffsMessage = "This is an off brand AWS Canary inspired by canarytokens.org. It wasn't set off; learn more here: https://trufflesecurity.com/canaries"
+const thinkstMessage = "This is an AWS canary token generated at canarytokens.org."
+const thinkstKnockoffsMessage = "This is an off brand AWS Canary inspired by canarytokens.org."
 
 var (
 	thinkstCanaryList = map[string]struct{}{
@@ -26,6 +24,7 @@ var (
 		"992382622183": {},
 		"730335385048": {},
 		"266735846894": {},
+		"893192397702": {},
 	}
 	thinkstKnockoffsCanaryList = map[string]struct{}{
 		"044858866125": {},
@@ -60,7 +59,7 @@ func (s scanner) verifyCanary(ctx context.Context, resIDMatch, resSecretMatch st
 		return false, "", err
 	}
 	svc := sns.NewFromConfig(cfg, func(o *sns.Options) {
-		o.APIOptions = append(o.APIOptions, middleware.AddUserAgentKeyValue("User-Agent", common.UserAgent()))
+		o.APIOptions = append(o.APIOptions, replaceUserAgentMiddleware)
 	})
 
 	// Prep vars and Publish to SNS

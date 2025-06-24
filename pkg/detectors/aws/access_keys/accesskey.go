@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws/middleware"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go/middleware"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -240,7 +241,7 @@ func (s scanner) verifyMatch(ctx context.Context, resIDMatch, resSecretMatch str
 	}
 	// Create STS client
 	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) {
-		o.APIOptions = append(o.APIOptions, middleware.AddUserAgentKeyValue("User-Agent", common.UserAgent()))
+		o.APIOptions = append(o.APIOptions, replaceUserAgentMiddleware)
 	})
 
 	// Make the GetCallerIdentity API call
@@ -286,4 +287,25 @@ func (s scanner) Type() detectorspb.DetectorType {
 
 func (s scanner) Description() string {
 	return "AWS (Amazon Web Services) is a comprehensive cloud computing platform offering a wide range of on-demand services like computing power, storage, databases. API keys for AWS can have varying amount of access to these services depending on the IAM policy attached."
+}
+
+// Adds a custom Build middleware to the stack to replace the User-Agent header of the final request
+// https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/middleware.html
+func replaceUserAgentMiddleware(stack *middleware.Stack) error {
+	return stack.Build.Add(
+		middleware.BuildMiddlewareFunc(
+			"ReplaceUserAgent",
+			func(ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler) (
+				out middleware.BuildOutput, metadata middleware.Metadata, err error,
+			) {
+				req, ok := in.Request.(*smithyhttp.Request)
+				if !ok {
+					return next.HandleBuild(ctx, in)
+				}
+				req.Header.Set("User-Agent", common.UserAgent())
+				return next.HandleBuild(ctx, in)
+			},
+		),
+		middleware.After,
+	)
 }

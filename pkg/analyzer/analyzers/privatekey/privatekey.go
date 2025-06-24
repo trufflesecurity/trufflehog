@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -129,6 +130,9 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 		color.Red("[x] Error: Invalid Private Key")
 		return
 	}
+
+	// key entered through command line may have spaces instead of newlines, replace them
+	token = replaceSpacesWithNewlines(token)
 
 	info, err := AnalyzePermissions(context.Background(), cfg, token)
 	if err != nil {
@@ -300,4 +304,27 @@ func analyzeGithubUser(ctx context.Context, parsedKey any) (*string, error) {
 
 func analyzeGitlabUser(ctx context.Context, parsedKey any) (*string, error) {
 	return privatekey.VerifyGitLabUser(ctx, parsedKey)
+}
+
+// replaceSpacesWithNewlines extracts the base64 part, replaces spaces with newlines if needed, and reconstructs the key.
+func replaceSpacesWithNewlines(privateKey string) string {
+	// Regex pattern to extract the key content
+	re := regexp.MustCompile(`(?i)(-----\s*BEGIN[ A-Z0-9_-]*PRIVATE KEY\s*-----)\s*([\s\S]*?)\s*(-----\s*END[ A-Z0-9_-]*PRIVATE KEY\s*-----)`)
+
+	// Find matches
+	matches := re.FindStringSubmatch(privateKey)
+	if len(matches) != 4 {
+		// no need to process
+		return privateKey
+	}
+
+	header := matches[1]     // BEGIN line
+	base64Part := matches[2] // Base64 content
+	footer := matches[3]     // END line
+
+	// Replace spaces with newlines
+	formattedBase64 := strings.ReplaceAll(base64Part, " ", "\n")
+
+	// Reconstruct the private key
+	return fmt.Sprintf("%s\n%s\n%s", header, formattedBase64, footer)
 }

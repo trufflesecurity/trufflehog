@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"github.com/go-errors/errors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/handlers"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/roundtripper"
@@ -235,7 +236,9 @@ func (s *Source) GetJenkinsObjectsForPath(ctx context.Context, absolutePath stri
 	res := JenkinsJobResponse{}
 	for i := 0; true; i += 100 {
 		baseUrl.Path = path.Join(absolutePath, "api/json")
-		baseUrl.RawQuery = fmt.Sprintf("tree=jobs[name,url]{%d,%d}", i, i+100)
+		params := url.Values{}
+		params.Set("tree", fmt.Sprintf("jobs[name,url]{%d,%d}", i, i+100))
+		baseUrl.RawQuery = params.Encode()
 
 		ctx.Logger().V(4).Info("executing query", "query_url", baseUrl.String())
 		req, err := s.NewRequest(http.MethodGet, baseUrl.String(), nil)
@@ -280,8 +283,10 @@ func (s *Source) GetJenkinsBuilds(ctx context.Context, jobAbsolutePath string) (
 	builds := JenkinsBuildResponse{}
 	buildsUrl := *s.url
 	for i := 0; true; i += 100 {
-		buildsUrl.Path = path.Join(jobAbsolutePath, "/api/json")
-		buildsUrl.RawQuery = fmt.Sprintf("tree=builds[number,url]{%d,%d}", i, i+100)
+		buildsUrl.Path = path.Join(jobAbsolutePath, "api/json")
+		params := url.Values{}
+		params.Set("tree", fmt.Sprintf("builds[number,url]{%d,%d}", i, i+100))
+		buildsUrl.RawQuery = params.Encode()
 		req, err := s.NewRequest(http.MethodGet, buildsUrl.String(), nil)
 		if err != nil {
 			return builds, errors.WrapPrefix(err, "Failed to create new request to get jenkins builds", 0)
@@ -407,13 +412,7 @@ func (s *Source) chunkBuild(
 			buildLogURL.String())
 	}
 
-	buildLog, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("error reading build log response body from %q: %w", buildLogURL.String(), err)
-	}
-
-	ctx.Logger().V(4).Info("scanning build log")
-	chunksChan <- &sources.Chunk{
+	chunkSkel := &sources.Chunk{
 		SourceName: s.name,
 		SourceID:   s.SourceID(),
 		SourceType: s.Type(),
@@ -427,11 +426,11 @@ func (s *Source) chunkBuild(
 				},
 			},
 		},
-		Data:   buildLog,
 		Verify: s.verify,
 	}
 
-	return nil
+	ctx.Logger().V(4).Info("scanning build log")
+	return handlers.HandleFile(ctx, resp.Body, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 }
 
 type JenkinsJobResponse struct {

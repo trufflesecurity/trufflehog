@@ -2,10 +2,9 @@ package zendeskapi
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -13,7 +12,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -25,7 +24,7 @@ var (
 
 	token  = regexp.MustCompile(detectors.PrefixRegex([]string{"zendesk"}) + `([A-Za-z0-9_-]{40})`)
 	email  = regexp.MustCompile(`\b([a-zA-Z-0-9-]{5,16}\@[a-zA-Z-0-9]{4,16}\.[a-zA-Z-0-9]{3,6})\b`)
-	domain = regexp.MustCompile(`\b([a-zA-Z-0-9]{3,16}\.zendesk\.com)\b`)
+	domain = regexp.MustCompile(`\b([a-zA-Z-0-9]{3,25}\.zendesk\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -38,40 +37,32 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	tokens := token.FindAllStringSubmatch(dataStr, -1)
-	domains := domain.FindAllStringSubmatch(dataStr, -1)
-	emails := email.FindAllStringSubmatch(dataStr, -1)
+	var uniqueEmails, uniqueTokens, uniqueDomains = make(map[string]struct{}), make(map[string]struct{}), make(map[string]struct{})
 
-	for _, token := range tokens {
-		resMatch := strings.TrimSpace(token[1])
+	for _, match := range email.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmails[match[1]] = struct{}{}
+	}
 
-		var resDomain string
-		for _, domain := range domains {
-			resDomain = strings.TrimSpace(domain[1])
+	for _, match := range token.FindAllStringSubmatch(dataStr, -1) {
+		uniqueTokens[match[1]] = struct{}{}
+	}
 
-			for _, email := range emails {
-				resEmail := strings.TrimSpace(email[1])
+	for _, match := range domain.FindAllStringSubmatch(dataStr, -1) {
+		uniqueDomains[match[1]] = struct{}{}
+	}
 
+	for token := range uniqueTokens {
+		for email := range uniqueEmails {
+			for domain := range uniqueDomains {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_ZendeskApi,
-					Raw:          []byte(resMatch),
+					Raw:          []byte(token),
 				}
 
 				if verify {
-					data := fmt.Sprintf("%s/token:%s", resEmail, resMatch)
-					sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-					req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomain+"/api/v2/users.json", nil)
-					if err != nil {
-						continue
-					}
-					req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-						}
-					}
+					isVerified, verificationErr := verifyZendesk(ctx, client, email, token, domain)
+					s1.Verified = isVerified
+					s1.SetVerificationError(verificationErr, token)
 				}
 
 				results = append(results, s1)
@@ -90,4 +81,32 @@ func (s Scanner) Type() detectorspb.DetectorType {
 
 func (s Scanner) Description() string {
 	return "Zendesk is a customer service platform. Zendesk API tokens can be used to access and modify customer service data."
+}
+
+func verifyZendesk(ctx context.Context, client *http.Client, email, token, domain string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+domain+"/api/v2/users.json", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	// docs: https://developer.zendesk.com/api-reference/introduction/security-and-auth/
+	req.SetBasicAuth(email+"/token", token)
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

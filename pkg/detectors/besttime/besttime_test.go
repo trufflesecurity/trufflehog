@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	validPattern   = "4K1WTb2ysVeg_jHDwtwhH68K9MuOjiTtXQCS"
+	validPattern   = "pri_099889f14d114dfaae476569b395eade"
 	complexPattern = `
 	func main() {
-		url := "https://api.example.com/v1/besttime/keys/4K1WTb2ysVeg_jHDwtwhH68K9MuOjiTtXQCS"
+		url := "https://api.example.com/v1/besttime/keys/pri_099889f14d114dfaae476569b395eade"
 
 		// Create a new request with the secret as a header
 		req, err := http.NewRequest("GET", url, http.NoBody)
@@ -52,12 +52,12 @@ func TestBestTime_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern",
 			input: fmt.Sprintf("besttime credentials: %s", validPattern),
-			want:  []string{"4K1WTb2ysVeg_jHDwtwhH68K9MuOjiTtXQCS"},
+			want:  []string{"pri_099889f14d114dfaae476569b395eade"},
 		},
 		{
 			name:  "valid pattern - complex",
 			input: complexPattern,
-			want:  []string{"4K1WTb2ysVeg_jHDwtwhH68K9MuOjiTtXQCS"},
+			want:  []string{"pri_099889f14d114dfaae476569b395eade"},
 		},
 		{
 			name:  "invalid pattern",

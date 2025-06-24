@@ -174,20 +174,19 @@ func (h *archiveHandler) openArchive(
 // to handle nested archives or to continue processing based on the file's content and depth in the archive structure.
 func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(context.Context, archives.FileInfo) error {
 	return func(ctx context.Context, file archives.FileInfo) error {
+		if common.IsDone(ctx) {
+			return ctx.Err()
+		}
+
 		lCtx := logContext.WithValues(
 			logContext.AddLogger(ctx),
 			"filename", file.Name(),
 			"size", file.Size(),
 		)
-		lCtx.Logger().V(3).Info("Handling extracted file.")
 
 		if file.IsDir() || file.LinkTarget != "" {
-			lCtx.Logger().V(3).Info("skipping directory or symlink")
+			lCtx.Logger().V(4).Info("skipping directory or symlink")
 			return nil
-		}
-
-		if common.IsDone(ctx) {
-			return ctx.Err()
 		}
 
 		depth := 0
@@ -203,7 +202,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		}
 
 		if common.SkipFile(file.Name()) || common.IsBinary(file.Name()) {
-			lCtx.Logger().V(3).Info("skipping file: extension is ignored")
+			lCtx.Logger().V(4).Info("skipping file: extension is ignored")
 			h.metrics.incFilesSkipped()
 			return nil
 		}
@@ -243,7 +242,7 @@ func (h *archiveHandler) extractorHandler(dataOrErrChan chan DataOrErr) func(con
 		h.metrics.incFilesProcessed()
 		h.metrics.observeFileSize(fileSize)
 
-		lCtx.Logger().V(4).Info("Processed file successfully", "filename", file.Name(), "size", file.Size())
+		lCtx.Logger().V(4).Info("Opened file successfully", "filename", file.Name(), "size", file.Size())
 		return h.openArchive(lCtx, depth, rdr, dataOrErrChan)
 	}
 }

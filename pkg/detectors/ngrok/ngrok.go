@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -30,6 +31,11 @@ func (s Scanner) Description() string {
 func (s Scanner) Keywords() []string {
 	return []string{"ngrok"}
 }
+
+const (
+	ngrokVerificationURL      = "https://api.ngrok.com/agent_ingresses"
+	tunnelCredentialErrorCode = "ERR_NGROK_206"
+)
 
 var (
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ngrok"}) + `\b(2[a-zA-Z0-9]{26}_\d[a-zA-Z0-9]{20})\b`)
@@ -60,6 +66,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, vErr := verifyMatch(ctx, s.client, token)
 			r.Verified = isVerified
 			r.SetVerificationError(vErr, token)
+			if isVerified {
+				r.AnalysisInfo = map[string]string{"key": token}
+			}
 		}
 
 		results = append(results, r)
@@ -69,7 +78,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.ngrok.com/agent_ingresses", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ngrokVerificationURL, nil)
 	if err != nil {
 		return false, err
 	}
@@ -90,7 +99,18 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		return true, nil
 	case http.StatusUnauthorized:
 		return false, nil
-	default:
-		return false, fmt.Errorf("ngrok: unexpected status code: %d", res.StatusCode)
+	case http.StatusForbidden:
+		return false, nil
+	case http.StatusBadRequest:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		// Check if the error code is "ERR_NGROK_206" which indicates that
+		// the credential is a valid tunnel Authtoken rather than an API key.
+		if strings.Contains(string(bodyBytes), tunnelCredentialErrorCode) {
+			return true, nil
+		}
 	}
+	return false, fmt.Errorf("ngrok: unexpected status code: %d", res.StatusCode)
 }
