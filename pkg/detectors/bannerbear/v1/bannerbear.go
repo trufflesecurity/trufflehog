@@ -16,8 +16,11 @@ import (
 
 type Scanner struct{}
 
+func (s Scanner) Version() int { return 1 }
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
@@ -44,6 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Bannerbear,
 			Raw:          []byte(resMatch),
+			ExtraData: map[string]string{
+				"version": fmt.Sprintf("%d", s.Version()),
+			},
 		}
 
 		if verify {
@@ -77,7 +83,7 @@ func verifyBannerBear(ctx context.Context, client *http.Client, key string) (boo
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	defer func() {

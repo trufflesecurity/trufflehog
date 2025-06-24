@@ -328,6 +328,12 @@ func (s *Source) scanDir(ctx context.Context, gitDir string, reporter sources.Ch
 		// TODO: Figure out why we skip directories ending in "git".
 		return nil
 	}
+
+	// Check if the directory exists
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		return fmt.Errorf("directory does not exist: %s", gitDir)
+	}
+
 	// try paths instead of url
 	repo, err := RepoFromPath(gitDir, s.scanOptions.Bare)
 	if err != nil {

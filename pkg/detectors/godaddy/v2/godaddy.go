@@ -2,8 +2,6 @@ package godaddy
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"net/http"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -84,15 +82,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				isVerified, verificationErr := VerifyGoDaddySecret(ctx, s.getClient(), prod, v1.MakeAuthHeaderValue(key, secret))
+				isVerified, verificationErr := v1.VerifyGoDaddySecret(ctx, s.getClient(), prod, v1.MakeAuthHeaderValue(key, secret))
 
 				result.Verified = isVerified
 				result.SetVerificationError(verificationErr, secret)
 
-				// in case of successful verification add the enviorement name in extradata to let user know which env this secret belong to.
-				if isVerified {
-					result.ExtraData["Environment"] = "Prod"
-				}
+				// add the env name in extradata to let user know which env this secret belong to.
+				result.ExtraData["Environment"] = "Prod"
 			}
 
 			results = append(results, result)
@@ -101,36 +97,4 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	return results, nil
 
-}
-
-// VerifyGoDaddySecret make a call to godaddy api with given secret to check if secret is valid or not.
-func VerifyGoDaddySecret(ctx context.Context, client *http.Client, environment, secret string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s/v1/domains/available?domain=example.com", environment), http.NoBody)
-	if err != nil {
-		return false, err
-	}
-
-	// set the required auth header
-	req.Header.Set("Authorization", secret)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return false, err
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return true, nil
-	case http.StatusUnauthorized:
-		return false, nil
-	case http.StatusForbidden:
-		// as per documentation in case of 403 the token is actually verified but it does not have access.
-		return true, nil
-	default:
-		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
 }

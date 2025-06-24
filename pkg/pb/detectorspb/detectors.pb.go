@@ -1133,6 +1133,7 @@ const (
 	DetectorType_DeepSeek                                DetectorType = 1026
 	DetectorType_StripePaymentIntent                     DetectorType = 1027
 	DetectorType_LangSmith                               DetectorType = 1028
+  DetectorType_BitbucketAppPassword                    DetectorType = 1029
 )
 
 // Enum value maps for DetectorType.
@@ -2163,6 +2164,7 @@ var (
 		1026: "DeepSeek",
 		1027: "StripePaymentIntent",
 		1028: "LangSmith",
+    1029: "BitbucketAppPassword",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3190,6 +3192,7 @@ var (
 		"DeepSeek":                          1026,
 		"StripePaymentIntent":               1027,
 		"LangSmith":                         1028,
+		"BitbucketAppPassword":              1029,
 	}
 )
 

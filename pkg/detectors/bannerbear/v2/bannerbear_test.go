@@ -1,4 +1,4 @@
-package gitlab
+package bannerbear
 
 import (
 	"context"
@@ -10,28 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `[{
-		"_id": "1a8d0cca-e1a9-4318-bc2f-f5658ab2dcb5",
-		"name": "Gitlab",
-		"type": "Detector",
-		"api": true,
-		"authentication_type": "",
-		"verification_url": "https://api.example.com/example",
-		"test_secrets": {
-			"gitlab_secret": "oXCt4JT2wf1_WlZl2OVG"
-		},
-		"docs":"https://docs.gitlab.com/test/api/example.json#get-drone-test-example-settings", // this matches the pattern but fail in entropy check
-		"expected_response": "200",
-		"method": "GET",
-		"deprecated": false
-	}]`
-	secret        = "oXCt4JT2wf1_WlZl2OVG"
-	validPattern2 = "GITLAB_TOKEN=ABc123456789dEFghIJK"
-	secret2       = "ABc123456789dEFghIJK"
-)
-
-func TestGitLab_Pattern(t *testing.T) {
+func TestBannerBear_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -42,13 +21,18 @@ func TestGitLab_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "valid pattern",
-			input: validPattern,
-			want:  []string{secret},
+			input: "bannerbear credentials: bb_pr_abcdc2b40ef44abcd8cbf3739aabcd",
+			want:  []string{"bb_pr_abcdc2b40ef44abcd8cbf3739aabcd"},
 		},
 		{
-			name:  "valid pattern (with = before secret)",
-			input: validPattern2,
-			want:  []string{secret2},
+			name:  "valid pattern - complex",
+			input: "bannerbear credentials: ajahf ajkahfkjah fka bb_pr_abcdc2b40ef44abcd8cbf3739aacba adlkajflaihflahdljajfla",
+			want:  []string{"bb_pr_abcdc2b40ef44abcd8cbf3739aacba"},
+		},
+		{
+			name:  "invalid pattern",
+			input: "bannerbear credentials: bb_pr_abcd",
+			want:  nil,
 		},
 	}
 

@@ -56,6 +56,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 		resMatch := strings.TrimSpace(match[1])
 
+		// to avoid false positives
+		if detectors.StringShannonEntropy(resMatch) < 3.6 {
+			continue
+		}
+
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Gitlab,
 			Raw:          []byte(resMatch),
