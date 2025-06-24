@@ -3,10 +3,10 @@ package rootly
 import (
 	"context"
 	"net/http"
-	"strings"
+	// "strings"
+	"fmt"
 
 	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -32,40 +32,53 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Rootly secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
-	dataStr := string(data)
+    dataStr := string(data)
+    uniqueMatches := make(map[string]struct{})
+    for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+        if len(match) == 1 {
+            uniqueMatches[match[0]] = struct{}{}
+        }
+    }
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+    for match := range uniqueMatches {
+        s1 := detectors.Result{
+            DetectorType: detectorspb.DetectorType_Rootly,
+            Raw:          []byte(match),
+        }
 
-	for _, match := range matches {
-		if len(match) != 1 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[0])
+        if verify {
+            isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
+            s1.Verified = isVerified
+            s1.ExtraData = extraData
+            s1.SetVerificationError(verificationErr, match)
+        }
 
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Rootly,
-			Raw:          []byte(resMatch),
-		}
+        results = append(results, s1)
+    }
 
-		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.rootly.com/v1/users/me", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", "Bearer "+resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
-		}
+    return results, nil
+}
 
-		results = append(results, s1)
-	}
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+    req, err := http.NewRequestWithContext(ctx, "GET", "https://api.rootly.com/v1/users/me", nil)
+    if err != nil {
+        return false, nil, err
+    }
+    req.Header.Add("Authorization", "Bearer "+token)
+    res, err := client.Do(req)
+    if err != nil {
+        return false, nil, err
+    }
+    defer res.Body.Close()
 
-	return results, nil
+    switch res.StatusCode {
+    case http.StatusOK:
+        return true, nil, nil
+    case http.StatusUnauthorized:
+        return false, nil, nil
+    default:
+        return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+    }
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
