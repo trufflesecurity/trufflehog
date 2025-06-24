@@ -98,7 +98,7 @@ func TestSource_Chunks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == "gets chunks after assuming role" {
-				t.Skip("SCAN-436")
+				t.Skip("skipping until our test environment stabilizes enough that we know how we're going to handle this")
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
