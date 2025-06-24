@@ -3,6 +3,7 @@ package salesforceoauth2
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -27,14 +29,17 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	instancePat       = regexp.MustCompile(`\b(?:https?://)?([0-9a-zA-Z\-\.]{1,100}\.my\.salesforce\.com)\b`)
-	consumerKeyPat    = regexp.MustCompile(`\b(3MVG[0-9a-zA-Z._+/=]{81,252})`)
-	consumerSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesforce", "consumer", "secret"}) + `\b([0-9A-F]{64}|[0-9]{19})\b`)
+	consumerKeyPat    = regexp.MustCompile(`\b(3MVG9[0-9a-zA-Z._+/=]{80,251})`)
+	consumerSecretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"salesforce", "consumer", "secret"}) + `\b([A-Za-z0-9+/=.]{64}|[0-9]{19})\b`)
+
+	invalidHosts = simple.NewCache[struct{}]()
+	errNoHost    = errors.New("no such host")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"salesforce", "3MVG"}
+	return []string{"salesforce", "3MVG9"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -78,6 +83,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for domain := range uniqueInstanceMatches {
 		for key := range uniqueKeyMatches {
 			for secret := range uniqueSecretMatches {
+				if invalidHosts.Exists(domain) {
+					delete(uniqueInstanceMatches, domain)
+					continue
+				}
 
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
@@ -88,7 +97,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if verify {
 					isVerified, verificationErr := s.verifyMatch(ctx, s.getClient(), domain, key, secret)
 					s1.Verified = isVerified
-					s1.SetVerificationError(verificationErr, secret)
+					if verificationErr != nil {
+						if errors.Is(verificationErr, errNoHost) {
+							invalidHosts.Set(domain, struct{}{})
+							continue
+						}
+
+						s1.SetVerificationError(verificationErr, secret)
+					}
 				}
 
 				results = append(results, s1)
@@ -115,6 +131,10 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, domain, k
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
 	if err != nil {
+		if strings.Contains(err.Error(), "no such host") {
+			return false, errNoHost
+		}
+
 		return false, fmt.Errorf("failed to perform request: %w", err)
 	}
 	defer func() {
