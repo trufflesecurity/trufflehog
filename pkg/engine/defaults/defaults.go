@@ -94,6 +94,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitlyaccesstoken"
@@ -1714,6 +1715,7 @@ func buildDetectorList() []detectors.Detector {
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
 		&stripepaymentintent.Scanner{},
+		&bitbucketapppassword.Scanner{},
 	}
 }
 
