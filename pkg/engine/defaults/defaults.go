@@ -721,6 +721,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/survicate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/swell"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/swiftype"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tableau"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tailscale"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tallyfy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/tatumio"
@@ -1714,6 +1715,7 @@ func buildDetectorList() []detectors.Detector {
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
 		&stripepaymentintent.Scanner{},
+		&tableau.Scanner{},
 	}
 }
 
