@@ -107,7 +107,7 @@ func verifyCredential(ctx context.Context, client *http.Client, username, passwo
 		return false, err
 	}
 	req.Header.Add("Accept", "application/json")
-	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
+	auth := base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", username, password))
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", auth))
 
 	res, err := client.Do(req)
