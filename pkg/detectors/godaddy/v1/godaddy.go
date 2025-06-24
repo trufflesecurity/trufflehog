@@ -25,9 +25,9 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// the key for the GoDaddy OTE environment is a 37-character alphanumeric string that may include underscores.
-	keyPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy", "ote"}) + common.BuildRegex("a-zA-Z0-9", "_", 37))
+	keyPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy"}) + common.BuildRegex("a-zA-Z0-9", "_", 37))
 	// the secret for the GoDaddy OTE environment is a 22-character alphanumeric string.
-	secretPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy", "ote"}) + common.BuildRegex("a-zA-Z0-9", "", 22))
+	secretPattern = regexp.MustCompile(detectors.PrefixRegex([]string{"godaddy"}) + common.BuildRegex("a-zA-Z0-9", "", 22))
 
 	// ote environment
 	ote = "api.ote-godaddy.com"
@@ -46,7 +46,7 @@ func (s *Scanner) Version() int { return 1 }
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"godaddy", "ote"}
+	return []string{"godaddy"}
 }
 
 func (s Scanner) Description() string {
@@ -88,10 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				result.Verified = isVerified
 				result.SetVerificationError(verificationErr, secret)
 
-				// in case of successful verification add the enviorement name in extradata to let user know which env this secret belong to.
-				if isVerified {
-					result.ExtraData["Environment"] = "OTE"
-				}
+				// add the env name in extradata to let user know which env this secret belong to.
+				result.ExtraData["Environment"] = "OTE"
 			}
 
 			results = append(results, result)
