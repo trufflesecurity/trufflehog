@@ -83,7 +83,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresastoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
+	bannerbearv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v1"
+	bannerbearv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beebole"
@@ -93,6 +94,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitlyaccesstoken"
@@ -934,7 +936,8 @@ func buildDetectorList() []detectors.Detector {
 		&azuresearchquerykey.Scanner{},
 		&azure_storage.Scanner{},
 		&azurerepositorykey.Scanner{},
-		&bannerbear.Scanner{},
+		&bannerbearv1.Scanner{},
+		&bannerbearv2.Scanner{},
 		&baremetrics.Scanner{},
 		&beamer.Scanner{},
 		&beebole.Scanner{},
@@ -1713,7 +1716,8 @@ func buildDetectorList() []detectors.Detector {
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
 		&stripepaymentintent.Scanner{},
-		&rootly.Scanner{},
+		&bitbucketapppassword.Scanner{},
+		&rootly.Scanner{}
 	}
 }
 
