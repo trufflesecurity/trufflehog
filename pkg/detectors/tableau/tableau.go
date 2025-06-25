@@ -26,6 +26,8 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
+func (Scanner) CloudEndpoint() string { return "" }
+
 var (
 	defaultClient = common.SaneHttpClient()
 
