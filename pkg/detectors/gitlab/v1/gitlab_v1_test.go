@@ -21,6 +21,7 @@ var (
 		"test_secrets": {
 			"gitlab_secret": "oXCt4JT2wf1_WlZl2OVG"
 		},
+		"docs":"https://docs.gitlab.com/test/api/example.json#get-drone-test-example-settings", // this matches the pattern but fail in entropy check
 		"expected_response": "200",
 		"method": "GET",
 		"deprecated": false
