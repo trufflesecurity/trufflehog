@@ -26,8 +26,6 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
-const defaultVerifyURL = "https://prod-apsoutheast-b.online.tableau.com/api/3.26/auth/signin"
-
 var (
 	defaultClient = common.SaneHttpClient()
 
@@ -128,10 +126,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					result.Verified = isVerified
 
 					// Merge verification extra data
-					if extraData != nil {
-						for k, v := range extraData {
-							result.ExtraData[k] = v
-						}
+					for k, v := range extraData {
+						result.ExtraData[k] = v
 					}
 
 					result.SetVerificationError(verificationErr, fmt.Sprintf("%s:%s@%s", tokenName, tokenSecret, endpoint))
