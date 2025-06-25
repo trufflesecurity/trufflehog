@@ -2,11 +2,11 @@ package cloudflarecakey
 
 import (
 	"context"
-	// "fmt"
-	// "log"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
+	"io"
 	"net/http"
-	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,7 +21,8 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"cloudflare"}) + `\b(v[A-Za-z0-9._-]{173,})\b`)
+	// origin ca keys documentation: https://developers.cloudflare.com/fundamentals/api/get-started/ca-keys/
+	keyPat = regexp.MustCompile(`\b(v1\.0-[A-Za-z0-9-]{171})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,39 +35,22 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueMatches := make(map[string]struct{})
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
+	for _, matches := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueMatches[matches[1]] = struct{}{}
+	}
 
-		if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-			continue
-		}
-
+	for caKey := range uniqueMatches {
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_CloudflareCaKey,
-			Raw:          []byte(resMatch),
+			Raw:          []byte(caKey),
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/certificates?zone_id=a", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("user-agent", "curl/7.68.0") // pretend to be from curl so we do not wait 100+ seconds -> nice try did not work
-
-			req.Header.Add("X-Auth-User-Service-Key", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyCloudFlareCAKey(ctx, client, caKey)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, caKey)
 		}
 
 		results = append(results, s1)
@@ -77,4 +61,38 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CloudflareCaKey
+}
+
+func (s Scanner) Description() string {
+	return "Cloudflare is a web infrastructure and website security company. Cloudflare CA keys can be used to manage SSL/TLS certificates and other security settings."
+}
+
+func verifyCloudFlareCAKey(ctx context.Context, client *http.Client, caKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.cloudflare.com/client/v4/certificates?zone_id=a", nil)
+	if err != nil {
+		return false, nil
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("user-agent", "curl/7.68.0") // pretend to be from curl so we do not wait 100+ seconds -> nice try did not work
+
+	req.Header.Add("X-Auth-User-Service-Key", caKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

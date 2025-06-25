@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 
-	//	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	//	"fmt"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -42,9 +43,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		key := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -72,10 +70,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							"username": apiRes.Result.Username,
 						}
 					}
-				} else {
-					if detectors.IsKnownFalsePositive(key, detectors.DefaultFalsePositives, true) {
-						continue
-					}
 				}
 			}
 		}
@@ -100,4 +94,8 @@ type userResponse struct {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TelegramBotToken
+}
+
+func (s Scanner) Description() string {
+	return "Telegram Bot API tokens are used to authenticate requests to the Telegram Bot API. They can be used to control and interact with Telegram bots."
 }

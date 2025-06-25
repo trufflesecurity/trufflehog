@@ -6,9 +6,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/coinbase/waas-client-library-go/auth"
 	"github.com/coinbase/waas-client-library-go/clients"
@@ -47,6 +48,11 @@ var (
 func (s Scanner) Keywords() []string {
 	return []string{"organizations", "apiKeys", "begin ec"}
 }
+
+const maxPrivateKeySize = 4096
+
+// MaxSecretSize returns the maximum size of a secret that this detector can find.
+func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
 
 // FromData will find and optionally verify CoinbaseWaaS secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
@@ -140,4 +146,8 @@ func (s Scanner) verifyMatch(ctx context.Context, apiKeyName, privKey string) (b
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_CoinbaseWaaS
+}
+
+func (s Scanner) Description() string {
+	return "Coinbase WaaS (Wallet as a Service) provides a secure and scalable infrastructure for managing cryptocurrency wallets. The API keys allow access to this service to perform operations such as creating and managing wallets."
 }

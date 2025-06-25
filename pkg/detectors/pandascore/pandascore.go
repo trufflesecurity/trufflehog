@@ -37,9 +37,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -48,7 +45,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequest("GET", "https://api.pandascore.co/videogames", nil)
+			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.pandascore.co/videogames", nil)
 			if err != nil {
 				continue
 			}
@@ -73,4 +70,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PandaScore
+}
+
+func (s Scanner) Description() string {
+	return "PandaScore is an esports data provider offering a wide range of statistics and live data for various video games. PandaScore API keys can be used to access and retrieve this data."
 }

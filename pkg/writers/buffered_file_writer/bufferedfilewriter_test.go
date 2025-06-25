@@ -1,13 +1,15 @@
 package bufferedfilewriter
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/buffers/pool"
 )
 
 func TestBufferedFileWriterNewThreshold(t *testing.T) {
@@ -28,7 +30,6 @@ func TestBufferedFileWriterNewThreshold(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			writer := New(tc.options...)
@@ -72,27 +73,158 @@ func TestBufferedFileWriterString(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
 			writer := New(WithThreshold(tc.threshold))
 			// First write, should go to file if it exceeds the threshold.
-			_, err := writer.Write(ctx, tc.input)
+			_, err := writer.Write(tc.input)
 			assert.NoError(t, err)
 
 			// Second write, should go to buffer
 			if tc.additionalInput != nil {
-				_, err = writer.Write(ctx, tc.additionalInput)
+				_, err = writer.Write(tc.additionalInput)
 				assert.NoError(t, err)
 			}
 
 			got, err := writer.String()
 			assert.NoError(t, err)
+			err = writer.CloseForWriting()
+			assert.NoError(t, err)
 
 			assert.Equal(t, tc.expectedStr, got, "String content mismatch")
 		})
 	}
+}
+
+const (
+	smallBuffer  = 2 << 5  // 64B
+	mediumBuffer = 2 << 10 // 2KB
+	smallFile    = 2 << 25 // 32MB
+	mediumFile   = 2 << 28 // 256MB
+)
+
+func BenchmarkBufferedFileWriterString_BufferOnly_Small(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), smallBuffer)
+
+	writer := New()
+
+	_, err := writer.Write(data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_BufferOnly_Medium(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), mediumBuffer)
+	writer := New()
+
+	_, err := writer.Write(data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_OnlyFile_Small(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), smallFile)
+
+	writer := New()
+
+	_, err := writer.Write(data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_OnlyFile_Medium(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), mediumFile)
+
+	writer := New()
+
+	_, err := writer.Write(data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_BufferWithFile_Small(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), smallFile)
+
+	writer := New()
+
+	_, err := writer.Write(data)
+	assert.NoError(b, err)
+
+	// Write again so we also fill up the buffer.
+	_, err = writer.Write(data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func BenchmarkBufferedFileWriterString_BufferWithFile_Medium(b *testing.B) {
+	data := bytes.Repeat([]byte("a"), mediumFile)
+
+	writer := New()
+
+	_, err := writer.Write(data)
+	assert.NoError(b, err)
+
+	// Write again so we also fill up the buffer.
+	_, err = writer.Write(data)
+	assert.NoError(b, err)
+
+	benchmarkBufferedFileWriterString(b, writer)
+
+	err = writer.CloseForWriting()
+	assert.NoError(b, err)
+
+	rc, err := writer.ReadCloser()
+	assert.NoError(b, err)
+	rc.Close()
+}
+
+func benchmarkBufferedFileWriterString(b *testing.B, w *BufferedFileWriter) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := w.String()
+		assert.NoError(b, err)
+	}
+	b.StopTimer()
 }
 
 func TestBufferedFileWriterLen(t *testing.T) {
@@ -109,11 +241,10 @@ func TestBufferedFileWriterLen(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			writer := New()
-			_, err := writer.Write(context.Background(), tc.input)
+			_, err := writer.Write(tc.input)
 			assert.NoError(t, err)
 
 			length := writer.Len()
@@ -127,11 +258,10 @@ func TestBufferedFileWriterLen(t *testing.T) {
 func TestBufferedFileWriterWriteWithinThreshold(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
 	data := []byte("hello world")
 
 	writer := New(WithThreshold(64))
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(t, err)
 
 	assert.Equal(t, data, writer.buf.Bytes())
@@ -142,11 +272,10 @@ func TestBufferedFileWriterWriteWithinThreshold(t *testing.T) {
 func TestBufferedFileWriterWriteExceedsThreshold(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
 	data := []byte("hello world")
 
 	writer := New(WithThreshold(5))
-	_, err := writer.Write(ctx, data)
+	_, err := writer.Write(data)
 	assert.NoError(t, err)
 
 	defer func() {
@@ -166,13 +295,12 @@ func TestBufferedFileWriterWriteExceedsThreshold(t *testing.T) {
 func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
 	initialData := []byte("initial data is longer than subsequent data")
 	subsequentData := []byte("subsequent data")
 
 	// Initialize writer with a threshold that initialData will exceed.
 	writer := New(WithThreshold(uint64(len(initialData) - 1)))
-	_, err := writer.Write(ctx, initialData)
+	_, err := writer.Write(initialData)
 	assert.NoError(t, err)
 
 	defer func() {
@@ -188,7 +316,7 @@ func TestBufferedFileWriterWriteAfterFlush(t *testing.T) {
 	assert.Equal(t, initialData, fileContents)
 
 	// Perform a subsequent write with data under the threshold.
-	_, err = writer.Write(ctx, subsequentData)
+	_, err = writer.Write(subsequentData)
 	assert.NoError(t, err)
 
 	assert.Equal(t, subsequentData, writer.buf.Bytes()) // Check buffer contents
@@ -211,7 +339,6 @@ func TestBufferedFileWriterClose(t *testing.T) {
 	t.Parallel()
 
 	const threshold = 10
-	ctx := context.Background()
 
 	tests := []struct {
 		name              string
@@ -222,7 +349,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "No File Created, Only Buffer Data",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data under the threshold
-				_, _ = w.Write(ctx, []byte("small data"))
+				_, _ = w.Write([]byte("small data"))
 			},
 			expectFileContent: "",
 		},
@@ -230,7 +357,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "File Created, No Data in Buffer",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data over the threshold to create a file
-				_, _ = w.Write(ctx, []byte("large data is more than the threshold"))
+				_, _ = w.Write([]byte("large data is more than the threshold"))
 			},
 			expectFileContent: "large data is more than the threshold",
 		},
@@ -238,8 +365,8 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "File Created, Data in Buffer",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data over the threshold to create a file, then write more data
-				_, _ = w.Write(ctx, []byte("large data is more than the threshold"))
-				_, _ = w.Write(ctx, []byte(" more data"))
+				_, _ = w.Write([]byte("large data is more than the threshold"))
+				_, _ = w.Write([]byte(" more data"))
 			},
 			expectFileContent: "large data is more than the threshold more data",
 		},
@@ -247,7 +374,7 @@ func TestBufferedFileWriterClose(t *testing.T) {
 			name: "File Created, Buffer Cleared",
 			prepareWriter: func(w *BufferedFileWriter) {
 				// Write data over the threshold to create a file, then clear the buffer.
-				_, _ = w.Write(ctx, []byte("large data is more than the threshold"))
+				_, _ = w.Write([]byte("large data is more than the threshold"))
 				w.buf.Reset()
 			},
 			expectFileContent: "large data is more than the threshold",
@@ -255,7 +382,6 @@ func TestBufferedFileWriterClose(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			writer := New(WithThreshold(threshold))
@@ -286,7 +412,7 @@ func TestBufferedFileWriterStateTransitionOnClose(t *testing.T) {
 	assert.Equal(t, writeOnly, writer.state)
 
 	// Perform some write operation.
-	_, err := writer.Write(context.Background(), []byte("test data"))
+	_, err := writer.Write([]byte("test data"))
 	assert.NoError(t, err)
 
 	// Close the writer.
@@ -303,6 +429,168 @@ func TestBufferedFileWriterWriteInReadOnlyState(t *testing.T) {
 	_ = writer.CloseForWriting() // Transition to read-only mode
 
 	// Attempt to write in read-only mode.
-	_, err := writer.Write(context.Background(), []byte("should fail"))
+	_, err := writer.Write([]byte("should fail"))
 	assert.Error(t, err)
+}
+
+func BenchmarkBufferedFileWriterWriteLarge(b *testing.B) {
+	data := make([]byte, 1024*1024*10) // 10MB
+	for i := range data {
+		data[i] = byte(i % 256) // Simple pattern to avoid uniform zero data
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Threshold is smaller than the data size, data should get flushed to the file.
+		writer := New(WithThreshold(1024))
+
+		b.StartTimer()
+		{
+			_, err := writer.Write(data)
+			assert.NoError(b, err)
+		}
+		b.StopTimer()
+
+		// Ensure proper cleanup after each write operation, including closing the file
+		err := writer.CloseForWriting()
+		assert.NoError(b, err)
+
+		rc, err := writer.ReadCloser()
+		assert.NoError(b, err)
+		rc.Close()
+	}
+}
+
+func BenchmarkBufferedFileWriterWriteSmall(b *testing.B) {
+	data := make([]byte, 1024*1024) // 1MB
+	for i := range data {
+		data[i] = byte(i % 256) // Simple pattern to avoid uniform zero data
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Threshold is the same as the buffer size, data should always be written to the buffer.
+		writer := New(WithThreshold(1024 * 1024))
+
+		b.StartTimer()
+		{
+			_, err := writer.Write(data)
+			assert.NoError(b, err)
+		}
+		b.StopTimer()
+
+		// Ensure proper cleanup after each write operation, including closing the file.
+		err := writer.CloseForWriting()
+		assert.NoError(b, err)
+
+		rc, err := writer.ReadCloser()
+		assert.NoError(b, err)
+		rc.Close()
+	}
+}
+
+func TestBufferWriterCloseForWritingWithFile(t *testing.T) {
+	bufPool := pool.NewBufferPool(defaultBufferSize)
+
+	buf := bufPool.Get()
+	writer := &BufferedFileWriter{
+		threshold: 10,
+		bufPool:   bufPool,
+		buf:       buf,
+	}
+
+	// Write data exceeding the threshold to ensure a file is created.
+	data := []byte("this is a longer string exceeding the threshold")
+	_, err := writer.Write(data)
+	assert.NoError(t, err)
+
+	err = writer.CloseForWriting()
+	assert.NoError(t, err)
+	assert.Equal(t, readOnly, writer.state)
+
+	rdr, err := writer.ReadCloser()
+	assert.NoError(t, err)
+	defer rdr.Close()
+
+	// Get a buffer from the pool and check if it is the same buffer used in the writer.
+	bufFromPool := bufPool.Get()
+	assert.Same(t, buf, bufFromPool, "Buffer should be returned to the pool")
+	bufPool.Put(bufFromPool)
+}
+
+func TestBufferedFileWriter_ReadFrom(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		expectedOutput string
+		expectedSize   int64
+	}{
+		{
+			name:           "Empty input",
+			input:          "",
+			expectedOutput: "",
+			expectedSize:   0,
+		},
+		{
+			name:           "Small input",
+			input:          "Hello, World!",
+			expectedOutput: "Hello, World!",
+			expectedSize:   13,
+		},
+		{
+			name:           "Large input",
+			input:          string(make([]byte, 1<<20)), // 1MB input
+			expectedOutput: string(make([]byte, 1<<20)),
+			expectedSize:   1 << 20,
+		},
+		{
+			name:           "Input slightly greater than threshold",
+			input:          string(make([]byte, defaultThreshold+1)),
+			expectedOutput: string(make([]byte, defaultThreshold+1)),
+			expectedSize:   defaultThreshold + 1,
+		},
+		// Test to ensure that anytime the buffer exceeds the threshold, the data is written to a file
+		// and the buffer is cleared.
+		{
+			name:           "Input much greater than threshold",
+			input:          string(make([]byte, (2*defaultThreshold)+largeBufferSize+1)),
+			expectedOutput: string(make([]byte, (2*defaultThreshold)+largeBufferSize+1)),
+			expectedSize:   (2 * defaultThreshold) + largeBufferSize + 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			writer := New()
+			reader := bytes.NewReader([]byte(tc.input))
+			size, err := writer.ReadFrom(reader)
+			assert.NoError(t, err)
+
+			if writer.buf != nil && writer.file != nil {
+				assert.Len(t, writer.buf.Bytes(), 0)
+			}
+
+			err = writer.CloseForWriting()
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.expectedSize, size)
+			if size == 0 {
+				return
+			}
+
+			rc, err := writer.ReadCloser()
+			assert.NoError(t, err)
+			defer rc.Close()
+
+			var result bytes.Buffer
+
+			_, err = io.Copy(&result, rc)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedOutput, result.String())
+		})
+	}
 }

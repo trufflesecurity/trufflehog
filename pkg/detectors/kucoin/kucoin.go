@@ -16,7 +16,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -45,21 +47,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	passphraseMatches := passphrasePat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, keyMatch := range keyMatches {
-		if len(keyMatch) != 2 {
-			continue
-		}
 		resKeyMatch := strings.TrimSpace(keyMatch[1])
 
 		for _, secretMatch := range secretMatches {
-			if len(secretMatch) != 2 {
-				continue
-			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			for _, passphraseMatch := range passphraseMatches {
-				if len(passphraseMatch) != 2 {
-					continue
-				}
 				resPassphraseMatch := strings.TrimSpace(passphraseMatch[1])
 
 				s1 := detectors.Result{
@@ -79,7 +72,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					signature := getKucoinSignature(resSecretMatch, timestamp, method, endpoint, bodyStr)
 					passPhrase := getKucoinPassphrase(resSecretMatch, resPassphraseMatch)
 
-					req, err := http.NewRequest(method, "https://api.kucoin.com"+endpoint, nil)
+					req, err := http.NewRequestWithContext(ctx, method, "https://api.kucoin.com"+endpoint, nil)
 					if err != nil {
 						continue
 					}
@@ -94,15 +87,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						defer res.Body.Close()
 						if res.StatusCode >= 200 && res.StatusCode < 300 {
 							s1.Verified = true
-						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resKeyMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
-
-							if detectors.IsKnownFalsePositive(resSecretMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}
@@ -134,4 +118,8 @@ func getKucoinSignature(apiSecret string, timestamp string, method string, endpo
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_KuCoin
+}
+
+func (s Scanner) Description() string {
+	return "KuCoin is a cryptocurrency exchange that provides various digital asset trading services. KuCoin API keys can be used to access and manage trading accounts, execute trades, and retrieve market data."
 }

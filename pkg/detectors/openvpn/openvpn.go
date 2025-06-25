@@ -4,16 +4,17 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -21,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	clientIDPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"openvpn"}) + `\b([A-Za-z0-9-]{3,40}\.[A-Za-z0-9-]{3,40})\b`)
 	clientSecretPat = regexp.MustCompile(`\b([a-zA-Z0-9_-]{64,})\b`)
@@ -89,10 +90,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						s1.SetVerificationError(err, clientSecretRes)
 					}
 				}
-				// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-				if detectors.IsKnownFalsePositive(clientSecretRes, detectors.DefaultFalsePositives, true) {
-					continue
-				}
+
 				results = append(results, s1)
 			}
 		}
@@ -104,4 +102,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_OpenVpn
+}
+
+func (s Scanner) Description() string {
+	return "OpenVPN is a virtual private network (VPN) solution. OpenVPN API credentials can be used to manage and configure VPN connections and settings."
 }

@@ -3,9 +3,10 @@ package pagerdutyapikey
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -39,9 +40,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -56,9 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
-		if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
-			continue
-		}
 		results = append(results, s1)
 	}
 
@@ -98,4 +93,8 @@ func verifyPagerdutyapikey(ctx context.Context, client *http.Client, token strin
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PagerDutyApiKey
+}
+
+func (s Scanner) Description() string {
+	return "PagerDuty is an incident management platform that provides reliable notifications, automatic escalations, on-call scheduling, and other functionality to help teams detect and fix infrastructure problems quickly. PagerDuty API keys can be used to access and manage these functionalities."
 }

@@ -15,7 +15,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -130,11 +132,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 							if pingEndpoint.State == gocb.PingStateOk {
 								s1.Verified = true
 								break
-							} else {
-								// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-								if detectors.IsKnownFalsePositive(resPasswordMatch, detectors.DefaultFalsePositives, true) {
-									continue
-								}
 							}
 						}
 					}
@@ -149,4 +146,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Couchbase
+}
+
+func (s Scanner) Description() string {
+	return "Couchbase is a distributed NoSQL cloud database. Couchbase credentials can be used to access and modify data within the Couchbase database."
 }

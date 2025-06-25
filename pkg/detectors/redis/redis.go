@@ -13,7 +13,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -73,10 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
-
 		results = append(results, s)
 	}
 
@@ -116,10 +114,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, false) {
-			continue
-		}
-
 		results = append(results, s)
 	}
 
@@ -144,4 +138,8 @@ func verifyRedis(ctx context.Context, u *url.URL) bool {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Redis
+}
+
+func (s Scanner) Description() string {
+	return "Redis is an in-memory data structure store, used as a database, cache, and message broker. Redis credentials can be used to access and manipulate stored data."
 }

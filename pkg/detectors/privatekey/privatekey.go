@@ -3,19 +3,28 @@ package privatekey
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
+	regexp "github.com/wasilibs/go-re2"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+)
+
+var (
+	falsePositiveGHUsernames = map[detectors.FalsePositive]struct{}{
+		// This hack is because it's probably one of the most widely distributed github keys
+		// and a frequent annoyance.
+		// It is active at the time of this commit, but the developer is unresponsive.
+		detectors.FalsePositive("aaron1234567890123"): {},
+	}
 )
 
 type Scanner struct {
@@ -24,10 +33,12 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
+var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 
 var (
 	// TODO: add base64 encoded key support
-	client = common.RetryableHttpClient()
+	client = common.RetryableHTTPClient()
 	keyPat = regexp.MustCompile(`(?i)-----\s*?BEGIN[ A-Z0-9_-]*?PRIVATE KEY\s*?-----[\s\S]*?----\s*?END[ A-Z0-9_-]*? PRIVATE KEY\s*?-----`)
 )
 
@@ -37,13 +48,18 @@ func (s Scanner) Keywords() []string {
 	return []string{"private key"}
 }
 
+const maxPrivateKeySize = 4096
+
+// ProvideMaxSecretSize returns the maximum size of a secret that this detector can find.
+func (s Scanner) MaxSecretSize() int64 { return maxPrivateKeySize }
+
 // FromData will find and optionally verify Privatekey secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	matches := keyPat.FindAllString(dataStr, -1)
 	for _, match := range matches {
-		token := normalize(match)
+		token := Normalize(match)
 		if len(token) < 64 {
 			continue
 		}
@@ -59,7 +75,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		parsedKey, err := ssh.ParseRawPrivateKey([]byte(token))
 		if err != nil && strings.Contains(err.Error(), "private key is passphrase protected") {
 			s1.ExtraData["encrypted"] = "true"
-			parsedKey, passphrase, err = crack([]byte(token))
+			parsedKey, passphrase, err = Crack([]byte(token))
 			if err != nil {
 				s1.SetVerificationError(err, token)
 				continue
@@ -81,14 +97,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			var (
 				wg                 sync.WaitGroup
 				extraData          = newExtraData()
-				verificationErrors = newVerificationErrors()
+				verificationErrors = NewVerificationErrors(3)
 			)
 
 			// Look up certificate information.
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				data, err := lookupFingerprint(fingerprint, s.IncludeExpired)
+				data, err := lookupFingerprintCertificateUrls(ctx, fingerprint, s.IncludeExpired)
 				if err == nil {
 					if data != nil {
 						extraData.Add("certificate_urls", strings.Join(data.CertificateURLs, ", "))
@@ -102,12 +118,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				user, err := verifyGitHubUser(parsedKey)
+				username, err := VerifyGitHubUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
 				}
-				if user != nil {
-					extraData.Add("github_user", *user)
+				if username != nil {
+					isFalsePositive, _ := detectors.IsKnownFalsePositive(*username, falsePositiveGHUsernames, false)
+					if !isFalsePositive {
+						extraData.Add("github_user", *username)
+					}
 				}
 			}()
 
@@ -115,7 +134,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				user, err := verifyGitLabUser(parsedKey)
+				user, err := VerifyGitLabUser(ctx, parsedKey)
 				if err != nil && !errors.Is(err, errPermissionDenied) {
 					verificationErrors.Add(err)
 				}
@@ -130,11 +149,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				for k, v := range extraData.data {
 					s1.ExtraData[k] = v
 				}
+
+				// enabled th
+				s1.AnalysisInfo = map[string]string{
+					"token": token,
+				}
 			} else {
 				s1.ExtraData = nil
 			}
-			if len(verificationErrors.errors) > 0 {
-				s1.SetVerificationError(fmt.Errorf("verification failures: %s", strings.Join(verificationErrors.errors, ", ")), token)
+			if len(verificationErrors.Errors) > 0 {
+				s1.SetVerificationError(fmt.Errorf("verification failures: %s", strings.Join(verificationErrors.Errors, ", ")), token)
 			}
 		}
 
@@ -144,24 +168,28 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
+}
+
+func (s Scanner) Description() string {
+	return "Private keys are used for securely connecting and authenticating to various systems and services. Exposure of private keys can lead to unauthorized access and data breaches."
+}
+
 type result struct {
 	CertificateURLs []string
 	GitHubUsername  string
 }
 
-func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (*result, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	results := DriftwoodResult{}
-	err = json.NewDecoder(res.Body).Decode(&results)
+func lookupFingerprintCertificateUrls(
+	ctx context.Context,
+	publicKeyFingerprintInHex string,
+	includeExpired bool,
+) (*result, error) {
+	results, err := LookupFingerprint(
+		ctx,
+		publicKeyFingerprintInHex,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -186,10 +214,39 @@ func lookupFingerprint(publicKeyFingerprintInHex string, includeExpired bool) (*
 	return data, nil
 }
 
+func LookupFingerprint(ctx context.Context, publicKeyFingerprintInHex string) (*DriftwoodResult, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://keychecker.trufflesecurity.com/fingerprint/%s", publicKeyFingerprintInHex), nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	results := DriftwoodResult{}
+	err = json.NewDecoder(res.Body).Decode(&results)
+	if err != nil {
+		return nil, err
+	}
+	return &results, nil
+}
+
 type DriftwoodResult struct {
 	CertificateResults []struct {
+		Domains                []string  `json:",omitempty"`
 		CertificateFingerprint string    `json:"CertificateFingerprint"`
 		ExpirationTimestamp    time.Time `json:"ExpirationTimestamp"`
+		IssuerName             string    `json:",omitempty"` // CA information
+		SubjectName            string    `json:",omitempty"` // Certificate subject
+		IssuerOrganization     []string  `json:",omitempty"` // CA organization(s)
+		SubjectOrganization    []string  `json:",omitempty"` // Subject organization(s)
+		KeyUsages              []string  `json:",omitempty"` // e.g., ["DigitalSignature", "KeyEncipherment"]
+		ExtendedKeyUsages      []string  `json:",omitempty"` // e.g., ["ServerAuth", "ClientAuth"]
+		SubjectKeyID           string    `json:",omitempty"` // hex encoded
+		AuthorityKeyID         string    `json:",omitempty"` // hex encoded
+		SerialNumber           string    `json:",omitempty"` // hex encoded
 	} `json:"CertificateResults"`
 	GitHubSSHResults []struct {
 		Username string `json:"Username"`
@@ -213,20 +270,20 @@ func (e *extraData) Add(key string, value string) {
 	e.mutex.Unlock()
 }
 
-type verificationErrors struct {
+type VerificationErrors struct {
 	mutex  sync.Mutex
-	errors []string
+	Errors []string
 }
 
-func newVerificationErrors() *verificationErrors {
-	return &verificationErrors{
-		errors: make([]string, 0, 3),
+func NewVerificationErrors(capacity int) *VerificationErrors {
+	return &VerificationErrors{
+		Errors: make([]string, 0, capacity),
 	}
 }
 
-func (e *verificationErrors) Add(err error) {
+func (e *VerificationErrors) Add(err error) {
 	e.mutex.Lock()
-	e.errors = append(e.errors, err.Error())
+	e.Errors = append(e.Errors, err.Error())
 	e.mutex.Unlock()
 }
 

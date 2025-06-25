@@ -4,18 +4,21 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -25,7 +28,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat   = regexp.MustCompile(detectors.PrefixRegex([]string{"gocanvas"}) + `\b([0-9A-Za-z/+]{43}=[ \r\n]{1})`)
-	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gocanvas"}) + `\b([\w\.-]+@[\w-]+\.[\w\.-]{2,5})\b`)
+	emailPat = regexp.MustCompile(detectors.PrefixRegex([]string{"gocanvas"}) + common.EmailPattern)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -39,18 +42,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	emailMatches := emailPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, emailMatch := range emailMatches {
-		if len(emailMatch) != 2 {
-			continue
-		}
-		resEmailMatch := strings.TrimSpace(emailMatch[1])
+	uniqueEmailMatches := make(map[string]struct{})
+	for _, match := range emailPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueEmailMatches[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
+	for emailMatch := range uniqueEmailMatches {
 		for _, match := range matches {
-			if len(match) != 2 {
-				continue
-			}
 			resMatch := strings.TrimSpace(match[1])
 
 			s1 := detectors.Result{
@@ -59,11 +58,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-
 				payload := url.Values{}
-				payload.Add("username", resEmailMatch)
+				payload.Add("username", emailMatch)
 
-				req, err := http.NewRequest("GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
+				req, err := http.NewRequestWithContext(ctx, "GET", "https://www.gocanvas.com/apiv2/forms.xml", strings.NewReader(payload.Encode()))
 				if err != nil {
 					continue
 				}
@@ -82,11 +80,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 						if res.StatusCode >= 200 && res.StatusCode < 300 && response.Error == nil {
 							s1.Verified = true
-						} else {
-							// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-							if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-								continue
-							}
 						}
 					}
 				}
@@ -107,4 +100,8 @@ type Response struct {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GoCanvas
+}
+
+func (s Scanner) Description() string {
+	return "GoCanvas is a platform for automating business processes using mobile forms. GoCanvas API keys can be used to access and modify data within the GoCanvas platform."
 }

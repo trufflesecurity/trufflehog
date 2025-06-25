@@ -1,0 +1,2596 @@
+{
+    "AnalyzerType": 16,
+    "Bindings": [
+        {
+            "Resource": {
+                "Name": "API Keys",
+                "FullyQualifiedName": "API Keys",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "api_keys.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "API Keys",
+                "FullyQualifiedName": "API Keys",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "api_keys.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "API Keys",
+                "FullyQualifiedName": "API Keys",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "api_keys.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "API Keys",
+                "FullyQualifiedName": "API Keys",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "api_keys.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Account",
+                "FullyQualifiedName": "User Account/Account",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.account.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Address Allow List",
+                "FullyQualifiedName": "Mail Settings/Address Allow List",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.address_whitelist.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Address Allow List",
+                "FullyQualifiedName": "Mail Settings/Address Allow List",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.address_whitelist.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Alerts",
+                "FullyQualifiedName": "Alerts",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "alerts.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Alerts",
+                "FullyQualifiedName": "Alerts",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "alerts.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Alerts",
+                "FullyQualifiedName": "Alerts",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "alerts.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Alerts",
+                "FullyQualifiedName": "Alerts",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "alerts.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Bounce Purge",
+                "FullyQualifiedName": "Mail Settings/Bounce Purge",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.bounce_purge.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Bounce Purge",
+                "FullyQualifiedName": "Mail Settings/Bounce Purge",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.bounce_purge.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Browser Stats",
+                "FullyQualifiedName": "Stats/Browser Stats",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "browsers.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Category Management",
+                "FullyQualifiedName": "Category Management",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "categories.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Category Management",
+                "FullyQualifiedName": "Category Management",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "categories.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Category Management",
+                "FullyQualifiedName": "Category Management",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "categories.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Category Management",
+                "FullyQualifiedName": "Category Management",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "categories.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Category Management",
+                "FullyQualifiedName": "Category Management",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "categories.stats.sums.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Category Management",
+                "FullyQualifiedName": "Category Management",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "categories.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Click Tracking",
+                "FullyQualifiedName": "Tracking/Click Tracking",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Tracking",
+                    "FullyQualifiedName": "Tracking",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "tracking_settings.click.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Click Tracking",
+                "FullyQualifiedName": "Tracking/Click Tracking",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Tracking",
+                    "FullyQualifiedName": "Tracking",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "tracking_settings.click.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Credits",
+                "FullyQualifiedName": "User Account/Credits",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.credits.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email",
+                "FullyQualifiedName": "User Account/Email",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.email.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email",
+                "FullyQualifiedName": "User Account/Email",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.email.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email",
+                "FullyQualifiedName": "User Account/Email",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.email.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email",
+                "FullyQualifiedName": "User Account/Email",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.email.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email Clients and Devices",
+                "FullyQualifiedName": "Stats/Email Clients and Devices",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "clients.desktop.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email Clients and Devices",
+                "FullyQualifiedName": "Stats/Email Clients and Devices",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "clients.phone.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email Clients and Devices",
+                "FullyQualifiedName": "Stats/Email Clients and Devices",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "clients.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email Clients and Devices",
+                "FullyQualifiedName": "Stats/Email Clients and Devices",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "clients.tablet.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email Clients and Devices",
+                "FullyQualifiedName": "Stats/Email Clients and Devices",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "clients.webmail.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Email Clients and Devices",
+                "FullyQualifiedName": "Stats/Email Clients and Devices",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "devices.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Enforced TLS",
+                "FullyQualifiedName": "User Account/Enforced TLS",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.settings.enforced_tls.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Enforced TLS",
+                "FullyQualifiedName": "User Account/Enforced TLS",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.settings.enforced_tls.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Event Notification",
+                "FullyQualifiedName": "Mail Settings/Event Notification",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.webhooks.event.settings.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Event Notification",
+                "FullyQualifiedName": "Mail Settings/Event Notification",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.webhooks.event.settings.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Event Notification",
+                "FullyQualifiedName": "Mail Settings/Event Notification",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.webhooks.event.test.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Event Notification",
+                "FullyQualifiedName": "Mail Settings/Event Notification",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.webhooks.event.test.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Event Notification",
+                "FullyQualifiedName": "Mail Settings/Event Notification",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.webhooks.event.test.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Footer",
+                "FullyQualifiedName": "Mail Settings/Footer",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.footer.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Footer",
+                "FullyQualifiedName": "Mail Settings/Footer",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.footer.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Forward Bounce",
+                "FullyQualifiedName": "Mail Settings/Forward Bounce",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.forward_bounce.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Forward Bounce",
+                "FullyQualifiedName": "Mail Settings/Forward Bounce",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.forward_bounce.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Forward Spam",
+                "FullyQualifiedName": "Mail Settings/Forward Spam",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.forward_spam.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Forward Spam",
+                "FullyQualifiedName": "Mail Settings/Forward Spam",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.forward_spam.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Geographical",
+                "FullyQualifiedName": "Stats/Geographical",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "geo.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Global Stats",
+                "FullyQualifiedName": "Stats/Global Stats",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "stats.global.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Google Analytics",
+                "FullyQualifiedName": "Tracking/Google Analytics",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Tracking",
+                    "FullyQualifiedName": "Tracking",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "tracking_settings.google_analytics.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Google Analytics",
+                "FullyQualifiedName": "Tracking/Google Analytics",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Tracking",
+                    "FullyQualifiedName": "Tracking",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "tracking_settings.google_analytics.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "IP Management",
+                "FullyQualifiedName": "IP Management",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "ips.pools.ips.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Inbound Parse",
+                "FullyQualifiedName": "Inbound Parse",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "user.webhooks.parse.settings.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Inbound Parse",
+                "FullyQualifiedName": "Inbound Parse",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "user.webhooks.parse.settings.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Inbound Parse",
+                "FullyQualifiedName": "Inbound Parse",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "user.webhooks.parse.settings.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Inbound Parse",
+                "FullyQualifiedName": "Inbound Parse",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "user.webhooks.parse.settings.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Legacy Email Template",
+                "FullyQualifiedName": "Mail Settings/Legacy Email Template",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.template.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Legacy Email Template",
+                "FullyQualifiedName": "Mail Settings/Legacy Email Template",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.template.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Mail Send",
+                "FullyQualifiedName": "Mail Send/Mail Send",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Send",
+                    "FullyQualifiedName": "Mail Send",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail.send",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Mail Settings",
+                "FullyQualifiedName": "Mail Settings",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "mail_settings.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Mailbox Provider Stats",
+                "FullyQualifiedName": "Stats/Mailbox Provider Stats",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mailbox_providers.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Multifactor Authentication",
+                "FullyQualifiedName": "User Account/Multifactor Authentication",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.multifactor_authentication.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Multifactor Authentication",
+                "FullyQualifiedName": "User Account/Multifactor Authentication",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.multifactor_authentication.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Multifactor Authentication",
+                "FullyQualifiedName": "User Account/Multifactor Authentication",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.multifactor_authentication.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Multifactor Authentication",
+                "FullyQualifiedName": "User Account/Multifactor Authentication",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.multifactor_authentication.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Open Tracking",
+                "FullyQualifiedName": "Tracking/Open Tracking",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Tracking",
+                    "FullyQualifiedName": "Tracking",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "tracking_settings.open.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Open Tracking",
+                "FullyQualifiedName": "Tracking/Open Tracking",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Tracking",
+                    "FullyQualifiedName": "Tracking",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "tracking_settings.open.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Parse Webhook",
+                "FullyQualifiedName": "Stats/Parse Webhook",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.webhooks.parse.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Partners",
+                "FullyQualifiedName": "Partners",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "partner_settings.new_relic.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Partners",
+                "FullyQualifiedName": "Partners",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "partner_settings.new_relic.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Partners",
+                "FullyQualifiedName": "Partners",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "partner_settings.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Password",
+                "FullyQualifiedName": "User Account/Password",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.password.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Password",
+                "FullyQualifiedName": "User Account/Password",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.password.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Plain Content",
+                "FullyQualifiedName": "Mail Settings/Plain Content",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.plain_content.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Plain Content",
+                "FullyQualifiedName": "Mail Settings/Plain Content",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Mail Settings",
+                    "FullyQualifiedName": "Mail Settings",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "mail_settings.plain_content.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Profile",
+                "FullyQualifiedName": "User Account/Profile",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.profile.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Profile",
+                "FullyQualifiedName": "User Account/Profile",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.profile.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Security",
+                "FullyQualifiedName": "Security",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "access_settings.activity.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Security",
+                "FullyQualifiedName": "Security",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "access_settings.whitelist.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Security",
+                "FullyQualifiedName": "Security",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "access_settings.whitelist.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Security",
+                "FullyQualifiedName": "Security",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "access_settings.whitelist.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Security",
+                "FullyQualifiedName": "Security",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "access_settings.whitelist.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Sender Authentication",
+                "FullyQualifiedName": "Sender Authentication",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "whitelabel.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Sender Authentication",
+                "FullyQualifiedName": "Sender Authentication",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "whitelabel.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Sender Authentication",
+                "FullyQualifiedName": "Sender Authentication",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "whitelabel.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Sender Authentication",
+                "FullyQualifiedName": "Sender Authentication",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "whitelabel.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Source Integration",
+                "FullyQualifiedName": "37006899",
+                "Type": "User",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "full_access",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Stats Overview",
+                "FullyQualifiedName": "Stats/Stats Overview",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Subscription Tracking",
+                "FullyQualifiedName": "Tracking/Subscription Tracking",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Tracking",
+                    "FullyQualifiedName": "Tracking",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "tracking_settings.subscription.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Subscription Tracking",
+                "FullyQualifiedName": "Tracking/Subscription Tracking",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Tracking",
+                    "FullyQualifiedName": "Tracking",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "tracking_settings.subscription.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Subuser Stats",
+                "FullyQualifiedName": "Stats/Subuser Stats",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "subusers.stats.monthly.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Subuser Stats",
+                "FullyQualifiedName": "Stats/Subuser Stats",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "subusers.stats.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Subuser Stats",
+                "FullyQualifiedName": "Stats/Subuser Stats",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Stats",
+                    "FullyQualifiedName": "Stats",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "subusers.stats.sums.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.blocks.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.blocks.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.blocks.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.blocks.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.bounces.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.bounces.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.bounces.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.bounces.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.invalid_emails.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.invalid_emails.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.invalid_emails.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.invalid_emails.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.spam_reports.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.spam_reports.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.spam_reports.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.spam_reports.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.unsubscribes.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.unsubscribes.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.unsubscribes.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.unsubscribes.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Supressions",
+                "FullyQualifiedName": "Suppressions/Supressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "suppression.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Teammates",
+                "FullyQualifiedName": "Teammates",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "teammates.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Teammates",
+                "FullyQualifiedName": "Teammates",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "teammates.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Teammates",
+                "FullyQualifiedName": "Teammates",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "teammates.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Teammates",
+                "FullyQualifiedName": "Teammates",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "teammates.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.versions.activate.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.versions.activate.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.versions.activate.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.versions.activate.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.versions.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.versions.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.versions.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Template Engine",
+                "FullyQualifiedName": "Template Engine",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "templates.versions.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Timezone",
+                "FullyQualifiedName": "User Account/Timezone",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.timezone.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Tracking",
+                "FullyQualifiedName": "Tracking",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            },
+            "Permission": {
+                "Value": "tracking_settings.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Unsubscribe Groups",
+                "FullyQualifiedName": "Suppressions/Unsubscribe Groups",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "asm.groups.create",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Unsubscribe Groups",
+                "FullyQualifiedName": "Suppressions/Unsubscribe Groups",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "asm.groups.delete",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Unsubscribe Groups",
+                "FullyQualifiedName": "Suppressions/Unsubscribe Groups",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "asm.groups.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Unsubscribe Groups",
+                "FullyQualifiedName": "Suppressions/Unsubscribe Groups",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "Suppressions",
+                    "FullyQualifiedName": "Suppressions",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "asm.groups.update",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Username",
+                "FullyQualifiedName": "User Account/Username",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.username.read",
+                "Parent": null
+            }
+        },
+        {
+            "Resource": {
+                "Name": "Username",
+                "FullyQualifiedName": "User Account/Username",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": {
+                    "Name": "User Account",
+                    "FullyQualifiedName": "User Account",
+                    "Type": "category",
+                    "Metadata": null,
+                    "Parent": null
+                }
+            },
+            "Permission": {
+                "Value": "user.username.update",
+                "Parent": null
+            }
+        }
+    ],
+    "UnboundedResources": [
+        {
+            "Name": "Billing",
+            "FullyQualifiedName": "Billing",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": null
+        },
+        {
+            "Name": "Design Library",
+            "FullyQualifiedName": "Design Library",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": null
+        },
+        {
+            "Name": "Email Activity",
+            "FullyQualifiedName": "Email Activity",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": null
+        },
+        {
+            "Name": "Email Testing",
+            "FullyQualifiedName": "Email Testing",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": null
+        },
+        {
+            "Name": "Scheduled Sends",
+            "FullyQualifiedName": "Mail Send/Scheduled Sends",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Mail Send",
+                "FullyQualifiedName": "Mail Send",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "BCC",
+            "FullyQualifiedName": "Mail Settings/BCC",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Mail Settings",
+                "FullyQualifiedName": "Mail Settings",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Spam Checker",
+            "FullyQualifiedName": "Mail Settings/Spam Checker",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Mail Settings",
+                "FullyQualifiedName": "Mail Settings",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Automation",
+            "FullyQualifiedName": "Marketing/Automation",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Marketing",
+                "FullyQualifiedName": "Marketing",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Marketing",
+            "FullyQualifiedName": "Marketing/Marketing",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Marketing",
+                "FullyQualifiedName": "Marketing",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Recipients Data Erasure",
+            "FullyQualifiedName": "Recipients Data Erasure",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": null
+        },
+        {
+            "Name": "Category Stats",
+            "FullyQualifiedName": "Stats/Category Stats",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Stats",
+                "FullyQualifiedName": "Stats",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Unsubscribe Group Suppressions",
+            "FullyQualifiedName": "Suppressions/Unsubscribe Group Suppressions",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Suppressions",
+                "FullyQualifiedName": "Suppressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Global Suppressions",
+            "FullyQualifiedName": "Suppressions/Global Suppressions",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Suppressions",
+                "FullyQualifiedName": "Suppressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Credentials",
+            "FullyQualifiedName": "Credentials",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": null
+        },
+        {
+            "Name": "Signup",
+            "FullyQualifiedName": "Signup",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": null
+        },
+        {
+            "Name": "Blocks",
+            "FullyQualifiedName": "Suppressions/Blocks",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Suppressions",
+                "FullyQualifiedName": "Suppressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Bounces",
+            "FullyQualifiedName": "Suppressions/Bounces",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Suppressions",
+                "FullyQualifiedName": "Suppressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Invalid Emails",
+            "FullyQualifiedName": "Suppressions/Invalid Emails",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Suppressions",
+                "FullyQualifiedName": "Suppressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Spam Reports",
+            "FullyQualifiedName": "Suppressions/Spam Reports",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Suppressions",
+                "FullyQualifiedName": "Suppressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "Unsubscribes",
+            "FullyQualifiedName": "Suppressions/Unsubscribes",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": {
+                "Name": "Suppressions",
+                "FullyQualifiedName": "Suppressions",
+                "Type": "category",
+                "Metadata": null,
+                "Parent": null
+            }
+        },
+        {
+            "Name": "UI",
+            "FullyQualifiedName": "UI",
+            "Type": "category",
+            "Metadata": null,
+            "Parent": null
+        }
+    ],
+    "Metadata": {
+        "2fa_required": true,
+        "key_type": "full access"
+    }
+}

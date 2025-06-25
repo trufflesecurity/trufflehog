@@ -14,6 +14,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -26,8 +27,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"agora"}) + `\b([a-z0-9]{32})\b`)
-	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"agora"}) + `\b([a-z0-9]{32})\b`)
+	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"agora", "key", "token"}) + `\b([a-z0-9]{32})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"agora", "secret"}) + `\b([a-z0-9]{32})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -51,17 +52,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, secret := range secretMatches {
-			if len(secret) != 2 {
+			resSecret := strings.TrimSpace(secret[1])
+			/*
+				as both agora key and secretMatch has same regex, the set of strings keyMatch for both probably me same.
+				we need to avoid the scenario where key is same as secretMatch. This will reduce the number of matches we process.
+			*/
+			if resMatch == resSecret {
 				continue
 			}
-			resSecret := strings.TrimSpace(secret[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Agora,
@@ -74,11 +75,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := verifyAgora(ctx, client, resMatch, resSecret)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resMatch)
-			}
-
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s1)
@@ -114,4 +110,8 @@ func verifyAgora(ctx context.Context, client *http.Client, resMatch, resSecret s
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Agora
+}
+
+func (s Scanner) Description() string {
+	return "Agora is a real-time engagement platform providing APIs for voice, video, and messaging. Agora API keys can be used to access and manage these services."
 }

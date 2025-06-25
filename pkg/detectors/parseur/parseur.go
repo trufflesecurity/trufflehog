@@ -38,9 +38,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 
 		resMatch := strings.TrimSpace(match[1])
 		s1 := detectors.Result{
@@ -55,13 +52,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			isVerified, verificationErr := verifyResult(ctx, s.client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
-		}
-
-		if !s1.Verified {
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-			if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
 		}
 
 		results = append(results, s1)
@@ -91,4 +81,8 @@ func verifyResult(ctx context.Context, client *http.Client, token string) (bool,
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Parseur
+}
+
+func (s Scanner) Description() string {
+	return "Parseur is a document parsing software used to extract data from emails and other documents. Parseur API keys can be used to access and manage this data."
 }

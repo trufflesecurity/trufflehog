@@ -11,6 +11,7 @@ func DefaultDecoders() []Decoder {
 		&UTF8{},
 		&Base64{},
 		&UTF16{},
+		&EscapedUnicode{},
 	}
 }
 
@@ -23,6 +24,7 @@ type DecodableChunk struct {
 
 type Decoder interface {
 	FromChunk(chunk *sources.Chunk) *DecodableChunk
+	Type() detectorspb.DecoderType
 }
 
 // Fuzz is an entrypoint for go-fuzz, which is an AFL-style fuzzing tool.

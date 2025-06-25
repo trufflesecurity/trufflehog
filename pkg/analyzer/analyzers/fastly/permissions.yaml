@@ -1,0 +1,5 @@
+permissions:
+  - global
+  - global:read
+  - purge_all
+  - purge_select

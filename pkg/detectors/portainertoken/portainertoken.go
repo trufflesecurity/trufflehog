@@ -3,24 +3,25 @@ package portainertoken
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat      = regexp.MustCompile(detectors.PrefixRegex([]string{"portainertoken"}) + `\b(ptr_[A-Za-z0-9\/_\-+=]{20,60})`)
 	endpointPat = regexp.MustCompile(detectors.PrefixRegex([]string{"portainer"}) + `\b(https?:\/\/\S+(:[0-9]{4,5})?)\b`)
@@ -40,13 +41,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	endpointMatches := endpointPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, endpointMatch := range endpointMatches {
 			resEndpointMatch := strings.TrimSpace(endpointMatch[1])
+
+			u, err := detectors.ParseURLAndStripPathAndParams(resEndpointMatch)
+			if err != nil {
+				fmt.Printf("\nINVALID URL\n")
+				// if the URL is invalid just move onto the next one
+				continue
+			}
+			u.Path = "/api/stacks"
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_PortainerToken,
@@ -59,7 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if client == nil {
 					client = defaultClient
 				}
-				req, err := http.NewRequestWithContext(ctx, "GET", resEndpointMatch+"/api/stacks", nil)
+				req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 				if err != nil {
 					continue
 				}
@@ -83,10 +89,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
-
 			if len(endpointMatches) > 0 {
 				results = append(results, s1)
 			}
@@ -97,4 +99,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_PortainerToken
+}
+
+func (s Scanner) Description() string {
+	return "Portainer is a management UI for Docker environments. Portainer tokens can be used to authenticate and interact with the Portainer API."
 }

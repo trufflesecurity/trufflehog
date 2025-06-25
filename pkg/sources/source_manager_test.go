@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"time"
 
-	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -60,7 +60,14 @@ func (c *counterChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...Chunki
 // countChunk implements SourceUnit.
 type countChunk byte
 
-func (c countChunk) SourceUnitID() string { return fmt.Sprintf("countChunk(%d)", c) }
+func (c countChunk) SourceUnitID() (string, SourceUnitKind) {
+	return fmt.Sprintf("countChunk(%d)", c), "test"
+}
+
+func (c countChunk) Display() string {
+	id, _ := c.SourceUnitID()
+	return id
+}
 
 func (c *counterChunker) Enumerate(ctx context.Context, reporter UnitReporter) error {
 	for i := 0; i < c.count; i++ {
@@ -107,7 +114,7 @@ func TestSourceManagerRun(t *testing.T) {
 	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
 	for i := 0; i < 3; i++ {
-		ref, err := mgr.Run(context.Background(), "dummy", source)
+		ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 		<-ref.Done()
 		assert.NoError(t, err)
 		assert.NoError(t, ref.Snapshot().FatalError())
@@ -125,7 +132,7 @@ func TestSourceManagerWait(t *testing.T) {
 	source, err := buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
 	// Asynchronously run the source.
-	_, err = mgr.Run(context.Background(), "dummy", source)
+	_, err = mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	// Read the 1 chunk we're expecting so Waiting completes.
 	<-mgr.Chunks()
@@ -134,7 +141,7 @@ func TestSourceManagerWait(t *testing.T) {
 	// Run should return an error now.
 	_, err = buildDummy(&counterChunker{count: 1})
 	assert.NoError(t, err)
-	_, err = mgr.Run(context.Background(), "dummy", source)
+	_, err = mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.Error(t, err)
 }
 
@@ -142,7 +149,7 @@ func TestSourceManagerError(t *testing.T) {
 	mgr := NewManager()
 	source, err := buildDummy(errorChunker{fmt.Errorf("oops")})
 	assert.NoError(t, err)
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
 	assert.Error(t, ref.Snapshot().FatalError())
@@ -158,13 +165,63 @@ func TestSourceManagerReport(t *testing.T) {
 		mgr := NewManager(opts...)
 		source, err := buildDummy(&counterChunker{count: 4})
 		assert.NoError(t, err)
-		ref, err := mgr.Run(context.Background(), "dummy", source)
+		ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 		assert.NoError(t, err)
 		<-ref.Done()
 		assert.Equal(t, 0, len(ref.Snapshot().Errors))
 		assert.Equal(t, uint64(4), ref.Snapshot().TotalChunks)
 	}
 }
+
+func TestSourceManagerEnumerate(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
+	source, err := buildDummy(&counterChunker{count: 1})
+	assert.NoError(t, err)
+	var enumeratedUnits []SourceUnit
+	reporter := visitorUnitReporter{
+		ok: func(_ context.Context, unit SourceUnit) error {
+			enumeratedUnits = append(enumeratedUnits, unit)
+			return nil
+		},
+	}
+	for i := 0; i < 3; i++ {
+		ref, err := mgr.Enumerate(context.Background(), "dummy", source, reporter)
+		<-ref.Done()
+		assert.NoError(t, err)
+		assert.NoError(t, ref.Snapshot().FatalError())
+		// The Chunks channel should be empty because we only enumerated.
+		_, err = tryRead(mgr.Chunks())
+		assert.Error(t, err)
+		// Each time the loop iterates, we add 1 unit to the slice.
+		assert.Equal(t, i+1, len(enumeratedUnits), ref.Snapshot())
+	}
+}
+
+func TestSourceManagerScan(t *testing.T) {
+	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
+	source, err := buildDummy(&counterChunker{count: 1})
+	assert.NoError(t, err)
+	for i := 0; i < 3; i++ {
+		ref, err := mgr.Scan(context.Background(), "dummy", source, countChunk(123))
+		<-ref.Done()
+		assert.NoError(t, err)
+		assert.NoError(t, ref.Snapshot().FatalError())
+		chunk, err := tryRead(mgr.Chunks())
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{123}, chunk.Data)
+		// The Chunks channel should be empty now.
+		_, err = tryRead(mgr.Chunks())
+		assert.Error(t, err)
+	}
+}
+
+type visitorUnitReporter struct {
+	ok  func(context.Context, SourceUnit) error
+	err func(context.Context, error) error
+}
+
+func (v visitorUnitReporter) UnitOk(ctx context.Context, u SourceUnit) error { return v.ok(ctx, u) }
+func (v visitorUnitReporter) UnitErr(ctx context.Context, err error) error   { return v.err(ctx, err) }
 
 type unitChunk struct {
 	unit   string
@@ -187,7 +244,7 @@ func (c *unitChunker) Chunks(ctx context.Context, ch chan *Chunk, _ ...ChunkingT
 }
 func (c *unitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
 	for _, step := range c.steps {
-		if err := rep.UnitOk(ctx, CommonSourceUnit{step.unit}); err != nil {
+		if err := rep.UnitOk(ctx, CommonSourceUnit{ID: step.unit}); err != nil {
 			return err
 		}
 	}
@@ -195,11 +252,12 @@ func (c *unitChunker) Enumerate(ctx context.Context, rep UnitReporter) error {
 }
 func (c *unitChunker) ChunkUnit(ctx context.Context, unit SourceUnit, rep ChunkReporter) error {
 	for _, step := range c.steps {
-		if unit.SourceUnitID() != step.unit {
+		id, _ := unit.SourceUnitID()
+		if id != step.unit {
 			continue
 		}
 		if step.err != "" {
-			if err := rep.ChunkErr(ctx, fmt.Errorf(step.err)); err != nil {
+			if err := rep.ChunkErr(ctx, fmt.Errorf("%s", step.err)); err != nil {
 				return err
 			}
 		}
@@ -222,7 +280,7 @@ func TestSourceManagerNonFatalError(t *testing.T) {
 	mgr := NewManager(WithBufferedOutput(8), WithSourceUnits())
 	source, err := buildDummy(&unitChunker{input})
 	assert.NoError(t, err)
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
 	report := ref.Snapshot()
@@ -234,12 +292,12 @@ func TestSourceManagerNonFatalError(t *testing.T) {
 }
 
 func TestSourceManagerContextCancelled(t *testing.T) {
-	mgr := NewManager(WithBufferedOutput(8))
+	mgr := NewManager(WithBufferedOutput(16))
 	source, err := buildDummy(&counterChunker{count: 100})
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ref, err := mgr.Run(ctx, "dummy", source)
+	ref, err := mgr.EnumerateAndScan(ctx, "dummy", source)
 	assert.NoError(t, err)
 
 	cancel()
@@ -283,7 +341,7 @@ func TestSourceManagerCancelRun(t *testing.T) {
 	}})
 	assert.NoError(t, err)
 
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 
 	cancelErr := fmt.Errorf("abort! abort!")
@@ -305,7 +363,7 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1337, mgr.AvailableCapacity())
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 
 	<-start // Wait for start signal.
@@ -316,7 +374,7 @@ func TestSourceManagerAvailableCapacity(t *testing.T) {
 }
 
 func TestSourceManagerUnitHook(t *testing.T) {
-	hook := NewUnitHook(context.TODO())
+	hook, ch := NewUnitHook(context.TODO())
 
 	input := []unitChunk{
 		{unit: "1 one", output: "bar"},
@@ -330,18 +388,26 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	)
 	source, err := buildDummy(&unitChunker{input})
 	assert.NoError(t, err)
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
+	assert.NoError(t, mgr.Wait())
 
-	metrics := hook.UnitMetrics()
-	assert.Equal(t, 3, len(metrics))
+	assert.Equal(t, 0, len(hook.InProgressSnapshot()))
+	var metrics []UnitMetrics
+	for metric := range ch {
+		metrics = append(metrics, metric)
+	}
+	justID := func(unit SourceUnit) string {
+		id, _ := unit.SourceUnitID()
+		return id
+	}
 	sort.Slice(metrics, func(i, j int) bool {
-		return metrics[i].Unit.SourceUnitID() < metrics[j].Unit.SourceUnitID()
+		return justID(metrics[i].Unit) < justID(metrics[j].Unit)
 	})
 	m0, m1, m2 := metrics[0], metrics[1], metrics[2]
 
-	assert.Equal(t, "1 one", m0.Unit.SourceUnitID())
+	assert.Equal(t, "1 one", justID(m0.Unit))
 	assert.Equal(t, uint64(1), m0.TotalChunks)
 	assert.Equal(t, uint64(3), m0.TotalBytes)
 	assert.NotZero(t, m0.StartTime)
@@ -349,7 +415,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.NotZero(t, m0.ElapsedTime())
 	assert.Equal(t, 0, len(m0.Errors))
 
-	assert.Equal(t, "2 two", m1.Unit.SourceUnitID())
+	assert.Equal(t, "2 two", justID(m1.Unit))
 	assert.Equal(t, uint64(0), m1.TotalChunks)
 	assert.Equal(t, uint64(0), m1.TotalBytes)
 	assert.NotZero(t, m1.StartTime)
@@ -357,7 +423,7 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.NotZero(t, m1.ElapsedTime())
 	assert.Equal(t, 1, len(m1.Errors))
 
-	assert.Equal(t, "3 three", m2.Unit.SourceUnitID())
+	assert.Equal(t, "3 three", justID(m2.Unit))
 	assert.Equal(t, uint64(0), m2.TotalChunks)
 	assert.Equal(t, uint64(0), m2.TotalBytes)
 	assert.NotZero(t, m2.StartTime)
@@ -366,14 +432,10 @@ func TestSourceManagerUnitHook(t *testing.T) {
 	assert.Equal(t, 1, len(m2.Errors))
 }
 
-// TestSourceManagerUnitHookNoBlock tests that the UnitHook drops metrics if
-// they aren't handled fast enough.
-func TestSourceManagerUnitHookNoBlock(t *testing.T) {
-	var evictedKeys []string
-	cache, _ := lru.NewWithEvict(1, func(key string, _ *UnitMetrics) {
-		evictedKeys = append(evictedKeys, key)
-	})
-	hook := NewUnitHook(context.TODO(), WithUnitHookCache(cache))
+// TestSourceManagerUnitHookBackPressure tests that the UnitHook blocks if the
+// finished metrics aren't handled fast enough.
+func TestSourceManagerUnitHookBackPressure(t *testing.T) {
+	hook, ch := NewUnitHook(context.TODO(), WithUnitHookFinishBufferSize(0))
 
 	input := []unitChunk{
 		{unit: "one", output: "bar"},
@@ -387,20 +449,27 @@ func TestSourceManagerUnitHookNoBlock(t *testing.T) {
 	)
 	source, err := buildDummy(&unitChunker{input})
 	assert.NoError(t, err)
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
-	<-ref.Done()
 
-	assert.Equal(t, 2, len(evictedKeys))
-	metrics := hook.UnitMetrics()
-	assert.Equal(t, 1, len(metrics))
-	assert.Equal(t, "three", metrics[0].Unit.SourceUnitID())
+	var metrics []UnitMetrics
+	for i := 0; i < len(input); i++ {
+		select {
+		case <-ref.Done():
+			t.Fatal("job should not finish until metrics have been collected")
+		case <-time.After(1 * time.Millisecond):
+		}
+		metrics = append(metrics, <-ch)
+	}
+
+	assert.NoError(t, mgr.Wait())
+	assert.Equal(t, 3, len(metrics), metrics)
 }
 
 // TestSourceManagerUnitHookNoUnits tests whether the UnitHook works for
 // sources that don't support units.
 func TestSourceManagerUnitHookNoUnits(t *testing.T) {
-	hook := NewUnitHook(context.TODO())
+	hook, ch := NewUnitHook(context.TODO())
 
 	mgr := NewManager(
 		WithBufferedOutput(8),
@@ -409,11 +478,15 @@ func TestSourceManagerUnitHookNoUnits(t *testing.T) {
 	source, err := buildDummy(&counterChunker{count: 5})
 	assert.NoError(t, err)
 
-	ref, err := mgr.Run(context.Background(), "dummy", source)
+	ref, err := mgr.EnumerateAndScan(context.Background(), "dummy", source)
 	assert.NoError(t, err)
 	<-ref.Done()
+	assert.NoError(t, mgr.Wait())
 
-	metrics := hook.UnitMetrics()
+	var metrics []UnitMetrics
+	for metric := range ch {
+		metrics = append(metrics, metric)
+	}
 	assert.Equal(t, 1, len(metrics))
 
 	m := metrics[0]

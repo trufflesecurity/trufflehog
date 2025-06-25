@@ -61,12 +61,14 @@ func TestFilesystem(t *testing.T) {
 
 	// Run the scan.
 	ctx := context.Background()
-	e, err := Start(ctx,
-		WithDetectors(DefaultDetectors()...),
-		WithVerify(false),
-	)
+	e, err := NewEngine(ctx, &Config{
+		Detectors:     DefaultDetectors(),
+		SourceManager: sources.NewManager(),
+		Verify:        false,
+	})
 	assert.NoError(t, err)
-	err = e.ScanFileSystem(ctx, sources.FilesystemConfig{
+	e.Start(ctx)
+	_, err = e.ScanFileSystem(ctx, sources.FilesystemConfig{
 		Paths:            []string{rootDir},
 		ExcludePathsFile: filepath.Join(configDir, "exclude"),
 	})

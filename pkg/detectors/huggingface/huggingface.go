@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -39,9 +40,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 1 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[0])
 
 		s1 := detectors.Result{
@@ -54,11 +52,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = isVerified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, resMatch)
-		}
-
-		// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-		if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-			continue
+			s1.AnalysisInfo = map[string]string{"key": resMatch}
 		}
 
 		results = append(results, s1)
@@ -133,6 +127,10 @@ func (s Scanner) verifyResult(ctx context.Context, apiKey string) (bool, map[str
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_HuggingFace
+}
+
+func (s Scanner) Description() string {
+	return "Hugging Face is a platform for natural language processing tasks and model hosting. Hugging Face API keys can be used to access various services and resources on the platform."
 }
 
 // https://huggingface.co/docs/hub/api#get-apiwhoami-v2

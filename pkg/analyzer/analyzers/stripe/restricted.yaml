@@ -1,0 +1,1416 @@
+categories:
+  Core:
+    Apple Pay Domains:
+      Read:
+        Scope: rak_apple_pay_domain_read
+        Endpoint: https://api.stripe.com/v1/apple_pay/domains
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://any-api.com/stripe_com/stripe_com/docs/_v1_apple_pay_domains/GetApplePayDomains
+        Note: ''
+      Write:
+        Scope: rak_apple_pay_domain_write
+        Endpoint: https://api.stripe.com/v1/apple_pay/domains
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: ''
+        Note: ''
+    Balance:
+      Read:
+        Scope: rak_balance_read
+        Endpoint: https://api.stripe.com/v1/balance
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/balance
+        Note: ''
+    Balance transaction sources:
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: 'I think we just build this one based off of all the others? Note that
+          this permission also implies the following permissions: Application Fees
+          (Read), Balance (Read), Financing Transactions (Read), Payouts (Read), Transfers
+          (Read), and Balance Transfers (Read)'
+    Balance Transfer:
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: Not sure this exists anymore
+      Write:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: Not sure this exists anymore
+    Test clocks:
+      Read:
+        Scope: rak_billing_clock_read
+        Endpoint: https://api.stripe.com/v1/test_helpers/test_clocks
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/test_clocks/list
+        Note: ''
+      Write:
+        Scope: rak_billing_clock_write
+        Endpoint: https://api.stripe.com/v1/test_helpers/test_clocks
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/test_clocks/create
+        Note: ''
+    Charges:
+      Read:
+        Scope: rak_charge_read
+        Endpoint: https://api.stripe.com/v1/charges
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/charges/list
+        Note: ''
+      Write:
+        Scope: rak_charge_write
+        Endpoint: https://api.stripe.com/v1/charges
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/charges/update
+        Note: ''
+    Confirmation token:
+      Read:
+        Scope: rak_confirmation_token_read
+        Endpoint: https://api.stripe.com/v1/confirmation_tokens/nowaythiscanexist
+        Method: GET
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/confirmation_tokens/retrieve
+        Note: ''
+    Confirmation token (client):
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: Not sure this exists anymore
+      Write:
+        Scope: rak_confirmation_token_client_write
+        Endpoint: https://api.stripe.com/v1/test_helpers/confirmation_tokens
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/confirmation_tokens/test_create
+        Note: ''
+    Customers:
+      Read:
+        Scope: rak_customer_read
+        Endpoint: https://api.stripe.com/v1/customers
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/customers/list
+        Note: ''
+      Write:
+        Scope: rak_customer_write
+        Endpoint: https://api.stripe.com/v1/customers/nowaythiscanexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/customers/update
+        Note: Couldn't use "Create Customer", b/c default with no payload creates
+          a customer.
+    Customer session:
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: Not sure this exists anymore
+      Write:
+        Scope: rak_customer_session_write
+        Endpoint: https://api.stripe.com/v1/customer_sessions
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/customer_sessions/create
+        Note: ''
+    Disputes:
+      Read:
+        Scope: rak_dispute_read
+        Endpoint: https://api.stripe.com/v1/disputes
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/disputes/list
+        Note: ''
+      Write:
+        Scope: rak_dispute_write
+        Endpoint: https://api.stripe.com/v1/disputes/nowaycanthisexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/disputes/update
+        Note: ''
+    Events:
+      Read:
+        Scope: rak_event_read
+        Endpoint: https://api.stripe.com/v1/events
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/events/list
+        Note: ''
+    Ephemeral keys:
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: ''
+      Write:
+        Scope: rak_ephemeral_key_write
+        Endpoint: https://api.stripe.com/v1/ephemeral_keys
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://any-api.com/stripe_com/stripe_com/docs/_v1_ephemeral_keys_key_
+        Note: ''
+    Files:
+      Read:
+        Scope: rak_file_read
+        Endpoint: https://api.stripe.com/v1/files
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: ''
+        Note: ''
+      Write:
+        Scope: ''
+        Endpoint: https://files.stripe.com/v1/files
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: ''
+        Note: On 403, it mistakenly says "rak_dispute_write" missing
+    Funding Instructions:
+      Read:
+        Scope: ''
+        Endpoint: https://api.stripe.com/v1/issuing/funding_instructions
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/funding_instructions/list
+        Note: On 403, it mistakently says "rak_topup_read"
+      Write:
+        Scope: ''
+        Endpoint: https://api.stripe.com/v1/issuing/funding_instructions
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/funding_instructions/create
+        Note: Same as read but says "write"
+    PaymentIntents:
+      Read:
+        Scope: rak_payment_intent_read
+        Endpoint: https://api.stripe.com/v1/payment_intents
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/payment_intents/list
+        Note: ''
+      Write:
+        Scope: rak_payment_intent_write
+        Endpoint: https://api.stripe.com/v1/payment_intents
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/payment_intents/create
+        Note: ''
+    PaymentMethods:
+      Read:
+        Scope: rak_payment_method_read
+        Endpoint: https://api.stripe.com/v1/payment_methods
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://any-api.com/stripe_com/stripe_com/docs/_v1_payment_methods/GetPaymentMethods
+        Note: ''
+      Write:
+        Scope: rak_payment_method_write
+        Endpoint: https://api.stripe.com/v1/payment_methods/nowaycanthisexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://any-api.com/stripe_com/stripe_com/docs/_v1_payment_methods_payment_method_/PostPaymentMethodsPaymentMethod
+        Note: ''
+    Payment Method Domains:
+      Read:
+        Scope: ''
+        Endpoint: https://api.stripe.com/v1/payment_method_domains
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/payment_method_domains/list
+        Note: ''
+      Write:
+        Scope: ''
+        Endpoint: https://api.stripe.com/v1/payment_method_domains
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/payment_method_domains/create
+        Note: ''
+    Payouts:
+      Read:
+        Scope: rak_payout_read
+        Endpoint: https://api.stripe.com/v1/payouts
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/payouts/list
+        Note: ''
+      Write:
+        Scope: rak_payout_write
+        Endpoint: https://api.stripe.com/v1/payouts
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/payouts/create
+        Note: ''
+    Products:
+      Read:
+        Scope: rak_product_read
+        Endpoint: https://api.stripe.com/v1/products
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/products/list
+        Note: ''
+      Write:
+        Scope: rak_product_write
+        Endpoint: https://api.stripe.com/v1/products
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/products/create
+        Note: ''
+    Shipping Rates:
+      Read:
+        Scope: rak_shipping_rate_read
+        Endpoint: https://api.stripe.com/v1/shipping_rates
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/shipping_rates/list
+        Note: ''
+      Write:
+        Scope: rak_shipping_rate_write
+        Endpoint: https://api.stripe.com/v1/shipping_rates
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/shipping_rates/create
+        Note: ''
+    SetupIntents:
+      Read:
+        Scope: rak_setup_intent_read
+        Endpoint: https://api.stripe.com/v1/setup_intents
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/setup_intents/list
+        Note: ''
+      Write:
+        Scope: rak_setup_intent_write
+        Endpoint: https://api.stripe.com/v1/setup_intents/nowaycanthisexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/setup_intents/create
+        Note: ''
+    Sources:
+      Read:
+        Scope: rak_source_read
+        Endpoint: https://api.stripe.com/v1/sources/nowaycanthisexist
+        Method: GET
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/sources/retrieve
+        Note: ''
+      Write:
+        Scope: rak_source_write
+        Endpoint: https://api.stripe.com/v1/sources/nowaycanthisexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/sources/update
+        Note: ''
+    Tokens:
+      Read:
+        Scope: rak_token_read
+        Endpoint: https://api.stripe.com/v1/tokens/nowaycanthisexist
+        Method: GET
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tokens/retrieve
+        Note: ''
+      Write:
+        Scope: rak_token_write
+        Endpoint: https://api.stripe.com/v1/tokens
+        Method: POST
+        Payload: '"card[number]"=4242424242424242'
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tokens/create_card
+        Note: ''
+  Checkout:
+    Checkout Sessions:
+      Read:
+        Scope: rak_checkout_session_read
+        Endpoint: https://api.stripe.com/v1/checkout/sessions
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/checkout/sessions/list
+        Note: ''
+      Write:
+        Scope: rak_checkout_session_write
+        Endpoint: https://api.stripe.com/v1/checkout/sessions
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/checkout/sessions/create
+        Note: ''
+  Billing:
+    Coupons:
+      Read:
+        Scope: rak_coupon_read
+        Endpoint: https://api.stripe.com/v1/coupons
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/coupons/list
+        Note: ''
+      Write:
+        Scope: rak_coupon_write
+        Endpoint: https://api.stripe.com/v1/coupons
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/coupons/create
+        Note: ''
+    Promotion Codes:
+      Read:
+        Scope: rak_promotion_code_read
+        Endpoint: https://api.stripe.com/v1/promotion_codes
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/promotion_codes/list
+        Note: ''
+      Write:
+        Scope: rak_promotion_code_write
+        Endpoint: https://api.stripe.com/v1/promotion_codes
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/promotion_codes/create
+        Note: ''
+    Credit notes:
+      Read:
+        Scope: rak_credit_note_read
+        Endpoint: https://api.stripe.com/v1/credit_notes
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/credit_notes/list
+        Note: ''
+      Write:
+        Scope: rak_credit_note_write
+        Endpoint: https://api.stripe.com/v1/credit_notes/nowaythiscanexsit
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/credit_notes/update
+        Note: ''
+    Customer portal:
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: ''
+      Write:
+        Scope: rak_customer_portal_write
+        Endpoint: https://api.stripe.com/v1/billing_portal/sessions
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/customer_portal/sessions/create
+        Note: ''
+    Invoices:
+      Read:
+        Scope: ''
+        Endpoint: https://api.stripe.com/v1/invoices
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/invoices/list
+        Note: Wrong scope in error message.
+      Write:
+        Scope: rak_invoice_write
+        Endpoint: https://api.stripe.com/v1/invoices
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/invoices/create
+        Note: ''
+    Prices:
+      Read:
+        Scope: rak_plan_read
+        Endpoint: https://api.stripe.com/v1/prices
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/prices/list
+        Note: ''
+      Write:
+        Scope: rak_plan_write
+        Endpoint: https://api.stripe.com/v1/prices
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/prices/create
+        Note: ''
+    Subscriptions:
+      Read:
+        Scope: rak_subscription_read
+        Endpoint: https://api.stripe.com/v1/subscriptions
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/subscriptions/list
+        Note: ''
+      Write:
+        Scope: rak_subscription_write
+        Endpoint: https://api.stripe.com/v1/subscriptions
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/subscriptions/create
+        Note: ''
+    Quote:
+      Read:
+        Scope: rak_quote_read
+        Endpoint: https://api.stripe.com/v1/quotes
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/quotes/list
+        Note: ''
+      Write:
+        Scope: rak_quote_write
+        Endpoint: https://api.stripe.com/v1/quotes/nowaythiscanexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/quotes/update
+        Note: ''
+    Tax IDs:
+      Read:
+        Scope: rak_tax_id_read
+        Endpoint: https://api.stripe.com/v1/tax_ids
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tax_ids/list
+        Note: ''
+      Write:
+        Scope: rak_tax_id_write
+        Endpoint: https://api.stripe.com/v1/tax_ids
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tax_ids/create
+        Note: ''
+    Tax Rates:
+      Read:
+        Scope: rak_tax_rate_read
+        Endpoint: https://api.stripe.com/v1/tax_rates
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tax_rates/list
+        Note: ''
+      Write:
+        Scope: rak_tax_rate_write
+        Endpoint: https://api.stripe.com/v1/tax_rates
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tax_rates/create
+        Note: ''
+    Usage Records:
+      Read:
+        Scope: rak_usage_record_read
+        Endpoint: https://api.stripe.com/v1/subscription_items/nowaythiscanexist/usage_record_summaries
+        Method: GET
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/usage_records/subscription_item_summary_list
+        Note: ''
+      Write:
+        Scope: rak_usage_record_write
+        Endpoint: https://api.stripe.com/v1/subscription_items/nowaythiscanexist/usage_records
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/usage_records/create
+        Note: ''
+    Meters:
+      Read:
+        Scope: rak_billing_meter_read
+        Endpoint: https://api.stripe.com/v1/billing/meters
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/billing/meter/list
+        Note: ''
+      Write:
+        Scope: rak_billing_meter_write
+        Endpoint: https://api.stripe.com/v1/billing/meters
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/billing/meter/create
+        Note: ''
+    Meter Events:
+      Read:
+        Scope: rak_billing_meter_event_read
+        Endpoint: https://api.stripe.com/v1/billing/meters/nowaythiscanexist/event_summaries
+        Method: GET
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/billing/meter-event_summary/list
+        Note: ''
+      Write:
+        Scope: rak_billing_meter_event_write
+        Endpoint: https://api.stripe.com/v1/billing/meter_events
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/billing/meter-event/create
+        Note: ''
+    Meter Event Adjustments:
+      Write:
+        Scope: rak_billing_meter_event_adjustment_write
+        Endpoint: https://api.stripe.com/v1/billing/meter_event_adjustments
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/billing/meter-event_adjustment/create
+        Note: ''
+  Connect:
+    Application Fees:
+      Read:
+        Scope: rak_application_fee_read
+        Endpoint: https://api.stripe.com/v1/application_fees
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/application_fees/list
+        Note: ''
+      Write:
+        Scope: rak_application_fee_write
+        Endpoint: https://api.stripe.com/v1/application_fees/nowaythiscanexist/refunds
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/fee_refunds/create
+        Note: ''
+    Login Links:
+      Write:
+        Scope: rak_edit_link_write
+        Endpoint: https://api.stripe.com/v1/account/login_links
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://any-api.com/stripe_com/stripe_com/docs/_v1_account_login_links/PostAccountLoginLinks
+        Note: ''
+    Account Links:
+      Write:
+        Scope: rak_account_link_write
+        Endpoint: https://api.stripe.com/v1/account_links
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/account_links
+        Note: ''
+    Top-ups:
+      Read:
+        Scope: rak_topup_read
+        Endpoint: https://api.stripe.com/v1/topups
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/topups/list
+        Note: ''
+      Write:
+        Scope: rak_topup_write
+        Endpoint: https://api.stripe.com/v1/topups
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/topups/create
+        Note: ''
+    Transfers:
+      Read:
+        Scope: rak_transfer_read
+        Endpoint: https://api.stripe.com/v1/transfers
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/transfers/list
+        Note: ''
+      Write:
+        Scope: rak_transfer_write
+        Endpoint: https://api.stripe.com/v1/transfers
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/transfers/create
+        Note: ''
+  Orders:
+    Orders:
+      Read:
+        Scope: rak_order_read
+        Endpoint: https://api.stripe.com/v1/orders
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://any-api.com/stripe_com/stripe_com/docs/_v1_orders/GetOrders
+        Note: ''
+      Write:
+        Scope: rak_order_write
+        Endpoint: https://api.stripe.com/v1/orders
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://any-api.com/stripe_com/stripe_com/docs/_v1_orders/PostOrders
+        Note: ''
+    SKUs:
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: Seems like any key has 200 over these.
+      Write:
+        Scope: rak_sku_write
+        Endpoint: https://api.stripe.com/v1/skus
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://any-api.com/stripe_com/stripe_com/docs/_v1_skus/PostSkus
+        Note: ''
+  Issuing:
+    Authorizations:
+      Read:
+        Scope: rak_issuing_authorization_read
+        Endpoint: https://api.stripe.com/v1/issuing/authorizations/nowaythiscanexist
+        Method: GET
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/authorizations/retrieve
+        Note: ''
+      Write:
+        Scope: rak_issuing_authorization_write
+        Endpoint: https://api.stripe.com/v1/issuing/authorizations/nowaythiscanexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/authorizations/update
+        Note: ''
+    Cardholders:
+      Read:
+        Scope: rak_issuing_cardholder_read
+        Endpoint: https://api.stripe.com/v1/issuing/cardholders/nowaythiscanexist
+        Method: GET
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/cardholders/retrieve
+        Note: ''
+      Write:
+        Scope: rak_issuing_cardholder_write
+        Endpoint: https://api.stripe.com/v1/issuing/cardholders
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/cardholders/create
+        Note: ''
+    Cards:
+      Read:
+        Scope: rak_issuing_card_read
+        Endpoint: https://api.stripe.com/v1/issuing/cards/nowaythiscanexist
+        Method: GET
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/cards/retrieve
+        Note: ''
+      Write:
+        Scope: rak_issuing_card_write
+        Endpoint: https://api.stripe.com/v1/issuing/cards
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/cards/create
+        Note: ''
+    Disputes:
+      Read:
+        Scope: rak_issuing_dispute_read
+        Endpoint: https://api.stripe.com/v1/issuing/disputes/nowaythiscanexist
+        Method: GET
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/disputes/retrieve
+        Note: ''
+      Write:
+        Scope: rak_issuing_dispute_write
+        Endpoint: https://api.stripe.com/v1/issuing/disputes/nowaythiscanexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/disputes/update
+        Note: ''
+    Tokens:
+      Read:
+        Scope: rak_issuing_network_token_read
+        Endpoint: https://api.stripe.com/v1/issuing/tokens/nowaythiscanexist
+        Method: GET
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/tokens/retrieve
+        Note: ''
+      Write:
+        Scope: rak_issuing_network_token_write
+        Endpoint: https://api.stripe.com/v1/issuing/tokens/nowaythiscanexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/tokens/update
+        Note: ''
+    Token Network Data:
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: ''
+    Transactions:
+      Read:
+        Scope: rak_issuing_transaction_read
+        Endpoint: https://api.stripe.com/v1/issuing/transactions/nowaythiscanexist
+        Method: GET
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/transactions/retrieve
+        Note: ''
+      Write:
+        Scope: rak_issuing_transaction_write
+        Endpoint: https://api.stripe.com/v1/issuing/transactions/nowaythiscanexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/issuing/transactions/update
+        Note: ''
+  Reporting:
+    Report Runs and Report Types:
+      Read:
+        Scope: rak_financial_statement_read
+        Endpoint: https://api.stripe.com/v1/reporting/report_runs
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/reporting/report_run/list
+        Note: ''
+  Identity:
+    Verification Sessions and Reports:
+      Read:
+        Scope: rak_identity_product_read
+        Endpoint: https://api.stripe.com/v1/identity/verification_sessions
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/identity/verification_sessions/list
+        Note: ''
+      Write:
+        Scope: rak_identity_product_write
+        Endpoint: https://api.stripe.com/v1/identity/verification_sessions
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/identity/verification_sessions/create
+        Note: ''
+    Access recent detailed verification results:
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: Skip for now b/c requires account with data
+    Access all detailed verification results:
+      Read:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: Skip for now b/c requires account with data + this one requires IP allowlisting
+  Webhook:
+    Webhook Endpoints:
+      Read:
+        Scope: rak_webhook_read
+        Endpoint: https://api.stripe.com/v1/webhook_endpoints
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/webhook_endpoints/list
+        Note: ''
+      Write:
+        Scope: rak_webhook_write
+        Endpoint: https://api.stripe.com/v1/webhook_endpoints
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/webhook_endpoints/create
+        Note: ''
+  Stripe CLI:
+    Debugging tools:
+      Write:
+        Scope: ''
+        Endpoint: ''
+        Method: ''
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: Can't find a relevant endpoint
+        Note: ''
+  Payment Links:
+    Payment Links:
+      Read:
+        Scope: rak_payment_links_read
+        Endpoint: https://api.stripe.com/v1/payment_links
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/payment_links/payment_links/list
+        Note: ''
+      Write:
+        Scope: rak_payment_links_write
+        Endpoint: https://api.stripe.com/v1/payment_links
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/payment_links/payment_links/create
+        Note: ''
+  Terminal:
+    Configurations:
+      Read:
+        Scope: rak_terminal_configuration_read
+        Endpoint: https://api.stripe.com/v1/terminal/configurations
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/terminal/configuration/list
+        Note: ''
+      Write:
+        Scope: rak_terminal_configuration_write
+        Endpoint: https://api.stripe.com/v1/terminal/configurations/nowaythiscanexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/terminal/configuration/update
+        Note: ''
+    Locations:
+      Read:
+        Scope: rak_terminal_location_read
+        Endpoint: https://api.stripe.com/v1/terminal/locations
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/terminal/locations/list
+        Note: ''
+      Write:
+        Scope: rak_terminal_location_write
+        Endpoint: https://api.stripe.com/v1/terminal/locations
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/terminal/locations/create
+        Note: ''
+    Readers:
+      Read:
+        Scope: rak_terminal_reader_read
+        Endpoint: https://api.stripe.com/v1/terminal/readers
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/terminal/readers/list
+        Note: ''
+      Write:
+        Scope: rak_terminal_reader_write
+        Endpoint: https://api.stripe.com/v1/terminal/readers
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/terminal/readers/create
+        Note: ''
+    Connection Tokens:
+      Write:
+        Scope: rak_terminal_connection_token_write
+        Endpoint: ''
+        Method: POST
+        Payload: ''
+        Valid: []
+        Invalid: []
+        Docs: ''
+        Note: Skip b/c requires a state change.
+  Tax:
+    Tax Calculations and Transactions:
+      Read:
+        Scope: rak_tax_transaction_read
+        Endpoint: https://api.stripe.com/v1/tax/calculations/nowaycanthisexist/line_items
+        Method: GET
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tax/calculations/line_items
+        Note: ''
+      Write:
+        Scope: rak_tax_transaction_write
+        Endpoint: https://api.stripe.com/v1/tax/calculations
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tax/calculations/create
+        Note: ''
+    Tax Settings and Registrations:
+      Read:
+        Scope: rak_tax_settings_read
+        Endpoint: https://api.stripe.com/v1/tax/settings
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tax/settings/retrieve
+        Note: ''
+      Write:
+        Scope: rak_tax_settings_write
+        Endpoint: https://api.stripe.com/v1/tax/registrations/nowaycanthisexist
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/tax/registrations/update
+        Note: ''
+  Radar:
+    Reviews:
+      Read:
+        Scope: rak_review_read
+        Endpoint: https://api.stripe.com/v1/reviews
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/radar/reviews/list
+        Note: ''
+      Write:
+        Scope: rak_review_write
+        Endpoint: https://api.stripe.com/v1/reviews/nowaycanthisexist/approve
+        Method: POST
+        Payload: ''
+        Valid:
+        - 404
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/radar/reviews/approve
+        Note: ''
+  Climate:
+    Climate Orders:
+      Read:
+        Scope: rak_climate_order_read
+        Endpoint: https://api.stripe.com/v1/climate/orders
+        Method: GET
+        Payload: ''
+        Valid:
+        - 200
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/climate/order/list
+        Note: ''
+      Write:
+        Scope: rak_climate_order_write
+        Endpoint: https://api.stripe.com/v1/climate/orders
+        Method: POST
+        Payload: ''
+        Valid:
+        - 400
+        Invalid:
+        - 403
+        Docs: https://docs.stripe.com/api/climate/order/create
+        Note: ''

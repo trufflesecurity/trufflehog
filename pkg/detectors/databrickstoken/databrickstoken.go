@@ -3,28 +3,30 @@ package databrickstoken
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	domain = regexp.MustCompile(`\b([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azurewebsites\.net))\b`)
-	keyPat = regexp.MustCompile(`\b(dapi[0-9a-f]{32})(-\d)?\b`)
+	domain = regexp.MustCompile(`\b([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(cloud\.databricks\.com|gcp\.databricks\.com|azuredatabricks\.net))\b`)
+	keyPat = regexp.MustCompile(`\b(dapi[0-9a-f]{32}(-\d)?)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -37,19 +39,21 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	domainMatches := domain.FindAllStringSubmatch(dataStr, -1)
+	var uniqueDomains, uniqueTokens = make(map[string]struct{}), make(map[string]struct{})
+	for _, match := range domain.FindAllStringSubmatch(dataStr, -1) {
+		uniqueDomains[strings.TrimSpace(match[1])] = struct{}{}
+	}
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueTokens[match[1]] = struct{}{}
+	}
 
-		for _, domainmatch := range domainMatches {
-			resDomainMatch := strings.TrimSpace(domainmatch[1])
-
+	for token := range uniqueTokens {
+		for domain := range uniqueDomains {
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_DatabricksToken,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resDomainMatch),
+				Raw:          []byte(token),
+				RawV2:        []byte(token + domain),
 			}
 
 			if verify {
@@ -57,28 +61,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if client == nil {
 					client = defaultClient
 				}
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+resDomainMatch+"/api/2.0/clusters/list", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else if res.StatusCode == 403 {
-						// nothing to do here
-					} else {
-						err = fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-						s1.SetVerificationError(err, resMatch)
+
+				isVerified, verificationErr := verifyDatabricksToken(client, domain, token)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr)
+
+				if s1.Verified {
+					s1.AnalysisInfo = map[string]string{
+						"token":  token,
+						"domain": domain,
 					}
-				} else {
-					s1.SetVerificationError(err, resMatch)
 				}
-			}
-			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s1)
@@ -89,4 +82,35 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_DatabricksToken
+}
+
+func (s Scanner) Description() string {
+	return "Databricks is a cloud data platform. Databricks tokens can be used to authenticate and interact with Databricks services and APIs."
+}
+
+func verifyDatabricksToken(client *http.Client, domain, token string) (bool, error) {
+	req, err := http.NewRequest(http.MethodGet, "https://"+domain+"/api/2.0/preview/scim/v2/Me", nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

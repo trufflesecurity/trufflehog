@@ -15,6 +15,7 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
@@ -41,14 +42,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	serviceMatches := servicePat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, serviceMatch := range serviceMatches {
-			if len(serviceMatch) != 2 {
-				continue
-			}
 			resServiceMatch := strings.TrimSpace(serviceMatch[1])
 
 			s1 := detectors.Result{
@@ -84,11 +79,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
-
 			results = append(results, s1)
 		}
 	}
@@ -98,4 +88,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureSearchAdminKey
+}
+
+func (s Scanner) Description() string {
+	return "Azure Search is a search-as-a-service solution that allows developers to incorporate search capabilities into their applications. Azure Search Admin Keys can be used to manage and query search services."
 }

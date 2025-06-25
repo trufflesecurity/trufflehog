@@ -3,10 +3,11 @@ package braintreepayments
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,6 +15,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client     *http.Client
 	useTestURL bool
 }
@@ -47,15 +49,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
@@ -69,11 +65,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := verifyBraintree(ctx, client, url, resIdMatch, resMatch)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resMatch)
-			}
-
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
 			}
 
 			results = append(results, s1)
@@ -115,7 +106,10 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 
 	bodyString := string(bodyBytes)
 	if !(res.StatusCode == http.StatusOK) {
@@ -132,4 +126,8 @@ func verifyBraintree(ctx context.Context, client *http.Client, url, pubKey, priv
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_BraintreePayments
+}
+
+func (s Scanner) Description() string {
+	return "Braintree is a full-stack payment platform that makes it easy to accept payments in your mobile app or website. Braintree API keys can be used to access and manage payment transactions, customer data, and other payment-related operations."
 }

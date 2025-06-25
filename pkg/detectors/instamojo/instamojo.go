@@ -3,10 +3,11 @@ package instamojo
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -14,6 +15,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -43,15 +45,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	clientIdmatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range secretMatches {
-		if len(match) != 2 {
-			continue
-		}
 		resSecret := strings.TrimSpace(match[1])
 
 		for _, clientIdMatch := range clientIdmatches {
-			if len(clientIdMatch) != 2 {
-				continue
-			}
 			resClientId := strings.TrimSpace(clientIdMatch[1])
 
 			s1 := detectors.Result{
@@ -90,10 +86,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				}
 			}
 
-			if !s1.Verified && detectors.IsKnownFalsePositive(string(s1.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
-
 			results = append(results, s1)
 		}
 	}
@@ -103,4 +95,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Instamojo
+}
+
+func (s Scanner) Description() string {
+	return "An Ecommerce service, API keys can be used to create and access customer data"
 }

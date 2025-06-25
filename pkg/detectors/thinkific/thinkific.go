@@ -3,23 +3,25 @@ package thinkific
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"thinkific"}) + `\b([0-9a-f]{32})\b`)
@@ -40,15 +42,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, domainMatch := range domainMatches {
-
-			if len(domainMatch) != 2 {
-				continue
-			}
 			resDomainMatch := strings.TrimSpace(domainMatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Thinkific,
@@ -75,18 +70,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					if strings.Contains(body, "API Access is not available") {
 						s1.Verified = true
-					} else {
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
-
 				}
 			}
 
 			results = append(results, s1)
 		}
-
 	}
 
 	return results, nil
@@ -94,4 +83,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Thinkific
+}
+
+func (s Scanner) Description() string {
+	return "Thinkific is an online course platform that allows users to create, market, and sell online courses. Thinkific API keys can be used to access and manage course data and user information."
 }

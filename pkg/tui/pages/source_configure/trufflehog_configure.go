@@ -69,7 +69,7 @@ func (m truffleCmdModel) Cmd() string {
 	}
 
 	if isTrue(inputs["only-verified"].Value) {
-		command = append(command, "--only-verified")
+		command = append(command, "--results=verified")
 	}
 
 	if inputs["exclude_detectors"].Value != "" {
