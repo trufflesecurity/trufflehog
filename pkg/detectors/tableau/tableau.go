@@ -1,6 +1,7 @@
 package tableau
 
 import (
+	"maps"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -128,9 +129,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					result.Verified = isVerified
 
 					// Merge verification extra data
-					for k, v := range extraData {
-						result.ExtraData[k] = v
-					}
+					maps.Copy(result.ExtraData, extraData)
 
 					result.SetVerificationError(verificationErr, fmt.Sprintf("%s:%s@%s", tokenName, tokenSecret, endpoint))
 				}
