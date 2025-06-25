@@ -80,14 +80,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		return nil, nil
 	}
 
+domainLoop:
 	for domain := range uniqueInstanceMatches {
+		if invalidHosts.Exists(domain) {
+			continue domainLoop
+		}
+
 		for key := range uniqueKeyMatches {
 			for secret := range uniqueSecretMatches {
-				if invalidHosts.Exists(domain) {
-					delete(uniqueInstanceMatches, domain)
-					continue
-				}
-
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_SalesforceOauth2,
 					Raw:          []byte(secret),
@@ -100,7 +100,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					if verificationErr != nil {
 						if errors.Is(verificationErr, errNoHost) {
 							invalidHosts.Set(domain, struct{}{})
-							continue
+							continue domainLoop
 						}
 
 						s1.SetVerificationError(verificationErr, secret)
