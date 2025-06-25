@@ -31,20 +31,17 @@ const defaultVerifyURL = "https://prod-apsoutheast-b.online.tableau.com/api/3.26
 var (
 	defaultClient = common.SaneHttpClient()
 
-	// Pattern for Personal Access Token Names
-	// Matches various naming conventions for token names
-	tokenNamePat = regexp.MustCompile(`(?i)\b(?:personal[_-]?access[_-]?token[_-]?name|pat[_-]?name|token[_-]?name|access[_-]?token[_-]?name|api[_-]?token[_-]?name)[_\s]*[:=]\s*["\']?([a-zA-Z0-9_-]{3,50})["\']?`)
+	// Pattern for Personal Access Token Names - Updated to handle JSON
+	tokenNamePat       = regexp.MustCompile(`(?i)\b(?:personal[_-]?access[_-]?token[_-]?name|pat[_-]?name|token[_-]?name|access[_-]?token[_-]?name|api[_-]?token[_-]?name)[_\s]*[:=]\s*["\']?([a-zA-Z0-9_-]{3,50})["\']?`)
+	quotedTokenNamePat = regexp.MustCompile(`(?i)["'](?:personal[_-]?access[_-]?token[_-]?name|pat[_-]?name|token[_-]?name|access[_-]?token[_-]?name|api[_-]?token[_-]?name)["']\s*:\s*["']([a-zA-Z0-9_-]{3,50})["']`)
 
-	// Pattern for Personal Access Token Secrets
-	// Matches Base64-like string followed by colon and alphanumeric string
-	tokenSecretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{22}==:[A-Za-z0-9]{32})\b`)
-
-	// Alternative pattern for quoted secrets in JSON/config files
+	// Pattern for Personal Access Token Secrets - Updated to handle JSON
+	tokenSecretPat  = regexp.MustCompile(`\b([A-Za-z0-9+/]{22}==:[A-Za-z0-9]{32})\b`)
 	quotedSecretPat = regexp.MustCompile(`["']([A-Za-z0-9+/]{22}==:[A-Za-z0-9]{32})["']`)
 
 	// Pattern for Tableau Server URLs
-	// Matches Tableau Online (*.online.tableau.com) - captures the full URL
-	tableauURLPat = regexp.MustCompile(`([a-zA-Z0-9\-]+\.online\.tableau\.com)`)
+	tableauURLPat       = regexp.MustCompile(`([a-zA-Z0-9\-]+\.online\.tableau\.com)`)
+	quotedTableauURLPat = regexp.MustCompile(`["']([a-zA-Z0-9\-]+\.online\.tableau\.com)["']`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -95,13 +92,15 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			endpointsToTest = append(endpointsToTest, url)
 		}
 	} else {
-		// No URLs found, use configured endpoints
-		endpointsToTest = append(endpointsToTest, s.Endpoints("")...)
-	}
+		// Check if the input contains any tableau.com reference (even invalid ones)
+		// If it does, don't use default endpoints - it means they provided a URL but it was invalid
+		if strings.Contains(strings.ToLower(dataStr), "online.tableau.com") {
+			// Invalid tableau URL found, don't use defaults
+			return results, nil
+		}
 
-	// If no endpoints available, use default
-	if len(endpointsToTest) == 0 {
-		endpointsToTest = []string{"prod-apsoutheast-b.online.tableau.com"}
+		// No URLs found at all, use configured endpoints
+		endpointsToTest = append(endpointsToTest, s.Endpoints("")...)
 	}
 
 	// Prepare results slice with estimated capacity
@@ -160,6 +159,15 @@ func extractTokenNames(data string) map[string]struct{} {
 		}
 	}
 
+	// Find matches using the quoted token name pattern
+	for _, match := range quotedTokenNamePat.FindAllStringSubmatch(data, -1) {
+		if len(match) >= 2 {
+			name := strings.TrimSpace(match[1])
+			if name != "" && len(name) >= 3 { // Minimum reasonable token name length
+				names[name] = struct{}{}
+			}
+		}
+	}
 	return names
 }
 
@@ -196,6 +204,16 @@ func extractTableauURLs(data string) map[string]struct{} {
 
 	// Find matches using the Tableau URL pattern
 	for _, match := range tableauURLPat.FindAllStringSubmatch(data, -1) {
+		if len(match) >= 2 {
+			url := strings.TrimSpace(match[1]) // This now captures the full URL including .online.tableau.com
+			if url != "" {
+				urls[url] = struct{}{}
+			}
+		}
+	}
+
+	// Find matches using the qupted Tableau URL pattern
+	for _, match := range quotedTableauURLPat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			url := strings.TrimSpace(match[1]) // This now captures the full URL including .online.tableau.com
 			if url != "" {
