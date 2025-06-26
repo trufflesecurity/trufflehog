@@ -349,6 +349,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harness"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hasura"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpscout"
@@ -1717,6 +1718,7 @@ func buildDetectorList() []detectors.Detector {
 		&zulipchat.Scanner{},
 		&stripepaymentintent.Scanner{},
 		&bitbucketapppassword.Scanner{},
+		&hasura.Scanner{},
 	}
 }
 
