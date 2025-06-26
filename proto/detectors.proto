@@ -1039,6 +1039,7 @@ enum DetectorType {
   StripePaymentIntent = 1027;
   LangSmith = 1028;
   BitbucketAppPassword = 1029;
+  Hasura = 1030;
 }
 
 message Result {
