@@ -18,6 +18,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sourcestest"
 )
 
 func TestSource_ChunksCount(t *testing.T) {
@@ -390,4 +391,93 @@ func TestSourceChunksResumptionMultipleBucketsIgnoredBucket(t *testing.T) {
 	}
 
 	assert.Equal(t, 103, count, "Should have processed all remaining data on resume")
+}
+
+func TestSource_Enumerate(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	s3key := secret.MustGetField("AWS_S3_KEY")
+	s3secret := secret.MustGetField("AWS_S3_SECRET")
+
+	connection := &sourcespb.S3{
+		Credential: &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    s3key,
+				Secret: s3secret,
+			},
+		},
+		Buckets: []string{"truffletestbucket"},
+	}
+
+	conn, err := anypb.New(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := Source{}
+	err = s.Init(ctx, "test enumerate", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &reporter)
+	assert.NoError(t, err)
+
+	assert.Greater(t, len(reporter.Units), 0, "Expected at least one unit to be enumerated")
+	assert.Equal(t, 0, len(reporter.UnitErrs), "Expected no errors during enumeration")
+
+	for _, unit := range reporter.Units {
+		id, _ := unit.SourceUnitID()
+		t.Logf("Enumerated unit: %s", id)
+		assert.NotEmpty(t, id, "Unit ID should not be empty")
+	}
+}
+
+func TestSource_ChunkUnit(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	secret, err := common.GetTestSecret(ctx)
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
+	}
+
+	s3key := secret.MustGetField("AWS_S3_KEY")
+	s3secret := secret.MustGetField("AWS_S3_SECRET")
+
+	connection := &sourcespb.S3{
+		Credential: &sourcespb.S3_AccessKey{
+			AccessKey: &credentialspb.KeySecret{
+				Key:    s3key,
+				Secret: s3secret,
+			},
+		},
+		Buckets: []string{"truffletestbucket"},
+	}
+
+	conn, err := anypb.New(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := Source{}
+	err = s.Init(ctx, "test enumerate", 0, 0, false, conn, 1)
+	assert.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.Enumerate(ctx, &reporter)
+	assert.NoError(t, err)
+
+	for _, unit := range reporter.Units {
+		err = s.ChunkUnit(ctx, unit, &reporter)
+		assert.NoError(t, err, "Expected no error during ChunkUnit")
+	}
+
+	assert.Greater(t, len(reporter.Chunks), 0)
+	assert.Equal(t, 0, len(reporter.ChunkErrs))
 }
