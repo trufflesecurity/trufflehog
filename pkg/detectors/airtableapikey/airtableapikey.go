@@ -97,6 +97,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func createResult(app string, key string, verified bool, err error) *detectors.Result {
 	r := &detectors.Result{
+		// https://airtable.com/developers/web/api/authentication
+		// https://support.airtable.com/docs/creating-personal-access-tokens
 		DetectorType: detectorspb.DetectorType_AirtableApiKey,
 		Raw:          []byte(key),
 		Redacted:     app,
