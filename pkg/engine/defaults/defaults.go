@@ -510,6 +510,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onedesk"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onelogin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepagecrm"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onepassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onesignal"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/onfleet"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/oopspam"
@@ -1375,6 +1376,7 @@ func buildDetectorList() []detectors.Detector {
 		&onedesk.Scanner{},
 		&onelogin.Scanner{},
 		&onepagecrm.Scanner{},
+		&onepassword.Scanner{},
 		&onesignal.Scanner{},
 		&onfleet.Scanner{},
 		&oopspam.Scanner{},
