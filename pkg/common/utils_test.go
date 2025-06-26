@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"unicode"
 )
 
 func TestAddItem(t *testing.T) {
@@ -193,4 +194,86 @@ func TestSliceContainsString(t *testing.T) {
 			t.Errorf("%s: index values do not match. Got: %d, expected: %d", testCase.name, resultIndex, testCase.expectedIndex)
 		}
 	}
+}
+
+func TestGenerateRandomPassword_Length(t *testing.T) {
+	pass := GenerateRandomPassword(true, true, true, true, 16)
+	if len(pass) != 16 {
+		t.Errorf("expected length 16, got %d", len(pass))
+	}
+}
+
+func TestGenerateRandomPassword_Empty(t *testing.T) {
+	pass := GenerateRandomPassword(false, false, false, false, 10)
+	if pass != "" {
+		t.Errorf("expected empty string, got %q", pass)
+	}
+}
+
+func TestGenerateRandomPassword_RequiredSets(t *testing.T) {
+	tests := []struct {
+		name    string
+		lower   bool
+		upper   bool
+		numeric bool
+		special bool
+	}{
+		{"lower only", true, false, false, false},
+		{"upper only", false, true, false, false},
+		{"numeric only", false, false, true, false},
+		{"special only", false, false, false, true},
+		{"all", true, true, true, true},
+		{"lower+upper", true, true, false, false},
+		{"lower+numeric", true, false, true, false},
+		{"upper+special", false, true, false, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pass := GenerateRandomPassword(tc.lower, tc.upper, tc.numeric, tc.special, 12)
+			if len(pass) != 12 {
+				t.Errorf("expected length 12, got %d", len(pass))
+			}
+			if tc.lower && !contains(pass, unicode.IsLower) {
+				t.Errorf("expected at least one lowercase letter")
+			}
+			if tc.upper && !contains(pass, unicode.IsUpper) {
+				t.Errorf("expected at least one uppercase letter")
+			}
+			if tc.numeric && !contains(pass, unicode.IsDigit) {
+				t.Errorf("expected at least one digit")
+			}
+			if tc.special && !containsSpecial(pass) {
+				t.Errorf("expected at least one special character")
+			}
+		})
+	}
+}
+
+func TestGenerateRandomPassword_ShortLength(t *testing.T) {
+	pass := GenerateRandomPassword(true, true, true, true, 0)
+	if pass != "" {
+		t.Errorf("expected empty string for length 0, got %q", pass)
+	}
+}
+
+func contains(s string, fn func(rune) bool) bool {
+	for _, r := range s {
+		if fn(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSpecial(s string) bool {
+	specials := "!@#$%^&*()-_=+[]{}|;:',.<>?/"
+	for _, r := range s {
+		for _, sr := range specials {
+			if r == sr {
+				return true
+			}
+		}
+	}
+	return false
 }

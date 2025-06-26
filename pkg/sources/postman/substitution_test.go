@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 func TestNewSubstitution(t *testing.T) {
@@ -63,6 +65,8 @@ func TestSource_KeywordCombinations(t *testing.T) {
 }
 
 func TestSource_BuildSubstituteSet(t *testing.T) {
+	ctx := context.Background()
+
 	s := &Source{
 		sub: NewSubstitution(),
 	}
@@ -89,7 +93,7 @@ func TestSource_BuildSubstituteSet(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := s.buildSubstituteSet(metadata, tc.data, DefaultMaxRecursionDepth)
+		result := s.buildSubstituteSet(ctx, metadata, tc.data, DefaultMaxRecursionDepth)
 		if !reflect.DeepEqual(result, tc.expected) {
 			t.Errorf("Expected substitution set: %v, got: %v", tc.expected, result)
 		}
@@ -158,6 +162,8 @@ func TestSource_FormatAndInjectKeywords(t *testing.T) {
 }
 
 func TestSource_BuildSubstitution_RecursionLimit(t *testing.T) {
+	ctx := context.Background()
+
 	s := &Source{
 		sub: NewSubstitution(),
 	}
@@ -229,9 +235,9 @@ func TestSource_BuildSubstitution_RecursionLimit(t *testing.T) {
 
 			// Use custom maxDepth if provided, otherwise use default
 			if tc.maxDepth > 0 {
-				s.buildSubstitution(tc.data, metadata, &combos, 0, tc.maxDepth)
+				s.buildSubstitution(ctx, tc.data, metadata, combos, 0, tc.maxDepth)
 			} else {
-				s.buildSubstitution(tc.data, metadata, &combos, 0, DefaultMaxRecursionDepth)
+				s.buildSubstitution(ctx, tc.data, metadata, combos, 0, DefaultMaxRecursionDepth)
 			}
 
 			var result []string

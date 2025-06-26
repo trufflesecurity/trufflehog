@@ -474,7 +474,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 			}
 
 			if err != nil {
-				return repo, fmt.Errorf("failed to fetch gist")
+				return repo, fmt.Errorf("failed to fetch gist: %w", err)
 			}
 
 			s.cacheGistInfo(gist)
@@ -488,7 +488,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 				continue
 			}
 			if err != nil {
-				return repo, fmt.Errorf("failed to fetch repository")
+				return repo, fmt.Errorf("failed to fetch repository: %w", err)
 			}
 			s.cacheRepoInfo(ghRepo)
 			break
