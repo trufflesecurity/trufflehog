@@ -10,6 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
@@ -62,14 +63,27 @@ func TestGitEngine(t *testing.T) {
 		},
 	} {
 		t.Run(tName, func(t *testing.T) {
-			e, err := Start(ctx,
-				WithConcurrency(1),
-				WithDecoders(decoders.DefaultDecoders()...),
-				WithDetectors(DefaultDetectors()...),
-				WithVerify(true),
-				WithPrinter(new(discardPrinter)),
-			)
-			assert.Nil(t, err)
+			const defaultOutputBufferSize = 64
+			opts := []func(*sources.SourceManager){
+				sources.WithSourceUnits(),
+				sources.WithBufferedOutput(defaultOutputBufferSize),
+			}
+
+			sourceManager := sources.NewManager(opts...)
+
+			conf := Config{
+				Concurrency:   1,
+				Decoders:      decoders.DefaultDecoders(),
+				Detectors:     defaults.DefaultDetectors(),
+				Verify:        true,
+				SourceManager: sourceManager,
+				Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+			}
+
+			e, err := NewEngine(ctx, &conf)
+			assert.NoError(t, err)
+
+			e.Start(ctx)
 
 			cfg := sources.GitConfig{
 				URI:      path,
@@ -77,7 +91,7 @@ func TestGitEngine(t *testing.T) {
 				BaseRef:  tTest.base,
 				MaxDepth: tTest.maxDepth,
 			}
-			if err := e.ScanGit(ctx, cfg); err != nil {
+			if _, err := e.ScanGit(ctx, cfg); err != nil {
 				return
 			}
 
@@ -111,14 +125,25 @@ func BenchmarkGitEngine(b *testing.B) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	e, err := Start(ctx,
-		WithConcurrency(runtime.NumCPU()),
-		WithDecoders(decoders.DefaultDecoders()...),
-		WithDetectors(DefaultDetectors()...),
-		WithVerify(false),
-		WithPrinter(new(discardPrinter)),
-	)
-	assert.Nil(b, err)
+	const defaultOutputBufferSize = 64
+	opts := []func(*sources.SourceManager){
+		sources.WithSourceUnits(),
+		sources.WithBufferedOutput(defaultOutputBufferSize),
+	}
+
+	sourceManager := sources.NewManager(opts...)
+
+	conf := Config{
+		Concurrency:   runtime.NumCPU(),
+		Decoders:      decoders.DefaultDecoders(),
+		Detectors:     defaults.DefaultDetectors(),
+		Verify:        false,
+		SourceManager: sourceManager,
+		Dispatcher:    NewPrinterDispatcher(new(discardPrinter)),
+	}
+
+	e, err := NewEngine(ctx, &conf)
+	assert.NoError(b, err)
 
 	go func() {
 		resultCount := 0
@@ -130,7 +155,7 @@ func BenchmarkGitEngine(b *testing.B) {
 	cfg := sources.GitConfig{URI: repoUrl}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := e.ScanGit(ctx, cfg); err != nil {
+		if _, err := e.ScanGit(ctx, cfg); err != nil {
 			return
 		}
 	}

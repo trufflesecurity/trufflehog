@@ -1,128 +1,134 @@
-//go:build detectors
-// +build detectors
-
 package azurecontainerregistry
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestAzureContainerRegistry_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	azureHost := testSecrets.MustGetField("AZURE_CR_HOST")
-	password := testSecrets.MustGetField("AZURE_CR_PASSWORD")
-	passwordInactive := testSecrets.MustGetField("AZURE_CR_PASSWORD_INACTIVE")
+var (
+	invalidPattern = `
+	azure:
+		url: http://invalid.azurecr.io.azure.com
+		secret: BXIMbhBlC3=5hIbqCEKvq7op!V2ZfO0XWbcnasZmPm/AJfQqdcnt/+2Ytxc1hDq1m/
+	`
+)
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestAzureContainerRegistry_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
+
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name  string
+		input string
+		want  []string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a azurecontainerregistry secret %s and %s within", azureHost, password)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_AzureContainerRegistry,
-					Verified:     true,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			name: "pwd",
+			input: `source storage.env
+
+ACR=smpldev.azurecr.io
+ACRUSER=smpldev
+ACRPWD=Cw8xeDNK6Bub3p61aq5ij/TiVvtBicpTj5rverVezj+ACRBPkEcx
+CONTAINER=storage-svc:latest`,
+			want: []string{`{"username":"smpldev","password":"Cw8xeDNK6Bub3p61aq5ij/TiVvtBicpTj5rverVezj+ACRBPkEcx"}`},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a azurecontainerregistry secret %s and %s within but not valid", azureHost, passwordInactive)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_AzureContainerRegistry,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			name: "password",
+			input: `    - name: Deploy to ARC
+      uses: azure/docker-login@v1
+      with:
+            login-server: crmshopacr.azurecr.io
+            username: crmshopacr
+            password: o9uXSjWlUdRwAeGP2xGSfGy+25vetsONo3Mq13fksa+ACRBXyFsY
+    - run: |`,
+			want: []string{`{"username":"crmshopacr","password":"o9uXSjWlUdRwAeGP2xGSfGy+25vetsONo3Mq13fksa+ACRBXyFsY"}`},
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:                nil,
-			wantErr:             false,
-			wantVerificationErr: false,
+			name: "docker cli login",
+			input: `docker login dvacr00.azurecr.io -u dvacr00 -p Ljc+1lq0U0+c3jHlMHxSxAhCipKt6zU43HfMle/Ymj+ACRAKcPHy
+docker push dvacr00.azurecr.io/foo-alpine:3.18`,
+			want: []string{`{"username":"dvacr00","password":"Ljc+1lq0U0+c3jHlMHxSxAhCipKt6zU43HfMle/Ymj+ACRAKcPHy"}`},
+		},
+		{
+			name:  "request body",
+			input: `"registries":[{"identity":"","passwordSecretRef":"registry-password","server":"cr2bxwtqgom2oo.azurecr.io","username":"cr2bxwtqgom2oo"}],"secrets":[{"name":"registry-password","value":"VP2rvkuld42mr3jNjM+rVbvIzVuZxwncKWyVU5UIad+ACRBivL0B"}]}`,
+			want:  []string{`{"username":"cr2bxwtqgom2oo","password":"VP2rvkuld42mr3jNjM+rVbvIzVuZxwncKWyVU5UIad+ACRBivL0B"}`},
+		},
+		{
+			name: "README",
+			input: `# AZURE-CICD-Deployment-with-Github-Actions
+
+## Save pass:
+
+s3cEZKH3yytiVnJ3h+eI3qhhzf9l1vNwEi1+q+WGdd+ACRCZ7JD6
+
+
+## Run from terminal:
+
+docker build -t testapp.azurecr.io/chicken:latest .
+`,
+			want: []string{`{"username":"testapp","password":"s3cEZKH3yytiVnJ3h+eI3qhhzf9l1vNwEi1+q+WGdd+ACRCZ7JD6"}`},
+		},
+		// TODO:
+		//{
+		//	name:  "az cli login",
+		//	input: `az acr login --name tstcopilotacr --username tstcopilotacr --password 9iZkJiOTKeEsQDfgoobtCYU47EEDs9UvU4L8NErLV+ACRACptmc`,
+		//	want:  []string{},
+		//},
+		//{
+		//	name:  "",
+		//	input: ``,
+		//	want:  []string{},
+		{
+			name:  "invalid pattern",
+			input: invalidPattern,
+			want:  nil,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("AzureContainerRegistry.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
-				}
-			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "RawV2", "Raw", "Redacted", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("AzureContainerRegistry.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

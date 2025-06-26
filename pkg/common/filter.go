@@ -97,8 +97,10 @@ func (filter *Filter) Pass(object string) bool {
 	if filter == nil {
 		return true
 	}
+
 	excluded := filter.exclude.Matches(object)
 	included := filter.include.Matches(object)
+
 	return !excluded && included
 }
 
@@ -113,4 +115,9 @@ func (rules *FilterRuleSet) Matches(object string) bool {
 		}
 	}
 	return false
+}
+
+// ShouldExclude return true if any regular expressions in the exclude FilterRuleSet matches the path.
+func (filter *Filter) ShouldExclude(path string) bool {
+	return filter.exclude.Matches(path)
 }

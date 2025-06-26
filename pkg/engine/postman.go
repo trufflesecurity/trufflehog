@@ -13,7 +13,7 @@ import (
 )
 
 // ScanPostman scans Postman with the provided options.
-func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error {
+func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) (sources.JobProgressRef, error) {
 	connection := sourcespb.Postman{
 		Workspaces:          c.Workspaces,
 		Collections:         c.Collections,
@@ -26,41 +26,35 @@ func (e *Engine) ScanPostman(ctx context.Context, c sources.PostmanConfig) error
 		CollectionPaths:     c.CollectionPaths,
 		EnvironmentPaths:    c.EnvironmentPaths,
 	}
+
+	// Check if postman data is going to be accessed via an api call using a token, or
+	// if it has been already exported and exists locally
 	if len(c.Token) > 0 {
 		connection.Credential = &sourcespb.Postman_Token{
 			Token: c.Token,
 		}
-	} else {
+	} else if len(c.WorkspacePaths) > 0 || len(c.CollectionPaths) > 0 || len(c.EnvironmentPaths) > 0 {
 		connection.Credential = &sourcespb.Postman_Unauthenticated{}
-	}
-
-	if len(c.Workspaces) == 0 && len(c.Collections) == 0 && len(c.Environments) == 0 && len(c.Token) == 0 && len(c.WorkspacePaths) == 0 && len(c.CollectionPaths) == 0 && len(c.EnvironmentPaths) == 0 {
-		ctx.Logger().Error(errors.New("no postman workspaces, collections, environments or API token provided"), "failed to scan postman")
-		return nil
-	}
-
-	// Turn AhoCorasick keywordsToDetectors into a map of keywords
-	keywords := make(map[string]struct{})
-	for key := range e.ahoCorasickCore.KeywordsToDetectors() {
-		keywords[key] = struct{}{}
+	} else {
+		return sources.JobProgressRef{}, errors.New("no path to locally exported data or API token provided")
 	}
 
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal Postman connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - postman"
 	sourceID, jobID, _ := e.sourceManager.GetIDs(ctx, sourceName, postman.SourceType)
 
 	postmanSource := &postman.Source{
-		DetectorKeywords: keywords,
+		DetectorKeywords: e.AhoCorasickCoreKeywords(),
 	}
+
 	if err := postmanSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, c.Concurrency); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, postmanSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, postmanSource)
 }

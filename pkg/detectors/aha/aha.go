@@ -8,7 +8,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -22,7 +21,7 @@ var (
 	// Ensure the Scanner satisfies the interface at compile time.
 	_ detectors.Detector = (*Scanner)(nil)
 
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"aha"}) + `\b([0-9a-f]{64})\b`)
@@ -32,7 +31,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"aha"}
+	return []string{"aha.io"}
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -50,16 +49,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	resURLMatch := "aha.io"
 	for _, URLmatch := range URLmatches {
-		if len(URLmatch) != 2 {
-			continue
-		}
 		resURLMatch = strings.TrimSpace(URLmatch[1])
 	}
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -108,4 +101,8 @@ func verifyAha(ctx context.Context, client *http.Client, resMatch, resURLMatch s
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Aha
+}
+
+func (s Scanner) Description() string {
+	return "Aha is a product management software suite. Aha API keys can be used to access and modify product data and workflows."
 }

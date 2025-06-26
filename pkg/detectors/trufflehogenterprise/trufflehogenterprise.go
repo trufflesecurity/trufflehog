@@ -43,21 +43,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	hostnameMatches := hostnamePat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, keyMatch := range keyMatches {
-		if len(keyMatch) != 1 {
-			continue
-		}
 		resKeyMatch := strings.TrimSpace(keyMatch[0])
 		for _, secretMatch := range secretMatches {
-
-			if len(secretMatch) != 1 {
-				continue
-			}
 			resSecretMatch := strings.TrimSpace(secretMatch[0])
 
 			for _, hostnameMatch := range hostnameMatches {
-				if len(hostnameMatch) != 1 {
-					continue
-				}
 
 				resHostnameMatch := strings.TrimSpace(hostnameMatch[0])
 
@@ -102,4 +92,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TrufflehogEnterprise
+}
+
+func (s Scanner) Description() string {
+	return "TruffleHog Enterprise is a tool for detecting and verifying secrets in your codebase. The keys and secrets detected can be used to access TruffleHog Enterprise services."
 }

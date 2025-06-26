@@ -25,10 +25,10 @@ const (
 	defaultDateFormat = "Mon Jan 2 15:04:05 2006 -0700"
 
 	// defaultMaxDiffSize is the maximum size for a diff. Larger diffs will be cut off.
-	defaultMaxDiffSize = 2 * 1024 * 1024 * 1024 // 2GB
+	defaultMaxDiffSize int64 = 2 * 1024 * 1024 * 1024 // 2GB
 
 	// defaultMaxCommitSize is the maximum size for a commit. Larger commits will be cut off.
-	defaultMaxCommitSize = 2 * 1024 * 1024 * 1024 // 2GB
+	defaultMaxCommitSize int64 = 2 * 1024 * 1024 * 1024 // 2GB
 )
 
 // contentWriter defines a common interface for writing, reading, and managing diff content.
@@ -120,8 +120,8 @@ type Commit struct {
 
 // Parser sets values used in GitParse.
 type Parser struct {
-	maxDiffSize   int
-	maxCommitSize int
+	maxDiffSize   int64
+	maxCommitSize int64
 	dateFormat    string
 
 	useCustomContentWriter bool
@@ -188,7 +188,7 @@ func UseCustomContentWriter() Option {
 
 // WithMaxDiffSize sets maxDiffSize option. Diffs larger than maxDiffSize will
 // be truncated.
-func WithMaxDiffSize(maxDiffSize int) Option {
+func WithMaxDiffSize(maxDiffSize int64) Option {
 	return func(parser *Parser) {
 		parser.maxDiffSize = maxDiffSize
 	}
@@ -197,7 +197,7 @@ func WithMaxDiffSize(maxDiffSize int) Option {
 // WithMaxCommitSize sets maxCommitSize option. Commits larger than maxCommitSize
 // will be put in the commit channel and additional diffs will be added to a
 // new commit.
-func WithMaxCommitSize(maxCommitSize int) Option {
+func WithMaxCommitSize(maxCommitSize int64) Option {
 	return func(parser *Parser) {
 		parser.maxCommitSize = maxCommitSize
 	}
@@ -221,7 +221,15 @@ func NewParser(options ...Option) *Parser {
 
 // RepoPath parses the output of the `git log` command for the `source` path.
 // The Diff chan will return diffs in the order they are parsed from the log.
-func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbreviatedLog bool, excludedGlobs []string, isBare bool) (chan *Diff, error) {
+func (c *Parser) RepoPath(
+	ctx context.Context,
+	source string,
+	head string,
+	abbreviatedLog bool,
+	excludedGlobs []string,
+	isBare bool,
+	additionalArgs ...string,
+) (chan *Diff, error) {
 	args := []string{
 		"-C", source,
 		"log",
@@ -239,8 +247,9 @@ func (c *Parser) RepoPath(ctx context.Context, source string, head string, abbre
 	} else {
 		args = append(args, "--all")
 	}
+	args = append(args, additionalArgs...) // These need to come before --
 	for _, glob := range excludedGlobs {
-		args = append(args, "--", ".", fmt.Sprintf(":(exclude)%s", glob))
+		args = append(args, "--", ".", ":(exclude)"+glob)
 	}
 
 	cmd := exec.Command("git", args...)
@@ -275,7 +284,7 @@ func (c *Parser) Staged(ctx context.Context, source string) (chan *Diff, error) 
 
 	absPath, err := filepath.Abs(source)
 	if err == nil {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_DIR=%s", filepath.Join(absPath, ".git")))
+		cmd.Env = append(cmd.Env, "GIT_DIR="+filepath.Join(absPath, ".git"))
 	}
 
 	return c.executeCommand(ctx, cmd, true)
@@ -307,12 +316,14 @@ func (c *Parser) executeCommand(ctx context.Context, cmd *exec.Cmd, isStaged boo
 	}()
 
 	go func() {
+		defer func() {
+			if err := cmd.Wait(); err != nil {
+				ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
+			}
+		}()
 		c.FromReader(ctx, stdOut, diffChan, isStaged)
 		if err := stdOut.Close(); err != nil {
 			ctx.Logger().V(2).Info("Error closing git stdout pipe.", "error", err)
-		}
-		if err := cmd.Wait(); err != nil {
-			ctx.Logger().V(2).Info("Error waiting for git command to complete.", "error", err)
 		}
 	}()
 
@@ -563,7 +574,7 @@ func (c *Parser) FromReader(ctx context.Context, stdOut io.Reader, diffChan chan
 			latestState = ParseFailure
 		}
 
-		if currentDiff.Len() > c.maxDiffSize {
+		if int64(currentDiff.Len()) > c.maxDiffSize {
 			ctx.Logger().V(2).Info(fmt.Sprintf(
 				"Diff for %s exceeded MaxDiffSize(%d)", currentDiff.PathB, c.maxDiffSize,
 			))

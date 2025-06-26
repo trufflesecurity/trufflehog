@@ -3,8 +3,9 @@ package stripe
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -36,11 +37,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Stripe,
 			Raw:          []byte(match),
 		}
-		s.ExtraData = map[string]string{
+		result.ExtraData = map[string]string{
 			"rotation_guide": "https://howtorotate.com/docs/tutorials/stripe/",
 		}
 
@@ -62,12 +63,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				res.Body.Close() // The request body is unused.
 
 				if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusForbidden {
-					s.Verified = true
+					result.Verified = true
 				}
 			}
+			result.AnalysisInfo = map[string]string{"key": match}
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return
@@ -75,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Stripe
+}
+
+func (s Scanner) Description() string {
+	return "Stripe is a payment processing platform. Stripe API keys can be used to interact with Stripe's services for processing payments, managing subscriptions, and more."
 }

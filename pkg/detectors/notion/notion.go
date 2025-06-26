@@ -38,9 +38,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Notion,
@@ -63,6 +60,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// Notion returns 401 for all non-valid keys, thus 403 indicates it has fine-tuned permissions,
 					// /v1/search, /v1/databases/*, etc. may work.
 					s1.Verified = true
+					s1.AnalysisInfo = map[string]string{"key": resMatch}
 
 				}
 			} else {
@@ -78,4 +76,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Notion
+}
+
+func (s Scanner) Description() string {
+	return "Notion is a productivity tool that provides an all-in-one workspace for note-taking, project management, and collaboration. Notion API keys can be used to access and modify data within a user's Notion workspace."
 }

@@ -4,16 +4,17 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -44,20 +45,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range serverMatches {
-		if len(match) != 2 {
-			continue
-		}
 		resServer := strings.TrimSpace(match[1])
 
 		for _, emailMatch := range emailMatches {
-			if len(emailMatch) != 2 {
-				continue
-			}
 			resEmail := strings.TrimSpace(emailMatch[1])
 			for _, keyMatch := range keyMatches {
-				if len(keyMatch) != 2 {
-					continue
-				}
 				resKey := strings.TrimSpace(keyMatch[1])
 
 				s1 := detectors.Result{
@@ -94,4 +86,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ClickHelp
+}
+
+func (s Scanner) Description() string {
+	return "ClickHelp is a documentation tool that allows users to create and manage online documentation. ClickHelp API keys can be used to access and modify documentation data."
 }

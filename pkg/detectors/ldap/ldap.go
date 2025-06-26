@@ -16,12 +16,16 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+
+func init() {
+	ldap.DefaultTimeout = 5 * time.Second
+}
 
 var (
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
@@ -127,8 +131,6 @@ func isErrDeterminate(err error) bool {
 func verifyLDAP(username, password string, ldapURL *url.URL) error {
 	// Tests with non-TLS, TLS, and STARTTLS
 
-	ldap.DefaultTimeout = 5 * time.Second
-
 	uri := ldapURL.String()
 
 	switch ldapURL.Scheme {
@@ -169,4 +171,8 @@ func verifyLDAP(username, password string, ldapURL *url.URL) error {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LDAP
+}
+
+func (s Scanner) Description() string {
+	return "LDAP (Lightweight Directory Access Protocol) is an open, vendor-neutral, industry standard application protocol for accessing and maintaining distributed directory information services over an Internet Protocol (IP) network."
 }

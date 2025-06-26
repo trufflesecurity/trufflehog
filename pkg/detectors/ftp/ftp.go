@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
 
-	regexp "github.com/wasilibs/go-re2"
-
 	"github.com/jlaffaye/ftp"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -103,8 +102,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func (s Scanner) IsFalsePositive(result detectors.Result) bool {
-	return detectors.IsKnownFalsePositive(string(result.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false)
+var ftpFalsePositives = map[detectors.FalsePositive]struct{}{
+	detectors.FalsePositive("@ftp.freebsd.org"): {},
+}
+
+func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
+	return detectors.IsKnownFalsePositive(string(result.Raw), ftpFalsePositives, false)
 }
 
 func isErrDeterminate(e error) bool {
@@ -129,4 +132,8 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FTP
+}
+
+func (s Scanner) Description() string {
+	return "FTP is a protocol for reading and writing files. An FTP password can be used to read and sometimes write files."
 }

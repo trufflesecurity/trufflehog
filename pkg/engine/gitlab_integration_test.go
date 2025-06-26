@@ -16,17 +16,19 @@ import (
 func TestGitLab(t *testing.T) {
 	// Run the scan.
 	ctx := context.Background()
-	e, err := Start(ctx,
-		WithDetectors(DefaultDetectors()...),
-		WithVerify(false),
-	)
+	e, err := NewEngine(ctx, &Config{
+		Detectors:     DefaultDetectors(),
+		SourceManager: sources.NewManager(),
+		Verify:        false,
+	})
 	assert.NoError(t, err)
+	e.Start(ctx)
 
 	secret, err := common.GetTestSecret(ctx)
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
-	err = e.ScanGitLab(ctx, sources.GitlabConfig{
+	_, err = e.ScanGitLab(ctx, sources.GitlabConfig{
 		Token: secret.MustGetField("GITLAB_TOKEN"),
 	})
 	assert.NoError(t, err)

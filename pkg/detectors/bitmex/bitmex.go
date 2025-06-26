@@ -5,19 +5,22 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -46,15 +49,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, secretMatch := range secretMatches {
-			if len(secretMatch) != 2 {
-				continue
-			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
@@ -64,28 +61,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-
-				timestamp := strconv.FormatInt(time.Now().Unix()+5, 10)
-				action := "GET"
-				path := "/api/v1/user"
-				payload := url.Values{}
-
-				signature := getBitmexSignature(timestamp, resSecretMatch, action, path, payload.Encode())
-
-				req, err := http.NewRequestWithContext(ctx, action, "https://www.bitmex.com"+path, strings.NewReader(payload.Encode()))
-				if err != nil {
-					continue
-				}
-				req.Header.Add("api-expires", timestamp)
-				req.Header.Add("api-key", resMatch)
-				req.Header.Add("api-signature", signature)
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, verificationErr := verifyBitmex(ctx, client, resMatch, resSecretMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(verificationErr)
 			}
 
 			results = append(results, s1)
@@ -95,14 +73,54 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func getBitmexSignature(timeStamp string, secret string, action string, path string, payload string) string {
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Bitmex
+}
 
+func (s Scanner) Description() string {
+	return "Bitmex is a cryptocurrency exchange and derivative trading platform. Bitmex API keys can be used to access and trade on the platform programmatically."
+}
+
+// docs: https://www.bitmex.com/app/apiKeysUsage
+func verifyBitmex(ctx context.Context, client *http.Client, key, secret string) (bool, error) {
+	timestamp := strconv.FormatInt(time.Now().Unix()+5, 10)
+	action := "GET"
+	path := "/api/v1/user"
+	payload := url.Values{}
+
+	signature := getBitmexSignature(timestamp, secret, action, path, payload.Encode())
+
+	req, err := http.NewRequestWithContext(ctx, action, "https://www.bitmex.com"+path, strings.NewReader(payload.Encode()))
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("api-expires", timestamp)
+	req.Header.Add("api-key", key)
+	req.Header.Add("api-signature", signature)
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+}
+
+func getBitmexSignature(timeStamp string, secret string, action string, path string, payload string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(action + path + timeStamp + payload))
 	macsum := mac.Sum(nil)
 	return hex.EncodeToString(macsum)
-}
-
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Bitmex
 }

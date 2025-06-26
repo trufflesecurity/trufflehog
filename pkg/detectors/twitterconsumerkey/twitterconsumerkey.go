@@ -87,6 +87,10 @@ func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TwitterConsumerkey
 }
 
+func (s Scanner) Description() string {
+	return "Twitter Consumer Keys and Secrets are used to authenticate API requests to Twitter. They allow access to Twitter's API to manage user data and perform actions on behalf of users."
+}
+
 func verifyBearerToken(ctx context.Context, client *http.Client, token string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.twitter.com/2/tweets/20", nil)
 	if err != nil {

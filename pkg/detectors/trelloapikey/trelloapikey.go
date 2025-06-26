@@ -2,7 +2,6 @@ package trelloapikey
 
 import (
 	"context"
-	// "log"
 	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
@@ -42,9 +41,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		if i == 0 {
 			resMatch := strings.TrimSpace(match[1])
 			for _, tokenMatch := range tokenMatches {
-				if len(tokenMatch) != 2 {
-					continue
-				}
 
 				token := strings.TrimSpace(tokenMatch[1])
 
@@ -79,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TrelloApiKey
+}
+
+func (s Scanner) Description() string {
+	return "Trello is a collaboration tool that organizes your projects into boards. Trello API keys can be used to access and modify data within Trello."
 }

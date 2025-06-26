@@ -1,4 +1,4 @@
-package dockerhubv2
+package dockerhub
 
 import (
 	"context"
@@ -8,9 +8,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	regexp "github.com/wasilibs/go-re2"
-
-	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -30,8 +29,8 @@ var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	// Can use email or username for login.
-	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
-	emailPat    = regexp.MustCompile(`(` + common.EmailPattern + `)`)
+	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `(?im)(?:user|usr|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
+	emailPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + common.EmailPattern)
 
 	// Can use password or personal access token (PAT) for login, but this scanner will only check for PATs.
 	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `\b([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
@@ -82,6 +81,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.Verified = isVerified
 				s1.ExtraData = extraData
 				s1.SetVerificationError(verificationErr)
+				if s1.Verified {
+					s1.AnalysisInfo = map[string]string{
+						"username": username,
+						"pat":      token,
+					}
+				}
 			}
 
 			results = append(results, s1)
@@ -177,4 +182,8 @@ type mfaRequiredResponse struct {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Dockerhub
+}
+
+func (s Scanner) Description() string {
+	return "Docker is a platform used to develop, ship, and run applications. Docker access tokens can be used to authenticate and interact with Docker services."
 }

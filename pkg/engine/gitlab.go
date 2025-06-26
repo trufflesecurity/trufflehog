@@ -16,7 +16,7 @@ import (
 )
 
 // ScanGitLab scans GitLab with the provided configuration.
-func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
+func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) (sources.JobProgressRef, error) {
 	logOptions := &gogit.LogOptions{}
 	opts := []git.ScanOption{
 		git.ScanOptionFilter(c.Filter),
@@ -24,7 +24,10 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 	}
 	scanOptions := git.NewScanOptions(opts...)
 
-	connection := &sourcespb.GitLab{SkipBinaries: c.SkipBinaries}
+	connection := &sourcespb.GitLab{
+		SkipBinaries:    c.SkipBinaries,
+		RemoveAuthInUrl: !c.AuthInUrl, // configuration uses the opposite field in proto to keep credentials in the URL by default.
+	}
 
 	switch {
 	case len(c.Token) > 0:
@@ -32,7 +35,7 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 			Token: c.Token,
 		}
 	default:
-		return fmt.Errorf("must provide token")
+		return sources.JobProgressRef{}, fmt.Errorf("must provide token")
 	}
 
 	if len(c.Endpoint) > 0 {
@@ -43,11 +46,19 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 		connection.Repositories = c.Repos
 	}
 
+	if len(c.IncludeRepos) > 0 {
+		connection.IncludeRepos = c.IncludeRepos
+	}
+
+	if len(c.ExcludeRepos) > 0 {
+		connection.IgnoreRepos = c.ExcludeRepos
+	}
+
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal gitlab connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - gitlab"
@@ -55,9 +66,8 @@ func (e *Engine) ScanGitLab(ctx context.Context, c sources.GitlabConfig) error {
 
 	gitlabSource := &gitlab.Source{}
 	if err := gitlabSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
 	gitlabSource.WithScanOptions(scanOptions)
-	_, err = e.sourceManager.Run(ctx, sourceName, gitlabSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, gitlabSource)
 }

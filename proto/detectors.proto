@@ -139,7 +139,7 @@ enum DetectorType {
   AirbrakeProjectKey = 125;
   AirbrakeUserKey = 126;
   PendoIntegrationKey = 127;
-  SplunkOberservabilityToken  = 128;
+  SplunkOberservabilityToken = 128;
   LokaliseToken = 129;
   Calendarific = 130;
   Jumpcloud = 131;
@@ -232,7 +232,7 @@ enum DetectorType {
   Duda = 219;
   Yext = 220;
   ContentStack = 221;
-  Storyblok = 222;
+  StoryblokAccessToken = 222;
   GraphCMS = 223;
   Checkmarket = 224;
   Convertkit = 225;
@@ -249,7 +249,7 @@ enum DetectorType {
   ZonkaFeedback = 236;
   Delighted = 237;
   Feedier = 238;
-  Abbysale = 239;
+  Abyssale = 239;
   Magnetic = 240;
   Nytimes = 241 [deprecated = true];
   Polygon = 242;
@@ -377,7 +377,7 @@ enum DetectorType {
   Nutritionix = 364;
   Swell = 365;
   ClickupPersonalToken = 366;
-  Nitro = 367;
+  Nitro = 367 [deprecated = true];
   Rev = 368;
   RunRunIt = 369;
   Typeform = 370;
@@ -500,7 +500,7 @@ enum DetectorType {
   Ipify = 488 [deprecated = true];
   LanguageLayer = 489;
   Lob = 490;
-  OnWaterIO = 491;
+  OnWaterIO = 491 [deprecated = true];
   Pastebin = 492;
   PdfLayer = 493;
   Pixabay = 494;
@@ -567,7 +567,7 @@ enum DetectorType {
   Gitter = 555;
   Host = 556;
   Iexcloud = 557;
-  Restpack = 558;
+  Restpack = 558 [deprecated = true];
   ScraperBox = 559;
   ScrapingAnt = 560;
   SerpStack = 561;
@@ -654,7 +654,7 @@ enum DetectorType {
   Flightstats = 642;
   ChecIO = 643;
   Manifest = 644;
-  ApiScience = 645;
+  ApiScience = 645 [deprecated = true];
   AppSynergy = 646;
   Caflou = 647;
   Caspio = 648;
@@ -681,7 +681,7 @@ enum DetectorType {
   Moderation = 669;
   Opendatasoft = 670;
   Podio = 671;
-  Rockset = 672;
+  Rockset = 672 [deprecated = true];
   Rownd = 673;
   Shotstack = 674;
   Swiftype = 675;
@@ -711,11 +711,11 @@ enum DetectorType {
   Paymoapp = 699;
   Mixmax = 700;
   Processst = 701;
-  Repairshopr  = 702;
+  Repairshopr = 702;
   Goshippo = 703;
   Sigopt = 704;
   Sugester = 705;
-  Viewneo = 706; 
+  Viewneo = 706;
   BoostNote = 707;
   CaptainData = 708;
   Checkvist = 709;
@@ -800,7 +800,7 @@ enum DetectorType {
   Apilayer = 788;
   Disqus = 789;
   Woopra = 790;
-  Paperform =791;
+  Paperform = 791;
   Gumroad = 792;
   Paydirtapp = 793;
   Detectify = 794;
@@ -999,6 +999,46 @@ enum DetectorType {
   Intra42 = 987;
   Groq = 988;
   TwitterConsumerkey = 989;
+  Eraser = 990;
+  LarkSuite = 991;
+  LarkSuiteApiKey = 992;
+  EndorLabs = 993;
+  ElevenLabs = 994;
+  Netsuite = 995;
+  RobinhoodCrypto = 996;
+  NVAPI = 997;
+  PyPI = 998;
+  RailwayApp = 999;
+  Meraki = 1000;
+  SaladCloudApiKey = 1001;
+  Box = 1002;
+  BoxOauth = 1003;
+  ApiMetrics = 1004;
+  WeightsAndBiases = 1005;
+  ZohoCRM = 1006;
+  AzureOpenAI = 1007;
+  GoDaddy = 1008;
+  Flexport = 1009;
+  TwitchAccessToken = 1010;
+  TwilioApiKey = 1011;
+  Sanity = 1012;
+  AzureRefreshToken = 1013;
+  AirtableOAuth = 1014;
+  AirtablePersonalAccessToken = 1015;
+  StoryblokPersonalAccessToken = 1016;
+  SentryOrgToken = 1017;
+  AzureApiManagementRepositoryKey = 1018;
+  AzureAPIManagementSubscriptionKey = 1019;
+  Harness = 1020;
+  Langfuse = 1021;
+  BingSubscriptionKey = 1022;
+  XAI = 1023;
+  AzureDirectManagementKey = 1024;
+  AzureAppConfigConnectionString = 1025;
+  DeepSeek = 1026;
+  StripePaymentIntent = 1027;
+  LangSmith = 1028;
+  BitbucketAppPassword = 1029;
 }
 
 message Result {

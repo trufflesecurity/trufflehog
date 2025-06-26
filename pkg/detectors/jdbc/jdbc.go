@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -49,7 +50,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
-	keyPat = regexp.MustCompile(`(?i)jdbc:[\w]{3,10}:[^\s"']{0,512}`)
+	keyPat = regexp.MustCompile(`(?i)jdbc:[\w]{3,10}:[^\s"'<>,(){}[\]&]{10,512}`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -60,6 +61,7 @@ func (s Scanner) Keywords() []string {
 
 // FromData will find and optionally verify Jdbc secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
+	logCtx := logContext.AddLogger(ctx)
 	dataStr := string(data)
 
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
@@ -74,40 +76,43 @@ matchLoop:
 		}
 		jdbcConn := match[0]
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_JDBC,
 			Raw:          []byte(jdbcConn),
 			Redacted:     tryRedactAnonymousJDBC(jdbcConn),
 		}
 
 		if verify {
-			s.Verified = false
-			j, err := newJDBC(jdbcConn)
+			j, err := newJDBC(logCtx, jdbcConn)
 			if err != nil {
 				continue
 			}
+
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 			pingRes := j.ping(ctx)
-			s.Verified = pingRes.err == nil
+			result.Verified = pingRes.err == nil
 			// If there's a ping error that is marked as "determinate" we throw it away. We do this because this was the
 			// behavior before tri-state verification was introduced and preserving it allows us to gradually migrate
 			// detectors to use tri-state verification.
 			if pingRes.err != nil && !pingRes.determinate {
 				err = pingRes.err
-				s.SetVerificationError(err, jdbcConn)
+				result.SetVerificationError(err, jdbcConn)
+			}
+			result.AnalysisInfo = map[string]string{
+				"connection_string": jdbcConn,
 			}
 			// TODO: specialized redaction
 		}
 
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return
 }
 
-func (s Scanner) IsFalsePositive(_ detectors.Result) bool {
-	return false
+func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {
+	return false, ""
 }
 
 func tryRedactAnonymousJDBC(conn string) string {
@@ -201,7 +206,7 @@ func tryRedactRegex(conn string) (string, bool) {
 	return newConn, true
 }
 
-var supportedSubprotocols = map[string]func(string) (jdbc, error){
+var supportedSubprotocols = map[string]func(logContext.Context, string) (jdbc, error){
 	"mysql":      parseMySQL,
 	"postgresql": parsePostgres,
 	"sqlserver":  parseSqlServer,
@@ -216,22 +221,24 @@ type jdbc interface {
 	ping(context.Context) pingResult
 }
 
-func newJDBC(conn string) (jdbc, error) {
+func newJDBC(ctx logContext.Context, conn string) (jdbc, error) {
 	// expected format: "jdbc:{subprotocol}:{subname}"
 	if !strings.HasPrefix(strings.ToLower(conn), "jdbc:") {
 		return nil, errors.New("expected jdbc prefix")
 	}
 	conn = conn[len("jdbc:"):]
+
 	subprotocol, subname, found := strings.Cut(conn, ":")
 	if !found {
 		return nil, errors.New("expected a colon separated subprotocol and subname")
 	}
+
 	// get the subprotocol parser
 	parser, ok := supportedSubprotocols[strings.ToLower(subprotocol)]
 	if !ok {
 		return nil, errors.New("unsupported subprotocol")
 	}
-	return parser(subname)
+	return parser(ctx, subname)
 }
 
 func ping(ctx context.Context, driverName string, isDeterminate func(error) bool, candidateConns ...string) pingResult {
@@ -261,4 +268,8 @@ func pingErr(ctx context.Context, driverName, conn string) error {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_JDBC
+}
+
+func (s Scanner) Description() string {
+	return "JDBC (Java Database Connectivity) is an API for connecting and executing queries with databases. JDBC connection strings can be used to access and manipulate databases."
 }

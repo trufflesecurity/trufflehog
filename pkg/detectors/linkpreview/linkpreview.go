@@ -35,9 +35,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -65,4 +62,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LinkPreview
+}
+
+func (s Scanner) Description() string {
+	return "LinkPreview is a service that provides information about a web page when given a URL. LinkPreview API keys can be used to access this service and retrieve metadata about web pages."
 }

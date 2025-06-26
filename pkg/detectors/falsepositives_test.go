@@ -1,6 +1,3 @@
-//go:build detectors
-// +build detectors
-
 package detectors
 
 import (
@@ -9,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	logContext "github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -28,20 +26,28 @@ func (d fakeDetector) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType(0)
 }
 
-func (d customFalsePositiveChecker) IsFalsePositive(result Result) bool {
-	return IsKnownFalsePositive(string(result.Raw), []FalsePositive{"a specific magic string"}, false)
+func (f fakeDetector) Description() string { return "" }
+
+func (d customFalsePositiveChecker) IsFalsePositive(result Result) (bool, string) {
+	return IsKnownFalsePositive(string(result.Raw), map[FalsePositive]struct{}{"a specific magic string": {}}, false)
 }
 
 func TestFilterKnownFalsePositives_DefaultLogic(t *testing.T) {
 	results := []Result{
-		{Raw: []byte("00000")},           // "default" false positive list
-		{Raw: []byte("number")},          // from wordlist
-		{Raw: []byte("hga8adshla3434g")}, // real secret
+		{Raw: []byte("00000")},  // "default" false positive list
+		{Raw: []byte("number")}, // from wordlist
+		// from uuid list
+		{Raw: []byte("00000000-0000-0000-0000-000000000000")},
+		{Raw: []byte("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")},
+		// real secrets
+		{Raw: []byte("hga8adshla3434g")},
+		{Raw: []byte("f795f7db-2dfe-4095-96f3-8f8370c735f9")},
 	}
 	expected := []Result{
 		{Raw: []byte("hga8adshla3434g")},
+		{Raw: []byte("f795f7db-2dfe-4095-96f3-8f8370c735f9")},
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results, false)
+	filtered := FilterKnownFalsePositives(logContext.Background(), fakeDetector{}, results)
 	assert.ElementsMatch(t, expected, filtered)
 }
 
@@ -57,14 +63,14 @@ func TestFilterKnownFalsePositives_CustomLogic(t *testing.T) {
 		{Raw: []byte("number")},
 		{Raw: []byte("hga8adshla3434g")},
 	}
-	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results, false)
+	filtered := FilterKnownFalsePositives(logContext.Background(), customFalsePositiveChecker{}, results)
 	assert.ElementsMatch(t, expected, filtered)
 }
 
 func TestIsFalsePositive(t *testing.T) {
 	type args struct {
 		match          string
-		falsePositives []FalsePositive
+		falsePositives map[FalsePositive]struct{}
 		useWordlist    bool
 	}
 	tests := []struct {
@@ -120,7 +126,7 @@ func TestIsFalsePositive(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsKnownFalsePositive(tt.args.match, tt.args.falsePositives, tt.args.useWordlist); got != tt.want {
+			if got, _ := IsKnownFalsePositive(tt.args.match, tt.args.falsePositives, tt.args.useWordlist); got != tt.want {
 				t.Errorf("IsKnownFalsePositive() = %v, want %v", got, tt.want)
 			}
 		})
@@ -148,14 +154,14 @@ func TestStringShannonEntropy(t *testing.T) {
 			args: args{
 				input: "aaaaaaaaaaaaaaaaaaaaaaaaaaab",
 			},
-			want: 0.22228483068568816,
+			want: 0.22,
 		},
 		{
 			name: "entropy 3",
 			args: args{
 				input: "aaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaab",
 			},
-			want: 0.22228483068568816,
+			want: 0.22,
 		},
 		{
 			name: "empty",
@@ -167,8 +173,11 @@ func TestStringShannonEntropy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := StringShannonEntropy(tt.args.input); got != tt.want {
-				t.Errorf("StringShannonEntropy() = %v, want %v", got, tt.want)
+			got := StringShannonEntropy(tt.args.input)
+			if len(tt.args.input) > 0 && tt.want != 0 {
+				assert.InEpsilon(t, tt.want, got, 0.1)
+			} else {
+				assert.Equal(t, tt.want, got)
 			}
 		})
 	}

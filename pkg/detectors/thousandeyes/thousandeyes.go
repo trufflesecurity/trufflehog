@@ -40,15 +40,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	emailMatches := email.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		tokenPatMatch := strings.TrimSpace(match[1])
 
 		for _, emailMatch := range emailMatches {
-			if len(emailMatch) != 2 {
-				continue
-			}
 
 			userPatMatch := strings.TrimSpace(emailMatch[1])
 
@@ -81,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ThousandEyes
+}
+
+func (s Scanner) Description() string {
+	return "ThousandEyes provides network intelligence and monitoring services. ThousandEyes API keys can be used to access and manage network performance data."
 }

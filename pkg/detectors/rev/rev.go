@@ -41,15 +41,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	clientMatches := clientKeyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, userMatch := range userMatches {
-		if len(userMatch) != 2 {
-			continue
-		}
 		resUserMatch := strings.TrimSpace(userMatch[1])
 
 		for _, clientMatch := range clientMatches {
-			if len(clientMatch) != 2 {
-				continue
-			}
 			resClientMatch := strings.TrimSpace(clientMatch[1])
 
 			s1 := detectors.Result{
@@ -81,4 +75,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Rev
+}
+
+func (s Scanner) Description() string {
+	return "Rev is a transcription service. Rev API keys can be used to access and modify transcription orders and data."
 }

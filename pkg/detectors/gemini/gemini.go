@@ -54,9 +54,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range idMatches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, secretMatch := range secretMatches {
@@ -134,4 +131,8 @@ func constructSignature(payload string, resSecretMatch string) string {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Gemini
+}
+
+func (s Scanner) Description() string {
+	return "Gemini is a cryptocurrency exchange platform. API keys can be used to access and manage account details and perform transactions."
 }
