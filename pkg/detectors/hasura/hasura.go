@@ -134,7 +134,6 @@ func (s Scanner) verifyHasura(ctx context.Context, client *http.Client, domain, 
 		return false, extraData, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// This struct can capture both the "errors" and "data" top-level keys.
 	var response struct {
 		Data   any   `json:"data"`
 		Errors []any `json:"errors"`
@@ -144,18 +143,13 @@ func (s Scanner) verifyHasura(ctx context.Context, client *http.Client, domain, 
 		return false, extraData, fmt.Errorf("failed to unmarshal json response: %w", err)
 	}
 
-	// Key is not verified if we have errors or no data
-	if len(response.Errors) > 0 || response.Data == nil {
-		return false, extraData, nil
-	}
-
 	// Key is verified if we have data and no errors
 	if response.Data != nil && len(response.Errors) == 0 {
 		return true, extraData, nil
 	}
 
-	// This should never be reached, but just in case
-	return false, extraData, fmt.Errorf("api returned 200 OK but response was inconclusive")
+	// Key is not verified if we have errors or no data
+	return false, extraData, nil
 }
 
 func isHasuraProjectUnavailable(bodyBytes []byte) bool {
