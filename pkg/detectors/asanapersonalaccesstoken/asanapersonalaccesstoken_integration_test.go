@@ -23,8 +23,14 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
+	testNewSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
+	if err != nil {
+		t.Fatalf("could not get test secrets from GCP: %s", err)
+	}
+
 	secret := testSecrets.MustGetField("ASANA_PAT")
 	inactiveSecret := testSecrets.MustGetField("ASANA_PAT_INACTIVE")
+	newFormatSecret := testNewSecrets.MustGetField("ASANA_PAT_NEW")
 
 	type args struct {
 		ctx    context.Context
@@ -79,6 +85,38 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "found, verified - new format",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("You can find a asana secret %s within", newFormatSecret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AsanaPersonalAccessToken,
+					Verified:     true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "found, verified with additional data",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte(fmt.Sprintf("asana_pat = %s\nother_data = some_value", secret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_AsanaPersonalAccessToken,
+					Verified:     true,
+				},
+			},
 			wantErr: false,
 		},
 	}
