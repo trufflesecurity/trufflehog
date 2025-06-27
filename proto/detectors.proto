@@ -317,7 +317,7 @@ enum DetectorType {
   Opengraphr = 304 [deprecated = true];
   Rawg = 305;
   Riotgames = 306;
-  RoninApp = 307;
+  Clientary = 307;
   Stormglass = 308;
   Tomtom = 309;
   Twitch = 310;
