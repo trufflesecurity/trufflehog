@@ -68,7 +68,7 @@ func isValidECPrivateKey(pemKey []byte) bool {
 
 	// Check the key type
 	_, ok := key.Public().(*ecdsa.PublicKey)
-        return ok
+	return ok
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -112,6 +112,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				isVerified, verificationErr := s.verifyMatch(ctx, client, resKeyName, resPrivateKey)
 				s1.Verified = isVerified
 				s1.SetVerificationError(verificationErr, resPrivateKey)
+
+				if s1.Verified {
+					s1.AnalysisInfo = map[string]string{
+						"keyName": resKeyName,
+						"key":     resPrivateKey,
+					}
+				}
 			}
 			results = append(results, s1)
 
