@@ -22,8 +22,16 @@ const (
 // Coinbase API requires the credentials encoded in a JWT token
 // The JWT token is signed with the private key and expires in 2 minutes
 func buildJWT(method, host, endpoint, keyName, key string) (string, error) {
+	// Normalize the credentials to ensure consistent line endings
+	keyNameStr := strings.NewReplacer("\\", "").Replace(keyName)
+	pemStr := strings.NewReplacer(
+		"\r\n", "\n",
+		"\\r\\n", "\n",
+		"\\n", "\n",
+		"\\r", "\n",
+	).Replace(key)
+
 	// Decode the PEM key
-	pemStr := strings.ReplaceAll(key, `\n`, "\n")
 	block, _ := pem.Decode([]byte(pemStr))
 	if block == nil || block.Type != "EC PRIVATE KEY" {
 		return "", fmt.Errorf("failed to decode PEM block containing EC private key")
@@ -36,7 +44,7 @@ func buildJWT(method, host, endpoint, keyName, key string) (string, error) {
 
 	now := time.Now().Unix()
 	claims := jwt.MapClaims{
-		"sub": keyName,
+		"sub": keyNameStr,
 		"iss": "cdp",
 		"nbf": now,
 		"exp": now + 120,
@@ -44,7 +52,7 @@ func buildJWT(method, host, endpoint, keyName, key string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-	token.Header["kid"] = keyName
+	token.Header["kid"] = keyNameStr
 	token.Header["nonce"] = fmt.Sprintf("%x", makeNonce())
 
 	signedToken, err := token.SignedString(privateKey)
