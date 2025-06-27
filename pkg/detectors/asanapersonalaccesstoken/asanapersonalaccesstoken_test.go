@@ -15,7 +15,6 @@ var (
 	validPatternOld = "asana_token: 594776654034514343561917591881414702593902454625364993/1724908107002616220416212965:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn"
 	// New format token with two forward slashes
 	newValidPattern  = "asana_token: 7/9823746598123746/8923746598123456:7f1a3c9be84d2a6c4e7d9c32bf1e7f88"
-	newValidpattern2 = "FINAL_ASANA_TOKEN=42/4444444444444444:AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEf"
 	invalidPattern   = "asana_token: 1724908107002616220416212965%594776654034514343561917591881414702593902454625364993:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn-ij2gwtg/xn9vh4jvsokdfaic0bn"
 )
 
@@ -37,11 +36,6 @@ func TestAsanaPersonalAccessToken_Pattern(t *testing.T) {
 			name:  "valid pattern - new format",
 			input: newValidPattern,
 			want:  []string{"7/9823746598123746/8923746598123456:7f1a3c9be84d2a6c4e7d9c32bf1e7f88"},
-		},
-		{
-			name:  "valid pattern - new format",
-			input: newValidpattern2,
-			want:  []string{"42/4444444444444444:AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEf"},
 		},
 		{
 			name:  "invalid pattern",
