@@ -1,4 +1,4 @@
-package bannerbear
+package heroku
 
 import (
 	"context"
@@ -18,21 +18,26 @@ type Scanner struct{}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"bannerbear"}) + `\b([0-9a-zA-Z]{22}tt)\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"heroku"}) + `\b([0-9Aa-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
 )
+
+func (s Scanner) Version() int {
+	return 1
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"bannerbear"}
+	return []string{"heroku"}
 }
 
-// FromData will find and optionally verify Bannerbear secrets in a given set of bytes.
+// FromData will find and optionally verify Heroku secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -42,14 +47,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_Bannerbear,
+			DetectorType: detectorspb.DetectorType_Heroku,
 			Raw:          []byte(resMatch),
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyBannerBear(ctx, client, resMatch)
+			isVerified, verificationErr := VerifyHerokuAPIKey(ctx, client, resMatch)
 			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr, resMatch)
+			s1.SetVerificationError(verificationErr)
 		}
 
 		results = append(results, s1)
@@ -59,25 +64,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Bannerbear
+	return detectorspb.DetectorType_Heroku
 }
 
 func (s Scanner) Description() string {
-	return "Bannerbear is an API for generating dynamic images, videos, and GIFs. Bannerbear API keys can be used to access and manipulate these resources."
+	return "Heroku is a cloud platform that lets companies build, deliver, monitor and scale apps. Heroku API keys can be used to access and manage Heroku applications and services."
 }
 
-// docs: https://developers.bannerbear.com/
-func verifyBannerBear(ctx context.Context, client *http.Client, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.bannerbear.com/v2/auth", http.NoBody)
+func VerifyHerokuAPIKey(ctx context.Context, client *http.Client, key string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.heroku.com/account", http.NoBody)
 	if err != nil {
 		return false, err
 	}
 
+	req.Header.Add("Accept", "application/vnd.heroku+json; version=3")
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	defer func() {

@@ -960,7 +960,7 @@ enum DetectorType {
   ZeroTier = 948;
   AppOptics = 949;
   Metabase = 950;
-  CoinbaseWaaS = 951;
+  CoinbaseWaaS = 951 [deprecated = true];
   LemonSqueezy = 952;
   Budibase = 953;
   DenoDeploy = 954;
@@ -1037,6 +1037,9 @@ enum DetectorType {
   AzureAppConfigConnectionString = 1025;
   DeepSeek = 1026;
   StripePaymentIntent = 1027;
+  LangSmith = 1028;
+  BitbucketAppPassword = 1029;
+  Hasura = 1030;
 }
 
 message Result {
