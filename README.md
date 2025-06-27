@@ -280,7 +280,14 @@ trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified,
 Use the `--image` flag multiple times to scan multiple images.
 
 ```bash
+# to scan from a remote registry
 trufflehog docker --image trufflesecurity/secrets --results=verified,unknown
+
+# to scan from the local docker daemon
+trufflehog docker --image docker://new_image:tag --results=verified,unknown
+
+# to scan from an image saved as a tarball
+trufflehog docker --image file://path_to_image.tar --results=verified,unknown
 ```
 
 ## 12: Scan in CI
@@ -672,7 +679,7 @@ TruffleHog will send a JSON POST request containing the regex matches to a
 configured webhook endpoint. If the endpoint responds with a `200 OK` response
 status code, the secret is considered verified.
 
-Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret, 
+Custom Detectors support a few different filtering mechanisms: entropy, regex targeting the entire match, regex targeting the captured secret,
 and excluded word lists checked against the secret (captured group if present, entire match if capture group is not present). Note that if
 your custom detector has multiple `regex` set (in this example `hogID`, and `hogToken`), then the filters get applied to each regex. [Here](examples/generic_with_filters.yml) is an example of a custom detector using these filters.
 
