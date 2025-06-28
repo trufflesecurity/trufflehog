@@ -28,9 +28,10 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	secret := testSecrets.MustGetField("ASANA_PAT")
-	inactiveSecret := testSecrets.MustGetField("ASANA_PAT_INACTIVE")
+	oldFormatSecret := testSecrets.MustGetField("ASANA_PAT")
 	newFormatSecret := testNewSecrets.MustGetField("ASANA_PAT_NEW")
+	inactiveOldFormatSecret := testSecrets.MustGetField("ASANA_PAT_INACTIVE")
+	inactiveNewFormatSecret := testNewSecrets.MustGetField("ASANA_PAT_NEW_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -49,7 +50,7 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a asana secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a asana secret %s within", oldFormatSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -77,17 +78,6 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:    nil,
-			wantErr: false,
-		},
-		{
 			name: "found, verified - new format",
 			s:    Scanner{},
 			args: args{
@@ -104,22 +94,32 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found, verified with additional data",
+			name: "found, unverified - new format",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("asana_pat = %s\nother_data = some_value", secret)),
+				data:   []byte(fmt.Sprintf("You can find a asana secret %s but unverified", inactiveNewFormatSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_AsanaPersonalAccessToken,
-					Verified:     true,
+					Verified:     false,
 				},
 			},
 			wantErr: false,
 		},
-	}
+				{
+			name: "not found",
+			s:    Scanner{},
+			args: args{
+				ctx:    context.Background(),
+				data:   []byte("You cannot find the secret within"),
+				verify: true,
+			},
+			want:    nil,
+			wantErr: false,
+		},
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Scanner{}
