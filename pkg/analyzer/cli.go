@@ -11,6 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/asana"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/bitbucket"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/coinbase"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/databricks"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/datadog"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers/digitalocean"
@@ -151,5 +152,7 @@ func Run(keyType string, secretInfo SecretInfo) {
 		databricks.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["domain"], secretInfo.Parts["token"])
 	case "jira":
 		jira.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["domain"], secretInfo.Parts["email"], secretInfo.Parts["token"])
+	case "coinbase":
+		coinbase.AnalyzeAndPrintPermissions(secretInfo.Cfg, secretInfo.Parts["keyName"], secretInfo.Parts["key"])
 	}
 }

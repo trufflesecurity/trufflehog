@@ -104,6 +104,7 @@ const (
 	AnalyzerTypeDropbox
 	AnalyzerTypeDataBricks
 	AnalyzerTypeJira
+	AnalyzerTypeCoinbase
 	// Add new items here with AnalyzerType prefix
 )
 
@@ -153,6 +154,7 @@ var analyzerTypeStrings = map[AnalyzerType]string{
 	AnalyzerTypeDropbox:       "Dropbox",
 	AnalyzerTypeDataBricks:    "DataBricks",
 	AnalyzerTypeJira:          "Jira",
+	AnalyzerTypeCoinbase:      "Coinbase",
 	// Add new mappings here
 }
 
