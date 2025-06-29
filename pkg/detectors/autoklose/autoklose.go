@@ -48,44 +48,56 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			// API Documentation: https://api.aklab.xyz/#auth-info-fd71acd1-2e41-4991-8789-3edfd258479a
-			req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.autoklose.com/api/me/?api_token=%s", resMatch), nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Accept", "application/json")
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() {
-					_, _ = io.Copy(io.Discard, res.Body)
-					_ = res.Body.Close()
-				}()
-
-				if res.StatusCode == http.StatusOK {
-					s1.Verified = true
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-
-					var responseBody map[string]interface{}
-					if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
-						if email, ok := responseBody["email"].(string); ok {
-							s1.ExtraData = map[string]string{
-								"email": email,
-							}
-						}
-					}
-				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
-			}
+			isVerified, extraData, err := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.ExtraData = extraData
+			s1.SetVerificationError(err, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+	// API Documentation: https://api.aklab.xyz/#auth-info-fd71acd1-2e41-4991-8789-3edfd258479a
+	url := fmt.Sprintf("https://api.autoklose.com/api/me/?api_token=%s", token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return false, nil, err
+	}
+	req.Header.Add("Accept", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, nil, err
+		}
+
+		var responseBody map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &responseBody); err != nil {
+			return false, nil, err
+		}
+
+		if email, ok := responseBody["email"].(string); ok {
+			return true, map[string]string{"email": email}, nil
+		}
+		return true, nil, nil
+	case http.StatusUnauthorized:
+		return false, nil, nil
+	default:
+		return false, nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
