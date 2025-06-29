@@ -16,6 +16,10 @@ var (
 		azure_key: uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
 		azure_org_id: WOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG
 	`
+	validPatternNoOrg = `
+	azure:
+		azure_key: uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
+	`
 	invalidPattern = `
 	azure:
 		azure_key: uie5tff7m5H5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un
@@ -33,9 +37,17 @@ func TestAzureDevopsPersonalAccessToken_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
+			name:  "valid pattern with org",
 			input: validPattern,
-			want:  []string{"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8unWOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG"},
+			want:  []string{
+				"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un", // token only
+				"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8unWOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG", // token + org
+			},
+		},
+		{
+			name:  "valid pattern without org",
+			input: validPatternNoOrg,
+			want:  []string{"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8un"}, // token only
 		},
 		{
 			name:  "invalid pattern",
