@@ -47,9 +47,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
         }
 
         if verify {
-            isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
+            isVerified, verificationErr := verifyMatch(ctx, client, match)
             s1.Verified = isVerified
-            s1.ExtraData = extraData
             s1.SetVerificationError(verificationErr, match)
         }
 
@@ -59,25 +58,25 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
     return results, nil
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
     req, err := http.NewRequestWithContext(ctx, "GET", "https://api.rootly.com/v1/users/me", nil)
     if err != nil {
-        return false, nil, err
+        return false, err
     }
     req.Header.Add("Authorization", "Bearer "+token)
     res, err := client.Do(req)
     if err != nil {
-        return false, nil, err
+        return false, err
     }
     defer res.Body.Close()
 
     switch res.StatusCode {
     case http.StatusOK:
-        return true, nil, nil
+        return true, nil
     case http.StatusUnauthorized:
-        return false, nil, nil
+        return false, nil
     default:
-        return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+        return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
     }
 }
 
