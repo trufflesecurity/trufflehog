@@ -1,22 +1,13 @@
-package roninapp
+package clientary
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validKey   = "tmvSxOOxP32WgoPfF2tWEmtsq8"
-	invalidKey = "tmvSxOOxP32Wg?PfF2tWEmtsq8"
-	validId    = "XEZOhulA1oP7vPSc4K"
-	invalidId  = "?EZOhulA1oP7vPSc4?"
-	keyword    = "roninapp"
 )
 
 func TestRoninApp_Pattern(t *testing.T) {
@@ -28,14 +19,34 @@ func TestRoninApp_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword roninapp",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, validKey, keyword, validId),
-			want:  []string{validKey, validKey},
+			name: "valid pattern - with keyword ronin",
+			input: `
+				# some random code
+				data := getIDFromDatabase(ctx)
+				roninAPIKey := ZycQ0G6IBgNsBWytwzwVKixyz
+				roninDomain := truffle-dev.roninapp.com
+			`,
+			want: []string{"ZycQ0G6IBgNsBWytwzwVKixyz:truffle-dev"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("%s token - '%s'\n%s token - '%s'\n", keyword, invalidKey, keyword, invalidId),
-			want:  []string{},
+			name: "valid pattern - with keyword clientary",
+			input: `
+				# some random code
+				data := getIDFromDatabase(ctx)
+				clientaryAPIKey := ZycQ0G6IBgNsBWytwzwVKixyz
+				clientaryDomain := truffle-dev.clientary.com
+			`,
+			want: []string{"ZycQ0G6IBgNsBWytwzwVKixyz:truffle-dev"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				# some random code
+				data := getIDFromDatabase(ctx)
+				roninAPIKey := ZycQ0G6IBg-NsBWytwzwVKixyz
+				rominDomain := t_de.roninapp.com
+			`,
+			want: []string{},
 		},
 	}
 
