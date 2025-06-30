@@ -143,10 +143,16 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch {
 			case key.Matches(msg, ui.common.KeyMap.Help):
 			case key.Matches(msg, ui.common.KeyMap.CmdQuit) && ui.activePage() != sourceConfigurePage:
+				ui.args = nil
 				return ui, tea.Quit
 			case key.Matches(msg, ui.common.KeyMap.Quit):
+				ui.args = nil
 				return ui, tea.Quit
-			case ui.activePage() > 0 && key.Matches(msg, ui.common.KeyMap.Back):
+			case key.Matches(msg, ui.common.KeyMap.Back):
+				if ui.activePage() == wizardIntroPage {
+					ui.args = nil
+					return ui, tea.Quit
+				}
 				_ = ui.popHistory()
 				return ui, nil
 			}
@@ -159,6 +165,7 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			switch item {
 			case wizard_intro.Quit:
+				ui.args = nil
 				cmds = append(cmds, tea.Quit)
 			case wizard_intro.ViewOSSProject:
 				ui.setActivePage(viewOSSProjectPage)
