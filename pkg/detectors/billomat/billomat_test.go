@@ -10,37 +10,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "billomatKey: xv3khh5klgzztdmptrgbqhkr0ucvr67i / billomatID: s2mels7c75tnsbs7ldu0wmjofzmugkg7vb"
-	complexPattern = `
-	func main() {
-		url := "https://api.billomat.net/v2/s2mels7c75tnsbs7ldu0wmjofzmugkg7vb"
-
-		// Create a new request with the secret as a header
-		req, err := http.NewRequest("GET", url, http.NoBody)
-		if err != nil {
-			fmt.Println("Error creating request:", err)
-			return
-		}
-		
-		req.Header.Set("X-BillomatApiKey", "xv3khh5klgzztdmptrgbqhkr0ucvr67i")
-
-		// Perform the request
-		client := &http.Client{}
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
-
-		// Check response status
-		if resp.StatusCode == http.StatusOK {
-			fmt.Println("Request successful!")
-		} else {
-			fmt.Println("Request failed with status:", resp.Status)
-		}
-	}
-	`
-	invalidPattern = "billomat_creds: s2mels7c75tnsbs7ldu0wmjofzmugkg7vb"
-)
-
 func TestBilloMat_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
@@ -51,25 +20,43 @@ func TestBilloMat_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
+			name: "valid pattern",
+			input: `
+					func main() {
+						url := "https://api.billomat.net/v2/id/truffletest"
+
+						// Create a new request with the secret as a header
+						req, err := http.NewRequest("GET", url, http.NoBody)
+						if err != nil {
+							fmt.Println("Error creating request:", err)
+							return
+						}
+						
+						req.Header.Set("X-BillomatApiKey", "c09761f99f39f79ae28eaaf8df20d7c9")
+
+						// Perform the request
+						client := &http.Client{}
+						resp, _ := client.Do(req)
+						defer resp.Body.Close()
+
+						// Check response status
+						if resp.StatusCode == http.StatusOK {
+							fmt.Println("Request successful!")
+						} else {
+							fmt.Println("Request failed with status:", resp.Status)
+						}
+					}`,
 			want: []string{
-				"xv3khh5klgzztdmptrgbqhkr0ucvr67is2mels7c75tnsbs7ldu0wmjofzmugkg7vb",
-				"xv3khh5klgzztdmptrgbqhkr0ucvr67ixv3khh5klgzztdmptrgbqhkr0ucvr67i",
+				"c09761f99f39f79ae28eaaf8df20d7c9truffletest",
 			},
 		},
 		{
-			name:  "valid pattern - complex",
-			input: complexPattern,
-			want: []string{
-				"xv3khh5klgzztdmptrgbqhkr0ucvr67inet",
-				"xv3khh5klgzztdmptrgbqhkr0ucvr67ixv3khh5klgzztdmptrgbqhkr0ucvr67i",
-			},
-		},
-		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "invalid pattern",
+			input: `
+				req.Header.Set("X-BillomatApiKey", "c09761h99f39f79ae28eaaf8df20d7c9")
+				billomatID := truffle-test
+			`,
+			want: nil,
 		},
 	}
 

@@ -175,7 +175,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codequiry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase_waas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlib"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/collect2"
@@ -349,6 +348,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harness"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hasura"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpscout"
@@ -1028,7 +1028,6 @@ func buildDetectorList() []detectors.Detector {
 		&codequiry.Scanner{},
 		&coinapi.Scanner{},
 		&coinbase.Scanner{},
-		&coinbase_waas.Scanner{},
 		&coinlayer.Scanner{},
 		&coinlib.Scanner{},
 		&collect2.Scanner{},
@@ -1719,6 +1718,7 @@ func buildDetectorList() []detectors.Detector {
 		&stripepaymentintent.Scanner{},
 		&tableau.Scanner{},
 		&bitbucketapppassword.Scanner{},
+		&hasura.Scanner{},
 	}
 }
 
