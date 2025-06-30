@@ -174,7 +174,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codequiry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase_waas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlib"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/collect2"
@@ -1027,7 +1026,6 @@ func buildDetectorList() []detectors.Detector {
 		&codequiry.Scanner{},
 		&coinapi.Scanner{},
 		&coinbase.Scanner{},
-		&coinbase_waas.Scanner{},
 		&coinlayer.Scanner{},
 		&coinlib.Scanner{},
 		&collect2.Scanner{},
