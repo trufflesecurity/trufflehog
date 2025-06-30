@@ -1,47 +1,36 @@
-package airtableapikey
+package langsmith
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "app_pOcv67-Yuztyq / key_Yuztyq-pOcv67"
-	invalidPattern = "app_pOcv67%Yuztyq/key_Yuztyq*pOcv67"
-)
-
-func TestAirTableApiKey_Pattern(t *testing.T) {
+func TestLangsmith_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with key",
-			input: fmt.Sprintf("airtable secrets: %s", validPattern),
-			want:  []string{"app_pOcv67-Yuztyq:key_Yuztyq-pOcv67"},
+			name:  "typical pattern",
+			input: "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",
+			want:  []string{"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"},
 		},
 		{
-			name: "valid pattern - with personal key",
-			input: `document.addEventListener('DOMContentLoaded', function () {
-    base = new Airtable({ apiKey: 'patHSL6ZkPWx8Rkva.f0b2c1970c1cd8b5126d04eaf59d9fd500a39736c73bbb3a471fsf7eb3561ec0' }).base('appiiuioD2lBj2DaJ');
-
-   reloadData();`,
-			want: []string{"appiiuioD2lBj2DaJ:patHSL6ZkPWx8Rkva.f0b2c1970c1cd8b5126d04eaf59d9fd500a39736c73bbb3a471fsf7eb3561ec0"},
+			name:  "finds all matches",
+			input: `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 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`,
+			want:  []string{"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", "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"},
 		},
 		{
 			name:  "invalid pattern",
-			input: fmt.Sprintf("airtable secrets: '%s'", invalidPattern),
-			want:  nil,
+			input: "lsv2_pt_1e0430d40fc14d3fj03397b9e6z46289_2b9036edd2",
+			want:  []string{},
 		},
 	}
 

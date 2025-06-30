@@ -14,7 +14,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airbrakeprojectkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airbrakeuserkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airship"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airtableapikey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airtableoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airtablepersonalaccesstoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/airvisual"
@@ -47,6 +46,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appoptics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/appsynergy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/apptivo"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artsy"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanaoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/asanapersonalaccesstoken"
@@ -83,7 +83,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresastoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchadminkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuresearchquerykey"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear"
+	bannerbearv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v1"
+	bannerbearv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bannerbear/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/baremetrics"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beamer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/beebole"
@@ -93,6 +94,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/billomat"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bingsubscriptionkey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbar"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitcoinaverage"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitfinex"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitlyaccesstoken"
@@ -172,7 +174,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/codequiry"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinapi"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinbase_waas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/coinlib"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/collect2"
@@ -346,6 +347,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/happyscribe"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harness"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/harvest"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hasura"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/hellosign"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpcrunch"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/helpscout"
@@ -406,6 +408,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kucoin"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/kylas"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/langfuse"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/langsmith"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/languagelayer"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/larksuite"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/larksuiteapikey"
@@ -858,7 +861,6 @@ func buildDetectorList() []detectors.Detector {
 		&airbrakeprojectkey.Scanner{},
 		&airbrakeuserkey.Scanner{},
 		&airship.Scanner{},
-		&airtableapikey.Scanner{},
 		&airtableoauth.Scanner{},
 		&airtablepersonalaccesstoken.Scanner{},
 		&airvisual.Scanner{},
@@ -894,7 +896,7 @@ func buildDetectorList() []detectors.Detector {
 		&appoptics.Scanner{},
 		&appsynergy.Scanner{},
 		&apptivo.Scanner{},
-		// &artifactory.Scanner{},
+		&artifactory.Scanner{},
 		&artsy.Scanner{},
 		&asanaoauth.Scanner{},
 		&asanapersonalaccesstoken.Scanner{},
@@ -932,7 +934,8 @@ func buildDetectorList() []detectors.Detector {
 		&azuresearchquerykey.Scanner{},
 		&azure_storage.Scanner{},
 		&azurerepositorykey.Scanner{},
-		&bannerbear.Scanner{},
+		&bannerbearv1.Scanner{},
+		&bannerbearv2.Scanner{},
 		&baremetrics.Scanner{},
 		&beamer.Scanner{},
 		&beebole.Scanner{},
@@ -1022,7 +1025,6 @@ func buildDetectorList() []detectors.Detector {
 		&codequiry.Scanner{},
 		&coinapi.Scanner{},
 		&coinbase.Scanner{},
-		&coinbase_waas.Scanner{},
 		&coinlayer.Scanner{},
 		&coinlib.Scanner{},
 		&collect2.Scanner{},
@@ -1263,6 +1265,7 @@ func buildDetectorList() []detectors.Detector {
 		&kucoin.Scanner{},
 		&kylas.Scanner{},
 		&langfuse.Scanner{},
+		&langsmith.Scanner{},
 		&languagelayer.Scanner{},
 		&larksuite.Scanner{},
 		&larksuiteapikey.Scanner{},
@@ -1710,6 +1713,8 @@ func buildDetectorList() []detectors.Detector {
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
 		&stripepaymentintent.Scanner{},
+		&bitbucketapppassword.Scanner{},
+		&hasura.Scanner{},
 	}
 }
 

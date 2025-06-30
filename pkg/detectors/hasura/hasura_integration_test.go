@@ -1,25 +1,23 @@
 //go:build detectors
 // +build detectors
 
-package coinbase
+package hasura
 
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestCoinbase_FromChunk(t *testing.T) {
+func TestHasura_FromData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
@@ -27,10 +25,9 @@ func TestCoinbase_FromChunk(t *testing.T) {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 
-	keyName := testSecrets.MustGetField("COINBASE_KEY_NAME")
-	privateKey := testSecrets.MustGetField("COINBASE_PRIVATE_KEY")
-	inactiveKeyName := testSecrets.MustGetField("COINBASE_INACTIVE_KEY_NAME")
-	inactivePrivateKey := testSecrets.MustGetField("COINBASE_INACTIVE_PRIVATE_KEY")
+	secret := testSecrets.MustGetField("HASURA")
+	inactiveSecret := testSecrets.MustGetField("HASURA_INACTIVE")
+	domain := testSecrets.MustGetField("HASURA_DOMAIN")
 
 	type args struct {
 		ctx    context.Context
@@ -50,13 +47,16 @@ func TestCoinbase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a coinbase secret %s %s within", keyName, privateKey)),
+				data:   []byte(fmt.Sprintf("You can find a hasura secret %s within hasura domain %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Coinbase,
+					DetectorType: detectorspb.DetectorType_Hasura,
 					Verified:     true,
+					Raw:          []byte(secret),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", domain, secret)),
+					ExtraData:    map[string]string{"domain": domain},
 				},
 			},
 			wantErr:             false,
@@ -67,13 +67,16 @@ func TestCoinbase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a coinbase secret %s %s within but not valid", inactiveKeyName, inactivePrivateKey)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a hasura secret %s within hasura domain %s but not valid", inactiveSecret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Coinbase,
+					DetectorType: detectorspb.DetectorType_Hasura,
 					Verified:     false,
+					Raw:          []byte(inactiveSecret),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", domain, inactiveSecret)),
+					ExtraData:    map[string]string{"domain": domain},
 				},
 			},
 			wantErr:             false,
@@ -96,30 +99,36 @@ func TestCoinbase_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a coinbase secret %s %s within", keyName, privateKey)),
+				data:   []byte(fmt.Sprintf("You can find a hasura secret %s within %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Coinbase,
+					DetectorType: detectorspb.DetectorType_Hasura,
 					Verified:     false,
+					Raw:          []byte(secret),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", domain, secret)),
+					ExtraData:    nil,
 				},
 			},
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
 		{
-			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(http.StatusInternalServerError, "")},
+			name: "found, unexpected api response",
+			s:    Scanner{client: common.ConstantResponseHttpClient(500, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a coinbase secret %s %s within", keyName, privateKey)),
+				data:   []byte(fmt.Sprintf("You can find a hasura secret %s within %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Coinbase,
+					DetectorType: detectorspb.DetectorType_Hasura,
 					Verified:     false,
+					Raw:          []byte(secret),
+					RawV2:        []byte(fmt.Sprintf("%s:%s", domain, secret)),
+					ExtraData:    map[string]string{"domain": domain},
 				},
 			},
 			wantErr:             false,
@@ -130,20 +139,21 @@ func TestCoinbase_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Coinbase.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
+
 				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
+					t.Fatalf("wantVerificationErr = %v, got verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Coinbase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError", "primarySecret")
+			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+				t.Errorf("Hasura.FromData() %s - diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

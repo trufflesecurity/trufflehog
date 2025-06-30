@@ -587,13 +587,14 @@ func TestChunkUnit(t *testing.T) {
 	}, &reporter)
 	assert.NoError(t, err)
 
-	// Error path.
+	// Error path - should return fatal error for missing directory.
 	err = s.ChunkUnit(ctx, SourceUnit{
 		ID:   "/file/not/found",
 		Kind: UnitDir,
 	}, &reporter)
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "directory does not exist")
 
 	assert.Equal(t, 22, len(reporter.Chunks))
-	assert.Equal(t, 1, len(reporter.ChunkErrs))
+	assert.Equal(t, 0, len(reporter.ChunkErrs))
 }
