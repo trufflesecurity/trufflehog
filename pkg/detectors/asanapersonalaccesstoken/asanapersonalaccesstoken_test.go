@@ -11,8 +11,11 @@ import (
 )
 
 var (
-	validPattern   = "asana_token: 594776654034514343561917591881414702593902454625364993/1724908107002616220416212965:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn"
-	invalidPattern = "asana_token: 1724908107002616220416212965%594776654034514343561917591881414702593902454625364993:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn-ij2gwtg/xn9vh4jvsokdfaic0bn"
+	// Old format token
+	validPatternOld = "asana_token: 594776654034514343561917591881414702593902454625364993/1724908107002616220416212965:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn"
+	// New format token with two forward slashes
+	newValidPattern  = "asana_token: 7/9823746598123746/8923746598123456:7f1a3c9be84d2a6c4e7d9c32bf1e7f88"
+	invalidPattern   = "asana_token: 1724908107002616220416212965%594776654034514343561917591881414702593902454625364993:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn-ij2gwtg/xn9vh4jvsokdfaic0bn"
 )
 
 func TestAsanaPersonalAccessToken_Pattern(t *testing.T) {
@@ -25,9 +28,14 @@ func TestAsanaPersonalAccessToken_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
+			name:  "valid pattern - old format",
+			input: validPatternOld,
 			want:  []string{"594776654034514343561917591881414702593902454625364993/1724908107002616220416212965:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn"},
+		},
+		{
+			name:  "valid pattern - new format",
+			input: newValidPattern,
+			want:  []string{"7/9823746598123746/8923746598123456:7f1a3c9be84d2a6c4e7d9c32bf1e7f88"},
 		},
 		{
 			name:  "invalid pattern",
