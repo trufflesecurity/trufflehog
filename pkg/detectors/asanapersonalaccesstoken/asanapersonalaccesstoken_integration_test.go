@@ -120,24 +120,25 @@ func TestAsanaPersonalAccessToken_FromChunk(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 		},
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Scanner{}
-			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("AsanaPersonalAccessToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				s := Scanner{}
+				got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("AsanaPersonalAccessToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
+					return
 				}
-				got[i].Raw = nil
-			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("AsanaPersonalAccessToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
+				for i := range got {
+					if len(got[i].Raw) == 0 {
+						t.Fatalf("no raw secret present: \n %+v", got[i])
+					}
+					got[i].Raw = nil
+				}
+				if diff := pretty.Compare(got, tt.want); diff != "" {
+					t.Errorf("AsanaPersonalAccessToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				}
+			})
+		}
 	}
 }
 
