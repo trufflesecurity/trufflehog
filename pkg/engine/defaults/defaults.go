@@ -861,7 +861,6 @@ func buildDetectorList() []detectors.Detector {
 		&airbrakeprojectkey.Scanner{},
 		&airbrakeuserkey.Scanner{},
 		&airship.Scanner{},
-		// &airtableapikey.Scanner{}, // AirTable depreacted the API Keys
 		&airtableoauth.Scanner{},
 		&airtablepersonalaccesstoken.Scanner{},
 		&airvisual.Scanner{},
