@@ -3,6 +3,7 @@ package asanaoauth
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -68,7 +69,10 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	if err != nil {
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
