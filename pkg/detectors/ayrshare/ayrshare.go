@@ -48,43 +48,61 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.ayrshare.com/api/user", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer func() {
-					_, _ = io.Copy(io.Discard, res.Body)
-					_ = res.Body.Close()
-				}()
-
-				if res.StatusCode == http.StatusOK {
-					s1.Verified = true
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-
-					var responseBody map[string]interface{}
-					if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
-						if email, ok := responseBody["email"].(string); ok {
-							s1.ExtraData = map[string]string{
-								"email": email,
-							}
-						}
-					}
-				}
-			} else {
-				s1.SetVerificationError(err, resMatch)
-			}
+			isVerified, extraData, err := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.ExtraData = extraData
+			s1.SetVerificationError(err, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, key string) (bool, map[string]string, error) {
+	// Reference: https://www.ayrshare.com/docs/apis/user/profile-details
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://app.ayrshare.com/api/user", http.NoBody)
+	if err != nil {
+		return false, nil, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, nil, err
+		}
+		var responseBody map[string]any
+		if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
+			if email, ok := responseBody["email"].(string); ok {
+				return true, map[string]string{"email": email}, nil
+			}
+		}
+		return true, nil, nil
+	case http.StatusUnauthorized:
+		return false, nil, nil
+	case http.StatusForbidden:
+		// Invalid Bearer tokens get a 403 Forbidden response despite what is stated in the docs.
+		// Documentation: https://www.ayrshare.com/docs/errors/errors-http
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, nil, err
+		}
+		if strings.Contains(string(bodyBytes), "API Key not valid") {
+			return false, nil, nil
+		}
+	}
+	return false, nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

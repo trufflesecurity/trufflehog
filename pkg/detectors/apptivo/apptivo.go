@@ -14,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -54,27 +54,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.apptivo.com/app/dao/v6/leads?a=getConfigData&apiKey=%s&accessKey=%s", resMatch, resIdMatch), nil)
-				if err != nil {
-					continue
-				}
-				res, err := client.Do(req)
-				if err == nil {
-					bodyBytes, err := io.ReadAll(res.Body)
-					if err != nil {
-						continue
-					}
-					bodyString := string(bodyBytes)
-					validResponse := strings.Contains(bodyString, `displayName`)
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						if validResponse {
-							s1.Verified = true
-						} else {
-							s1.Verified = false
-						}
-					}
-				}
+				isVerified, err := verifyMatch(ctx, client, resMatch, resIdMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(err, resMatch, resIdMatch)
 			}
 
 			results = append(results, s1)
@@ -82,6 +64,32 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, apiKey, accessKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://api.apptivo.com/app/dao/v6/leads?a=getConfigData&apiKey=%s&accessKey=%s", apiKey, accessKey), http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		return strings.Contains(string(bodyBytes), `displayName`), nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
