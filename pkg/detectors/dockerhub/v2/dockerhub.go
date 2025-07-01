@@ -29,7 +29,9 @@ var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	// Can use email or username for login.
-	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9]{4,40})\b`)
+	// Docker ID must be between 4 and 30 characters long, and can only contain numbers and lowercase letters.
+	// You can't use any special characters or spaces. https://docs.docker.com/admin/faqs/general-faqs/#what-is-a-docker-id
+	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|username|-u|id)(?:\s*[:=]\s*|[\s]+)['"]?([a-z0-9]{4,30})['"]?(?:\s|$)`)
 	emailPat    = regexp.MustCompile(common.EmailPattern)
 
 	// Can use password or personal/organization access token (PAT/OAT) for login, but this scanner will only check for PATs and OATs.
