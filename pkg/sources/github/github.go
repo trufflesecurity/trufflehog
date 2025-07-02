@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -1177,10 +1178,10 @@ func isGistUrl(urlParts []string) bool {
 	}
 
 	// github enterprise: any url with 'gist'
-	for _, part := range urlParts {
-		if strings.EqualFold(part, "gist") {
-			return true
-		}
+	if (len(urlParts) == 3 || len(urlParts) == 4) && slices.Contains(urlParts, "gist") {
+		// gist.company.com/gist/gist-id
+		// gist.company.com/path/gist/gist-id
+		return true
 	}
 
 	return false
