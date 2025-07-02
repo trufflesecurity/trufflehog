@@ -464,12 +464,12 @@ func (s *Source) getAllProjectRepos(
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
 
-	// Record the projectsWithNamespace for logging.
+	// record the projectsWithNamespace for logging.
 	var projectsWithNamespace []string
 
 	const (
-		orderBy         = "id" // TODO: Use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
-		paginationLimit = 100  // Default is 20, max is 100.
+		orderBy         = "id" // TODO: use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
+		paginationLimit = 100  // default is 20, max is 100.
 	)
 
 	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
@@ -479,7 +479,7 @@ func (s *Source) getAllProjectRepos(
 		Membership:  gitlab.Ptr(true),
 	}
 
-	// For non gitlab.com instances, include all available projects (public + membership)
+	// for non gitlab.com instances, include all available projects (public + membership).
 	if s.url != gitlabBaseURL {
 		projectQueryOptions.Membership = gitlab.Ptr(false)
 	}
@@ -489,6 +489,7 @@ func (s *Source) getAllProjectRepos(
 		"all_available", *projectQueryOptions.Membership)
 	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(0)
 
+	// paginate through all projects until no more pages remain.
 	for {
 		projects, res, err := apiClient.Projects.ListProjects(projectQueryOptions)
 		if err != nil {
@@ -496,26 +497,28 @@ func (s *Source) getAllProjectRepos(
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
+
 			break
 		}
 
 		ctx.Logger().V(3).Info("listed projects", "count", len(projects))
 
-		// Process each project
+		// process each project
 		for _, proj := range projects {
-			ctx := context.WithValues(ctx,
+			projCtx := context.WithValues(ctx,
 				"project_id", proj.ID,
 				"project_name", proj.NameWithNamespace)
 
-			// Skip projects configured to be ignored.
+			// skip projects configured to be ignored.
 			if ignoreRepo(proj.PathWithNamespace) {
-				ctx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+				projCtx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+
 				continue
 			}
 
-			// Report an error if we could not convert the project into a URL.
+			// report an error if we could not convert the project into a URL.
 			if _, err := url.Parse(proj.HTTPURLToRepo); err != nil {
-				ctx.Logger().V(3).Info("skipping project",
+				projCtx.Logger().V(3).Info("skipping project",
 					"reason", "URL parse failure",
 					"url", proj.HTTPURLToRepo,
 					"parse_error", err)
@@ -524,19 +527,23 @@ func (s *Source) getAllProjectRepos(
 				if err := reporter.UnitErr(ctx, err); err != nil {
 					return err
 				}
+
 				continue
 			}
 
-			// Report the unit.
-			ctx.Logger().V(3).Info("accepting project")
+			// report the unit.
+			projCtx.Logger().V(3).Info("accepting project")
+
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
 			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
+
 			if err := reporter.UnitOk(ctx, unit); err != nil {
 				return err
 			}
 		}
-		// Handle pagination
+
+		// handle pagination.
 		projectQueryOptions.Page = res.NextPage
 		if res.NextPage == 0 {
 			break
