@@ -31,7 +31,7 @@ var (
 	// Can use email or username for login.
 	// Docker ID must be between 4 and 30 characters long, and can only contain numbers and lowercase letters.
 	// You can't use any special characters or spaces. https://docs.docker.com/admin/faqs/general-faqs/#what-is-a-docker-id
-	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|username|-u|id)(?:\s*[:=]\s*|[\s]+)['"]?([a-z0-9]{4,30})['"]?(?:\s|$)`)
+	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|username|-u|id)(?:['"]?\s*[:=]\s*['"]?|[\s]+)([a-z0-9]{4,30})['"]?(?:\s|$|[,}])`)
 	emailPat    = regexp.MustCompile(common.EmailPattern)
 
 	// Can use password or personal/organization access token (PAT/OAT) for login, but this scanner will only check for PATs and OATs.

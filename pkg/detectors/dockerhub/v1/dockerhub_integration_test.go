@@ -26,8 +26,8 @@ func TestDockerhub_FromChunk(t *testing.T) {
 	}
 	username := testSecrets.MustGetField("DOCKERHUB_USERNAME")
 	email := testSecrets.MustGetField("DOCKERHUB_EMAIL")
-	pat := testSecrets.MustGetField("DOCKERHUB_PAT")
-	inactivePat := testSecrets.MustGetField("DOCKERHUB_INACTIVE_PAT")
+	pat := testSecrets.MustGetField("DOCKERHUB_V1_PAT")
+	inactivePat := testSecrets.MustGetField("DOCKERHUB_v1_INACTIVE_PAT")
 
 	type args struct {
 		ctx    context.Context
