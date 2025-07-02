@@ -2,17 +2,14 @@ package dockerhub
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dockerhub/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
@@ -29,11 +26,11 @@ var _ detectors.Versioner = (*Scanner)(nil)
 
 var (
 	// Can use email or username for login.
-	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `(?im)(?:user|usr|username|-u|id)\S{0,40}?[:=\s]{1,3}[ '"=]?([a-zA-Z0-9][a-zA-Z0-9_-]{3,39})\b`)
+	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `(?im)(?:user|usr|username|-u|id)(?:['"]?\s*[:=]\s*['"]?|[\s]+)([a-zA-Z0-9]{4,40})['"]?(?:\s|$|[,}])`)
 	emailPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + common.EmailPattern)
 
 	// Can use password or personal access token (PAT) for login, but this scanner will only check for PATs.
-	accessTokenPat = regexp.MustCompile(`(?i)(?:docker[-_]?(?:token|pat|password|access[-_]?token))\s{0,10}?[:=\s]{1,3}[ '"=]?([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
+	accessTokenPat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker", "-p"}) + `\b([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})\b`)
 
 	// Pattern to exclude Docker protocol headers
 	excludeHeaderPat = regexp.MustCompile(`(?i)(?:docker[-_]?upload[-_]?uuid|x[-_]?docker[-_]?upload[-_]?uuid|docker[-_]?content[-_]?digest)\s*:\s*([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12})`)
@@ -93,9 +90,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s.client = common.SaneHttpClient()
 				}
 
-				isVerified, extraData, verificationErr := s.verifyMatch(ctx, username, token)
+				isVerified, extraData, verificationErr := v2.VerifyMatch(ctx, s.client, username, token)
 				s1.Verified = isVerified
 				s1.ExtraData = extraData
+				s1.ExtraData["version"] = fmt.Sprintf("%d", s.Version())
 				s1.SetVerificationError(verificationErr)
 				if s1.Verified {
 					s1.AnalysisInfo = map[string]string{
@@ -122,103 +120,23 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 // Helper function to detect if a string looks like a UUID fragment
 func isLikelyUUIDFragment(s string) bool {
-	// Check if it's all digits (common in correlation IDs)
-	if regexp.MustCompile(`^\d+$`).MatchString(s) {
+	// Check for UUID segment (8-4-4-4-12 format segments)
+	if regexp.MustCompile(`^[a-f0-9]{8}$`).MatchString(s) ||
+		regexp.MustCompile(`^[a-f0-9]{4}-?[a-f0-9]{4}$`).MatchString(s) {
 		return true
 	}
-	// Check if it looks like the first part of a UUID (8 hex chars)
-	if regexp.MustCompile(`^[a-f0-9]{8}$`).MatchString(strings.ToLower(s)) {
+
+	// Check for numeric-only strings (common in correlation IDs)
+	if regexp.MustCompile(`^\d{8,}$`).MatchString(s) {
 		return true
 	}
+
+	// Check for full UUIDs
+	if regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`).MatchString(s) {
+		return true
+	}
+
 	return false
-}
-
-func (s Scanner) verifyMatch(ctx context.Context, username string, password string) (bool, map[string]string, error) {
-	payload := strings.NewReader(fmt.Sprintf(`{"identifier": "%s", "secret": "%s"}`, username, password))
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://hub.docker.com/v2/auth/token", payload)
-	if err != nil {
-		return false, nil, err
-	}
-
-	req.Header.Add("Content-Type", "application/json")
-	res, err := s.client.Do(req)
-	if err != nil {
-		return false, nil, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return false, nil, err
-	}
-
-	switch res.StatusCode {
-	case http.StatusOK:
-		var tokenRes tokenResponse
-		if err := json.Unmarshal(body, &tokenRes); (err != nil || tokenRes == tokenResponse{}) {
-			return false, nil, err
-		}
-
-		parser := jwt.NewParser()
-		token, _, err := parser.ParseUnverified(tokenRes.AccessToken, &hubJwtClaims{})
-		if err != nil {
-			return true, nil, err
-		}
-
-		if claims, ok := token.Claims.(*hubJwtClaims); ok {
-			extraData := map[string]string{
-				"hub_username": username,
-				"hub_email":    claims.HubClaims.Email,
-				"hub_scope":    claims.Scope,
-				"version":      fmt.Sprintf("%d", s.Version()),
-			}
-			return true, extraData, nil
-		}
-		return true, nil, nil
-	case http.StatusUnauthorized:
-		// Valid credentials can still return a 401 status code if 2FA is enabled
-		var mfaRes mfaRequiredResponse
-		if err := json.Unmarshal(body, &mfaRes); err != nil || mfaRes.MfaToken == "" {
-			return false, map[string]string{"version": fmt.Sprintf("%d", s.Version())}, nil
-		}
-
-		extraData := map[string]string{
-			"hub_username": username,
-			"2fa_required": "true",
-			"version":      fmt.Sprintf("%d", s.Version()),
-		}
-		return true, extraData, nil
-	case http.StatusTooManyRequests:
-		extraData := map[string]string{
-			"verification": "rate_limited",
-			"status_code":  "429",
-			"version":      fmt.Sprintf("%d", s.Version()),
-			"retry_after":  res.Header.Get("X-Retry-After"),
-		}
-
-		return false, extraData, fmt.Errorf("rate limited (429) - verification unavailable")
-	default:
-		return false, nil, fmt.Errorf("unexpected response status %d", res.StatusCode)
-	}
-}
-
-type tokenResponse struct {
-	AccessToken string `json:"access_token"`
-}
-
-type userClaims struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-}
-
-type hubJwtClaims struct {
-	Scope     string     `json:"scope"`
-	HubClaims userClaims `json:"https://hub.docker.com"` // not sure why this is a key, further investigation required.
-	jwt.RegisteredClaims
-}
-
-type mfaRequiredResponse struct {
-	MfaToken string `json:"login_2fa_token"`
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

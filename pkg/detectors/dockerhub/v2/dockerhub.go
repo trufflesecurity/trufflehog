@@ -31,7 +31,7 @@ var (
 	// Can use email or username for login.
 	// Docker ID must be between 4 and 30 characters long, and can only contain numbers and lowercase letters.
 	// You can't use any special characters or spaces. https://docs.docker.com/admin/faqs/general-faqs/#what-is-a-docker-id
-	usernamePat = regexp.MustCompile(`(?im)(?:user|usr|username|-u|id)(?:['"]?\s*[:=]\s*['"]?|[\s]+)([a-z0-9]{4,30})['"]?(?:\s|$|[,}])`)
+	usernamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"docker"}) + `(?im)(?:user|usr|username|-u|id)(?:['"]?\s*[:=]\s*['"]?|[\s]+)([a-z0-9]{4,30})['"]?(?:\s|$|[,}])`)
 	emailPat    = regexp.MustCompile(common.EmailPattern)
 
 	// Can use password or personal/organization access token (PAT/OAT) for login, but this scanner will only check for PATs and OATs.
@@ -79,9 +79,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					s.client = common.SaneHttpClient()
 				}
 
-				isVerified, extraData, verificationErr := s.verifyMatch(ctx, username, token)
+				isVerified, extraData, verificationErr := VerifyMatch(ctx, s.client, username, token)
 				s1.Verified = isVerified
 				s1.ExtraData = extraData
+				s1.ExtraData["version"] = fmt.Sprintf("%d", s.Version())
 				s1.SetVerificationError(verificationErr)
 				if s1.Verified {
 					s1.AnalysisInfo = map[string]string{
@@ -106,44 +107,43 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func (s Scanner) verifyMatch(ctx context.Context, username string, password string) (bool, map[string]string, error) {
+func VerifyMatch(ctx context.Context, client *http.Client, username string, password string) (bool, map[string]string, error) {
 	payload := strings.NewReader(fmt.Sprintf(`{"identifier": "%s", "secret": "%s"}`, username, password))
-
+	extraData := map[string]string{}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://hub.docker.com/v2/auth/token", payload)
 	if err != nil {
-		return false, nil, err
+		return false, extraData, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	res, err := s.client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, extraData, err
 	}
 	defer res.Body.Close()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return false, nil, err
+		return false, extraData, err
 	}
 
 	switch res.StatusCode {
 	case http.StatusOK:
 		var tokenRes tokenResponse
 		if err := json.Unmarshal(body, &tokenRes); (err != nil || tokenRes == tokenResponse{}) {
-			return false, nil, err
+			return false, extraData, err
 		}
 
 		parser := jwt.NewParser()
 		token, _, err := parser.ParseUnverified(tokenRes.Token, &hubJwtClaims{})
 		if err != nil {
-			return true, nil, err
+			return true, extraData, err
 		}
 
 		if claims, ok := token.Claims.(*hubJwtClaims); ok {
-			extraData := map[string]string{
+			extraData = map[string]string{
 				"hub_username": username,
 				"hub_email":    claims.HubClaims.Email,
 				"hub_scope":    claims.Scope,
-				"version":      fmt.Sprintf("%d", s.Version()),
 			}
 			return true, extraData, nil
 		}
@@ -152,21 +152,18 @@ func (s Scanner) verifyMatch(ctx context.Context, username string, password stri
 		// Valid credentials can still return a 401 status code if 2FA is enabled
 		var mfaRes mfaRequiredResponse
 		if err := json.Unmarshal(body, &mfaRes); err != nil || mfaRes.MfaToken == "" {
-			return false, map[string]string{"version": fmt.Sprintf("%d", s.Version())}, nil
+			return false, extraData, nil
 		}
 
-		extraData := map[string]string{
+		extraData = map[string]string{
 			"hub_username": username,
 			"2fa_required": "true",
-			"version":      fmt.Sprintf("%d", s.Version()),
 		}
-
 		return true, extraData, nil
 	case http.StatusTooManyRequests:
-		extraData := map[string]string{
+		extraData = map[string]string{
 			"verification": "rate_limited",
 			"status_code":  "429",
-			"version":      fmt.Sprintf("%d", s.Version()),
 			"retry_after":  res.Header.Get("X-Retry-After"),
 		}
 
