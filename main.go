@@ -275,8 +275,9 @@ func init() {
 
 	cli.Version("trufflehog " + version.BuildVersion)
 
-	// Support -h for help
+	// Support -h for help and write it to stdout.
 	cli.HelpFlag.Short('h')
+	cli.UsageWriter(os.Stdout)
 
 	// Check if the TUI environment variable is set.
 	if ok, err := strconv.ParseBool(os.Getenv("TUI_PARENT")); err == nil {

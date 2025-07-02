@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"io"
 	"math/big"
+	mrand "math/rand"
 	"strings"
 )
 
@@ -69,4 +70,66 @@ func SliceContainsString(origTargetString string, stringSlice []string, ignoreCa
 		}
 	}
 	return false, "", 0
+}
+
+// GoFakeIt Password generator does not guarantee inclusion of characters.
+// Using a custom random password generator with guaranteed inclusions (atleast) of lower, upper, numeric and special characters
+func GenerateRandomPassword(lower, upper, numeric, special bool, length int) string {
+	if length < 1 {
+		return ""
+	}
+
+	var password []rune
+	var required []rune
+	var allowed []rune
+
+	lowerChars := []rune("abcdefghijklmnopqrstuvwxyz")
+	upperChars := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	specialChars := []rune("!@#$%^&*()-_=+[]{}|;:',.<>?/")
+	numberChars := []rune("0123456789")
+
+	// Ensure inclusion from each requested category
+	if lower {
+		rand, _ := rand.Int(rand.Reader, big.NewInt(int64(len(lowerChars))))
+		ch := lowerChars[rand.Int64()]
+		required = append(required, ch)
+		allowed = append(allowed, lowerChars...)
+	}
+	if upper {
+		rand, _ := rand.Int(rand.Reader, big.NewInt(int64(len(upperChars))))
+		ch := upperChars[rand.Int64()]
+		required = append(required, ch)
+		allowed = append(allowed, upperChars...)
+	}
+	if numeric {
+		rand, _ := rand.Int(rand.Reader, big.NewInt(int64(len(numberChars))))
+		ch := numberChars[rand.Int64()]
+		required = append(required, ch)
+		allowed = append(allowed, numberChars...)
+	}
+	if special {
+		rand, _ := rand.Int(rand.Reader, big.NewInt(int64(len(specialChars))))
+		ch := specialChars[rand.Int64()]
+		required = append(required, ch)
+		allowed = append(allowed, specialChars...)
+	}
+
+	if len(allowed) == 0 {
+		return "" // No character sets enabled
+	}
+
+	// Fill the rest of the password
+	for i := 0; i < length-len(required); i++ {
+		rand, _ := rand.Int(rand.Reader, big.NewInt(int64(len(allowed))))
+		ch := allowed[rand.Int64()]
+		password = append(password, ch)
+	}
+
+	// Combine required and random characters, then shuffle
+	password = append(password, required...)
+	mrand.Shuffle(len(password), func(i, j int) {
+		password[i], password[j] = password[j], password[i]
+	})
+
+	return string(password)
 }

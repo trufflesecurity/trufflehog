@@ -2,20 +2,12 @@ package artifactory
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern = "5YcZhIKwxTdxwpZHf9c1Usu8xNtAklRsqWYXWf2qmjW0RSQQ0U4sVnrNgOwIJlTOqJf06T3dl / RVo8ytzB65L.jfrog.io"
-	// validPattern2 is for cloud endpoints so it does not have any JFrog endpoint
-	validPattern2  = "5YcZhIKwxTdxwpZHf9c1Usu8xNtAklRsqWYXWf2qmjW0RSQQ0U4sVnrNgOwIJlTOqJf06T3dl"
-	invalidPattern = "W0RSQQ0U4sVnrNgOwIJlTOqJf06T3dl^&5YcZhIKwxTdxwpZHf9c1Usu8xNtA / rtest#y$zB65L%.jfrog.io"
 )
 
 func TestArtifactory_Pattern(t *testing.T) {
@@ -31,23 +23,76 @@ func TestArtifactory_Pattern(t *testing.T) {
 		want             []string
 	}{
 		{
-			name:             "valid pattern",
-			input:            fmt.Sprintf("artifactory credentials: %s", validPattern),
+			name: "valid pattern",
+			input: `
+				# artifactory credentials
+				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				Url: rwxtOp.jfrog.io
+			`,
 			useCloudEndpoint: false,
 			useFoundEndpoint: true,
-			want:             []string{"5YcZhIKwxTdxwpZHf9c1Usu8xNtAklRsqWYXWf2qmjW0RSQQ0U4sVnrNgOwIJlTOqJf06T3dlRVo8ytzB65L.jfrog.io"},
+			want:             []string{"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgrwxtOp.jfrog.io"},
 		},
 		{
-			name:             "valid pattern - with cloud endpoints",
-			input:            fmt.Sprintf("artifactory credentials: %s", validPattern2),
+			name: "valid pattern - with cloud endpoints",
+			input: `
+				# artifactory credentials
+				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+			`,
 			cloudEndpoint:    "cloudendpoint.jfrog.io",
 			useCloudEndpoint: true,
 			useFoundEndpoint: false,
-			want:             []string{"5YcZhIKwxTdxwpZHf9c1Usu8xNtAklRsqWYXWf2qmjW0RSQQ0U4sVnrNgOwIJlTOqJf06T3dlcloudendpoint.jfrog.io"},
+			want:             []string{"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io"},
 		},
 		{
-			name:             "invalid pattern",
-			input:            fmt.Sprintf("artifactory credentials: %s", invalidPattern),
+			name: "valid pattern - with cloud and found endpoints",
+			input: `
+				# artifactory credentials
+				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				Url: rwxtOp.jfrog.io
+			`,
+			cloudEndpoint:    "cloudendpoint.jfrog.io",
+			useCloudEndpoint: true,
+			useFoundEndpoint: true,
+			want: []string{
+				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io",
+				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgrwxtOp.jfrog.io",
+			},
+		},
+		{
+			name: "valid pattern - with disabled found endpoints",
+			input: `
+				# artifactory credentials
+				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				Url: rwxtOp.jfrog.io
+			`,
+			cloudEndpoint:    "cloudendpoint.jfrog.io",
+			useCloudEndpoint: true,
+			useFoundEndpoint: false,
+			want: []string{
+				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io",
+			},
+		},
+		{
+			name: "valid pattern - with https in configured endpoint",
+			input: `
+				# artifactory credentials
+				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+			`,
+			cloudEndpoint:    "https://cloudendpoint.jfrog.io",
+			useCloudEndpoint: true,
+			useFoundEndpoint: false,
+			want: []string{
+				"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgcloudendpoint.jfrog.io",
+			},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				# artifactory credentials
+				Token: cmVmdGtuOjAxOjE3ODA_NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				Url: rwxtOp.jfroq.io
+			`,
 			useFoundEndpoint: true,
 			want:             nil,
 		},
