@@ -3,6 +3,7 @@ package appcues
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -60,18 +61,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					RawV2:        []byte(resMatch + resUserMatch),
 				}
 				if verify {
-					req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.appcues.com/v2/accounts/%s/flows", resIdMatch), nil)
-					if err != nil {
-						continue
-					}
-					req.SetBasicAuth(resUserMatch, resMatch)
-					res, err := client.Do(req)
-					if err == nil {
-						defer res.Body.Close()
-						if res.StatusCode >= 200 && res.StatusCode < 300 {
-							s1.Verified = true
-						}
-					}
+					isVerified, err := verifyMatch(ctx, client, resUserMatch, resMatch, resIdMatch)
+					s1.Verified = isVerified
+					s1.SetVerificationError(err, resUserMatch, resMatch, resIdMatch)
 				}
 
 				results = append(results, s1)
@@ -80,6 +72,31 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, resUserMatch, resMatch, resIdMatch string) (bool, error) {
+	// Reference: https://api.appcues.com/v2/docs?_gl=1#responses
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://api.appcues.com/v2/accounts/%s/flows", resIdMatch), http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	req.SetBasicAuth(resUserMatch, resMatch)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusBadRequest:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
