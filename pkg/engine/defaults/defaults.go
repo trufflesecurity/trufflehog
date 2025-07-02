@@ -151,6 +151,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clicksendsms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clickuppersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cliengo"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clientary"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clinchpad"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clockify"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clockworksms"
@@ -611,7 +612,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roaring"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/robinhoodcrypto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rocketreach"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roninapp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/route4me"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rubygems"
@@ -621,6 +621,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salescookie"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesflare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforceoauth2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesmate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sanity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterprojectkey"
@@ -1002,6 +1003,7 @@ func buildDetectorList() []detectors.Detector {
 		&clicksendsms.Scanner{},
 		&clickuppersonaltoken.Scanner{},
 		&cliengo.Scanner{},
+		&clientary.Scanner{},
 		&clinchpad.Scanner{},
 		&clockify.Scanner{},
 		&clockworksms.Scanner{},
@@ -1477,7 +1479,6 @@ func buildDetectorList() []detectors.Detector {
 		&robinhoodcrypto.Scanner{},
 		&rocketreach.Scanner{},
 		// &rockset.Scanner{},
-		&roninapp.Scanner{},
 		&route4me.Scanner{},
 		&rownd.Scanner{},
 		&rubygems.Scanner{},
@@ -1487,6 +1488,7 @@ func buildDetectorList() []detectors.Detector {
 		&salescookie.Scanner{},
 		&salesflare.Scanner{},
 		&salesforce.Scanner{},
+		&salesforceoauth2.Scanner{},
 		&salesmate.Scanner{},
 		&sanity.Scanner{},
 		&satismeterprojectkey.Scanner{},
