@@ -1165,8 +1165,25 @@ func extractGistID(urlParts []string) string {
 	return urlParts[len(urlParts)-1]
 }
 
+// isGistUrl returns true if the URL path is of a gist
 func isGistUrl(urlParts []string) bool {
-	return strings.EqualFold(urlParts[0], "gist.github.com") || (len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist"))
+	if len(urlParts) == 0 {
+		return false
+	}
+
+	// standard github gists: gist.github.com/user/abc123
+	if strings.EqualFold(urlParts[0], "gist.github.com") {
+		return true
+	}
+
+	// github enterprise: any url with 'gist'
+	for _, part := range urlParts {
+		if strings.EqualFold(part, "gist") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
