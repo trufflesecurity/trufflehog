@@ -291,6 +291,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/float"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flowflu"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flutterwave"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/flyio"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/fmfw"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/formbucket"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/formcraft"
@@ -1145,6 +1146,7 @@ func buildDetectorList() []detectors.Detector {
 		&float.Scanner{},
 		&flowflu.Scanner{},
 		&flutterwave.Scanner{},
+		&flyio.Scanner{},
 		&fmfw.Scanner{},
 		&formbucket.Scanner{},
 		&formcraft.Scanner{},

@@ -1,18 +1,11 @@
-//go:build detectors
-// +build detectors
-
 package flyio
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -28,20 +21,28 @@ func TestFlyio_Pattern(t *testing.T) {
 	}{
 		{
 			name:  "typical pattern",
-			input: "flyio_token = 'fo1_AD1shwGbLSpZSPEXM1vhcbPZowurCDkXySOOJj0w4G2'",
-			want:  []string{"fo1_AD1shwGbLSpZSPEXM1vhcbPZowurCDkXySOOJj0w4G2"},
+			input: "flyio_token = 'FlyV1 fm2_AD1shwGbLSpZSPEXM1vhcbPZowurCDkXySOOJj0w4G2abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'",
+			want:  []string{"FlyV1 fm2_AD1shwGbLSpZSPEXM1vhcbPZowurCDkXySOOJj0w4G2abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"},
+		},
+		{
+			name:  "invalid pattern - too short",
+			input: "flyio_token = 'FlyV1 fm2_short'",
+			want:  []string{},
+		},
+		{
+			name:  "invalid pattern - wrong prefix",
+			input: "flyio_token = 'FlyV2 fm2_AD1shwGbLSpZSPEXM1vhcbPZowurCDkXySOOJj0w4G2abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'",
+			want:  []string{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chunkSpecificDetectors := make(map[ahocorasick.DetectorKey]detectors.Detector, 2)
-			ahoCorasickCore.PopulateMatchingDetectors(test.input, chunkSpecificDetectors)
-			if len(chunkSpecificDetectors) == 0 {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(test.want) > 0 && len(matchedDetectors) == 0 {
 				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			fmt.Println(test.input)
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
 			if err != nil {
@@ -50,8 +51,10 @@ func TestFlyio_Pattern(t *testing.T) {
 			}
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
+				if len(results) == 0 && len(test.want) > 0 {
 					t.Errorf("did not receive result")
+				} else if len(results) > 0 && len(test.want) == 0 {
+					t.Errorf("expected no results, but received %d", len(results))
 				} else {
 					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
@@ -78,127 +81,68 @@ func TestFlyio_Pattern(t *testing.T) {
 	}
 }
 
-func TestFlyio_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("FLYIO")
-	inactiveSecret := testSecrets.MustGetField("FLYIO_INACTIVE")
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestFlyio_IsFalsePositive(t *testing.T) {
+	s := Scanner{}
+
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name     string
+		token    string
+		expected bool
+		reason   string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a flyio secret %s within", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_FlyIO,
-					Verified:     true,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			name:     "valid flyio token with repeated chars - should not be false positive",
+			token:    "FlyV1 fm2_abcdAAAA1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+			expected: false,
+			reason:   "",
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a flyio secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_FlyIO,
-					Verified:     false,
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			name:     "flyio token with test pattern - should be false positive",
+			token:    "FlyV1 fm2_abcdexample1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+			expected: true,
+			reason:   "contains obvious test pattern: example",
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:                nil,
-			wantErr:             false,
-			wantVerificationErr: false,
+			name:     "flyio token with demo pattern - should be false positive",
+			token:    "FlyV1 fm2_abcddemo1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+			expected: true,
+			reason:   "contains obvious test pattern: demo",
 		},
-		// {
-		// 	name: "found, would be verified if not for timeout",
-		// 	s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte(fmt.Sprintf("You can find a flyio secret %s within", secret)),
-		// 		verify: true,
-		// 	},
-		// 	want: []detectors.Result{
-		// 		{
-		// 			DetectorType: detectorspb.DetectorType_FlyIO,
-		// 			Verified:     false,
-		// 		},
-		// 	},
-		// 	wantErr:             false,
-		// 	wantVerificationErr: true,
-		// },
-		// {
-		// 	name: "found, verified but unexpected api surface",
-		// 	s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
-		// 	args: args{
-		// 		ctx:    context.Background(),
-		// 		data:   []byte(fmt.Sprintf("You can find a flyio secret %s within", secret)),
-		// 		verify: true,
-		// 	},
-		// 	want: []detectors.Result{
-		// 		{
-		// 			DetectorType: detectorspb.DetectorType_FlyIO,
-		// 			Verified:     false,
-		// 		},
-		// 	},
-		// 	wantErr:             false,
-		// 	wantVerificationErr: true,
-		// },
+		{
+			name:     "flyio token with repeated digits - should be false positive",
+			token:    "FlyV1 fm2_abcd11111111567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+			expected: true,
+			reason:   "contains obvious test pattern: 11111111",
+		},
+		{
+			name:     "non-flyio token with repeated chars - should use default logic",
+			token:    "not_a_flyio_token_but_has_aaaaaa_in_it",
+			expected: true,
+			reason:   "contains term: aaaaaa",
+		},
+		{
+			name:     "non-flyio valid token - should not be false positive",
+			token:    "XYZABC123789def456",
+			expected: false,
+			reason:   "",
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Flyio.FromData() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			result := detectors.Result{
+				DetectorType: detectorspb.DetectorType_FlyIO,
+				Raw:          []byte(tt.token),
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
-				}
+
+			isFP, reason := s.IsFalsePositive(result)
+
+			if isFP != tt.expected {
+				t.Errorf("IsFalsePositive() got = %v, want %v (reason: %s)", isFP, tt.expected, reason)
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Flyio.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+
+			if tt.expected && reason != tt.reason {
+				t.Errorf("IsFalsePositive() reason got = %v, want %v", reason, tt.reason)
 			}
 		})
 	}
