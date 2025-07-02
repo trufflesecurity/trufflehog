@@ -464,34 +464,55 @@ func (s *Source) getAllProjectRepos(
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
 
-	// Projects without repo will get user projects, groups projects, and subgroup projects.
-	user, _, err := apiClient.Users.CurrentUser()
-	if err != nil {
-		return fmt.Errorf("unable to authenticate using %s: %w", s.authMethod, err)
-	}
-
-	uniqueProjects := make(map[int]*gitlab.Project)
 	// Record the projectsWithNamespace for logging.
 	var projectsWithNamespace []string
 
-	// Used to filter out duplicate projects.
-	processProjects := func(ctx context.Context, projList []*gitlab.Project) error {
-		for _, proj := range projList {
+	const (
+		orderBy         = "id" // TODO: Use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
+		paginationLimit = 100  // Default is 20, max is 100.
+	)
+
+	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
+	projectQueryOptions := &gitlab.ListProjectsOptions{
+		OrderBy:     gitlab.Ptr(orderBy),
+		ListOptions: listOpts,
+		Membership:  gitlab.Ptr(true),
+	}
+
+	// For non gitlab.com instances, include all available projects (public + membership)
+	if s.url != gitlabBaseURL {
+		projectQueryOptions.Membership = gitlab.Ptr(false)
+	}
+
+	ctx.Logger().Info("starting projects enumeration",
+		"list_options", listOpts,
+		"all_available", *projectQueryOptions.Membership)
+	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(0)
+
+	for {
+		projects, res, err := apiClient.Projects.ListProjects(projectQueryOptions)
+		if err != nil {
+			err = fmt.Errorf("received error on listing projects: %w", err)
+			if err := reporter.UnitErr(ctx, err); err != nil {
+				return err
+			}
+			break
+		}
+
+		ctx.Logger().V(3).Info("listed projects", "count", len(projects))
+
+		// Process each project
+		for _, proj := range projects {
 			ctx := context.WithValues(ctx,
 				"project_id", proj.ID,
 				"project_name", proj.NameWithNamespace)
-			// Skip projects we've already seen.
-			if _, exists := uniqueProjects[proj.ID]; exists {
-				ctx.Logger().V(3).Info("skipping project", "reason", "ID already seen")
-				continue
-			}
+
 			// Skip projects configured to be ignored.
 			if ignoreRepo(proj.PathWithNamespace) {
 				ctx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
 				continue
 			}
-			// Record that we've seen this project.
-			uniqueProjects[proj.ID] = proj
+
 			// Report an error if we could not convert the project into a URL.
 			if _, err := url.Parse(proj.HTTPURLToRepo); err != nil {
 				ctx.Logger().V(3).Info("skipping project",
@@ -505,6 +526,7 @@ func (s *Source) getAllProjectRepos(
 				}
 				continue
 			}
+
 			// Report the unit.
 			ctx.Logger().V(3).Info("accepting project")
 			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
@@ -514,100 +536,10 @@ func (s *Source) getAllProjectRepos(
 				return err
 			}
 		}
-		return nil
-	}
-
-	const (
-		orderBy         = "id" // TODO: Use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
-		paginationLimit = 100  // Default is 20, max is 100.
-	)
-	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
-
-	projectQueryOptions := &gitlab.ListProjectsOptions{OrderBy: gitlab.Ptr(orderBy), ListOptions: listOpts}
-	for {
-		userProjects, res, err := apiClient.Projects.ListUserProjects(user.ID, projectQueryOptions)
-		if err != nil {
-			err = fmt.Errorf("received error on listing user projects: %w", err)
-			if err := reporter.UnitErr(ctx, err); err != nil {
-				return err
-			}
-			break
-		}
-		ctx.Logger().V(3).Info("listed user projects", "count", len(userProjects))
-		if err := processProjects(ctx, userProjects); err != nil {
-			return err
-		}
+		// Handle pagination
 		projectQueryOptions.Page = res.NextPage
 		if res.NextPage == 0 {
 			break
-		}
-	}
-
-	listGroupsOptions := gitlab.ListGroupsOptions{
-		ListOptions:  listOpts,
-		AllAvailable: gitlab.Ptr(false), // This actually grabs public groups on public GitLab if set to true.
-		TopLevelOnly: gitlab.Ptr(false),
-		Owned:        gitlab.Ptr(false),
-	}
-
-	if s.url != gitlabBaseURL {
-		listGroupsOptions.AllAvailable = gitlab.Ptr(true)
-	}
-
-	ctx.Logger().Info("beginning group enumeration",
-		"list_options", listOpts,
-		"all_available", *listGroupsOptions.AllAvailable)
-	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(0)
-
-	var groups []*gitlab.Group
-	for {
-		groupList, res, err := apiClient.Groups.ListGroups(&listGroupsOptions)
-		if err != nil {
-			err = fmt.Errorf("received error on listing groups, you probably don't have permissions to do that: %w", err)
-			if err := reporter.UnitErr(ctx, err); err != nil {
-				return err
-			}
-			break
-		}
-		ctx.Logger().V(3).Info("listed groups", "count", len(groupList))
-		groups = append(groups, groupList...)
-		gitlabGroupsEnumerated.WithLabelValues(s.name).Add(float64(len(groupList)))
-		listGroupsOptions.Page = res.NextPage
-		if res.NextPage == 0 {
-			break
-		}
-	}
-
-	ctx.Logger().Info("got groups", "group_count", len(groups))
-
-	for _, group := range groups {
-		ctx := context.WithValue(ctx, "group_id", group.ID)
-		listGroupProjectOptions := &gitlab.ListGroupProjectsOptions{
-			ListOptions:      listOpts,
-			OrderBy:          gitlab.Ptr(orderBy),
-			IncludeSubGroups: gitlab.Ptr(true),
-			WithShared:       gitlab.Ptr(s.enumerateSharedProjects),
-		}
-		for {
-			grpPrjs, res, err := apiClient.Groups.ListGroupProjects(group.ID, listGroupProjectOptions)
-			if err != nil {
-				err = fmt.Errorf(
-					"received error on listing group projects for %q, you probably don't have permissions to do that: %w",
-					group.FullPath, err,
-				)
-				if err := reporter.UnitErr(ctx, err); err != nil {
-					return err
-				}
-				break
-			}
-			ctx.Logger().V(3).Info("listed group projects", "count", len(grpPrjs))
-			if err := processProjects(ctx, grpPrjs); err != nil {
-				return err
-			}
-			listGroupProjectOptions.Page = res.NextPage
-			if res.NextPage == 0 {
-				break
-			}
 		}
 	}
 
