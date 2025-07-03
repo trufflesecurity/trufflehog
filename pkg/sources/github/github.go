@@ -1179,6 +1179,7 @@ func isGistUrl(urlParts []string) bool {
 
 	// github enterprise: any 3 or 4 parts url with 'gist'
 	if (len(urlParts) == 3 || len(urlParts) == 4) && slices.Contains(urlParts, "gist") {
+		// enterprise.company.com/gist/gist-id
 		// gist.company.com/gist/gist-id
 		// gist.company.com/path/gist/gist-id
 		return true
