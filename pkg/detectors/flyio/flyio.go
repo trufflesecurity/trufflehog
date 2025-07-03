@@ -30,7 +30,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"flyio", "FlyV1", "fm2_"}
+	return []string{"flyio", "FlyV1"}
 }
 
 // FromData will find and optionally verify Flyio secrets in a given set of bytes.
@@ -74,7 +74,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	// 403 is returned if incorrect org_slug is sent.
 	// 401 is returned if the token is invalid.
 	// 400 is returned if the token is valid but no org_slug is sent.
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.machines.dev/v1/apps?org_slug=", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.machines.dev/v1/apps?org_slug=", http.NoBody)
 	if err != nil {
 		return false, nil
 	}
