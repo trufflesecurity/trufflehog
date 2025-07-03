@@ -10,6 +10,7 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/feature"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/log"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -30,9 +31,6 @@ const SourceType = sourcespb.SourceType_SOURCE_TYPE_GITLAB
 
 // This is the URL for gitlab hosted at gitlab.com
 const gitlabBaseURL = "https://gitlab.com/"
-
-// useSimplifiedGitlabEnumeration if set to true use simplified list-all-projects API to enumerate
-var useSimplifiedGitlabEnumeration = true
 
 type Source struct {
 	name     string
@@ -268,7 +266,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 				return ctx.Err()
 			},
 		}
-		if useSimplifiedGitlabEnumeration {
+		if feature.UseSimplifiedGitlabEnumeration.Load() {
 			if err := s.getAllProjectReposV2(ctx, apiClient, ignoreRepo, reporter); err != nil {
 				return err
 			}
@@ -403,7 +401,7 @@ func (s *Source) Validate(ctx context.Context) []error {
 		},
 	}
 
-	if useSimplifiedGitlabEnumeration {
+	if feature.UseSimplifiedGitlabEnumeration.Load() {
 		if err := s.getAllProjectReposV2(ctx, apiClient, ignoreProject, visitor); err != nil {
 			errs = append(errs, err)
 			return errs
@@ -943,7 +941,7 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		_ = reporter.UnitErr(ctx, fmt.Errorf("could not compile include/exclude repo glob: %w", err))
 	})
 
-	if useSimplifiedGitlabEnumeration {
+	if feature.UseSimplifiedGitlabEnumeration.Load() {
 		return s.getAllProjectReposV2(ctx, apiClient, ignoreRepo, reporter)
 	} else {
 		return s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter)
