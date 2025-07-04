@@ -249,6 +249,13 @@ func verifyTableauPAT(ctx context.Context, client *http.Client, tokenName, token
 	// Build the verification URL
 	verifyURL := fmt.Sprintf("https://%s/api/3.26/auth/signin", endpoint)
 
+	// Prepare metadata early - before any potential errors
+	extraData := map[string]string{
+		"verification_endpoint": verifyURL,
+		"verification_method":   "tableau_pat_auth",
+		"tableau_endpoint":      endpoint,
+	}
+
 	// Rest of your verification logic...
 	authReq := TableauAuthRequest{
 		Credentials: TableauCredentials{
@@ -275,6 +282,14 @@ func verifyTableauPAT(ctx context.Context, client *http.Client, tokenName, token
 	// Execute request
 	resp, err := client.Do(req)
 	if err != nil {
+		// Check if it's a DNS/network error
+		if strings.Contains(err.Error(), "no such host") ||
+			strings.Contains(err.Error(), "dial tcp") ||
+			strings.Contains(err.Error(), "connection refused") {
+			extraData["verification_status"] = "invalid_endpoint"
+			extraData["network_error"] = "true"
+			return false, extraData, nil // No error, just invalid endpoint
+		}
 		return false, nil, fmt.Errorf("request failed: %v", err)
 	}
 	defer func() {
@@ -288,13 +303,8 @@ func verifyTableauPAT(ctx context.Context, client *http.Client, tokenName, token
 		return false, nil, fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	// Prepare metadata
-	extraData := map[string]string{
-		"verification_endpoint": verifyURL,
-		"http_status":           fmt.Sprintf("%d", resp.StatusCode),
-		"verification_method":   "tableau_pat_auth",
-		"tableau_endpoint":      endpoint,
-	}
+	// Add HTTP status to metadata
+	extraData["http_status"] = fmt.Sprintf("%d", resp.StatusCode)
 
 	// Status code handling...
 	switch resp.StatusCode {

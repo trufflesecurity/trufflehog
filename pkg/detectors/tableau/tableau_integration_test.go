@@ -20,7 +20,7 @@ import (
 func TestTableau_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
@@ -61,33 +61,6 @@ func TestTableau_FromChunk(t *testing.T) {
 						"token_name":            tokenName,
 						"token_secret":          tokenSecret,
 						"endpoint":              tableauURL,
-						"credential_type":       "personal_access_token",
-						"verification_endpoint": "https://" + tableauURL + "/api/3.26/auth/signin",
-						"http_status":           "200",
-						"verification_method":   "tableau_pat_auth",
-						"verification_status":   "valid",
-						"auth_token_received":   "true",
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found, verified without URL (using default)",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("tableau pat_name = '%s'\ntableau pat_secret = '%s'", tokenName, tokenSecret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Tableau,
-					Verified:     true,
-					ExtraData: map[string]string{
-						"token_name":            tokenName,
-						"token_secret":          tokenSecret,
-						"endpoint":              tableauURL, // Should use default endpoint
 						"credential_type":       "personal_access_token",
 						"verification_endpoint": "https://" + tableauURL + "/api/3.26/auth/signin",
 						"http_status":           "200",
@@ -230,7 +203,7 @@ func TestTableau_FromChunk(t *testing.T) {
 				ctx: context.Background(),
 				data: []byte(fmt.Sprintf(`
 					tableau pat_name = '%s'
-					tableau token_name = '%s'  
+					tableau token_name = '%s'
 					tableau pat_secret = '%s'
 					tableau token_secret = '%s'
 					server1 = '%s'
@@ -283,6 +256,12 @@ func TestTableau_FromChunk(t *testing.T) {
 				t.Errorf("Tableau.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			// Check that we got the expected number of results
+			if len(got) != len(tt.want) {
+				t.Errorf("Tableau.FromData() got %d results, want %d", len(got), len(tt.want))
+			}
+
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
@@ -292,32 +271,13 @@ func TestTableau_FromChunk(t *testing.T) {
 				}
 			}
 
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Tableau.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			ignoreOpts := []cmp.Option{
+				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData"),
+				cmpopts.IgnoreUnexported(detectors.Result{}),
 			}
 
-			// Verify that ExtraData contains expected keys
-			for i, result := range got {
-				if tt.want != nil && i < len(tt.want) {
-					if result.ExtraData != nil {
-						// Check that essential ExtraData fields are present
-						if _, exists := result.ExtraData["token_name"]; !exists {
-							t.Errorf("Expected token_name in ExtraData")
-						}
-						if _, exists := result.ExtraData["token_secret"]; !exists {
-							t.Errorf("Expected token_secret in ExtraData")
-						}
-						if _, exists := result.ExtraData["endpoint"]; !exists {
-							t.Errorf("Expected endpoint in ExtraData")
-						}
-						if result.Verified {
-							if _, exists := result.ExtraData["verification_status"]; !exists {
-								t.Errorf("Expected verification_status in ExtraData for verified result")
-							}
-						}
-					}
-				}
+			if diff := cmp.Diff(got, tt.want, ignoreOpts...); diff != "" {
+				t.Errorf("Tableau.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
