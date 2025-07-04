@@ -1,4 +1,9 @@
-package billomat
+/*
+RoninApp rebranded to Clientary
+
+Article: https://www.clientary.com/articles/a-new-brand/
+*/
+package clientary
 
 import (
 	"context"
@@ -6,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -26,27 +30,27 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"billomat"}) + `\b([0-9a-z]{4,20})\b`) // the Billomat ID must be between 4 and 20 characters long.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"billomat"}) + `\b([0-9a-f]{32})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ronin", "clientary"}) + `\b([0-9a-zA-Z]{24,26})\b`)
+	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"ronin", "clientary"}) + `\b([0-9Aa-zA-Z-]{4,25})\b`)
 
-	errAccountIDNotFound = errors.New("account id not found")
+	errAccountNotFound = errors.New("account not found")
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"billomat"}
+	return []string{"ronin", "clientary"}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Billomat
+	return detectorspb.DetectorType_Clientary
 }
 
 func (s Scanner) Description() string {
-	return "Billomat is an online invoicing software. Billomat API keys can be used to access and manage invoices, clients, and other related data."
+	return "Clientary is a one software app to manage Clients, Invoices, Projects, Proposals, Estimates, Hours, Payments, Contractors and Staff. Clientary keys can be used to access and manage invoices and other resources."
 }
 
-// FromData will find and optionally verify Billomat secrets in a given set of bytes.
+// FromData will find and optionally verify RoninApp secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -62,42 +66,54 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for apiKey := range uniqueAPIKeys {
 		for id := range uniqueIDs {
+			// since regex matches can overlap, continue only if both apiKey and id are the same.
+			if apiKey == id {
+				continue
+			}
+
 			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Billomat,
+				DetectorType: detectorspb.DetectorType_Clientary,
 				Raw:          []byte(apiKey),
-				RawV2:        []byte(apiKey + id),
+				RawV2:        []byte(apiKey + ":" + id),
+				ExtraData:    make(map[string]string),
 			}
 
 			if verify {
-				isVerified, verificationErr := verifyBillomat(ctx, client, id, apiKey)
+				isVerified, verificationErr := verifyClientaryAPIKey(ctx, client, id, apiKey)
 				s1.Verified = isVerified
 				if verificationErr != nil {
 					// remove the account ID if not found to prevent reuse during other API key checks.
-					if errors.Is(verificationErr, errAccountIDNotFound) {
+					if errors.Is(verificationErr, errAccountNotFound) {
 						delete(uniqueIDs, id)
 						continue
 					}
 
 					s1.SetVerificationError(verificationErr, apiKey)
 				}
+
+				// If a verified result is found, attach rebranding documentation to inform the user about the RoninApp rebranding to Clientary.
+				if s1.Verified {
+					s1.ExtraData["Rebrading Docs"] = "https://www.clientary.com/articles/a-new-brand/"
+				}
 			}
 
 			results = append(results, s1)
 		}
+
 	}
 
 	return results, nil
 }
 
-// docs: https://www.billomat.com/en/api/basics/authentication/
-func verifyBillomat(ctx context.Context, client *http.Client, id, key string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://%s.billomat.net/api/v2/clients/myself", id), http.NoBody)
+// docs: https://www.clientary.com/api
+func verifyClientaryAPIKey(ctx context.Context, client *http.Client, id, apiKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+id+".clientary.com/api/v2/invoices", http.NoBody)
 	if err != nil {
-		return false, err
+		return false, nil
 	}
 
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-BillomatApiKey", key)
+	req.SetBasicAuth(apiKey, apiKey)
+	req.Header.Add("Accept", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -112,25 +128,11 @@ func verifyBillomat(ctx context.Context, client *http.Client, id, key string) (b
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized:
+	case http.StatusForbidden, http.StatusUnauthorized:
 		return false, nil
-	case http.StatusNotFound: // billomat api returns 404 if account id does not exist
-		// read the full response body
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return false, nil
-		}
-
-		/*
-			The regex for capturing a Billomat ID is prone to false positives.
-			To minimize incorrect matches, we return an error if the captured account ID does not exist,
-			as this likely indicates the match was invalid.
-		*/
-		if strings.Contains(string(bodyBytes), "account not found") {
-			return false, errAccountIDNotFound
-		}
-
-		return false, nil
+	case http.StatusNotFound:
+		// API return 404 if the account id does not exist
+		return false, errAccountNotFound
 	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}

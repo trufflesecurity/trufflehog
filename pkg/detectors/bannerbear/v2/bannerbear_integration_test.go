@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package airtableapikey
+package bannerbear
 
 import (
 	"context"
@@ -11,22 +11,21 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestAirtableApiKey_FromChunk(t *testing.T) {
+func TestBannerbear_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AIRTABLEAPIKEY_KEY")
-	inactiveSecret := testSecrets.MustGetField("AIRTABLEAPIKEY_KEY_INACTIVE")
-	app := testSecrets.MustGetField("AIRTABLEAPIKEY_APP")
+	secret := testSecrets.MustGetField("BANNERBEARV2")
+	inactiveSecret := testSecrets.MustGetField("BANNERBEARV2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -45,13 +44,12 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a airtableapikey secret %s within airtable https://api.airtable.com/v0/%s/Projects", secret, app)),
+				data:   []byte(fmt.Sprintf("You can find a bannerbear secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AirtableApiKey,
-					Redacted:     app,
+					DetectorType: detectorspb.DetectorType_Bannerbear,
 					Verified:     true,
 				},
 			},
@@ -62,13 +60,12 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a airtableapikey secret %s within airtable %s", inactiveSecret, app)),
+				data:   []byte(fmt.Sprintf("You can find a bannerbear secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AirtableApiKey,
-					Redacted:     app,
+					DetectorType: detectorspb.DetectorType_Bannerbear,
 					Verified:     false,
 				},
 			},
@@ -91,7 +88,7 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("AirtableApiKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Bannerbear.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -100,9 +97,10 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 				}
 				got[i].Raw = nil
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Airtable.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "verificationError", "primarySecret", "ExtraData")
+			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+				t.Errorf("BannerbearV2.FromData() %s - diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

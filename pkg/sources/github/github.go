@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -474,7 +475,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 			}
 
 			if err != nil {
-				return repo, fmt.Errorf("failed to fetch gist")
+				return repo, fmt.Errorf("failed to fetch gist: %w", err)
 			}
 
 			s.cacheGistInfo(gist)
@@ -488,7 +489,7 @@ func (s *Source) ensureRepoInfoCache(ctx context.Context, repo string, reporter 
 				continue
 			}
 			if err != nil {
-				return repo, fmt.Errorf("failed to fetch repository")
+				return repo, fmt.Errorf("failed to fetch repository: %w", err)
 			}
 			s.cacheRepoInfo(ghRepo)
 			break
@@ -1165,8 +1166,26 @@ func extractGistID(urlParts []string) string {
 	return urlParts[len(urlParts)-1]
 }
 
+// isGistUrl returns true if the URL path is of a gist
 func isGistUrl(urlParts []string) bool {
-	return strings.EqualFold(urlParts[0], "gist.github.com") || (len(urlParts) == 4 && strings.EqualFold(urlParts[1], "gist"))
+	if len(urlParts) == 0 {
+		return false
+	}
+
+	// standard github gists: gist.github.com/user/abc123
+	if strings.EqualFold(urlParts[0], "gist.github.com") {
+		return true
+	}
+
+	// github enterprise: any 3 or 4 parts url with 'gist'
+	if (len(urlParts) == 3 || len(urlParts) == 4) && slices.Contains(urlParts, "gist") {
+		// enterprise.company.com/gist/gist-id
+		// gist.company.com/gist/gist-id
+		// gist.company.com/path/gist/gist-id
+		return true
+	}
+
+	return false
 }
 
 func (s *Source) chunkGistComments(ctx context.Context, gistURL string, gistInfo repoInfo, comments []*github.GistComment, reporter sources.ChunkReporter, cutoffTime *time.Time) error {
