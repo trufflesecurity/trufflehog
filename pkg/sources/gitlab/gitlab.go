@@ -664,7 +664,6 @@ func (s *Source) getAllProjectReposV2(
 	ctx.Logger().Info("starting projects enumeration",
 		"list_options", listOpts,
 		"all_available", *projectQueryOptions.Membership)
-	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(0)
 
 	// paginate through all projects until no more pages remain.
 	for {
