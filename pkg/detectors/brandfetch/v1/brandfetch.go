@@ -16,9 +16,11 @@ import (
 
 type Scanner struct{}
 
+func (s Scanner) Version() int { return 1 }
+
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
-
+var _ detectors.Versioner = (*Scanner)(nil)
 var (
 	client = common.SaneHttpClient()
 
@@ -35,12 +37,9 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Brandfetch secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-
 	for _, match := range matches {
 		resMatch := strings.TrimSpace(match[1])
-
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Brandfetch,
 			Raw:          []byte(resMatch),
@@ -51,17 +50,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr)
 		}
-
 		results = append(results, s1)
 	}
-
 	return results, nil
 }
-
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Brandfetch
 }
-
 func (s Scanner) Description() string {
 	return "Brandfetch is a service that provides brand data, including logos, colors, fonts, and more. Brandfetch API keys can be used to access this data."
 }
