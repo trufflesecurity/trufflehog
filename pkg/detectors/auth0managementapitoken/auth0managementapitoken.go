@@ -3,6 +3,7 @@ package auth0managementapitoken
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -61,22 +62,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				/*
-				   curl -H "Authorization: Bearer $token" https://domain/api/v2/users
-				*/
-
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/api/v2/users", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", managementAPITokenRes))
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, err := verifyMatch(ctx, client, managementAPITokenRes, domainRes)
+				s1.Verified = isVerified
+				s1.SetVerificationError(err, managementAPITokenRes)
 			}
 
 			results = append(results, s1)
@@ -84,6 +72,34 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, token, domain string) (bool, error) {
+	/*
+		curl -H "Authorization: Bearer $token" https://domain/api/v2/users
+		Reference: https://auth0.com/docs/api/management/v2/users/get-users
+	*/
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+domain+"/api/v2/users", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+	switch res.StatusCode {
+	case http.StatusOK, http.StatusForbidden:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

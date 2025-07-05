@@ -65,35 +65,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if client == nil {
 					client = defaultClient
 				}
-				url := fmt.Sprintf("%s/applications?api-version=2020-09-01.12.0", endpoint)
-				date := time.Now().UTC().Format(http.TimeFormat)
-				stringToSign := fmt.Sprintf(
-					"GET\n\n\n\n\napplication/json\n%s\n\n\n\n\n\n%s\napi-version:%s",
-					date,
-					strings.ToLower(fmt.Sprintf("/%s/applications", accountName)),
-					"2020-09-01.12.0",
-				)
-				key, _ := base64.StdEncoding.DecodeString(accountKey)
-				h := hmac.New(sha256.New, key)
-				h.Write([]byte(stringToSign))
-				signature := base64.StdEncoding.EncodeToString(h.Sum(nil))
-				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Set("Content-Type", "application/json")
-				req.Header.Set("Authorization", fmt.Sprintf("SharedKey %s:%s", accountName, signature))
-				req.Header.Set("Date", date)
-				resp, err := client.Do(req)
-				if err != nil {
-					continue
-				}
-				defer resp.Body.Close()
-
-				if resp.StatusCode == http.StatusOK {
-					s1.Verified = true
-				}
-
+				isVerified, err := verifyMatch(ctx, client, endpoint, accountName, accountKey)
+				s1.Verified = isVerified
+				s1.SetVerificationError(err)
 			}
 
 			results = append(results, s1)
@@ -104,6 +78,51 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, endpoint, accountName, accountKey string) (bool, error) {
+	// Reference: https://learn.microsoft.com/en-us/rest/api/batchservice/application/list
+	url := fmt.Sprintf("%s/applications?api-version=2020-09-01.12.0", endpoint)
+
+	date := time.Now().UTC().Format(http.TimeFormat)
+	stringToSign := fmt.Sprintf(
+		"GET\n\n\n\n\napplication/json\n%s\n\n\n\n\n\n%s\napi-version:%s",
+		date,
+		strings.ToLower(fmt.Sprintf("/%s/applications", accountName)),
+		"2020-09-01.12.0",
+	)
+	key, _ := base64.StdEncoding.DecodeString(accountKey)
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(stringToSign))
+	signature := base64.StdEncoding.EncodeToString(h.Sum(nil))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("SharedKey %s:%s", accountName, signature))
+	req.Header.Set("Date", date)
+	resp, err := client.Do(req)
+	if err != nil {
+		// If the host is not found, we can assume that the endpoint is invalid
+		if strings.Contains(err.Error(), "no such host") {
+			return false, nil
+		}
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusForbidden:
+		// Key is either invalid or the account is disabled.
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d for %s", resp.StatusCode, url)
+	}
 }
 
 func (s Scanner) IsFalsePositive(_ detectors.Result) (bool, string) {

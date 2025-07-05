@@ -33,10 +33,8 @@ var (
 		# - The above credentials should only be used in a secure environment.
 	`
 	secrets = []string{
-		"MvkLktYDS7PSE0xRMHIYBKrAjXruEk5P1VrJUUGtgspa3KTi6rMvkLktYDS7PSE0xRMHIYBKrAjXruEk5P1VrJUUGtgspa3KTi6r",
 		"MvkLktYDS7PSE0xRMHIYBKrAjXruEk5P1VrJUUGtgspa3KTi6rq3DZbY7iviUpewfCHEpK1I51G8XW63GuLuJyAIEqOFtEB1qlg1",
 		"q3DZbY7iviUpewfCHEpK1I51G8XW63GuLuJyAIEqOFtEB1qlg1MvkLktYDS7PSE0xRMHIYBKrAjXruEk5P1VrJUUGtgspa3KTi6r",
-		"q3DZbY7iviUpewfCHEpK1I51G8XW63GuLuJyAIEqOFtEB1qlg1q3DZbY7iviUpewfCHEpK1I51G8XW63GuLuJyAIEqOFtEB1qlg1",
 	}
 )
 
