@@ -705,24 +705,23 @@ func (s *Source) shouldSkipObject(ctx context.Context, objIdx int, obj s3types.O
 }
 
 type S3SourceUnit struct {
-	Object s3types.Object
 	Bucket string
 	Role   string
 }
 
 func (s S3SourceUnit) SourceUnitID() (string, sources.SourceUnitKind) {
 	// The ID is the object key, and the kind is "s3_object".
-	return *s.Object.Key, "s3_object"
+	return s.Bucket, "s3_object"
 }
 
 func (s S3SourceUnit) Display() string {
-	return fmt.Sprintf("%s:%s", s.Bucket, *s.Object.Key)
+	return s.Bucket
 }
 
 var _ sources.SourceUnit = S3SourceUnit{}
 
 // Enumerate implements SourceUnitEnumerator interface. This implementation visits
-// each configured role, scans the buckets and passes each s3 object as a source unit
+// each configured role and passes each s3 bucket as a source unit
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	visitor := func(c context.Context, defaultRegionClient *s3.Client, roleArn string, buckets []string) error {
 		for _, bucket := range buckets {
@@ -730,50 +729,15 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 				return ctx.Err()
 			}
 
-			ctx.Logger().V(5).Info("Enumerating bucket")
+			ctx.Logger().V(5).Info("Enumerating bucket", "bucket", bucket)
 
-			regionalClient, err := s.getRegionalClientForBucket(ctx, defaultRegionClient, roleArn, bucket)
-			if err != nil {
-				ctx.Logger().V(5).Error(err, "could not get regional client for bucket")
-				continue
+			unit := S3SourceUnit{
+				Bucket: bucket,
+				Role:   roleArn,
 			}
 
-			input := &s3.ListObjectsV2Input{Bucket: &bucket}
-			paginator := s3.NewListObjectsV2Paginator(regionalClient, input)
-
-			pageNumber := 1
-			for paginator.HasMorePages() {
-				output, err := paginator.NextPage(ctx)
-				if err != nil {
-					ctx.Logger().V(5).Error(err, "could not list objects in bucket")
-					break
-				}
-
-				metadata := pageMetadata{
-					bucket:     bucket,
-					pageNumber: pageNumber,
-					client:     regionalClient,
-					page:       output,
-				}
-
-				for objIdx, obj := range output.Contents {
-
-					skipObject, _ := s.shouldSkipObject(ctx, objIdx, obj, metadata)
-					if skipObject {
-						continue
-					}
-
-					unit := S3SourceUnit{
-						Object: obj,
-						Bucket: bucket,
-						Role:   roleArn,
-					}
-					if err := reporter.UnitOk(ctx, unit); err != nil {
-						return err
-					}
-				}
-
-				pageNumber++
+			if err := reporter.UnitOk(ctx, unit); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -788,9 +752,8 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 	if !ok {
 		return fmt.Errorf("expected *S3SourceUnit, got %T", unit)
 	}
-	objectKey, _ := unit.SourceUnitID()
-	bucket := s3unit.Bucket
-	logger := ctx.Logger().WithValues("bucket", bucket, "key", objectKey)
+	bucket, _ := unit.SourceUnitID()
+	logger := ctx.Logger().WithValues("bucket", bucket)
 
 	defaultClient, err := s.newClient(ctx, defaultAWSRegion, s3unit.Role)
 	if err != nil {
@@ -802,20 +765,66 @@ func (s *Source) ChunkUnit(ctx context.Context, unit sources.SourceUnit, reporte
 		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get regional client for bucket: %w", err))
 	}
 
+	input := &s3.ListObjectsV2Input{Bucket: &bucket}
+	paginator := s3.NewListObjectsV2Paginator(client, input)
+
+	pageNumber := 1
+	for paginator.HasMorePages() {
+		output, err := paginator.NextPage(ctx)
+		if err != nil {
+			ctx.Logger().V(5).Error(err, "could not list objects in bucket")
+			break
+		}
+
+		metadata := pageMetadata{
+			bucket:     bucket,
+			pageNumber: pageNumber,
+			client:     client,
+			page:       output,
+		}
+
+		for objIdx, obj := range output.Contents {
+			skipObject, _ := s.shouldSkipObject(ctx, objIdx, obj, metadata)
+			if skipObject {
+				continue
+			}
+
+			logger.V(3).Info(fmt.Sprintf("chunking s3 unit %s", *obj.Key))
+
+			err := s.chunkObject(ctx, client, reporter, &obj, bucket)
+			if err != nil {
+				return reporter.ChunkErr(ctx, err)
+			}
+
+			logger.V(5).Info("S3 object chunked successfully", "object_key", *obj.Key)
+		}
+		pageNumber++
+	}
+	return nil
+}
+
+func (s *Source) chunkObject(
+	ctx context.Context,
+	client *s3.Client,
+	reporter sources.ChunkReporter,
+	obj *s3types.Object,
+	bucket string,
+) error {
 	// Make sure we use a separate context for the GetObjectWithContext call.
 	// This ensures that the timeout is isolated and does not affect any downstream operations. (e.g. HandleFile)
 	const getObjectTimeout = 30 * time.Second
 	objCtx, cancel := context.WithTimeout(ctx, getObjectTimeout)
 	defer cancel()
 
-	res, err := s.getObject(objCtx, client, objectKey, bucket, *s3unit.Object.Size)
+	res, err := s.getObject(objCtx, client, *obj.Key, bucket, *obj.Size)
 	if err != nil {
-		return reporter.ChunkErr(ctx, fmt.Errorf("unable to get object: %w", err))
+		return fmt.Errorf("unable to get object: %w", err)
 	}
 	defer res.Body.Close()
 
-	logger.V(3).Info(fmt.Sprintf("chunking s3 unit %s", *s3unit.Object.Key))
-
-	return s.handleFileChunk(ctx, s3unit.Object, res, reporter, bucket, client.Options().Region)
-
+	err = s.handleFileChunk(ctx, *obj, res, reporter, bucket, client.Options().Region)
+	if err != nil {
+		return fmt.Errorf("error handling file chunk: %w", err)
+	}
+	return nil
 }
