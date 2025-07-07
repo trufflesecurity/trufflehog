@@ -34,8 +34,6 @@ var (
 	`
 	secrets = []string{
 		"nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6evkkrqz3onrg2epqj9i2lgkb0wxf8lq0gdzvw6macc9br1qi9ry335u173dr3gzcgy9v6",
-		"nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6evkkrqz3onrg2epqj9i2lgkb0wxf8lq0gdzvw6macc9br1qi9ry335u173dr3gzcgy9v6",
-		"ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4olz2l5jzw54yv3ai0qwdri6l1f4iyruc7f",
 		"ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4olz2l5jzw54yv3ai0qwdri6l1f4iyruc7f",
 	}
 )
