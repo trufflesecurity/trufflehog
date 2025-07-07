@@ -80,7 +80,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
-	case http.StatusUnauthorized, http.StatusForbidden:
+	case http.StatusUnauthorized:
 		// 401: Token is invalid or expired
 		return false, nil
 	default:
