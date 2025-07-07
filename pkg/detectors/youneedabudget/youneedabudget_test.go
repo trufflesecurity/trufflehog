@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	validPattern   = "1f80bdfa73f8e9e50445de3a5a52fbe585fafe0e26d6fccf090b11153775c43d"
-	invalidPattern = "1f?0bdfa73f8e9e50445de3a5a52fbe585fafe0e26d6fccf090b11153775c43d"
+	validPattern   = "fkyzQu-fAqA0922twkqvwAl1k8H_RAzgmEl6b6e8Qfg"
+	invalidPattern = "DRntlQ5CkhA_3tnhQpobw1D0K6OEabiV80"
 	keyword        = "youneedabudget"
 )
 
@@ -28,6 +28,11 @@ func TestYouNeedABudget_Pattern(t *testing.T) {
 		{
 			name:  "valid pattern - with keyword youneedabudget",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
+			want:  []string{validPattern},
+		},
+		{
+			name:  "valid pattern - without quotes",
+			input: fmt.Sprintf("%s token = %s", keyword, validPattern),
 			want:  []string{validPattern},
 		},
 		{
