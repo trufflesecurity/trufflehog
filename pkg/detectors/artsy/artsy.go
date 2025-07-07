@@ -2,6 +2,8 @@ package artsy
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -54,17 +56,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "POST", "https://api.artsy.net/api/tokens/xapp_token?client_id="+resIdMatch+"&client_secret="+resMatch, nil)
-				if err != nil {
-					continue
-				}
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, err := verifyMatch(ctx, client, resIdMatch, resMatch)
+				s1.Verified = isVerified
+				s1.SetVerificationError(err, resMatch)
 			}
 
 			results = append(results, s1)
@@ -73,6 +67,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, id, secret string) (bool, error) {
+	// Reference: https://developers.artsy.net/v2/docs/authentication
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.artsy.net/api/tokens/xapp_token?client_id="+id+"&client_secret="+secret, http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+	switch res.StatusCode {
+	case http.StatusCreated:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

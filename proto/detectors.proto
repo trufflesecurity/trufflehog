@@ -62,7 +62,7 @@ enum DetectorType {
   TwitterApiSecret = 48;
   NpmToken = 49;
   NewRelicPersonalApiKey = 50;
-  AirtableApiKey = 51;
+  AirtableApiKey = 51 [deprecated = true];
   AkamaiToken = 52;
   AmazonMWS = 53;
   KubeConfig = 54;
@@ -317,7 +317,7 @@ enum DetectorType {
   Opengraphr = 304 [deprecated = true];
   Rawg = 305;
   Riotgames = 306;
-  RoninApp = 307;
+  Clientary = 307;
   Stormglass = 308;
   Tomtom = 309;
   Twitch = 310;
