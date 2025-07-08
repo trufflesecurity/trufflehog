@@ -57,7 +57,6 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 		// New test cases for additional Unicode escape formats
 
 		// \u{X} format - Rust, Swift, some JS, etc.
-		// ToDo: look into other JS support A hexadecimal number representing the Unicode code point of the character. The \xHH form must have two hexadecimal digits; the \uHHHH form must have four; the \u{HHH} form may have 1 to 6 hexadecimal digits. Can we handle 6 hexadecimal digits?
 		{
 			name: "[brace] \\u{X} format - Rust/Swift style",
 			chunk: &sources.Chunk{
@@ -69,7 +68,6 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 		},
 
 		// \U00XXXXXX format - Python, etc.
-		// Todo: Can we handle 8 bytes?
 		{
 			name: "[long] \\U00XXXXXX format - Python style",
 			chunk: &sources.Chunk{
@@ -92,7 +90,7 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 		},
 
 		// \X format - CSS (space delimited)
-		// ToDo: It says this in the spec: Or one to six hex digits, followed by an optional whitespace. Looks like if it's less than 6 hex digits, you need a space unless contining hex digits. But if it's 6 or more, you don't need a space. Is that correct? Verify that and then ensure that the logic can handle no whitespace sequence or whitespace sequence with no hex digits after it.
+		// ToDo: Look into supporting CSS where there is no whitespace ex: \013322\013171\013001. Currently not supported by this implementation.
 		{
 			name: "[css] \\X format - CSS style",
 			chunk: &sources.Chunk{
@@ -104,7 +102,6 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 		},
 
 		// &#xX; format - HTML/XML
-		// Todo: Verify that we can handle the correct number of hex digits. Seems like it could be 1-6.
 		{
 			name: "[html] &#xX; format - HTML/XML style",
 			chunk: &sources.Chunk{
