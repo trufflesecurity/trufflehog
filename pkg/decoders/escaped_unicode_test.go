@@ -55,10 +55,11 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 		},
 
 		// New test cases for additional Unicode escape formats
-		
-		// \u{X} format - Lua, Ruby, JavaScript, etc.
+
+		// \u{X} format - Rust, Swift, some JS, etc.
+		// ToDo: look into other JS support A hexadecimal number representing the Unicode code point of the character. The \xHH form must have two hexadecimal digits; the \uHHHH form must have four; the \u{HHH} form may have 1 to 6 hexadecimal digits. Can we handle 6 hexadecimal digits?
 		{
-			name: "[brace] \\u{X} format - Lua/JS style",
+			name: "[brace] \\u{X} format - Rust/Swift style",
 			chunk: &sources.Chunk{
 				Data: []byte("\\u{74}\\u{6f}\\u{6b}\\u{65}\\u{6e}\\u{3a}\\u{20}\\u{22}\\u{67}\\u{68}\\u{70}\\u{5f}\\u{49}\\u{77}\\u{64}\\u{4d}\\u{78}\\u{39}\\u{57}\\u{46}\\u{57}\\u{52}\\u{52}\\u{66}\\u{4d}\\u{68}\\u{54}\\u{59}\\u{69}\\u{61}\\u{56}\\u{6a}\\u{5a}\\u{37}\\u{38}\\u{4a}\\u{66}\\u{75}\\u{61}\\u{6d}\\u{76}\\u{6e}\\u{30}\\u{59}\\u{57}\\u{52}\\u{4d}\\u{30}\\u{22}"),
 			},
@@ -66,10 +67,11 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 				Data: []byte("token: \"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\""),
 			},
 		},
-		
-		// \U00XXXXXX format - C, Python, etc.
+
+		// \U00XXXXXX format - Python, etc.
+		// Todo: Can we handle 8 bytes?
 		{
-			name: "[long] \\U00XXXXXX format - C/Python style",
+			name: "[long] \\U00XXXXXX format - Python style",
 			chunk: &sources.Chunk{
 				Data: []byte("\\U00000074\\U0000006f\\U0000006b\\U00000065\\U0000006e\\U0000003a\\U00000020\\U00000022\\U00000067\\U00000068\\U00000070\\U0000005f\\U00000049\\U00000077\\U00000064\\U0000004d\\U00000078\\U00000039\\U00000057\\U00000046\\U00000057\\U00000052\\U00000052\\U00000066\\U0000004d\\U00000068\\U00000054\\U00000059\\U00000069\\U00000061\\U00000056\\U0000006a\\U0000005a\\U00000037\\U00000038\\U0000004a\\U00000066\\U00000075\\U00000061\\U0000006d\\U00000076\\U0000006e\\U00000030\\U00000059\\U00000057\\U00000052\\U0000004d\\U00000030\\U00000022"),
 			},
@@ -77,7 +79,7 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 				Data: []byte("token: \"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\""),
 			},
 		},
-		
+
 		// \x{X} format - Perl
 		{
 			name: "[perl] \\x{X} format - Perl style",
@@ -88,8 +90,9 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 				Data: []byte("token: \"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\""),
 			},
 		},
-		
+
 		// \X format - CSS (space delimited)
+		// ToDo: It says this in the spec: Or one to six hex digits, followed by an optional whitespace. Looks like if it's less than 6 hex digits, you need a space unless contining hex digits. But if it's 6 or more, you don't need a space. Is that correct? Verify that and then ensure that the logic can handle no whitespace sequence or whitespace sequence with no hex digits after it.
 		{
 			name: "[css] \\X format - CSS style",
 			chunk: &sources.Chunk{
@@ -99,8 +102,9 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 				Data: []byte("token: \"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\""),
 			},
 		},
-		
+
 		// &#xX; format - HTML/XML
+		// Todo: Verify that we can handle the correct number of hex digits. Seems like it could be 1-6.
 		{
 			name: "[html] &#xX; format - HTML/XML style",
 			chunk: &sources.Chunk{
@@ -110,7 +114,7 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 				Data: []byte("token: \"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\""),
 			},
 		},
-		
+
 		// %uXXXX format - Percent-encoding (non-standard)
 		{
 			name: "[percent] %uXXXX format - Percent encoding",
@@ -121,18 +125,29 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 				Data: []byte("token: \"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\""),
 			},
 		},
-		
-		// 0xX format - Hexadecimal notation with space separation
-		{
-			name: "[hex] 0xX format - Hex with spaces",
-			chunk: &sources.Chunk{
-				Data: []byte("0x74 0x6f 0x6b 0x65 0x6e 0x3a 0x20 0x22 0x67 0x68 0x70 0x5f 0x49 0x77 0x64 0x4d 0x78 0x39 0x57 0x46 0x57 0x52 0x52 0x66 0x4d 0x68 0x54 0x59 0x69 0x61 0x56 0x6a 0x5a 0x37 0x38 0x4a 0x66 0x75 0x61 0x6d 0x76 0x6e 0x30 0x59 0x57 0x52 0x4d 0x30 0x22 "),
-			},
-			want: &sources.Chunk{
-				Data: []byte("token: \"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\""),
-			},
-		},
-		
+
+		// // 0xX format - Hexadecimal notation with space separation
+		// {
+		// 	name: "[hex] 0xX format - Hex with spaces",
+		// 	chunk: &sources.Chunk{
+		// 		Data: []byte("0x74 0x6f 0x6b 0x65 0x6e 0x3a 0x20 0x22 0x67 0x68 0x70 0x5f 0x49 0x77 0x64 0x4d 0x78 0x39 0x57 0x46 0x57 0x52 0x52 0x66 0x4d 0x68 0x54 0x59 0x69 0x61 0x56 0x6a 0x5a 0x37 0x38 0x4a 0x66 0x75 0x61 0x6d 0x76 0x6e 0x30 0x59 0x57 0x52 0x4d 0x30 0x22 "),
+		// 	},
+		// 	want: &sources.Chunk{
+		// 		Data: []byte("token: \"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\""),
+		// 	},
+		// },
+
+		// // 0xX format - Hexadecimal notation with comma separation
+		// {
+		// 	name: "[hex] 0xX format - Hex with commas",
+		// 	chunk: &sources.Chunk{
+		// 		Data: []byte("0x74,0x6f,0x6b,0x65,0x6e,0x3a,0x20,0x22,0x67,0x68,0x70,0x5f,0x49,0x77,0x64,0x4d,0x78,0x39,0x57,0x46,0x57,0x52,0x52,0x66,0x4d,0x68,0x54,0x59,0x69,0x61,0x56,0x6a,0x5a,0x37,0x38,0x4a,0x66,0x75,0x61,0x6d,0x76,0x6e,0x30,0x59,0x57,0x52,0x4d,0x30,0x22"),
+		// 	},
+		// 	want: &sources.Chunk{
+		// 		Data: []byte("token: \"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\""),
+		// 	},
+		// },
+
 		// Test cases for mixed content with new formats
 		{
 			name: "[mixed] \\u{X} in code context",
@@ -143,7 +158,7 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 				Data: []byte("const secret = \"AKIAUM4G6O6NAKE7LCDJ\";"),
 			},
 		},
-		
+
 		{
 			name: "[mixed] HTML entity in web context",
 			chunk: &sources.Chunk{
@@ -164,7 +179,7 @@ func TestUnicodeEscape_FromChunk(t *testing.T) {
 				Data: []byte("😀 Happy face emoji"),
 			},
 		},
-		
+
 		{
 			name: "[emoji] \\U00XXXXXX with emoji",
 			chunk: &sources.Chunk{

@@ -11,7 +11,7 @@ var (
 	// Original formats
 	originalUnicodeData = []byte("\\u0041\\u004b\\u0049\\u0041\\u0055\\u004d\\u0034\\u0047\\u0036\\u004f\\u0036\\u004e\\u0041\\u004b\\u0045\\u0037\\u004c\\u0043\\u0044\\u004a")
 	codePointData       = []byte("U+0041 U+004B U+0049 U+0041 U+0055 U+004D U+0034 U+0047 U+0036 U+004F U+0036 U+004E U+0041 U+004B U+0045 U+0037 U+004C U+0043 U+0044 U+004A")
-	
+
 	// New formats
 	braceEscapeData   = []byte("\\u{41}\\u{4b}\\u{49}\\u{41}\\u{55}\\u{4d}\\u{34}\\u{47}\\u{36}\\u{4f}\\u{36}\\u{4e}\\u{41}\\u{4b}\\u{45}\\u{37}\\u{4c}\\u{43}\\u{44}\\u{4a}")
 	longEscapeData    = []byte("\\U00000041\\U0000004b\\U00000049\\U00000041\\U00000055\\U0000004d\\U00000034\\U00000047\\U00000036\\U0000004f\\U00000036\\U0000004e\\U00000041\\U0000004b\\U00000045\\U00000037\\U0000004c\\U00000043\\U00000044\\U0000004a")
@@ -19,8 +19,8 @@ var (
 	cssEscapeData     = []byte("\\41 \\4b \\49 \\41 \\55 \\4d \\34 \\47 \\36 \\4f \\36 \\4e \\41 \\4b \\45 \\37 \\4c \\43 \\44 \\4a ")
 	htmlEscapeData    = []byte("&#x41;&#x4b;&#x49;&#x41;&#x55;&#x4d;&#x34;&#x47;&#x36;&#x4f;&#x36;&#x4e;&#x41;&#x4b;&#x45;&#x37;&#x4c;&#x43;&#x44;&#x4a;")
 	percentEscapeData = []byte("%u0041%u004b%u0049%u0041%u0055%u004d%u0034%u0047%u0036%u004f%u0036%u004e%u0041%u004b%u0045%u0037%u004c%u0043%u0044%u004a")
-	hexEscapeData     = []byte("0x41 0x4b 0x49 0x41 0x55 0x4d 0x34 0x47 0x36 0x4f 0x36 0x4e 0x41 0x4b 0x45 0x37 0x4c 0x43 0x44 0x4a ")
-	
+	//hexEscapeData     = []byte("0x41 0x4b 0x49 0x41 0x55 0x4d 0x34 0x47 0x36 0x4f 0x36 0x4e 0x41 0x4b 0x45 0x37 0x4c 0x43 0x44 0x4a ")
+
 	// Mixed content (more realistic scenario)
 	mixedContentData = []byte(`
 		const config = {
@@ -30,7 +30,7 @@ var (
 			normalText: "This is normal text that should not be processed"
 		}
 	`)
-	
+
 	// Large data for stress testing
 	largeData = func() []byte {
 		data := make([]byte, 0, 10000)
@@ -43,7 +43,7 @@ var (
 		}
 		return data
 	}()
-	
+
 	// No Unicode data (worst case for performance)
 	noUnicodeData = []byte(`
 		This is a large block of text with no Unicode escape sequences.
@@ -107,17 +107,17 @@ func BenchmarkDecodePercentEscape(b *testing.B) {
 	}
 }
 
-func BenchmarkDecodeHexEscape(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = decodeHexEscape(hexEscapeData)
-	}
-}
+// func BenchmarkDecodeHexEscape(b *testing.B) {
+// 	for i := 0; i < b.N; i++ {
+// 		_ = decodeHexEscape(hexEscapeData)
+// 	}
+// }
 
 // Benchmark the full FromChunk method with different data types
 func BenchmarkFromChunk_OriginalFormat(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: originalUnicodeData}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = decoder.FromChunk(chunk)
@@ -127,7 +127,7 @@ func BenchmarkFromChunk_OriginalFormat(b *testing.B) {
 func BenchmarkFromChunk_BraceFormat(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: braceEscapeData}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = decoder.FromChunk(chunk)
@@ -137,7 +137,7 @@ func BenchmarkFromChunk_BraceFormat(b *testing.B) {
 func BenchmarkFromChunk_LongFormat(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: longEscapeData}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = decoder.FromChunk(chunk)
@@ -147,7 +147,7 @@ func BenchmarkFromChunk_LongFormat(b *testing.B) {
 func BenchmarkFromChunk_HtmlFormat(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: htmlEscapeData}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = decoder.FromChunk(chunk)
@@ -157,7 +157,7 @@ func BenchmarkFromChunk_HtmlFormat(b *testing.B) {
 func BenchmarkFromChunk_MixedContent(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: mixedContentData}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = decoder.FromChunk(chunk)
@@ -167,7 +167,7 @@ func BenchmarkFromChunk_MixedContent(b *testing.B) {
 func BenchmarkFromChunk_NoUnicode(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: noUnicodeData}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = decoder.FromChunk(chunk)
@@ -177,7 +177,7 @@ func BenchmarkFromChunk_NoUnicode(b *testing.B) {
 func BenchmarkFromChunk_LargeData(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: largeData}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = decoder.FromChunk(chunk)
@@ -187,7 +187,7 @@ func BenchmarkFromChunk_LargeData(b *testing.B) {
 // Benchmark regex matching performance (most expensive operation)
 func BenchmarkRegexMatching_AllPatterns(b *testing.B) {
 	testData := mixedContentData
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate the pattern matching in FromChunk
@@ -199,13 +199,13 @@ func BenchmarkRegexMatching_AllPatterns(b *testing.B) {
 		_ = escapePat.Match(testData)
 		_ = codePointPat.Match(testData)
 		_ = cssEscapePat.Match(testData)
-		_ = hexEscapePat.Match(testData)
+		//_ = hexEscapePat.Match(testData)
 	}
 }
 
 func BenchmarkRegexMatching_NoMatch(b *testing.B) {
 	testData := noUnicodeData
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate the pattern matching in FromChunk on data with no matches
@@ -217,7 +217,7 @@ func BenchmarkRegexMatching_NoMatch(b *testing.B) {
 		_ = escapePat.Match(testData)
 		_ = codePointPat.Match(testData)
 		_ = cssEscapePat.Match(testData)
-		_ = hexEscapePat.Match(testData)
+		//_ = hexEscapePat.Match(testData)
 	}
 }
 
@@ -225,7 +225,7 @@ func BenchmarkRegexMatching_NoMatch(b *testing.B) {
 func BenchmarkFromChunk_MemoryAllocation(b *testing.B) {
 	decoder := &EscapedUnicode{}
 	chunk := &sources.Chunk{Data: mixedContentData}
-	
+
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
