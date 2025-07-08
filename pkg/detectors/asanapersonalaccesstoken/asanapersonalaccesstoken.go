@@ -74,14 +74,13 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
-
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
 	case http.StatusUnauthorized:
 		return false, nil
 	default:
-		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected status code %d", res.StatusCode)
 	}
 }
 

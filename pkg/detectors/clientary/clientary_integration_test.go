@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package roninapp
+package clientary
 
 import (
 	"context"
@@ -44,13 +44,20 @@ func TestRoninApp_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a roninapp secret %s within roninappdomain %s", secret, domain)),
+				data:   []byte(fmt.Sprintf("You can find a clientary secret %s and clientaryDomain %s", secret, domain)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_RoninApp,
+					DetectorType: detectorspb.DetectorType_Clientary,
+					Verified:     false,
+				},
+				{
+					DetectorType: detectorspb.DetectorType_Clientary,
 					Verified:     true,
+					ExtraData: map[string]string{
+						"Rebrading Docs": "https://www.clientary.com/articles/a-new-brand/",
+					},
 				},
 			},
 			wantErr: false,
@@ -60,12 +67,12 @@ func TestRoninApp_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a roninapp secret %s within roninappdomain %s but not valid", inactiveSecret, domain)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a ronin secret %s and ronaindomain %s but not valid", inactiveSecret, domain)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_RoninApp,
+					DetectorType: detectorspb.DetectorType_Clientary,
 					Verified:     false,
 				},
 			},
@@ -96,6 +103,7 @@ func TestRoninApp_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].RawV2 = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("RoninApp.FromData() %s diff: (-got +want)\n%s", tt.name, diff)

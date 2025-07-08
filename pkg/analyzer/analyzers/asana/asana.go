@@ -46,7 +46,7 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 
 	result := analyzers.AnalyzerResult{}
 
-	// resoures/permission setup
+	// resources/permission setup
 	permissions := allPermissions()
 	userResource := analyzers.Resource{
 		Name:               info.Data.Name,
