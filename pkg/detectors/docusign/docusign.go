@@ -4,17 +4,20 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/go-errors/errors"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	"github.com/go-errors/errors"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 type Response struct {
 	AccessToken string `json:"access_token"`
@@ -45,15 +48,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	secretMatches := secretPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, idMatch := range idMatches {
-		if len(idMatch) != 2 {
-			continue
-		}
 		resIDMatch := strings.TrimSpace(idMatch[1])
 
 		for _, secretMatch := range secretMatches {
-			if len(secretMatch) != 2 {
-				continue
-			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			s1 := detectors.Result{
@@ -91,11 +88,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				if err == nil {
 					if res.StatusCode >= 200 && res.StatusCode < 300 && verifiedBodyResponse {
 						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resIDMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
 					}
 				}
 			}
@@ -109,4 +101,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Docusign
+}
+
+func (s Scanner) Description() string {
+	return "Docusign is an electronic signature and digital transaction management service. Docusign credentials can be used to access and manage digital transactions and documents."
 }

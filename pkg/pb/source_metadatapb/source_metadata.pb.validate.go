@@ -1298,6 +1298,12 @@ func (m *Gitlab) validate(all bool) error {
 
 	// no validation rules for Line
 
+	// no validation rules for ProjectId
+
+	// no validation rules for ProjectName
+
+	// no validation rules for ProjectOwner
+
 	if len(errors) > 0 {
 		return GitlabMultiError(errors)
 	}
@@ -1486,6 +1492,125 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GCSValidationError{}
+
+// Validate checks the field values on Huggingface with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Huggingface) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Huggingface with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in HuggingfaceMultiError, or
+// nil if none found.
+func (m *Huggingface) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Huggingface) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Link
+
+	// no validation rules for Username
+
+	// no validation rules for Repository
+
+	// no validation rules for Commit
+
+	// no validation rules for Email
+
+	// no validation rules for File
+
+	// no validation rules for Timestamp
+
+	// no validation rules for Line
+
+	// no validation rules for Visibility
+
+	// no validation rules for ResourceType
+
+	if len(errors) > 0 {
+		return HuggingfaceMultiError(errors)
+	}
+
+	return nil
+}
+
+// HuggingfaceMultiError is an error wrapping multiple validation errors
+// returned by Huggingface.ValidateAll() if the designated constraints aren't met.
+type HuggingfaceMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m HuggingfaceMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m HuggingfaceMultiError) AllErrors() []error { return m }
+
+// HuggingfaceValidationError is the validation error returned by
+// Huggingface.Validate if the designated constraints aren't met.
+type HuggingfaceValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e HuggingfaceValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e HuggingfaceValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e HuggingfaceValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e HuggingfaceValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e HuggingfaceValidationError) ErrorName() string { return "HuggingfaceValidationError" }
+
+// Error satisfies the builtin error interface
+func (e HuggingfaceValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sHuggingface.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = HuggingfaceValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = HuggingfaceValidationError{}
 
 // Validate checks the field values on Jira with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
@@ -2713,9 +2838,18 @@ func (m *Forager) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Metadata.(type) {
-
+	switch v := m.Metadata.(type) {
 	case *Forager_Github:
+		if v == nil {
+			err := ForagerValidationError{
+				field:  "Metadata",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGithub()).(type) {
@@ -2747,6 +2881,16 @@ func (m *Forager) validate(all bool) error {
 		}
 
 	case *Forager_Npm:
+		if v == nil {
+			err := ForagerValidationError{
+				field:  "Metadata",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetNpm()).(type) {
@@ -2778,6 +2922,16 @@ func (m *Forager) validate(all bool) error {
 		}
 
 	case *Forager_Pypi:
+		if v == nil {
+			err := ForagerValidationError{
+				field:  "Metadata",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetPypi()).(type) {
@@ -2808,6 +2962,8 @@ func (m *Forager) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -3234,6 +3390,725 @@ var _ interface {
 	ErrorName() string
 } = AzureReposValidationError{}
 
+// Validate checks the field values on Postman with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Postman) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Postman with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in PostmanMultiError, or nil if none found.
+func (m *Postman) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Postman) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Link
+
+	// no validation rules for WorkspaceUuid
+
+	// no validation rules for WorkspaceName
+
+	// no validation rules for CollectionId
+
+	// no validation rules for CollectionName
+
+	// no validation rules for EnvironmentId
+
+	// no validation rules for EnvironmentName
+
+	// no validation rules for RequestId
+
+	// no validation rules for RequestName
+
+	// no validation rules for FolderId
+
+	// no validation rules for FolderName
+
+	// no validation rules for FieldType
+
+	// no validation rules for LocationType
+
+	if len(errors) > 0 {
+		return PostmanMultiError(errors)
+	}
+
+	return nil
+}
+
+// PostmanMultiError is an error wrapping multiple validation errors returned
+// by Postman.ValidateAll() if the designated constraints aren't met.
+type PostmanMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m PostmanMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m PostmanMultiError) AllErrors() []error { return m }
+
+// PostmanValidationError is the validation error returned by Postman.Validate
+// if the designated constraints aren't met.
+type PostmanValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e PostmanValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e PostmanValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e PostmanValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e PostmanValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e PostmanValidationError) ErrorName() string { return "PostmanValidationError" }
+
+// Error satisfies the builtin error interface
+func (e PostmanValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sPostman.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = PostmanValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = PostmanValidationError{}
+
+// Validate checks the field values on Vector with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Vector) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Vector with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in VectorMultiError, or nil if none found.
+func (m *Vector) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Vector) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetTimestamp()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, VectorValidationError{
+					field:  "Timestamp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, VectorValidationError{
+					field:  "Timestamp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTimestamp()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return VectorValidationError{
+				field:  "Timestamp",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for SourceType
+
+	// no validation rules for Host
+
+	if len(errors) > 0 {
+		return VectorMultiError(errors)
+	}
+
+	return nil
+}
+
+// VectorMultiError is an error wrapping multiple validation errors returned by
+// Vector.ValidateAll() if the designated constraints aren't met.
+type VectorMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m VectorMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m VectorMultiError) AllErrors() []error { return m }
+
+// VectorValidationError is the validation error returned by Vector.Validate if
+// the designated constraints aren't met.
+type VectorValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e VectorValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e VectorValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e VectorValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e VectorValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e VectorValidationError) ErrorName() string { return "VectorValidationError" }
+
+// Error satisfies the builtin error interface
+func (e VectorValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sVector.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = VectorValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = VectorValidationError{}
+
+// Validate checks the field values on Webhook with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Webhook) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Webhook with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in WebhookMultiError, or nil if none found.
+func (m *Webhook) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Webhook) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.Data.(type) {
+	case *Webhook_Vector:
+		if v == nil {
+			err := WebhookValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetVector()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, WebhookValidationError{
+						field:  "Vector",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, WebhookValidationError{
+						field:  "Vector",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetVector()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return WebhookValidationError{
+					field:  "Vector",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return WebhookMultiError(errors)
+	}
+
+	return nil
+}
+
+// WebhookMultiError is an error wrapping multiple validation errors returned
+// by Webhook.ValidateAll() if the designated constraints aren't met.
+type WebhookMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m WebhookMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m WebhookMultiError) AllErrors() []error { return m }
+
+// WebhookValidationError is the validation error returned by Webhook.Validate
+// if the designated constraints aren't met.
+type WebhookValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e WebhookValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e WebhookValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e WebhookValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e WebhookValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e WebhookValidationError) ErrorName() string { return "WebhookValidationError" }
+
+// Error satisfies the builtin error interface
+func (e WebhookValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sWebhook.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = WebhookValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = WebhookValidationError{}
+
+// Validate checks the field values on Elasticsearch with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Elasticsearch) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Elasticsearch with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ElasticsearchMultiError, or
+// nil if none found.
+func (m *Elasticsearch) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Elasticsearch) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Index
+
+	// no validation rules for DocumentId
+
+	// no validation rules for Timestamp
+
+	if len(errors) > 0 {
+		return ElasticsearchMultiError(errors)
+	}
+
+	return nil
+}
+
+// ElasticsearchMultiError is an error wrapping multiple validation errors
+// returned by Elasticsearch.ValidateAll() if the designated constraints
+// aren't met.
+type ElasticsearchMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ElasticsearchMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ElasticsearchMultiError) AllErrors() []error { return m }
+
+// ElasticsearchValidationError is the validation error returned by
+// Elasticsearch.Validate if the designated constraints aren't met.
+type ElasticsearchValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ElasticsearchValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ElasticsearchValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ElasticsearchValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ElasticsearchValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ElasticsearchValidationError) ErrorName() string { return "ElasticsearchValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ElasticsearchValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sElasticsearch.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ElasticsearchValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ElasticsearchValidationError{}
+
+// Validate checks the field values on Sentry with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Sentry) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Sentry with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in SentryMultiError, or nil if none found.
+func (m *Sentry) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Sentry) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for EventId
+
+	// no validation rules for OrganizationId
+
+	// no validation rules for OrganizationSlug
+
+	// no validation rules for OrganizationDateCreated
+
+	// no validation rules for ProjectId
+
+	// no validation rules for ProjectSlug
+
+	// no validation rules for IssueId
+
+	// no validation rules for DateCreated
+
+	// no validation rules for Link
+
+	if len(errors) > 0 {
+		return SentryMultiError(errors)
+	}
+
+	return nil
+}
+
+// SentryMultiError is an error wrapping multiple validation errors returned by
+// Sentry.ValidateAll() if the designated constraints aren't met.
+type SentryMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SentryMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SentryMultiError) AllErrors() []error { return m }
+
+// SentryValidationError is the validation error returned by Sentry.Validate if
+// the designated constraints aren't met.
+type SentryValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SentryValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SentryValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SentryValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SentryValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SentryValidationError) ErrorName() string { return "SentryValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SentryValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSentry.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SentryValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SentryValidationError{}
+
+// Validate checks the field values on Stdin with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Stdin) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Stdin with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in StdinMultiError, or nil if none found.
+func (m *Stdin) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Stdin) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return StdinMultiError(errors)
+	}
+
+	return nil
+}
+
+// StdinMultiError is an error wrapping multiple validation errors returned by
+// Stdin.ValidateAll() if the designated constraints aren't met.
+type StdinMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StdinMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StdinMultiError) AllErrors() []error { return m }
+
+// StdinValidationError is the validation error returned by Stdin.Validate if
+// the designated constraints aren't met.
+type StdinValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StdinValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StdinValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StdinValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StdinValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StdinValidationError) ErrorName() string { return "StdinValidationError" }
+
+// Error satisfies the builtin error interface
+func (e StdinValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStdin.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StdinValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StdinValidationError{}
+
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -3256,9 +4131,18 @@ func (m *MetaData) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Data.(type) {
-
+	switch v := m.Data.(type) {
 	case *MetaData_Azure:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAzure()).(type) {
@@ -3290,6 +4174,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Bitbucket:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBitbucket()).(type) {
@@ -3321,6 +4215,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Circleci:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetCircleci()).(type) {
@@ -3352,6 +4256,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Confluence:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetConfluence()).(type) {
@@ -3383,6 +4297,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Docker:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetDocker()).(type) {
@@ -3414,6 +4338,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Ecr:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetEcr()).(type) {
@@ -3445,6 +4379,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Gcs:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGcs()).(type) {
@@ -3476,6 +4420,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Github:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGithub()).(type) {
@@ -3507,6 +4461,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Gitlab:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGitlab()).(type) {
@@ -3538,6 +4502,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Jira:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetJira()).(type) {
@@ -3569,6 +4543,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Npm:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetNpm()).(type) {
@@ -3600,6 +4584,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Pypi:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetPypi()).(type) {
@@ -3631,6 +4625,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_S3:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetS3()).(type) {
@@ -3662,6 +4666,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Slack:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSlack()).(type) {
@@ -3693,6 +4707,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Filesystem:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetFilesystem()).(type) {
@@ -3724,6 +4748,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Git:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGit()).(type) {
@@ -3755,6 +4789,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Test:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTest()).(type) {
@@ -3786,6 +4830,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Buildkite:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetBuildkite()).(type) {
@@ -3817,6 +4871,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Gerrit:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGerrit()).(type) {
@@ -3848,6 +4912,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Jenkins:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetJenkins()).(type) {
@@ -3879,6 +4953,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Teams:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTeams()).(type) {
@@ -3910,6 +4994,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Artifactory:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetArtifactory()).(type) {
@@ -3941,6 +5035,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Syslog:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSyslog()).(type) {
@@ -3972,6 +5076,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Forager:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetForager()).(type) {
@@ -4003,6 +5117,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_Sharepoint:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSharepoint()).(type) {
@@ -4034,6 +5158,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_GoogleDrive:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetGoogleDrive()).(type) {
@@ -4065,6 +5199,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_AzureRepos:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetAzureRepos()).(type) {
@@ -4096,6 +5240,16 @@ func (m *MetaData) validate(all bool) error {
 		}
 
 	case *MetaData_TravisCI:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetTravisCI()).(type) {
@@ -4126,6 +5280,254 @@ func (m *MetaData) validate(all bool) error {
 			}
 		}
 
+	case *MetaData_Postman:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetPostman()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Postman",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Postman",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetPostman()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Postman",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Webhook:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetWebhook()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Webhook",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Webhook",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetWebhook()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Webhook",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Elasticsearch:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetElasticsearch()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Elasticsearch",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Elasticsearch",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetElasticsearch()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Elasticsearch",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Huggingface:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetHuggingface()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Huggingface",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Huggingface",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetHuggingface()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Huggingface",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Sentry:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetSentry()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Sentry",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Sentry",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSentry()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Sentry",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Stdin:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetStdin()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Stdin",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Stdin",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetStdin()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Stdin",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {

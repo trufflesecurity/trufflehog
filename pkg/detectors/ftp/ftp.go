@@ -3,13 +3,13 @@ package ftp
 import (
 	"context"
 	"errors"
-	regexp "github.com/wasilibs/go-re2"
 	"net/textproto"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/jlaffaye/ftp"
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -29,6 +29,7 @@ type Scanner struct {
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 var (
 	keyPat = regexp.MustCompile(`\bftp://[\S]{3,50}:([\S]{3,50})@[-.%\w\/:]+\b`)
@@ -95,14 +96,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 		}
 
-		if detectors.IsKnownFalsePositive(string(s1.Raw), []detectors.FalsePositive{"@ftp.freebsd.org"}, false) {
-			continue
-		}
-
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+var ftpFalsePositives = map[detectors.FalsePositive]struct{}{
+	detectors.FalsePositive("@ftp.freebsd.org"): {},
+}
+
+func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
+	return detectors.IsKnownFalsePositive(string(result.Raw), ftpFalsePositives, false)
 }
 
 func isErrDeterminate(e error) bool {
@@ -127,4 +132,8 @@ func verifyFTP(timeout time.Duration, u *url.URL) error {
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_FTP
+}
+
+func (s Scanner) Description() string {
+	return "FTP is a protocol for reading and writing files. An FTP password can be used to read and sometimes write files."
 }

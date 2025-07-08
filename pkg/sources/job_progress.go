@@ -94,11 +94,11 @@ type ChunkError struct {
 }
 
 func (f ChunkError) Error() string {
-	unit := "<nil>"
+	unit, kind := "<nil>", SourceUnitKind("unit")
 	if f.Unit != nil {
-		unit = f.Unit.SourceUnitID()
+		unit, kind = f.Unit.SourceUnitID()
 	}
-	return fmt.Sprintf("error chunking unit %q: %s", unit, f.Err.Error())
+	return fmt.Sprintf("error chunking %s %q: %s", kind, unit, f.Err.Error())
 }
 func (f ChunkError) Unwrap() error { return f.Err }
 
@@ -188,7 +188,8 @@ func (jp *JobProgress) executeHooks(todo func(hook JobProgressHook)) {
 		hooksExecTime.WithLabelValues().Observe(float64(elapsed))
 	}(time.Now())
 	for _, hook := range jp.hooks {
-		// TODO: Non-blocking?
+		// Execute hooks synchronously so they can provide
+		// back-pressure to the source.
 		todo(hook)
 	}
 }
@@ -306,13 +307,13 @@ func (jp *JobProgress) Ref() JobProgressRef {
 	}
 }
 
-// EnumerationErrors joins all errors encountered during initialization or
+// EnumerationError joins all errors encountered during initialization or
 // enumeration.
 func (m JobProgressMetrics) EnumerationError() error {
 	return errors.Join(m.Errors...)
 }
 
-// ChunkErrors joins all errors encountered during chunking.
+// ChunkError joins all errors encountered during chunking.
 func (m JobProgressMetrics) ChunkError() error {
 	var aggregate []error
 	for _, err := range m.Errors {
@@ -354,6 +355,10 @@ func (m JobProgressMetrics) PercentComplete() int {
 		// Fallback to the source's self-reported percent complete if
 		// the unit information isn't available.
 		return int(m.SourcePercent)
+	} else if den == 0 {
+		// This should never happen. Return an invalid value so we can
+		// trace it back to here if we ever see it.
+		return -1
 	}
 	return int(num * 100 / den)
 }

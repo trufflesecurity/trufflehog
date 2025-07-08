@@ -3,26 +3,30 @@ package apiflash
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apiflash"}) + `\b([a-z0-9]{32})\b`)
-	urlPat = regexp.MustCompile(detectors.PrefixRegex([]string{"apiflash"}) + `\b([a-zA-Z0-9\S]{21,30})\b`)
+
+	urlToCapture = "http://google.com" // a fix constant url to capture to verify the access key
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -34,48 +38,25 @@ func (s Scanner) Keywords() []string {
 // FromData will find and optionally verify Apiflash secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	urlMatches := urlPat.FindAllStringSubmatch(dataStr, -1)
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
+	uniqueAPIKeys := make(map[string]struct{})
+	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueAPIKeys[strings.TrimSpace(match[1])] = struct{}{}
+	}
+
+	for key := range uniqueAPIKeys {
+		s1 := detectors.Result{
+			DetectorType: detectorspb.DetectorType_Apiflash,
+			Raw:          []byte(key),
 		}
-		resMatch := strings.TrimSpace(match[1])
 
-		for _, urlMatch := range urlMatches {
-			if len(urlMatch) != 2 {
-				continue
-			}
-
-			resUrlMatch := strings.TrimSpace(urlMatch[1])
-			s1 := detectors.Result{
-				DetectorType: detectorspb.DetectorType_Apiflash,
-				Raw:          []byte(resMatch),
-				RawV2:        []byte(resMatch + resUrlMatch),
-			}
-
-			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.apiflash.com/v1/urltoimage?url=%s&access_key=%s", resUrlMatch, resMatch), nil)
-				if err != nil {
-					continue
-				}
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					} else {
-						// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-						if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-							continue
-						}
-					}
-				}
-			}
-
-			results = append(results, s1)
+		if verify {
+			isVerified, verificationErr := verifyAPIFlash(ctx, client, key)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, key)
 		}
+
+		results = append(results, s1)
 	}
 
 	return results, nil
@@ -83,4 +64,33 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Apiflash
+}
+
+func (s Scanner) Description() string {
+	return "Apiflash is a screenshot API service. Apiflash keys can be used to access and utilize the screenshot API service."
+}
+
+func verifyAPIFlash(ctx context.Context, client *http.Client, accessKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.apiflash.com/v1/urltoimage?url=%s&access_key=%s&wait_until=page_loaded", urlToCapture, accessKey), http.NoBody)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, nil
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }

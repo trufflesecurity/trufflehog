@@ -1,0 +1,38 @@
+[
+    {
+        "name": "configuration_access",
+        "test": {
+            "endpoint": "https://api.opsgenie.com/v2/account",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "read",
+        "test": {
+            "endpoint": "https://api.opsgenie.com/v2/alerts",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "delete",
+        "test": {
+            "endpoint": "https://api.opsgenie.com/v2/alerts/`nowaythiscanexist",
+            "method": "DELETE",
+            "valid_status_code": [202],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "create_and_update",
+        "test": {
+            "endpoint": "https://api.opsgenie.com/v2/alerts/`nowaycanthisexist/message",
+            "method": "PUT",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    }
+]

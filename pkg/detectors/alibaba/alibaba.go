@@ -22,6 +22,7 @@ import (
 )
 
 type Scanner struct {
+	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
 }
 
@@ -50,6 +51,10 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"LTAI"}
+}
+
+func (s Scanner) Description() string {
+	return "Alibaba Cloud is a cloud computing service that provides a suite of cloud computing services including data storage, relational databases, big-data processing, and content delivery networks (CDNs). Alibaba Cloud API keys can be used to access and manage these services."
 }
 
 func randString(n int) string {
@@ -91,15 +96,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 
 			resIdMatch := strings.TrimSpace(idMatch[1])
 
@@ -116,10 +115,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.SetVerificationError(verificationErr, resMatch)
 			}
 
-			// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-			if !s1.Verified && detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-				continue
-			}
 			results = append(results, s1)
 		}
 	}

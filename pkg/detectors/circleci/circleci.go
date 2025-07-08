@@ -2,8 +2,9 @@ package circleci
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
@@ -36,7 +37,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 		token := match[1]
 
-		s := detectors.Result{
+		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Circle,
 			Raw:          []byte(token),
 		}
@@ -55,17 +56,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				defer res.Body.Close()
 			}
 			if res != nil && res.StatusCode >= 200 && res.StatusCode < 300 {
-				s.Verified = true
+				result.Verified = true
 			}
 		}
 
-		if !s.Verified {
-			if detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
-		}
-
-		results = append(results, s)
+		results = append(results, result)
 	}
 
 	return
@@ -73,4 +68,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Circle
+}
+
+func (s Scanner) Description() string {
+	return "CircleCI is a continuous integration and delivery platform used to build, test, and deploy software. CircleCI tokens can be used to interact with the CircleCI API and access various resources and functionalities."
 }

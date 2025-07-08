@@ -1,161 +1,110 @@
-//go:build detectors
-// +build detectors
-
 package snowflake
 
 import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestSnowflake_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
+func TestSnowflake_Pattern(t *testing.T) {
 
-	secret := testSecrets.MustGetField("SNOWFLAKE_PASS")
-	inactiveSecret := testSecrets.MustGetField("SNOWFLAKE_PASS_INACTIVE")
+	validAccount := "tuacoip-zt74995"
+	validPrivateLinkAccount := "tuacoip-zt74995.privatelink"
+	validSingleCharacterAccount := "tuacoip-z"
+	validUsername := gofakeit.Username()
+	invalidUsername := "Spencer@5091.com" // special characters not allowed
 
-	// Create a context with a past deadline to simulate DeadlineExceeded error
-	pastTime := time.Now().Add(-time.Second) // Set the deadline in the past
-	errorCtx, cancel := context.WithDeadline(context.Background(), pastTime)
-	defer cancel()
+	validPassword := common.GenerateRandomPassword(true, true, true, false, 10)
+	invalidPassword := "!12" // invalid length
 
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name  string
+		input string
+		want  [][]string
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("snowflake: \n account=tuacoip-zt74995 \n username=zubairkhan14 \n password=%s \n database=SNOWFLAKE", secret)),
-				verify: true,
+			name:  "Snowflake Credentials",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, validUsername, validPassword),
+			want: [][]string{
+				{validAccount, validUsername, validPassword},
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Snowflake,
-					Verified:     true,
-					ExtraData: map[string]string{
-						"account":   "tuacoip-zt74995",
-						"databases": "SNOWFLAKE, SNOWFLAKE_SAMPLE_DATA",
-						"username":  "zubairkhan14",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("snowflake: \n account=tuacoip-zt74995 \n username=zubairkhan14 \n password=%s \n database=SNOWFLAKE", inactiveSecret)),
-				verify: true,
+			name:  "Private Snowflake Credentials",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validPrivateLinkAccount, validUsername, validPassword),
+			want: [][]string{
+				{validPrivateLinkAccount, validUsername, validPassword},
 			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Snowflake,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"account":  "tuacoip-zt74995",
-						"username": "zubairkhan14",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
+			name:  "Snowflake Credentials - Single Character account",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validSingleCharacterAccount, validUsername, validPassword),
+			want: [][]string{
+				{validSingleCharacterAccount, validUsername, validPassword},
 			},
-			want:                nil,
-			wantErr:             false,
-			wantVerificationErr: false,
 		},
 		{
-			name: "found, indeterminate error (timeout)",
-			s:    Scanner{},
-			args: args{
-				ctx:    errorCtx,
-				data:   []byte(fmt.Sprintf("snowflake: \n account=tuacoip-zt74995 \n username=zubairkhan14 \n password=%s \n database=SNOWFLAKE", secret)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Snowflake,
-					ExtraData: map[string]string{
-						"account":  "tuacoip-zt74995",
-						"username": "zubairkhan14",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
+			name:  "Snowflake Credentials - Invalid Username & Password",
+			input: fmt.Sprintf("snowflake: \n account=%s \n username=%s \n password=%s \n database=SNOWFLAKE", validAccount, invalidUsername, invalidPassword),
+			want:  [][]string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Snowflake.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			detectorMatches := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(detectorMatches) == 0 {
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
-				}
-			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Snowflake.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			resultsArray := make([][]string, len(results))
+			for i, r := range results {
+				resultsArray[i] = []string{r.ExtraData["account"], r.ExtraData["username"], string(r.Raw)}
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+				actual[r.ExtraData["account"]] = struct{}{}
+				actual[r.ExtraData["username"]] = struct{}{}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				for _, value := range v {
+					expected[value] = struct{}{}
+				}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

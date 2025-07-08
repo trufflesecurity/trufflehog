@@ -3,9 +3,11 @@ package appsynergy
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -37,9 +39,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -48,23 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			payload := strings.NewReader(`{"html":"<html><body><h1>Hello World</h1></body></html>","filename":"HelloWorld.pdf"}`)
-			req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://www.appsynergy.com/api?action=HTML2PDF&apiKey=%s", resMatch), payload)
-			if err != nil {
-				continue
-			}
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
-			}
+			isVerified, err := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err, resMatch)
 		}
 
 		results = append(results, s1)
@@ -73,6 +58,45 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func verifyMatch(ctx context.Context, client *http.Client, secret string) (bool, error) {
+	payload := strings.NewReader(`{"html":"<html><body><h1>Hello World</h1></body></html>","filename":"HelloWorld.pdf"}`)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://www.appsynergy.com/api?action=HTML2PDF&apiKey="+secret, payload)
+	if err != nil {
+		return false, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	case http.StatusBadRequest:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		body := string(bodyBytes)
+		if strings.Contains(body, "Invalid API Key") {
+			return false, nil
+		}
+		return false, fmt.Errorf("status bad request invalid api key message not found: %d", res.StatusCode)
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+}
+
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AppSynergy
+}
+
+func (s Scanner) Description() string {
+	return "AppSynergy is a platform for building cloud applications. AppSynergy API keys can be used to access and manage applications and data within the platform."
 }

@@ -2,10 +2,12 @@ package appointedd
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -37,9 +39,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -47,28 +46,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			Raw:          []byte(resMatch),
 		}
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.appointedd.com/v1/availability/slots", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("X-API-KEY", resMatch)
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				bodyBytes, err := io.ReadAll(res.Body)
-				if err != nil {
-					continue
-				}
-				body := string(bodyBytes)
-
-				if strings.Contains(body, "total") {
-					s1.Verified = true
-				} else {
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
-			}
+			isVerified, err := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err, resMatch)
 		}
 
 		results = append(results, s1)
@@ -77,6 +57,39 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func verifyMatch(ctx context.Context, client *http.Client, secret string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.appointedd.com/v1/availability/slots", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("X-API-KEY", secret)
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, err
+		}
+		return strings.Contains(string(bodyBytes), "total"), nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+}
+
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Appointedd
+}
+
+func (s Scanner) Description() string {
+	return "Appointedd provides online booking and scheduling services. The API key can be used to access and manage booking data."
 }

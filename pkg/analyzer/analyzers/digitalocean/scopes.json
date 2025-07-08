@@ -1,0 +1,884 @@
+[
+    {
+        "name": "one_click:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/1-clicks",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "one_click:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/1-clicks/kubernetes",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "action:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/actions",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "app:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/apps",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "app:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/apps",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "app:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/apps/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "app:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/apps/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "billing:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/customers/my/balance",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "block_storage:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/volumes",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "block_storage:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/volumes",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "block_storage:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/volumes/0000",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "cdn_endpoint:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/cdn/endpoints",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "cdn_endpoint:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/cdn/endpoints",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "cdn_endpoint:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/cdn/endpoints/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "cdn_endpoint:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/cdn/endpoints/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "certificate:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/certificates",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "certificate:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/certificates",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "certificate:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/certificates/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "container_registry:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/registry",
+            "method": "GET",
+            "valid_status_code": [200, 404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "container_registry:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/registry",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "database:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/databases",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "database:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/databases",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "database:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/databases/`nowaythisidcanexist/config",
+            "method": "PATCH",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "database:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/databases/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "domain_record:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/domains/`nowaythisdomaincanexist.com/records",
+            "method": "GET",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "domain_record:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/domains/`nowaythisdomaincanexist.com/records",
+            "method": "POST",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "domain_record:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/domains/`nowaythisdomaincanexist.com/records/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "domain_record:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/domains/`nowaythisdomaincanexist.com/records/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "domain:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/domains",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "domain:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/domains",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "domain:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/domains/`nowaythisdomaincanexist.com",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "droplet:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/droplets",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "droplet:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/droplets",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "droplet:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/droplets/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "droplet_autoscale_pool:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/droplets/autoscale",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "droplet_autoscale_pool:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/droplets/autoscale",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "droplet_autoscale_pool:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/droplets/autoscale/0d3db13e-a604-4944-9827-7ec2642d32ac",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "droplet_autoscale_pool:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/droplets/autoscale/0d3db13e-a604-4944-9827-7ec2642d32ac",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "firewall:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/firewalls",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "firewall:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/firewalls",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "firewall:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/firewalls/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "firewall:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/firewalls/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "floating_ip:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/floating_ips",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "floating_ip:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/floating_ips",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "floating_ip:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/floating_ips/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "namespace:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/functions/namespaces",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "namespace:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/functions/namespaces",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "namespace:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/functions/namespaces/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "genai_agent:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/gen-ai/agents",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "genai_agent:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/gen-ai/agents",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "genai_agent:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/gen-ai/agents/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "genai_agent:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/gen-ai/agents/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [400],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "image:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/images",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "image:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/images",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "image:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/images/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "image:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/images/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "kubernetes:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/kubernetes/clusters",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "kubernetes:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/kubernetes/clusters",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "kubernetes:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/kubernetes/clusters/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "kubernetes:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/kubernetes/clusters/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "load_balancer:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/load_balancers",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "load_balancer:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/load_balancers",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "load_balancer:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/load_balancers/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "load_balancer:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/load_balancers/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "monitoring:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/monitoring/alerts",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "monitoring:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/monitoring/alerts",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "monitoring:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/monitoring/alerts/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "monitoring:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/monitoring/alerts/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "project:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/projects",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "project:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/projects",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "project:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/projects/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "project:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/projects/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "region:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/regions",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "reserved_ip:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/reserved_ips",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "reserved_ip:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/reserved_ips",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "reserved_ip:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/reserved_ips/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "size:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/sizes",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "snapshot:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/snapshots",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "snapshot:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/snapshots/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "ssh_key:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/account/keys",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "ssh_key:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/account/keys",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "ssh_key:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/account/keys/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "ssh_key:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/account/keys/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "tag:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/tags",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "tag:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/tags",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "tag:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/tags/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "uptime:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/uptime/checks",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "uptime:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/uptime/checks",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "uptime:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/uptime/checks/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "uptime:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/uptime/checks/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "vpc_peering:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/vpc_peerings",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "vpc_peering:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/vpc_peerings",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "vpc_peering:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/vpc_peerings/5a4981aa-9653-4bd1-bef5-d6bff52042e4",
+            "method": "PATCH",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "vpc_peering:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/vpc_peerings/5a4981aa-9653-4bd1-bef5-d6bff52042e4",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "vpc:read",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/vpcs",
+            "method": "GET",
+            "valid_status_code": [200],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "vpc:create",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/vpcs",
+            "method": "POST",
+            "valid_status_code": [422],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "vpc:update",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/vpcs/`nowaythisidcanexist",
+            "method": "PUT",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    },
+    {
+        "name": "vpc:delete",
+        "test": {
+            "endpoint": "https://api.digitalocean.com/v2/vpcs/`nowaythisidcanexist",
+            "method": "DELETE",
+            "valid_status_code": [404],
+            "invalid_status_code": [403]
+        }
+    }
+]

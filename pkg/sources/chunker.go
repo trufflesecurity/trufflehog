@@ -2,8 +2,8 @@ package sources
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -17,37 +17,6 @@ const (
 	// TotalChunkSize is the total size of a chunk with peek data.
 	TotalChunkSize = ChunkSize + PeekSize
 )
-
-// Chunker takes a chunk and splits it into chunks of ChunkSize.
-func Chunker(originalChunk *Chunk) chan *Chunk {
-	chunkChan := make(chan *Chunk, 1)
-	go func() {
-		defer close(chunkChan)
-		if len(originalChunk.Data) <= TotalChunkSize {
-			chunkChan <- originalChunk
-			return
-		}
-
-		r := bytes.NewReader(originalChunk.Data)
-		reader := bufio.NewReaderSize(bufio.NewReader(r), ChunkSize)
-		for {
-			chunkBytes := make([]byte, TotalChunkSize)
-			chunk := *originalChunk
-			chunkBytes = chunkBytes[:ChunkSize]
-			n, err := io.ReadFull(reader, chunkBytes)
-			if n > 0 {
-				peekData, _ := reader.Peek(TotalChunkSize - n)
-				chunkBytes = append(chunkBytes[:n], peekData...)
-				chunk.Data = chunkBytes
-				chunkChan <- &chunk
-			}
-			if err != nil {
-				break
-			}
-		}
-	}()
-	return chunkChan
-}
 
 type chunkReaderConfig struct {
 	chunkSize int
@@ -124,12 +93,28 @@ func createReaderFn(config *chunkReaderConfig) ChunkReader {
 }
 
 func readInChunks(ctx context.Context, reader io.Reader, config *chunkReaderConfig) <-chan ChunkResult {
-	const channelSize = 1
+	const channelSize = 64
 	chunkReader := bufio.NewReaderSize(reader, config.chunkSize)
 	chunkResultChan := make(chan ChunkResult, channelSize)
 
 	go func() {
 		defer close(chunkResultChan)
+
+		// Defer a panic recovery to handle any panics that occur while reading, which can sometimes unavoidably happen
+		// due to third-party library bugs.
+		defer func() {
+			if r := recover(); r != nil {
+				var panicErr error
+				if e, ok := r.(error); ok {
+					panicErr = e
+				} else {
+					panicErr = fmt.Errorf("panic occurred: %v", r)
+				}
+				chunkResultChan <- ChunkResult{
+					err: fmt.Errorf("panic error: %w", panicErr),
+				}
+			}
+		}()
 
 		for {
 			chunkRes := ChunkResult{}

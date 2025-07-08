@@ -1,0 +1,3 @@
+permissions:
+- user:read
+- site_admin:full

@@ -3,12 +3,11 @@ package detectors
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"math/big"
 	"net/url"
 	"strings"
 	"unicode"
-
-	"errors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
@@ -25,6 +24,24 @@ type Detector interface {
 	Keywords() []string
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
+	// Description returns a description for the result being detected
+	Description() string
+}
+
+// CustomResultsCleaner is an optional interface that a detector can implement to customize how its generated results
+// are "cleaned," which is defined as removing superfluous results from those found in a given chunk. The default
+// implementation of this logic removes all unverified results if there are any verified results, and all unverified
+// results except for one otherwise, but this interface allows a detector to specify different logic. (This logic must
+// be implemented outside results generation because there are circumstances under which the engine should not execute
+// it.)
+type CustomResultsCleaner interface {
+	// CleanResults removes "superfluous" results from a result set (where the definition of "superfluous" is detector-
+	// specific).
+	CleanResults(results []Result) []Result
+	// ShouldCleanResultsIrrespectiveOfConfiguration allows a custom cleaner to instruct the engine to ignore
+	// user-provided configuration that controls whether results are cleaned. (User-provided configuration is not the
+	// only factor that determines whether the engine runs cleaning logic.)
+	ShouldCleanResultsIrrespectiveOfConfiguration() bool
 }
 
 // Versioner is an optional interface that a detector can implement to
@@ -33,11 +50,38 @@ type Versioner interface {
 	Version() int
 }
 
+// MaxSecretSizeProvider is an optional interface that a detector can implement to
+// provide a custom max size for the secret it finds.
+type MaxSecretSizeProvider interface {
+	MaxSecretSize() int64
+}
+
+// StartOffsetProvider is an optional interface that a detector can implement to
+// provide a custom start offset for the secret it finds.
+type StartOffsetProvider interface {
+	StartOffset() int64
+}
+
+// MultiPartCredentialProvider is an optional interface that a detector can implement
+// to indicate its compatibility with multi-part credentials and provide the maximum
+// secret size for the credential it finds.
+type MultiPartCredentialProvider interface {
+	// MaxCredentialSpan returns the maximum span or range of characters that the
+	// detector should consider when searching for a multi-part credential.
+	MaxCredentialSpan() int64
+}
+
 // EndpointCustomizer is an optional interface that a detector can implement to
 // support verifying against user-supplied endpoints.
 type EndpointCustomizer interface {
-	SetEndpoints(...string) error
-	DefaultEndpoint() string
+	SetConfiguredEndpoints(...string) error
+	SetCloudEndpoint(string)
+	UseCloudEndpoint(bool)
+	UseFoundEndpoints(bool)
+}
+
+type CloudProvider interface {
+	CloudEndpoint() string
 }
 
 type Result struct {
@@ -45,9 +89,10 @@ type Result struct {
 	DetectorType detectorspb.DetectorType
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
-	// DecoderType is the type of Decoder.
-	DecoderType detectorspb.DecoderType
-	Verified    bool
+	Verified     bool
+	// VerificationFromCache indicates whether this result's verification result came from the verification cache rather
+	// than an actual remote request.
+	VerificationFromCache bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -62,9 +107,30 @@ type Result struct {
 	// This field should only be populated if the verification process itself failed in a way that provides no
 	// information about the verification status of the candidate secret, such as if the verification request timed out.
 	verificationError error
+
+	// AnalysisInfo should be set with information required for credential
+	// analysis to run. The keys of the map are analyzer specific and
+	// should match what is expected in the corresponding analyzer.
+	AnalysisInfo map[string]string
+
+	// primarySecret is used when a detector has multiple secret patterns.
+	// This secret is designated to determine the line number.
+	// If set, the line number will correspond to this secret.
+	primarySecret struct {
+		Value string
+		Line  int64
+	}
 }
 
-// SetVerificationError is the only way to set a verification error. Any sensetive values should be passed-in as secrets to be redacted.
+// CopyVerificationInfo clones verification info (status and error) from another Result struct. This is used when
+// loading verification info from a verification cache. (A method is necessary because verification errors are not
+// exported, to prevent the accidental storage of sensitive information in them.)
+func (r *Result) CopyVerificationInfo(from *Result) {
+	r.Verified = from.Verified
+	r.verificationError = from.verificationError
+}
+
+// SetVerificationError is the only way to set a new verification error. Any sensitive values should be passed-in as secrets to be redacted.
 func (r *Result) SetVerificationError(err error, secrets ...string) {
 	if err != nil {
 		r.verificationError = redactSecrets(err, secrets...)
@@ -74,6 +140,26 @@ func (r *Result) SetVerificationError(err error, secrets ...string) {
 // Public accessors for the fields could also be provided if needed.
 func (r *Result) VerificationError() error {
 	return r.verificationError
+}
+
+// SetPrimarySecretValue set the value passed as primary secret in the result
+func (r *Result) SetPrimarySecretValue(value string) {
+	if value != "" {
+		r.primarySecret.Value = value
+	}
+}
+
+// SetPrimarySecretLine set the passed line number as primary secret line number
+func (r *Result) SetPrimarySecretLine(line int64) {
+	// line number is only set if value is set for primary secret
+	if r.primarySecret.Value != "" {
+		r.primarySecret.Line = line
+	}
+}
+
+// GetPrimarySecretValue return primary secret match value
+func (r *Result) GetPrimarySecretValue() string {
+	return r.primarySecret.Value
 }
 
 // redactSecrets replaces all instances of the given secrets with [REDACTED] in the error message.
@@ -101,10 +187,17 @@ func unwrapToLast(err error) error {
 }
 
 type ResultWithMetadata struct {
+	// IsWordlistFalsePositive indicates whether this secret was flagged as a false positive based on a wordlist check
+	IsWordlistFalsePositive bool
 	// SourceMetadata contains source-specific contextual information.
 	SourceMetadata *source_metadatapb.MetaData
 	// SourceID is the ID of the source that the API uses to map secrets to specific sources.
 	SourceID sources.SourceID
+	// JobID is the ID of the job that the API uses to map secrets to specific jobs.
+	JobID sources.JobID
+	// SecretID is the ID of the secret, if it exists.
+	// Only secrets that are being reverified will have a SecretID.
+	SecretID int64
 	// SourceType is the type of Source.
 	SourceType sourcespb.SourceType
 	// SourceName is the name of the Source.
@@ -112,6 +205,10 @@ type ResultWithMetadata struct {
 	Result
 	// Data from the sources.Chunk which this result was emitted for
 	Data []byte
+	// DetectorDescription is the description of the Detector.
+	DetectorDescription string
+	// DecoderType is the type of decoder that was used to generate this result's data.
+	DecoderType detectorspb.DecoderType
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
@@ -119,6 +216,8 @@ func CopyMetadata(chunk *sources.Chunk, result Result) ResultWithMetadata {
 	return ResultWithMetadata{
 		SourceMetadata: chunk.SourceMetadata,
 		SourceID:       chunk.SourceID,
+		JobID:          chunk.JobID,
+		SecretID:       chunk.SecretID,
 		SourceType:     chunk.SourceType,
 		SourceName:     chunk.SourceName,
 		Result:         result,
@@ -154,12 +253,12 @@ func CleanResults(results []Result) []Result {
 }
 
 // PrefixRegex ensures that at least one of the given keywords is within
-// 20 characters of the capturing group that follows.
+// 40 characters of the capturing group that follows.
 // This can help prevent false positives.
 func PrefixRegex(keywords []string) string {
-	pre := `(?i)(?:`
+	pre := `(?i:`
 	middle := strings.Join(keywords, "|")
-	post := `)(?:.|[\n\r]){0,40}`
+	post := `)(?:.|[\n\r]){0,40}?`
 	return pre + middle + post
 }
 
@@ -206,4 +305,14 @@ func MustGetBenchmarkData() map[string][]byte {
 func RedactURL(u url.URL) string {
 	u.User = url.UserPassword(u.User.Username(), "********")
 	return strings.TrimSpace(strings.Replace(u.String(), "%2A", "*", -1))
+}
+
+func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
+	parsedURL, err := url.Parse(u)
+	if err != nil {
+		return nil, err
+	}
+	parsedURL.Path = ""
+	parsedURL.RawQuery = ""
+	return parsedURL, nil
 }

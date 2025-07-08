@@ -2,10 +2,13 @@ package ayrshare
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
+	"io"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -21,7 +24,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ayrshare"}) + `\b([A-Z]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"ayrshare"}) + `\b([A-Z0-9]{8}-[A-Z0-9]{8}-[A-Z0-9]{8}-[A-Z0-9]{8})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -37,9 +40,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -48,23 +48,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.ayrshare.com/api/analytics/links", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				} else {
-					// This function will check false positives for common test words, but also it will make sure the key appears 'random' enough to be a real key.
-					if detectors.IsKnownFalsePositive(resMatch, detectors.DefaultFalsePositives, true) {
-						continue
-					}
-				}
-			}
+			isVerified, extraData, err := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.ExtraData = extraData
+			s1.SetVerificationError(err, resMatch)
 		}
 
 		results = append(results, s1)
@@ -73,6 +60,55 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func verifyMatch(ctx context.Context, client *http.Client, key string) (bool, map[string]string, error) {
+	// Reference: https://www.ayrshare.com/docs/apis/user/profile-details
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://app.ayrshare.com/api/user", http.NoBody)
+	if err != nil {
+		return false, nil, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", key))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, nil, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, nil, err
+		}
+		var responseBody map[string]any
+		if err := json.Unmarshal(bodyBytes, &responseBody); err == nil {
+			if email, ok := responseBody["email"].(string); ok {
+				return true, map[string]string{"email": email}, nil
+			}
+		}
+		return true, nil, nil
+	case http.StatusUnauthorized:
+		return false, nil, nil
+	case http.StatusForbidden:
+		// Invalid Bearer tokens get a 403 Forbidden response despite what is stated in the docs.
+		// Documentation: https://www.ayrshare.com/docs/errors/errors-http
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return false, nil, err
+		}
+		if strings.Contains(string(bodyBytes), "API Key not valid") {
+			return false, nil, nil
+		}
+	}
+	return false, nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+}
+
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Ayrshare
+}
+
+func (s Scanner) Description() string {
+	return "Ayrshare provides social media management services. Ayrshare API keys can be used to manage social media accounts and posts."
 }

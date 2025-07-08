@@ -10,7 +10,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{}
+type Scanner struct{
+	detectors.DefaultMultiPartCredentialProvider
+}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -40,7 +42,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		tokens := tokenPat.FindAllString(dataStr, -1)
 
 		for _, token := range tokens {
-			s := detectors.Result{
+			result := detectors.Result{
 				DetectorType: detectorspb.DetectorType_RechargePayments,
 				Raw:          []byte(token),
 			}
@@ -57,16 +59,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					res.Body.Close() // The request body is unused.
 
 					if res.StatusCode == http.StatusOK {
-						s.Verified = true
+						result.Verified = true
 					}
 				}
 			}
 
-			if !s.Verified && detectors.IsKnownFalsePositive(string(s.Raw), detectors.DefaultFalsePositives, true) {
-				continue
-			}
-
-			results = append(results, s)
+			results = append(results, result)
 		}
 	}
 
@@ -75,4 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RechargePayments
+}
+
+func (s Scanner) Description() string {
+	return "Recharge is a subscription payment solution. Recharge API keys can be used to access and manage subscription data and transactions."
 }
