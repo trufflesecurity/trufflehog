@@ -20,12 +20,15 @@ import (
 func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("SALESFORCEREFRESHTOKEN")
-	inactiveSecret := testSecrets.MustGetField("SALESFORCEREFRESHTOKEN_INACTIVE")
+	refreshToken := testSecrets.MustGetField("SALESFORCE_REFRESH_TOKEN")
+	consumerKey := testSecrets.MustGetField("SALESFORCE_REFRESH_TOKEN_KEY")
+	consumerSecret := testSecrets.MustGetField("SALESFORCE_REFRESH_TOKEN_SECRET")
+	inactiveSecret := testSecrets.MustGetField("SALESFORCE_REFRESH_TOKEN_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context
@@ -41,11 +44,11 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 		wantVerificationErr bool
 	}{
 		{
-			name: "found, verified",
+			name: "found one valid trio, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a salesforcerefreshtoken secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("refresh_token: %s, key: %s, secret: %s", refreshToken, consumerKey, consumerSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -58,11 +61,11 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 			wantVerificationErr: false,
 		},
 		{
-			name: "found, unverified",
+			name: "found one invalid trio, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a salesforcerefreshtoken secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("refresh_token: %s, key: %s, secret: %s", refreshToken, consumerKey, inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -72,14 +75,38 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 				},
 			},
 			wantErr:             false,
+			wantVerificationErr: true, // Verification fails because the credentials are invalid and we can't verify the refresh token.
+		},
+		{
+			name: "multiple findings, one verified",
+			s:    Scanner{},
+			args: args{
+				ctx: context.Background(),
+				data: []byte(fmt.Sprintf(`
+				refresh_token: %s, key: %s, valid_secret: %s, 
+				invalid_refresh_token: 5Aep861eN26Sp9j0R5QPjh0AAAABBBBCCCCjcNqfo5kVBplkpP5tzyWXyVGAivx26AAAABBBBjYE133BBBBAAAA`,
+					refreshToken, consumerKey, consumerSecret)),
+				verify: true,
+			},
+			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_SalesforceRefreshToken,
+					Verified:     true, // The valid refresh token combination
+				},
+				{
+					DetectorType: detectorspb.DetectorType_SalesforceRefreshToken,
+					Verified:     false, // The invalid refresh token combination
+				},
+			},
+			wantErr:             false,
 			wantVerificationErr: false,
 		},
 		{
-			name: "not found",
+			name: "not found (missing a component)",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
+				data:   []byte(fmt.Sprintf("key: %s, secret: %s", consumerKey, consumerSecret)), // No refresh token
 				verify: true,
 			},
 			want:                nil,
@@ -91,7 +118,7 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a salesforcerefreshtoken secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("refresh_token: %s, key: %s, secret: %s", refreshToken, consumerKey, consumerSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -104,11 +131,11 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 			wantVerificationErr: true,
 		},
 		{
-			name: "found, verified but unexpected api surface",
+			name: "found, unexpected api response",
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a salesforcerefreshtoken secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("refresh_token: %s, key: %s, secret: %s", refreshToken, consumerKey, consumerSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -125,20 +152,30 @@ func TestSalesforcerefreshtoken_FromChunk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Salesforcerefreshtoken.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
+
+			// Since the order of results can vary with maps, we use a more robust comparison.
+			// This checks that for every `want` result, there is a matching `got` result.
+			opts := []cmp.Option{
+				cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "ExtraData", "VerificationFromCache", "primarySecret"),
+				cmpopts.SortSlices(func(a, b detectors.Result) bool { return a.Verified }),
+			}
+			if diff := cmp.Diff(tt.want, got, opts...); diff != "" {
+				t.Errorf("FromData() results mismatch (-want +got):\n%s", diff)
+			}
+
+			// Also check that verification errors match expectations across all results.
+			var gotErr bool
+			for _, r := range got {
+				if r.VerificationError() != nil {
+					gotErr = true
+					break
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Salesforcerefreshtoken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			if gotErr != tt.wantVerificationErr {
+				t.Errorf("wantVerificationErr = %v, but got an error state of %v", tt.wantVerificationErr, gotErr)
 			}
 		})
 	}
