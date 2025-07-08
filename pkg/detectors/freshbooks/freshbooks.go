@@ -3,17 +3,17 @@ package freshbooks
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -21,10 +21,10 @@ type Scanner struct{
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
-
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"freshbooks"}) + `\b([0-9a-z]{64})\b`)
+	// TODO: this domain pattern is too restrictive
 	uriPat = regexp.MustCompile(detectors.PrefixRegex([]string{"freshbooks"}) + `\b(https://www.[0-9A-Za-z_-]{1,}.com)\b`)
 )
 
@@ -42,14 +42,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	uriMatches := uriPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, uriMatch := range uriMatches {
-			if len(uriMatch) != 2 {
-				continue
-			}
 			resURI := strings.TrimSpace(uriMatch[1])
 
 			s1 := detectors.Result{
@@ -85,4 +79,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Freshbooks
+}
+
+func (s Scanner) Description() string {
+	return "FreshBooks is an accounting software package developed and marketed by 2ndSite Inc. FreshBooks API keys can be used to access and modify accounting data and perform other operations."
 }

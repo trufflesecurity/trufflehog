@@ -6,6 +6,8 @@ import "github.com/charmbracelet/bubbles/key"
 type KeyMap struct {
 	Quit      key.Binding
 	CmdQuit   key.Binding
+	Left      key.Binding
+	Right     key.Binding
 	Up        key.Binding
 	Down      key.Binding
 	UpDown    key.Binding
@@ -81,6 +83,28 @@ func DefaultKeyMap() *KeyMap {
 		key.WithHelp(
 			"↑↓",
 			"navigate",
+		),
+	)
+
+	km.Left = key.NewBinding(
+		key.WithKeys(
+			"left",
+			"h",
+		),
+		key.WithHelp(
+			"←/h",
+			"left",
+		),
+	)
+
+	km.Right = key.NewBinding(
+		key.WithKeys(
+			"right",
+			"l",
+		),
+		key.WithHelp(
+			"→/l",
+			"right",
 		),
 	)
 

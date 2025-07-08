@@ -39,9 +39,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -77,4 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Moderation
+}
+
+func (s Scanner) Description() string {
+	return "Moderation API keys are used to access the Moderation API, which provides services for analyzing and moderating content."
 }

@@ -47,21 +47,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	passphraseMatches := passphrasePat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, keyMatch := range keyMatches {
-		if len(keyMatch) != 2 {
-			continue
-		}
 		resKeyMatch := strings.TrimSpace(keyMatch[1])
 
 		for _, secretMatch := range secretMatches {
-			if len(secretMatch) != 2 {
-				continue
-			}
 			resSecretMatch := strings.TrimSpace(secretMatch[1])
 
 			for _, passphraseMatch := range passphraseMatches {
-				if len(passphraseMatch) != 2 {
-					continue
-				}
 				resPassphraseMatch := strings.TrimSpace(passphraseMatch[1])
 
 				s1 := detectors.Result{
@@ -127,4 +118,8 @@ func getKucoinSignature(apiSecret string, timestamp string, method string, endpo
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_KuCoin
+}
+
+func (s Scanner) Description() string {
+	return "KuCoin is a cryptocurrency exchange that provides various digital asset trading services. KuCoin API keys can be used to access and manage trading accounts, execute trades, and retrieve market data."
 }

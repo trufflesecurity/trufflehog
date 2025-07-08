@@ -37,9 +37,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -76,4 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Infura
+}
+
+func (s Scanner) Description() string {
+	return "Infura provides the infrastructure for decentralized applications to connect to the Ethereum blockchain. Infura keys can be used to interact with the Ethereum network."
 }

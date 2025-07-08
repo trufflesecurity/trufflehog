@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go square
+
 package square
 
 import (
@@ -9,10 +11,9 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
@@ -22,7 +23,7 @@ type Analyzer struct {
 	Cfg *config.Config
 }
 
-func (Analyzer) Type() analyzerpb.AnalyzerType { return analyzerpb.AnalyzerType_Square }
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeSquare }
 
 func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
 	key, ok := credInfo["key"]
@@ -41,21 +42,41 @@ func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
 		return nil
 	}
 	result := analyzers.AnalyzerResult{
-		AnalyzerType: analyzerpb.AnalyzerType_Square,
+		AnalyzerType:       analyzers.AnalyzerTypeSquare,
+		UnboundedResources: []analyzers.Resource{},
 		Metadata: map[string]any{
-			"team_members": info.Team.TeamMembers,
-			"expires_at":   info.Permissions.ExpiresAt,
-			"client_id":    info.Permissions.ClientID,
-			"merchant_id":  info.Permissions.MerchantID,
+			"expires_at":  info.Permissions.ExpiresAt,
+			"client_id":   info.Permissions.ClientID,
+			"merchant_id": info.Permissions.MerchantID,
 		},
 	}
 
 	bindings, unboundedResources := getBindingsAndUnboundedResources(info.Permissions.Scopes)
 
 	result.Bindings = bindings
-	result.UnboundedResources = unboundedResources
+	result.UnboundedResources = append(result.UnboundedResources, unboundedResources...)
+	result.UnboundedResources = append(result.UnboundedResources, getTeamMembersResources(info.Team)...)
 
 	return &result
+}
+
+// Convert given list of team members into resources
+func getTeamMembersResources(team TeamJSON) []analyzers.Resource {
+	teamMembersResources := make([]analyzers.Resource, len(team.TeamMembers))
+
+	for idx, teamMember := range team.TeamMembers {
+		teamMembersResources[idx] = analyzers.Resource{
+			Name:               teamMember.FirstName + " " + teamMember.LastName,
+			FullyQualifiedName: teamMember.Email,
+			Type:               "team_member",
+			Metadata: map[string]any{
+				"is_owner":   teamMember.IsOwner,
+				"created_at": teamMember.CreatedAt,
+			},
+		}
+	}
+
+	return teamMembersResources
 }
 
 // Build a list of Bindings and UnboundedResources by referencing the category permissions list and
@@ -82,6 +103,9 @@ func getBindingsAndUnboundedResources(scopes []string) ([]analyzers.Binding, []a
 					Parent:             &parentResource,
 				}
 				for _, permission := range requiredPermissions {
+					if _, ok := StringToPermission[permission]; !ok { // skip unknown permissions
+						continue
+					}
 					if contains(scopes, permission) {
 						categoryBinding = append(categoryBinding, analyzers.Binding{
 							Resource: resource,
@@ -128,7 +152,9 @@ type SecretInfo struct {
 func getPermissions(cfg *config.Config, key string) (PermissionsJSON, error) {
 	var permissions PermissionsJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	// POST request is considered as non-safe. Square Post request does not change any state.
+	// We are using unrestricted client to avoid error for non-safe API request.
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	req, err := http.NewRequest("POST", "https://connect.squareup.com/oauth2/token/status", nil)
 	if err != nil {
 		return permissions, err
@@ -159,7 +185,9 @@ func getPermissions(cfg *config.Config, key string) (PermissionsJSON, error) {
 func getUsers(cfg *config.Config, key string) (TeamJSON, error) {
 	var team TeamJSON
 
-	client := analyzers.NewAnalyzeClient(cfg)
+	// POST request is considered as non-safe. Square Post request does not change any state.
+	// We are using unrestricted client to avoid error for non-safe API request.
+	client := analyzers.NewAnalyzeClientUnrestricted(cfg)
 	req, err := http.NewRequest("POST", "https://connect.squareup.com/v2/team-members/search", nil)
 	if err != nil {
 		return team, err

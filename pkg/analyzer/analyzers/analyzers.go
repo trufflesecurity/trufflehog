@@ -3,27 +3,26 @@ package analyzers
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"time"
+	"sort"
 
 	"github.com/fatih/color"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/pb/analyzerpb"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
 
 type (
 	Analyzer interface {
-		Type() analyzerpb.AnalyzerType
+		Type() AnalyzerType
 		Analyze(ctx context.Context, credentialInfo map[string]string) (*AnalyzerResult, error)
 	}
 
+	AnalyzerType int
+
 	// AnalyzerResult is the output of analysis.
 	AnalyzerResult struct {
-		AnalyzerType       analyzerpb.AnalyzerType
+		AnalyzerType       AnalyzerType
 		Bindings           []Binding
 		UnboundedResources []Resource
 		Metadata           map[string]any
@@ -59,6 +58,128 @@ const (
 
 	FullAccess string = "full_access"
 )
+
+const (
+	AnalyzerTypeInvalid AnalyzerType = iota
+	AnalyzerTypeAirbrake
+	AnalyzerAnthropic
+	AnalyzerTypeAsana
+	AnalyzerTypeBitbucket
+	AnalyzerTypeDockerHub
+	AnalyzerTypeElevenLabs
+	AnalyzerTypeGitHub
+	AnalyzerTypeGitLab
+	AnalyzerTypeHuggingFace
+	AnalyzerTypeMailchimp
+	AnalyzerTypeMailgun
+	AnalyzerTypeMySQL
+	AnalyzerTypeOpenAI
+	AnalyzerTypeOpsgenie
+	AnalyzerTypePostgres
+	AnalyzerTypePostman
+	AnalyzerTypeSendgrid
+	AnalyzerTypeShopify
+	AnalyzerTypeSlack
+	AnalyzerTypeSourcegraph
+	AnalyzerTypeSquare
+	AnalyzerTypeStripe
+	AnalyzerTypeTwilio
+	AnalyzerTypePrivateKey
+	AnalyzerTypeNotion
+	AnalyzerTypeDigitalOcean
+	AnalyzerTypePlanetScale
+	AnalyzerTypeAirtableOAuth
+	AnalyzerTypeAirtablePat
+	AnalyzerTypeGroq
+	AnalyzerTypeLaunchDarkly
+	AnalyzerTypeFigma
+	AnalyzerTypePlaid
+	AnalyzerTypeNetlify
+	AnalyzerTypeFastly
+	AnalyzerTypeMonday
+	AnalyzerTypeDatadog
+	AnalyzerTypeNgrok
+	AnalyzerTypeMux
+	AnalyzerTypePosthog
+	AnalyzerTypeDropbox
+	AnalyzerTypeDataBricks
+	AnalyzerTypeJira
+	// Add new items here with AnalyzerType prefix
+)
+
+// analyzerTypeStrings maps the enum to its string representation.
+var analyzerTypeStrings = map[AnalyzerType]string{
+	AnalyzerTypeInvalid:       "Invalid",
+	AnalyzerTypeAirbrake:      "Airbrake",
+	AnalyzerAnthropic:         "Anthropic",
+	AnalyzerTypeAsana:         "Asana",
+	AnalyzerTypeBitbucket:     "Bitbucket",
+	AnalyzerTypeDigitalOcean:  "DigitalOcean",
+	AnalyzerTypeDockerHub:     "DockerHub",
+	AnalyzerTypeElevenLabs:    "ElevenLabs",
+	AnalyzerTypeGitHub:        "GitHub",
+	AnalyzerTypeGitLab:        "GitLab",
+	AnalyzerTypeHuggingFace:   "HuggingFace",
+	AnalyzerTypeMailchimp:     "Mailchimp",
+	AnalyzerTypeMailgun:       "Mailgun",
+	AnalyzerTypeMySQL:         "MySQL",
+	AnalyzerTypeOpenAI:        "OpenAI",
+	AnalyzerTypeOpsgenie:      "Opsgenie",
+	AnalyzerTypePostgres:      "Postgres",
+	AnalyzerTypePostman:       "Postman",
+	AnalyzerTypeSendgrid:      "Sendgrid",
+	AnalyzerTypeShopify:       "Shopify",
+	AnalyzerTypeSlack:         "Slack",
+	AnalyzerTypeSourcegraph:   "Sourcegraph",
+	AnalyzerTypeSquare:        "Square",
+	AnalyzerTypeStripe:        "Stripe",
+	AnalyzerTypeTwilio:        "Twilio",
+	AnalyzerTypePrivateKey:    "PrivateKey",
+	AnalyzerTypeNotion:        "Notion",
+	AnalyzerTypePlanetScale:   "PlanetScale",
+	AnalyzerTypeAirtableOAuth: "AirtableOAuth",
+	AnalyzerTypeAirtablePat:   "AirtablePat",
+	AnalyzerTypeGroq:          "Groq",
+	AnalyzerTypeLaunchDarkly:  "LaunchDarkly",
+	AnalyzerTypeFigma:         "Figma",
+	AnalyzerTypePlaid:         "Plaid",
+	AnalyzerTypeNetlify:       "Netlify",
+	AnalyzerTypeFastly:        "Fastly",
+	AnalyzerTypeMonday:        "Monday",
+	AnalyzerTypeDatadog:       "Datadog",
+	AnalyzerTypeNgrok:         "Ngrok",
+	AnalyzerTypeMux:           "Mux",
+	AnalyzerTypePosthog:       "Posthog",
+	AnalyzerTypeDropbox:       "Dropbox",
+	AnalyzerTypeDataBricks:    "DataBricks",
+	AnalyzerTypeJira:          "Jira",
+	// Add new mappings here
+}
+
+// String method to get the string representation of an AnalyzerType.
+func (a AnalyzerType) String() string {
+	if str, ok := analyzerTypeStrings[a]; ok {
+		return str
+	}
+	return "Unknown"
+}
+
+// AvailableAnalyzers returns a sorted slice of AnalyzerType strings, skipping "Invalid".
+func AvailableAnalyzers() []string {
+	var analyzerStrings []string
+
+	// Iterate through the map to collect all string values except "Invalid".
+	for typ, str := range analyzerTypeStrings {
+		if typ != AnalyzerTypeInvalid {
+			analyzerStrings = append(analyzerStrings, str)
+		}
+	}
+
+	// Sort the slice alphabetically.
+	sort.Strings(analyzerStrings)
+
+	return analyzerStrings
+}
 
 type PermissionStatus struct {
 	Value   bool
@@ -154,68 +275,6 @@ var GreenWriter = color.New(color.FgGreen).SprintFunc()
 var YellowWriter = color.New(color.FgYellow).SprintFunc()
 var RedWriter = color.New(color.FgRed).SprintFunc()
 var DefaultWriter = color.New().SprintFunc()
-
-type AnalyzeClient struct {
-	http.Client
-	LoggingEnabled bool
-	LogFile        string
-}
-
-func CreateLogFileName(baseName string) string {
-	// Get the current time
-	currentTime := time.Now()
-
-	// Format the time as "2024_06_30_07_15_30"
-	timeString := currentTime.Format("2006_01_02_15_04_05")
-
-	// Create the log file name
-	logFileName := fmt.Sprintf("%s_%s.log", timeString, baseName)
-	return logFileName
-}
-
-func NewAnalyzeClient(cfg *config.Config) *http.Client {
-	if cfg == nil || !cfg.LoggingEnabled {
-		return &http.Client{}
-	}
-	return &http.Client{
-		Transport: LoggingRoundTripper{
-			parent:  http.DefaultTransport,
-			logFile: cfg.LogFile,
-		},
-	}
-}
-
-type LoggingRoundTripper struct {
-	parent http.RoundTripper
-	// TODO: io.Writer
-	logFile string
-}
-
-func (r LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	startTime := time.Now()
-
-	resp, err := r.parent.RoundTrip(req)
-	if err != nil {
-		return resp, err
-	}
-
-	// TODO: JSON
-	logEntry := fmt.Sprintf("Date: %s, Method: %s, Path: %s, Status: %d\n", startTime.Format(time.RFC3339), req.Method, req.URL.Path, resp.StatusCode)
-
-	// Open log file in append mode.
-	file, err := os.OpenFile(r.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return resp, fmt.Errorf("failed to open log file: %w", err)
-	}
-	defer file.Close()
-
-	// Write log entry to file.
-	if _, err := file.WriteString(logEntry); err != nil {
-		return resp, fmt.Errorf("failed to write log entry to file: %w", err)
-	}
-
-	return resp, nil
-}
 
 // BindAllPermissions creates a Binding for each permission to the given
 // resource.

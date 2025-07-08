@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
@@ -298,6 +299,83 @@ func TestChunkUnitReporterErr(t *testing.T) {
 		ID: "/file/not/found",
 	}, &reporter)
 	assert.Error(t, err)
+}
+
+func TestSkipDir(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// create a temp directory with files
+	ignoreDir, cleanupDir, err := createTempDir("", "ignore1", "ignore2", "ignore3")
+	require.NoError(t, err)
+	defer cleanupDir()
+
+	// create an ExcludePathsFile that contains the ignoreDir path
+	excludeFile, cleanupFile, err := createTempFile("", ignoreDir+"\n")
+	require.NoError(t, err)
+	defer cleanupFile()
+
+	conn, err := anypb.New(&sourcespb.Filesystem{
+		ExcludePathsFile: excludeFile.Name(),
+	})
+	require.NoError(t, err)
+
+	// initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "exclude directory", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{
+		ID: ignoreDir,
+	}, &reporter)
+	require.NoError(t, err)
+
+	require.Equal(t, 0, len(reporter.Chunks), "Expected no chunks from excluded directory")
+	require.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors for excluded directory")
+}
+
+func TestScanSubDirFile(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	// create a temp directory with files
+	parentDir, cleanupParentDir, err := createTempDir("", "file1")
+	require.NoError(t, err)
+	defer cleanupParentDir()
+
+	childDir, cleanupChildDir, err := createTempDir(parentDir, "file2")
+	require.NoError(t, err)
+	defer cleanupChildDir()
+
+	// create a file in child directory
+	file, cleanupFile, err := createTempFile(childDir, "should scan this file")
+	require.NoError(t, err)
+	defer cleanupFile()
+
+	// create an IncludePathsFile that contains the file path
+	includeFile, cleanupFile, err := createTempFile("", file.Name()+"\n")
+	require.NoError(t, err)
+	defer cleanupFile()
+
+	conn, err := anypb.New(&sourcespb.Filesystem{
+		IncludePathsFile: includeFile.Name(),
+	})
+	require.NoError(t, err)
+
+	// initialize the source.
+	s := Source{}
+	err = s.Init(ctx, "include sub directory file", 0, 0, true, conn, 1)
+	require.NoError(t, err)
+
+	reporter := sourcestest.TestReporter{}
+	err = s.ChunkUnit(ctx, sources.CommonSourceUnit{
+		ID: parentDir,
+	}, &reporter)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(reporter.Chunks), "Expected chunks from included file")
+	require.Equal(t, 0, len(reporter.ChunkErrs), "Expected no errors")
 }
 
 // createTempFile is a helper function to create a temporary file in the given

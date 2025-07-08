@@ -42,15 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	passMatches := passPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range passMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 
 			resPassMatch := strings.TrimSpace(idMatch[1])
 
@@ -83,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Dotmailer
+}
+
+func (s Scanner) Description() string {
+	return "Dotmailer is an email marketing automation platform. API keys can be used to access and manage email campaigns and related data."
 }

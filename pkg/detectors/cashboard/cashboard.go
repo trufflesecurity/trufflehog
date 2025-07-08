@@ -4,16 +4,17 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -42,15 +43,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	userMatches := userPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, userMatch := range userMatches {
-			if len(userMatch) != 2 {
-				continue
-			}
 			resUser := strings.TrimSpace(userMatch[1])
 
 			s1 := detectors.Result{
@@ -85,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Cashboard
+}
+
+func (s Scanner) Description() string {
+	return "Cashboard is a financial management service. Cashboard credentials can be used to access and manage financial data and accounts."
 }

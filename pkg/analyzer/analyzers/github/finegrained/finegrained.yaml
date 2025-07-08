@@ -1,5 +1,6 @@
 # Please generate a yaml list of all of the strings permission_name:access_level for all of the permissions and access levels that can be emitted from the test functions. The strings should be lower snake case with a colon joining the permission name and access level. The only access levels I want are "read" and "write"
 permissions:
+  - no_access
   - actions:read
   - actions:write
   - administration:read

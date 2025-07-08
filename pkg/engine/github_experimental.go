@@ -17,7 +17,7 @@ import (
 )
 
 // ScanGitHubExperimental scans GitHub using an experimental feature. Consider all functionality to be in an alpha release here.
-func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExperimentalConfig) error {
+func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExperimentalConfig) (sources.JobProgressRef, error) {
 	connection := sourcespb.GitHubExperimental{
 		Repository:         c.Repository,
 		ObjectDiscovery:    c.ObjectDiscovery,
@@ -28,7 +28,7 @@ func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExp
 	// Check at least one experimental sub-module is being used.
 	// Add to this list as more experimental sub-modules are added.
 	if !c.ObjectDiscovery {
-		return fmt.Errorf("at least one experimental submodule must be enabled")
+		return sources.JobProgressRef{}, fmt.Errorf("at least one experimental submodule must be enabled")
 	}
 
 	if len(c.Token) > 0 {
@@ -36,14 +36,14 @@ func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExp
 			Token: c.Token,
 		}
 	} else {
-		return fmt.Errorf("token is required for github experimental")
+		return sources.JobProgressRef{}, fmt.Errorf("token is required for github experimental")
 	}
 
 	var conn anypb.Any
 	err := anypb.MarshalFrom(&conn, &connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal github experimental connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	logOptions := &gogit.LogOptions{}
@@ -57,9 +57,8 @@ func (e *Engine) ScanGitHubExperimental(ctx context.Context, c sources.GitHubExp
 
 	githubExperimentalSource := &github_experimental.Source{}
 	if err := githubExperimentalSource.Init(ctx, sourceName, jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
 	githubExperimentalSource.WithScanOptions(scanOptions)
-	_, err = e.sourceManager.Run(ctx, sourceName, githubExperimentalSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, githubExperimentalSource)
 }

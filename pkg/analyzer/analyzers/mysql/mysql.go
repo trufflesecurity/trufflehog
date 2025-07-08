@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go mysql
+
 package mysql
 
 import (
@@ -9,15 +11,195 @@ import (
 
 	"github.com/dustin/go-humanize"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jedib0t/go-pretty/text"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/xo/dburl"
 
 	"github.com/fatih/color"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeMySQL }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	uri, ok := credInfo["connection_string"]
+	if !ok {
+		return nil, fmt.Errorf("missing connection string")
+	}
+	info, err := AnalyzePermissions(a.Cfg, uri)
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType: analyzers.AnalyzerTypeMySQL,
+		Metadata:     nil,
+		Bindings:     []analyzers.Binding{},
+	}
+
+	// add user privileges to bindings
+	userBindings, userResource := bakeUserBindings(info)
+	result.Bindings = append(result.Bindings, userBindings...)
+
+	// add user's database privileges to bindings
+	databaseBindings := bakeDatabaseBindings(userResource, info)
+	result.Bindings = append(result.Bindings, databaseBindings...)
+
+	return &result
+}
+
+func bakeUserBindings(info *SecretInfo) ([]analyzers.Binding, *analyzers.Resource) {
+
+	var userBindings []analyzers.Binding
+
+	// add user and their privileges to bindings
+	userResource := analyzers.Resource{
+		Name:               info.User,
+		FullyQualifiedName: info.Host + "/" + info.User,
+		Type:               "user",
+	}
+
+	for _, priv := range info.GlobalPrivs.Privs {
+		userBindings = append(userBindings, analyzers.Binding{
+			Resource: userResource,
+			Permission: analyzers.Permission{
+				Value: priv,
+			},
+		})
+	}
+
+	return userBindings, &userResource
+}
+
+func bakeDatabaseBindings(userResource *analyzers.Resource, info *SecretInfo) []analyzers.Binding {
+	var databaseBindings []analyzers.Binding
+
+	for _, database := range info.Databases {
+		dbResource := analyzers.Resource{
+			Name:               database.Name,
+			FullyQualifiedName: info.Host + "/" + database.Name,
+			Type:               "database",
+			Metadata: map[string]any{
+				"default":      database.Default,
+				"non_existent": database.Nonexistent,
+			},
+			Parent: userResource,
+		}
+
+		for _, priv := range database.Privs {
+			databaseBindings = append(databaseBindings, analyzers.Binding{
+				Resource: dbResource,
+				Permission: analyzers.Permission{
+					Value: priv,
+				},
+			})
+		}
+
+		// add this database's table privileges to bindings
+		tableBindings := bakeTableBindings(&dbResource, database)
+		databaseBindings = append(databaseBindings, tableBindings...)
+
+		// add this database's routines privileges to bindings
+		routineBindings := bakeRoutineBindings(&dbResource, database)
+		databaseBindings = append(databaseBindings, routineBindings...)
+	}
+
+	return databaseBindings
+}
+
+func bakeTableBindings(dbResource *analyzers.Resource, database *Database) []analyzers.Binding {
+	if database.Tables == nil {
+		return nil
+	}
+	var tableBindings []analyzers.Binding
+	for _, table := range *database.Tables {
+		tableResource := analyzers.Resource{
+			Name:               table.Name,
+			FullyQualifiedName: dbResource.FullyQualifiedName + "/" + table.Name,
+			Type:               "table",
+			Metadata: map[string]any{
+				"bytes":        table.Bytes,
+				"non_existent": table.Nonexistent,
+			},
+			Parent: dbResource,
+		}
+
+		for _, priv := range table.Privs {
+			tableBindings = append(tableBindings, analyzers.Binding{
+				Resource: tableResource,
+				Permission: analyzers.Permission{
+					Value: priv,
+				},
+			})
+		}
+
+		// Add this table's column privileges to bindings
+		for _, column := range table.Columns {
+			columnResource := analyzers.Resource{
+				Name:               column.Name,
+				FullyQualifiedName: tableResource.FullyQualifiedName + "/" + column.Name,
+				Type:               "column",
+				Parent:             &tableResource,
+			}
+
+			for _, priv := range column.Privs {
+				tableBindings = append(tableBindings, analyzers.Binding{
+					Resource: columnResource,
+					Permission: analyzers.Permission{
+						Value: priv,
+					},
+				})
+			}
+		}
+	}
+
+	return tableBindings
+}
+
+func bakeRoutineBindings(dbResource *analyzers.Resource, database *Database) []analyzers.Binding {
+	if database.Routines == nil {
+		return nil
+	}
+
+	var routineBindings []analyzers.Binding
+	for _, routine := range *database.Routines {
+		routineResource := analyzers.Resource{
+			Name:               routine.Name,
+			FullyQualifiedName: dbResource.FullyQualifiedName + "/" + routine.Name,
+			Type:               "routine",
+			Metadata: map[string]any{
+				"non_existent": routine.Nonexistent,
+			},
+			Parent: dbResource,
+		}
+
+		for _, priv := range routine.Privs {
+			routineBindings = append(routineBindings, analyzers.Binding{
+				Resource: routineResource,
+				Permission: analyzers.Permission{
+					Value: priv,
+				},
+			})
+		}
+	}
+
+	return routineBindings
+}
 
 const (
 	// MySQL SSL Modes
@@ -74,6 +256,7 @@ type Routine struct {
 // USER() returns `doadmin@localhost`
 
 type SecretInfo struct {
+	Host        string
 	User        string
 	Databases   map[string]*Database
 	GlobalPrivs GlobalPrivs
@@ -99,8 +282,13 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 }
 
 func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, error) {
+	// Parse the connection string
+	u, err := parseConnectionStr(connectionStr)
+	if err != nil {
+		return nil, fmt.Errorf("parsing the connection string: %w", err)
+	}
 
-	db, err := createConnection(connectionStr)
+	db, err := createConnection(u)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to the MySQL database: %w", err)
 	}
@@ -139,13 +327,14 @@ func AnalyzePermissions(cfg *config.Config, connectionStr string) (*SecretInfo, 
 	processGrants(grants, databases, &globalPrivs)
 
 	return &SecretInfo{
+		Host:        u.Hostname(),
 		User:        user,
 		Databases:   databases,
 		GlobalPrivs: globalPrivs,
 	}, nil
 }
 
-func createConnection(connection string) (*sql.DB, error) {
+func parseConnectionStr(connection string) (*dburl.URL, error) {
 	// Check if the connection string starts with 'mysql://'
 	if !strings.HasPrefix(connection, "mysql://") {
 		color.Yellow("[i] The connection string should start with 'mysql://'. Adding it for you.")
@@ -163,7 +352,10 @@ func createConnection(connection string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	return u, nil
+}
 
+func createConnection(u *dburl.URL) (*sql.DB, error) {
 	// Connect to the MySQL database
 	db, err := sql.Open("mysql", u.DSN)
 	if err != nil {

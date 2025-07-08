@@ -15,10 +15,10 @@ jobs:
     name: golangci-lint
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
-      - uses: actions/checkout@v4
+          go-version: "1.24"
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
@@ -28,7 +28,7 @@ jobs:
           # working-directory: somedir
 
           # Optional: golangci-lint command line arguments.
-          args: --enable bodyclose --enable exportloopref --timeout 10m
+          args: --enable bodyclose --enable copyloopvar --enable misspell --timeout 10m
 
           # Optional: if set to true then the action don't cache or restore ~/go/pkg.
           # skip-pkg-cache: true

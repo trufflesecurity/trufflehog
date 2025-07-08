@@ -1,3 +1,5 @@
+//go:generate generate_permissions permissions.yaml permissions.go opsgenie
+
 package opsgenie
 
 import (
@@ -11,10 +13,80 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/table"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/analyzers"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/analyzer/config"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 )
+
+var _ analyzers.Analyzer = (*Analyzer)(nil)
+
+type Analyzer struct {
+	Cfg *config.Config
+}
+
+func (Analyzer) Type() analyzers.AnalyzerType { return analyzers.AnalyzerTypeOpsgenie }
+
+func (a Analyzer) Analyze(_ context.Context, credInfo map[string]string) (*analyzers.AnalyzerResult, error) {
+	key, ok := credInfo["key"]
+	if !ok {
+		return nil, errors.New("missing key in credInfo")
+	}
+	info, err := AnalyzePermissions(a.Cfg, key)
+	if err != nil {
+		return nil, err
+	}
+	return secretInfoToAnalyzerResult(info), nil
+}
+
+func secretInfoToAnalyzerResult(info *SecretInfo) *analyzers.AnalyzerResult {
+	if info == nil {
+		return nil
+	}
+	result := analyzers.AnalyzerResult{
+		AnalyzerType:       analyzers.AnalyzerTypeOpsgenie,
+		Metadata:           nil,
+		Bindings:           make([]analyzers.Binding, len(info.Permissions)),
+		UnboundedResources: make([]analyzers.Resource, len(info.Users)),
+	}
+
+	// Opsgenie has API integrations, so the key does not belong
+	// to a particular user or account, it itself is a resource
+	resource := analyzers.Resource{
+		Name:               "Opsgenie API Integration Key",
+		FullyQualifiedName: "Opsgenie API Integration Key",
+		Type:               "API Key",
+		Metadata: map[string]any{
+			"expires": "never",
+		},
+	}
+
+	for idx, permission := range info.Permissions {
+		result.Bindings[idx] = analyzers.Binding{
+			Resource: resource,
+			Permission: analyzers.Permission{
+				Value: permission,
+			},
+		}
+	}
+
+	// We can find list of users in the current account
+	// if the API key has Configuration Access, so these can be
+	// unbounded resources
+	for idx, user := range info.Users {
+		result.UnboundedResources[idx] = analyzers.Resource{
+			Name:               user.FullName,
+			FullyQualifiedName: user.Username,
+			Type:               "user",
+			Metadata: map[string]any{
+				"username": user.Username,
+				"role":     user.Role.Name,
+			},
+		}
+	}
+
+	return &result
+}
 
 //go:embed scopes.json
 var scopesConfig []byte
@@ -60,7 +132,16 @@ func (h *HttpStatusTest) RunTest(cfg *config.Config, headers map[string]string) 
 	}
 
 	// Create new HTTP request
-	client := analyzers.NewAnalyzeClient(cfg)
+	var client *http.Client
+
+	// Non-safe Opsgenie APIs are asynchronous and always return 202 if credential has the permission.
+	// For Safe API Methods, use the restricted client
+	if analyzers.IsMethodSafe(h.Method) {
+		client = analyzers.NewAnalyzeClient(cfg)
+	} else {
+		client = analyzers.NewAnalyzeClientUnrestricted(cfg)
+	}
+
 	req, err := http.NewRequest(h.Method, h.Endpoint, data)
 	if err != nil {
 		return false, err
@@ -195,7 +276,7 @@ func AnalyzePermissions(cfg *config.Config, key string) (*SecretInfo, error) {
 
 	info.Permissions = permissions
 
-	if contains(permissions, "Configuration Access") {
+	if contains(permissions, "configuration_access") {
 		users, err := getUserList(cfg, key)
 		if err != nil {
 			return nil, fmt.Errorf("getting user list: %w", err)

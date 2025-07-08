@@ -37,9 +37,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -74,4 +71,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Postbacks
+}
+
+func (s Scanner) Description() string {
+	return "Postbacks are used to send data to a specified URL based on certain events or triggers. Postback URLs are often used in affiliate marketing, ad tracking, and analytics."
 }

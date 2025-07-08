@@ -4,16 +4,17 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -42,16 +43,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	keyMatches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range unameMatches {
-		if len(match) != 2 {
-			continue
-		}
 
 		unameMatch := strings.TrimSpace(match[1])
 
 		for _, secret := range keyMatches {
-			if len(secret) != 2 {
-				continue
-			}
 
 			keyMatch := strings.TrimSpace(secret[1])
 
@@ -87,4 +82,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Guru
+}
+
+func (s Scanner) Description() string {
+	return "Guru is a knowledge management solution. Guru credentials can be used to access and manage knowledge within an organization."
 }

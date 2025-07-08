@@ -42,6 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Groq,
 			Raw:          []byte(match),
+			ExtraData: map[string]string{
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/groq/",
+			},
 		}
 
 		if verify {
@@ -54,6 +57,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1.Verified = isVerified
 			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, match)
+
+			if isVerified {
+				s1.AnalysisInfo = map[string]string{
+					"key": match,
+				}
+			}
 		}
 
 		results = append(results, s1)
@@ -94,4 +103,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Groq
+}
+
+func (s Scanner) Description() string {
+	return "Groq is a company that creates data processing hardware and software. Groq API keys can be used to access their services."
 }

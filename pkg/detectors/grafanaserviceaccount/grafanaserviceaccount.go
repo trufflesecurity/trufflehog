@@ -3,11 +3,11 @@ package grafanaserviceaccount
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -21,7 +21,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(`\b(glsa_[0-9a-zA-Z_]{41})\b`)
 	domainPat = regexp.MustCompile(`\b([a-zA-Z0-9-]+\.grafana\.net)\b`)
@@ -41,15 +41,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range keyMatches {
-		if len(match) != 2 {
-			continue
-		}
 		key := strings.TrimSpace(match[1])
 
 		for _, domainMatch := range domainMatches {
-			if len(domainMatch) != 2 {
-				continue
-			}
 			domainRes := strings.TrimSpace(domainMatch[1])
 
 			s1 := detectors.Result{
@@ -93,4 +87,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_GrafanaServiceAccount
+}
+
+func (s Scanner) Description() string {
+	return "Grafana service accounts are used to authenticate and interact with Grafana's API. These credentials can be used to access and modify Grafana resources and settings."
 }

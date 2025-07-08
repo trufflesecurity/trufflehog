@@ -1,178 +1,248 @@
-//go:build detectors
-// +build detectors
-
 package jiratoken
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestJiraToken_FromChunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
-	if err != nil {
-		t.Fatalf("could not get test secrets from GCP: %s", err)
-	}
-	secret := testSecrets.MustGetField("JIRA_V2_TOKEN")
-	inactiveSecret := testSecrets.MustGetField("JIRA_V2_INACTIVE")
-	email := testSecrets.MustGetField("JIRA_V2_EMAIL")
-	domain := testSecrets.MustGetField("JIRA_V2_DOMAIN")
-
-	type args struct {
-		ctx    context.Context
-		data   []byte
-		verify bool
-	}
+func TestJiraToken_Pattern(t *testing.T) {
+	d := Scanner{}
+	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 	tests := []struct {
-		name                string
-		s                   Scanner
-		args                args
-		want                []detectors.Result
-		wantErr             bool
-		wantVerificationErr bool
+		name       string
+		input      string
+		want       []string
+		noKeywords bool
 	}{
 		{
-			name: "found, verified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a jira secret %s within jira %s with jira %s", secret, email, domain)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
-					Verified:     true,
-					ExtraData: map[string]string{
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
-						"version":        "2",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			name: "valid pattern",
+			input: `
+					{
+					"expand": "schema,names",
+					"startAt": 0,
+					"maxResults": 50,
+					"total": 1,
+					"issues": [
+						{
+							"expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+							"id": "fake454",
+							"self": "https://example.atlassian.net/rest/api/2/issue/fake454",
+							"key": "ESI-5555",
+							"fields": {
+								"statuscategorychangedate": "2016-06-01T01:25:35.807-0700",
+								"issuetype": {
+								"self": "https://example.atlassian.net/rest/api/2/issuetype/09090",
+								"id": "09090",
+								"description": "This is an example ticket. Here's the token to test JIRA APIs: ATATThktLkSzzcXi1xt19IlU6gAchV1TS83w11YOqAXqFUeA2=Yx3ssoNC",
+								"name": "Example Pattern test",
+								"subtask": false,
+								"avatarId": 1298,
+								"entityId": "93a51c1d-fake-4673-a71d-0889fake1238",
+								"hierarchyLevel": 0,
+								"emailAddress": "trufflesecurity@example.com",
+							},
+						}
+					]}`,
+			want: []string{"trufflesecurity@example.com" + ":" + "ATATThktLkSzzcXi1xt19IlU6gAchV1TS83w11YOqAXqFUeA2=Yx3ssoNC" + ":" + "example.atlassian.net"},
 		},
 		{
-			name: "found, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a jira secret %s within jira %s but not jira %s valid", inactiveSecret, email, domain)), // the secret would satisfy the regex but not pass validation
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
-						"version":        "2",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: false,
+			name: "valid pattern - without domain",
+			input: `
+					{
+					"expand": "schema,names",
+					"startAt": 0,
+					"maxResults": 50,
+					"total": 1,
+					"issues": [
+						{
+							"expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+							"id": "fake454",
+							"key": "ESI-5555",
+							"fields": {
+								"statuscategorychangedate": "2016-06-01T01:25:35.807-0700",
+								"issuetype": {
+								"id": "09090",
+								"description": "This is an example ticket. Here's the token to test JIRA APIs: ATATThktLkSzzcXi1xt19IlU6gAchV1TS83w11YOqAXqFUeA2=Yx3ssoNC",
+								"name": "Example Pattern test 2",
+								"subtask": false,
+								"avatarId": 1298,
+								"entityId": "93a51c1d-fake-4673-a71d-0889fake1238",
+								"hierarchyLevel": 0,
+								"emailAddress": "trufflesecurity@example.com",
+							},
+						}
+					]}`,
+			want: []string{"trufflesecurity@example.com" + ":" + "ATATThktLkSzzcXi1xt19IlU6gAchV1TS83w11YOqAXqFUeA2=Yx3ssoNC" + ":" + "api.atlassian.com"},
 		},
 		{
-			name: "not found",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte("You cannot find the secret within"),
-				verify: true,
-			},
-			want:                nil,
-			wantErr:             false,
-			wantVerificationErr: false,
+			name: "valid pattern - without token",
+			input: `
+					{
+					"expand": "schema,names",
+					"startAt": 0,
+					"maxResults": 50,
+					"total": 1,
+					"issues": [
+						{
+							"expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+							"id": "fake454",
+							"key": "ESI-5555",
+							"fields": {
+								"statuscategorychangedate": "2016-06-01T01:25:35.807-0700",
+								"issuetype": {
+								"id": "09090",
+								"self": "https://example.atlassian.net/rest/api/2/issuetype/09090",
+								"description": "This is an example ticket",
+								"name": "Example Pattern test 2",
+								"subtask": false,
+								"avatarId": 1298,
+								"entityId": "93a51c1d-fake-4673-a71d-0889fake1238",
+								"hierarchyLevel": 0,
+								"emailAddress": "trufflesecurity@example.com",
+							},
+						}
+					]}`,
+			want: []string{},
 		},
 		{
-			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a jira secret %s within jira %s with jira %s", secret, email, domain)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
-						"version":        "2",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
+			name: "valid pattern - without email",
+			input: `
+					{
+					"expand": "schema,names",
+					"startAt": 0,
+					"maxResults": 50,
+					"total": 1,
+					"issues": [
+						{
+							"expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+							"id": "fake454",
+							"key": "ESI-5555",
+							"fields": {
+								"statuscategorychangedate": "2016-06-01T01:25:35.807-0700",
+								"issuetype": {
+								"id": "09090",
+								"self": "https://example.atlassian.net/rest/api/2/issuetype/09090",
+								"description": "This is an example ticket. Here's the token to test JIRA APIs: ATATThktLkSzzcXi1xt19IlU6gAchV1TS83w11YOqAXqFUeA2=Yx3ssoNC",
+								"name": "Example Pattern test 2",
+								"subtask": false,
+								"avatarId": 1298,
+								"entityId": "93a51c1d-fake-4673-a71d-0889fake1238",
+								"hierarchyLevel": 0,
+								"emailAddress": "",
+							},
+						}
+					]}`,
+			want: []string{},
 		},
 		{
-			name: "found, verified but unexpected api surface",
-			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a jira secret %s within jira %s with jira %s", secret, email, domain)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_JiraToken,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"rotation_guide": "https://howtorotate.com/docs/tutorials/atlassian/",
-						"version":        "2",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
+			name: "valid pattern - without keywords",
+			input: `
+					{
+					"expand": "schema,names",
+					"startAt": 0,
+					"maxResults": 50,
+					"total": 1,
+					"issues": [
+						{
+							"expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+							"id": "fake454",
+							"key": "ESI-5555",
+							"fields": {
+								"statuscategorychangedate": "2016-06-01T01:25:35.807-0700",
+								"issuetype": {
+								"id": "09090",
+								"description": "ATATThktLkSzzcXi1xt19IlU6gAchV1TS83w11YOqAXqFUeA2=Yx3ssoNC",
+								"name": "Example Pattern test 2",
+								"subtask": false,
+								"avatarId": 1298,
+								"entityId": "93a51c1d-fake-4673-a71d-0889fake1238",
+								"hierarchyLevel": 0,
+								"emailAddress": "trufflesecurity@example.com",
+							},
+						}
+					]}`,
+			want:       []string{},
+			noKeywords: true,
+		},
+		{
+			name: "invalid pattern",
+			input: `
+					{
+					"expand": "schema,names",
+					"startAt": 0,
+					"maxResults": 50,
+					"total": 1,
+					"issues": [
+						{
+							"expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+							"id": "fake454",
+							"key": "ESI-5555",
+							"fields": {
+								"statuscategorychangedate": "2016-06-01T01:25:35.807-0700",
+								"issuetype": {
+								"id": "09090",
+								"description": "This is an example ticket. Here's the token to test JIRA APIs: ATATTA9nsCA?a7812Z7VoI%YJ0K4rFWLBfk91rhOsLAW=Yx3ssoNC",
+								"name": "Example Pattern test 2",
+								"subtask": false,
+								"avatarId": 1298,
+								"entityId": "93a51c1d-fake-4673-a71d-0889fake1238",
+								"hierarchyLevel": 0,
+								"emailAddress": "?y4r3fs1ewqec12v1e3tl.5Hcsrcehic89saXd.ro@",
+							},
+						}
+					]}`,
+			want: []string{},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("JiraToken.FromData() error = %v, wantErr %v", err, tt.wantErr)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
+			if len(matchedDetectors) == 0 {
+				// if intentionally no keywords are passed
+				if test.noKeywords {
+					return
+				}
+
+				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
 				return
 			}
-			for i := range got {
-				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
-				}
-				if (got[i].VerificationError() != nil) != tt.wantVerificationErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
-				}
-			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("JiraToken.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
-			}
-		})
-	}
-}
 
-func BenchmarkFromData(benchmark *testing.B) {
-	ctx := context.Background()
-	s := Scanner{}
-	for name, data := range detectors.MustGetBenchmarkData() {
-		benchmark.Run(name, func(b *testing.B) {
-			b.ResetTimer()
-			for n := 0; n < b.N; n++ {
-				_, err := s.FromData(ctx, false, data)
-				if err != nil {
-					b.Fatal(err)
+			results, err := d.FromData(context.Background(), false, []byte(test.input))
+			if err != nil {
+				t.Errorf("error = %v", err)
+				return
+			}
+
+			if len(results) != len(test.want) {
+				if len(results) == 0 {
+					t.Errorf("did not receive result")
+				} else {
+					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
 				}
+				return
+			}
+
+			actual := make(map[string]struct{}, len(results))
+			for _, r := range results {
+				if len(r.RawV2) > 0 {
+					actual[string(r.RawV2)] = struct{}{}
+				} else {
+					actual[string(r.Raw)] = struct{}{}
+				}
+			}
+			expected := make(map[string]struct{}, len(test.want))
+			for _, v := range test.want {
+				expected[v] = struct{}{}
+			}
+
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
 			}
 		})
 	}

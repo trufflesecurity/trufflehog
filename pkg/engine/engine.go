@@ -1,3 +1,6 @@
+// Check the [process flow](docs/process_flow.md) and [concurrency](docs/concurrency.md) docs for
+// something of a structural overview
+
 package engine
 
 import (
@@ -21,13 +24,17 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/decoders"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/defaults"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/giturl"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/output"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/verificationcache"
 )
+
+var detectionTimeout = detectors.DefaultResponseTimeout
 
 var errOverlap = errors.New(
 	"More than one detector has found this result. For your safety, verification has been disabled." +
@@ -92,6 +99,7 @@ type Config struct {
 	// also serves as a multiplier for other worker types (e.g., detector workers, notifier workers)
 	Concurrency int
 
+	ConfiguredSources             []sources.ConfiguredSource
 	Decoders                      []decoders.Decoder
 	Detectors                     []detectors.Detector
 	DetectorVerificationOverrides map[config.DetectorID]bool
@@ -133,6 +141,18 @@ type Config struct {
 	// that have been detected by multiple detectors.
 	// By default, it is set to true.
 	VerificationOverlap bool
+
+	// DetectorWorkerMultiplier is used to determine the number of detector workers to spawn.
+	DetectorWorkerMultiplier int
+
+	// NotificationWorkerMultiplier is used to determine the number of notification workers to spawn.
+	NotificationWorkerMultiplier int
+
+	// VerificationOverlapWorkerMultiplier is used to determine the number of verification overlap workers to spawn.
+	VerificationOverlapWorkerMultiplier int
+
+	VerificationResultCache  verificationcache.ResultCache
+	VerificationCacheMetrics verificationcache.MetricsReporter
 }
 
 // Engine represents the core scanning engine responsible for detecting secrets in input data.
@@ -141,9 +161,10 @@ type Config struct {
 // customization through various options and configurations.
 type Engine struct {
 	// CLI flags.
-	concurrency int
-	decoders    []decoders.Decoder
-	detectors   []detectors.Detector
+	concurrency       int
+	decoders          []decoders.Decoder
+	detectors         []detectors.Detector
+	verificationCache *verificationcache.VerificationCache
 	// Any detectors configured to override sources' verification flags
 	detectorVerificationOverrides map[config.DetectorID]bool
 
@@ -164,7 +185,7 @@ type Engine struct {
 	scanEntireChunk bool
 
 	// ahoCorasickHandler manages the Aho-Corasick trie and related keyword lookups.
-	ahoCorasickCore *ahocorasick.Core
+	AhoCorasickCore *ahocorasick.Core
 
 	// Engine synchronization primitives.
 	sourceManager                 *sources.SourceManager
@@ -193,24 +214,37 @@ type Engine struct {
 
 	// Note: bad hack only used for testing.
 	verificationOverlapTracker *verificationOverlapTracker
+
+	// detectorWorkerMultiplier is used to calculate the number of detector workers.
+	detectorWorkerMultiplier int
+	// notificationWorkerMultiplier is used to calculate the number of notification workers.
+	notificationWorkerMultiplier int
+	// verificationOverlapWorkerMultiplier is used to calculate the number of verification overlap workers.
+	verificationOverlapWorkerMultiplier int
 }
 
 // NewEngine creates a new Engine instance with the provided configuration.
 func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
+	verificationCache := verificationcache.New(cfg.VerificationResultCache, cfg.VerificationCacheMetrics)
+
 	engine := &Engine{
-		concurrency:                   cfg.Concurrency,
-		decoders:                      cfg.Decoders,
-		detectors:                     cfg.Detectors,
-		dispatcher:                    cfg.Dispatcher,
-		verify:                        cfg.Verify,
-		filterUnverified:              cfg.FilterUnverified,
-		filterEntropy:                 cfg.FilterEntropy,
-		printAvgDetectorTime:          cfg.PrintAvgDetectorTime,
-		retainFalsePositives:          cfg.LogFilteredUnverified,
-		verificationOverlap:           cfg.VerificationOverlap,
-		sourceManager:                 cfg.SourceManager,
-		scanEntireChunk:               cfg.ShouldScanEntireChunk,
-		detectorVerificationOverrides: cfg.DetectorVerificationOverrides,
+		concurrency:                         cfg.Concurrency,
+		decoders:                            cfg.Decoders,
+		detectors:                           cfg.Detectors,
+		verificationCache:                   verificationCache,
+		dispatcher:                          cfg.Dispatcher,
+		verify:                              cfg.Verify,
+		filterUnverified:                    cfg.FilterUnverified,
+		filterEntropy:                       cfg.FilterEntropy,
+		printAvgDetectorTime:                cfg.PrintAvgDetectorTime,
+		retainFalsePositives:                cfg.LogFilteredUnverified,
+		verificationOverlap:                 cfg.VerificationOverlap,
+		sourceManager:                       cfg.SourceManager,
+		scanEntireChunk:                     cfg.ShouldScanEntireChunk,
+		detectorVerificationOverrides:       cfg.DetectorVerificationOverrides,
+		detectorWorkerMultiplier:            cfg.DetectorWorkerMultiplier,
+		notificationWorkerMultiplier:        cfg.NotificationWorkerMultiplier,
+		verificationOverlapWorkerMultiplier: cfg.VerificationOverlapWorkerMultiplier,
 	}
 	if engine.sourceManager == nil {
 		return nil, fmt.Errorf("source manager is required")
@@ -246,7 +280,6 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if len(detectorsWithCustomVerifierEndpoints) > 0 {
 		filters = append(filters, func(d detectors.Detector) bool {
 			urls, ok := getWithDetectorID(d, detectorsWithCustomVerifierEndpoints)
@@ -258,12 +291,15 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 				return false
 			}
 
-			if !cfg.CustomVerifiersOnly || len(urls) == 0 {
-				urls = append(urls, customizer.DefaultEndpoint())
+			if cfg.CustomVerifiersOnly && len(urls) > 0 {
+				customizer.UseCloudEndpoint(false)
+				customizer.UseFoundEndpoints(false)
 			}
-			if err := customizer.SetEndpoints(urls...); err != nil {
+
+			if err := customizer.SetConfiguredEndpoints(urls...); err != nil {
 				return false
 			}
+
 			return true
 		})
 	}
@@ -292,6 +328,9 @@ func NewEngine(ctx context.Context, cfg *Config) (*Engine, error) {
 	return engine, nil
 }
 
+// SetDetectorTimeout sets the maximum timeout for each detector to scan a chunk.
+func SetDetectorTimeout(timeout time.Duration) { detectionTimeout = timeout }
+
 // setDefaults ensures that if specific engine properties aren't provided,
 // they're set to reasonable default values. It makes the engine robust to
 // incomplete configuration.
@@ -301,7 +340,19 @@ func (e *Engine) setDefaults(ctx context.Context) {
 		ctx.Logger().Info("No concurrency specified, defaulting to max", "cpu", numCPU)
 		e.concurrency = numCPU
 	}
-	ctx.Logger().V(3).Info("engine started", "workers", e.concurrency)
+
+	if e.detectorWorkerMultiplier < 1 {
+		// bound by net i/o so it's higher than other workers
+		e.detectorWorkerMultiplier = 8
+	}
+
+	if e.notificationWorkerMultiplier < 1 {
+		e.notificationWorkerMultiplier = 1
+	}
+
+	if e.verificationOverlapWorkerMultiplier < 1 {
+		e.verificationOverlapWorkerMultiplier = 1
+	}
 
 	// Default decoders handle common encoding formats.
 	if len(e.decoders) == 0 {
@@ -310,7 +361,7 @@ func (e *Engine) setDefaults(ctx context.Context) {
 
 	// Only use the default detectors if none are provided.
 	if len(e.detectors) == 0 {
-		e.detectors = DefaultDetectors()
+		e.detectors = defaults.DefaultDetectors()
 	}
 
 	if e.dispatcher == nil {
@@ -363,7 +414,7 @@ func parseCustomVerifierEndpoints(endpoints map[string]string) (map[config.Detec
 		return nil, fmt.Errorf("invalid verifier detector configuration id %v: %w", id, err)
 	}
 	// Extra check for endpoint customization.
-	isEndpointCustomizer := DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
+	isEndpointCustomizer := defaults.DefaultDetectorTypesImplementing[detectors.EndpointCustomizer]()
 	for id := range customVerifierEndpoints {
 		if _, ok := isEndpointCustomizer[id.ID]; !ok {
 			return nil, fmt.Errorf("endpoint provided but detector does not support endpoint customization: %w", err)
@@ -400,7 +451,7 @@ func getWithDetectorID[T any](d detectors.Detector, data map[config.DetectorID]T
 // verifyDetectorsAreVersioner checks all keys in a provided map to verify the
 // provided type is actually a Versioner.
 func verifyDetectorsAreVersioner[T any](data map[config.DetectorID]T) (config.DetectorID, error) {
-	isVersioner := DefaultDetectorTypesImplementing[detectors.Versioner]()
+	isVersioner := defaults.DefaultDetectorTypesImplementing[detectors.Versioner]()
 	for id := range data {
 		if id.Version == 0 {
 			// Version not provided.
@@ -455,6 +506,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 		// This reflects the anticipated lower volume of data that needs re-verification.
 		// The buffer size is a trade-off between memory usage and the need to prevent blocking.
 		verificationOverlapChunksChanMultiplier = 25
+		resultsChanMultiplier                   = detectableChunksChanMultiplier
 	)
 
 	// Channels are used for communication between different parts of the engine,
@@ -465,7 +517,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 	e.verificationOverlapChunksChan = make(
 		chan verificationOverlapChunk, defaultChannelBuffer*verificationOverlapChunksChanMultiplier,
 	)
-	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer)
+	e.results = make(chan detectors.ResultWithMetadata, defaultChannelBuffer*resultsChanMultiplier)
 	e.dedupeCache = cache
 	ctx.Logger().V(4).Info("engine initialized")
 
@@ -476,7 +528,7 @@ func (e *Engine) initialize(ctx context.Context) error {
 	}
 
 	ctx.Logger().V(4).Info("setting up aho-corasick core")
-	e.ahoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
+	e.AhoCorasickCore = ahocorasick.NewAhoCorasickCore(e.detectors, ahoCOptions...)
 	ctx.Logger().V(4).Info("set up aho-corasick core")
 
 	return nil
@@ -494,6 +546,17 @@ func (r *verificationOverlapTracker) increment() {
 }
 
 const ignoreTag = "trufflehog:ignore"
+
+// AhoCorasickCoreKeywords returns a set of keywords that the engine's
+// AhoCorasickCore is using.
+func (e *Engine) AhoCorasickCoreKeywords() map[string]struct{} {
+	// Turn AhoCorasick keywordsToDetectors into a map of keywords
+	keywords := make(map[string]struct{})
+	for key := range e.AhoCorasickCore.KeywordsToDetectors() {
+		keywords[key] = struct{}{}
+	}
+	return keywords
+}
 
 // HasFoundResults returns true if any results are found.
 func (e *Engine) HasFoundResults() bool {
@@ -528,7 +591,7 @@ func (e *Engine) GetDetectorsMetrics() map[string]time.Duration {
 	e.metrics.mu.RLock()
 	defer e.metrics.mu.RUnlock()
 
-	result := make(map[string]time.Duration, len(DefaultDetectors()))
+	result := make(map[string]time.Duration, len(defaults.DefaultDetectors()))
 	for detectorName, durations := range e.DetectorAvgTime() {
 		var total time.Duration
 		for _, d := range durations {
@@ -622,9 +685,10 @@ func (e *Engine) startScannerWorkers(ctx context.Context) {
 }
 
 func (e *Engine) startDetectorWorkers(ctx context.Context) {
-	const detectorWorkerMultiplier = 4
-	ctx.Logger().V(2).Info("starting detector workers", "count", e.concurrency*detectorWorkerMultiplier)
-	for worker := uint64(0); worker < uint64(e.concurrency*detectorWorkerMultiplier); worker++ {
+	numWorkers := e.concurrency * e.detectorWorkerMultiplier
+
+	ctx.Logger().V(2).Info("starting detector workers", "count", numWorkers)
+	for worker := 0; worker < numWorkers; worker++ {
 		e.wgDetectorWorkers.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "detector_worker_id", common.RandomID(5))
@@ -636,8 +700,10 @@ func (e *Engine) startDetectorWorkers(ctx context.Context) {
 }
 
 func (e *Engine) startVerificationOverlapWorkers(ctx context.Context) {
-	ctx.Logger().V(2).Info("starting verificationOverlap workers", "count", e.concurrency)
-	for worker := uint64(0); worker < uint64(e.concurrency); worker++ {
+	numWorkers := e.concurrency * e.verificationOverlapWorkerMultiplier
+
+	ctx.Logger().V(2).Info("starting verificationOverlap workers", "count", numWorkers)
+	for worker := 0; worker < numWorkers; worker++ {
 		e.verificationOverlapWg.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "verification_overlap_worker_id", common.RandomID(5))
@@ -649,13 +715,10 @@ func (e *Engine) startVerificationOverlapWorkers(ctx context.Context) {
 }
 
 func (e *Engine) startNotifierWorkers(ctx context.Context) {
-	const notifierWorkerRatio = 4
-	maxNotifierWorkers := 1
-	if numWorkers := e.concurrency / notifierWorkerRatio; numWorkers > 0 {
-		maxNotifierWorkers = numWorkers
-	}
-	ctx.Logger().V(2).Info("starting notifier workers", "count", maxNotifierWorkers)
-	for worker := 0; worker < maxNotifierWorkers; worker++ {
+	numWorkers := e.notificationWorkerMultiplier * e.concurrency
+
+	ctx.Logger().V(2).Info("starting notifier workers", "count", numWorkers)
+	for worker := 0; worker < numWorkers; worker++ {
 		e.WgNotifier.Add(1)
 		go func() {
 			ctx := context.WithValue(ctx, "notifier_worker_id", common.RandomID(5))
@@ -731,13 +794,17 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 		startTime := time.Now()
 		sourceVerify := chunk.Verify
 		for _, decoder := range e.decoders {
+			decodeStart := time.Now()
 			decoded := decoder.FromChunk(chunk)
+			decodeTime := time.Since(decodeStart).Microseconds()
+			decodeLatency.WithLabelValues(decoder.Type().String(), chunk.SourceName).Observe(float64(decodeTime))
+
 			if decoded == nil {
-				ctx.Logger().V(4).Info("no decoder found for chunk", "chunk", chunk)
+				// This means that the decoder didn't understand this chunk and isn't applicable to it.
 				continue
 			}
 
-			matchingDetectors := e.ahoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
+			matchingDetectors := e.AhoCorasickCore.FindDetectorMatches(decoded.Chunk.Data)
 			if len(matchingDetectors) > 1 && !e.verificationOverlap {
 				wgVerificationOverlap.Add(1)
 				e.verificationOverlapChunksChan <- verificationOverlapChunk{
@@ -759,20 +826,17 @@ func (e *Engine) scannerWorker(ctx context.Context) {
 					wgDoneFn: wgDetect.Done,
 				}
 			}
-			continue
 		}
 
 		dataSize := float64(len(chunk.Data))
 
 		scanBytesPerChunk.Observe(dataSize)
 		jobBytesScanned.WithLabelValues(
-			strconv.Itoa(int(chunk.JobID)),
 			chunk.SourceType.String(),
 			chunk.SourceName,
 		).Add(dataSize)
 		chunksScannedLatency.Observe(float64(time.Since(startTime).Microseconds()))
 		jobChunksScanned.WithLabelValues(
-			strconv.Itoa(int(chunk.JobID)),
 			chunk.SourceType.String(),
 			chunk.SourceName,
 		).Inc()
@@ -882,9 +946,14 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 			// DO NOT VERIFY at this stage of the pipeline.
 			matchedBytes := detector.Matches()
 			for _, match := range matchedBytes {
+				ctx, cancel := context.WithTimeout(ctx, time.Second*2)
 				results, err := detector.FromData(ctx, false, match)
+				cancel()
 				if err != nil {
-					ctx.Logger().Error(err, "error verifying chunk")
+					ctx.Logger().Error(
+						err, "error finding results in chunk during verification overlap",
+						"detector", detector.Key.Type().String(),
+					)
 				}
 
 				if len(results) == 0 {
@@ -894,7 +963,15 @@ func (e *Engine) verificationOverlapWorker(ctx context.Context) {
 					detectorKeysWithResults[detector.Key] = detector
 				}
 
-				results = e.filterResults(ctx, detector, results)
+				// If results filtration eliminates a rotated secret, then that rotation will never be reported. This
+				// problem can theoretically occur for any scan, but we've only actually seen it in practice during
+				// targeted scans. (The reason for this discrepancy is unclear.) The simplest fix is therefore to
+				// disable filtration for targeted scans, but if you're here because this problem surfaced for a
+				// non-targeted scan then we'll have to solve it correctly.
+				if chunk.chunk.SecretID == 0 {
+					results = e.filterResults(ctx, detector, results)
+				}
+
 				for _, res := range results {
 					var val []byte
 					if res.RawV2 != nil {
@@ -979,11 +1056,18 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	if e.printAvgDetectorTime {
 		start = time.Now()
 	}
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer common.Recover(ctx)
-	defer cancel()
 
-	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector)
+	ctx = context.WithValues(ctx,
+		"detector", data.detector.Key.Loggable(),
+		"decoder_type", data.decoder.String(),
+		"chunk_source_name", data.chunk.SourceName,
+		"chunk_source_id", data.chunk.SourceID,
+		"chunk_source_metadata", data.chunk.SourceMetadata.String())
+
+	ctx.Logger().V(5).Info("Starting to detect chunk")
+
+	isFalsePositive := detectors.GetFalsePositiveCheck(data.detector.Detector)
 
 	var matchCount int
 	// To reduce the overhead of regex calls in the detector,
@@ -995,9 +1079,21 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	for _, matchBytes := range matches {
 		matchCount++
 		detectBytesPerMatch.Observe(float64(len(matchBytes)))
-		results, err := data.detector.Detector.FromData(ctx, data.chunk.Verify, matchBytes)
+
+		ctx, cancel := context.WithTimeout(ctx, detectionTimeout)
+		t := time.AfterFunc(detectionTimeout+1*time.Second, func() {
+			ctx.Logger().Error(nil, "a detector ignored the context timeout")
+		})
+		results, err := e.verificationCache.FromData(
+			ctx,
+			data.detector.Detector,
+			data.chunk.Verify,
+			data.chunk.SecretID != 0,
+			matchBytes)
+		t.Stop()
+		cancel()
 		if err != nil {
-			ctx.Logger().Error(err, "error scanning chunk")
+			ctx.Logger().Error(err, "error finding results in chunk")
 			continue
 		}
 
@@ -1025,7 +1121,14 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 			e.metrics.detectorAvgTime.Store(detectorName, avgTime)
 		}
 
-		results = e.filterResults(ctx, data.detector, results)
+		// If results filtration eliminates a rotated secret, then that rotation will never be reported. This problem
+		// can theoretically occur for any scan, but we've only actually seen it in practice during targeted scans. (The
+		// reason for this discrepancy is unclear.) The simplest fix is therefore to disable filtration for targeted
+		// scans, but if you're here because this problem surfaced for a non-targeted scan then we'll have to solve it
+		// correctly.
+		if data.chunk.SecretID == 0 {
+			results = e.filterResults(ctx, data.detector, results)
+		}
 
 		for _, res := range results {
 			e.processResult(ctx, data, res, isFalsePositive)
@@ -1033,6 +1136,8 @@ func (e *Engine) detectChunk(ctx context.Context, data detectableChunk) {
 	}
 
 	matchesPerChunk.Observe(float64(matchCount))
+
+	ctx.Logger().V(5).Info("Finished detecting chunk")
 
 	data.wgDoneFn()
 }
@@ -1042,15 +1147,24 @@ func (e *Engine) filterResults(
 	detector *ahocorasick.DetectorMatch,
 	results []detectors.Result,
 ) []detectors.Result {
-	if e.filterUnverified {
-		results = detectors.CleanResults(results)
+	clean := detectors.CleanResults
+	ignoreConfig := false
+	if cleaner, ok := detector.Detector.(detectors.CustomResultsCleaner); ok {
+		clean = cleaner.CleanResults
+		ignoreConfig = cleaner.ShouldCleanResultsIrrespectiveOfConfiguration()
 	}
+	if e.filterUnverified || ignoreConfig {
+		results = clean(results)
+	}
+
 	if !e.retainFalsePositives {
 		results = detectors.FilterKnownFalsePositives(ctx, detector.Detector, results)
 	}
+
 	if e.filterEntropy != 0 {
 		results = detectors.FilterResultsWithEntropy(ctx, results, e.filterEntropy, e.retainFalsePositives)
 	}
+
 	return results
 }
 
@@ -1081,6 +1195,7 @@ func (e *Engine) processResult(
 
 	secret := detectors.CopyMetadata(&data.chunk, res)
 	secret.DecoderType = data.decoder
+	secret.DetectorDescription = data.detector.Detector.Description()
 
 	if !res.Verified && res.Raw != nil {
 		isFp, _ := isFalsePositive(res)
@@ -1158,11 +1273,18 @@ func SupportsLineNumbers(sourceType sourcespb.SourceType) bool {
 
 // FragmentLineOffset sets the line number for a provided source chunk with a given detector result.
 func FragmentLineOffset(chunk *sources.Chunk, result *detectors.Result) (int64, bool) {
-	before, after, found := bytes.Cut(chunk.Data, result.Raw)
+	// get the primary secret value from the result if set
+	secret := result.GetPrimarySecretValue()
+	if secret == "" {
+		secret = string(result.Raw)
+	}
+
+	before, after, found := bytes.Cut(chunk.Data, []byte(secret))
 	if !found {
 		return 0, false
 	}
 	lineNumber := int64(bytes.Count(before, []byte("\n")))
+	result.SetPrimarySecretLine(lineNumber)
 	// If the line contains the ignore tag, we should ignore the result.
 	endLine := bytes.Index(after, []byte("\n"))
 	if endLine == -1 {
@@ -1210,8 +1332,14 @@ func FragmentFirstLineAndLink(chunk *sources.Chunk) (int64, *int64, string) {
 		fragmentStart = &metadata.AzureRepos.Line
 		link = metadata.AzureRepos.Link
 	default:
-		return 0, nil, ""
+		return 1, nil, ""
 	}
+
+	// Ensure we maintain 1-based line indexing if fragmentStart is not set or is 0.
+	if *fragmentStart == 0 {
+		*fragmentStart = 1
+	}
+
 	return *fragmentStart, fragmentStart, link
 }
 

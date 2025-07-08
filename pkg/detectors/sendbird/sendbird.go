@@ -47,15 +47,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	appIdMatches := appIdPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, appIdMatch := range appIdMatches {
-		if len(appIdMatch) != 2 {
-			continue
-		}
 		resAppIdMatch := strings.TrimSpace(appIdMatch[1])
 
 		for _, match := range matches {
-			if len(match) != 2 {
-				continue
-			}
 			resMatch := strings.TrimSpace(match[1])
 
 			s1 := detectors.Result{
@@ -114,4 +108,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Sendbird
+}
+
+func (s Scanner) Description() string {
+	return "Sendbird is a communication platform providing chat, voice, and video services. Sendbird API tokens can be used to access and manage communication services."
 }

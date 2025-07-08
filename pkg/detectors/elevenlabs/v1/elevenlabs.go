@@ -55,7 +55,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		s1 := detectors.Result{
 			DetectorType: detectorspb.DetectorType_ElevenLabs,
 			Raw:          []byte(match),
-			ExtraData:    map[string]string{"version": "1"},
+			ExtraData: map[string]string{
+				"version":        "1",
+				"rotation_guide": "https://howtorotate.com/docs/tutorials/elevenlabs/",
+			},
 		}
 
 		if verify {
@@ -71,6 +74,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				s1.ExtraData["Tier"] = userResponse.Subscription.Tier
 			}
 			s1.SetVerificationError(verificationErr, match)
+
+			if s1.Verified {
+				s1.AnalysisInfo = map[string]string{
+					"key": match,
+				}
+			}
 		}
 
 		results = append(results, s1)
@@ -113,4 +122,8 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_ElevenLabs
+}
+
+func (s Scanner) Description() string {
+	return "Elevenlabs is an AI-driven voice synthesis platform. Elevenlabs API keys can be used to access and manipulate voice synthesis features and services."
 }

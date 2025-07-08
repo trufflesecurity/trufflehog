@@ -119,7 +119,7 @@ type HFClient struct {
 	HTTPClient *http.Client
 }
 
-// NewClient creates a new API client
+// NewHFClient creates a new HF client
 func NewHFClient(baseURL, apiKey string, timeout time.Duration) *HFClient {
 	return &HFClient{
 		BaseURL: baseURL,

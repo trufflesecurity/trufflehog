@@ -13,7 +13,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -42,15 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	userMatches := userPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, userMatch := range userMatches {
-			if len(match) != 2 {
-				continue
-			}
 			resUser := strings.TrimSpace(userMatch[1])
 
 			s1 := detectors.Result{
@@ -86,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Textmagic
+}
+
+func (s Scanner) Description() string {
+	return "Textmagic is a service for sending and receiving text messages. Textmagic API keys can be used to access and manage text messaging services."
 }

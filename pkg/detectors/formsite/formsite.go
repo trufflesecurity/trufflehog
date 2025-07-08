@@ -3,16 +3,17 @@ package formsite
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -43,19 +44,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	userMatches := userPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, serverMatch := range serverMatches {
-			if len(serverMatch) != 2 {
-				continue
-			}
 			resServerMatch := strings.TrimSpace(serverMatch[1])
 			for _, userMatch := range userMatches {
-				if len(userMatch) != 2 {
-					continue
-				}
 				resUserMatch := strings.TrimSpace(userMatch[1])
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Formsite,
@@ -88,4 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Formsite
+}
+
+func (s Scanner) Description() string {
+	return "Formsite is an online form builder service. Formsite API keys can be used to access and manage forms and data submissions."
 }

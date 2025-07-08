@@ -6,7 +6,7 @@ import "errors"
 type Permission int
 
 const (
-    NoAccess Permission = iota
+    Invalid Permission = iota
     ModelsRead Permission = iota
     ModelCapabilitiesWrite Permission = iota
     AssistantsRead Permission = iota
@@ -17,6 +17,10 @@ const (
     FineTuningWrite Permission = iota
     FilesRead Permission = iota
     FilesWrite Permission = iota
+    EvalsRead Permission = iota
+    EvalsWrite Permission = iota
+    ResponsesRead Permission = iota
+    ResponsesWrite Permission = iota
 )
 
 var (
@@ -31,6 +35,10 @@ var (
         FineTuningWrite: "fine_tuning:write",
         FilesRead: "files:read",
         FilesWrite: "files:write",
+        EvalsRead: "evals:read",
+        EvalsWrite: "evals:write",
+        ResponsesRead: "responses:read",
+        ResponsesWrite: "responses:write",
     }
 
     StringToPermission = map[string]Permission{
@@ -44,32 +52,44 @@ var (
         "fine_tuning:write": FineTuningWrite,
         "files:read": FilesRead,
         "files:write": FilesWrite,
+        "evals:read": EvalsRead,
+        "evals:write": EvalsWrite,
+        "responses:read": ResponsesRead,
+        "responses:write": ResponsesWrite,
     }
 
     PermissionIDs = map[Permission]int{
-        ModelsRead: 0,
-        ModelCapabilitiesWrite: 1,
-        AssistantsRead: 2,
-        AssistantsWrite: 3,
-        ThreadsRead: 4,
-        ThreadsWrite: 5,
-        FineTuningRead: 6,
-        FineTuningWrite: 7,
-        FilesRead: 8,
-        FilesWrite: 9,
+        ModelsRead: 1,
+        ModelCapabilitiesWrite: 2,
+        AssistantsRead: 3,
+        AssistantsWrite: 4,
+        ThreadsRead: 5,
+        ThreadsWrite: 6,
+        FineTuningRead: 7,
+        FineTuningWrite: 8,
+        FilesRead: 9,
+        FilesWrite: 10,
+        EvalsRead: 11,
+        EvalsWrite: 12,
+        ResponsesRead: 13,
+        ResponsesWrite: 14,
     }
 
     IdToPermission = map[int]Permission{
-        0: ModelsRead,
-        1: ModelCapabilitiesWrite,
-        2: AssistantsRead,
-        3: AssistantsWrite,
-        4: ThreadsRead,
-        5: ThreadsWrite,
-        6: FineTuningRead,
-        7: FineTuningWrite,
-        8: FilesRead,
-        9: FilesWrite,
+        1: ModelsRead,
+        2: ModelCapabilitiesWrite,
+        3: AssistantsRead,
+        4: AssistantsWrite,
+        5: ThreadsRead,
+        6: ThreadsWrite,
+        7: FineTuningRead,
+        8: FineTuningWrite,
+        9: FilesRead,
+        10: FilesWrite,
+        11: EvalsRead,
+        12: EvalsWrite,
+        13: ResponsesRead,
+        14: ResponsesWrite,
     }
 )
 

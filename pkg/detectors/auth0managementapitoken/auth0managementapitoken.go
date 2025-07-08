@@ -3,12 +3,12 @@ package auth0managementapitoken
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -22,7 +22,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.MaxSecretSizeProvider = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithLocalAddresses
 
 	// long jwt token but note this is default 8640000 seconds = 24 hours but could be set to maximum 2592000 seconds = 720 hours = 30 days
 	// at https://manage.auth0.com/dashboard/us/dev-63memjo3/apis/management/explorer
@@ -46,18 +46,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, managementApiTokenMatch := range managementAPITokenMatches {
-		if len(managementApiTokenMatch) != 2 {
-			continue
-		}
 		managementAPITokenRes := strings.TrimSpace(managementApiTokenMatch[1])
 		if len(managementAPITokenRes) < 2000 || len(managementAPITokenRes) > 5000 {
 			continue
 		}
 
 		for _, domainMatch := range domainMatches {
-			if len(domainMatch) != 2 {
-				continue
-			}
 			domainRes := strings.TrimSpace(domainMatch[1])
 
 			s1 := detectors.Result{
@@ -68,22 +62,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			if verify {
-				/*
-				   curl -H "Authorization: Bearer $token" https://domain/api/v2/users
-				*/
-
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://"+domainRes+"/api/v2/users", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", managementAPITokenRes))
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				isVerified, err := verifyMatch(ctx, client, managementAPITokenRes, domainRes)
+				s1.Verified = isVerified
+				s1.SetVerificationError(err, managementAPITokenRes)
 			}
 
 			results = append(results, s1)
@@ -93,6 +74,38 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
+func verifyMatch(ctx context.Context, client *http.Client, token, domain string) (bool, error) {
+	/*
+		curl -H "Authorization: Bearer $token" https://domain/api/v2/users
+		Reference: https://auth0.com/docs/api/management/v2/users/get-users
+	*/
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+domain+"/api/v2/users", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+	switch res.StatusCode {
+	case http.StatusOK, http.StatusForbidden:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
+}
+
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Auth0ManagementApiToken
+}
+
+func (s Scanner) Description() string {
+	return "Auth0 provides authentication and authorization as a service. Auth0 Management API tokens can be used to manage users, roles, permissions, and other aspects of the Auth0 service."
 }

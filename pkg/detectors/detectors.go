@@ -24,6 +24,24 @@ type Detector interface {
 	Keywords() []string
 	// Type returns the DetectorType number from detectors.proto for the given detector.
 	Type() detectorspb.DetectorType
+	// Description returns a description for the result being detected
+	Description() string
+}
+
+// CustomResultsCleaner is an optional interface that a detector can implement to customize how its generated results
+// are "cleaned," which is defined as removing superfluous results from those found in a given chunk. The default
+// implementation of this logic removes all unverified results if there are any verified results, and all unverified
+// results except for one otherwise, but this interface allows a detector to specify different logic. (This logic must
+// be implemented outside results generation because there are circumstances under which the engine should not execute
+// it.)
+type CustomResultsCleaner interface {
+	// CleanResults removes "superfluous" results from a result set (where the definition of "superfluous" is detector-
+	// specific).
+	CleanResults(results []Result) []Result
+	// ShouldCleanResultsIrrespectiveOfConfiguration allows a custom cleaner to instruct the engine to ignore
+	// user-provided configuration that controls whether results are cleaned. (User-provided configuration is not the
+	// only factor that determines whether the engine runs cleaning logic.)
+	ShouldCleanResultsIrrespectiveOfConfiguration() bool
 }
 
 // Versioner is an optional interface that a detector can implement to
@@ -56,8 +74,14 @@ type MultiPartCredentialProvider interface {
 // EndpointCustomizer is an optional interface that a detector can implement to
 // support verifying against user-supplied endpoints.
 type EndpointCustomizer interface {
-	SetEndpoints(...string) error
-	DefaultEndpoint() string
+	SetConfiguredEndpoints(...string) error
+	SetCloudEndpoint(string)
+	UseCloudEndpoint(bool)
+	UseFoundEndpoints(bool)
+}
+
+type CloudProvider interface {
+	CloudEndpoint() string
 }
 
 type Result struct {
@@ -65,9 +89,10 @@ type Result struct {
 	DetectorType detectorspb.DetectorType
 	// DetectorName is the name of the Detector. Used for custom detectors.
 	DetectorName string
-	// DecoderType is the type of Decoder.
-	DecoderType detectorspb.DecoderType
-	Verified    bool
+	Verified     bool
+	// VerificationFromCache indicates whether this result's verification result came from the verification cache rather
+	// than an actual remote request.
+	VerificationFromCache bool
 	// Raw contains the raw secret identifier data. Prefer IDs over secrets since it is used for deduping after hashing.
 	Raw []byte
 	// RawV2 contains the raw secret identifier that is a combination of both the ID and the secret.
@@ -87,9 +112,25 @@ type Result struct {
 	// analysis to run. The keys of the map are analyzer specific and
 	// should match what is expected in the corresponding analyzer.
 	AnalysisInfo map[string]string
+
+	// primarySecret is used when a detector has multiple secret patterns.
+	// This secret is designated to determine the line number.
+	// If set, the line number will correspond to this secret.
+	primarySecret struct {
+		Value string
+		Line  int64
+	}
 }
 
-// SetVerificationError is the only way to set a verification error. Any sensitive values should be passed-in as secrets to be redacted.
+// CopyVerificationInfo clones verification info (status and error) from another Result struct. This is used when
+// loading verification info from a verification cache. (A method is necessary because verification errors are not
+// exported, to prevent the accidental storage of sensitive information in them.)
+func (r *Result) CopyVerificationInfo(from *Result) {
+	r.Verified = from.Verified
+	r.verificationError = from.verificationError
+}
+
+// SetVerificationError is the only way to set a new verification error. Any sensitive values should be passed-in as secrets to be redacted.
 func (r *Result) SetVerificationError(err error, secrets ...string) {
 	if err != nil {
 		r.verificationError = redactSecrets(err, secrets...)
@@ -99,6 +140,26 @@ func (r *Result) SetVerificationError(err error, secrets ...string) {
 // Public accessors for the fields could also be provided if needed.
 func (r *Result) VerificationError() error {
 	return r.verificationError
+}
+
+// SetPrimarySecretValue set the value passed as primary secret in the result
+func (r *Result) SetPrimarySecretValue(value string) {
+	if value != "" {
+		r.primarySecret.Value = value
+	}
+}
+
+// SetPrimarySecretLine set the passed line number as primary secret line number
+func (r *Result) SetPrimarySecretLine(line int64) {
+	// line number is only set if value is set for primary secret
+	if r.primarySecret.Value != "" {
+		r.primarySecret.Line = line
+	}
+}
+
+// GetPrimarySecretValue return primary secret match value
+func (r *Result) GetPrimarySecretValue() string {
+	return r.primarySecret.Value
 }
 
 // redactSecrets replaces all instances of the given secrets with [REDACTED] in the error message.
@@ -144,6 +205,10 @@ type ResultWithMetadata struct {
 	Result
 	// Data from the sources.Chunk which this result was emitted for
 	Data []byte
+	// DetectorDescription is the description of the Detector.
+	DetectorDescription string
+	// DecoderType is the type of decoder that was used to generate this result's data.
+	DecoderType detectorspb.DecoderType
 }
 
 // CopyMetadata returns a detector result with included metadata from the source chunk.
@@ -240,4 +305,14 @@ func MustGetBenchmarkData() map[string][]byte {
 func RedactURL(u url.URL) string {
 	u.User = url.UserPassword(u.User.Username(), "********")
 	return strings.TrimSpace(strings.Replace(u.String(), "%2A", "*", -1))
+}
+
+func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
+	parsedURL, err := url.Parse(u)
+	if err != nil {
+		return nil, err
+	}
+	parsedURL.Path = ""
+	parsedURL.RawQuery = ""
+	return parsedURL, nil
 }

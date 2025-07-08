@@ -41,15 +41,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	subMatches := subPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, subMatch := range subMatches {
-			if len(subMatch) != 2 {
-				continue
-			}
 
 			subMatch := strings.TrimSpace(subMatch[1])
 
@@ -83,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Vouchery
+}
+
+func (s Scanner) Description() string {
+	return "Vouchery is a service that provides API keys for accessing their promotional and loyalty campaign management platform. These keys can be used to manage and track various promotional activities."
 }

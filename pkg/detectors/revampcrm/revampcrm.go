@@ -40,15 +40,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		tokenPatMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 
 			userPatMatch := strings.TrimSpace(idMatch[1])
 
@@ -80,4 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_RevampCRM
+}
+
+func (s Scanner) Description() string {
+	return "RevampCRM is a customer relationship management service. The credentials can be used to access and manage customer data."
 }

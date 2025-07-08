@@ -20,13 +20,15 @@ func TestAnalyzer_Analyze(t *testing.T) {
 
 	tests := []struct {
 		name    string
+		sid     string
 		key     string
 		want    string // JSON string
 		wantErr bool
 	}{
 		{
 			name: "valid Twilio key",
-			key:  testSecrets.MustGetField("TWILLIO_ID") + ":" + testSecrets.MustGetField("TWILLIO_API"),
+			sid:  testSecrets.MustGetField("TWILLIO_ID"),
+			key:  testSecrets.MustGetField("TWILLIO_API"),
 			want: `            {
              "AnalyzerType": 20,
              "Bindings": [
@@ -249,7 +251,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Analyzer{}
-			got, err := a.Analyze(ctx, map[string]string{"key": tt.key})
+			got, err := a.Analyze(ctx, map[string]string{"key": tt.key, "sid": tt.sid})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Analyzer.Analyze() error = %v, wantErr %v", err, tt.wantErr)
 				return

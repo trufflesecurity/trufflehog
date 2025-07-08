@@ -8,6 +8,17 @@ import (
 )
 
 var (
+	decodeLatency = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: common.MetricsNamespace,
+			Subsystem: common.MetricsSubsystem,
+			Name:      "decode_latency",
+			Help:      "Time spent decoding a chunk in microseconds",
+			Buckets:   prometheus.ExponentialBuckets(50, 2, 20),
+		},
+		[]string{"decoder_type", "source_name"},
+	)
+
 	// Detector metrics.
 	detectorExecutionCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -41,7 +52,7 @@ var (
 		Name:      "job_bytes_scanned",
 		Help:      "Total number of bytes scanned for a job.",
 	},
-		[]string{"job_id", "source_type", "source_name"},
+		[]string{"source_type", "source_name"},
 	)
 
 	scanBytesPerChunk = promauto.NewHistogram(prometheus.HistogramOpts{
@@ -58,7 +69,7 @@ var (
 		Name:      "job_chunks_scanned",
 		Help:      "Total number of chunks scanned for a job.",
 	},
-		[]string{"job_id", "source_type", "source_name"},
+		[]string{"source_type", "source_name"},
 	)
 
 	detectBytesPerMatch = promauto.NewHistogram(prometheus.HistogramOpts{

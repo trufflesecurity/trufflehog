@@ -34,9 +34,9 @@ const (
 var (
 	defaultClient = common.SaneHttpClient()
 	tokenPats     = map[tokenType]*regexp.Regexp{
-		TenantAccessToken: regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "tenant"}) + `\b(t-[a-z0-9A-Z_.]{14,50})\b`),
-		UserAccessToken:   regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "user"}) + `\b(u-[a-z0-9A-Z_.]{14,50})\b`),
-		AppAccessToken:    regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "app"}) + `\b(a-[a-z0-9A-Z_.]{14,50})\b`),
+		TenantAccessToken: regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "tenant"}) + `(?:^|[^-])\b(t-[a-z0-9A-Z_.]{14,50})\b(?:[^-]|$)`),
+		UserAccessToken:   regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "user"}) + `(?:^|[^-])\b(u-[a-z0-9A-Z_.]{14,50})\b(?:[^-]|$)`),
+		AppAccessToken:    regexp.MustCompile(detectors.PrefixRegex([]string{"lark", "larksuite", "app"}) + `(?:^|[^-])\b(a-[a-z0-9A-Z_.]{14,50})\b(?:[^-]|$)`),
 	}
 
 	verificationUrls = map[tokenType]string{
@@ -49,7 +49,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"lark", "larksuite", "t-", "a-", "u-"}
+	return []string{"lark", "larksuite"}
 }
 
 // FromData will find and optionally verify Larksuite secrets in a given set of bytes.
@@ -95,6 +95,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_LarkSuite
+}
+
+func (s Scanner) Description() string {
+	return "LarkSuite is a collaborative suite that includes chat, calendar, and cloud storage features. The detected token can be used to access and interact with these services."
 }
 
 func verifyAccessToken(ctx context.Context, client *http.Client, url string, token string) (bool, error) {

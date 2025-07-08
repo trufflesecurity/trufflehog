@@ -127,15 +127,23 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			ctx.Logger().Error(err, "error walking directory")
 			return nil
 		}
+
 		fullPath := filepath.Join(path, relativePath)
+
+		// check if the full path is not matching any pattern in include FilterRuleSet and matching any exclude FilterRuleSet.
+		if s.filter != nil && !s.filter.Pass(fullPath) {
+			// skip excluded directories
+			if d.IsDir() && s.filter.ShouldExclude(fullPath) {
+				return fs.SkipDir
+			}
+
+			return nil // skip the file
+		}
 
 		// Skip over non-regular files. We do this check here to suppress noisy
 		// logs for trying to scan directories and other non-regular files in
 		// our traversal.
 		if !d.Type().IsRegular() {
-			return nil
-		}
-		if s.filter != nil && !s.filter.Pass(fullPath) {
 			return nil
 		}
 
@@ -153,7 +161,7 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 var skipSymlinkErr = errors.New("skipping symlink")
 
 func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
-	logger := ctx.Logger().WithValues("path", path)
+	fileCtx := context.WithValues(ctx, "path", path)
 	fileStat, err := os.Lstat(path)
 	if err != nil {
 		return fmt.Errorf("unable to stat file: %w", err)
@@ -168,7 +176,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 	}
 	defer inputFile.Close()
 
-	logger.V(3).Info("scanning file")
+	fileCtx.Logger().V(3).Info("scanning file")
 
 	chunkSkel := &sources.Chunk{
 		SourceType: s.Type(),
@@ -185,7 +193,7 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 		Verify: s.verify,
 	}
 
-	return handlers.HandleFile(ctx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan})
+	return handlers.HandleFile(fileCtx, inputFile, chunkSkel, sources.ChanReporter{Ch: chunksChan})
 }
 
 // Enumerate implements SourceUnitEnumerator interface. This implementation simply
@@ -193,38 +201,16 @@ func (s *Source) scanFile(ctx context.Context, path string, chunksChan chan *sou
 // filepath or a directory.
 func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) error {
 	for _, path := range s.paths {
-		fileInfo, err := os.Lstat(filepath.Clean(path))
+		_, err := os.Lstat(filepath.Clean(path))
 		if err != nil {
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
 			continue
 		}
-		if !fileInfo.IsDir() {
-			item := sources.CommonSourceUnit{ID: path}
-			if err := reporter.UnitOk(ctx, item); err != nil {
-				return err
-			}
-			continue
-		}
-		err = fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return reporter.UnitErr(ctx, err)
-			}
-			if d.IsDir() {
-				return nil
-			}
-			fullPath := filepath.Join(path, relativePath)
-			if s.filter != nil && !s.filter.Pass(fullPath) {
-				return nil
-			}
-			item := sources.CommonSourceUnit{ID: fullPath}
-			return reporter.UnitOk(ctx, item)
-		})
-		if err != nil {
-			if err := reporter.UnitErr(ctx, err); err != nil {
-				return err
-			}
+		item := sources.CommonSourceUnit{ID: path}
+		if err := reporter.UnitOk(ctx, item); err != nil {
+			return err
 		}
 	}
 	return nil

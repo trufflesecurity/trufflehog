@@ -3,9 +3,10 @@ package mattermostpersonaltoken
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -41,15 +42,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	serverMatches := serverPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, serverMatch := range serverMatches {
-			if len(serverMatch) != 2 {
-				continue
-			}
 			serverRes := strings.TrimSpace(serverMatch[1])
 
 			s1 := detectors.Result{
@@ -82,4 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_MattermostPersonalToken
+}
+
+func (s Scanner) Description() string {
+	return "Mattermost is an open-source, self-hostable online chat service with file sharing, search, and integrations. Mattermost Personal Tokens can be used to authenticate API requests to a Mattermost server."
 }

@@ -8,7 +8,6 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -22,7 +21,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	defaultClient = common.SaneHttpClient()
+	defaultClient = detectors.DetectorHttpClientWithNoLocalAddresses
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `\b([0-9a-zA-Z]{52})\b`)
 	urlPat = regexp.MustCompile(detectors.PrefixRegex([]string{"azure"}) + `https:\/\/([0-9a-z]{5,40})\.search\.windows\.net\/indexes\/([0-9a-z]{5,40})\b`)
@@ -42,9 +41,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	urlMatches := urlPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, urlMatch := range urlMatches {
@@ -91,4 +87,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_AzureSearchQueryKey
+}
+
+func (s Scanner) Description() string {
+	return "Azure Search Query Keys are used to authenticate search requests to Azure Search service. They should be kept confidential to prevent unauthorized access to search indexes and data."
 }

@@ -2,16 +2,16 @@ package sugester
 
 import (
 	"context"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-type Scanner struct{
+type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -19,7 +19,7 @@ type Scanner struct{
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat    = regexp.MustCompile(detectors.PrefixRegex([]string{"sugester"}) + `\b([a-zA-Z0-9]{32})\b`)
@@ -40,15 +40,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	domainMatches := domainPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, domainmatch := range domainMatches {
-			if len(match) != 2 {
-				continue
-			}
 			resDomainMatch := strings.TrimSpace(domainmatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Sugester,
@@ -72,7 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			results = append(results, s1)
 		}
-
 	}
 
 	return results, nil
@@ -80,4 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Sugester
+}
+
+func (s Scanner) Description() string {
+	return "Sugester is a customer support software that offers various tools for managing customer interactions. Sugester API keys can be used to access and manage data within the Sugester platform."
 }

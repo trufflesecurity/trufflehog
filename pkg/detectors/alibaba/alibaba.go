@@ -53,6 +53,10 @@ func (s Scanner) Keywords() []string {
 	return []string{"LTAI"}
 }
 
+func (s Scanner) Description() string {
+	return "Alibaba Cloud is a cloud computing service that provides a suite of cloud computing services including data storage, relational databases, big-data processing, and content delivery networks (CDNs). Alibaba Cloud API keys can be used to access and manage these services."
+}
+
 func randString(n int) string {
 	const alphanum = "0123456789abcdefghijklmnopqrstuvwxyz"
 	var bytes = make([]byte, n)
@@ -92,15 +96,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 
 			resIdMatch := strings.TrimSpace(idMatch[1])
 

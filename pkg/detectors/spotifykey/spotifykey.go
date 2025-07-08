@@ -44,14 +44,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 			idresMatch := strings.TrimSpace(idMatch[1])
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_SpotifyKey,
@@ -82,4 +76,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_SpotifyKey
+}
+
+func (s Scanner) Description() string {
+	return "Spotify API keys can be used to access and modify data within Spotify's services."
 }

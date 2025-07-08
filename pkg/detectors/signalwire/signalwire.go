@@ -4,11 +4,11 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"strings"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	regexp "github.com/wasilibs/go-re2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
@@ -21,7 +21,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	client = detectors.DetectorHttpClientWithNoLocalAddresses
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"signalwire"}) + `\b([0-9A-Za-z]{50})\b`)
@@ -44,21 +44,12 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	urlMatches := urlPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 			resID := strings.TrimSpace(idMatch[1])
 
 			for _, urlMatch := range urlMatches {
-				if len(urlMatch) != 2 {
-					continue
-				}
 				resURL := strings.TrimSpace(urlMatch[1])
 
 				s1 := detectors.Result{
@@ -94,4 +85,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Signalwire
+}
+
+func (s Scanner) Description() string {
+	return "SignalWire is a communications platform as a service (CPaaS) provider. SignalWire credentials can be used to access and manage communication services such as voice, messaging, and video."
 }

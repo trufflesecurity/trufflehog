@@ -3,11 +3,12 @@ package twitch
 import (
 	"context"
 	"fmt"
-	regexp "github.com/wasilibs/go-re2"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+
+	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
@@ -28,8 +29,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitch"}) + `\b([0-9a-z]{30})\b`)
-	idPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"twitch"}) + `\b([0-9a-z]{30})\b`)
+	idPat     = regexp.MustCompile(detectors.PrefixRegex([]string{"twitch"}) + `\b([0-9a-z]{30})\b`)
+	secretPat = regexp.MustCompile(detectors.PrefixRegex([]string{"twitch"}) + `\b([0-9a-z]{30})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -42,31 +43,34 @@ func (s Scanner) Keywords() []string {
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
+	var uniqueIDMatches, uniqueSecretMatches = make(map[string]struct{}), make(map[string]struct{})
 
-	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
-		resMatch := strings.TrimSpace(match[1])
+	for _, match := range idPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueIDMatches[match[1]] = struct{}{}
+	}
 
-		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
+	for _, match := range secretPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueSecretMatches[match[1]] = struct{}{}
+	}
+
+	for id := range uniqueIDMatches {
+		for secret := range uniqueSecretMatches {
+			// as both patterns are same, to avoid same strings
+			if id == secret {
 				continue
 			}
-			resIdMatch := strings.TrimSpace(idMatch[1])
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Twitch,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(id),
+				RawV2:        []byte(id + ":" + secret),
 			}
 
 			if verify {
 				client := s.getClient()
-				isVerified, verificationErr := verifyTwitch(ctx, client, resMatch, resIdMatch)
+				isVerified, verificationErr := verifyTwitch(ctx, client, secret, id)
 				s1.Verified = isVerified
-				s1.SetVerificationError(verificationErr, resMatch)
+				s1.SetVerificationError(verificationErr, id)
 			}
 
 			results = append(results, s1)
@@ -114,4 +118,8 @@ func verifyTwitch(ctx context.Context, client *http.Client, resMatch string, res
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Twitch
+}
+
+func (s Scanner) Description() string {
+	return "Twitch is a live streaming service. Twitch client credentials can be used to access and modify data on the Twitch platform."
 }

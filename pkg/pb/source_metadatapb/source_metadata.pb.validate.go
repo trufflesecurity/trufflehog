@@ -3417,8 +3417,6 @@ func (m *Postman) validate(all bool) error {
 
 	// no validation rules for WorkspaceName
 
-	// no validation rules for GlobalsId
-
 	// no validation rules for CollectionId
 
 	// no validation rules for CollectionName
@@ -3437,9 +3435,7 @@ func (m *Postman) validate(all bool) error {
 
 	// no validation rules for FieldType
 
-	// no validation rules for FieldName
-
-	// no validation rules for VariableType
+	// no validation rules for LocationType
 
 	if len(errors) > 0 {
 		return PostmanMultiError(errors)
@@ -3898,6 +3894,220 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ElasticsearchValidationError{}
+
+// Validate checks the field values on Sentry with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Sentry) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Sentry with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in SentryMultiError, or nil if none found.
+func (m *Sentry) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Sentry) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for EventId
+
+	// no validation rules for OrganizationId
+
+	// no validation rules for OrganizationSlug
+
+	// no validation rules for OrganizationDateCreated
+
+	// no validation rules for ProjectId
+
+	// no validation rules for ProjectSlug
+
+	// no validation rules for IssueId
+
+	// no validation rules for DateCreated
+
+	// no validation rules for Link
+
+	if len(errors) > 0 {
+		return SentryMultiError(errors)
+	}
+
+	return nil
+}
+
+// SentryMultiError is an error wrapping multiple validation errors returned by
+// Sentry.ValidateAll() if the designated constraints aren't met.
+type SentryMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SentryMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SentryMultiError) AllErrors() []error { return m }
+
+// SentryValidationError is the validation error returned by Sentry.Validate if
+// the designated constraints aren't met.
+type SentryValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SentryValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SentryValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SentryValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SentryValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SentryValidationError) ErrorName() string { return "SentryValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SentryValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSentry.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SentryValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SentryValidationError{}
+
+// Validate checks the field values on Stdin with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Stdin) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Stdin with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in StdinMultiError, or nil if none found.
+func (m *Stdin) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Stdin) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return StdinMultiError(errors)
+	}
+
+	return nil
+}
+
+// StdinMultiError is an error wrapping multiple validation errors returned by
+// Stdin.ValidateAll() if the designated constraints aren't met.
+type StdinMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StdinMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StdinMultiError) AllErrors() []error { return m }
+
+// StdinValidationError is the validation error returned by Stdin.Validate if
+// the designated constraints aren't met.
+type StdinValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StdinValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StdinValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StdinValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StdinValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StdinValidationError) ErrorName() string { return "StdinValidationError" }
+
+// Error satisfies the builtin error interface
+func (e StdinValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStdin.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StdinValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StdinValidationError{}
 
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -5228,6 +5438,88 @@ func (m *MetaData) validate(all bool) error {
 			if err := v.Validate(); err != nil {
 				return MetaDataValidationError{
 					field:  "Huggingface",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Sentry:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetSentry()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Sentry",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Sentry",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSentry()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Sentry",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *MetaData_Stdin:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetStdin()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Stdin",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "Stdin",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetStdin()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "Stdin",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

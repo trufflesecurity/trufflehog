@@ -11,6 +11,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/credentialspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/jenkins"
 )
 
@@ -23,7 +24,7 @@ type JenkinsConfig struct {
 }
 
 // ScanJenkins scans Jenkins logs.
-func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) error {
+func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) (sources.JobProgressRef, error) {
 	var connection *sourcespb.Jenkins
 	switch {
 	case jenkinsConfig.Username != "" && jenkinsConfig.Password != "":
@@ -38,7 +39,7 @@ func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) e
 	case jenkinsConfig.Header != "":
 		splits := strings.Split(jenkinsConfig.Header, ":")
 		if len(splits) != 2 {
-			return errors.New("invalid header format, expected key: value")
+			return sources.JobProgressRef{}, errors.New("invalid header format, expected key: value")
 		}
 		key := splits[0]
 		value := splits[1]
@@ -66,7 +67,7 @@ func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) e
 	err := anypb.MarshalFrom(&conn, connection, proto.MarshalOptions{})
 	if err != nil {
 		ctx.Logger().Error(err, "failed to marshal Jenkins connection")
-		return err
+		return sources.JobProgressRef{}, err
 	}
 
 	sourceName := "trufflehog - Jenkins"
@@ -74,8 +75,7 @@ func (e *Engine) ScanJenkins(ctx context.Context, jenkinsConfig JenkinsConfig) e
 
 	jenkinsSource := &jenkins.Source{}
 	if err := jenkinsSource.Init(ctx, "trufflehog - Jenkins", jobID, sourceID, true, &conn, runtime.NumCPU()); err != nil {
-		return err
+		return sources.JobProgressRef{}, err
 	}
-	_, err = e.sourceManager.Run(ctx, sourceName, jenkinsSource)
-	return err
+	return e.sourceManager.EnumerateAndScan(ctx, sourceName, jenkinsSource)
 }

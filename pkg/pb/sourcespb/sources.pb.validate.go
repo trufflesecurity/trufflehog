@@ -658,6 +658,8 @@ func (m *Bitbucket) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
+	// no validation rules for InstallationType
+
 	switch v := m.Credential.(type) {
 	case *Bitbucket_Token:
 		if v == nil {
@@ -2313,6 +2315,10 @@ func (m *GitLab) validate(all bool) error {
 
 	// no validation rules for SkipArchives
 
+	// no validation rules for ExcludeProjectsSharedIntoGroups
+
+	// no validation rules for RemoveAuthInUrl
+
 	switch v := m.Credential.(type) {
 	case *GitLab_Token:
 		if v == nil {
@@ -2541,6 +2547,10 @@ func (m *GitHub) validate(all bool) error {
 	// no validation rules for SkipArchives
 
 	// no validation rules for IncludeWikis
+
+	// no validation rules for CommentsTimeframeDays
+
+	// no validation rules for RemoveAuthInUrl
 
 	switch v := m.Credential.(type) {
 	case *GitHub_GithubApp:
@@ -2885,6 +2895,262 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GitHubExperimentalValidationError{}
+
+// Validate checks the field values on GitHubRealtime with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *GitHubRealtime) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GitHubRealtime with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in GitHubRealtimeMultiError,
+// or nil if none found.
+func (m *GitHubRealtime) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GitHubRealtime) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for ListenerPort
+
+	// no validation rules for WebhookSecret
+
+	if _, err := url.Parse(m.GetEndpoint()); err != nil {
+		err = GitHubRealtimeValidationError{
+			field:  "Endpoint",
+			reason: "value must be a valid URI",
+			cause:  err,
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	switch v := m.Credential.(type) {
+	case *GitHubRealtime_GithubApp:
+		if v == nil {
+			err := GitHubRealtimeValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetGithubApp()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GitHubRealtimeValidationError{
+						field:  "GithubApp",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GitHubRealtimeValidationError{
+						field:  "GithubApp",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetGithubApp()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GitHubRealtimeValidationError{
+					field:  "GithubApp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *GitHubRealtime_Token:
+		if v == nil {
+			err := GitHubRealtimeValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Token
+	case *GitHubRealtime_Unauthenticated:
+		if v == nil {
+			err := GitHubRealtimeValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetUnauthenticated()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GitHubRealtimeValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GitHubRealtimeValidationError{
+						field:  "Unauthenticated",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUnauthenticated()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GitHubRealtimeValidationError{
+					field:  "Unauthenticated",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *GitHubRealtime_BasicAuth:
+		if v == nil {
+			err := GitHubRealtimeValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetBasicAuth()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GitHubRealtimeValidationError{
+						field:  "BasicAuth",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GitHubRealtimeValidationError{
+						field:  "BasicAuth",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetBasicAuth()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GitHubRealtimeValidationError{
+					field:  "BasicAuth",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return GitHubRealtimeMultiError(errors)
+	}
+
+	return nil
+}
+
+// GitHubRealtimeMultiError is an error wrapping multiple validation errors
+// returned by GitHubRealtime.ValidateAll() if the designated constraints
+// aren't met.
+type GitHubRealtimeMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GitHubRealtimeMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GitHubRealtimeMultiError) AllErrors() []error { return m }
+
+// GitHubRealtimeValidationError is the validation error returned by
+// GitHubRealtime.Validate if the designated constraints aren't met.
+type GitHubRealtimeValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GitHubRealtimeValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GitHubRealtimeValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GitHubRealtimeValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GitHubRealtimeValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GitHubRealtimeValidationError) ErrorName() string { return "GitHubRealtimeValidationError" }
+
+// Error satisfies the builtin error interface
+func (e GitHubRealtimeValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGitHubRealtime.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GitHubRealtimeValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GitHubRealtimeValidationError{}
 
 // Validate checks the field values on GoogleDrive with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
@@ -3751,6 +4017,8 @@ func (m *S3) validate(all bool) error {
 	var errors []error
 
 	// no validation rules for MaxObjectSize
+
+	// no validation rules for EnableResumption
 
 	switch v := m.Credential.(type) {
 	case *S3_AccessKey:
@@ -4853,6 +5121,8 @@ func (m *Teams) validate(all bool) error {
 		}
 		errors = append(errors, err)
 	}
+
+	// no validation rules for TenantId
 
 	switch v := m.Credential.(type) {
 	case *Teams_Token:
@@ -6240,3 +6510,246 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ElasticsearchValidationError{}
+
+// Validate checks the field values on Sentry with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Sentry) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Sentry with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in SentryMultiError, or nil if none found.
+func (m *Sentry) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Sentry) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Endpoint
+
+	// no validation rules for InsecureSkipVerifyTls
+
+	// no validation rules for Projects
+
+	switch v := m.Credential.(type) {
+	case *Sentry_AuthToken:
+		if v == nil {
+			err := SentryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for AuthToken
+	case *Sentry_DsnKey:
+		if v == nil {
+			err := SentryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for DsnKey
+	case *Sentry_ApiKey:
+		if v == nil {
+			err := SentryValidationError{
+				field:  "Credential",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ApiKey
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return SentryMultiError(errors)
+	}
+
+	return nil
+}
+
+// SentryMultiError is an error wrapping multiple validation errors returned by
+// Sentry.ValidateAll() if the designated constraints aren't met.
+type SentryMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SentryMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SentryMultiError) AllErrors() []error { return m }
+
+// SentryValidationError is the validation error returned by Sentry.Validate if
+// the designated constraints aren't met.
+type SentryValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SentryValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SentryValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SentryValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SentryValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SentryValidationError) ErrorName() string { return "SentryValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SentryValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSentry.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SentryValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SentryValidationError{}
+
+// Validate checks the field values on Stdin with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Stdin) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Stdin with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in StdinMultiError, or nil if none found.
+func (m *Stdin) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Stdin) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return StdinMultiError(errors)
+	}
+
+	return nil
+}
+
+// StdinMultiError is an error wrapping multiple validation errors returned by
+// Stdin.ValidateAll() if the designated constraints aren't met.
+type StdinMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m StdinMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m StdinMultiError) AllErrors() []error { return m }
+
+// StdinValidationError is the validation error returned by Stdin.Validate if
+// the designated constraints aren't met.
+type StdinValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e StdinValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e StdinValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e StdinValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e StdinValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e StdinValidationError) ErrorName() string { return "StdinValidationError" }
+
+// Error satisfies the builtin error interface
+func (e StdinValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sStdin.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = StdinValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = StdinValidationError{}

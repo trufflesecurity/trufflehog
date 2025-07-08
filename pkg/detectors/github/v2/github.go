@@ -6,11 +6,10 @@ import (
 
 	regexp "github.com/wasilibs/go-re2"
 
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v1"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
@@ -21,11 +20,12 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 var _ detectors.Versioner = (*Scanner)(nil)
 var _ detectors.EndpointCustomizer = (*Scanner)(nil)
+var _ detectors.CloudProvider = (*Scanner)(nil)
 
 func (s Scanner) Version() int {
 	return 2
 }
-func (Scanner) DefaultEndpoint() string { return "https://api.github.com" }
+func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
 
 var (
 	// Oauth token
@@ -53,9 +53,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 		// First match is entire regex, second is the first group.
-		if len(match) != 2 {
-			continue
-		}
 
 		token := match[1]
 
@@ -92,4 +89,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Github
+}
+
+func (s Scanner) Description() string {
+	return "GitHub is a platform for version control and collaboration. Personal access tokens (PATs) can be used to access and modify repositories and other resources."
 }

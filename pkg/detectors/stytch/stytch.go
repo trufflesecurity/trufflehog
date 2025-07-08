@@ -39,15 +39,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	idMatches := idPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		tokenPatMatch := strings.TrimSpace(match[1])
 
 		for _, idMatch := range idMatches {
-			if len(idMatch) != 2 {
-				continue
-			}
 
 			userPatMatch := strings.TrimSpace(idMatch[1])
 			s1 := detectors.Result{
@@ -79,4 +73,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_Stytch
+}
+
+func (s Scanner) Description() string {
+	return "Stytch is a platform for passwordless authentication. Stytch API keys can be used to access and manage authentication services."
 }

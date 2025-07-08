@@ -11,13 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v67/github"
 	"github.com/k0kubun/go-ansi"
 	"github.com/schollz/progressbar/v3"
+	"golang.org/x/oauth2"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/context"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/sources/git"
-	"golang.org/x/oauth2"
 )
 
 // Assumption: sleeping for 60 seconds is enough to reset the secondary rate limit
@@ -38,7 +39,7 @@ const startingCharLen = 4
 // Max character length (6 is the default maximum)
 // 6 chars == 16M possibilities --> which will take 18k-55k queries.
 // that's really the max that's tolerable since it will take a long time to run.
-// If you increase this to accomdate a MASSIVE repository, it will take a long time to run.
+// If you increase this to accommodate a MASSIVE repository, it will take a long time to run.
 const maxCharLen = 6
 
 // Starting GraphQL query chunk size.
@@ -594,7 +595,7 @@ func (s *Source) EnumerateAndScanAllObjects(ctx context.Context, chunksChan chan
 	}
 
 	// download the repo
-	path, repo, err := git.CloneRepoUsingToken(ctx, ghToken, repoURL, ghUser)
+	path, repo, err := git.CloneRepoUsingToken(ctx, ghToken, repoURL, ghUser, true)
 	if err != nil {
 		return fmt.Errorf("failed to clone the repository: %w", err)
 	}

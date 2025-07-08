@@ -37,9 +37,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
 
 	for _, match := range matches {
-		if len(match) != 2 {
-			continue
-		}
 		resMatch := strings.TrimSpace(match[1])
 
 		s1 := detectors.Result{
@@ -69,4 +66,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 func (s Scanner) Type() detectorspb.DetectorType {
 	return detectorspb.DetectorType_TravelPayouts
+}
+
+func (s Scanner) Description() string {
+	return "TravelPayouts is a travel affiliate network that provides access to various travel-related APIs. TravelPayouts keys can be used to interact with these APIs to retrieve travel data and earn commissions on bookings."
 }
