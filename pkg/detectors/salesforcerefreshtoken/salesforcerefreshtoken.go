@@ -151,9 +151,3 @@ func (s Scanner) verifyMatch(ctx context.Context, client *http.Client, refreshTo
 type introspectAPIResponse struct {
 	Active bool `json:"active"`
 }
-
-// Reusable error response struct
-type oauthErrorResponse struct {
-	Error            string `json:"error"`
-	ErrorDescription string `json:"error_description"`
-}
