@@ -126,6 +126,8 @@ github.com/avast/apkparser v0.0.0-20250307094510-e2100ee9c0f5 h1:zRaiVswCgpvZ6ly
 github.com/avast/apkparser v0.0.0-20250307094510-e2100ee9c0f5/go.mod h1:GNvprXNmXaDjpHmN3RFxz5QdK5VXTUvmQludCbjoBy4=
 github.com/avast/apkparser v0.0.0-20250530053210-166ba1767cb9 h1:/c8YtwIZvwI43QdQh/nh5s4GYWnMPqnzZNJ5JFxMAkU=
 github.com/avast/apkparser v0.0.0-20250530053210-166ba1767cb9/go.mod h1:3F9A8btIerUcuy7Fmno+g/nIk4ELKJ6NCs2/KK1bvLs=
+github.com/avast/apkparser v0.0.0-20250626104540-d53391f4d69d h1:PGSn2pnK/u5ZBompy83R6Wo4BqLYp3dX43QWDoPv7TA=
+github.com/avast/apkparser v0.0.0-20250626104540-d53391f4d69d/go.mod h1:3F9A8btIerUcuy7Fmno+g/nIk4ELKJ6NCs2/KK1bvLs=
 github.com/aws/aws-sdk-go-v2 v1.36.3 h1:mJoei2CxPutQVxaATCzDUjcZEjVRdpsiiXi2o38yqWM=
 github.com/aws/aws-sdk-go-v2 v1.36.3/go.mod h1:LLXuLpgzEbD766Z5ECcRmi8AzSwfZItDtmABVkRLGzg=
 github.com/aws/aws-sdk-go-v2 v1.36.4 h1:GySzjhVvx0ERP6eyfAbAuAXLtAda5TEy19E5q5W8I9E=
