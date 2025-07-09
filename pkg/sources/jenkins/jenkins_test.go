@@ -93,11 +93,11 @@ func createMockJenkinsServer(jobName string, buildNumber int, logContent string)
 // logs to large CI/CD outputs.
 func TestJenkinsVariousSizes(t *testing.T) {
 	testCases := []struct {
-		name          string
-		dataSize      int
-		pattern       string
-		jobName       string
-		buildNumber   int
+		name        string
+		dataSize    int
+		pattern     string
+		jobName     string
+		buildNumber int
 	}{
 		{
 			name:        "small_60KB",
@@ -179,9 +179,9 @@ func TestJenkinsVariousSizes(t *testing.T) {
 			// Verify that large logs are actually being split into multiple chunks.
 			// This catches regressions where chunking logic might not be working.
 			// Data larger than a single chunk should result in multiple chunks.
-			if tc.dataSize > sources.ChunkSize && len(chunks) <= 1 {
+			if tc.dataSize > sources.DefaultChunkSize && len(chunks) <= 1 {
 				t.Logf("Got only %d chunk for data size %d bytes (chunk size: %d bytes), may indicate chunking not working as expected",
-					len(chunks), tc.dataSize, sources.ChunkSize)
+					len(chunks), tc.dataSize, sources.DefaultChunkSize)
 			}
 
 			// Ensure no individual chunk exceeds the maximum allowed size.
