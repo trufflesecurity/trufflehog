@@ -1,10 +1,13 @@
 package docker
 
 import (
+	"io"
 	"strings"
 	"sync"
 	"testing"
 
+	image "github.com/docker/docker/api/types/image"
+	dockerClient "github.com/docker/docker/client"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -153,10 +156,30 @@ func TestDockerImageScanFromLocalDaemon(t *testing.T) {
 		},
 	}
 
+	// pull the image here to ensure it exists locally
+	img := "docker.io/trufflesecurity/secrets:latest"
+
+	client, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv, dockerClient.WithAPIVersionNegotiation())
+	if err != nil {
+		t.Errorf("Failed to create Docker client: %v", err)
+	}
+
+	resp, err := client.ImagePull(context.TODO(), img, image.PullOptions{})
+	if err != nil {
+		t.Errorf("Failed to load image %s: %v", img, err)
+	}
+
+	defer resp.Close()
+
+	// if we don't read the response, the image will not be available in the local Docker daemon
+	_, err = io.ReadAll(resp)
+	if err != nil {
+		t.Errorf("Failed to read response body: %v", err)
+	}
+
 	for _, tt := range dockerDaemonTestCases {
 		t.Run(tt.name, func(t *testing.T) {
-			// This test assumes the local Docker daemon is running and the image exists locally.
-			// You may need to pull or build the image "trufflesecurity/secrets" locally before running this test.
+			// This test assumes the local Docker daemon is running
 			dockerConn := &sourcespb.Docker{
 				Credential: &sourcespb.Docker_Unauthenticated{
 					Unauthenticated: &credentialspb.Unauthenticated{},
@@ -165,7 +188,7 @@ func TestDockerImageScanFromLocalDaemon(t *testing.T) {
 			}
 
 			conn := &anypb.Any{}
-			err := conn.MarshalFrom(dockerConn)
+			err = conn.MarshalFrom(dockerConn)
 			assert.NoError(t, err)
 
 			s := &Source{}
