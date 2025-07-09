@@ -450,6 +450,9 @@ func run(state overseer.State) {
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
 
+	// OSS Default simplified gitlab enumeration
+	feature.UseSimplifiedGitlabEnumeration.Store(true)
+
 	conf := &config.Config{}
 	if *configFilename != "" {
 		var err error
