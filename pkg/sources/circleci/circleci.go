@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"sync/atomic"
 
 	"github.com/go-errors/errors"
@@ -23,7 +25,8 @@ import (
 const (
 	SourceType = sourcespb.SourceType_SOURCE_TYPE_CIRCLECI
 
-	baseURL = "https://circleci.com/api/v1.1/"
+	// CircleCI has released API v2, but we're continuing to use v1.1 for now because it still supports listing endpoints and remains officially supported.
+	baseURL = "https://circleci.com/api/v1.1"
 )
 
 type Source struct {
@@ -36,6 +39,35 @@ type Source struct {
 	sources.Progress
 	client *http.Client
 	sources.CommonSourceUnitUnmarshaller
+}
+
+// CircleCI API Response types
+type project struct {
+	VCS      string `json:"vcs_type"`
+	Username string `json:"username"`
+	RepoName string `json:"reponame"`
+	VCSUrl   string `json:"vcs_url"`
+}
+
+type build struct {
+	BuildNum int `json:"build_num"`
+}
+
+type buildJobs struct {
+	CircleYAML struct {
+		YamlString string `json:"string"`
+	} `json:"circle_yml"`
+	Steps []buildStep `json:"steps"`
+}
+
+type buildStep struct {
+	Name    string   `json:"name"`
+	Actions []action `json:"actions"`
+}
+
+type action struct {
+	Index     int    `json:"index"`
+	OutputURL string `json:"output_url"`
 }
 
 // Ensure the Source satisfies the interfaces at compile time.
@@ -82,41 +114,49 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 
 // Chunks emits chunks of bytes over a channel.
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
-	projects, err := s.projects(ctx)
+	// TODO: list Artifacts, list checkout-keys, list env-variables
+
+	// list all projects
+	projects, err := s.listAllProjects(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting projects: %w", err)
 	}
 
-	var scanned uint64
+	var projectsScanned uint64
 	scanErrs := sources.NewScanErrors()
 
-	for _, proj := range projects {
+	for _, project := range projects {
 		s.jobPool.Go(func() error {
-			builds, err := s.buildsForProject(ctx, proj)
+			projBuilds, err := s.listProjectBuilds(ctx, &project)
 			if err != nil {
-				scanErrs.Add(fmt.Errorf("error getting builds for project %s: %w", proj.RepoName, err))
+				scanErrs.Add(fmt.Errorf("error getting builds for project %s: %w", project.RepoName, err))
 				return nil
 			}
 
-			for _, bld := range builds {
-				buildSteps, err := s.stepsForBuild(ctx, proj, bld)
+			for _, build := range projBuilds {
+				projBuildJobs, err := s.listProjBuildJobs(ctx, &project, &build)
 				if err != nil {
-					scanErrs.Add(fmt.Errorf("error getting steps for build %d: %w", bld.BuildNum, err))
+					scanErrs.Add(fmt.Errorf("error getting steps for build %d: %w", build.BuildNum, err))
 					return nil
 				}
 
-				for _, step := range buildSteps {
+				for _, step := range projBuildJobs.Steps {
 					for _, action := range step.Actions {
-						if err = s.chunkAction(ctx, proj, bld, action, step.Name, chunksChan); err != nil {
+						if err = s.chunkAction(ctx, project, build, action, step.Name, chunksChan); err != nil {
 							scanErrs.Add(fmt.Errorf("error chunking action %v: %w", action, err))
 							return nil
 						}
 					}
 				}
+
+				if err = s.chunkCircleCIYamlString(ctx, project, build, projBuildJobs.CircleYAML.YamlString, chunksChan); err != nil {
+					scanErrs.Add(fmt.Errorf("error chunking build yaml: %w", err))
+					return nil
+				}
 			}
 
-			atomic.AddUint64(&scanned, 1)
-			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", scanned, len(projects)))
+			atomic.AddUint64(&projectsScanned, 1)
+			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", projectsScanned, len(projects)))
 			return nil
 		})
 	}
@@ -129,115 +169,143 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 	return nil
 }
 
-type project struct {
-	VCS      string `json:"vcs_type"`
-	Username string `json:"username"`
-	RepoName string `json:"reponame"`
-}
-
-func (s *Source) projects(_ context.Context) ([]project, error) {
-	reqURL := fmt.Sprintf("%sprojects", baseURL)
-	req, err := http.NewRequest("GET", reqURL, nil)
+// listAllProjects lists all the projects the token can access
+func (s *Source) listAllProjects(ctx context.Context) ([]project, error) {
+	ctx.Logger().V(5).Info("listing projects")
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/projects", baseURL), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("Circle-Token", s.token)
 	req.Header.Set("Accept", "application/json")
-	res, err := s.client.Do(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	if res.StatusCode > 399 && res.StatusCode < 500 {
-		return nil, fmt.Errorf("invalid credentials, status %d", res.StatusCode)
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var projects []project
+		if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
+			return nil, err
+		}
+
+		ctx.Logger().V(2).Info(fmt.Sprintf("successfully listed %d projects", len(projects)))
+
+		return projects, nil
+	case http.StatusUnauthorized:
+		return nil, fmt.Errorf("invalid credentials, status %d", resp.StatusCode)
+	default:
+		return nil, fmt.Errorf("unexpected status code: %d while listing projects", resp.StatusCode)
 	}
-
-	var projects []project
-	if err := json.NewDecoder(res.Body).Decode(&projects); err != nil {
-		return nil, err
-	}
-
-	return projects, nil
 }
 
-type build struct {
-	BuildNum int `json:"build_num"`
-}
+func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]build, error) {
+	// the vcs url is in format //circle.com/org-id/proj-id, so we need to remove the // and .com to use it in the API
+	vcsURL := strings.ReplaceAll(proj.VCSUrl, "//", "")
+	vcsURL = strings.ReplaceAll(vcsURL, ".com", "")
 
-func (s *Source) buildsForProject(_ context.Context, proj project) ([]build, error) {
-	reqURL := fmt.Sprintf("%sproject/%s/%s/%s", baseURL, proj.VCS, proj.Username, proj.RepoName)
-	req, err := http.NewRequest("GET", reqURL, nil)
+	// update clean vcs url in the project for later use
+	proj.VCSUrl = vcsURL
+
+	ctx.Logger().V(5).Info(fmt.Sprintf("listing project: %s builds with URL: %s", proj.RepoName, proj.VCSUrl))
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/project/%s", baseURL, vcsURL), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("Circle-Token", s.token)
 	req.Header.Set("Accept", "application/json")
-	res, err := s.client.Do(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	var builds []build
-	if err := json.NewDecoder(res.Body).Decode(&builds); err != nil {
-		return nil, err
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var builds []build
+		if err := json.NewDecoder(resp.Body).Decode(&builds); err != nil {
+			return nil, err
+		}
+
+		ctx.Logger().V(2).Info(fmt.Sprintf("successfully listed %d builds for project: %s", len(builds), proj.RepoName))
+
+		return builds, nil
+	case http.StatusNotFound:
+		return nil, fmt.Errorf("no builds found for project: %s", proj.RepoName)
+	default:
+		return nil, fmt.Errorf("unexpected status code while fetching builds for project: %s", proj.RepoName)
 	}
 
-	return builds, nil
 }
 
-type action struct {
-	Index     int    `json:"index"`
-	OutputURL string `json:"output_url"`
-}
-
-type buildStep struct {
-	Name    string   `json:"name"`
-	Actions []action `json:"actions"`
-}
-
-func (s *Source) stepsForBuild(_ context.Context, proj project, bld build) ([]buildStep, error) {
-	reqURL := fmt.Sprintf("%sproject/%s/%s/%s/%d", baseURL, proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
-	req, err := http.NewRequest("GET", reqURL, nil)
+func (s *Source) listProjBuildJobs(ctx context.Context, proj *project, projectBuild *build) (*buildJobs, error) {
+	ctx.Logger().V(5).Info(fmt.Sprintf("listing project: %s build: %d jobs", proj.RepoName, projectBuild.BuildNum))
+	// /project/circleci/org-id/proj-id/1
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/project/%s/%d", baseURL, proj.VCSUrl, projectBuild.BuildNum), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("Circle-Token", s.token)
 	req.Header.Set("Accept", "application/json")
-	res, err := s.client.Do(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
 
-	type buildRes struct {
-		Steps []buildStep `json:"steps"`
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var buildResp buildJobs
+		if err := json.NewDecoder(resp.Body).Decode(&buildResp); err != nil {
+			return nil, err
+		}
+
+		ctx.Logger().V(2).Info(fmt.Sprintf("successfully listed project: %s build: %d jobs", proj.RepoName, projectBuild.BuildNum))
+
+		return &buildResp, nil
+	default:
+		return nil, fmt.Errorf("unexpected status code: %d while fetching project: %s build: %d jobs", resp.StatusCode, proj.RepoName, projectBuild.BuildNum)
 	}
-
-	var bldRes buildRes
-	if err := json.NewDecoder(res.Body).Decode(&bldRes); err != nil {
-		return nil, err
-	}
-
-	return bldRes.Steps, nil
 }
 
-func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act action, stepName string, chunksChan chan *sources.Chunk) error {
-	req, err := http.NewRequest("GET", act.OutputURL, nil)
+func (s *Source) chunkAction(ctx context.Context, proj project, projectBuild build, action action, stepName string, chunksChan chan *sources.Chunk) error {
+	req, err := http.NewRequest(http.MethodGet, action.OutputURL, nil)
 	if err != nil {
 		return err
 	}
-	res, err := s.client.Do(req)
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, bld.BuildNum)
+	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, projectBuild.BuildNum)
 
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, res.Body)
+	chunkResChan := chunkReader(ctx, resp.Body)
 	for data := range chunkResChan {
 		chunk := &sources.Chunk{
 			SourceType: s.Type(),
@@ -251,7 +319,7 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 						VcsType:     proj.VCS,
 						Username:    proj.Username,
 						Repository:  proj.RepoName,
-						BuildNumber: int64(bld.BuildNum),
+						BuildNumber: int64(projectBuild.BuildNum),
 						BuildStep:   stepName,
 						Link:        linkURL,
 					},
@@ -263,6 +331,46 @@ func (s *Source) chunkAction(ctx context.Context, proj project, bld build, act a
 		if err := data.Error(); err != nil {
 			return err
 		}
+
+		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Source) chunkCircleCIYamlString(ctx context.Context, proj project, projectBuild build, yamlString string, chunksChan chan *sources.Chunk) error {
+	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, projectBuild.BuildNum)
+
+	chunkReader := sources.NewChunkReader()
+	chunkResChan := chunkReader(ctx, strings.NewReader(yamlString))
+	for data := range chunkResChan {
+		chunk := &sources.Chunk{
+			SourceType: s.Type(),
+			SourceName: s.name,
+			SourceID:   s.SourceID(),
+			JobID:      s.JobID(),
+			Data:       removeCircleSha1Line(data.Bytes()),
+			SourceMetadata: &source_metadatapb.MetaData{
+				Data: &source_metadatapb.MetaData_Circleci{
+					Circleci: &source_metadatapb.CircleCI{
+						VcsType:     proj.VCS,
+						Username:    proj.Username,
+						Repository:  proj.RepoName,
+						BuildNumber: int64(projectBuild.BuildNum),
+						BuildStep:   "",
+						Link:        linkURL,
+					},
+				},
+			},
+			Verify: s.verify,
+		}
+		chunk.Data = data.Bytes()
+		if err := data.Error(); err != nil {
+			return err
+		}
+
 		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
 			return err
 		}
