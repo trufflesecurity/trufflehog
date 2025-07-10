@@ -3,6 +3,7 @@ package circleci
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -64,6 +65,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Circle,
 			Raw:          []byte(token),
+			ExtraData: map[string]string{
+				"Version": strconv.Itoa(s.Version()),
+			},
 		}
 
 		if verify {

@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
-
-	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
 type Scanner struct {
@@ -66,6 +66,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		result := detectors.Result{
 			DetectorType: detectorspb.DetectorType_Circle,
 			Raw:          []byte(token),
+			ExtraData: map[string]string{
+				"Version": strconv.Itoa(s.Version()),
+			},
 		}
 
 		if verify {
@@ -82,7 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 func VerifyCircleCIToken(ctx context.Context, client *http.Client, token string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://circleci.com/api/v2/me", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://circleci.com/api/v2/me", http.NoBody)
 	if err != nil {
 		return false, err
 	}
