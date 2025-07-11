@@ -33,7 +33,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Simplified token name pattern using PrefixRegex
-	tokenNamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"tableau", "token_name", "pat_name"}) + `\b([a-zA-Z0-9_-]{3,50})\b`)
+	tokenNamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"tableau", "token", "pat"}) + `(?:name|_name)\s*[:=]\s*["']?([a-zA-Z0-9_-]{3,50})["']?`)
 
 	// Pattern for Personal Access Token Secrets
 	tokenSecretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{22}==:[A-Za-z0-9]{32})\b`)
@@ -74,7 +74,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	// Use maps to deduplicate endpoints
 	var uniqueEndpoints = make(map[string]struct{})
 
-	// Add found + configured endpoints to the list
+	// Add endpoints to the list
+	s.UseFoundEndpoints(true)
 	for _, endpoint := range s.Endpoints(foundURLs...) {
 		// Remove https:// prefix if present since we add it during verification
 		endpoint = strings.TrimPrefix(endpoint, "https://")
@@ -104,7 +105,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 					result.SetVerificationError(verificationErr, tokenName, tokenSecret, endpoint)
 				}
-
 				results = append(results, result)
 			}
 		}
@@ -116,7 +116,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // extractTokenNames finds all potential token names in the data
 func extractTokenNames(data string) []string {
 	var names []string
-	
+
 	for _, match := range tokenNamePat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			name := strings.TrimSpace(match[1])
@@ -125,7 +125,7 @@ func extractTokenNames(data string) []string {
 			}
 		}
 	}
-	
+
 	return names
 }
 

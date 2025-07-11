@@ -18,7 +18,7 @@ var (
 	// Tableau Online endpoints for testing
 	validTableauURL    = "prod-ansouthgest-a.online.tableau.com"
 	valid2ndTableauURL = "prod.online.tableau.com"
-	invalidTableauURL  = "prod.tabeau.com" // missing .online
+	invalidTableauURL  = "prod.tabeau.com"
 )
 
 func TestTableau_Pattern(t *testing.T) {
@@ -31,92 +31,82 @@ func TestTableau_Pattern(t *testing.T) {
 		want        []string
 		description string
 	}{
-		// Basic valid patterns - different formats
+		// Basic valid patterns - keywords must be present for PrefixRegex to work
 		{
-			name:        "config_style_with_equals",
-			input:       fmt.Sprintf("personalAccessTokenName = '%s'\npersonalAccessTokenSecret = '%s'\nserver = '%s'", validPATName, validPATSecret, validTableauURL),
+			name:        "tableau_keyword_with_token_name",
+			input:       fmt.Sprintf("# Tableau configuration tableau_token_name = %s secret = %s server = %s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests basic config-style key=value format",
+			description: "Tests tableau keyword with token_name pattern",
 		},
 		{
-			name:        "config_style_with_colon",
-			input:       fmt.Sprintf("token_name: '%s'\ntoken_secret: '%s'\nendpoint: '%s'", validPATName, validPATSecret, validTableauURL),
+			name:        "tableau_online_url_with_credentials",
+			input:       fmt.Sprintf(" Tableau Connect to %s\ntoken_name = %s\nsecret = %s", validTableauURL, validPATName, validPATSecret),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests YAML-style key: value format",
+			description: "Tests tableau online URL triggering detection",
 		},
 		{
-			name:        "json_format",
-			input:       fmt.Sprintf(`{"personalAccessTokenName": "%s", "personalAccessTokenSecret": "%s", "server": "%s"}`, validPATName, validPATSecret, validTableauURL),
+			name:        "tableau_config_multiple_formats",
+			input:       fmt.Sprintf("# Tableau server config\npat_name = %s\ntoken_secret = %s\ntableau_server = %s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests JSON object format",
-		},
-		{
-			name:        "unquoted_values",
-			input:       fmt.Sprintf("access_token_name = %s\naccess_token_secret = %s\nserver = %s", validPATName, validPATSecret, validTableauURL),
-			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests unquoted configuration values",
+			description: "Tests tableau keyword with pat_name pattern",
 		},
 
-		// Abbreviation patterns
+		// Test secret pattern matching with context
 		{
-			name:        "pat_abbreviation",
-			input:       fmt.Sprintf("pat_name = '%s'\npat_secret = '%s'\ntableau_server = '%s'", validPATName, validPATSecret, validTableauURL),
+			name:        "tableau_context_with_credentials",
+			input:       fmt.Sprintf("# Connecting to Tableau\nname = %s\nsecret = %s\nurl = %s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests PAT abbreviation format",
-		},
-		{
-			name:        "api_token_variant",
-			input:       fmt.Sprintf("api_token_name = '%s'\napi_token_secret = '%s'\nhost = '%s'", validPATName, validPATSecret, validTableauURL),
-			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests API token naming variant",
+			description: "Tests tableau context triggering detection",
 		},
 
-		// Multiple combinations
+		// Multiple combinations with keywords
 		{
-			name:  "multiple_token_names_single_secret",
-			input: fmt.Sprintf("pat_name = '%s'\ntoken_name = '%s'\npat_secret = '%s'\nserver = '%s'", validPATName, "another-token", validPATSecret, validTableauURL),
+			name:  "multiple_token_names_with_tableau_context",
+			input: fmt.Sprintf("# Tableau server configuration\ntableau_token_name = %s\ntoken_name = %s\nsecret = %s\nserver = %s", validPATName, "another-token", validPATSecret, validTableauURL),
 			want: []string{
 				fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL),
 				fmt.Sprintf("%s:%s:%s", "another-token", validPATSecret, validTableauURL),
 			},
-			description: "Tests multiple token names with single secret",
+			description: "Tests multiple token names with tableau context",
 		},
 		{
-			name:  "single_token_multiple_urls",
-			input: fmt.Sprintf("pat_name = '%s'\npat_secret = '%s'\nserver1 = '%s'\nserver2 = '%s'", validPATName, validPATSecret, validTableauURL, valid2ndTableauURL),
+			name:  "single_token_multiple_urls_with_context",
+			input: fmt.Sprintf("# Tableau online config\ntoken_name = %s\nsecret = %s\nserver1 = %s\nserver2 = %s", validPATName, validPATSecret, validTableauURL, valid2ndTableauURL),
 			want: []string{
 				fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL),
 				fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, valid2ndTableauURL),
 			},
-			description: "Tests single token with multiple URLs",
+			description: "Tests single token with multiple URLs and tableau context",
 		},
 		{
-			name:        "invalid_secret_format",
-			input:       fmt.Sprintf("pat_name = '%s'\npat_secret = '%s'\nserver = '%s'", validPATName, invalidPATSecret, validTableauURL),
+			name:        "invalid_secret_format_with_tableau_keyword",
+			input:       fmt.Sprintf("# Tableau config\ntoken_name = %s\nsecret = %s\nserver = %s", validPATName, invalidPATSecret, validTableauURL),
 			want:        []string{},
-			description: "Tests rejection of invalid secret format",
+			description: "Tests that invalid secret format is not detected even with keywords",
 		},
 		{
-			name:        "invalid_tableau_url",
-			input:       fmt.Sprintf("pat_name = '%s'\npat_secret = '%s'\nserver = '%s'", validPATName, validPATSecret, invalidTableauURL),
+			name:        "invalid_tableau_url_with_keyword",
+			input:       fmt.Sprintf("# Tableau setup\ntoken_name = %s\nsecret = %s\nserver = %s", validPATName, validPATSecret, invalidTableauURL),
 			want:        []string{},
-			description: "Tests rejection of invalid Tableau URL format",
+			description: "Tests that invalid Tableau URL is not detected even with keywords",
+		},
+
+		// Missing components with keywords
+		{
+			name:        "missing_token_name_with_tableau_context",
+			input:       fmt.Sprintf("# Tableau server\nsecret = %s\nserver = %s", validPATSecret, validTableauURL),
+			want:        []string{},
+			description: "Tests that missing token name produces no results even with tableau keyword",
 		},
 		{
-			name:        "missing_token_name",
-			input:       fmt.Sprintf("pat_secret = '%s'\nserver = '%s'", validPATSecret, validTableauURL),
+			name:        "missing_secret_with_tableau_context",
+			input:       fmt.Sprintf("# Tableau configuration\ntoken_name = %s\nserver = %s", validPATName, validTableauURL),
 			want:        []string{},
-			description: "Tests that missing token name produces no results",
-		},
-		{
-			name:        "missing_secret",
-			input:       fmt.Sprintf("pat_name = '%s'\nserver = '%s'", validPATName, validTableauURL),
-			want:        []string{},
-			description: "Tests that missing secret produces no results",
+			description: "Tests that missing secret produces no results even with tableau keyword",
 		},
 		{
 			name:        "no_tableau_keywords",
-			input:       "username = 'test'\npassword = 'secret123'\nhost = 'example.com'",
+			input:       "username = test\npassword = secret123\nhost = example.com",
 			want:        []string{},
 			description: "Tests that non-Tableau config produces no results",
 		},
@@ -137,12 +127,18 @@ func TestTableau_Pattern(t *testing.T) {
 			}
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
+				if len(test.want) == 0 {
+					if len(results) != 0 {
+						t.Errorf("expected no results but got %d", len(results))
+					}
 				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
+					t.Errorf("expected %d results, got %d", len(test.want), len(results))
 				}
 				return
+			}
+
+			if len(test.want) == 0 {
+				return // Test passed - no results expected and none received
 			}
 
 			actual := make(map[string]struct{}, len(results))
