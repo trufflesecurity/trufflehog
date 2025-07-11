@@ -16,10 +16,10 @@ import (
 )
 
 func TestSource_Scan(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	secret, err := common.GetTestSecret(ctx)
+	secret, err := common.GetSecret(ctx, "trufflehog-testing", "test")
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to access secret: %v", err))
 	}
@@ -50,9 +50,9 @@ func TestSource_Scan(t *testing.T) {
 			wantSourceMetadata: &source_metadatapb.MetaData{
 				Data: &source_metadatapb.MetaData_Circleci{
 					Circleci: &source_metadatapb.CircleCI{
-						VcsType:    "github",
-						Username:   "dustin-decker",
-						Repository: "circle-ci",
+						VcsType:    "circleci",
+						Username:   "TruffleSecurity",
+						Repository: "example-leaks",
 						BuildStep:  "Spin up environment",
 					},
 				},
