@@ -32,24 +32,21 @@ func (Scanner) CloudEndpoint() string { return "" }
 var (
 	defaultClient = common.SaneHttpClient()
 
-	// Pattern for Personal Access Token Names - Updated to handle JSON
-	tokenNamePat       = regexp.MustCompile(`(?i)\b(?:(?:tableau)[_-]?)?(?:token[_-]?name|pat[_-]?name|personal[_-]?access[_-]?token[_-]?name|access[_-]?token[_-]?name|pod[_-]?name|personal[_-]?token[_-]?name|api[_-]?token[_-]?name)[_\s]*[:=]\s*["']?([a-zA-Z0-9_-]{3,50})["']?`)
-	quotedTokenNamePat = regexp.MustCompile(`(?i)["'](?:tableau[_-]?)?(?:token[_-]?name|pat[_-]?name|personal[_-]?access[_-]?token[_-]?name|access[_-]?token[_-]?name|pod[_-]?name|personal[_-]?token[_-]?name|api[_-]?token[_-]?name)["']\s*:\s*["']([a-zA-Z0-9_-]{3,50})["']`)
+	// Simplified token name pattern using PrefixRegex
+	tokenNamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"tableau", "token_name", "pat_name"}) + `\b([a-zA-Z0-9_-]{3,50})\b`)
 
-	// Pattern for Personal Access Token Secrets - Updated to handle JSON
+	// Pattern for Personal Access Token Secrets
 	tokenSecretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{22}==:[A-Za-z0-9]{32})\b`)
 
-	// Pattern for Tableau Server URLs
-	tableauURLPat = regexp.MustCompile(`(?i)(?:https?://)?([a-zA-Z0-9\-]+\.online\.tableau\.com)(?:/.*)?`)
+	// Simplified Tableau Server URLs pattern
+	tableauURLPat = regexp.MustCompile(`\b([a-zA-Z0-9\-]+\.online\.tableau\.com)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 func (s Scanner) Keywords() []string {
 	return []string{
-		"personal_access_token",
-		"personalAccessToken",
-		"pat",
 		"tableau",
+		"online.tableau.com",
 	}
 }
 
@@ -74,33 +71,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		return results, nil
 	}
 
-	// Get all endpoints to test
-	var endpointsToTest []string
+	// Use maps to deduplicate endpoints
+	var uniqueEndpoints = make(map[string]struct{})
 
-	if len(foundURLs) > 0 {
-		// Use found URLs only
-		for url := range foundURLs {
-			endpointsToTest = append(endpointsToTest, url)
-		}
-	} else {
-		// Check if the input contains any tableau.com reference (even invalid ones)
-		// If it does, don't use default endpoints - it means they provided a URL but it was invalid
-		if strings.Contains(strings.ToLower(dataStr), "online.tableau.com") {
-			// Invalid tableau URL found, don't use defaults
-			return results, nil
-		}
-
-		// No URLs found at all, use configured endpoints
-		endpointsToTest = append(endpointsToTest, s.Endpoints("")...)
+	// Add found + configured endpoints to the list
+	for _, endpoint := range s.Endpoints(foundURLs...) {
+		// Remove https:// prefix if present since we add it during verification
+		endpoint = strings.TrimPrefix(endpoint, "https://")
+		uniqueEndpoints[endpoint] = struct{}{}
 	}
 
-	// Prepare results slice with estimated capacity
-	results = make([]detectors.Result, 0, len(tokenNames)*len(tokenSecrets)*len(endpointsToTest))
-
 	// Process each combination of token name, token secret, and endpoint
-	for tokenName := range tokenNames {
-		for tokenSecret := range tokenSecrets {
-			for _, endpoint := range endpointsToTest {
+	for _, tokenName := range tokenNames {
+		for _, tokenSecret := range tokenSecrets {
+			for endpoint := range uniqueEndpoints {
 				result := detectors.Result{
 					DetectorType: detectorspb.DetectorType_Tableau,
 					Raw:          []byte(tokenName),
@@ -118,7 +102,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					// Merge verification extra data
 					maps.Copy(result.ExtraData, extraData)
 
-					result.SetVerificationError(verificationErr, fmt.Sprintf("%s:%s@%s", tokenName, tokenSecret, endpoint))
+					result.SetVerificationError(verificationErr, tokenName, tokenSecret, endpoint)
 				}
 
 				results = append(results, result)
@@ -130,41 +114,30 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 // extractTokenNames finds all potential token names in the data
-func extractTokenNames(data string) map[string]struct{} {
-	names := make(map[string]struct{})
-
-	// Find matches using the token name pattern
+func extractTokenNames(data string) []string {
+	var names []string
+	
 	for _, match := range tokenNamePat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			name := strings.TrimSpace(match[1])
-			if name != "" && len(name) >= 3 { // Minimum reasonable token name length
-				names[name] = struct{}{}
+			if name != "" && len(name) >= 3 {
+				names = append(names, name)
 			}
 		}
 	}
-
-	// Find matches using the quoted token name pattern
-	for _, match := range quotedTokenNamePat.FindAllStringSubmatch(data, -1) {
-		if len(match) >= 2 {
-			name := strings.TrimSpace(match[1])
-			if name != "" && len(name) >= 3 { // Minimum reasonable token name length
-				names[name] = struct{}{}
-			}
-		}
-	}
+	
 	return names
 }
 
 // extractTokenSecrets finds all potential token secrets in the data
-func extractTokenSecrets(data string) map[string]struct{} {
-	secrets := make(map[string]struct{})
+func extractTokenSecrets(data string) []string {
+	var secrets []string
 
-	// Find matches using the general secret pattern only
 	for _, match := range tokenSecretPat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			secret := strings.TrimSpace(match[1])
-			if isValidSecretFormat(secret) {
-				secrets[secret] = struct{}{}
+			if secret != "" {
+				secrets = append(secrets, secret)
 			}
 		}
 	}
@@ -173,50 +146,19 @@ func extractTokenSecrets(data string) map[string]struct{} {
 }
 
 // extractTableauURLs finds all potential Tableau server URLs in the data
-func extractTableauURLs(data string) map[string]struct{} {
-	urls := make(map[string]struct{})
+func extractTableauURLs(data string) []string {
+	var urls []string
 
-	// Find matches using the Tableau URL pattern
 	for _, match := range tableauURLPat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
-			url := strings.TrimSpace(match[1]) // This now captures the full URL including .online.tableau.com
+			url := strings.TrimSpace(match[1])
 			if url != "" {
-				urls[url] = struct{}{}
+				urls = append(urls, url)
 			}
 		}
 	}
 
 	return urls
-}
-
-// isValidSecretFormat validates that the secret matches expected Tableau PAT format
-func isValidSecretFormat(secret string) bool {
-	if len(secret) < 20 { // Minimum reasonable length
-		return false
-	}
-
-	parts := strings.Split(secret, ":")
-	if len(parts) != 2 {
-		return false
-	}
-
-	// First part should look like base64 (may end with =)
-	base64Part := parts[0]
-	if len(base64Part) < 16 {
-		return false
-	}
-
-	// Second part should be alphanumeric
-	tokenPart := parts[1]
-	if len(tokenPart) < 20 {
-		return false
-	}
-
-	// Basic pattern validation
-	base64Pattern := regexp.MustCompile(`^[A-Za-z0-9+/]+={0,2}$`)
-	tokenPattern := regexp.MustCompile(`^[A-Za-z0-9]+$`)
-
-	return base64Pattern.MatchString(base64Part) && tokenPattern.MatchString(tokenPart)
 }
 
 // TableauAuthRequest represents the authentication request structure
@@ -286,7 +228,6 @@ func verifyTableauPAT(ctx context.Context, client *http.Client, tokenName, token
 		if strings.Contains(err.Error(), "no such host") ||
 			strings.Contains(err.Error(), "dial tcp") ||
 			strings.Contains(err.Error(), "connection refused") {
-			extraData["verification_status"] = "invalid_endpoint"
 			extraData["network_error"] = "true"
 			return false, extraData, nil // No error, just invalid endpoint
 		}
@@ -310,33 +251,24 @@ func verifyTableauPAT(ctx context.Context, client *http.Client, tokenName, token
 	switch resp.StatusCode {
 	case http.StatusOK:
 		var authResp TableauAuthResponse
-		if err := json.Unmarshal(bodyBytes, &authResp); err == nil {
-			if token := authResp.Credentials.Token; token != "" {
-				extraData["auth_token_received"] = "true"
-				extraData["site_id"] = authResp.Credentials.Site.ID
-				extraData["user_id"] = authResp.Credentials.User.ID
-				extraData["verification_status"] = "valid"
-				return true, extraData, nil
-			}
+		if err := json.Unmarshal(bodyBytes, &authResp); err != nil {
+			return true, extraData, err
 		}
+
+		if token := authResp.Credentials.Token; token != "" {
+			extraData["auth_token_received"] = "true"
+			extraData["site_id"] = authResp.Credentials.Site.ID
+			extraData["user_id"] = authResp.Credentials.User.ID
+			return true, extraData, nil
+		}
+
 		// Fallback success on 200
-		extraData["verification_status"] = "valid"
 		return true, extraData, nil
 
-	case http.StatusUnauthorized:
-		extraData["verification_status"] = "invalid"
-		return false, extraData, nil
-
-	case http.StatusBadRequest:
-		extraData["verification_status"] = "invalid_format"
-		return false, extraData, nil
-
-	case http.StatusForbidden:
-		extraData["verification_status"] = "insufficient_permissions"
+	case http.StatusUnauthorized, http.StatusBadRequest, http.StatusForbidden:
 		return false, extraData, nil
 
 	default:
-		extraData["verification_status"] = "error"
 		return false, extraData, fmt.Errorf("unexpected HTTP response status %d", resp.StatusCode)
 	}
 }
