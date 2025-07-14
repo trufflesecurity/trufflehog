@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 	"net/url"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -328,7 +329,5 @@ type CachedVerificationResult struct {
 // ComputeXXHash computes the XXHash of the given secret and returns it as a string.
 // This hash can be used as a unique identifier for caching purposes.
 func ComputeXXHash(secret []byte) string {
-	h := xxhash.New()
-	h.Write(secret)
-	return string(h.Sum(nil))
+	return strconv.FormatUint(xxhash.Sum64(secret), 10)
 }
