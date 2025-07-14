@@ -1,4 +1,4 @@
-package dwolla
+package circleci
 
 import (
 	"context"
@@ -10,35 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-		api:
-			auth_type: "Basic"
-			in: "Header"
-			api_version: v1
-			dwolla_id: "MvkLktYDS7PSE0xRMHIYBKrAjXruEk5P1VrJUUGtgspa3KTi6r"
-			dwolla_secret: "q3DZbY7iviUpewfCHEpK1I51G8XW63GuLuJyAIEqOFtEB1qlg1"
-			base_url: "https://api.example.com/$api_version/example"
-			response_code: 200
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
-	`
-	secrets = []string{
-		"MvkLktYDS7PSE0xRMHIYBKrAjXruEk5P1VrJUUGtgspa3KTi6rq3DZbY7iviUpewfCHEpK1I51G8XW63GuLuJyAIEqOFtEB1qlg1",
-		"q3DZbY7iviUpewfCHEpK1I51G8XW63GuLuJyAIEqOFtEB1qlg1MvkLktYDS7PSE0xRMHIYBKrAjXruEk5P1VrJUUGtgspa3KTi6r",
-	}
-)
-
-func TestDwollaPattern(t *testing.T) {
+func TestCircleCI_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -48,9 +20,25 @@ func TestDwollaPattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  secrets,
+			name: "valid pattern",
+			input: `
+				# Configuration File: config.yaml
+				database:
+					host: $DB_HOST
+					port: $DB_PORT
+					username: $DB_USERNAME
+					password: $DB_PASS  # IMPORTANT: Do not share this password publicly
+
+				api:
+					auth_type: API-Key
+					base_url: "https://api.example.com/v1/user"
+					api_key: "CCIPAT_FAKEd5qPreGFAKEaQxBi6i_914bf0042f4f2d34e1d2ef6615c051a5caf70172"
+
+				# Notes:
+				# - Remember to rotate the secret every 90 days.
+				# - The above credentials should only be used in a secure environment.
+			`,
+			want: []string{"CCIPAT_FAKEd5qPreGFAKEaQxBi6i_914bf0042f4f2d34e1d2ef6615c051a5caf70172"},
 		},
 	}
 

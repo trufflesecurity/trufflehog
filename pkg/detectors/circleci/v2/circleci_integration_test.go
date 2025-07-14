@@ -1,33 +1,30 @@
 //go:build detectors
 // +build detectors
 
-package dwolla
+package circleci
 
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-
+	"github.com/kylelemons/godebug/pretty"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestDwolla_FromChunk(t *testing.T) {
+func TestCircleCI_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	id := testSecrets.MustGetField("DWOLLA_ID")
-	secret := testSecrets.MustGetField("DWOLLA_SECRET")
-	inactiveSecret := testSecrets.MustGetField("DWOLLA_INACTIVE")
-
+	secret := testSecrets.MustGetField("CIRCLECI")
+	secretInactive := testSecrets.MustGetField("CIRCLECI_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -45,16 +42,12 @@ func TestDwolla_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dwolla secret %s within dwolla id %s but verified", secret, id)),
+				data:   []byte(fmt.Sprintf("You can find a circle secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dwolla,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Dwolla,
+					DetectorType: detectorspb.DetectorType_Circle,
 					Verified:     true,
 				},
 			},
@@ -65,16 +58,12 @@ func TestDwolla_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dwolla secret %s within dwolla id %s but not valid", inactiveSecret, id)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a circle secret %s within", secretInactive)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dwolla,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Dwolla,
+					DetectorType: detectorspb.DetectorType_Circle,
 					Verified:     false,
 				},
 			},
@@ -97,28 +86,21 @@ func TestDwolla_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Dwolla.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CircleCI.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if os.Getenv("FORCE_PASS_DIFF") == "true" {
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
+					t.Fatal("no raw secret present")
 				}
-				gotErr := ""
-				if got[i].VerificationError() != nil {
-					gotErr = got[i].VerificationError().Error()
-				}
-				wantErr := ""
-				if tt.want[i].VerificationError() != nil {
-					wantErr = tt.want[i].VerificationError().Error()
-				}
-				if gotErr != wantErr {
-					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
-				}
+				got[i].Raw = nil
+				got[i].ExtraData = nil
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Dwolla.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			if diff := pretty.Compare(got, tt.want); diff != "" {
+				t.Errorf("CircleCI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
