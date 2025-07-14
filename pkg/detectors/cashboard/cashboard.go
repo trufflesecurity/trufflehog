@@ -89,8 +89,6 @@ func verifyMatch(ctx context.Context, client *http.Client, user, token string) (
 		_ = res.Body.Close()
 	}()
 
-	fmt.Println("res.StatusCode =>", res.StatusCode)
-
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil
