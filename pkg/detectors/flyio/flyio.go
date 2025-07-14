@@ -30,7 +30,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"flyio", "FlyV1"}
+	return []string{"FlyV1"}
 }
 
 // FromData will find and optionally verify Flyio secrets in a given set of bytes.
