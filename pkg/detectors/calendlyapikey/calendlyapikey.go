@@ -3,6 +3,7 @@ package calendlyapikey
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -22,7 +23,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"calendly"}) + `\b(eyJ[A-Za-z0-9-_]{100,300}\.eyJ[A-Za-z0-9-_]{100,300}\.[A-Za-z0-9-_]+)\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"calendly"}) + `\b(eyJ[A-Za-z0-9-_]{10,300}\.eyJ[A-Za-z0-9-_]{10,300}\.[A-Za-z0-9-_]+)\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -46,24 +47,42 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://api.calendly.com/users/me", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-				}
-			}
+			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(verificationErr, resMatch)
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.calendly.com/users/me", http.NoBody)
+	if err != nil {
+		return false, nil
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	res, err := client.Do(req)
+
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
