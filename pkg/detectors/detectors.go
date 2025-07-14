@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/source_metadatapb"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/sourcespb"
@@ -315,4 +316,19 @@ func ParseURLAndStripPathAndParams(u string) (*url.URL, error) {
 	parsedURL.Path = ""
 	parsedURL.RawQuery = ""
 	return parsedURL, nil
+}
+
+// CachedVerificationResult holds the result of a secret verification.
+// It includes whether the secret was verified and any error that occurred during verification.
+type CachedVerificationResult struct {
+	Verified        bool
+	VerificationErr error
+}
+
+// ComputeXXHash computes the XXHash of the given secret and returns it as a string.
+// This hash can be used as a unique identifier for caching purposes.
+func ComputeXXHash(secret []byte) string {
+	h := xxhash.New()
+	h.Write(secret)
+	return string(h.Sum(nil))
 }

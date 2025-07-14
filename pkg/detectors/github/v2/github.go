@@ -3,9 +3,11 @@ package github
 import (
 	"context"
 	"fmt"
+	"time"
 
 	regexp "github.com/wasilibs/go-re2"
 
+	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	v1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/github/v1"
@@ -37,7 +39,18 @@ var (
 
 	// TODO: Oauth2 client_id and client_secret
 	// https://developer.github.com/v3/#oauth2-keysecret
+
+	credsCache = simple.NewCache(simple.WithExpirationInterval[detectors.CachedVerificationResult](1*time.Hour),
+		simple.WithPurgeInterval[detectors.CachedVerificationResult](1*time.Hour))
 )
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Github
+}
+
+func (s Scanner) Description() string {
+	return "GitHub is a platform for version control and collaboration. Personal access tokens (PATs) can be used to access and modify repositories and other resources."
+}
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -53,7 +66,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for _, match := range matches {
 		// First match is entire regex, second is the first group.
-
 		token := match[1]
 
 		s1 := detectors.Result{
@@ -64,6 +76,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				"version":        fmt.Sprintf("%d", s.Version()),
 			},
 			AnalysisInfo: map[string]string{"key": token},
+		}
+
+		if useCachedVerification(&s1) {
+			results = append(results, s1)
+			continue
 		}
 
 		if verify {
@@ -79,6 +96,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if headers != nil {
 				v1.SetHeaderInfo(headers, &s1)
 			}
+
+			credsCache.Set(detectors.ComputeXXHash(s1.Raw), detectors.CachedVerificationResult{
+				Verified:        s1.Verified,
+				VerificationErr: s1.VerificationError(),
+			})
 		}
 
 		results = append(results, s1)
@@ -87,10 +109,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Github
-}
+// useCachedVerification checks the cache for a verification result corresponding to the secret in the provided result.
+// If a cached result is found, it updates the result verification fields with the cached data and returns true.
+// If no cached result is found, it returns false.
+func useCachedVerification(result *detectors.Result) bool {
+	credData, exist := credsCache.Get(detectors.ComputeXXHash(result.Raw))
+	if exist {
+		result.Verified = credData.Verified
+		result.SetVerificationError(credData.VerificationErr)
+		result.VerificationFromCache = true
 
-func (s Scanner) Description() string {
-	return "GitHub is a platform for version control and collaboration. Personal access tokens (PATs) can be used to access and modify repositories and other resources."
+		return true
+	}
+
+	return false
 }
