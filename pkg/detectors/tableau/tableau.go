@@ -33,7 +33,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Simplified token name pattern using PrefixRegex
-	tokenNamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"tableau", "token", "pat"}) + `(?:name|_name)\s*[:=]\s*["']?([a-zA-Z0-9_-]{3,50})["']?`)
+	tokenNamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"tableau", "token", "pat", "name"}) + `\s*["']?([a-zA-Z0-9_-]{3,50})["']?`)
 
 	// Pattern for Personal Access Token Secrets
 	tokenSecretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{22}==:[A-Za-z0-9]{32})\b`)
@@ -57,7 +57,6 @@ func (s Scanner) getClient() *http.Client {
 	return defaultClient
 }
 
-// FromData will find and optionally verify Tableau Personal Access Token credentials in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
@@ -75,7 +74,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	var uniqueEndpoints = make(map[string]struct{})
 
 	// Add endpoints to the list
-	s.UseFoundEndpoints(true)
 	for _, endpoint := range s.Endpoints(foundURLs...) {
 		// Remove https:// prefix if present since we add it during verification
 		endpoint = strings.TrimPrefix(endpoint, "https://")
@@ -90,19 +88,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_Tableau,
 					Raw:          []byte(tokenName),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", tokenName, tokenSecret, endpoint)),
-					ExtraData: map[string]string{
-						"credential_type": "personal_access_token",
-					},
 				}
 
 				if verify {
 					client := s.getClient()
 					isVerified, extraData, verificationErr := verifyTableauPAT(ctx, client, tokenName, tokenSecret, endpoint)
 					result.Verified = isVerified
-
-					// Merge verification extra data
 					maps.Copy(result.ExtraData, extraData)
-
 					result.SetVerificationError(verificationErr, tokenName, tokenSecret, endpoint)
 				}
 				results = append(results, result)
@@ -116,23 +108,18 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // extractTokenNames finds all potential token names in the data
 func extractTokenNames(data string) []string {
 	var names []string
-
 	for _, match := range tokenNamePat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			name := strings.TrimSpace(match[1])
-			if name != "" && len(name) >= 3 {
-				names = append(names, name)
-			}
+			names = append(names, name)
 		}
 	}
-
 	return names
 }
 
 // extractTokenSecrets finds all potential token secrets in the data
 func extractTokenSecrets(data string) []string {
 	var secrets []string
-
 	for _, match := range tokenSecretPat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			secret := strings.TrimSpace(match[1])
@@ -141,7 +128,6 @@ func extractTokenSecrets(data string) []string {
 			}
 		}
 	}
-
 	return secrets
 }
 
@@ -243,9 +229,6 @@ func verifyTableauPAT(ctx context.Context, client *http.Client, tokenName, token
 	if err != nil {
 		return false, nil, fmt.Errorf("failed to read response body: %v", err)
 	}
-
-	// Add HTTP status to metadata
-	extraData["http_status"] = fmt.Sprintf("%d", resp.StatusCode)
 
 	// Status code handling...
 	switch resp.StatusCode {
