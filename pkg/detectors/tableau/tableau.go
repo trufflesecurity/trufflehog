@@ -126,9 +126,7 @@ func extractTokenSecrets(data string) []string {
 	for _, match := range tokenSecretPat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			secret := strings.TrimSpace(match[1])
-			if secret != "" {
-				secrets = append(secrets, secret)
-			}
+			secrets = append(secrets, secret)
 		}
 	}
 	return secrets
