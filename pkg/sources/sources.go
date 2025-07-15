@@ -342,6 +342,8 @@ type GitlabConfig struct {
 	Token string
 	// Repos is the list of repositories to scan.
 	Repos []string
+	// GroupIds is the list of groups to scan.
+	GroupIds []string
 	// Filter is the filter to use to scan the source.
 	Filter *common.Filter
 	// SkipBinaries allows skipping binary files from the scan.
