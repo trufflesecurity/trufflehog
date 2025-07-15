@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	regexp "github.com/wasilibs/go-re2"
@@ -30,6 +31,7 @@ func (s Scanner) Version() int {
 func (Scanner) CloudEndpoint() string { return "https://api.github.com" }
 
 var (
+	client = common.SaneHttpClient()
 	// Oauth token
 	// https://developer.github.com/v3/#oauth2-token-sent-in-a-header
 	// Token type list:
@@ -78,29 +80,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			AnalysisInfo: map[string]string{"key": token},
 		}
 
-		if useCachedVerification(&s1) {
-			results = append(results, s1)
-			continue
-		}
-
 		if verify {
-			client := common.SaneHttpClient()
-
-			isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
-			s1.Verified = isVerified
-			s1.SetVerificationError(err, token)
-
-			if userResponse != nil {
-				v1.SetUserResponse(userResponse, &s1)
-			}
-			if headers != nil {
-				v1.SetHeaderInfo(headers, &s1)
-			}
-
-			credsCache.Set(detectors.ComputeXXHash(s1.Raw), detectors.CachedVerificationResult{
-				Verified:        s1.Verified,
-				VerificationErr: s1.VerificationError(),
-			})
+			s.verifyOrGetCachedResult(ctx, client, token, &s1)
 		}
 
 		results = append(results, s1)
@@ -109,18 +90,45 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-// useCachedVerification checks the cache for a verification result corresponding to the secret in the provided result.
-// If a cached result is found, it updates the result verification fields with the cached data and returns true.
-// If no cached result is found, it returns false.
-func useCachedVerification(result *detectors.Result) bool {
-	credData, exist := credsCache.Get(detectors.ComputeXXHash(result.Raw))
+// verifyOrGetCachedResult checks the cache for a verification result for the given secret and updates the result's verification fields.
+// If no cached result exists, it verifies the secret using the GitHub API and caches the result.
+// Uses per-secret locking to prevent concurrent verifications of the same secret.
+func (s Scanner) verifyOrGetCachedResult(ctx context.Context, client *http.Client, token string, result *detectors.Result) {
+	secretHash := detectors.ComputeXXHash(result.Raw)
+
+	// acquire lock for this specific secret
+	lock := detectors.GetOrCreateLock(secretHash)
+	lock.Lock()
+	defer lock.Unlock()
+
+	// check if result for the secret is cached already
+	credData, exist := credsCache.Get(secretHash)
 	if exist {
 		result.Verified = credData.Verified
 		result.SetVerificationError(credData.VerificationErr)
 		result.VerificationFromCache = true
 
-		return true
+		detectors.CleanupLock(secretHash)
+
+		return
 	}
 
-	return false
+	// if not cached, verify the secret using github API
+	isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
+	result.Verified = isVerified
+	result.SetVerificationError(err, token)
+
+	if userResponse != nil {
+		v1.SetUserResponse(userResponse, result)
+	}
+	if headers != nil {
+		v1.SetHeaderInfo(headers, result)
+	}
+
+	credsCache.Set(detectors.ComputeXXHash(result.Raw), detectors.CachedVerificationResult{
+		Verified:        result.Verified,
+		VerificationErr: result.VerificationError(),
+	})
+
+	detectors.CleanupLock(secretHash)
 }

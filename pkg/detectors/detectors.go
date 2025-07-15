@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 
 	"github.com/cespare/xxhash/v2"
@@ -330,4 +331,26 @@ type CachedVerificationResult struct {
 // This hash can be used as a unique identifier for caching purposes.
 func ComputeXXHash(secret []byte) string {
 	return strconv.FormatUint(xxhash.Sum64(secret), 10)
+}
+
+// secretLocks manages per-secret locks for concurrent verification across all detectors.
+var secretLocks sync.Map // maps secret hash to *sync.Mutex
+
+// GetOrCreateLock retrieves or creates a mutex for the given secret hash.
+func GetOrCreateLock(hash string) *sync.Mutex {
+	if lock, exists := secretLocks.Load(hash); exists {
+		return lock.(*sync.Mutex)
+	}
+
+	newLock := &sync.Mutex{}
+	if actual, loaded := secretLocks.LoadOrStore(hash, newLock); loaded {
+		return actual.(*sync.Mutex)
+	}
+
+	return newLock
+}
+
+// CleanupLock removes the lock for a secret hash after verification.
+func CleanupLock(hash string) {
+	secretLocks.Delete(hash)
 }
