@@ -65,6 +65,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Dovico,
 				Raw:          []byte(key),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", key, userKey)),
 			}
 
 			if verify {
@@ -75,6 +76,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			}
 
 			results = append(results, s1)
+
+			if s1.Verified {
+				// Data keys are mapped to users and consumer secrets so we can skip it once verified
+				break
+			}
 		}
 	}
 
