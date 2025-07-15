@@ -12,9 +12,11 @@ import (
 )
 
 var (
-	validPattern   = "secret_oPp4m4V04lEWqgLGyhCN7b8H9JLANmyE1AYl2aG3aTN"
-	invalidPattern = "secret_oPp4m4V04lEWqgLGyh?N7b8H9JLANmyE1AYl2aG3aTN"
-	keyword        = "notion"
+	validPattern     = "secret_oPp4m4V04lEWqgLGyhCN7b8H9JLANmyE1AYl2aG3aTN"
+	invalidPattern   = "secret_oPp4m4V04lEWqgLGyh?N7b8H9JLANmyE1AYl2aG3aTN"
+	validPatternV2   = "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"
+	invalidPatternV2 = "ntn_123456789012345678901234567890123456789012345678901234567890"
+	keyword          = "notion"
 )
 
 func TestNotion_Pattern(t *testing.T) {
@@ -26,13 +28,23 @@ func TestNotion_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with keyword notion",
+			name:  "valid legacy pattern - with keyword notion",
 			input: fmt.Sprintf("%s token = '%s'", keyword, validPattern),
 			want:  []string{validPattern},
 		},
 		{
-			name:  "invalid pattern",
+			name:  "invalid legacy pattern",
 			input: fmt.Sprintf("%s = '%s'", keyword, invalidPattern),
+			want:  []string{},
+		},
+		{
+			name:  "valid new pattern - with ntn_ prefix",
+			input: fmt.Sprintf("notion api key: %s", validPatternV2),
+			want:  []string{validPatternV2},
+		},
+		{
+			name:  "invalid new pattern - wrong timestamp length",
+			input: fmt.Sprintf("notion = '%s'", invalidPatternV2),
 			want:  []string{},
 		},
 	}
