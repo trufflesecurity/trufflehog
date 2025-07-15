@@ -44,6 +44,7 @@ type Source struct {
 	token        string
 	url          string
 	repos        []string
+	groups       []string
 	ignoreRepos  []string
 	includeRepos []string
 
