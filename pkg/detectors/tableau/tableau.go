@@ -88,6 +88,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 					DetectorType: detectorspb.DetectorType_Tableau,
 					Raw:          []byte(tokenName),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", tokenName, tokenSecret, endpoint)),
+					ExtraData:    make(map[string]string),
 				}
 
 				if verify {
@@ -111,7 +112,9 @@ func extractTokenNames(data string) []string {
 	for _, match := range tokenNamePat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			name := strings.TrimSpace(match[1])
-			names = append(names, name)
+			if name != "com" {
+				names = append(names, name)
+			}
 		}
 	}
 	return names

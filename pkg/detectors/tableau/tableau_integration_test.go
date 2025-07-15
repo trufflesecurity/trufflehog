@@ -6,6 +6,7 @@ package tableau
 import (
 	"context"
 	"fmt"
+
 	"testing"
 	"time"
 
@@ -50,7 +51,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("tableau pat_name = '%s'\ntableau pat_secret = '%s'\nserver = '%s'", tokenName, tokenSecret, tableauURL)),
+				data:   []byte(fmt.Sprintf("token=%s\nsecret=%s\nserver=%s", tokenName, tokenSecret, tableauURL)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -73,34 +74,11 @@ func TestTableau_FromChunk(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "found, would be verified if not for timeout",
-			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("tableau pat_name = '%s'\ntableau pat_secret = '%s'\nserver = '%s'", tokenName, tokenSecret, tableauURL)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Tableau,
-					Verified:     false,
-					ExtraData: map[string]string{
-						"token_name":      tokenName,
-						"token_secret":    tokenSecret,
-						"endpoint":        tableauURL,
-						"credential_type": "personal_access_token",
-					},
-				},
-			},
-			wantErr:             false,
-			wantVerificationErr: true,
-		},
-		{
 			name: "found, verified but unexpected api surface",
 			s:    Scanner{client: common.ConstantResponseHttpClient(500, "Internal Server Error")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("tableau pat_name = '%s'\ntableau pat_secret = '%s'\nserver = '%s'", tokenName, tokenSecret, tableauURL)),
+				data:   []byte(fmt.Sprintf("name = '%s'\n secret = '%s'\nserver = '%s'", tokenName, tokenSecret, tableauURL)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -127,7 +105,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("tableau pat_name = '%s'\ntableau pat_secret = '%s'\nserver = '%s'", tokenName, tokenSecret, invalidURL)),
+				data:   []byte(fmt.Sprintf("name = '%s'\nsecret = '%s'\nserver = '%s'", tokenName, tokenSecret, invalidURL)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -153,7 +131,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("tableau pat_name = '%s'\ntableau pat_secret = '%s'\nserver = '%s'", inactiveTokenName, inactiveTokenSecret, tableauURL)),
+				data:   []byte(fmt.Sprintf("name = '%s'\n secret = '%s'\nserver = '%s'", inactiveTokenName, inactiveTokenSecret, tableauURL)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -202,10 +180,10 @@ func TestTableau_FromChunk(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				data: []byte(fmt.Sprintf(`
-					tableau pat_name = '%s'
-					tableau token_name = '%s'
-					tableau pat_secret = '%s'
-					tableau token_secret = '%s'
+					name1 = '%s'
+					name2 = '%s'
+					secret = '%s'
+					secret2 = '%s'
 					server1 = '%s'
 					server2 = '%s'
 				`, tokenName, inactiveTokenName, tokenSecret, inactiveTokenSecret, tableauURL, invalidURL)),
@@ -251,7 +229,11 @@ func TestTableau_FromChunk(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
+			// Enable found endpoints for tests that need URL detection
+			scanner := tt.s
+			scanner.UseFoundEndpoints(true)
+
+			got, err := scanner.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Tableau.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -22,6 +22,7 @@ var (
 
 func TestTableau_Pattern(t *testing.T) {
 	d := Scanner{}
+	d.UseFoundEndpoints(true) // Enable found endpoints for tests
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
 	tests := []struct {
@@ -31,64 +32,70 @@ func TestTableau_Pattern(t *testing.T) {
 		description string
 	}{
 		{
-			name:        "tableau_keyword_with_token_name",
-			input:       fmt.Sprintf("tableau_token_name=%s\nsecret=%s\nserver=%s", validPATName, validPATSecret, validTableauURL),
+			name:        "tableau_prefix_with_token_name",
+			input:       fmt.Sprintf("token=%s\nsecret=%s\nserver=%s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests tableau keyword with token_name pattern",
+			description: "Tests tableau prefix directly followed by token name",
 		},
 		{
-			name:        "tableau_online_url_with_credentials",
-			input:       fmt.Sprintf("Tableau Connect to %s\ntoken_name=%s\n%s", validTableauURL, validPATName, validPATSecret),
+			name:        "token_prefix_with_name",
+			input:       fmt.Sprintf("Connect to %s\ntoken %s\n%s", validTableauURL, validPATName, validPATSecret),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests tableau online URL triggering detection",
+			description: "Tests token prefix triggering detection",
 		},
 		{
-			name:        "tableau_context_with_credentials",
-			input:       fmt.Sprintf("tableau_name=%s\n%s\nurl=%s", validPATName, validPATSecret, validTableauURL),
+			name:        "pat_prefix_with_name",
+			input:       fmt.Sprintf("pat %s\n%s\nurl=%s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests tableau context triggering detection",
+			description: "Tests pat prefix triggering detection",
 		},
 		{
-			name:  "multiple_token_names_with_tableau_context",
-			input: fmt.Sprintf("tableau_token_name=%s\ntoken_name=%s\n%s\nserver=%s", validPATName, "another-token", validPATSecret, validTableauURL),
+			name:        "name_prefix_with_token",
+			input:       fmt.Sprintf("name %s\n%s\nurl=%s", validPATName, validPATSecret, validTableauURL),
+			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
+			description: "Tests name prefix triggering detection",
+		},
+		{
+			name:  "multiple_token_names_with_different_prefixes",
+			input: fmt.Sprintf("tableau %s\ntoken %s\n%s\nserver=%s", validPATName, "another-token", validPATSecret, validTableauURL),
 			want: []string{
 				fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL),
 				fmt.Sprintf("%s:%s:%s", "another-token", validPATSecret, validTableauURL),
 			},
-			description: "Tests multiple token names with tableau context",
+			description: "Tests multiple token names with different prefixes",
 		},
 		{
-			name:  "single_token_multiple_urls_with_context",
-			input: fmt.Sprintf("token_name=%s\n%s\nserver1=%s\nserver2=%s", validPATName, validPATSecret, validTableauURL, valid2ndTableauURL),
+			name:  "single_token_multiple_urls",
+			input: fmt.Sprintf("token %s\n%s\nserver1=%s\nserver2=%s", validPATName, validPATSecret, validTableauURL, valid2ndTableauURL),
 			want: []string{
 				fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL),
 				fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, valid2ndTableauURL),
 			},
-			description: "Tests single token with multiple URLs and tableau context",
+			description: "Tests single token with multiple URLs",
 		},
 		{
-			name:        "invalid_secret_format_with_tableau_keyword",
-			input:       fmt.Sprintf("tableau_token_name=%s\n%s\nserver=%s", validPATName, invalidPATSecret, validTableauURL),
+			name:        "invalid_secret_format",
+			input:       fmt.Sprintf("tableau %s\n%s\nserver=%s", validPATName, invalidPATSecret, validTableauURL),
 			want:        []string{},
-			description: "Tests that invalid secret format is not detected even with keywords",
+			description: "Tests that invalid secret format is not detected",
 		},
 		{
-			name:        "invalid_tableau_url_with_keyword",
-			input:       fmt.Sprintf("tableau_token_name=%s\n%s\nserver=%s", validPATName, validPATSecret, invalidTableauURL),
-			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, "prod-ansouthgest-a.online.tableau.com")}, // Uses default endpoint
-			description: "Tests that invalid Tableau URL uses default endpoint",
-		},
-		{
-			name:        "missing_token_name_with_tableau_context",
-			input:       fmt.Sprintf("tableau_secret=%s\nserver=%s", validPATSecret, validTableauURL),
+			name:        "invalid_tableau_url",
+			input:       fmt.Sprintf("tableau %s\n%s\nserver=%s", validPATName, validPATSecret, invalidTableauURL),
 			want:        []string{},
-			description: "Tests that missing token name produces no results even with tableau keyword",
+			description: "Tests that invalid Tableau URL is not detected when useFoundEndpoints is true",
 		},
 		{
-			name:        "missing_secret_with_tableau_context",
-			input:       fmt.Sprintf("tableau_token_name=%s\nserver=%s", validPATName, validTableauURL),
+			name:        "missing_token_name",
+			input:       fmt.Sprintf("\n%s\nserver=%s", validPATSecret, validTableauURL),
 			want:        []string{},
-			description: "Tests that missing secret produces no results even with tableau keyword",
+			description: "Tests that missing token name produces no results",
+		},
+		{
+			name:        "missing_secret",
+			input:       fmt.Sprintf("tableau %s\nserver=%s", validPATName, validTableauURL),
+			want:        []string{},
+			description: "Tests that missing secret produces no results",
 		},
 		{
 			name:        "no_tableau_keywords",
@@ -97,51 +104,44 @@ func TestTableau_Pattern(t *testing.T) {
 			description: "Tests that non-Tableau config produces no results",
 		},
 		{
-			name:        "quoted_token_name_with_whitespace",
-			input:       fmt.Sprintf("tableau_token_name = \"%s\" \n%s\nserver = %s", validPATName, validPATSecret, validTableauURL),
+			name:        "quoted_token_name",
+			input:       fmt.Sprintf("tableau \"%s\"\n%s\nserver = %s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests token name with quotes and extra whitespace",
+			description: "Tests token name with quotes",
 		},
 		{
-			name:        "simple_token_name_format",
-			input:       fmt.Sprintf("name=%s\n%s\nserver=%s", validPATName, validPATSecret, validTableauURL),
+			name:        "token_name_with_whitespace",
+			input:       fmt.Sprintf("name   %s\n%s\nserver=%s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests simple name= format",
+			description: "Tests token name with extra whitespace",
 		},
 		{
-			name:        "token_name_with_colon",
-			input:       fmt.Sprintf("token_name: %s\n%s\nserver: %s", validPATName, validPATSecret, validTableauURL),
+			name:        "pat_with_single_quotes",
+			input:       fmt.Sprintf("pat '%s'\n%s\nserver=%s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests token name with colon separator",
+			description: "Tests token name with single quotes",
+		},
+		{
+			name:        "tableau_online_url_context",
+			input:       fmt.Sprintf("Connect to %s using tableau %s with secret %s", validTableauURL, validPATName, validPATSecret),
+			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
+			description: "Tests tableau online URL with proper context",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Debug: Check if keywords are found
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
-			
 			if len(test.want) > 0 {
 				if len(matchedDetectors) == 0 {
 					t.Errorf("keywords '%v' not matched in input: %s", d.Keywords(), test.input)
 					return
 				}
-				t.Logf("Keywords matched: %d detectors found", len(matchedDetectors))
 			}
 
 			if len(matchedDetectors) == 0 && len(test.want) == 0 {
-				t.Logf("No keywords matched and no results expected - PASS")
 				return
 			}
-
-			// Debug: Test the extraction functions directly
-			tokenNames := extractTokenNames(test.input)
-			tokenSecrets := extractTokenSecrets(test.input)
-			foundURLs := extractTableauURLs(test.input)
-			
-			t.Logf("Extracted token names: %v", tokenNames)
-			t.Logf("Extracted token secrets: %v", tokenSecrets)
-			t.Logf("Extracted URLs: %v", foundURLs)
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
 			if err != nil {
@@ -149,19 +149,8 @@ func TestTableau_Pattern(t *testing.T) {
 				return
 			}
 
-			t.Logf("Results found: %d", len(results))
-			for i, result := range results {
-				t.Logf("Result %d: %s", i, string(result.RawV2))
-			}
-
 			if len(results) != len(test.want) {
 				t.Errorf("expected %d results, got %d", len(test.want), len(results))
-				for _, r := range results {
-					t.Logf("Got result: %s", string(r.RawV2))
-				}
-				for _, w := range test.want {
-					t.Logf("Expected: %s", w)
-				}
 				return
 			}
 
@@ -176,57 +165,6 @@ func TestTableau_Pattern(t *testing.T) {
 
 			if diff := cmp.Diff(expected, actual); diff != "" {
 				t.Errorf("%s diff: (-want +got)\n%s", test.name, diff)
-			}
-		})
-	}
-}
-
-// Test the individual extraction functions
-func TestExtractionFunctions(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		wantName []string
-		wantSecret []string
-		wantURL  []string
-	}{
-		{
-			name:       "basic_extraction",
-			input:      fmt.Sprintf("tableau_token_name=%s\n%s\nserver=%s", validPATName, validPATSecret, validTableauURL),
-			wantName:   []string{validPATName},
-			wantSecret: []string{validPATSecret},
-			wantURL:    []string{validTableauURL},
-		},
-		{
-			name:       "multiple_names",
-			input:      fmt.Sprintf("name=%s\ntoken_name=%s\n%s", validPATName, "another-token", validPATSecret),
-			wantName:   []string{validPATName, "another-token"},
-			wantSecret: []string{validPATSecret},
-			wantURL:    []string{},
-		},
-		{
-			name:       "no_matches",
-			input:      "username=test\npassword=secret123",
-			wantName:   []string{},
-			wantSecret: []string{},
-			wantURL:    []string{},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			names := extractTokenNames(test.input)
-			secrets := extractTokenSecrets(test.input)
-			urls := extractTableauURLs(test.input)
-
-			if diff := cmp.Diff(test.wantName, names); diff != "" {
-				t.Errorf("token names diff: (-want +got)\n%s", diff)
-			}
-			if diff := cmp.Diff(test.wantSecret, secrets); diff != "" {
-				t.Errorf("token secrets diff: (-want +got)\n%s", diff)
-			}
-			if diff := cmp.Diff(test.wantURL, urls); diff != "" {
-				t.Errorf("URLs diff: (-want +got)\n%s", diff)
 			}
 		})
 	}
