@@ -84,7 +84,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			s.verifyOrGetCachedResult(ctx, client, token, &s1)
+			if err := s.verifyOrGetCachedResult(ctx, client, token, &s1); err != nil {
+				return results, err
+			}
 		}
 
 		results = append(results, s1)
