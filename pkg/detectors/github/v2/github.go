@@ -7,6 +7,7 @@ import (
 	"time"
 
 	regexp "github.com/wasilibs/go-re2"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/cache/simple"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -44,6 +45,8 @@ var (
 
 	credsCache = simple.NewCache(simple.WithExpirationInterval[detectors.CachedVerificationResult](1*time.Hour),
 		simple.WithPurgeInterval[detectors.CachedVerificationResult](1*time.Hour))
+
+	verificationGroup = new(singleflight.Group)
 )
 
 func (s Scanner) Type() detectorspb.DetectorType {
@@ -91,44 +94,53 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 }
 
 // verifyOrGetCachedResult checks the cache for a verification result for the given secret and updates the result's verification fields.
-// If no cached result exists, it verifies the secret using the GitHub API and caches the result.
-// Uses per-secret locking to prevent concurrent verifications of the same secret.
-func (s Scanner) verifyOrGetCachedResult(ctx context.Context, client *http.Client, token string, result *detectors.Result) {
+// If no cached result exists, it verifies the secret using the GitHub API and caches the result, using singleflight to prevent concurrent verifications of the same secret.
+func (s Scanner) verifyOrGetCachedResult(ctx context.Context, client *http.Client, token string, result *detectors.Result) error {
 	secretHash := detectors.ComputeXXHash(result.Raw)
 
-	// acquire lock for this specific secret
-	lock := detectors.GetOrCreateLock(secretHash)
-	lock.Lock()
-	defer lock.Unlock()
+	_, err, shared := verificationGroup.Do(secretHash, func() (interface{}, error) {
+		// check if result for the secret is cached already
+		credData, exist := credsCache.Get(secretHash)
+		if exist {
+			result.Verified = credData.Verified
+			result.SetVerificationError(credData.VerificationErr)
+			result.VerificationFromCache = true
 
-	// check if result for the secret is cached already
-	credData, exist := credsCache.Get(secretHash)
-	if exist {
-		result.Verified = credData.Verified
-		result.SetVerificationError(credData.VerificationErr)
-		result.VerificationFromCache = true
+			return nil, nil
+		}
 
-		detectors.CleanupLock(secretHash)
+		// if not cached, verify the secret using github API
+		isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
+		result.Verified = isVerified
+		result.SetVerificationError(err, token)
 
-		return
-	}
+		if userResponse != nil {
+			v1.SetUserResponse(userResponse, result)
+		}
+		if headers != nil {
+			v1.SetHeaderInfo(headers, result)
+		}
 
-	// if not cached, verify the secret using github API
-	isVerified, userResponse, headers, err := s.VerifyGithub(ctx, client, token)
-	result.Verified = isVerified
-	result.SetVerificationError(err, token)
+		credsCache.Set(secretHash, detectors.CachedVerificationResult{
+			Verified:        result.Verified,
+			VerificationErr: result.VerificationError(),
+		})
 
-	if userResponse != nil {
-		v1.SetUserResponse(userResponse, result)
-	}
-	if headers != nil {
-		v1.SetHeaderInfo(headers, result)
-	}
-
-	credsCache.Set(detectors.ComputeXXHash(result.Raw), detectors.CachedVerificationResult{
-		Verified:        result.Verified,
-		VerificationErr: result.VerificationError(),
+		return nil, nil
 	})
+	if err != nil {
+		return err
+	}
 
-	detectors.CleanupLock(secretHash)
+	// for shared results, update result fields from cache
+	// as first request for a secret always set result in cache, in case of shared the cache must exist
+	if shared {
+		if credData, exists := credsCache.Get(secretHash); exists {
+			result.Verified = credData.Verified
+			result.SetVerificationError(credData.VerificationErr)
+			result.VerificationFromCache = true
+		}
+	}
+
+	return nil
 }
