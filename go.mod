@@ -9,6 +9,7 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2
 // Coinbase archived this library and it has some vulnerable dependencies so we've forked.
 replace github.com/coinbase/waas-client-library-go => github.com/trufflesecurity/waas-client-library-go v1.0.9
 
+// TODO: v1.134.0 is available but deprecates existing Auth methods, should be updated separately
 replace gitlab.com/gitlab-org/api/client-go => gitlab.com/gitlab-org/api/client-go v0.129.0
 
 require (
@@ -100,7 +101,6 @@ require (
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.9.0
 	github.com/xo/dburl v0.23.8
-	// TODO: v1.134.0 is available but deprecates existing Auth methods, should be updated separately
 	gitlab.com/gitlab-org/api/client-go v0.129.0
 	go.mongodb.org/mongo-driver v1.17.4
 	go.uber.org/automaxprocs v1.6.0
