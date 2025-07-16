@@ -98,7 +98,8 @@ require (
 	github.com/trufflesecurity/disk-buffer-reader v0.2.1
 	github.com/wasilibs/go-re2 v1.9.0
 	github.com/xo/dburl v0.23.8
-	gitlab.com/gitlab-org/api/client-go v0.134.0
+	// TODO: v1.134.0 is available but deprecates existing Auth methods, should be updated separately
+	gitlab.com/gitlab-org/api/client-go v0.129.0
 	go.mongodb.org/mongo-driver v1.17.4
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.5.2
