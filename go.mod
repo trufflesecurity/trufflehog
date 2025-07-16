@@ -9,6 +9,8 @@ replace github.com/jpillora/overseer => github.com/trufflesecurity/overseer v1.2
 // Coinbase archived this library and it has some vulnerable dependencies so we've forked.
 replace github.com/coinbase/waas-client-library-go => github.com/trufflesecurity/waas-client-library-go v1.0.9
 
+replace gitlab.com/gitlab-org/api/client-go => gitlab.com/gitlab-org/api/client-go v0.129.0
+
 require (
 	cloud.google.com/go/secretmanager v1.14.7
 	cloud.google.com/go/storage v1.50.0
