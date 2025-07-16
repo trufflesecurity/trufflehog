@@ -749,6 +749,7 @@ func (s *Source) getAllProjectReposInGroup(
 	reporter sources.UnitReporter,
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
+	processedProjects := make(map[string]bool)
 
 	var projectsWithNamespace []string
 	const (
@@ -797,6 +798,12 @@ func (s *Source) getAllProjectReposInGroup(
 					"project_id", proj.ID,
 					"project_name", proj.NameWithNamespace,
 					"group_id", groupID)
+
+				if processedProjects[proj.HTTPURLToRepo] {
+					projCtx.Logger().V(3).Info("skipping project", "reason", "already processed")
+					continue
+				}
+				processedProjects[proj.HTTPURLToRepo] = true
 
 				// skip projects configured to be ignored.
 				if ignoreRepo(proj.PathWithNamespace) {
