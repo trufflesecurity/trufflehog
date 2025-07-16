@@ -666,16 +666,16 @@ func (s *Source) getAllProjectReposV2(
 		"all_available", *projectQueryOptions.Membership)
 
 	// https://pkg.go.dev/gitlab.com/gitlab-org/api/client-go#Scan2
-	projectsChan := gitlab.Scan2(func(p gitlab.PaginationOptionFunc) ([]*gitlab.Project, *gitlab.Response, error) {
+	projectsIter := gitlab.Scan2(func(p gitlab.PaginationOptionFunc) ([]*gitlab.Project, *gitlab.Response, error) {
 		return apiClient.Projects.ListProjects(projectQueryOptions, p, gitlab.WithContext(ctx))
 	})
 
 	totalCount := 0
 
 	// process each project
-	for project, projectErr := range projectsChan {
+	for project, projectErr := range projectsIter {
 		if projectErr != nil {
-			err := fmt.Errorf("failed to enumerate project: %w", projectErr)
+			err := fmt.Errorf("error during project enumeration: %w", projectErr)
 
 			if reportErr := reporter.UnitErr(ctx, err); reportErr != nil {
 				return reportErr
