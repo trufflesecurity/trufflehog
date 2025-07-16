@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync/atomic"
 
@@ -122,18 +123,18 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 		return fmt.Errorf("error getting projects: %w", err)
 	}
 
-	var projectsScanned uint64
+	var countOfProjectsScanned uint64
 	scanErrs := sources.NewScanErrors()
 
 	for _, project := range projects {
 		s.jobPool.Go(func() error {
-			projBuilds, err := s.listProjectBuilds(ctx, &project)
+			projectBuilds, err := s.listProjectBuilds(ctx, &project)
 			if err != nil {
 				scanErrs.Add(fmt.Errorf("error getting builds for project %s: %w", project.RepoName, err))
 				return nil
 			}
 
-			for _, build := range projBuilds {
+			for _, build := range projectBuilds {
 				projBuildJobs, err := s.listProjBuildJobs(ctx, &project, &build)
 				if err != nil {
 					scanErrs.Add(fmt.Errorf("error getting steps for build %d: %w", build.BuildNum, err))
@@ -155,8 +156,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 				}
 			}
 
-			atomic.AddUint64(&projectsScanned, 1)
-			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", projectsScanned, len(projects)))
+			atomic.AddUint64(&countOfProjectsScanned, 1)
+			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", countOfProjectsScanned, len(projects)))
 			return nil
 		})
 	}
@@ -193,7 +194,7 @@ func (s *Source) listAllProjects(ctx context.Context) ([]project, error) {
 	case http.StatusOK:
 		var projects []project
 		if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot decode CircleCI projects JSON: %w", err)
 		}
 
 		ctx.Logger().V(2).Info(fmt.Sprintf("successfully listed %d projects", len(projects)))
@@ -207,9 +208,13 @@ func (s *Source) listAllProjects(ctx context.Context) ([]project, error) {
 }
 
 func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]build, error) {
-	// the vcs url is in format //circle.com/org-id/proj-id, so we need to remove the // and .com to use it in the API
-	vcsURL := strings.ReplaceAll(proj.VCSUrl, "//", "")
-	vcsURL = strings.ReplaceAll(vcsURL, ".com", "")
+	// the vcs url is in format //circleci.com/org-id/proj-id, so we need to remove the // and .com to use it in the API
+	parsedURL, err := url.Parse(proj.VCSUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	vcsURL := strings.ReplaceAll(parsedURL.Host, ".com", "") + parsedURL.Path // circleci/org-id/proj-id
 
 	// update clean vcs url in the project for later use
 	proj.VCSUrl = vcsURL
@@ -237,7 +242,7 @@ func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]build,
 	case http.StatusOK:
 		var builds []build
 		if err := json.NewDecoder(resp.Body).Decode(&builds); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot decode CircleCI project builds JSON: %w", err)
 		}
 
 		ctx.Logger().V(2).Info(fmt.Sprintf("successfully listed %d builds for project: %s", len(builds), proj.RepoName))
@@ -276,7 +281,7 @@ func (s *Source) listProjBuildJobs(ctx context.Context, proj *project, projectBu
 	case http.StatusOK:
 		var buildResp buildJobs
 		if err := json.NewDecoder(resp.Body).Decode(&buildResp); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot decode CircleCI project build jobs JSON: %w", err)
 		}
 
 		ctx.Logger().V(2).Info(fmt.Sprintf("successfully listed project: %s build: %d jobs", proj.RepoName, projectBuild.BuildNum))
@@ -327,7 +332,6 @@ func (s *Source) chunkAction(ctx context.Context, proj project, projectBuild bui
 			},
 			Verify: s.verify,
 		}
-		chunk.Data = data.Bytes()
 		if err := data.Error(); err != nil {
 			return err
 		}
@@ -366,7 +370,6 @@ func (s *Source) chunkCircleCIYamlString(ctx context.Context, proj project, proj
 			},
 			Verify: s.verify,
 		}
-		chunk.Data = data.Bytes()
 		if err := data.Error(); err != nil {
 			return err
 		}
