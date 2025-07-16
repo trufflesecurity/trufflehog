@@ -159,6 +159,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	}
 
 	s.repos = conn.GetRepositories()
+	s.groupIds = conn.GetGroupIds()
 	s.ignoreRepos = conn.GetIgnoreRepos()
 	s.includeRepos = conn.GetIncludeRepos()
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
@@ -267,12 +268,13 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 				return ctx.Err()
 			},
 		}
-		if feature.UseSimplifiedGitlabEnumeration.Load() {
-			if err := s.getAllProjectReposV2(ctx, apiClient, ignoreRepo, reporter); err != nil {
+
+		if len(s.groupIds) > 0 {
+			if err := s.getAllProjectReposInGroup(ctx, apiClient, s.groupIds, ignoreRepo, reporter); err != nil {
 				return err
 			}
-		} else if len(s.groupIds) > 0 {
-			if err := s.getAllProjectReposInGroup(ctx, apiClient, s.groupIds, ignoreRepo, reporter); err != nil {
+		} else if feature.UseSimplifiedGitlabEnumeration.Load() {
+			if err := s.getAllProjectReposV2(ctx, apiClient, ignoreRepo, reporter); err != nil {
 				return err
 			}
 		} else {
@@ -406,7 +408,12 @@ func (s *Source) Validate(ctx context.Context) []error {
 		},
 	}
 
-	if feature.UseSimplifiedGitlabEnumeration.Load() {
+	if len(s.groupIds) > 0 {
+		if err := s.getAllProjectReposInGroup(ctx, apiClient, s.groupIds, ignoreProject, visitor); err != nil {
+			errs = append(errs, err)
+			return errs
+		}
+	} else if feature.UseSimplifiedGitlabEnumeration.Load() {
 		if err := s.getAllProjectReposV2(ctx, apiClient, ignoreProject, visitor); err != nil {
 			errs = append(errs, err)
 			return errs
@@ -483,7 +490,6 @@ func (s *Source) getAllProjectRepos(
 	reporter sources.UnitReporter,
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
-
 	// Projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
 	if err != nil {
@@ -1046,7 +1052,9 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		_ = reporter.UnitErr(ctx, fmt.Errorf("could not compile include/exclude repo glob: %w", err))
 	})
 
-	if feature.UseSimplifiedGitlabEnumeration.Load() {
+	if len(s.groupIds) > 0 {
+		return s.getAllProjectReposInGroup(ctx, apiClient, s.groupIds, ignoreRepo, reporter)
+	} else if feature.UseSimplifiedGitlabEnumeration.Load() {
 		return s.getAllProjectReposV2(ctx, apiClient, ignoreRepo, reporter)
 	} else {
 		return s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter)
