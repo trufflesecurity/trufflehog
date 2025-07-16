@@ -1,4 +1,4 @@
-package asanapersonalaccesstoken
+package circleci
 
 import (
 	"context"
@@ -10,15 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	// Old format token
-	validPatternOld = "asana_token: 594776654034514343561917591881414702593902454625364993/1724908107002616220416212965:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn"
-	// New format token with two forward slashes
-	newValidPattern  = "asana_token: 7/9823746598123746/8923746598123456:7f1a3c9be84d2a6c4e7d9c32bf1e7f88"
-	invalidPattern   = "asana_token: 1724908107002616220416212965%594776654034514343561917591881414702593902454625364993:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn-ij2gwtg/xn9vh4jvsokdfaic0bn"
-)
-
-func TestAsanaPersonalAccessToken_Pattern(t *testing.T) {
+func TestCircleCI_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -28,19 +20,25 @@ func TestAsanaPersonalAccessToken_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern - old format",
-			input: validPatternOld,
-			want:  []string{"594776654034514343561917591881414702593902454625364993/1724908107002616220416212965:Yv3DoiSFhtsgUwN3AcnXWjK8zabQHKSHBRHpuNKVjz3oCcpyDIdXRm3GL4SUDkTMFoTbRDCHe8tTBHxdtoXItn"},
-		},
-		{
-			name:  "valid pattern - new format",
-			input: newValidPattern,
-			want:  []string{"7/9823746598123746/8923746598123456:7f1a3c9be84d2a6c4e7d9c32bf1e7f88"},
-		},
-		{
-			name:  "invalid pattern",
-			input: invalidPattern,
-			want:  nil,
+			name: "valid pattern",
+			input: `
+				# Configuration File: config.yaml
+				database:
+					host: $DB_HOST
+					port: $DB_PORT
+					username: $DB_USERNAME
+					password: $DB_PASS  # IMPORTANT: Do not share this password publicly
+
+				api:
+					auth_type: API-Key
+					base_url: "https://api.example.com/v1/user"
+					api_key: "CCIPAT_FAKEd5qPreGFAKEaQxBi6i_914bf0042f4f2d34e1d2ef6615c051a5caf70172"
+
+				# Notes:
+				# - Remember to rotate the secret every 90 days.
+				# - The above credentials should only be used in a secure environment.
+			`,
+			want: []string{"CCIPAT_FAKEd5qPreGFAKEaQxBi6i_914bf0042f4f2d34e1d2ef6615c051a5caf70172"},
 		},
 	}
 
