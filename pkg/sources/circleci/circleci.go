@@ -346,7 +346,6 @@ func (s *Source) chunkAction(ctx context.Context, proj project, projectBuild bui
 
 func (s *Source) chunkCircleCIYamlString(ctx context.Context, proj project, projectBuild build, yamlString string, chunksChan chan *sources.Chunk) error {
 	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, projectBuild.BuildNum)
-
 	chunkReader := sources.NewChunkReader()
 	chunkResChan := chunkReader(ctx, strings.NewReader(yamlString))
 	for data := range chunkResChan {
