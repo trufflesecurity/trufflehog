@@ -53,6 +53,7 @@ enum SourceType {
   SOURCE_TYPE_SENTRY = 38;
   SOURCE_TYPE_GITHUB_REALTIME = 39;
   SOURCE_TYPE_STDIN = 40;
+  SOURCE_TYPE_SLACK_CONTINUOUS = 41;
 }
 
 message LocalSource {
@@ -474,6 +475,13 @@ message Webhook {
   oneof credential {
     credentials.Header header = 2;
   }
+}
+
+message SlackContinuous {
+  string project_id = 1;
+  string topic = 2;
+  string subscription = 3;
+  bytes private_key = 4;
 }
 
 message Elasticsearch {
