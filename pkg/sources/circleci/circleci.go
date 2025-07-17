@@ -152,10 +152,6 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 
 				for _, step := range projBuildJobs.Steps {
 					for _, action := range step.Actions {
-						ctx = context.WithValues(ctx,
-							"action_output_url", action.OutputUrl,
-						)
-
 						data, err := s.getOutputUrlResponse(action.OutputUrl)
 						if err != nil {
 							ctx.Logger().Error(err, "error getting action output url response")
