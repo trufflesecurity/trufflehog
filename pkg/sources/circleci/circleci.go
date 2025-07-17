@@ -26,7 +26,8 @@ import (
 const (
 	SourceType = sourcespb.SourceType_SOURCE_TYPE_CIRCLECI
 
-	// CircleCI has released API v2, but we're continuing to use v1.1 for now because it still supports listing endpoints and remains officially supported.
+	// CircleCI has released API v2, but we're continuing to use v1.1
+	// Because v1.1 still supports listing endpoints and remains officially supported.
 	baseURL = "https://circleci.com/api/v1.1"
 )
 
@@ -46,16 +47,14 @@ type Source struct {
 type project struct {
 	VCS      string `json:"vcs_type"`
 	Username string `json:"username"`
-	RepoName string `json:"reponame"`
-	VCSUrl   string `json:"vcs_url"`
+	Reponame string `json:"Reponame"`
+	VcsUrl   string `json:"vcs_url"`
 }
 
-type build struct {
-	BuildNum int `json:"build_num"`
-}
+type BuildNum int
 
 type buildJobs struct {
-	CircleYAML struct {
+	CircleYaml struct {
 		YamlString string `json:"string"`
 	} `json:"circle_yml"`
 	Steps []buildStep `json:"steps"`
@@ -67,8 +66,7 @@ type buildStep struct {
 }
 
 type action struct {
-	Index     int    `json:"index"`
-	OutputURL string `json:"output_url"`
+	OutputUrl string `json:"output_url"`
 }
 
 // Ensure the Source satisfies the interfaces at compile time.
@@ -117,54 +115,90 @@ func (s *Source) Init(_ context.Context, name string, jobId sources.JobID, sourc
 func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ ...sources.ChunkingTarget) error {
 	// TODO: list Artifacts, list checkout-keys, list env-variables
 
-	// list all projects
 	projects, err := s.listAllProjects(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting projects: %w", err)
 	}
 
-	var countOfProjectsScanned uint64
-	scanErrs := sources.NewScanErrors()
+	var countOfProjectsScanned atomic.Uint64
+	var errors []error
 
 	for _, project := range projects {
+		ctx = context.WithValues(ctx,
+			"repository_name", project.Reponame,
+		)
+
 		s.jobPool.Go(func() error {
 			projectBuilds, err := s.listProjectBuilds(ctx, &project)
 			if err != nil {
-				scanErrs.Add(fmt.Errorf("error getting builds for project %s: %w", project.RepoName, err))
+				ctx.Logger().Error(err, "error getting builds for project")
+				errors = append(errors, err)
+
 				return nil
 			}
 
-			for _, build := range projectBuilds {
-				projBuildJobs, err := s.listProjBuildJobs(ctx, &project, &build)
+			for _, buildNum := range projectBuilds {
+				ctx = context.WithValues(ctx,
+					"build_number", buildNum,
+				)
+
+				projBuildJobs, err := s.listProjBuildJobs(ctx, &project, buildNum)
 				if err != nil {
-					scanErrs.Add(fmt.Errorf("error getting steps for build %d: %w", build.BuildNum, err))
+					ctx.Logger().Error(err, "error getting steps for build")
+					errors = append(errors, err)
+
 					return nil
 				}
 
 				for _, step := range projBuildJobs.Steps {
 					for _, action := range step.Actions {
-						if err = s.chunkAction(ctx, project, build, action, step.Name, chunksChan); err != nil {
-							scanErrs.Add(fmt.Errorf("error chunking action %v: %w", action, err))
+						ctx = context.WithValues(ctx,
+							"action_output_url", action.OutputUrl,
+						)
+
+						data, err := s.getOutputUrlResponse(action.OutputUrl)
+						if err != nil {
+							ctx.Logger().Error(err, "error getting action output url response")
+							errors = append(errors, err)
+
+							return nil
+						}
+
+						if err = s.chunk(ctx, project, buildNum, step.Name, data, chunksChan); err != nil {
+							ctx.Logger().Error(err, "error chunking action")
+							errors = append(errors, err)
+
 							return nil
 						}
 					}
 				}
 
-				if err = s.chunkCircleCIYamlString(ctx, project, build, projBuildJobs.CircleYAML.YamlString, chunksChan); err != nil {
-					scanErrs.Add(fmt.Errorf("error chunking build yaml: %w", err))
+				if err = s.chunk(ctx, project, buildNum, "", projBuildJobs.CircleYaml.YamlString, chunksChan); err != nil {
+					ctx.Logger().Error(err, "error chunking build yaml")
+					errors = append(errors, err)
+
 					return nil
 				}
 			}
 
-			atomic.AddUint64(&countOfProjectsScanned, 1)
-			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", countOfProjectsScanned, len(projects)))
+			scanCount := countOfProjectsScanned.Add(1)
+			s.SetProgressComplete(
+				int(scanCount),
+				len(projects),
+				fmt.Sprintf("Scanned %d/%d projects", scanCount, len(projects)),
+				"", // this would be for resumption, but we're not currently using it
+			)
+
+			ctx.Logger().V(2).Info(fmt.Sprintf("scanned %d/%d projects", countOfProjectsScanned.Load(), len(projects)))
+
 			return nil
 		})
 	}
 
 	_ = s.jobPool.Wait()
-	if scanErrs.Count() > 0 {
-		ctx.Logger().V(2).Info("encountered errors while scanning", "count", scanErrs.Count(), "errors", scanErrs)
+
+	if len(errors) > 0 {
+		ctx.Logger().Info("encountered errors during scanning", "count", len(errors), "errors", errors)
 	}
 
 	return nil
@@ -197,7 +231,7 @@ func (s *Source) listAllProjects(ctx context.Context) ([]project, error) {
 			return nil, fmt.Errorf("cannot decode CircleCI projects JSON: %w", err)
 		}
 
-		ctx.Logger().V(2).Info(fmt.Sprintf("successfully listed %d projects", len(projects)))
+		ctx.Logger().V(2).Info("successfully listed projects", "project_count", len(projects))
 
 		return projects, nil
 	case http.StatusUnauthorized:
@@ -207,9 +241,9 @@ func (s *Source) listAllProjects(ctx context.Context) ([]project, error) {
 	}
 }
 
-func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]build, error) {
+func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]BuildNum, error) {
 	// the vcs url is in format //circleci.com/org-id/proj-id, so we need to remove the // and .com to use it in the API
-	parsedURL, err := url.Parse(proj.VCSUrl)
+	parsedURL, err := url.Parse(proj.VcsUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -217,9 +251,9 @@ func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]build,
 	vcsURL := strings.ReplaceAll(parsedURL.Host, ".com", "") + parsedURL.Path // circleci/org-id/proj-id
 
 	// update clean vcs url in the project for later use
-	proj.VCSUrl = vcsURL
+	proj.VcsUrl = vcsURL
 
-	ctx.Logger().V(5).Info(fmt.Sprintf("listing project: %s builds with URL: %s", proj.RepoName, proj.VCSUrl))
+	ctx.Logger().V(5).Info("listing project builds with URL", "repo_name", proj.Reponame, "vcs_url", proj.VcsUrl)
 
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/project/%s", baseURL, vcsURL), http.NoBody)
 	if err != nil {
@@ -240,26 +274,32 @@ func (s *Source) listProjectBuilds(ctx context.Context, proj *project) ([]build,
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		var builds []build
-		if err := json.NewDecoder(resp.Body).Decode(&builds); err != nil {
+		var rawBuilds []map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&rawBuilds); err != nil {
 			return nil, fmt.Errorf("cannot decode CircleCI project builds JSON: %w", err)
 		}
 
-		ctx.Logger().V(2).Info(fmt.Sprintf("successfully listed %d builds for project: %s", len(builds), proj.RepoName))
+		buildNums := make([]BuildNum, 0)
+		for _, item := range rawBuilds {
+			if bn, ok := item["build_num"].(float64); ok {
+				buildNums = append(buildNums, BuildNum(bn))
+			}
+		}
 
-		return builds, nil
+		ctx.Logger().V(2).Info("successfully listed builds for project", "repo_name", proj.Reponame, "build_count", len(buildNums))
+
+		return buildNums, nil
 	case http.StatusNotFound:
-		return nil, fmt.Errorf("no builds found for project: %s", proj.RepoName)
+		return nil, fmt.Errorf("no builds found for project: %s", proj.Reponame)
 	default:
-		return nil, fmt.Errorf("unexpected status code while fetching builds for project: %s", proj.RepoName)
+		return nil, fmt.Errorf("unexpected status code while fetching builds for project: %s", proj.Reponame)
 	}
-
 }
 
-func (s *Source) listProjBuildJobs(ctx context.Context, proj *project, projectBuild *build) (*buildJobs, error) {
-	ctx.Logger().V(5).Info(fmt.Sprintf("listing project: %s build: %d jobs", proj.RepoName, projectBuild.BuildNum))
+func (s *Source) listProjBuildJobs(ctx context.Context, proj *project, buildNum BuildNum) (*buildJobs, error) {
+	ctx.Logger().V(5).Info(fmt.Sprintf("listing project: %s build: %d jobs", proj.Reponame, buildNum))
 	// /project/circleci/org-id/proj-id/1
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/project/%s/%d", baseURL, proj.VCSUrl, projectBuild.BuildNum), http.NoBody)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/project/%s/%d", baseURL, proj.VcsUrl, buildNum), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -284,70 +324,42 @@ func (s *Source) listProjBuildJobs(ctx context.Context, proj *project, projectBu
 			return nil, fmt.Errorf("cannot decode CircleCI project build jobs JSON: %w", err)
 		}
 
-		ctx.Logger().V(2).Info(fmt.Sprintf("successfully listed project: %s build: %d jobs", proj.RepoName, projectBuild.BuildNum))
+		ctx.Logger().V(2).Info("successfully listed project build jobs", "repo_name", proj.Reponame, "build_num", buildNum)
 
 		return &buildResp, nil
 	default:
-		return nil, fmt.Errorf("unexpected status code: %d while fetching project: %s build: %d jobs", resp.StatusCode, proj.RepoName, projectBuild.BuildNum)
+		return nil, fmt.Errorf("unexpected status code: %d while fetching project: %s build: %d jobs", resp.StatusCode, proj.Reponame, buildNum)
 	}
 }
 
-func (s *Source) chunkAction(ctx context.Context, proj project, projectBuild build, action action, stepName string, chunksChan chan *sources.Chunk) error {
-	req, err := http.NewRequest(http.MethodGet, action.OutputURL, nil)
+func (s *Source) getOutputUrlResponse(outputUrl string) (string, error) {
+	req, err := http.NewRequest(http.MethodGet, outputUrl, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}()
 
-	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, projectBuild.BuildNum)
-
-	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, resp.Body)
-	for data := range chunkResChan {
-		chunk := &sources.Chunk{
-			SourceType: s.Type(),
-			SourceName: s.name,
-			SourceID:   s.SourceID(),
-			JobID:      s.JobID(),
-			Data:       removeCircleSha1Line(data.Bytes()),
-			SourceMetadata: &source_metadatapb.MetaData{
-				Data: &source_metadatapb.MetaData_Circleci{
-					Circleci: &source_metadatapb.CircleCI{
-						VcsType:     proj.VCS,
-						Username:    proj.Username,
-						Repository:  proj.RepoName,
-						BuildNumber: int64(projectBuild.BuildNum),
-						BuildStep:   stepName,
-						Link:        linkURL,
-					},
-				},
-			},
-			Verify: s.verify,
-		}
-		if err := data.Error(); err != nil {
-			return err
-		}
-
-		if err := common.CancellableWrite(ctx, chunksChan, chunk); err != nil {
-			return err
-		}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return nil
+	return string(bodyBytes), nil
 }
 
-func (s *Source) chunkCircleCIYamlString(ctx context.Context, proj project, projectBuild build, yamlString string, chunksChan chan *sources.Chunk) error {
-	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.RepoName, projectBuild.BuildNum)
+func (s *Source) chunk(ctx context.Context, proj project, buildNum BuildNum, stepName, chunkData string, chunksChan chan *sources.Chunk) error {
+	linkURL := fmt.Sprintf("https://app.circleci.com/pipelines/%s/%s/%s/%d", proj.VCS, proj.Username, proj.Reponame, buildNum)
+
 	chunkReader := sources.NewChunkReader()
-	chunkResChan := chunkReader(ctx, strings.NewReader(yamlString))
+	chunkResChan := chunkReader(ctx, strings.NewReader(chunkData))
 	for data := range chunkResChan {
 		chunk := &sources.Chunk{
 			SourceType: s.Type(),
@@ -360,9 +372,9 @@ func (s *Source) chunkCircleCIYamlString(ctx context.Context, proj project, proj
 					Circleci: &source_metadatapb.CircleCI{
 						VcsType:     proj.VCS,
 						Username:    proj.Username,
-						Repository:  proj.RepoName,
-						BuildNumber: int64(projectBuild.BuildNum),
-						BuildStep:   "",
+						Repository:  proj.Reponame,
+						BuildNumber: int64(buildNum),
+						BuildStep:   stepName,
 						Link:        linkURL,
 					},
 				},

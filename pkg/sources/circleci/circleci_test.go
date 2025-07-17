@@ -2,10 +2,10 @@ package circleci
 
 import (
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -84,52 +84,26 @@ func TestSource_Scan(t *testing.T) {
 			s := Source{}
 
 			conn, err := anypb.New(tt.init.connection)
-			if err != nil {
-				t.Fatal(err)
-			}
+			assert.NoError(t, err)
 
 			err = s.Init(ctx, tt.init.name, 0, 0, tt.init.verify, conn, 5)
-			if err != nil {
-				t.Errorf("Source.Init() error = %v", err)
-				return
+			assert.NoError(t, err)
+
+			chunksCh := make(chan *sources.Chunk, 1000)
+			chunksErr := s.Chunks(ctx, chunksCh)
+			close(chunksCh)
+
+			chunks := []*sources.Chunk{}
+			for chunk := range chunksCh {
+				chunks = append(chunks, chunk)
 			}
 
-			chunksCh := make(chan *sources.Chunk, 1)
-			var wg sync.WaitGroup
-			var chunksErr error
-
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				defer close(chunksCh)
-				chunksErr = s.Chunks(ctx, chunksCh)
-			}()
-
-			var chunks []*sources.Chunk
-			done := make(chan struct{})
-
-			go func() {
-				defer close(done)
-				for chunk := range chunksCh {
-					chunks = append(chunks, chunk)
-				}
-			}()
-
-			// wait for chunks collection to complete
-			<-done
-			wg.Wait()
-
-			// check for errors
-			if (chunksErr != nil) != tt.wantErr {
-				t.Errorf("Source.Chunks() error = %v, wantErr %v", chunksErr, tt.wantErr)
-				return
+			if tt.wantErr {
+				assert.Error(t, chunksErr)
 			}
 
 			// verify minimum chunk count
-			if len(chunks) < tt.wantMinChunks {
-				t.Errorf("Source.Chunks() got %d chunks, want at least %d", len(chunks), tt.wantMinChunks)
-				return
-			}
+			assert.GreaterOrEqual(t, len(chunks), tt.wantMinChunks)
 		})
 	}
 }
@@ -145,9 +119,7 @@ func TestSource_EdgeCases(t *testing.T) {
 			test: func(t *testing.T) {
 				s := Source{}
 				err := s.Init(context.Background(), "test", 0, 0, false, nil, 5)
-				if err == nil {
-					t.Error("Expected error for nil connection")
-				}
+				assert.Error(t, err)
 			},
 		},
 		{
@@ -164,10 +136,7 @@ func TestSource_EdgeCases(t *testing.T) {
 				})
 
 				err := s.Init(ctx, "test", 0, 0, false, conn, 5)
-				// should handle cancelled context gracefully
-				if err != nil {
-					t.Logf("Init with cancelled context returned error: %v", err)
-				}
+				assert.NoError(t, err)
 			},
 		},
 	}
