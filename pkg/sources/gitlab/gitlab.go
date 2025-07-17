@@ -641,17 +641,17 @@ func (s *Source) getAllProjectReposV2(
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
 
-	// record the projectsWithNamespace for logging.
-	var projectsWithNamespace []string
+	const paginationLimit = 100 // default is 20, max is 100.
 
-	const (
-		orderBy         = "id" // TODO: use keyset pagination (https://docs.gitlab.com/ee/api/rest/index.html#keyset-based-pagination)
-		paginationLimit = 100  // default is 20, max is 100.
-	)
+	// example: https://gitlab.com/gitlab-org/api/client-go/-/blob/main/examples/pagination.go#L55
+	listOpts := gitlab.ListOptions{
+		OrderBy:    "id",
+		Pagination: "keyset", // https://docs.gitlab.com/api/rest/#keyset-based-pagination
+		PerPage:    paginationLimit,
+		Sort:       "asc",
+	}
 
-	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
 	projectQueryOptions := &gitlab.ListProjectsOptions{
-		OrderBy:     gitlab.Ptr(orderBy),
 		ListOptions: listOpts,
 		Membership:  gitlab.Ptr(true),
 	}
@@ -665,68 +665,65 @@ func (s *Source) getAllProjectReposV2(
 		"list_options", listOpts,
 		"all_available", *projectQueryOptions.Membership)
 
-	// paginate through all projects until no more pages remain.
-	for {
-		projects, res, err := apiClient.Projects.ListProjects(projectQueryOptions)
-		if err != nil {
-			err = fmt.Errorf("received error on listing projects: %w", err)
+	// https://pkg.go.dev/gitlab.com/gitlab-org/api/client-go#Scan2
+	projectsIter := gitlab.Scan2(func(p gitlab.PaginationOptionFunc) ([]*gitlab.Project, *gitlab.Response, error) {
+		return apiClient.Projects.ListProjects(projectQueryOptions, p, gitlab.WithContext(ctx))
+	})
+
+	totalCount := 0
+
+	// process each project
+	for project, projectErr := range projectsIter {
+		if projectErr != nil {
+			err := fmt.Errorf("error during project enumeration: %w", projectErr)
+
+			if reportErr := reporter.UnitErr(ctx, err); reportErr != nil {
+				return reportErr
+			}
+
+			continue
+		}
+
+		totalCount++
+
+		projCtx := context.WithValues(ctx,
+			"project_id", project.ID,
+			"project_name", project.NameWithNamespace)
+
+		// skip projects configured to be ignored.
+		if ignoreRepo(project.PathWithNamespace) {
+			projCtx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+
+			continue
+		}
+
+		// report an error if we could not convert the project into a URL.
+		if _, err := url.Parse(project.HTTPURLToRepo); err != nil {
+			projCtx.Logger().V(3).Info("skipping project",
+				"reason", "URL parse failure",
+				"url", project.HTTPURLToRepo,
+				"parse_error", err)
+
+			err = fmt.Errorf("could not parse url %q given by project: %w", project.HTTPURLToRepo, err)
 			if err := reporter.UnitErr(ctx, err); err != nil {
 				return err
 			}
 
-			break
+			continue
 		}
 
-		ctx.Logger().V(3).Info("listed projects", "count", len(projects))
+		// report the unit.
+		projCtx.Logger().V(3).Info("accepting project")
 
-		// process each project
-		for _, proj := range projects {
-			projCtx := context.WithValues(ctx,
-				"project_id", proj.ID,
-				"project_name", proj.NameWithNamespace)
+		unit := git.SourceUnit{Kind: git.UnitRepo, ID: project.HTTPURLToRepo}
+		gitlabReposEnumerated.WithLabelValues(s.name).Inc()
 
-			// skip projects configured to be ignored.
-			if ignoreRepo(proj.PathWithNamespace) {
-				projCtx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
-
-				continue
-			}
-
-			// report an error if we could not convert the project into a URL.
-			if _, err := url.Parse(proj.HTTPURLToRepo); err != nil {
-				projCtx.Logger().V(3).Info("skipping project",
-					"reason", "URL parse failure",
-					"url", proj.HTTPURLToRepo,
-					"parse_error", err)
-
-				err = fmt.Errorf("could not parse url %q given by project: %w", proj.HTTPURLToRepo, err)
-				if err := reporter.UnitErr(ctx, err); err != nil {
-					return err
-				}
-
-				continue
-			}
-
-			// report the unit.
-			projCtx.Logger().V(3).Info("accepting project")
-
-			unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
-			gitlabReposEnumerated.WithLabelValues(s.name).Inc()
-			projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
-
-			if err := reporter.UnitOk(ctx, unit); err != nil {
-				return err
-			}
-		}
-
-		// handle pagination.
-		projectQueryOptions.Page = res.NextPage
-		if res.NextPage == 0 {
-			break
+		if err := reporter.UnitOk(ctx, unit); err != nil {
+			return err
 		}
 	}
 
-	ctx.Logger().Info("Enumerated GitLab projects", "count", len(projectsWithNamespace))
+	ctx.Logger().Info("Enumerated GitLab projects", "count", totalCount)
 
 	return nil
 }
