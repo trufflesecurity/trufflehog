@@ -2,7 +2,6 @@ package cannyio
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,10 +15,6 @@ import (
 )
 
 type Scanner struct{}
-
-type errorResponse struct {
-	Error string `json:"error"`
-}
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
@@ -89,12 +84,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 			return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 		}
 
-		var errResp errorResponse
-		if err := json.Unmarshal(body, &errResp); err != nil {
-			return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
-		}
-
-		if strings.Contains(strings.ToLower(errResp.Error), "invalid api key") {
+		if strings.Contains(strings.ToLower(string(body)), "invalid api key") {
 			return false, nil
 		}
 
