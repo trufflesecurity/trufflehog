@@ -109,10 +109,16 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // extractTokenNames finds all potential token names in the data
 func extractTokenNames(data string) []string {
 	var names []string
+	// Create a map of false positive terms
+	falsePositives := map[detectors.FalsePositive]struct{}{
+		detectors.FalsePositive("com"): {},
+	}
+
 	for _, match := range tokenNamePat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			name := strings.TrimSpace(match[1])
-			if name != "com" {
+			isFalsePositive, _ := detectors.IsKnownFalsePositive(name, falsePositives, false)
+			if !isFalsePositive {
 				names = append(names, name)
 			}
 		}

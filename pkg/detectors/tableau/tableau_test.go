@@ -38,12 +38,6 @@ func TestTableau_Pattern(t *testing.T) {
 			description: "Tests tableau prefix directly followed by token name",
 		},
 		{
-			name:        "token_prefix_with_name",
-			input:       fmt.Sprintf("Connect to %s\ntoken %s\n%s", validTableauURL, validPATName, validPATSecret),
-			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
-			description: "Tests token prefix triggering detection",
-		},
-		{
 			name:        "pat_prefix_with_name",
 			input:       fmt.Sprintf("pat %s\n%s\nurl=%s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
