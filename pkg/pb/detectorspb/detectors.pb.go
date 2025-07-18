@@ -1138,6 +1138,7 @@ const (
 	DetectorType_BitbucketAppPassword                    DetectorType = 1029
 	DetectorType_Hasura                                  DetectorType = 1030
 	DetectorType_SalesforceRefreshToken                  DetectorType = 1031
+	DetectorType_WebexBot                                DetectorType = 1032
 )
 
 // Enum value maps for DetectorType.
@@ -2171,6 +2172,7 @@ var (
 		1029: "BitbucketAppPassword",
 		1030: "Hasura",
 		1031: "SalesforceRefreshToken",
+		1032:  "WebexBot",
 	}
 	DetectorType_value = map[string]int32{
 		"Alibaba":                               0,
@@ -3201,6 +3203,7 @@ var (
 		"BitbucketAppPassword":              1029,
 		"Hasura":                            1030,
 		"SalesforceRefreshToken":            1031,
+		"WebexBot":                           1032,
 	}
 )
 
