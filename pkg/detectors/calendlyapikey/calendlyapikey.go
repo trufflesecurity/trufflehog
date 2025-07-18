@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.calendly.com/users/me", http.NoBody)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	res, err := client.Do(req)

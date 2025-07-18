@@ -66,7 +66,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	payload := strings.NewReader("apiKey=" + token)
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://canny.io/api/v1/boards/list", payload)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	res, err := client.Do(req)
@@ -88,16 +88,16 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		if err != nil {
 			return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 		}
-		
+
 		var errResp errorResponse
 		if err := json.Unmarshal(body, &errResp); err != nil {
 			return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 		}
-		
+
 		if strings.Contains(strings.ToLower(errResp.Error), "invalid api key") {
 			return false, nil
 		}
-		
+
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	default:
 		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)

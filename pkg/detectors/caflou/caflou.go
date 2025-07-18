@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			if client == nil {
 				client = defaultClient
 			}
-			
+
 			isVerified, verificationErr := verifyMatch(ctx, client, resMatch)
 			s1.Verified = isVerified
 			s1.SetVerificationError(verificationErr, resMatch)
@@ -69,20 +69,20 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://app.caflou.com/api/v1/accounts", nil)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	res, err := client.Do(req)
-	
+
 	if err != nil {
 		return false, err
 	}
-	
+
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
-	
+
 	switch res.StatusCode {
 	case http.StatusOK:
 		return true, nil

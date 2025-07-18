@@ -61,7 +61,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://calendarific.com/api/v2/holidays?&api_key="+token+"&country=US&year=2019", http.NoBody)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	res, err := client.Do(req)
 

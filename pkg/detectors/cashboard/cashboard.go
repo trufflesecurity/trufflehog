@@ -72,7 +72,7 @@ func verifyMatch(ctx context.Context, client *http.Client, user, token string) (
 	sEnc := b64.StdEncoding.EncodeToString([]byte(data))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.cashboardapp.com/account", http.NoBody)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", sEnc))
 	req.Header.Add("Content-Type", "application/xml")
