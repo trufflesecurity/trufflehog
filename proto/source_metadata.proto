@@ -338,6 +338,8 @@ message Vector {
   google.protobuf.Timestamp timestamp = 1;
   string source_type = 2;
   string host = 3;
+  string locator = 4;
+  string link = 5;
 }
 
 message Webhook {
