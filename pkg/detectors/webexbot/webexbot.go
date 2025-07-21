@@ -20,7 +20,7 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-var keywords = []string{"webexbot", "bot", "token", "api", "spark", "webex"}
+var keywords = []string{"webexbot", "spark", "webex"}
 var (
 	defaultClient = common.SaneHttpClient()
 	keyPat        = regexp.MustCompile(detectors.PrefixRegex(keywords) + `([a-zA-Z0-9]{64}_[a-zA-Z0-9]{4}_[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12})`)
