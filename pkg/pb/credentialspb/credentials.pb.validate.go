@@ -785,6 +785,8 @@ func (m *Oauth2) validate(all bool) error {
 
 	// no validation rules for AccessToken
 
+	// no validation rules for RedirectUri
+
 	if len(errors) > 0 {
 		return Oauth2MultiError(errors)
 	}
