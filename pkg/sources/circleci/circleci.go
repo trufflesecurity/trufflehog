@@ -147,7 +147,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 					ctx.Logger().Error(err, "error getting steps for build")
 					errors = append(errors, err)
 
-					return nil
+					continue
 				}
 
 				for _, step := range projBuildJobs.Steps {
@@ -157,14 +157,14 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 							ctx.Logger().Error(err, "error getting action output url response")
 							errors = append(errors, err)
 
-							return nil
+							continue
 						}
 
 						if err = s.chunk(ctx, project, buildNum, step.Name, data, chunksChan); err != nil {
 							ctx.Logger().Error(err, "error chunking action")
 							errors = append(errors, err)
 
-							return nil
+							continue
 						}
 					}
 				}
@@ -173,7 +173,7 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 					ctx.Logger().Error(err, "error chunking build yaml")
 					errors = append(errors, err)
 
-					return nil
+					continue
 				}
 			}
 
