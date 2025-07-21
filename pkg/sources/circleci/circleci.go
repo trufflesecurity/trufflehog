@@ -47,7 +47,7 @@ type Source struct {
 type project struct {
 	VCS      string `json:"vcs_type"`
 	Username string `json:"username"`
-	Reponame string `json:"Reponame"`
+	Reponame string `json:"reponame"`
 	VcsUrl   string `json:"vcs_url"`
 }
 
