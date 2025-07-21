@@ -166,6 +166,7 @@ func (s *Source) newClient(ctx context.Context, region, roleArn string) (*s3.Cli
 		stsClient := sts.NewFromConfig(cfg)
 		provider := stscreds.NewAssumeRoleProvider(stsClient, roleArn, func(options *stscreds.AssumeRoleOptions) {
 			options.RoleSessionName = "trufflehog"
+			options.DisableLogOutputChecksumValidationSkipped = true
 		})
 		// From https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/configure-gosdk.html#specify-credentials-programmatically:
 		//   "If you explicitly configure a provider on aws.Config directly,
