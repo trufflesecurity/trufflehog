@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"encoding/json"
 	"errors"
 	"runtime"
 	"sync"
@@ -447,12 +448,13 @@ type StdinConfig struct{}
 
 // Progress is used to update job completion progress across sources.
 type Progress struct {
-	mut               sync.Mutex
-	PercentComplete   int64
-	Message           string
-	EncodedResumeInfo string
-	SectionsCompleted int32
-	SectionsRemaining int32
+	mut                   sync.Mutex
+	encodedResumeInfoByID map[string]string
+	PercentComplete       int64
+	Message               string
+	EncodedResumeInfo     string
+	SectionsCompleted     int32
+	SectionsRemaining     int32
 }
 
 // Validator is an interface for validating a source. Sources can optionally implement this interface to validate
@@ -509,4 +511,55 @@ func (p *Progress) GetProgress() *Progress {
 	p.mut.Lock()
 	defer p.mut.Unlock()
 	return p
+}
+
+// GetEncodedResumeInfoFor gets the encoded resume information for the provided
+// ID, usually a unit ID.
+func (p *Progress) GetEncodedResumeInfoFor(id string) string {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	p.ensureEncodedResumeInfoByID()
+	return p.encodedResumeInfoByID[id]
+}
+
+// SetEncodedResumeInfoFor sets the encoded resume information for the provided
+// ID, usually a unit ID.
+func (p *Progress) SetEncodedResumeInfoFor(id, value string) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	p.ensureEncodedResumeInfoByID()
+	p.encodedResumeInfoByID[id] = value
+	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
+}
+
+// ClearEncodedResumeInfoFor removes the encoded resume information from being
+// tracked.
+func (p *Progress) ClearEncodedResumeInfoFor(id string) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+	p.ensureEncodedResumeInfoByID()
+	delete(p.encodedResumeInfoByID, id)
+	p.EncodedResumeInfo = marshalEncodedResumeInfo(p.encodedResumeInfoByID)
+}
+
+// ensureEncodedResumeInfoByID ensures the encodedResumeInfoByID attribute is a
+// non-nil map. The mutex must be held when calling this function.
+func (p *Progress) ensureEncodedResumeInfoByID() {
+	if p.encodedResumeInfoByID != nil {
+		return
+	}
+	p.encodedResumeInfoByID = unmarshalEncodedResumeInfo(p.EncodedResumeInfo)
+}
+
+// marshalEncodedResumeInfo converts a map of values into a serialized string.
+func marshalEncodedResumeInfo(values map[string]string) string {
+	marshalled, _ := json.Marshal(values)
+	return string(marshalled)
+}
+
+// unmarshalEncodedResumeInfo converts a serialized string into a map of values.
+func unmarshalEncodedResumeInfo(data string) map[string]string {
+	resumeInfo := make(map[string]string)
+	_ = json.Unmarshal([]byte(data), &resumeInfo)
+	return resumeInfo
 }
