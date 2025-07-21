@@ -269,18 +269,8 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 			},
 		}
 
-		if len(s.groupIds) > 0 {
-			if err := s.getAllProjectReposInGroup(ctx, apiClient, s.groupIds, ignoreRepo, reporter); err != nil {
-				return err
-			}
-		} else if feature.UseSimplifiedGitlabEnumeration.Load() {
-			if err := s.getAllProjectReposV2(ctx, apiClient, ignoreRepo, reporter); err != nil {
-				return err
-			}
-		} else {
-			if err := s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter); err != nil {
-				return err
-			}
+		if err := s.listProjects(ctx, apiClient, ignoreRepo, reporter); err != nil {
+			return err
 		}
 
 	} else {
@@ -292,6 +282,21 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	slices.Sort(s.repos)
 
 	return s.scanRepos(ctx, chunksChan)
+}
+
+func (s *Source) listProjects(ctx context.Context,
+	apiClient *gitlab.Client,
+	ignoreProject func(string) bool,
+	visitor sources.UnitReporter) error {
+	if len(s.groupIds) > 0 {
+		return s.getAllProjectReposInGroups(ctx, apiClient, ignoreProject, visitor)
+	}
+
+	if feature.UseSimplifiedGitlabEnumeration.Load() {
+		return s.getAllProjectReposV2(ctx, apiClient, ignoreProject, visitor)
+	}
+
+	return s.getAllProjectRepos(ctx, apiClient, ignoreProject, visitor)
 }
 
 func (s *Source) scanTargets(ctx context.Context, client *gitlab.Client, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
@@ -408,21 +413,9 @@ func (s *Source) Validate(ctx context.Context) []error {
 		},
 	}
 
-	if len(s.groupIds) > 0 {
-		if err := s.getAllProjectReposInGroup(ctx, apiClient, s.groupIds, ignoreProject, visitor); err != nil {
-			errs = append(errs, err)
-			return errs
-		}
-	} else if feature.UseSimplifiedGitlabEnumeration.Load() {
-		if err := s.getAllProjectReposV2(ctx, apiClient, ignoreProject, visitor); err != nil {
-			errs = append(errs, err)
-			return errs
-		}
-	} else {
-		if err := s.getAllProjectRepos(ctx, apiClient, ignoreProject, visitor); err != nil {
-			errs = append(errs, err)
-			return errs
-		}
+	if err := s.listProjects(ctx, apiClient, ignoreProject, visitor); err != nil {
+		errs = append(errs, err)
+		return errs
 	}
 
 	if len(repos) == 0 {
@@ -739,16 +732,17 @@ func (s *Source) getAllProjectReposV2(
 	return nil
 }
 
-// getAllProjectReposInGroup fetches all projects in a GitLab group and its subgroups.
+// getAllProjectReposInGroups fetches all projects in a GitLab group and its subgroups.
 // It uses the group projects API with include_subgroups=true parameter.
-func (s *Source) getAllProjectReposInGroup(
+func (s *Source) getAllProjectReposInGroups(
 	ctx context.Context,
 	apiClient *gitlab.Client,
-	groupIDs []string,
 	ignoreRepo func(string) bool,
 	reporter sources.UnitReporter,
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
+	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(float64(len(s.groupIds)))
+
 	processedProjects := make(map[string]bool)
 
 	var projectsWithNamespace []string
@@ -771,11 +765,11 @@ func (s *Source) getAllProjectReposInGroup(
 	}
 
 	ctx.Logger().Info("starting group projects enumeration",
-		"group_ids", groupIDs,
+		"group_ids", s.groupIds,
 		"include_subgroups", true,
 		"list_options", listOpts)
 
-	for _, groupID := range groupIDs {
+	for _, groupID := range s.groupIds {
 		groupCtx := context.WithValues(ctx, "group_id", groupID)
 
 		projectOpts.Page = 0
@@ -1059,13 +1053,11 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		_ = reporter.UnitErr(ctx, fmt.Errorf("could not compile include/exclude repo glob: %w", err))
 	})
 
-	if len(s.groupIds) > 0 {
-		return s.getAllProjectReposInGroup(ctx, apiClient, s.groupIds, ignoreRepo, reporter)
-	} else if feature.UseSimplifiedGitlabEnumeration.Load() {
-		return s.getAllProjectReposV2(ctx, apiClient, ignoreRepo, reporter)
-	} else {
-		return s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter)
+	if err := s.listProjects(ctx, apiClient, ignoreRepo, reporter); err != nil {
+		return err
 	}
+
+	return nil
 }
 
 // ChunkUnit downloads and reports chunks for the given GitLab repository unit.
