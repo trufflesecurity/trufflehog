@@ -118,7 +118,7 @@ func VerifyGitlab(ctx context.Context, client *http.Client, baseEndpoint, resMat
 	// one of these scopes has access to, so we just check an example endpoint for each scope. If any
 	// of them contain data, we know we have a valid key, but if they all fail, we don't
 
-	req, err := http.NewRequestWithContext(ctx, "GET", baseEndpoint+"/api/v4/user", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseEndpoint+"/api/v4/user", http.NoBody)
 	if err != nil {
 		return false, nil, err
 	}
