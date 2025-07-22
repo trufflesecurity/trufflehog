@@ -56,11 +56,13 @@ func (s *Source) cloneRepo(
 
 	switch s.conn.GetCredential().(type) {
 	case *sourcespb.Huggingface_Unauthenticated:
+		ctx.Logger().V(2).Info("cloning repo without authentication", "repo_url", repoURL)
 		path, repo, err = git.CloneRepoUsingUnauthenticated(ctx, repoURL)
 		if err != nil {
 			return "", nil, err
 		}
 	case *sourcespb.Huggingface_Token:
+		ctx.Logger().V(2).Info("cloning repo with token authentication", "repo_url", repoURL)
 		path, repo, err = git.CloneRepoUsingToken(ctx, s.huggingfaceToken, repoURL, "", true)
 		if err != nil {
 			return "", nil, err
