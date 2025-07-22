@@ -790,7 +790,7 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		}
 
 		if len(*gitlabScanRepos) > 0 && len(*gitlabScanGroupIds) > 0 {
-			ctx.Logger().Info("--repo and --group-id cannot be used together. --group-id will be ignored")
+			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both repositories and groups at the same time")
 		}
 
 		cfg := sources.GitlabConfig{
