@@ -6778,6 +6778,8 @@ func (m *SlackContinuous) validate(all bool) error {
 
 	// no validation rules for Namespace
 
+	// no validation rules for ProjectId
+
 	// no validation rules for PrivateKey
 
 	if len(errors) > 0 {

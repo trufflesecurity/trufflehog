@@ -505,5 +505,5 @@ message Stdin {}
 
 message SlackContinuous {
   string namespace = 1;
-  bytes private_key = 2;
+  string project_id = 2;
 }
