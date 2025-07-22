@@ -4688,7 +4688,6 @@ type SlackContinuous struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	ProjectId     string                 `protobuf:"bytes,2,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	PrivateKey    []byte                 `protobuf:"bytes,3,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4735,13 +4734,6 @@ func (x *SlackContinuous) GetProjectId() string {
 		return x.ProjectId
 	}
 	return ""
-}
-
-func (x *SlackContinuous) GetPrivateKey() []byte {
-	if x != nil {
-		return x.PrivateKey
-	}
-	return nil
 }
 
 var File_sources_proto protoreflect.FileDescriptor
@@ -5143,13 +5135,11 @@ const file_sources_proto_rawDesc = "" +
 	"\bprojects\x18\x06 \x01(\tR\bprojectsB\f\n" +
 	"\n" +
 	"credential\"\a\n" +
-	"\x05Stdin\"o\n" +
+	"\x05Stdin\"N\n" +
 	"\x0fSlackContinuous\x12\x1c\n" +
 	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x1d\n" +
 	"\n" +
-	"project_id\x18\x02 \x01(\tR\tprojectId\x12\x1f\n" +
-	"\vprivate_key\x18\x03 \x01(\fR\n" +
-	"privateKey*\xa3\t\n" +
+	"project_id\x18\x02 \x01(\tR\tprojectId*\xa3\t\n" +
 	"\n" +
 	"SourceType\x12\x1d\n" +
 	"\x19SOURCE_TYPE_AZURE_STORAGE\x10\x00\x12\x19\n" +
