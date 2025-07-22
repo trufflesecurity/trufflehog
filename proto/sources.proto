@@ -477,13 +477,6 @@ message Webhook {
   }
 }
 
-message SlackContinuous {
-  string project_id = 1;
-  string topic = 2;
-  string subscription = 3;
-  bytes private_key = 4;
-}
-
 message Elasticsearch {
   repeated string nodes = 1;
   string username = 2;
@@ -509,3 +502,8 @@ message Sentry {
 }
 
 message Stdin {}
+
+message SlackContinuous {
+  string namespace = 1;
+  bytes private_key = 2;
+}

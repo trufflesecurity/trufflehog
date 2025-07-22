@@ -4410,74 +4410,6 @@ type Webhook_Header struct {
 
 func (*Webhook_Header) isWebhook_Credential() {}
 
-type SlackContinuous struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	Topic         string                 `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
-	Subscription  string                 `protobuf:"bytes,3,opt,name=subscription,proto3" json:"subscription,omitempty"`
-	PrivateKey    []byte                 `protobuf:"bytes,4,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SlackContinuous) Reset() {
-	*x = SlackContinuous{}
-	mi := &file_sources_proto_msgTypes[35]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SlackContinuous) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SlackContinuous) ProtoMessage() {}
-
-func (x *SlackContinuous) ProtoReflect() protoreflect.Message {
-	mi := &file_sources_proto_msgTypes[35]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SlackContinuous.ProtoReflect.Descriptor instead.
-func (*SlackContinuous) Descriptor() ([]byte, []int) {
-	return file_sources_proto_rawDescGZIP(), []int{35}
-}
-
-func (x *SlackContinuous) GetProjectId() string {
-	if x != nil {
-		return x.ProjectId
-	}
-	return ""
-}
-
-func (x *SlackContinuous) GetTopic() string {
-	if x != nil {
-		return x.Topic
-	}
-	return ""
-}
-
-func (x *SlackContinuous) GetSubscription() string {
-	if x != nil {
-		return x.Subscription
-	}
-	return ""
-}
-
-func (x *SlackContinuous) GetPrivateKey() []byte {
-	if x != nil {
-		return x.PrivateKey
-	}
-	return nil
-}
-
 type Elasticsearch struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Nodes          []string               `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
@@ -4496,7 +4428,7 @@ type Elasticsearch struct {
 
 func (x *Elasticsearch) Reset() {
 	*x = Elasticsearch{}
-	mi := &file_sources_proto_msgTypes[36]
+	mi := &file_sources_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4508,7 +4440,7 @@ func (x *Elasticsearch) String() string {
 func (*Elasticsearch) ProtoMessage() {}
 
 func (x *Elasticsearch) ProtoReflect() protoreflect.Message {
-	mi := &file_sources_proto_msgTypes[36]
+	mi := &file_sources_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4521,7 +4453,7 @@ func (x *Elasticsearch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Elasticsearch.ProtoReflect.Descriptor instead.
 func (*Elasticsearch) Descriptor() ([]byte, []int) {
-	return file_sources_proto_rawDescGZIP(), []int{36}
+	return file_sources_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *Elasticsearch) GetNodes() []string {
@@ -4611,7 +4543,7 @@ type Sentry struct {
 
 func (x *Sentry) Reset() {
 	*x = Sentry{}
-	mi := &file_sources_proto_msgTypes[37]
+	mi := &file_sources_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4623,7 +4555,7 @@ func (x *Sentry) String() string {
 func (*Sentry) ProtoMessage() {}
 
 func (x *Sentry) ProtoReflect() protoreflect.Message {
-	mi := &file_sources_proto_msgTypes[37]
+	mi := &file_sources_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4636,7 +4568,7 @@ func (x *Sentry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sentry.ProtoReflect.Descriptor instead.
 func (*Sentry) Descriptor() ([]byte, []int) {
-	return file_sources_proto_rawDescGZIP(), []int{37}
+	return file_sources_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *Sentry) GetEndpoint() string {
@@ -4724,7 +4656,7 @@ type Stdin struct {
 
 func (x *Stdin) Reset() {
 	*x = Stdin{}
-	mi := &file_sources_proto_msgTypes[38]
+	mi := &file_sources_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4736,7 +4668,7 @@ func (x *Stdin) String() string {
 func (*Stdin) ProtoMessage() {}
 
 func (x *Stdin) ProtoReflect() protoreflect.Message {
-	mi := &file_sources_proto_msgTypes[38]
+	mi := &file_sources_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4749,7 +4681,59 @@ func (x *Stdin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Stdin.ProtoReflect.Descriptor instead.
 func (*Stdin) Descriptor() ([]byte, []int) {
+	return file_sources_proto_rawDescGZIP(), []int{37}
+}
+
+type SlackContinuous struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	PrivateKey    []byte                 `protobuf:"bytes,2,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SlackContinuous) Reset() {
+	*x = SlackContinuous{}
+	mi := &file_sources_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SlackContinuous) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SlackContinuous) ProtoMessage() {}
+
+func (x *SlackContinuous) ProtoReflect() protoreflect.Message {
+	mi := &file_sources_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SlackContinuous.ProtoReflect.Descriptor instead.
+func (*SlackContinuous) Descriptor() ([]byte, []int) {
 	return file_sources_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *SlackContinuous) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *SlackContinuous) GetPrivateKey() []byte {
+	if x != nil {
+		return x.PrivateKey
+	}
+	return nil
 }
 
 var File_sources_proto protoreflect.FileDescriptor
@@ -5127,14 +5111,7 @@ const file_sources_proto_rawDesc = "" +
 	"\x0elisten_address\x18\x01 \x01(\tB\a\xfaB\x04r\x02h\x01R\rlistenAddress\x12-\n" +
 	"\x06header\x18\x02 \x01(\v2\x13.credentials.HeaderH\x00R\x06headerB\f\n" +
 	"\n" +
-	"credential\"\x8b\x01\n" +
-	"\x0fSlackContinuous\x12\x1d\n" +
-	"\n" +
-	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x14\n" +
-	"\x05topic\x18\x02 \x01(\tR\x05topic\x12\"\n" +
-	"\fsubscription\x18\x03 \x01(\tR\fsubscription\x12\x1f\n" +
-	"\vprivate_key\x18\x04 \x01(\fR\n" +
-	"privateKey\"\xcd\x02\n" +
+	"credential\"\xcd\x02\n" +
 	"\rElasticsearch\x12\x14\n" +
 	"\x05nodes\x18\x01 \x03(\tR\x05nodes\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x1a\n" +
@@ -5158,7 +5135,11 @@ const file_sources_proto_rawDesc = "" +
 	"\bprojects\x18\x06 \x01(\tR\bprojectsB\f\n" +
 	"\n" +
 	"credential\"\a\n" +
-	"\x05Stdin*\xa3\t\n" +
+	"\x05Stdin\"P\n" +
+	"\x0fSlackContinuous\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x1f\n" +
+	"\vprivate_key\x18\x02 \x01(\fR\n" +
+	"privateKey*\xa3\t\n" +
 	"\n" +
 	"SourceType\x12\x1d\n" +
 	"\x19SOURCE_TYPE_AZURE_STORAGE\x10\x00\x12\x19\n" +
@@ -5263,10 +5244,10 @@ var file_sources_proto_goTypes = []any{
 	(*AzureRepos)(nil),                          // 35: sources.AzureRepos
 	(*Postman)(nil),                             // 36: sources.Postman
 	(*Webhook)(nil),                             // 37: sources.Webhook
-	(*SlackContinuous)(nil),                     // 38: sources.SlackContinuous
-	(*Elasticsearch)(nil),                       // 39: sources.Elasticsearch
-	(*Sentry)(nil),                              // 40: sources.Sentry
-	(*Stdin)(nil),                               // 41: sources.Stdin
+	(*Elasticsearch)(nil),                       // 38: sources.Elasticsearch
+	(*Sentry)(nil),                              // 39: sources.Sentry
+	(*Stdin)(nil),                               // 40: sources.Stdin
+	(*SlackContinuous)(nil),                     // 41: sources.SlackContinuous
 	(*durationpb.Duration)(nil),                 // 42: google.protobuf.Duration
 	(*anypb.Any)(nil),                           // 43: google.protobuf.Any
 	(*credentialspb.BasicAuth)(nil),             // 44: credentials.BasicAuth
@@ -5484,7 +5465,7 @@ func file_sources_proto_init() {
 	file_sources_proto_msgTypes[34].OneofWrappers = []any{
 		(*Webhook_Header)(nil),
 	}
-	file_sources_proto_msgTypes[37].OneofWrappers = []any{
+	file_sources_proto_msgTypes[36].OneofWrappers = []any{
 		(*Sentry_AuthToken)(nil),
 		(*Sentry_DsnKey)(nil),
 		(*Sentry_ApiKey)(nil),
