@@ -20,16 +20,15 @@ type Scanner struct {
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
 
-var keywords = []string{"webexbot", "spark", "webex"}
 var (
 	defaultClient = common.SaneHttpClient()
-	keyPat        = regexp.MustCompile(detectors.PrefixRegex(keywords) + `([a-zA-Z0-9]{64}_[a-zA-Z0-9]{4}_[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12})`)
+	keyPat        = regexp.MustCompile(`([a-zA-Z0-9]{64}_[a-zA-Z0-9]{4}_[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12})`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return keywords
+	return []string{"webexbot", "spark", "webex"}
 }
 
 // FromData will find and optionally verify Webexbot secrets in a given set of bytes.
@@ -99,13 +98,13 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	case http.StatusOK:
 		// parse the response body to json
 		var resp response
-		toReturn := make(map[string]string)
+		extraData := make(map[string]string)
 		if err := json.NewDecoder(res.Body).Decode(&resp); err == nil {
-			toReturn["type"] = resp.Type
-			toReturn["username"] = resp.UserName
+			extraData["type"] = resp.Type
+			extraData["username"] = resp.UserName
 		}
 
-		return true, toReturn, nil
+		return true, extraData, nil
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
 		return false, nil, nil
