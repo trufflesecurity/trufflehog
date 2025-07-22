@@ -33,7 +33,7 @@ var (
 	defaultClient = common.SaneHttpClient()
 
 	// Simplified token name pattern using PrefixRegex
-	tokenNamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"tableau", "token", "pat", "name"}) + `\s*["']?([a-zA-Z0-9_-]{3,50})["']?`)
+	tokenNamePat = regexp.MustCompile(detectors.PrefixRegex([]string{"token_name", "pat_name", "tableau_pat_name", "tableau_token", "pat", "token", "name"}) + `\s*["']?([a-zA-Z0-9_-]{3,50})["']?`)
 
 	// Pattern for Personal Access Token Secrets
 	tokenSecretPat = regexp.MustCompile(`\b([A-Za-z0-9+/]{22}==:[A-Za-z0-9]{32})\b`)
@@ -109,16 +109,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 // extractTokenNames finds all potential token names in the data
 func extractTokenNames(data string) []string {
 	var names []string
-	// Create a map of false positive terms
-	falsePositives := map[detectors.FalsePositive]struct{}{
-		detectors.FalsePositive("com"): {},
-	}
-
 	for _, match := range tokenNamePat.FindAllStringSubmatch(data, -1) {
 		if len(match) >= 2 {
 			name := strings.TrimSpace(match[1])
-			isFalsePositive, _ := detectors.IsKnownFalsePositive(name, falsePositives, false)
-			if !isFalsePositive {
+			if name[0] != '_' {
 				names = append(names, name)
 			}
 		}

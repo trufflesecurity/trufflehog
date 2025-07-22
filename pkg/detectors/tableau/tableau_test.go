@@ -51,7 +51,7 @@ func TestTableau_Pattern(t *testing.T) {
 		},
 		{
 			name:  "multiple_token_names_with_different_prefixes",
-			input: fmt.Sprintf("tableau %s\ntoken %s\n%s\nserver=%s", validPATName, "another-token", validPATSecret, validTableauURL),
+			input: fmt.Sprintf("tableau token_name= %s\npat_name= %s\n%s\nserver=%s", validPATName, "another-token", validPATSecret, validTableauURL),
 			want: []string{
 				fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL),
 				fmt.Sprintf("%s:%s:%s", "another-token", validPATSecret, validTableauURL),
@@ -99,7 +99,7 @@ func TestTableau_Pattern(t *testing.T) {
 		},
 		{
 			name:        "quoted_token_name",
-			input:       fmt.Sprintf("tableau \"%s\"\n%s\nserver = %s", validPATName, validPATSecret, validTableauURL),
+			input:       fmt.Sprintf("tableau_name \"%s\"\n%s\nserver = %s", validPATName, validPATSecret, validTableauURL),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
 			description: "Tests token name with quotes",
 		},
@@ -117,7 +117,7 @@ func TestTableau_Pattern(t *testing.T) {
 		},
 		{
 			name:        "tableau_online_url_context",
-			input:       fmt.Sprintf("Connect to %s using tableau %s with secret %s", validTableauURL, validPATName, validPATSecret),
+			input:       fmt.Sprintf("Connect to %s using tableau_token %s with secret %s", validTableauURL, validPATName, validPATSecret),
 			want:        []string{fmt.Sprintf("%s:%s:%s", validPATName, validPATSecret, validTableauURL)},
 			description: "Tests tableau online URL with proper context",
 		},
