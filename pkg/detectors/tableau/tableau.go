@@ -85,7 +85,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		for _, tokenSecret := range tokenSecrets {
 			for endpoint := range uniqueEndpoints {
 				result := detectors.Result{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Raw:          []byte(tokenName),
 					RawV2:        []byte(fmt.Sprintf("%s:%s:%s", tokenName, tokenSecret, endpoint)),
 					ExtraData:    make(map[string]string),
@@ -238,15 +238,6 @@ func verifyTableauPAT(ctx context.Context, client *http.Client, tokenName, token
 		if err := json.Unmarshal(bodyBytes, &authResp); err != nil {
 			return true, extraData, err
 		}
-
-		if token := authResp.Credentials.Token; token != "" {
-			extraData["auth_token_received"] = "true"
-			extraData["site_id"] = authResp.Credentials.Site.ID
-			extraData["user_id"] = authResp.Credentials.User.ID
-			return true, extraData, nil
-		}
-
-		// Fallback success on 200
 		return true, extraData, nil
 
 	case http.StatusUnauthorized, http.StatusBadRequest, http.StatusForbidden:
@@ -258,7 +249,7 @@ func verifyTableauPAT(ctx context.Context, client *http.Client, tokenName, token
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Tableau
+	return detectorspb.DetectorType_TableauPersonalAccessToken
 }
 
 func (s Scanner) Description() string {

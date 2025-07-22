@@ -1041,7 +1041,7 @@ enum DetectorType {
   BitbucketAppPassword = 1029;
   Hasura = 1030;
   SalesforceRefreshToken = 1031;
-  Tableau = 1032;
+  TableauPersonalAccessToken = 1032;
 }
 
 message Result {

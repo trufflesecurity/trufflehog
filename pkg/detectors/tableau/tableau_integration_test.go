@@ -56,7 +56,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     true,
 					ExtraData: map[string]string{
 						"token_name":            tokenName,
@@ -83,7 +83,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"token_name":            tokenName,
@@ -110,7 +110,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"token_name":            tokenName,
@@ -136,7 +136,7 @@ func TestTableau_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false,
 					ExtraData: map[string]string{
 						"token_name":            inactiveTokenName,
@@ -191,35 +191,35 @@ func TestTableau_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     true, // tokenName + tokenSecret + valid URL
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false, // tokenName + tokenSecret + invalid URL
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false, // tokenName + inactiveTokenSecret + valid URL
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false, // tokenName + inactiveTokenSecret + invalid URL
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false, // inactiveTokenName + tokenSecret + valid URL
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false, // inactiveTokenName + tokenSecret + invalid URL
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false, // inactiveTokenName + inactiveTokenSecret + valid URL
 				},
 				{
-					DetectorType: detectorspb.DetectorType_Tableau,
+					DetectorType: detectorspb.DetectorType_TableauPersonalAccessToken,
 					Verified:     false, // inactiveTokenName + inactiveTokenSecret + invalid URL
 				},
 			},
