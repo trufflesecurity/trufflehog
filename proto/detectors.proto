@@ -1040,6 +1040,8 @@ enum DetectorType {
   LangSmith = 1028;
   BitbucketAppPassword = 1029;
   Hasura = 1030;
+  SalesforceRefreshToken = 1031;
+  AnypointOAuth2 = 1032;
 }
 
 message Result {

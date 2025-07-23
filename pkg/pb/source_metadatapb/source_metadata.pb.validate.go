@@ -3568,6 +3568,10 @@ func (m *Vector) validate(all bool) error {
 
 	// no validation rules for Host
 
+	// no validation rules for Locator
+
+	// no validation rules for Link
+
 	if len(errors) > 0 {
 		return VectorMultiError(errors)
 	}

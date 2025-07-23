@@ -475,6 +475,14 @@ message Webhook {
   oneof credential {
     credentials.Header header = 2;
   }
+  oneof variant {
+    Vector vector = 4;
+  }
+}
+
+message Vector {
+  string locator_field = 1;
+  string link_format = 2;
 }
 
 message Elasticsearch {

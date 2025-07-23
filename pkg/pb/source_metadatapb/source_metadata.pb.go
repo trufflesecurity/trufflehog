@@ -2924,6 +2924,8 @@ type Vector struct {
 	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	SourceType    string                 `protobuf:"bytes,2,opt,name=source_type,json=sourceType,proto3" json:"source_type,omitempty"`
 	Host          string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
+	Locator       string                 `protobuf:"bytes,4,opt,name=locator,proto3" json:"locator,omitempty"`
+	Link          string                 `protobuf:"bytes,5,opt,name=link,proto3" json:"link,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2975,6 +2977,20 @@ func (x *Vector) GetSourceType() string {
 func (x *Vector) GetHost() string {
 	if x != nil {
 		return x.Host
+	}
+	return ""
+}
+
+func (x *Vector) GetLocator() string {
+	if x != nil {
+		return x.Locator
+	}
+	return ""
+}
+
+func (x *Vector) GetLink() string {
+	if x != nil {
+		return x.Link
 	}
 	return ""
 }
@@ -4246,12 +4262,14 @@ const file_source_metadata_proto_rawDesc = "" +
 	"field_type\x18\r \x01(\tR\tfieldType\x12I\n" +
 	"\rlocation_type\x18\x10 \x01(\x0e2$.source_metadata.PostmanLocationTypeR\flocationTypeJ\x04\b\x04\x10\x05J\x04\b\x0e\x10\x0fJ\x04\b\x0f\x10\x10R\n" +
 	"globals_idR\n" +
-	"field_nameR\rvariable_type\"w\n" +
+	"field_nameR\rvariable_type\"\xa5\x01\n" +
 	"\x06Vector\x128\n" +
 	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x1f\n" +
 	"\vsource_type\x18\x02 \x01(\tR\n" +
 	"sourceType\x12\x12\n" +
-	"\x04host\x18\x03 \x01(\tR\x04host\"D\n" +
+	"\x04host\x18\x03 \x01(\tR\x04host\x12\x18\n" +
+	"\alocator\x18\x04 \x01(\tR\alocator\x12\x12\n" +
+	"\x04link\x18\x05 \x01(\tR\x04link\"D\n" +
 	"\aWebhook\x121\n" +
 	"\x06vector\x18\x01 \x01(\v2\x17.source_metadata.VectorH\x00R\x06vectorB\x06\n" +
 	"\x04data\"d\n" +

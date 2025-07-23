@@ -4342,7 +4342,11 @@ type Webhook struct {
 	// Types that are valid to be assigned to Credential:
 	//
 	//	*Webhook_Header
-	Credential    isWebhook_Credential `protobuf_oneof:"credential"`
+	Credential isWebhook_Credential `protobuf_oneof:"credential"`
+	// Types that are valid to be assigned to Variant:
+	//
+	//	*Webhook_Vector
+	Variant       isWebhook_Variant `protobuf_oneof:"variant"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4400,6 +4404,22 @@ func (x *Webhook) GetHeader() *credentialspb.Header {
 	return nil
 }
 
+func (x *Webhook) GetVariant() isWebhook_Variant {
+	if x != nil {
+		return x.Variant
+	}
+	return nil
+}
+
+func (x *Webhook) GetVector() *Vector {
+	if x != nil {
+		if x, ok := x.Variant.(*Webhook_Vector); ok {
+			return x.Vector
+		}
+	}
+	return nil
+}
+
 type isWebhook_Credential interface {
 	isWebhook_Credential()
 }
@@ -4409,6 +4429,68 @@ type Webhook_Header struct {
 }
 
 func (*Webhook_Header) isWebhook_Credential() {}
+
+type isWebhook_Variant interface {
+	isWebhook_Variant()
+}
+
+type Webhook_Vector struct {
+	Vector *Vector `protobuf:"bytes,4,opt,name=vector,proto3,oneof"`
+}
+
+func (*Webhook_Vector) isWebhook_Variant() {}
+
+type Vector struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LocatorField  string                 `protobuf:"bytes,1,opt,name=locator_field,json=locatorField,proto3" json:"locator_field,omitempty"`
+	LinkFormat    string                 `protobuf:"bytes,2,opt,name=link_format,json=linkFormat,proto3" json:"link_format,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Vector) Reset() {
+	*x = Vector{}
+	mi := &file_sources_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Vector) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Vector) ProtoMessage() {}
+
+func (x *Vector) ProtoReflect() protoreflect.Message {
+	mi := &file_sources_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Vector.ProtoReflect.Descriptor instead.
+func (*Vector) Descriptor() ([]byte, []int) {
+	return file_sources_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *Vector) GetLocatorField() string {
+	if x != nil {
+		return x.LocatorField
+	}
+	return ""
+}
+
+func (x *Vector) GetLinkFormat() string {
+	if x != nil {
+		return x.LinkFormat
+	}
+	return ""
+}
 
 type Elasticsearch struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -4428,7 +4510,7 @@ type Elasticsearch struct {
 
 func (x *Elasticsearch) Reset() {
 	*x = Elasticsearch{}
-	mi := &file_sources_proto_msgTypes[35]
+	mi := &file_sources_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4440,7 +4522,7 @@ func (x *Elasticsearch) String() string {
 func (*Elasticsearch) ProtoMessage() {}
 
 func (x *Elasticsearch) ProtoReflect() protoreflect.Message {
-	mi := &file_sources_proto_msgTypes[35]
+	mi := &file_sources_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4453,7 +4535,7 @@ func (x *Elasticsearch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Elasticsearch.ProtoReflect.Descriptor instead.
 func (*Elasticsearch) Descriptor() ([]byte, []int) {
-	return file_sources_proto_rawDescGZIP(), []int{35}
+	return file_sources_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *Elasticsearch) GetNodes() []string {
@@ -4543,7 +4625,7 @@ type Sentry struct {
 
 func (x *Sentry) Reset() {
 	*x = Sentry{}
-	mi := &file_sources_proto_msgTypes[36]
+	mi := &file_sources_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4555,7 +4637,7 @@ func (x *Sentry) String() string {
 func (*Sentry) ProtoMessage() {}
 
 func (x *Sentry) ProtoReflect() protoreflect.Message {
-	mi := &file_sources_proto_msgTypes[36]
+	mi := &file_sources_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4568,7 +4650,7 @@ func (x *Sentry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sentry.ProtoReflect.Descriptor instead.
 func (*Sentry) Descriptor() ([]byte, []int) {
-	return file_sources_proto_rawDescGZIP(), []int{36}
+	return file_sources_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *Sentry) GetEndpoint() string {
@@ -4656,7 +4738,7 @@ type Stdin struct {
 
 func (x *Stdin) Reset() {
 	*x = Stdin{}
-	mi := &file_sources_proto_msgTypes[37]
+	mi := &file_sources_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4668,7 +4750,7 @@ func (x *Stdin) String() string {
 func (*Stdin) ProtoMessage() {}
 
 func (x *Stdin) ProtoReflect() protoreflect.Message {
-	mi := &file_sources_proto_msgTypes[37]
+	mi := &file_sources_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4681,7 +4763,7 @@ func (x *Stdin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Stdin.ProtoReflect.Descriptor instead.
 func (*Stdin) Descriptor() ([]byte, []int) {
-	return file_sources_proto_rawDescGZIP(), []int{37}
+	return file_sources_proto_rawDescGZIP(), []int{38}
 }
 
 type SlackContinuous struct {
@@ -4694,7 +4776,7 @@ type SlackContinuous struct {
 
 func (x *SlackContinuous) Reset() {
 	*x = SlackContinuous{}
-	mi := &file_sources_proto_msgTypes[38]
+	mi := &file_sources_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4706,7 +4788,7 @@ func (x *SlackContinuous) String() string {
 func (*SlackContinuous) ProtoMessage() {}
 
 func (x *SlackContinuous) ProtoReflect() protoreflect.Message {
-	mi := &file_sources_proto_msgTypes[38]
+	mi := &file_sources_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4719,7 +4801,7 @@ func (x *SlackContinuous) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SlackContinuous.ProtoReflect.Descriptor instead.
 func (*SlackContinuous) Descriptor() ([]byte, []int) {
-	return file_sources_proto_rawDescGZIP(), []int{38}
+	return file_sources_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *SlackContinuous) GetNamespace() string {
@@ -5106,12 +5188,18 @@ const file_sources_proto_rawDesc = "" +
 	"\x10collection_paths\x18\f \x03(\tR\x0fcollectionPaths\x12+\n" +
 	"\x11environment_paths\x18\r \x03(\tR\x10environmentPathsB\f\n" +
 	"\n" +
-	"credential\"v\n" +
+	"credential\"\xac\x01\n" +
 	"\aWebhook\x12.\n" +
 	"\x0elisten_address\x18\x01 \x01(\tB\a\xfaB\x04r\x02h\x01R\rlistenAddress\x12-\n" +
-	"\x06header\x18\x02 \x01(\v2\x13.credentials.HeaderH\x00R\x06headerB\f\n" +
+	"\x06header\x18\x02 \x01(\v2\x13.credentials.HeaderH\x00R\x06header\x12)\n" +
+	"\x06vector\x18\x04 \x01(\v2\x0f.sources.VectorH\x01R\x06vectorB\f\n" +
 	"\n" +
-	"credential\"\xcd\x02\n" +
+	"credentialB\t\n" +
+	"\avariant\"N\n" +
+	"\x06Vector\x12#\n" +
+	"\rlocator_field\x18\x01 \x01(\tR\flocatorField\x12\x1f\n" +
+	"\vlink_format\x18\x02 \x01(\tR\n" +
+	"linkFormat\"\xcd\x02\n" +
 	"\rElasticsearch\x12\x14\n" +
 	"\x05nodes\x18\x01 \x03(\tR\x05nodes\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x1a\n" +
@@ -5204,7 +5292,7 @@ func file_sources_proto_rawDescGZIP() []byte {
 }
 
 var file_sources_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_sources_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_sources_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_sources_proto_goTypes = []any{
 	(SourceType)(0),                             // 0: sources.SourceType
 	(BitbucketInstallationType)(0),              // 1: sources.BitbucketInstallationType
@@ -5244,85 +5332,87 @@ var file_sources_proto_goTypes = []any{
 	(*AzureRepos)(nil),                          // 35: sources.AzureRepos
 	(*Postman)(nil),                             // 36: sources.Postman
 	(*Webhook)(nil),                             // 37: sources.Webhook
-	(*Elasticsearch)(nil),                       // 38: sources.Elasticsearch
-	(*Sentry)(nil),                              // 39: sources.Sentry
-	(*Stdin)(nil),                               // 40: sources.Stdin
-	(*SlackContinuous)(nil),                     // 41: sources.SlackContinuous
-	(*durationpb.Duration)(nil),                 // 42: google.protobuf.Duration
-	(*anypb.Any)(nil),                           // 43: google.protobuf.Any
-	(*credentialspb.BasicAuth)(nil),             // 44: credentials.BasicAuth
-	(*credentialspb.Unauthenticated)(nil),       // 45: credentials.Unauthenticated
-	(*credentialspb.Oauth2)(nil),                // 46: credentials.Oauth2
-	(*credentialspb.KeySecret)(nil),             // 47: credentials.KeySecret
-	(*credentialspb.CloudEnvironment)(nil),      // 48: credentials.CloudEnvironment
-	(*credentialspb.SSHAuth)(nil),               // 49: credentials.SSHAuth
-	(*credentialspb.GitHubApp)(nil),             // 50: credentials.GitHubApp
-	(*credentialspb.AWSSessionTokenSecret)(nil), // 51: credentials.AWSSessionTokenSecret
-	(*credentialspb.SlackTokens)(nil),           // 52: credentials.SlackTokens
-	(*credentialspb.Header)(nil),                // 53: credentials.Header
-	(*credentialspb.ClientCredentials)(nil),     // 54: credentials.ClientCredentials
-	(*timestamppb.Timestamp)(nil),               // 55: google.protobuf.Timestamp
+	(*Vector)(nil),                              // 38: sources.Vector
+	(*Elasticsearch)(nil),                       // 39: sources.Elasticsearch
+	(*Sentry)(nil),                              // 40: sources.Sentry
+	(*Stdin)(nil),                               // 41: sources.Stdin
+	(*SlackContinuous)(nil),                     // 42: sources.SlackContinuous
+	(*durationpb.Duration)(nil),                 // 43: google.protobuf.Duration
+	(*anypb.Any)(nil),                           // 44: google.protobuf.Any
+	(*credentialspb.BasicAuth)(nil),             // 45: credentials.BasicAuth
+	(*credentialspb.Unauthenticated)(nil),       // 46: credentials.Unauthenticated
+	(*credentialspb.Oauth2)(nil),                // 47: credentials.Oauth2
+	(*credentialspb.KeySecret)(nil),             // 48: credentials.KeySecret
+	(*credentialspb.CloudEnvironment)(nil),      // 49: credentials.CloudEnvironment
+	(*credentialspb.SSHAuth)(nil),               // 50: credentials.SSHAuth
+	(*credentialspb.GitHubApp)(nil),             // 51: credentials.GitHubApp
+	(*credentialspb.AWSSessionTokenSecret)(nil), // 52: credentials.AWSSessionTokenSecret
+	(*credentialspb.SlackTokens)(nil),           // 53: credentials.SlackTokens
+	(*credentialspb.Header)(nil),                // 54: credentials.Header
+	(*credentialspb.ClientCredentials)(nil),     // 55: credentials.ClientCredentials
+	(*timestamppb.Timestamp)(nil),               // 56: google.protobuf.Timestamp
 }
 var file_sources_proto_depIdxs = []int32{
-	42, // 0: sources.LocalSource.scan_interval:type_name -> google.protobuf.Duration
-	43, // 1: sources.LocalSource.connection:type_name -> google.protobuf.Any
-	44, // 2: sources.Artifactory.basic_auth:type_name -> credentials.BasicAuth
-	45, // 3: sources.Artifactory.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 4: sources.AzureStorage.basic_auth:type_name -> credentials.BasicAuth
-	45, // 5: sources.AzureStorage.unauthenticated:type_name -> credentials.Unauthenticated
-	46, // 6: sources.Bitbucket.oauth:type_name -> credentials.Oauth2
-	44, // 7: sources.Bitbucket.basic_auth:type_name -> credentials.BasicAuth
+	43, // 0: sources.LocalSource.scan_interval:type_name -> google.protobuf.Duration
+	44, // 1: sources.LocalSource.connection:type_name -> google.protobuf.Any
+	45, // 2: sources.Artifactory.basic_auth:type_name -> credentials.BasicAuth
+	46, // 3: sources.Artifactory.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 4: sources.AzureStorage.basic_auth:type_name -> credentials.BasicAuth
+	46, // 5: sources.AzureStorage.unauthenticated:type_name -> credentials.Unauthenticated
+	47, // 6: sources.Bitbucket.oauth:type_name -> credentials.Oauth2
+	45, // 7: sources.Bitbucket.basic_auth:type_name -> credentials.BasicAuth
 	1,  // 8: sources.Bitbucket.installation_type:type_name -> sources.BitbucketInstallationType
-	45, // 9: sources.Confluence.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 10: sources.Confluence.basic_auth:type_name -> credentials.BasicAuth
+	46, // 9: sources.Confluence.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 10: sources.Confluence.basic_auth:type_name -> credentials.BasicAuth
 	2,  // 11: sources.Confluence.spaces_scope:type_name -> sources.Confluence.GetAllSpacesScope
-	45, // 12: sources.Docker.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 13: sources.Docker.basic_auth:type_name -> credentials.BasicAuth
-	47, // 14: sources.ECR.access_key:type_name -> credentials.KeySecret
-	45, // 15: sources.GCS.unauthenticated:type_name -> credentials.Unauthenticated
-	48, // 16: sources.GCS.adc:type_name -> credentials.CloudEnvironment
-	46, // 17: sources.GCS.oauth:type_name -> credentials.Oauth2
-	44, // 18: sources.Git.basic_auth:type_name -> credentials.BasicAuth
-	45, // 19: sources.Git.unauthenticated:type_name -> credentials.Unauthenticated
-	49, // 20: sources.Git.ssh_auth:type_name -> credentials.SSHAuth
-	46, // 21: sources.GitLab.oauth:type_name -> credentials.Oauth2
-	44, // 22: sources.GitLab.basic_auth:type_name -> credentials.BasicAuth
-	50, // 23: sources.GitHub.github_app:type_name -> credentials.GitHubApp
-	45, // 24: sources.GitHub.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 25: sources.GitHub.basic_auth:type_name -> credentials.BasicAuth
-	50, // 26: sources.GitHubRealtime.github_app:type_name -> credentials.GitHubApp
-	45, // 27: sources.GitHubRealtime.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 28: sources.GitHubRealtime.basic_auth:type_name -> credentials.BasicAuth
-	45, // 29: sources.Huggingface.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 30: sources.JIRA.basic_auth:type_name -> credentials.BasicAuth
-	45, // 31: sources.JIRA.unauthenticated:type_name -> credentials.Unauthenticated
-	46, // 32: sources.JIRA.oauth:type_name -> credentials.Oauth2
-	45, // 33: sources.NPMUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
-	45, // 34: sources.PyPIUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
-	47, // 35: sources.S3.access_key:type_name -> credentials.KeySecret
-	45, // 36: sources.S3.unauthenticated:type_name -> credentials.Unauthenticated
-	48, // 37: sources.S3.cloud_environment:type_name -> credentials.CloudEnvironment
-	51, // 38: sources.S3.session_token:type_name -> credentials.AWSSessionTokenSecret
-	52, // 39: sources.Slack.tokens:type_name -> credentials.SlackTokens
-	44, // 40: sources.Gerrit.basic_auth:type_name -> credentials.BasicAuth
-	45, // 41: sources.Gerrit.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 42: sources.Jenkins.basic_auth:type_name -> credentials.BasicAuth
-	53, // 43: sources.Jenkins.header:type_name -> credentials.Header
-	45, // 44: sources.Jenkins.unauthenticated:type_name -> credentials.Unauthenticated
-	54, // 45: sources.Teams.authenticated:type_name -> credentials.ClientCredentials
-	46, // 46: sources.Teams.oauth:type_name -> credentials.Oauth2
-	45, // 47: sources.Forager.unauthenticated:type_name -> credentials.Unauthenticated
-	55, // 48: sources.Forager.since:type_name -> google.protobuf.Timestamp
-	52, // 49: sources.SlackRealtime.tokens:type_name -> credentials.SlackTokens
-	46, // 50: sources.Sharepoint.oauth:type_name -> credentials.Oauth2
-	46, // 51: sources.AzureRepos.oauth:type_name -> credentials.Oauth2
-	45, // 52: sources.Postman.unauthenticated:type_name -> credentials.Unauthenticated
-	53, // 53: sources.Webhook.header:type_name -> credentials.Header
-	54, // [54:54] is the sub-list for method output_type
-	54, // [54:54] is the sub-list for method input_type
-	54, // [54:54] is the sub-list for extension type_name
-	54, // [54:54] is the sub-list for extension extendee
-	0,  // [0:54] is the sub-list for field type_name
+	46, // 12: sources.Docker.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 13: sources.Docker.basic_auth:type_name -> credentials.BasicAuth
+	48, // 14: sources.ECR.access_key:type_name -> credentials.KeySecret
+	46, // 15: sources.GCS.unauthenticated:type_name -> credentials.Unauthenticated
+	49, // 16: sources.GCS.adc:type_name -> credentials.CloudEnvironment
+	47, // 17: sources.GCS.oauth:type_name -> credentials.Oauth2
+	45, // 18: sources.Git.basic_auth:type_name -> credentials.BasicAuth
+	46, // 19: sources.Git.unauthenticated:type_name -> credentials.Unauthenticated
+	50, // 20: sources.Git.ssh_auth:type_name -> credentials.SSHAuth
+	47, // 21: sources.GitLab.oauth:type_name -> credentials.Oauth2
+	45, // 22: sources.GitLab.basic_auth:type_name -> credentials.BasicAuth
+	51, // 23: sources.GitHub.github_app:type_name -> credentials.GitHubApp
+	46, // 24: sources.GitHub.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 25: sources.GitHub.basic_auth:type_name -> credentials.BasicAuth
+	51, // 26: sources.GitHubRealtime.github_app:type_name -> credentials.GitHubApp
+	46, // 27: sources.GitHubRealtime.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 28: sources.GitHubRealtime.basic_auth:type_name -> credentials.BasicAuth
+	46, // 29: sources.Huggingface.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 30: sources.JIRA.basic_auth:type_name -> credentials.BasicAuth
+	46, // 31: sources.JIRA.unauthenticated:type_name -> credentials.Unauthenticated
+	47, // 32: sources.JIRA.oauth:type_name -> credentials.Oauth2
+	46, // 33: sources.NPMUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
+	46, // 34: sources.PyPIUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
+	48, // 35: sources.S3.access_key:type_name -> credentials.KeySecret
+	46, // 36: sources.S3.unauthenticated:type_name -> credentials.Unauthenticated
+	49, // 37: sources.S3.cloud_environment:type_name -> credentials.CloudEnvironment
+	52, // 38: sources.S3.session_token:type_name -> credentials.AWSSessionTokenSecret
+	53, // 39: sources.Slack.tokens:type_name -> credentials.SlackTokens
+	45, // 40: sources.Gerrit.basic_auth:type_name -> credentials.BasicAuth
+	46, // 41: sources.Gerrit.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 42: sources.Jenkins.basic_auth:type_name -> credentials.BasicAuth
+	54, // 43: sources.Jenkins.header:type_name -> credentials.Header
+	46, // 44: sources.Jenkins.unauthenticated:type_name -> credentials.Unauthenticated
+	55, // 45: sources.Teams.authenticated:type_name -> credentials.ClientCredentials
+	47, // 46: sources.Teams.oauth:type_name -> credentials.Oauth2
+	46, // 47: sources.Forager.unauthenticated:type_name -> credentials.Unauthenticated
+	56, // 48: sources.Forager.since:type_name -> google.protobuf.Timestamp
+	53, // 49: sources.SlackRealtime.tokens:type_name -> credentials.SlackTokens
+	47, // 50: sources.Sharepoint.oauth:type_name -> credentials.Oauth2
+	47, // 51: sources.AzureRepos.oauth:type_name -> credentials.Oauth2
+	46, // 52: sources.Postman.unauthenticated:type_name -> credentials.Unauthenticated
+	54, // 53: sources.Webhook.header:type_name -> credentials.Header
+	38, // 54: sources.Webhook.vector:type_name -> sources.Vector
+	55, // [55:55] is the sub-list for method output_type
+	55, // [55:55] is the sub-list for method input_type
+	55, // [55:55] is the sub-list for extension type_name
+	55, // [55:55] is the sub-list for extension extendee
+	0,  // [0:55] is the sub-list for field type_name
 }
 
 func init() { file_sources_proto_init() }
@@ -5464,8 +5554,9 @@ func file_sources_proto_init() {
 	}
 	file_sources_proto_msgTypes[34].OneofWrappers = []any{
 		(*Webhook_Header)(nil),
+		(*Webhook_Vector)(nil),
 	}
-	file_sources_proto_msgTypes[36].OneofWrappers = []any{
+	file_sources_proto_msgTypes[37].OneofWrappers = []any{
 		(*Sentry_AuthToken)(nil),
 		(*Sentry_DsnKey)(nil),
 		(*Sentry_ApiKey)(nil),
@@ -5476,7 +5567,7 @@ func file_sources_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sources_proto_rawDesc), len(file_sources_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   39,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
