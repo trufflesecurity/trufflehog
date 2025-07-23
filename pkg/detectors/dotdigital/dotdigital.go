@@ -27,7 +27,7 @@ var (
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	emailPat = regexp.MustCompile(`\b(apiuser-[a-z0-9]{12}@apiconnector.com)\b`)
-	passPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"dotdigital", "pass"}) + `([a-zA-Z0-9\S]{8,24})`)
+	passPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"pw", "pass"}) + `\b([a-zA-Z0-9\S]{8,24})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -74,7 +74,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			results = append(results, s1)
 
 			if s1.Verified {
-				// If the secret is verified, we can stop checking for more passwords for this email.
+				// Once the email is verified, we can stop checking other passwords for it.
 				break
 			}
 		}

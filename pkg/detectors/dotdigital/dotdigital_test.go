@@ -27,10 +27,7 @@ var (
 		# Notes:
 		# - The above credentials should only be used in a secure environment.
 	`
-	secrets = []string{
-		"apiuser-trq6zw9mmdlt@apiconnector.comN{w44mqa'2si(zY8",
-		"apiuser-trq6zw9mmdlt@apiconnector.comapiuser-trq6zw9mmdlt@",
-	}
+	secrets = []string{"apiuser-trq6zw9mmdlt@apiconnector.comN{w44mqa'2si(zY8"}
 )
 
 func TestDotdigital_Pattern(t *testing.T) {

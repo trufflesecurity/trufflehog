@@ -48,10 +48,6 @@ func TestDotdigital_FromChunk(t *testing.T) {
 			want: []detectors.Result{
 				{
 					DetectorType: detectorspb.DetectorType_Dotmailer,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Dotmailer,
 					Verified:     true,
 				},
 			},
@@ -66,10 +62,6 @@ func TestDotdigital_FromChunk(t *testing.T) {
 				verify: true,
 			},
 			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_Dotmailer,
-					Verified:     false,
-				},
 				{
 					DetectorType: detectorspb.DetectorType_Dotmailer,
 					Verified:     false,
