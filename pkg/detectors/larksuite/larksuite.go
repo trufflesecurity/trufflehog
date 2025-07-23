@@ -27,6 +27,10 @@ const (
 	CodeUserResigned      = 20021 // User resigned
 	CodeUserFrozen        = 20022 // User frozen
 	CodeUserNotRegistered = 20023 // User not registered
+
+	// Undocumented error codes - these are found in the API responses but not in the documentation
+	CodeUndocumentedInvalid1 = 99991663 // Invalid access token for authorization. Please make a request with token attached.
+	CodeUndocumentedInvalid2 = 99991668 // Invalid access token for authorization. Please make a request with token attached.
 )
 
 // VerificationResult represents the outcome of token verification
@@ -184,7 +188,8 @@ func classifyErrorCode(code int) VerificationResult {
 		return VerificationValid
 
 	// HTTP 200 codes that indicate definitive token invalidity
-	case CodeInvalidToken, CodeUserNotExist, CodeUserResigned, CodeUserFrozen, CodeUserNotRegistered:
+	case CodeInvalidToken, CodeUserNotExist, CodeUserResigned, CodeUserFrozen, CodeUserNotRegistered, CodeUndocumentedInvalid1,
+		CodeUndocumentedInvalid2:
 		return VerificationInvalid
 
 	// All other error codes are treated as verification errors
