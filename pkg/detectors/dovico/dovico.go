@@ -77,8 +77,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 			results = append(results, s1)
 
+			// Credentials have 1:1 mapping so we can stop checking other user keys once it is verified
 			if s1.Verified {
-				// Data keys are mapped to users and consumer secrets so we can skip it once verified
 				break
 			}
 		}
