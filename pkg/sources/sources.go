@@ -448,7 +448,8 @@ type StdinConfig struct{}
 
 // Progress is used to update job completion progress across sources.
 type Progress struct {
-	mut                   sync.Mutex
+	mut sync.Mutex
+	// encodedResumeInfoByID is used for sub-unit resumption (see below)
 	encodedResumeInfoByID map[string]string
 	PercentComplete       int64
 	Message               string
@@ -513,6 +514,22 @@ func (p *Progress) GetProgress() *Progress {
 	return p
 }
 
+// -sub-unit-resumption------------------------------------------------------------
+//
+// The following collection of methods are intended to provide a thread-safe
+// way to access the EncodedResumeInfo for Sources to enable saving and
+// resuming progress mid SourceUnit scan.
+//
+// In majority of cases, synchronization like this is not needed. However,
+// there are edge-cases that warrant this: headless and OSS scans. Two types of
+// scans *that can't even be resumed*, but the alternative is to make the
+// Source aware of that, complicating the implementation even more.
+//
+// Usage:
+//  - id should be the SourceUnit ID
+//  - value is opaque data each Source uses
+//
+
 // GetEncodedResumeInfoFor gets the encoded resume information for the provided
 // ID, usually a unit ID.
 func (p *Progress) GetEncodedResumeInfoFor(id string) string {
@@ -563,3 +580,5 @@ func unmarshalEncodedResumeInfo(data string) map[string]string {
 	_ = json.Unmarshal([]byte(data), &resumeInfo)
 	return resumeInfo
 }
+
+// -/sub-unit-resumption-----------------------------------------------------------
