@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -41,10 +42,14 @@ func TestDotdigital_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dotdigital secret %s within dotdigital pass %s", email, password)),
+				data:   []byte(fmt.Sprintf("You can find a dotdigital user %s within dotdigital pass %s", email, password)),
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Dotmailer,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_Dotmailer,
 					Verified:     true,
@@ -57,10 +62,14 @@ func TestDotdigital_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dotdigital secret %s within dotdigital pass %s but not valid ", inactivePassword, password)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a dotdigital user %s within dotdigital pass %s but not valid ", email, inactivePassword)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
+				{
+					DetectorType: detectorspb.DetectorType_Dotmailer,
+					Verified:     false,
+				},
 				{
 					DetectorType: detectorspb.DetectorType_Dotmailer,
 					Verified:     false,
@@ -90,11 +99,22 @@ func TestDotdigital_FromChunk(t *testing.T) {
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatal("no raw secret present")
+					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Dotdigital.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
