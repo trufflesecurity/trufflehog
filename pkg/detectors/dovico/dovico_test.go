@@ -23,8 +23,8 @@ var (
 			auth_type: "Token"
 			in: "Header"
 			api_version: v1
-			dovico_user: "ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4olz2l5jzw54yv3ai0qwdri6l1f4iyruc7f"
-			dovico_token: "nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6evkkrqz3onrg2epqj9i2lgkb0wxf8lq0gdzvw6macc9br1qi9ry335u173dr3gzcgy9v6"
+			dovico_user: "ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4ol"
+			dovico_token: "nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6e"
 			base_url: "https://api.example.com/$api_version/example"
 			response_code: 200
 
@@ -33,10 +33,8 @@ var (
 		# - The above credentials should only be used in a secure environment.
 	`
 	secrets = []string{
-		"nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6evkkrqz3onrg2epqj9i2lgkb0wxf8lq0gdzvw6macc9br1qi9ry335u173dr3gzcgy9v6",
-		"nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6evkkrqz3onrg2epqj9i2lgkb0wxf8lq0gdzvw6macc9br1qi9ry335u173dr3gzcgy9v6",
-		"ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4olz2l5jzw54yv3ai0qwdri6l1f4iyruc7f",
-		"ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4olz2l5jzw54yv3ai0qwdri6l1f4iyruc7f",
+		"nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6e:ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4ol",
+		"ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4ol:nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6e",
 	}
 )
 
