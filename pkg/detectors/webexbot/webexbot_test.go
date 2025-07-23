@@ -23,13 +23,19 @@ func TestWebexbot_Pattern(t *testing.T) {
 			want:  []string{"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl"},
 		},
 		{
-			name:  "finds all matches",
-			input: "bot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl'",
-			want:  []string{"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl"},
+			name: "finds multiple Webex Bot tokens",
+			input: `
+			webex_bot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert'
+			webexbot = "ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh"
+		`,
+			want: []string{
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert",
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh",
+			},
 		},
 		{
-			name:  "invalid pattern",
-			input: "bot_token = 'lksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl'",
+			name:  "does not match invalid token name",
+			input: "webex = 'asdf1234qwer5678zxcv9012lkjh_asdf_qwer3456-qwer-vbnm-asdf-zxcvbnmasdfgh'",
 			want:  []string{},
 		},
 	}
