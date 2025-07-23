@@ -1,3 +1,6 @@
+//go:build detectors
+// +build detectors
+
 package dotdigital
 
 import (
@@ -47,7 +50,7 @@ func TestDotdigital_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dotmailer,
+					DetectorType: detectorspb.DetectorType_Dotdigital,
 					Verified:     true,
 				},
 			},
@@ -63,7 +66,7 @@ func TestDotdigital_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dotmailer,
+					DetectorType: detectorspb.DetectorType_Dotdigital,
 					Verified:     false,
 				},
 			},
