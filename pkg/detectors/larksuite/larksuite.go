@@ -15,6 +15,29 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 )
 
+// Define error code constants for better maintainability
+const (
+	// Success codes
+	CodeSuccess        = 0
+	CodeSpecialSuccess = 99991672 // Based on old code - couldn't find documentation for this code
+
+	// HTTP 200 response codes - token invalidity
+	CodeInvalidToken      = 20005 // The user access token passed is invalid
+	CodeUserNotExist      = 20008 // User not exist
+	CodeUserResigned      = 20021 // User resigned
+	CodeUserFrozen        = 20022 // User frozen
+	CodeUserNotRegistered = 20023 // User not registered
+)
+
+// VerificationResult represents the outcome of token verification
+type VerificationResult int
+
+const (
+	VerificationValid   VerificationResult = iota // Token is valid
+	VerificationInvalid                           // Token is definitively invalid
+	VerificationError                             // Error occurred during verification
+)
+
 type Scanner struct {
 	detectors.DefaultMultiPartCredentialProvider
 	client *http.Client
@@ -106,7 +129,9 @@ func verifyAccessToken(ctx context.Context, client *http.Client, url string, tok
 	if err != nil {
 		return false, err
 	}
+
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+
 	res, err := client.Do(req)
 	if err != nil {
 		return false, err
@@ -115,26 +140,62 @@ func verifyAccessToken(ctx context.Context, client *http.Client, url string, tok
 		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}()
-	switch res.StatusCode {
-	case http.StatusOK, http.StatusBadRequest:
-		var bodyResponse verificationResponse
-		if err := json.NewDecoder(res.Body).Decode(&bodyResponse); err != nil {
-			err = fmt.Errorf("failed to decode response: %w", err)
-			return false, err
-		} else {
-			if bodyResponse.Code == 0 || bodyResponse.Code == 99991672 {
-				return true, nil
-			} else {
-				return false, fmt.Errorf("unexpected verification response code %d, message %s", bodyResponse.Code, bodyResponse.Message)
-			}
-		}
+
+	// For LarkSuite API, we expect JSON responses for all documented status codes
+	var bodyResponse verificationResponse
+	if err := json.NewDecoder(res.Body).Decode(&bodyResponse); err != nil {
+		return false, fmt.Errorf("failed to decode response (status %d): %w", res.StatusCode, err)
+	}
+
+	// Handle based on error code classification
+	result := classifyErrorCode(bodyResponse.Code)
+
+	switch result {
+	case VerificationValid:
+		return true, nil
+
+	case VerificationInvalid:
+		return false, nil
+
+	case VerificationError:
+		// All other cases: system errors, rate limits, permission issues, etc.
+		// Return error so token is marked as "unverified" (couldn't verify)
+		return false, fmt.Errorf("verification failed (status %d, code %d): %s",
+			res.StatusCode, bodyResponse.Code, bodyResponse.Message)
+
 	default:
-		// 500 larksuite was unable to generate a result
-		return false, err
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 }
 
 type verificationResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"msg"`
+}
+
+// classifyErrorCode determines how to handle different error codes based on their meaning
+func classifyErrorCode(code int) VerificationResult {
+	// based on the documentation, API fails if response code is not zero
+	// https://open.larksuite.com/document/uAjLw4CM/ukTMukTMukTM/reference/authen-v1/user_info/get
+	// https://open.larksuite.com/document/server-docs/calendar-v4/calendar/list
+	// https://open.larksuite.com/document/server-docs/tenant-v2/tenant/query
+	switch code {
+	case CodeSuccess, CodeSpecialSuccess:
+		return VerificationValid
+
+	// HTTP 200 codes that indicate definitive token invalidity
+	case CodeInvalidToken, CodeUserNotExist, CodeUserResigned, CodeUserFrozen, CodeUserNotRegistered:
+		return VerificationInvalid
+
+	// All other error codes are treated as verification errors
+	// This includes:
+	// - Invalid requests (20001)
+	// - System errors (20050, 190003)
+	// - Rate limits (190004, 190005, 190010)
+	// - Permission issues (190006, 191002, 191003, 191004, 1184001)
+	// - Resource not found (190007, 191000, 195100, 1184000)
+	// - Parameter issues (190002, 190008, 190009, 191001)
+	default:
+		return VerificationError
+	}
 }
