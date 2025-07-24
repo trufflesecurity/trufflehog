@@ -520,10 +520,9 @@ func (p *Progress) GetProgress() *Progress {
 // way to access the EncodedResumeInfo for Sources to enable saving and
 // resuming progress mid SourceUnit scan.
 //
-// In majority of cases, synchronization like this is not needed. However,
-// there are edge-cases that warrant this: headless and OSS scans. Two types of
-// scans *that can't even be resumed*, but the alternative is to make the
-// Source aware of that, complicating the implementation even more.
+// This level of synchronization is only necessary when multiple concurrent
+// invocations of ChunkUnit consume/mutate the same Progress object. The source
+// manager executes scans this way under certain circumstances.
 //
 // Usage:
 //  - id should be the SourceUnit ID
