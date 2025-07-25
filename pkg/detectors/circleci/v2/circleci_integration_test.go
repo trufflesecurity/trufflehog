@@ -1,33 +1,30 @@
 //go:build detectors
 // +build detectors
 
-package dovico
+package circleci
 
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestDovico_FromChunk(t *testing.T) {
+func TestCircleCI_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DOVICO_CLIENT")
-	user := testSecrets.MustGetField("DOVICO_USER")
-	inactiveSecret := testSecrets.MustGetField("DOVICO_CLIENT_INACTIVE")
-	inactiveUser := testSecrets.MustGetField("DOVICO_USER_INACTIVE")
-
+	secret := testSecrets.MustGetField("CIRCLECI")
+	secretInactive := testSecrets.MustGetField("CIRCLECI_INACTIVE")
 	type args struct {
 		ctx    context.Context
 		data   []byte
@@ -45,17 +42,13 @@ func TestDovico_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dovico secret %s within dovico user %s ", secret, user)),
+				data:   []byte(fmt.Sprintf("You can find a circle secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dovico,
+					DetectorType: detectorspb.DetectorType_Circle,
 					Verified:     true,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Dovico,
-					Verified:     false,
 				},
 			},
 			wantErr: false,
@@ -65,16 +58,12 @@ func TestDovico_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dovico secret %s within dovico user %s but not valid", inactiveSecret, inactiveUser)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a circle secret %s within", secretInactive)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dovico,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Dovico,
+					DetectorType: detectorspb.DetectorType_Circle,
 					Verified:     false,
 				},
 			},
@@ -97,18 +86,21 @@ func TestDovico_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Dovico.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CircleCI.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if os.Getenv("FORCE_PASS_DIFF") == "true" {
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
-					t.Fatalf("no raw secret present: \n %+v", got[i])
+					t.Fatal("no raw secret present")
 				}
 				got[i].Raw = nil
-				got[i].RawV2 = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Dovico.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("CircleCI.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

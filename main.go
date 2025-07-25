@@ -184,7 +184,7 @@ var (
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
 
 	dockerScan         = cli.Command("docker", "Scan Docker Image")
-	dockerScanImages   = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+	dockerScanImages   = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, the docker:// prefix to point to the docker daemon, otherwise an image registry is assumed.").Required().Strings()
 	dockerScanToken    = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
 	dockerExcludePaths = dockerScan.Flag("exclude-paths", "Comma separated list of paths to exclude from scan").String()
 
@@ -450,8 +450,12 @@ func run(state overseer.State) {
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
 
+
 	// OSS Default Use Git Mirror on
 	feature.UseGitMirror.Store(true)
+
+	// OSS Default simplified gitlab enumeration
+	feature.UseSimplifiedGitlabEnumeration.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {

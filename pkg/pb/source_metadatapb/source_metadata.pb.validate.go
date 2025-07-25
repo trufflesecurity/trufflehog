@@ -79,7 +79,7 @@ type AzureMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m AzureMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -198,7 +198,7 @@ type BitbucketMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m BitbucketMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -309,7 +309,7 @@ type BuildkiteMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m BuildkiteMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -422,7 +422,7 @@ type CircleCIMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m CircleCIMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -533,7 +533,7 @@ type TravisCIMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m TravisCIMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -648,7 +648,7 @@ type ConfluenceMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ConfluenceMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -754,7 +754,7 @@ type DockerMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m DockerMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -866,7 +866,7 @@ type ECRMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ECRMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -973,7 +973,7 @@ type FilesystemMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m FilesystemMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1083,7 +1083,7 @@ type GitMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GitMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1199,7 +1199,7 @@ type GithubMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GithubMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1317,7 +1317,7 @@ type GitlabMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GitlabMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1429,7 +1429,7 @@ type GCSMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GCSMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1548,7 +1548,7 @@ type HuggingfaceMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m HuggingfaceMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1658,7 +1658,7 @@ type JiraMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m JiraMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1766,7 +1766,7 @@ type NPMMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m NPMMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1874,7 +1874,7 @@ type PyPiMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m PyPiMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1982,7 +1982,7 @@ type S3MultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m S3MultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2098,7 +2098,7 @@ type SlackMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SlackMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2208,7 +2208,7 @@ type GerritMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GerritMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2308,7 +2308,7 @@ type TestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m TestMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2414,7 +2414,7 @@ type JenkinsMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m JenkinsMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2532,7 +2532,7 @@ type TeamsMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m TeamsMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2643,7 +2643,7 @@ type ArtifactoryMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ArtifactoryMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2753,7 +2753,7 @@ type SyslogMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SyslogMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2979,7 +2979,7 @@ type ForagerMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ForagerMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3092,7 +3092,7 @@ type SharePointMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SharePointMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3205,7 +3205,7 @@ type GoogleDriveMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GoogleDriveMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3326,7 +3326,7 @@ type AzureReposMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m AzureReposMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3450,7 +3450,7 @@ type PostmanMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m PostmanMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3568,6 +3568,10 @@ func (m *Vector) validate(all bool) error {
 
 	// no validation rules for Host
 
+	// no validation rules for Locator
+
+	// no validation rules for Link
+
 	if len(errors) > 0 {
 		return VectorMultiError(errors)
 	}
@@ -3581,7 +3585,7 @@ type VectorMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m VectorMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3725,7 +3729,7 @@ type WebhookMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m WebhookMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3831,7 +3835,7 @@ type ElasticsearchMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ElasticsearchMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3947,7 +3951,7 @@ type SentryMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SentryMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -4045,7 +4049,7 @@ type StdinMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m StdinMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -4108,6 +4112,122 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = StdinValidationError{}
+
+// Validate checks the field values on SlackContinuous with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *SlackContinuous) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SlackContinuous with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SlackContinuousMultiError, or nil if none found.
+func (m *SlackContinuous) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SlackContinuous) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for ChannelId
+
+	// no validation rules for ChannelName
+
+	// no validation rules for Timestamp
+
+	// no validation rules for UserId
+
+	// no validation rules for File
+
+	// no validation rules for Email
+
+	// no validation rules for Visibility
+
+	// no validation rules for Location
+
+	if len(errors) > 0 {
+		return SlackContinuousMultiError(errors)
+	}
+
+	return nil
+}
+
+// SlackContinuousMultiError is an error wrapping multiple validation errors
+// returned by SlackContinuous.ValidateAll() if the designated constraints
+// aren't met.
+type SlackContinuousMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SlackContinuousMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SlackContinuousMultiError) AllErrors() []error { return m }
+
+// SlackContinuousValidationError is the validation error returned by
+// SlackContinuous.Validate if the designated constraints aren't met.
+type SlackContinuousValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SlackContinuousValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SlackContinuousValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SlackContinuousValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SlackContinuousValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SlackContinuousValidationError) ErrorName() string { return "SlackContinuousValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SlackContinuousValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSlackContinuous.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SlackContinuousValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SlackContinuousValidationError{}
 
 // Validate checks the field values on MetaData with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -5526,6 +5646,47 @@ func (m *MetaData) validate(all bool) error {
 			}
 		}
 
+	case *MetaData_SlackContinuous:
+		if v == nil {
+			err := MetaDataValidationError{
+				field:  "Data",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetSlackContinuous()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "SlackContinuous",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, MetaDataValidationError{
+						field:  "SlackContinuous",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSlackContinuous()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return MetaDataValidationError{
+					field:  "SlackContinuous",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -5543,7 +5704,7 @@ type MetaDataMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m MetaDataMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}

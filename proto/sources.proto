@@ -53,6 +53,7 @@ enum SourceType {
   SOURCE_TYPE_SENTRY = 38;
   SOURCE_TYPE_GITHUB_REALTIME = 39;
   SOURCE_TYPE_STDIN = 40;
+  SOURCE_TYPE_SLACK_CONTINUOUS = 41;
 }
 
 message LocalSource {
@@ -474,6 +475,14 @@ message Webhook {
   oneof credential {
     credentials.Header header = 2;
   }
+  oneof variant {
+    Vector vector = 4;
+  }
+}
+
+message Vector {
+  string locator_field = 1;
+  string link_format = 2;
 }
 
 message Elasticsearch {
@@ -501,3 +510,8 @@ message Sentry {
 }
 
 message Stdin {}
+
+message SlackContinuous {
+  string namespace = 1;
+  string project_id = 2;
+}

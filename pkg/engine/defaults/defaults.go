@@ -144,7 +144,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checkout"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/checkvist"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cicero"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/circleci"
+	circleciV1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/circleci/v1"
+	circleciV2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/circleci/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clarifai"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clearbit"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/clickhelp"
@@ -622,6 +623,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesflare"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforce"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforceoauth2"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesforcerefreshtoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/salesmate"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/sanity"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/satismeterprojectkey"
@@ -946,6 +948,7 @@ func buildDetectorList() []detectors.Detector {
 		&billomat.Scanner{},
 		&bingsubscriptionkey.Scanner{},
 		&bitbar.Scanner{},
+		&bitbucketapppassword.Scanner{},
 		&bitcoinaverage.Scanner{},
 		&bitfinex.Scanner{},
 		&bitlyaccesstoken.Scanner{},
@@ -996,7 +999,8 @@ func buildDetectorList() []detectors.Detector {
 		&checkout.Scanner{},
 		&checkvist.Scanner{},
 		&cicero.Scanner{},
-		&circleci.Scanner{},
+		&circleciV1.Scanner{},
+		&circleciV2.Scanner{},
 		&clarifai.Scanner{},
 		&clearbit.Scanner{},
 		&clickhelp.Scanner{},
@@ -1205,6 +1209,7 @@ func buildDetectorList() []detectors.Detector {
 		&happyscribe.Scanner{},
 		&harness.Scanner{},
 		&harvest.Scanner{},
+		&hasura.Scanner{},
 		&hellosign.Scanner{},
 		&helpcrunch.Scanner{},
 		&helpscout.Scanner{},
@@ -1489,6 +1494,7 @@ func buildDetectorList() []detectors.Detector {
 		&salesflare.Scanner{},
 		&salesforce.Scanner{},
 		&salesforceoauth2.Scanner{},
+		&salesforcerefreshtoken.Scanner{},
 		&salesmate.Scanner{},
 		&sanity.Scanner{},
 		&satismeterprojectkey.Scanner{},
@@ -1579,6 +1585,7 @@ func buildDetectorList() []detectors.Detector {
 		&strava.Scanner{},
 		&streak.Scanner{},
 		&stripe.Scanner{},
+		&stripepaymentintent.Scanner{},
 		&stripo.Scanner{},
 		&stytch.Scanner{},
 		&sugester.Scanner{},
@@ -1714,9 +1721,6 @@ func buildDetectorList() []detectors.Detector {
 		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
-		&stripepaymentintent.Scanner{},
-		&bitbucketapppassword.Scanner{},
-		&hasura.Scanner{},
 	}
 }
 
