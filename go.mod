@@ -13,7 +13,7 @@ replace github.com/coinbase/waas-client-library-go => github.com/trufflesecurity
 replace gitlab.com/gitlab-org/api/client-go => gitlab.com/gitlab-org/api/client-go v0.129.0
 
 require (
-	cloud.google.com/go/secretmanager v1.14.7
+	cloud.google.com/go/secretmanager v1.15.0
 	cloud.google.com/go/storage v1.56.0
 	github.com/BobuSumisu/aho-corasick v1.0.3
 	github.com/TheZeroSlave/zapsentry v1.23.0
