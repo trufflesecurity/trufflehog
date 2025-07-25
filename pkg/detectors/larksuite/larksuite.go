@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path"
+	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -86,7 +88,9 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for key, tokenPat := range tokenPats {
 		uniqueMatches := make(map[string]struct{})
 		for _, match := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
-			uniqueMatches[match[1]] = struct{}{}
+			if !isLikelyFilename(match[1]) {
+				uniqueMatches[match[1]] = struct{}{}
+			}
 		}
 
 		for token := range uniqueMatches {
@@ -203,4 +207,84 @@ func classifyErrorCode(code int) VerificationResult {
 	default:
 		return VerificationError
 	}
+}
+
+// isLikelyFilename - filter out tokens that end with common file extensions
+func isLikelyFilename(token string) bool {
+	_, ok := commonFileExtensions[strings.ToLower(path.Ext(token))]
+	return ok
+}
+
+var commonFileExtensions = map[string]struct{}{
+	// Web files
+	".html": {},
+	".htm":  {},
+	".css":  {},
+	".js":   {},
+	".json": {},
+	".xml":  {},
+	".svg":  {},
+	".php":  {},
+	".asp":  {},
+	".aspx": {},
+	".jsp":  {},
+
+	// Document files
+	".txt":  {},
+	".md":   {},
+	".pdf":  {},
+	".doc":  {},
+	".docx": {},
+	".rtf":  {},
+
+	// Data files
+	".csv":  {},
+	".xlsx": {},
+	".xls":  {},
+	".sql":  {},
+	".db":   {},
+
+	// Config files
+	".conf":   {},
+	".config": {},
+	".ini":    {},
+	".yaml":   {},
+	".yml":    {},
+	".toml":   {},
+
+	// Log files
+	".log": {},
+	".out": {},
+	".err": {},
+
+	// Archive files
+	".zip": {},
+	".tar": {},
+	".gz":  {},
+	".rar": {},
+
+	// Image files
+	".png":  {},
+	".jpg":  {},
+	".jpeg": {},
+	".gif":  {},
+	".bmp":  {},
+	".ico":  {},
+
+	// Source code files
+	".go":   {},
+	".py":   {},
+	".java": {},
+	".cpp":  {},
+	".c":    {},
+	".h":    {},
+	".rb":   {},
+	".rs":   {},
+	".ts":   {},
+
+	// Other common files
+	".tmp":  {},
+	".bak":  {},
+	".old":  {},
+	".lock": {},
 }
