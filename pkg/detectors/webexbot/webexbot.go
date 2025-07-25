@@ -28,7 +28,7 @@ var (
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
-	return []string{"webexbot", "spark", "webex"}
+	return []string{"spark", "webex"}
 }
 
 // FromData will find and optionally verify Webexbot secrets in a given set of bytes.
@@ -99,11 +99,12 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		// parse the response body to json
 		var resp response
 		extraData := make(map[string]string)
-		if err := json.NewDecoder(res.Body).Decode(&resp); err == nil {
-			extraData["type"] = resp.Type
-			extraData["username"] = resp.UserName
+		if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+			return true, nil, fmt.Errorf("failed to decode response: %w", err)
 		}
 
+		extraData["type"] = resp.Type
+		extraData["username"] = resp.UserName
 		return true, extraData, nil
 	case http.StatusUnauthorized:
 		// The secret is determinately not verified (nothing to do)
