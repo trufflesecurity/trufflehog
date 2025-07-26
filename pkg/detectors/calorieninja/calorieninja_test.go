@@ -28,7 +28,12 @@ var (
 		# - Remember to rotate the secret every 90 days.
 		# - The above credentials should only be used in a secure environment.
 	`
+	validPatternWithBase64 = `
+		# Configuration with base64-like API key
+		calorieninja_api_key: "e2xRY0yQmqhSetiQx0ZKWg==QMP1HstAoHdzP8qg"
+	`
 	secret = "ix1aaifujilTcGEjB67e1EBBRXcr7r9cdChAR5hb"
+	secretBase64 = "e2xRY0yQmqhSetiQx0ZKWg==QMP1HstAoHdzP8qg"
 )
 
 func TestCalorieNinja_Pattern(t *testing.T) {
@@ -44,6 +49,11 @@ func TestCalorieNinja_Pattern(t *testing.T) {
 			name:  "valid pattern",
 			input: validPattern,
 			want:  []string{secret},
+		},
+		{
+			name:  "valid pattern with base64 characters",
+			input: validPatternWithBase64,
+			want:  []string{secretBase64},
 		},
 	}
 

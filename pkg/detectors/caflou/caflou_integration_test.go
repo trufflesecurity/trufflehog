@@ -19,12 +19,12 @@ import (
 func TestCaflou_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors2")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
 	secret := testSecrets.MustGetField("CAFLOU")
-	inactiveSecret := testSecrets.MustGetField("CAFLOU_INACTIVE")
+	inactiveSecret := testSecrets.MustGetField("CAFLOU_INVALID")
 
 	type args struct {
 		ctx    context.Context
