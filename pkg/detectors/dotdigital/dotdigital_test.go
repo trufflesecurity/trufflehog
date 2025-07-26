@@ -1,4 +1,4 @@
-package dotmailer
+package dotdigital
 
 import (
 	"context"
@@ -16,29 +16,21 @@ var (
 		database:
 			host: $DB_HOST
 			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
 
 		api:
 			auth_type: "Basic"
-			in: "Path"
-			api_version: v1
-			dotmailer_key: "apiuser-trq6zw9mmdlt@apiconnector@com"
-			dotmailer_secret: "N{w44mqa'2si(zY8"
+			dotdigital_email: "apiuser-trq6zw9mmdlt@apiconnector.com"
+			dotdigital_password: "N{w44mqa'2si(zY8"
 			base_url: "https://api.example.com/$api_version/example"
 			response_code: 200
 
 		# Notes:
-		# - Remember to rotate the secret every 90 days.
 		# - The above credentials should only be used in a secure environment.
 	`
-	secrets = []string{
-		"apiuser-trq6zw9mmdlt@apiconnector@comN{w44mqa'2si(zY8",
-		"apiuser-trq6zw9mmdlt@apiconnector@comapiuser-trq6zw9mmdlt@",
-	}
+	secrets = []string{"apiuser-trq6zw9mmdlt@apiconnector.comN{w44mqa'2si(zY8"}
 )
 
-func TestDotMailer_Pattern(t *testing.T) {
+func TestDotdigital_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
