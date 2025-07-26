@@ -446,6 +446,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailjetsms"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailmodo"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mailsac"
+	make_api_token "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/make/api_token"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mandrill"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mapbox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/mapquest"
@@ -1311,6 +1312,7 @@ func buildDetectorList() []detectors.Detector {
 		&mailjetsms.Scanner{},
 		&mailmodo.Scanner{},
 		&mailsac.Scanner{},
+		&make_api_token.Scanner{},
 		&mandrill.Scanner{},
 		// &manifest.Scanner{},
 		&mapbox.Scanner{},
