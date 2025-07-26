@@ -44,6 +44,7 @@ type Source struct {
 	token        string
 	url          string
 	repos        []string
+	groupIds     []string
 	ignoreRepos  []string
 	includeRepos []string
 
@@ -158,6 +159,7 @@ func (s *Source) Init(ctx context.Context, name string, jobId sources.JobID, sou
 	}
 
 	s.repos = conn.GetRepositories()
+	s.groupIds = conn.GetGroupIds()
 	s.ignoreRepos = conn.GetIgnoreRepos()
 	s.includeRepos = conn.GetIncludeRepos()
 	s.enumerateSharedProjects = !conn.ExcludeProjectsSharedIntoGroups
@@ -266,14 +268,9 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 				return ctx.Err()
 			},
 		}
-		if feature.UseSimplifiedGitlabEnumeration.Load() {
-			if err := s.getAllProjectReposV2(ctx, apiClient, ignoreRepo, reporter); err != nil {
-				return err
-			}
-		} else {
-			if err := s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter); err != nil {
-				return err
-			}
+
+		if err := s.listProjects(ctx, apiClient, ignoreRepo, reporter); err != nil {
+			return err
 		}
 
 	} else {
@@ -285,6 +282,21 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, tar
 	slices.Sort(s.repos)
 
 	return s.scanRepos(ctx, chunksChan)
+}
+
+func (s *Source) listProjects(ctx context.Context,
+	apiClient *gitlab.Client,
+	ignoreProject func(string) bool,
+	visitor sources.UnitReporter) error {
+	if len(s.groupIds) > 0 {
+		return s.getAllProjectReposInGroups(ctx, apiClient, ignoreProject, visitor)
+	}
+
+	if feature.UseSimplifiedGitlabEnumeration.Load() {
+		return s.getAllProjectReposV2(ctx, apiClient, ignoreProject, visitor)
+	}
+
+	return s.getAllProjectRepos(ctx, apiClient, ignoreProject, visitor)
 }
 
 func (s *Source) scanTargets(ctx context.Context, client *gitlab.Client, targets []sources.ChunkingTarget, chunksChan chan *sources.Chunk) error {
@@ -401,16 +413,9 @@ func (s *Source) Validate(ctx context.Context) []error {
 		},
 	}
 
-	if feature.UseSimplifiedGitlabEnumeration.Load() {
-		if err := s.getAllProjectReposV2(ctx, apiClient, ignoreProject, visitor); err != nil {
-			errs = append(errs, err)
-			return errs
-		}
-	} else {
-		if err := s.getAllProjectRepos(ctx, apiClient, ignoreProject, visitor); err != nil {
-			errs = append(errs, err)
-			return errs
-		}
+	if err := s.listProjects(ctx, apiClient, ignoreProject, visitor); err != nil {
+		errs = append(errs, err)
+		return errs
 	}
 
 	if len(repos) == 0 {
@@ -478,7 +483,6 @@ func (s *Source) getAllProjectRepos(
 	reporter sources.UnitReporter,
 ) error {
 	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
-
 	// Projects without repo will get user projects, groups projects, and subgroup projects.
 	user, _, err := apiClient.Users.CurrentUser()
 	if err != nil {
@@ -728,6 +732,118 @@ func (s *Source) getAllProjectReposV2(
 	return nil
 }
 
+// getAllProjectReposInGroups fetches all projects in a GitLab group and its subgroups.
+// It uses the group projects API with include_subgroups=true parameter.
+func (s *Source) getAllProjectReposInGroups(
+	ctx context.Context,
+	apiClient *gitlab.Client,
+	ignoreRepo func(string) bool,
+	reporter sources.UnitReporter,
+) error {
+	gitlabReposEnumerated.WithLabelValues(s.name).Set(0)
+	gitlabGroupsEnumerated.WithLabelValues(s.name).Set(float64(len(s.groupIds)))
+
+	processedProjects := make(map[string]bool)
+
+	var projectsWithNamespace []string
+	const (
+		orderBy         = "id"
+		paginationLimit = 100
+	)
+
+	listOpts := gitlab.ListOptions{PerPage: paginationLimit}
+	projectOpts := &gitlab.ListGroupProjectsOptions{
+		ListOptions:      listOpts,
+		OrderBy:          gitlab.Ptr(orderBy),
+		IncludeSubGroups: gitlab.Ptr(true),
+		WithShared:       gitlab.Ptr(true),
+	}
+
+	// For non gitlab.com instances, you might want to adjust access levels
+	if s.url != gitlabBaseURL {
+		projectOpts.MinAccessLevel = gitlab.Ptr(gitlab.GuestPermissions)
+	}
+
+	ctx.Logger().Info("starting group projects enumeration",
+		"group_ids", s.groupIds,
+		"include_subgroups", true,
+		"list_options", listOpts)
+
+	for _, groupID := range s.groupIds {
+		groupCtx := context.WithValues(ctx, "group_id", groupID)
+
+		projectOpts.Page = 0
+		groupCtx.Logger().V(2).Info("processing group", "group_id", groupID)
+
+		for {
+			projects, res, err := apiClient.Groups.ListGroupProjects(groupID, projectOpts)
+			if err != nil {
+				err = fmt.Errorf("received error on listing projects for group %s: %w", groupID, err)
+				if err := reporter.UnitErr(ctx, err); err != nil {
+					return err
+				}
+				break
+			}
+
+			groupCtx.Logger().V(3).Info("listed group projects", "count", len(projects))
+
+			for _, proj := range projects {
+				projCtx := context.WithValues(ctx,
+					"project_id", proj.ID,
+					"project_name", proj.NameWithNamespace,
+					"group_id", groupID)
+
+				if processedProjects[proj.HTTPURLToRepo] {
+					projCtx.Logger().V(3).Info("skipping project", "reason", "already processed")
+					continue
+				}
+				processedProjects[proj.HTTPURLToRepo] = true
+
+				// skip projects configured to be ignored.
+				if ignoreRepo(proj.PathWithNamespace) {
+					projCtx.Logger().V(3).Info("skipping project", "reason", "ignored in config")
+					continue
+				}
+
+				// report an error if we could not convert the project into a URL.
+				if _, err := url.Parse(proj.HTTPURLToRepo); err != nil {
+					projCtx.Logger().V(3).Info("skipping project",
+						"reason", "URL parse failure",
+						"url", proj.HTTPURLToRepo,
+						"parse_error", err)
+
+					err = fmt.Errorf("could not parse url %q given by project: %w", proj.HTTPURLToRepo, err)
+					if err := reporter.UnitErr(ctx, err); err != nil {
+						return err
+					}
+					continue
+				}
+
+				// report the unit.
+				projCtx.Logger().V(3).Info("accepting project")
+
+				unit := git.SourceUnit{Kind: git.UnitRepo, ID: proj.HTTPURLToRepo}
+				gitlabReposEnumerated.WithLabelValues(s.name).Inc()
+				projectsWithNamespace = append(projectsWithNamespace, proj.NameWithNamespace)
+
+				if err := reporter.UnitOk(ctx, unit); err != nil {
+					return err
+				}
+			}
+
+			// handle pagination.
+			projectOpts.Page = res.NextPage
+			if res.NextPage == 0 {
+				break
+			}
+		}
+	}
+
+	ctx.Logger().Info("Enumerated GitLab group projects", "count", len(projectsWithNamespace))
+
+	return nil
+}
+
 func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk) error {
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)
@@ -937,11 +1053,11 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 		_ = reporter.UnitErr(ctx, fmt.Errorf("could not compile include/exclude repo glob: %w", err))
 	})
 
-	if feature.UseSimplifiedGitlabEnumeration.Load() {
-		return s.getAllProjectReposV2(ctx, apiClient, ignoreRepo, reporter)
-	} else {
-		return s.getAllProjectRepos(ctx, apiClient, ignoreRepo, reporter)
+	if err := s.listProjects(ctx, apiClient, ignoreRepo, reporter); err != nil {
+		return err
 	}
+
+	return nil
 }
 
 // ChunkUnit downloads and reports chunks for the given GitLab repository unit.
