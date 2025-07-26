@@ -53,7 +53,7 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
 
 3. Add a 'version' field in ExtraData for both existing and new detector versions.
 
-4. Update the existing detector in DefaultDetectors in `/pkg/engine/defaults.go`
+4. Update the existing detector in DefaultDetectors in `/pkg/engine/defaults/defaults.go`
 
 5. Proceed from step 3 of [Creating a new Secret Scanner](#creating-a-new-secret-scanner)
 
@@ -71,8 +71,8 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
    ```
 4. Add the Secret Detector to TruffleHog's Default Detectors
 
-   Add the secret scanner to the [`pkg/engine/defaults.go`](https://github.com/trufflesecurity/trufflehog/blob/main/pkg/engine/defaults.go) file like [`github.com/trufflesecurity/trufflehog/v3/pkg/detectors/<detector_name>`](https://github.com/trufflesecurity/trufflehog/blob/b71ea27a696bdf1c3141f637fda4ee4936c2f2d6/pkg/engine/defaults.go#L9) and 
-   [`<detector_name>.Scanner{}`](https://github.com/trufflesecurity/trufflehog/blob/b71ea27a696bdf1c3141f637fda4ee4936c2f2d6/pkg/engine/defaults.go#L1546)
+   Add the secret scanner to the [`pkg/engine/defaults/defaults.go`](https://github.com/trufflesecurity/trufflehog/blob/main/pkg/engine/defaults/defaults.go) file like [`github.com/trufflesecurity/trufflehog/v3/pkg/detectors/<detector_name>`](https://github.com/trufflesecurity/trufflehog/blob/b71ea27a696bdf1c3141f637fda4ee4936c2f2d6/pkg/engine/defaults/defaults.go#L9) and 
+   [`<detector_name>.Scanner{}`](https://github.com/trufflesecurity/trufflehog/blob/b71ea27a696bdf1c3141f637fda4ee4936c2f2d6/pkg/engine/defaults/defaults.go#L1546)
 
 5. Complete the Secret Detector.
 
@@ -83,7 +83,7 @@ Note: Be sure to update the tests to reference the new secret values in GSM, or 
    2. Update the verifier code to use a non-destructive API call that can determine whether the secret is valid or not.
       * Make sure you understand [verification indeterminacy](#verification-indeterminacy).
    3. Create a [test for the detector](#testing-the-detector).
-   4. Add your new detector to DefaultDetectors in `/pkg/engine/defaults.go`.
+   4. Add your new detector to DefaultDetectors in `/pkg/engine/defaults/defaults.go`.
    5. Create a pull request for review.
 
 ### Testing the Detector
