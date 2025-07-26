@@ -335,7 +335,7 @@ enum DetectorType {
   Appcues = 322;
   Autoklose = 323;
   Cloudplan = 324;
-  Dotmailer = 325;
+  Dotdigital = 325;
   GetEmail = 326;
   GetEmails = 327;
   Kontent = 328;
