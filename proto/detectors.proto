@@ -1043,6 +1043,7 @@ enum DetectorType {
   SalesforceRefreshToken = 1031;
   AnypointOAuth2 = 1032;
   MakeApiToken = 1033;
+  MakeMcpToken = 1034;
 }
 
 message Result {
