@@ -24,6 +24,8 @@ var (
 	defaultClient = common.SaneHttpClient()
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"make"}) + `\b([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b`)
+	// Pattern to match Make.com URLs in the data
+	urlPat = regexp.MustCompile(`\bhttps://(eu[12]|us[12])\.make\.(?:com|celonis\.com)/api/v2/`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -41,31 +43,65 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		uniqueMatches[match[1]] = struct{}{}
 	}
 
-	for match := range uniqueMatches {
-		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_MakeApiToken,
-			Raw:          []byte(match),
-		}
+	// Extract Make URLs from the data
+	var foundURLs []string
+	for _, match := range urlPat.FindAllStringSubmatch(dataStr, -1) {
+		foundURLs = append(foundURLs, match[0])
+	}
 
-		if verify {
-			client := s.client
-			if client == nil {
-				client = defaultClient
+	// If URLs were found, create combinations of tokens and URLs
+	if len(foundURLs) > 0 {
+		for match := range uniqueMatches {
+			for _, foundURL := range foundURLs {
+				s1 := detectors.Result{
+					DetectorType: detectorspb.DetectorType_MakeApiToken,
+					Raw:          []byte(match),
+					RawV2:        []byte(match + ":" + foundURL),
+				}
+
+				if verify {
+					client := s.client
+					if client == nil {
+						client = defaultClient
+					}
+
+					isVerified, extraData, verificationErr := verifyMatch(ctx, client, match, foundURLs)
+					s1.Verified = isVerified
+					s1.ExtraData = extraData
+					s1.SetVerificationError(verificationErr, match)
+				}
+
+				results = append(results, s1)
+			}
+		}
+	} else {
+		// No URLs found, just return tokens
+		for match := range uniqueMatches {
+			s1 := detectors.Result{
+				DetectorType: detectorspb.DetectorType_MakeApiToken,
+				Raw:          []byte(match),
 			}
 
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
-			s1.Verified = isVerified
-			s1.ExtraData = extraData
-			s1.SetVerificationError(verificationErr, match)
-		}
+			if verify {
+				client := s.client
+				if client == nil {
+					client = defaultClient
+				}
 
-		results = append(results, s1)
+				isVerified, extraData, verificationErr := verifyMatch(ctx, client, match, foundURLs)
+				s1.Verified = isVerified
+				s1.ExtraData = extraData
+				s1.SetVerificationError(verificationErr, match)
+			}
+
+			results = append(results, s1)
+		}
 	}
 
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
+func verifyMatch(ctx context.Context, client *http.Client, token string, foundURLs []string) (bool, map[string]string, error) {
 	baseURLs := []string{
 		"https://eu1.make.com/api/v2/",
 		"https://eu2.make.com/api/v2/",
@@ -75,37 +111,34 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		"https://eu1.make.celonis.com/api/v2/",
 	}
 
+
+	// If we found URLs in the data, try those first
+	if len(foundURLs) > 0 {
+		for _, foundURL := range foundURLs {
+			verified, err := tryURL(ctx, client, foundURL, token)
+			if verified {
+				return true, nil, nil
+			}
+			if err != nil {
+				// If the matched URL failed, continue to try all base URLs
+				break
+			}
+			// If the matched URL returned a determinate failure (401), we still try other base URLs
+		}
+	}
+
+	// Try all base URLs
 	var lastErr error
 	for _, baseURL := range baseURLs {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"users/me/current-authorization", nil)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		req.Header.Set("Authorization", "Token "+token)
-
-		res, err := client.Do(req)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-
-		func() {
-			_, _ = io.Copy(io.Discard, res.Body)
-			_ = res.Body.Close()
-		}()
-
-		switch res.StatusCode {
-		case http.StatusOK:
+		verified, err := tryURL(ctx, client, baseURL, token)
+		if verified {
 			return true, nil, nil
-		case http.StatusUnauthorized:
-			// Determinate failure - invalid token
-			continue
-		default:
-			// Indeterminate failure - unexpected response
-			lastErr = fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		}
+		if err != nil {
+			lastErr = err
 			continue
 		}
+		// Continue to next URL on determinate failures (401)
 	}
 
 	// If we got here, either all endpoints failed or we had errors
@@ -113,6 +146,37 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		return false, nil, lastErr
 	}
 	return false, nil, nil
+}
+
+func tryURL(ctx context.Context, client *http.Client, baseURL, token string) (bool, error) {
+	// This endpoint returns 200 OK if the token is valid and the correct FQDN for the API is used.
+	// https://developers.make.com/api-documentation/api-reference/users-greater-than-me#get-users-me-current-authorization
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"users/me/current-authorization", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", "Token "+token)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		// Determinate failure - invalid token
+		return false, nil
+	default:
+		// Indeterminate failure - unexpected response
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
