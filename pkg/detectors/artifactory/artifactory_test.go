@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
@@ -25,9 +26,10 @@ func TestArtifactory_Pattern(t *testing.T) {
 		{
 			name: "valid pattern",
 			input: `
-				# artifactory credentials
-				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				Url: rwxtOp.jfrog.io
+				[INFO] Sending request to the artifactory API
+				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[INFO] rwxtOp.jfrog.io
+				[INFO] Response received: 200 OK
 			`,
 			useCloudEndpoint: false,
 			useFoundEndpoint: true,
@@ -36,8 +38,9 @@ func TestArtifactory_Pattern(t *testing.T) {
 		{
 			name: "valid pattern - with cloud endpoints",
 			input: `
-				# artifactory credentials
-				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[INFO] Sending request to the artifactory API
+				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[INFO] Response received: 200 OK
 			`,
 			cloudEndpoint:    "cloudendpoint.jfrog.io",
 			useCloudEndpoint: true,
@@ -47,9 +50,10 @@ func TestArtifactory_Pattern(t *testing.T) {
 		{
 			name: "valid pattern - with cloud and found endpoints",
 			input: `
-				# artifactory credentials
-				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				Url: rwxtOp.jfrog.io
+				[INFO] Sending request to the artifactory API
+				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[INFO] rwxtOp.jfrog.io
+				[INFO] Response received: 200 OK
 			`,
 			cloudEndpoint:    "cloudendpoint.jfrog.io",
 			useCloudEndpoint: true,
@@ -62,9 +66,10 @@ func TestArtifactory_Pattern(t *testing.T) {
 		{
 			name: "valid pattern - with disabled found endpoints",
 			input: `
-				# artifactory credentials
-				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				Url: rwxtOp.jfrog.io
+				[INFO] Sending request to the artifactory API
+				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[INFO] rwxtOp.jfrog.io
+				[INFO] Response received: 200 OK
 			`,
 			cloudEndpoint:    "cloudendpoint.jfrog.io",
 			useCloudEndpoint: true,
@@ -76,8 +81,9 @@ func TestArtifactory_Pattern(t *testing.T) {
 		{
 			name: "valid pattern - with https in configured endpoint",
 			input: `
-				# artifactory credentials
-				Token: cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[INFO] Sending request to the artifactory API
+				[DEBUG] Using Key=cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[INFO] Response received: 200 OK
 			`,
 			cloudEndpoint:    "https://cloudendpoint.jfrog.io",
 			useCloudEndpoint: true,
@@ -89,9 +95,10 @@ func TestArtifactory_Pattern(t *testing.T) {
 		{
 			name: "invalid pattern",
 			input: `
-				# artifactory credentials
-				Token: cmVmdGtuOjAxOjE3ODA_NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
-				Url: rwxtOp.jfroq.io
+				[INFO] Sending request to the artifactory API
+				[DEBUG] Using Key=cmVmdGtuOjAxOjEODA_1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZg
+				[INFO] rwxtOp.jfrog.io
+				[INFO] Response received: 200 OK
 			`,
 			useFoundEndpoint: true,
 			want:             nil,
@@ -110,22 +117,15 @@ func TestArtifactory_Pattern(t *testing.T) {
 
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -137,6 +137,7 @@ func TestArtifactory_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

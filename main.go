@@ -450,6 +450,10 @@ func run(state overseer.State) {
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
 
+
+	// OSS Default Use Git Mirror on
+	feature.UseGitMirror.Store(true)
+
 	// OSS Default simplified gitlab enumeration
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
 
