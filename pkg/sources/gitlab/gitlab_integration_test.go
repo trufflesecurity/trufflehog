@@ -559,7 +559,7 @@ func TestSource_InclusionGlobbing(t *testing.T) {
 			assert.NoError(t, err)
 
 			var errs []error
-			ignoreRepo := buildIgnorer(ctx, src.includeRepos, src.ignoreRepos, func(err error, pattern string) {
+			ignoreRepo := buildIgnorer(src.includeRepos, src.ignoreRepos, func(err error, pattern string) {
 				errs = append(errs, err)
 			})
 			err = src.getAllProjectRepos(ctx, apiClient, ignoreRepo, visitor)

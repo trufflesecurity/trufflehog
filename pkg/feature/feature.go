@@ -9,6 +9,7 @@ var (
 	EnableAPKHandler               atomic.Bool
 	UserAgentSuffix                AtomicString
 	UseSimplifiedGitlabEnumeration atomic.Bool
+	UseGitMirror       atomic.Bool
 )
 
 type AtomicString struct {

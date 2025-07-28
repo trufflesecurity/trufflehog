@@ -1,56 +1,42 @@
-package dovico
+package webexbot
 
 import (
 	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern = `
-		# Configuration File: config.yaml
-		database:
-			host: $DB_HOST
-			port: $DB_PORT
-			username: $DB_USERNAME
-			password: $DB_PASS  # IMPORTANT: Do not share this password publicly
-
-		api:
-			auth_type: "Token"
-			in: "Header"
-			api_version: v1
-			dovico_user: "ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4ol"
-			dovico_token: "nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6e"
-			base_url: "https://api.example.com/$api_version/example"
-			response_code: 200
-
-		# Notes:
-		# - Remember to rotate the secret every 90 days.
-		# - The above credentials should only be used in a secure environment.
-	`
-	secrets = []string{
-		"nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6e:ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4ol",
-		"ntb4fnhk5iot7hzbfjw08jm661iocdd4.3ws4ol:nuhkw7nsrybuvmetium29a6oajxr3xdg.sbpi6e",
-	}
-)
-
-func TestDovico_Pattern(t *testing.T) {
+func TestWebexbot_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: validPattern,
-			want:  secrets,
+			name:  "typical pattern",
+			input: "webexbot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl'",
+			want:  []string{"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl"},
+		},
+		{
+			name: "finds multiple Webex Bot tokens",
+			input: `
+			webex_bot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert'
+			webexbot = "ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh"
+		`,
+			want: []string{
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert",
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh",
+			},
+		},
+		{
+			name:  "does not match invalid token name",
+			input: "webex = 'asdf1234qwer5678zxcv9012lkjh_asdf_qwer3456-qwer-vbnm-asdf-zxcvbnmasdfgh'",
+			want:  []string{},
 		},
 	}
 

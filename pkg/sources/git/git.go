@@ -445,16 +445,26 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 			gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", authHeader))
 		}
 	}
-
-	if !feature.SkipAdditionalRefs.Load() {
+	// append clone argument
+	gitArgs = append(gitArgs, "clone")
+	var dstGitDir string
+	if feature.UseGitMirror.Load() {
 		gitArgs = append(gitArgs,
-			"-c",
-			"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
+			"--mirror",
+		)
+		dstGitDir = filepath.Join(params.clonePath, gitDirName) // <tmp>/.git
+	} else {
+		if !feature.SkipAdditionalRefs.Load() {
+			gitArgs = append(gitArgs,
+				"-c",
+				"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
+		}
+		dstGitDir = params.clonePath
 	}
 
-	gitArgs = append(gitArgs, "clone",
+	gitArgs = append(gitArgs,
 		cloneURL.String(),
-		params.clonePath,
+		dstGitDir,
 		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
 	)
 

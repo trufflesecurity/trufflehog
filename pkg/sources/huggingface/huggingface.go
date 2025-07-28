@@ -68,7 +68,6 @@ type Source struct {
 	scanOptions *git.ScanOptions
 
 	apiClient       *HFClient
-	log             logr.Logger
 	conn            *sourcespb.Huggingface
 	jobPool         *errgroup.Group
 	resumeInfoMutex sync.Mutex
@@ -112,13 +111,13 @@ type filteredRepoCache struct {
 	include, exclude []glob.Glob
 }
 
-func (s *Source) newFilteredRepoCache(c cache.Cache[string], include, exclude []string) *filteredRepoCache {
+func (s *Source) newFilteredRepoCache(ctx context.Context, c cache.Cache[string], include, exclude []string) *filteredRepoCache {
 	includeGlobs := make([]glob.Glob, 0, len(include))
 	excludeGlobs := make([]glob.Glob, 0, len(exclude))
 	for _, ig := range include {
 		g, err := glob.Compile(ig)
 		if err != nil {
-			s.log.V(1).Info("invalid include glob", "include_value", ig, "err", err)
+			ctx.Logger().V(1).Info("invalid include glob", "include_value", ig, "err", err)
 			continue
 		}
 		includeGlobs = append(includeGlobs, g)
@@ -126,7 +125,7 @@ func (s *Source) newFilteredRepoCache(c cache.Cache[string], include, exclude []
 	for _, eg := range exclude {
 		g, err := glob.Compile(eg)
 		if err != nil {
-			s.log.V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
+			ctx.Logger().V(1).Info("invalid exclude glob", "exclude_value", eg, "err", err)
 			continue
 		}
 		excludeGlobs = append(excludeGlobs, g)
@@ -169,13 +168,11 @@ func (c *filteredRepoCache) includeRepo(s string) bool {
 }
 
 // Init returns an initialized HuggingFace source.
-func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
+func (s *Source) Init(ctx context.Context, name string, jobID sources.JobID, sourceID sources.SourceID, verify bool, connection *anypb.Any, concurrency int) error {
 	err := git.CmdCheck()
 	if err != nil {
 		return err
 	}
-
-	s.log = aCtx.Logger()
 
 	s.name = name
 	s.sourceID = sourceID
@@ -208,17 +205,17 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 		return err
 	}
 
-	s.filteredModelsCache = s.newFilteredRepoCache(simple.NewCache[string](),
+	s.filteredModelsCache = s.newFilteredRepoCache(ctx, simple.NewCache[string](),
 		append(s.conn.GetModels(), s.conn.GetIncludeModels()...),
 		s.conn.GetIgnoreModels(),
 	)
 
-	s.filteredSpacesCache = s.newFilteredRepoCache(simple.NewCache[string](),
+	s.filteredSpacesCache = s.newFilteredRepoCache(ctx, simple.NewCache[string](),
 		append(s.conn.GetSpaces(), s.conn.GetIncludeSpaces()...),
 		s.conn.GetIgnoreSpaces(),
 	)
 
-	s.filteredDatasetsCache = s.newFilteredRepoCache(simple.NewCache[string](),
+	s.filteredDatasetsCache = s.newFilteredRepoCache(ctx, simple.NewCache[string](),
 		append(s.conn.GetDatasets(), s.conn.GetIncludeDatasets()...),
 		s.conn.GetIgnoreDatasets(),
 	)
@@ -249,8 +246,8 @@ func (s *Source) Init(aCtx context.Context, name string, jobID sources.JobID, so
 						Link:         giturl.GenerateLink(repository, commit, file, line),
 						Timestamp:    sanitizer.UTF8(timestamp),
 						Line:         line,
-						Visibility:   s.visibilityOf(aCtx, repository),
-						ResourceType: s.getResourceType(aCtx, repository),
+						Visibility:   s.visibilityOf(ctx, repository),
+						ResourceType: s.getResourceType(ctx, repository),
 					},
 				},
 			}
@@ -369,7 +366,7 @@ func (s *Source) enumerate(ctx context.Context) error {
 		}
 	}
 
-	s.log.Info("Completed enumeration", "num_models", len(s.models), "num_spaces", len(s.spaces), "num_datasets", len(s.datasets))
+	ctx.Logger().Info("Completed enumeration", "num_models", len(s.models), "num_spaces", len(s.spaces), "num_datasets", len(s.datasets))
 
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.models)
@@ -507,7 +504,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 	repos := s.getReposListByType(resourceType)
 
-	s.log.V(2).Info("Found "+resourceType+" to scan", "count", len(repos))
+	ctx.Logger().V(2).Info("Found "+resourceType+" to scan", "count", len(repos))
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(repos, s.GetProgress().EncodedResumeInfo)
@@ -539,7 +536,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 			if !ok {
 				// This should never happen.
 				err := fmt.Errorf("no repoInfo for URL: %s", repoURL)
-				s.log.Error(err, "failed to scan "+resourceType)
+				ctx.Logger().Error(err, "failed to scan "+resourceType)
 				return nil
 			}
 			repoCtx := context.WithValues(ctx, resourceType, repoURL)
@@ -565,7 +562,7 @@ func (s *Source) scanRepos(ctx context.Context, chunksChan chan *sources.Chunk, 
 
 	_ = s.jobPool.Wait()
 	if scanErrs.Count() > 0 {
-		s.log.V(0).Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs.String())
+		ctx.Logger().V(0).Info("failed to scan some repositories", "error_count", scanErrs.Count(), "errors", scanErrs.String())
 	}
 	s.SetProgressComplete(len(repos), len(repos), "Completed HuggingFace "+resourceType+" scan", "")
 	return nil
