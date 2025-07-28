@@ -1042,8 +1042,8 @@ enum DetectorType {
   Hasura = 1030;
   SalesforceRefreshToken = 1031;
   AnypointOAuth2 = 1032;
-  MakeApiToken = 1033;
-  MakeMcpToken = 1034;
+  MakeApiToken = 1034;
+  MakeMcpToken = 1035;
 }
 
 message Result {
