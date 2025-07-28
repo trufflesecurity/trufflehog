@@ -1042,7 +1042,8 @@ enum DetectorType {
   Hasura = 1030;
   SalesforceRefreshToken = 1031;
   AnypointOAuth2 = 1032;
-  TableauPersonalAccessToken = 1033;
+  WebexBot = 1033;
+  TableauPersonalAccessToken = 1034;
 }
 
 message Result {
