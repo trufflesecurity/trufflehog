@@ -1043,8 +1043,9 @@ enum DetectorType {
   SalesforceRefreshToken = 1031;
   AnypointOAuth2 = 1032;
   WebexBot = 1033;
-  MakeApiToken = 1034;
-  MakeMcpToken = 1035;
+  TableauPersonalAccessToken = 1034;
+  MakeApiToken = 1035;
+  MakeMcpToken = 1036;
 }
 
 message Result {
