@@ -69,6 +69,7 @@ const (
 	SourceType_SOURCE_TYPE_SENTRY                     SourceType = 38
 	SourceType_SOURCE_TYPE_GITHUB_REALTIME            SourceType = 39
 	SourceType_SOURCE_TYPE_STDIN                      SourceType = 40
+	SourceType_SOURCE_TYPE_SLACK_CONTINUOUS           SourceType = 41
 )
 
 // Enum value maps for SourceType.
@@ -115,6 +116,7 @@ var (
 		38: "SOURCE_TYPE_SENTRY",
 		39: "SOURCE_TYPE_GITHUB_REALTIME",
 		40: "SOURCE_TYPE_STDIN",
+		41: "SOURCE_TYPE_SLACK_CONTINUOUS",
 	}
 	SourceType_value = map[string]int32{
 		"SOURCE_TYPE_AZURE_STORAGE":              0,
@@ -158,6 +160,7 @@ var (
 		"SOURCE_TYPE_SENTRY":                     38,
 		"SOURCE_TYPE_GITHUB_REALTIME":            39,
 		"SOURCE_TYPE_STDIN":                      40,
+		"SOURCE_TYPE_SLACK_CONTINUOUS":           41,
 	}
 )
 
@@ -4723,6 +4726,61 @@ func (*Stdin) Descriptor() ([]byte, []int) {
 	return file_sources_proto_rawDescGZIP(), []int{38}
 }
 
+type SlackContinuous struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Namespace string `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	ProjectId string `protobuf:"bytes,2,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+}
+
+func (x *SlackContinuous) Reset() {
+	*x = SlackContinuous{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_sources_proto_msgTypes[39]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SlackContinuous) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SlackContinuous) ProtoMessage() {}
+
+func (x *SlackContinuous) ProtoReflect() protoreflect.Message {
+	mi := &file_sources_proto_msgTypes[39]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SlackContinuous.ProtoReflect.Descriptor instead.
+func (*SlackContinuous) Descriptor() ([]byte, []int) {
+	return file_sources_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *SlackContinuous) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *SlackContinuous) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
 var File_sources_proto protoreflect.FileDescriptor
 
 var file_sources_proto_rawDesc = []byte{
@@ -5442,7 +5500,12 @@ var file_sources_proto_rawDesc = []byte{
 	0x1a, 0x0a, 0x08, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x18, 0x06, 0x20, 0x01, 0x28,
 	0x09, 0x52, 0x08, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x42, 0x0c, 0x0a, 0x0a, 0x63,
 	0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c, 0x22, 0x07, 0x0a, 0x05, 0x53, 0x74, 0x64,
-	0x69, 0x6e, 0x2a, 0x81, 0x09, 0x0a, 0x0a, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x54, 0x79, 0x70,
+	0x69, 0x6e, 0x22, 0x4e, 0x0a, 0x0f, 0x53, 0x6c, 0x61, 0x63, 0x6b, 0x43, 0x6f, 0x6e, 0x74, 0x69,
+	0x6e, 0x75, 0x6f, 0x75, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x6e, 0x61, 0x6d, 0x65, 0x73, 0x70, 0x61,
+	0x63, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x6e, 0x61, 0x6d, 0x65, 0x73, 0x70,
+	0x61, 0x63, 0x65, 0x12, 0x1d, 0x0a, 0x0a, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x5f, 0x69,
+	0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74,
+	0x49, 0x64, 0x2a, 0xa3, 0x09, 0x0a, 0x0a, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x54, 0x79, 0x70,
 	0x65, 0x12, 0x1d, 0x0a, 0x19, 0x53, 0x4f, 0x55, 0x52, 0x43, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45,
 	0x5f, 0x41, 0x5a, 0x55, 0x52, 0x45, 0x5f, 0x53, 0x54, 0x4f, 0x52, 0x41, 0x47, 0x45, 0x10, 0x00,
 	0x12, 0x19, 0x0a, 0x15, 0x53, 0x4f, 0x55, 0x52, 0x43, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f,
@@ -5514,16 +5577,18 @@ var file_sources_proto_rawDesc = []byte{
 	0x0a, 0x1b, 0x53, 0x4f, 0x55, 0x52, 0x43, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x47, 0x49,
 	0x54, 0x48, 0x55, 0x42, 0x5f, 0x52, 0x45, 0x41, 0x4c, 0x54, 0x49, 0x4d, 0x45, 0x10, 0x27, 0x12,
 	0x15, 0x0a, 0x11, 0x53, 0x4f, 0x55, 0x52, 0x43, 0x45, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x53,
-	0x54, 0x44, 0x49, 0x4e, 0x10, 0x28, 0x2a, 0x47, 0x0a, 0x19, 0x42, 0x69, 0x74, 0x62, 0x75, 0x63,
-	0x6b, 0x65, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6c, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x54,
-	0x79, 0x70, 0x65, 0x12, 0x0e, 0x0a, 0x0a, 0x41, 0x55, 0x54, 0x4f, 0x44, 0x45, 0x54, 0x45, 0x43,
-	0x54, 0x10, 0x00, 0x12, 0x09, 0x0a, 0x05, 0x43, 0x4c, 0x4f, 0x55, 0x44, 0x10, 0x01, 0x12, 0x0f,
-	0x0a, 0x0b, 0x44, 0x41, 0x54, 0x41, 0x5f, 0x43, 0x45, 0x4e, 0x54, 0x45, 0x52, 0x10, 0x02, 0x42,
-	0x3b, 0x5a, 0x39, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x72,
-	0x75, 0x66, 0x66, 0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f, 0x74, 0x72,
-	0x75, 0x66, 0x66, 0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f,
-	0x70, 0x62, 0x2f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x33,
+	0x54, 0x44, 0x49, 0x4e, 0x10, 0x28, 0x12, 0x20, 0x0a, 0x1c, 0x53, 0x4f, 0x55, 0x52, 0x43, 0x45,
+	0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x53, 0x4c, 0x41, 0x43, 0x4b, 0x5f, 0x43, 0x4f, 0x4e, 0x54,
+	0x49, 0x4e, 0x55, 0x4f, 0x55, 0x53, 0x10, 0x29, 0x2a, 0x47, 0x0a, 0x19, 0x42, 0x69, 0x74, 0x62,
+	0x75, 0x63, 0x6b, 0x65, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6c, 0x6c, 0x61, 0x74, 0x69, 0x6f,
+	0x6e, 0x54, 0x79, 0x70, 0x65, 0x12, 0x0e, 0x0a, 0x0a, 0x41, 0x55, 0x54, 0x4f, 0x44, 0x45, 0x54,
+	0x45, 0x43, 0x54, 0x10, 0x00, 0x12, 0x09, 0x0a, 0x05, 0x43, 0x4c, 0x4f, 0x55, 0x44, 0x10, 0x01,
+	0x12, 0x0f, 0x0a, 0x0b, 0x44, 0x41, 0x54, 0x41, 0x5f, 0x43, 0x45, 0x4e, 0x54, 0x45, 0x52, 0x10,
+	0x02, 0x42, 0x3b, 0x5a, 0x39, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
+	0x74, 0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x2f,
+	0x74, 0x72, 0x75, 0x66, 0x66, 0x6c, 0x65, 0x68, 0x6f, 0x67, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b,
+	0x67, 0x2f, 0x70, 0x62, 0x2f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x70, 0x62, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -5539,7 +5604,7 @@ func file_sources_proto_rawDescGZIP() []byte {
 }
 
 var file_sources_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_sources_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_sources_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_sources_proto_goTypes = []interface{}{
 	(SourceType)(0),                             // 0: sources.SourceType
 	(BitbucketInstallationType)(0),              // 1: sources.BitbucketInstallationType
@@ -5583,76 +5648,77 @@ var file_sources_proto_goTypes = []interface{}{
 	(*Elasticsearch)(nil),                       // 39: sources.Elasticsearch
 	(*Sentry)(nil),                              // 40: sources.Sentry
 	(*Stdin)(nil),                               // 41: sources.Stdin
-	(*durationpb.Duration)(nil),                 // 42: google.protobuf.Duration
-	(*anypb.Any)(nil),                           // 43: google.protobuf.Any
-	(*credentialspb.BasicAuth)(nil),             // 44: credentials.BasicAuth
-	(*credentialspb.Unauthenticated)(nil),       // 45: credentials.Unauthenticated
-	(*credentialspb.Oauth2)(nil),                // 46: credentials.Oauth2
-	(*credentialspb.KeySecret)(nil),             // 47: credentials.KeySecret
-	(*credentialspb.CloudEnvironment)(nil),      // 48: credentials.CloudEnvironment
-	(*credentialspb.SSHAuth)(nil),               // 49: credentials.SSHAuth
-	(*credentialspb.GitHubApp)(nil),             // 50: credentials.GitHubApp
-	(*credentialspb.AWSSessionTokenSecret)(nil), // 51: credentials.AWSSessionTokenSecret
-	(*credentialspb.SlackTokens)(nil),           // 52: credentials.SlackTokens
-	(*credentialspb.Header)(nil),                // 53: credentials.Header
-	(*credentialspb.ClientCredentials)(nil),     // 54: credentials.ClientCredentials
-	(*timestamppb.Timestamp)(nil),               // 55: google.protobuf.Timestamp
+	(*SlackContinuous)(nil),                     // 42: sources.SlackContinuous
+	(*durationpb.Duration)(nil),                 // 43: google.protobuf.Duration
+	(*anypb.Any)(nil),                           // 44: google.protobuf.Any
+	(*credentialspb.BasicAuth)(nil),             // 45: credentials.BasicAuth
+	(*credentialspb.Unauthenticated)(nil),       // 46: credentials.Unauthenticated
+	(*credentialspb.Oauth2)(nil),                // 47: credentials.Oauth2
+	(*credentialspb.KeySecret)(nil),             // 48: credentials.KeySecret
+	(*credentialspb.CloudEnvironment)(nil),      // 49: credentials.CloudEnvironment
+	(*credentialspb.SSHAuth)(nil),               // 50: credentials.SSHAuth
+	(*credentialspb.GitHubApp)(nil),             // 51: credentials.GitHubApp
+	(*credentialspb.AWSSessionTokenSecret)(nil), // 52: credentials.AWSSessionTokenSecret
+	(*credentialspb.SlackTokens)(nil),           // 53: credentials.SlackTokens
+	(*credentialspb.Header)(nil),                // 54: credentials.Header
+	(*credentialspb.ClientCredentials)(nil),     // 55: credentials.ClientCredentials
+	(*timestamppb.Timestamp)(nil),               // 56: google.protobuf.Timestamp
 }
 var file_sources_proto_depIdxs = []int32{
-	42, // 0: sources.LocalSource.scan_interval:type_name -> google.protobuf.Duration
-	43, // 1: sources.LocalSource.connection:type_name -> google.protobuf.Any
-	44, // 2: sources.Artifactory.basic_auth:type_name -> credentials.BasicAuth
-	45, // 3: sources.Artifactory.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 4: sources.AzureStorage.basic_auth:type_name -> credentials.BasicAuth
-	45, // 5: sources.AzureStorage.unauthenticated:type_name -> credentials.Unauthenticated
-	46, // 6: sources.Bitbucket.oauth:type_name -> credentials.Oauth2
-	44, // 7: sources.Bitbucket.basic_auth:type_name -> credentials.BasicAuth
+	43, // 0: sources.LocalSource.scan_interval:type_name -> google.protobuf.Duration
+	44, // 1: sources.LocalSource.connection:type_name -> google.protobuf.Any
+	45, // 2: sources.Artifactory.basic_auth:type_name -> credentials.BasicAuth
+	46, // 3: sources.Artifactory.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 4: sources.AzureStorage.basic_auth:type_name -> credentials.BasicAuth
+	46, // 5: sources.AzureStorage.unauthenticated:type_name -> credentials.Unauthenticated
+	47, // 6: sources.Bitbucket.oauth:type_name -> credentials.Oauth2
+	45, // 7: sources.Bitbucket.basic_auth:type_name -> credentials.BasicAuth
 	1,  // 8: sources.Bitbucket.installation_type:type_name -> sources.BitbucketInstallationType
-	45, // 9: sources.Confluence.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 10: sources.Confluence.basic_auth:type_name -> credentials.BasicAuth
+	46, // 9: sources.Confluence.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 10: sources.Confluence.basic_auth:type_name -> credentials.BasicAuth
 	2,  // 11: sources.Confluence.spaces_scope:type_name -> sources.Confluence.GetAllSpacesScope
-	45, // 12: sources.Docker.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 13: sources.Docker.basic_auth:type_name -> credentials.BasicAuth
-	47, // 14: sources.ECR.access_key:type_name -> credentials.KeySecret
-	45, // 15: sources.GCS.unauthenticated:type_name -> credentials.Unauthenticated
-	48, // 16: sources.GCS.adc:type_name -> credentials.CloudEnvironment
-	46, // 17: sources.GCS.oauth:type_name -> credentials.Oauth2
-	44, // 18: sources.Git.basic_auth:type_name -> credentials.BasicAuth
-	45, // 19: sources.Git.unauthenticated:type_name -> credentials.Unauthenticated
-	49, // 20: sources.Git.ssh_auth:type_name -> credentials.SSHAuth
-	46, // 21: sources.GitLab.oauth:type_name -> credentials.Oauth2
-	44, // 22: sources.GitLab.basic_auth:type_name -> credentials.BasicAuth
-	50, // 23: sources.GitHub.github_app:type_name -> credentials.GitHubApp
-	45, // 24: sources.GitHub.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 25: sources.GitHub.basic_auth:type_name -> credentials.BasicAuth
-	50, // 26: sources.GitHubRealtime.github_app:type_name -> credentials.GitHubApp
-	45, // 27: sources.GitHubRealtime.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 28: sources.GitHubRealtime.basic_auth:type_name -> credentials.BasicAuth
-	45, // 29: sources.Huggingface.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 30: sources.JIRA.basic_auth:type_name -> credentials.BasicAuth
-	45, // 31: sources.JIRA.unauthenticated:type_name -> credentials.Unauthenticated
-	46, // 32: sources.JIRA.oauth:type_name -> credentials.Oauth2
-	45, // 33: sources.NPMUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
-	45, // 34: sources.PyPIUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
-	47, // 35: sources.S3.access_key:type_name -> credentials.KeySecret
-	45, // 36: sources.S3.unauthenticated:type_name -> credentials.Unauthenticated
-	48, // 37: sources.S3.cloud_environment:type_name -> credentials.CloudEnvironment
-	51, // 38: sources.S3.session_token:type_name -> credentials.AWSSessionTokenSecret
-	52, // 39: sources.Slack.tokens:type_name -> credentials.SlackTokens
-	44, // 40: sources.Gerrit.basic_auth:type_name -> credentials.BasicAuth
-	45, // 41: sources.Gerrit.unauthenticated:type_name -> credentials.Unauthenticated
-	44, // 42: sources.Jenkins.basic_auth:type_name -> credentials.BasicAuth
-	53, // 43: sources.Jenkins.header:type_name -> credentials.Header
-	45, // 44: sources.Jenkins.unauthenticated:type_name -> credentials.Unauthenticated
-	54, // 45: sources.Teams.authenticated:type_name -> credentials.ClientCredentials
-	46, // 46: sources.Teams.oauth:type_name -> credentials.Oauth2
-	45, // 47: sources.Forager.unauthenticated:type_name -> credentials.Unauthenticated
-	55, // 48: sources.Forager.since:type_name -> google.protobuf.Timestamp
-	52, // 49: sources.SlackRealtime.tokens:type_name -> credentials.SlackTokens
-	46, // 50: sources.Sharepoint.oauth:type_name -> credentials.Oauth2
-	46, // 51: sources.AzureRepos.oauth:type_name -> credentials.Oauth2
-	45, // 52: sources.Postman.unauthenticated:type_name -> credentials.Unauthenticated
-	53, // 53: sources.Webhook.header:type_name -> credentials.Header
+	46, // 12: sources.Docker.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 13: sources.Docker.basic_auth:type_name -> credentials.BasicAuth
+	48, // 14: sources.ECR.access_key:type_name -> credentials.KeySecret
+	46, // 15: sources.GCS.unauthenticated:type_name -> credentials.Unauthenticated
+	49, // 16: sources.GCS.adc:type_name -> credentials.CloudEnvironment
+	47, // 17: sources.GCS.oauth:type_name -> credentials.Oauth2
+	45, // 18: sources.Git.basic_auth:type_name -> credentials.BasicAuth
+	46, // 19: sources.Git.unauthenticated:type_name -> credentials.Unauthenticated
+	50, // 20: sources.Git.ssh_auth:type_name -> credentials.SSHAuth
+	47, // 21: sources.GitLab.oauth:type_name -> credentials.Oauth2
+	45, // 22: sources.GitLab.basic_auth:type_name -> credentials.BasicAuth
+	51, // 23: sources.GitHub.github_app:type_name -> credentials.GitHubApp
+	46, // 24: sources.GitHub.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 25: sources.GitHub.basic_auth:type_name -> credentials.BasicAuth
+	51, // 26: sources.GitHubRealtime.github_app:type_name -> credentials.GitHubApp
+	46, // 27: sources.GitHubRealtime.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 28: sources.GitHubRealtime.basic_auth:type_name -> credentials.BasicAuth
+	46, // 29: sources.Huggingface.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 30: sources.JIRA.basic_auth:type_name -> credentials.BasicAuth
+	46, // 31: sources.JIRA.unauthenticated:type_name -> credentials.Unauthenticated
+	47, // 32: sources.JIRA.oauth:type_name -> credentials.Oauth2
+	46, // 33: sources.NPMUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
+	46, // 34: sources.PyPIUnauthenticatedPackage.unauthenticated:type_name -> credentials.Unauthenticated
+	48, // 35: sources.S3.access_key:type_name -> credentials.KeySecret
+	46, // 36: sources.S3.unauthenticated:type_name -> credentials.Unauthenticated
+	49, // 37: sources.S3.cloud_environment:type_name -> credentials.CloudEnvironment
+	52, // 38: sources.S3.session_token:type_name -> credentials.AWSSessionTokenSecret
+	53, // 39: sources.Slack.tokens:type_name -> credentials.SlackTokens
+	45, // 40: sources.Gerrit.basic_auth:type_name -> credentials.BasicAuth
+	46, // 41: sources.Gerrit.unauthenticated:type_name -> credentials.Unauthenticated
+	45, // 42: sources.Jenkins.basic_auth:type_name -> credentials.BasicAuth
+	54, // 43: sources.Jenkins.header:type_name -> credentials.Header
+	46, // 44: sources.Jenkins.unauthenticated:type_name -> credentials.Unauthenticated
+	55, // 45: sources.Teams.authenticated:type_name -> credentials.ClientCredentials
+	47, // 46: sources.Teams.oauth:type_name -> credentials.Oauth2
+	46, // 47: sources.Forager.unauthenticated:type_name -> credentials.Unauthenticated
+	56, // 48: sources.Forager.since:type_name -> google.protobuf.Timestamp
+	53, // 49: sources.SlackRealtime.tokens:type_name -> credentials.SlackTokens
+	47, // 50: sources.Sharepoint.oauth:type_name -> credentials.Oauth2
+	47, // 51: sources.AzureRepos.oauth:type_name -> credentials.Oauth2
+	46, // 52: sources.Postman.unauthenticated:type_name -> credentials.Unauthenticated
+	54, // 53: sources.Webhook.header:type_name -> credentials.Header
 	38, // 54: sources.Webhook.vector:type_name -> sources.Vector
 	55, // [55:55] is the sub-list for method output_type
 	55, // [55:55] is the sub-list for method input_type
@@ -6135,6 +6201,18 @@ func file_sources_proto_init() {
 				return nil
 			}
 		}
+		file_sources_proto_msgTypes[39].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SlackContinuous); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_sources_proto_msgTypes[1].OneofWrappers = []interface{}{
 		(*Artifactory_BasicAuth)(nil),
@@ -6283,7 +6361,7 @@ func file_sources_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_sources_proto_rawDesc,
 			NumEnums:      3,
-			NumMessages:   39,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

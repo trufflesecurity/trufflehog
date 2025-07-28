@@ -189,7 +189,7 @@ func TestGitlab_FromChunk(t *testing.T) {
 				}
 				got[i].AnalysisInfo = nil
 			}
-			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
+			opts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, opts); diff != "" {
 				t.Errorf("Gitlab.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
