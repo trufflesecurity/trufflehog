@@ -136,7 +136,7 @@ type LocalSourceMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m LocalSourceMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -346,7 +346,7 @@ type ArtifactoryMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ArtifactoryMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -556,7 +556,7 @@ type AzureStorageMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m AzureStorageMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -772,7 +772,7 @@ type BitbucketMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m BitbucketMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -900,7 +900,7 @@ type CircleCIMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m CircleCIMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1028,7 +1028,7 @@ type TravisCIMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m TravisCIMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1246,7 +1246,7 @@ type ConfluenceMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ConfluenceMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1455,7 +1455,7 @@ type DockerMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m DockerMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1599,7 +1599,7 @@ type ECRMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ECRMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1702,7 +1702,7 @@ type FilesystemMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m FilesystemMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1968,7 +1968,7 @@ type GCSMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GCSMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2214,7 +2214,7 @@ type GitMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GitMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2431,7 +2431,7 @@ type GitLabMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GitLabMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2705,7 +2705,7 @@ type GitHubMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GitHubMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -2830,7 +2830,7 @@ type GitHubExperimentalMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GitHubExperimentalMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3088,7 +3088,7 @@ type GitHubRealtimeMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GitHubRealtimeMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3204,7 +3204,7 @@ type GoogleDriveMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GoogleDriveMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3383,7 +3383,7 @@ type HuggingfaceMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m HuggingfaceMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3635,7 +3635,7 @@ type JIRAMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m JIRAMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3781,7 +3781,7 @@ type NPMUnauthenticatedPackageMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m NPMUnauthenticatedPackageMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -3929,7 +3929,7 @@ type PyPIUnauthenticatedPackageMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m PyPIUnauthenticatedPackageMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -4202,7 +4202,7 @@ type S3MultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m S3MultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -4370,7 +4370,7 @@ type SlackMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SlackMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -4468,7 +4468,7 @@ type TestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m TestMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -4584,7 +4584,7 @@ type BuildkiteMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m BuildkiteMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -4785,7 +4785,7 @@ type GerritMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GerritMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -5025,7 +5025,7 @@ type JenkinsMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m JenkinsMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -5236,7 +5236,7 @@ type TeamsMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m TeamsMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -5344,7 +5344,7 @@ type SyslogMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SyslogMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -5519,7 +5519,7 @@ type ForagerMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ForagerMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -5665,7 +5665,7 @@ type SlackRealtimeMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SlackRealtimeMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -5812,7 +5812,7 @@ type SharepointMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SharepointMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -5987,7 +5987,7 @@ type AzureReposMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m AzureReposMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -6143,7 +6143,7 @@ type PostmanMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m PostmanMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -6374,7 +6374,7 @@ type WebhookMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m WebhookMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -6476,7 +6476,7 @@ type VectorMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m VectorMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -6594,7 +6594,7 @@ type ElasticsearchMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ElasticsearchMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -6739,7 +6739,7 @@ type SentryMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SentryMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -6837,7 +6837,7 @@ type StdinMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m StdinMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -6941,7 +6941,7 @@ type SlackContinuousMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SlackContinuousMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
