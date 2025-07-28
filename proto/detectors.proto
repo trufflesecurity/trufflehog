@@ -1043,7 +1043,7 @@ enum DetectorType {
   SalesforceRefreshToken = 1031;
   AnypointOAuth2 = 1032;
   WebexBot = 1033;
-  PhaseOAuthAcessToken = 1035;
+  PhraseOAuthAccessToken = 1035;
 }
 
 message Result {

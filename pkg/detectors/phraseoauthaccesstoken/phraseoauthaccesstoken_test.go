@@ -12,7 +12,7 @@ import (
 
 var (
 	validPattern   = "1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890"
-	invalidPattern = "1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef123456789g" // invalid character 'g'
+	invalidPattern = "7cf4135a4e7f7ac228d36f210f151917a86f5dbd6"
 	keyword        = "phrase"
 )
 

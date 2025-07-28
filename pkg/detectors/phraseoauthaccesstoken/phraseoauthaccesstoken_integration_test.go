@@ -20,12 +20,12 @@ import (
 func TestPhrase_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("PHRASE")
-	inactiveSecret := testSecrets.MustGetField("PHRASE_INACTIVE")
+	secret := testSecrets.MustGetField("PHRASE_OAUTH_ACCESS_TOKEN")
+	inactiveSecret := testSecrets.MustGetField("PHRASE_OAUTH_ACCESS_TOKEN_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -50,8 +50,9 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Phrase,
+					DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
 					Verified:     true,
+					Raw:          []byte(secret),
 				},
 			},
 			wantErr:             false,
@@ -62,13 +63,14 @@ func TestPhrase_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a phrase secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a phrase secret %s within but not valid", inactiveSecret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Phrase,
+					DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
 					Verified:     false,
+					Raw:          []byte(inactiveSecret),
 				},
 			},
 			wantErr:             false,
@@ -96,8 +98,9 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Phrase,
+					DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
 					Verified:     false,
+					Raw:          []byte(secret),
 				},
 			},
 			wantErr:             false,
@@ -113,14 +116,16 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Phrase,
+					DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
 					Verified:     false,
+					Raw:          []byte(secret),
 				},
 			},
 			wantErr:             false,
 			wantVerificationErr: true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
@@ -128,6 +133,14 @@ func TestPhrase_FromChunk(t *testing.T) {
 				t.Errorf("Phrase.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			// Validate that we got results when expected
+			if len(got) != len(tt.want) {
+				t.Errorf("Phrase.FromData() got %d results, want %d", len(got), len(tt.want))
+				return
+			}
+
+			// Check individual results
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
@@ -136,9 +149,12 @@ func TestPhrase_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError")
-			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Phrase.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+
+			// Use IgnoreUnexported to handle the unexported primarySecret field
+			// Also ignore verificationError as it's handled separately above
+			ignoreOpts := cmpopts.IgnoreUnexported(detectors.Result{})
+			if diff := cmp.Diff(tt.want, got, ignoreOpts); diff != "" {
+				t.Errorf("Phrase.FromData() %s diff: (-want +got)\n%s", tt.name, diff)
 			}
 		})
 	}

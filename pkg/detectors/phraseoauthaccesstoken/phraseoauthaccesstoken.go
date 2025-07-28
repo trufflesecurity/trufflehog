@@ -23,7 +23,7 @@ var _ detectors.Detector = (*Scanner)(nil)
 var (
 	defaultClient = common.SaneHttpClient()
 	// Phrase access tokens are typically 64-character hexadecimal strings
-	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"phrase"}) + `\b([a-f0-9]{64})\b`)
+	keyPat = regexp.MustCompile(detectors.PrefixRegex([]string{"phrase", "accessToken", "access_token"}) + `\b([a-z0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -32,19 +32,30 @@ func (s Scanner) Keywords() []string {
 	return []string{"phrase"}
 }
 
-// FromData will find and optionally verify Phrase secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
 	uniqueMatches := make(map[string]struct{})
-	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		uniqueMatches[match[1]] = struct{}{}
+	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
+
+	for _, match := range matches {
+		// Ensure we have a proper capture group
+		if len(match) < 2 {
+			continue
+		}
+
+		token := match[1]
+		if token == "" {
+			continue
+		}
+
+		uniqueMatches[token] = struct{}{}
 	}
 
-	for match := range uniqueMatches {
+	for token := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_PhaseOAuthAcessToken,
-			Raw:          []byte(match),
+			DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
+			Raw:          []byte(token),
 		}
 
 		if verify {
@@ -53,10 +64,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, match)
+			isVerified, extraData, verificationErr := verifyMatch(ctx, client, token)
 			s1.Verified = isVerified
 			s1.ExtraData = extraData
-			s1.SetVerificationError(verificationErr, match)
+			s1.SetVerificationError(verificationErr, token)
 		}
 
 		results = append(results, s1)
@@ -88,15 +99,13 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 		return true, nil, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return false, nil, nil
-	case http.StatusTooManyRequests:
-		return true, nil, nil
 	default:
 		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PhaseOAuthAcessToken
+	return detectorspb.DetectorType_PhraseOAuthAccessToken
 }
 
 func (s Scanner) Description() string {
