@@ -1,4 +1,4 @@
-package phaseoauthacesstoken
+package phraseaccesstoken
 
 import (
 	"context"
@@ -54,7 +54,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 	for token := range uniqueMatches {
 		s1 := detectors.Result{
-			DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
+			DetectorType: detectorspb.DetectorType_PhraseAccessToken,
 			Raw:          []byte(token),
 		}
 
@@ -105,7 +105,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_PhraseOAuthAccessToken
+	return detectorspb.DetectorType_PhraseAccessToken
 }
 
 func (s Scanner) Description() string {

@@ -1,4 +1,4 @@
-package phaseoauthacesstoken
+package phraseaccesstoken
 
 import (
 	"context"

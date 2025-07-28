@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package phaseoauthacesstoken
+package phraseaccesstoken
 
 import (
 	"context"
@@ -50,7 +50,7 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
+					DetectorType: detectorspb.DetectorType_PhraseAccessToken,
 					Verified:     true,
 					Raw:          []byte(secret),
 				},
@@ -68,7 +68,7 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
+					DetectorType: detectorspb.DetectorType_PhraseAccessToken,
 					Verified:     false,
 					Raw:          []byte(inactiveSecret),
 				},
@@ -98,7 +98,7 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
+					DetectorType: detectorspb.DetectorType_PhraseAccessToken,
 					Verified:     false,
 					Raw:          []byte(secret),
 				},
@@ -116,7 +116,7 @@ func TestPhrase_FromChunk(t *testing.T) {
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_PhraseOAuthAccessToken,
+					DetectorType: detectorspb.DetectorType_PhraseAccessToken,
 					Verified:     false,
 					Raw:          []byte(secret),
 				},
