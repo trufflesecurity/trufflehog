@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	// "strings"
 	"fmt"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
@@ -22,7 +21,7 @@ var (
 	client = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
-	keyPat = regexp.MustCompile(`\brootly_[a-f0-9]{64}\b`)
+	keyPat = regexp.MustCompile(`\b(rootly_[a-f0-9]{64})\b`)
 )
 
 // Keywords are used for efficiently pre-filtering chunks.
@@ -36,9 +35,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	dataStr := string(data)
 	uniqueMatches := make(map[string]struct{})
 	for _, match := range keyPat.FindAllStringSubmatch(dataStr, -1) {
-		if len(match) == 1 {
-			uniqueMatches[match[0]] = struct{}{}
-		}
+		uniqueMatches[match[1]] = struct{}{}
 	}
 
 	for match := range uniqueMatches {
