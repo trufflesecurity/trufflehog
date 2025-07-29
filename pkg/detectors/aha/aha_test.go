@@ -2,8 +2,6 @@ package aha
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,17 +10,9 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff/example.aha.io"
-	invalidPattern = "00112233445566778899aabbCC$%eeff00112233445566778899aabbccddeeff/example.fake.io"
-)
-
 func TestAha_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
-	key := strings.Split(validPattern, "/")[0]
-	url := strings.Split(validPattern, "/")[1]
 
 	tests := []struct {
 		name  string
@@ -30,34 +20,52 @@ func TestAha_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("aha.io = '%s'", validPattern),
-			want:  []string{key},
+			name: "valid pattern",
+			input: `
+				[INFO] sending request to the aha.io API
+				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
+				[DEBUG] using host = example.aha.io
+				[INFO] response received: 200 OK
+			`,
+			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541cexample.aha.io"},
 		},
 		{
-			name:  "valid pattern - detect URL far away from keyword",
-			input: fmt.Sprintf("aha.io = '%s\n URL is not close to the keyword but should be detected %s'", key, url),
-			want:  []string{key},
+			name: "valid pattern - key out of prefix range",
+			input: `
+				[INFO] sending request to the aha.io API
+				[WARN] Do not commit the secrets
+				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
+				[DEBUG] using host = example.aha.io
+				[INFO] response received: 200 OK
+			`,
+			want: nil,
 		},
 		{
-			name:  "valid pattern - key out of prefix range",
-			input: fmt.Sprintf("aha.io keyword is not close to the real key and secret = '%s'", validPattern),
-			want:  nil,
+			name: "valid pattern - only key",
+			input: `
+				[INFO] sending request to the aha.io API
+				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
+				[INFO] response received: 200 OK
+			`,
+			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541caha.io"},
 		},
 		{
-			name:  "valid pattern - only key",
-			input: fmt.Sprintf("aha.io %s", key),
-			want:  []string{key},
+			name: "valid pattern - only URL",
+			input: `
+				[INFO] sending request to the example.aha.io API
+				[INFO] response received: 200 OK
+			`,
+			want: nil,
 		},
 		{
-			name:  "valid pattern - only URL",
-			input: fmt.Sprintf("aha.io %s", url),
-			want:  nil,
-		},
-		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("aha.io %s", invalidPattern),
-			want:  nil,
+			name: "invalid pattern",
+			input: `
+				[INFO] sending request to the aha.io API
+				[DEBUG] using key = 81a1411a7e276fd88819df3137eJ406e0f281f8a8c417947ca4b025890c8541c
+				[DEBUG] using host = 1test.aha.io
+				[INFO] response received: 200 OK
+			`,
+			want: nil,
 		},
 	}
 
