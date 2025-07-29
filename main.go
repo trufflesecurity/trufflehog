@@ -136,6 +136,7 @@ var (
 	gitlabScanEndpoint     = gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
 	gitlabScanRepos        = gitlabScan.Flag("repo", "GitLab repo url. You can repeat this flag. Leave empty to scan all repos accessible with provided credential. Example: https://gitlab.com/org/repo.git").Strings()
 	gitlabScanToken        = gitlabScan.Flag("token", "GitLab token. Can be provided with environment variable GITLAB_TOKEN.").Envar("GITLAB_TOKEN").Required().String()
+	gitlabScanGroupIds     = gitlabScan.Flag("group-id", "GitLab group ID. If provided, it will scan the group and its subgroups. You can repeat this flag.").Strings()
 	gitlabScanIncludePaths = gitlabScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitlabScanExcludePaths = gitlabScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 	gitlabScanIncludeRepos = gitlabScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
@@ -449,6 +450,10 @@ func run(state overseer.State) {
 
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
+
+
+	// OSS Default Use Git Mirror on
+	feature.UseGitMirror.Store(true)
 
 	// OSS Default simplified gitlab enumeration
 	feature.UseSimplifiedGitlabEnumeration.Store(true)
@@ -784,10 +789,15 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
 		}
 
+		if len(*gitlabScanRepos) > 0 && len(*gitlabScanGroupIds) > 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both repositories and groups at the same time")
+		}
+
 		cfg := sources.GitlabConfig{
 			Endpoint:     *gitlabScanEndpoint,
 			Token:        *gitlabScanToken,
 			Repos:        *gitlabScanRepos,
+			GroupIds:     *gitlabScanGroupIds,
 			IncludeRepos: *gitlabScanIncludeRepos,
 			ExcludeRepos: *gitlabScanExcludeRepos,
 			Filter:       filter,
