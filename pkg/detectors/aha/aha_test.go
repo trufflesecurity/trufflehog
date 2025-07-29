@@ -23,47 +23,48 @@ func TestAha_Pattern(t *testing.T) {
 		{
 			name: "valid pattern",
 			input: `
-				[INFO] Sending request to the truffle-security.aha.io API
-				[DEBUG] Using Key=b2fb683b321da0f90aa23decc45c74a8578f2eb4390af155d3277e53362a8b45
-				[INFO] Response received: 200 OK
+				[INFO] sending request to the aha.io API
+				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
+				[DEBUG] using host = example.aha.io
+				[INFO] response received: 200 OK
 			`,
-			want: []string{"b2fb683b321da0f90aa23decc45c74a8578f2eb4390af155d3277e53362a8b45"},
+			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541cexample.aha.io"},
 		},
 		{
-			name: "valid pattern",
+			name: "valid pattern - key out of prefix range",
 			input: `
-				[DEBUG] Using truffle-security.aha.io domain
-				[INFO] Sending request to the API
-				[DEBUG] Using Key=b2fb683b321da0f90aa23decc45c74a8578f2eb4390af155d3277e53362a8b45
-				[INFO] Response received: 200 OK
+				[INFO] sending request to the aha.io API
+				[WARN] Do not commit the secrets
+				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
+				[DEBUG] using host = example.aha.io
+				[INFO] response received: 200 OK
 			`,
 			want: nil,
 		},
 		{
 			name: "valid pattern - only key",
 			input: `
-				[INFO] Sending request to the aha.io API
-				[DEBUG] Using Key=b2fb683b321da0f90aa23decc45c74a8578f2eb4390af155d3277e53362a8b45
-				[INFO] Response received: 200 OK
+				[INFO] sending request to the aha.io API
+				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
+				[INFO] response received: 200 OK
 			`,
-			want: []string{"b2fb683b321da0f90aa23decc45c74a8578f2eb4390af155d3277e53362a8b45"},
+			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541caha.io"},
 		},
 		{
 			name: "valid pattern - only URL",
 			input: `
-				[DEBUG] Using truffle-security.aha.io domain
-				[INFO] Sending request to the API
-				[INFO] Response received: 200 OK
+				[INFO] sending request to the example.aha.io API
+				[INFO] response received: 200 OK
 			`,
 			want: nil,
 		},
 		{
 			name: "invalid pattern",
 			input: `
-				[DEBUG] Using truffle-security.aha.io domain
-				[INFO] Sending request to the API
-				[DEBUG] Using Key=b2fb683b321da0f90aa23decc4ic74a8578f2eb4390af155d3277e53362a8b45
-				[ERROR] Response received: 400 BadRequest
+				[INFO] sending request to the aha.io API
+				[DEBUG] using key = 81a1411a7e276fd88819df3137eJ406e0f281f8a8c417947ca4b025890c8541c
+				[DEBUG] using host = 1test.aha.io
+				[INFO] response received: 200 OK
 			`,
 			want: nil,
 		},
