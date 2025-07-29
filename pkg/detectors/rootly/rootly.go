@@ -64,7 +64,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 	// this endpoint returns 200 if results exist and 404 if incidents do not exist or that token is not authorized
 	// considering both 200 and 404 as positive results i.e. the token is valid
 	// /user/me endpoint does not verify Team and Global API Keys returning 422 error. (There are 3 types of API keys in Rootly, Global, Team and Personal)
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.rootly.com/v1/incidents", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.rootly.com/v1/incidents", http.NoBody)
 	if err != nil {
 		return false, err
 	}
