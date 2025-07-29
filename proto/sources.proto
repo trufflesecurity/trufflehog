@@ -233,6 +233,7 @@ message GitLab {
   repeated string include_repos = 9;
   bool exclude_projects_shared_into_groups = 10;
   bool remove_auth_in_url = 11;
+  repeated string group_ids = 12;
 }
 
 message GitHub {
