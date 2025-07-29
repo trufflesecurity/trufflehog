@@ -1,71 +1,42 @@
-package aha
+package webexbot
 
 import (
 	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestAha_Pattern(t *testing.T) {
+func TestWebexbot_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name: "valid pattern",
-			input: `
-				[INFO] sending request to the aha.io API
-				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
-				[DEBUG] using host = example.aha.io
-				[INFO] response received: 200 OK
-			`,
-			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541cexample.aha.io"},
+			name:  "typical pattern",
+			input: "webexbot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl'",
+			want:  []string{"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl"},
 		},
 		{
-			name: "valid pattern - key out of prefix range",
+			name: "finds multiple Webex Bot tokens",
 			input: `
-				[INFO] sending request to the aha.io API
-				[WARN] Do not commit the secrets
-				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
-				[DEBUG] using host = example.aha.io
-				[INFO] response received: 200 OK
-			`,
-			want: nil,
+			webex_bot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert'
+			webexbot = "ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh"
+		`,
+			want: []string{
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert",
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh",
+			},
 		},
 		{
-			name: "valid pattern - only key",
-			input: `
-				[INFO] sending request to the aha.io API
-				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
-				[INFO] response received: 200 OK
-			`,
-			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541caha.io"},
-		},
-		{
-			name: "valid pattern - only URL",
-			input: `
-				[INFO] sending request to the example.aha.io API
-				[INFO] response received: 200 OK
-			`,
-			want: nil,
-		},
-		{
-			name: "invalid pattern",
-			input: `
-				[INFO] sending request to the aha.io API
-				[DEBUG] using key = 81a1411a7e276fd88819df3137eJ406e0f281f8a8c417947ca4b025890c8541c
-				[DEBUG] using host = 1test.aha.io
-				[INFO] response received: 200 OK
-			`,
-			want: nil,
+			name:  "does not match invalid token name",
+			input: "webex = 'asdf1234qwer5678zxcv9012lkjh_asdf_qwer3456-qwer-vbnm-asdf-zxcvbnmasdfgh'",
+			want:  []string{},
 		},
 	}
 
