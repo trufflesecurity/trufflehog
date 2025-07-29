@@ -25,7 +25,7 @@ func TestAha_Pattern(t *testing.T) {
 				[INFO] sending request to the aha.io API
 				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
 				[DEBUG] using host = example.aha.io
-				[INFO] response recieved: 200 OK
+				[INFO] response received: 200 OK
 			`,
 			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541cexample.aha.io"},
 		},
@@ -36,7 +36,7 @@ func TestAha_Pattern(t *testing.T) {
 				[WARN] Do not commit the secrets
 				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
 				[DEBUG] using host = example.aha.io
-				[INFO] response recieved: 200 OK
+				[INFO] response received: 200 OK
 			`,
 			want: nil,
 		},
@@ -45,7 +45,7 @@ func TestAha_Pattern(t *testing.T) {
 			input: `
 				[INFO] sending request to the aha.io API
 				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
-				[INFO] response recieved: 200 OK
+				[INFO] response received: 200 OK
 			`,
 			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541caha.io"},
 		},
@@ -53,7 +53,7 @@ func TestAha_Pattern(t *testing.T) {
 			name: "valid pattern - only URL",
 			input: `
 				[INFO] sending request to the example.aha.io API
-				[INFO] response recieved: 200 OK
+				[INFO] response received: 200 OK
 			`,
 			want: nil,
 		},
@@ -63,7 +63,7 @@ func TestAha_Pattern(t *testing.T) {
 				[INFO] sending request to the aha.io API
 				[DEBUG] using key = 81a1411a7e276fd88819df3137eJ406e0f281f8a8c417947ca4b025890c8541c
 				[DEBUG] using host = 1test.aha.io
-				[INFO] response recieved: 200 OK
+				[INFO] response received: 200 OK
 			`,
 			want: nil,
 		},
