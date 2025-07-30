@@ -33,6 +33,20 @@ func TestBox_Pattern(t *testing.T) {
 			want: []string{"Ogowv5cj5AJJjO5F3daNHbKJDdPud0CZ"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{box}</id>
+  					<secret>{box AQAAABAAA Dxb2zNdFF2QTSMwrZJnoeD54Dc4zZAIW}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"Dxb2zNdFF2QTSMwrZJnoeD54Dc4zZAIW"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] request received to fetch box data

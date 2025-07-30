@@ -46,6 +46,20 @@ func TestBrainTreePayments_Pattern(t *testing.T) {
 			want: []string{"f7b3cb83a7fdb915a71ce17ab8a903cc"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{braintree jvbs4thxyzhh8n00}</id>
+  					<secret>{braintree AQAAABAAA 7d1ab9c76bea2cfb80a29fef8f1e0b12}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"7d1ab9c76bea2cfb80a29fef8f1e0b12"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

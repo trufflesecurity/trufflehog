@@ -55,6 +55,20 @@ func TestBrowserStack_Pattern(t *testing.T) {
 			},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{BS_USERNAME Q8fo0ADq_-_Cj4HtE4Gr}</id>
+  					<secret>{BROWSERSTACK_ACCESS_KEY AQAAABAAA 25IQfQKfEm26vKV96nao}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"25IQfQKfEm26vKV96naoQ8fo0ADq_-_Cj4HtE4Gr"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

@@ -46,6 +46,20 @@ func TestBorgBase_Pattern(t *testing.T) {
 			want: []string{"FoHclCFSi_aV09jowJQ4RUF_MiqW6ioqq6_OcyB0PFlV-mQ1yoFjk5JLlxbzRUzKTA6vsfR8wq6TNc83rtNKlkD092Sj1c9CbPVBXlHksy.sT2I/so6bMGdPcqxzbjrxYgAUiORgqJDeTet4gKOQlZpt"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{borgbase}</id>
+  					<secret>{borgbase AQAAABAAA KtSE0ggsVsvvDQPHau2ItXW8yi7YsFTho4wHTTjCDShrWgYA421GzfXMwkOYklS6psQd1W8459NvmcZSmr7_LKqQffBGYAVvexM1D4JxRcQS49H3rnFlwDYspB5_m7AxvmbPrpWj8TfNm7zKCa2Ed}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"KtSE0ggsVsvvDQPHau2ItXW8yi7YsFTho4wHTTjCDShrWgYA421GzfXMwkOYklS6psQd1W8459NvmcZSmr7_LKqQffBGYAVvexM1D4JxRcQS49H3rnFlwDYspB5_m7AxvmbPrpWj8TfNm7zKCa2Ed"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

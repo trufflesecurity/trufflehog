@@ -45,6 +45,20 @@ func TestBrandFetch_Pattern(t *testing.T) {
 			want: []string{"uHOAdwfQ7sD2yOpur72UqyUeIqnFwILOIlEPyBtJ"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{uSiXZ-NMpDW-ZJQFSN-5wkT7SqQ8-mDbr9K2pl}</id>
+  					<secret>{brandfetch AQAAABAAA uSiXZNMpDWWhZJQFSNkE5wkT7SqQ8B3mDbr9K2pl}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"uSiXZNMpDWWhZJQFSNkE5wkT7SqQ8B3mDbr9K2pl"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {
