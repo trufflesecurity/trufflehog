@@ -51,6 +51,7 @@ type Scanner struct {
 
 // Check that the LarkSuite scanner implements the SecretScanner interface at compile time.
 var _ detectors.Detector = Scanner{}
+var _ detectors.CustomFalsePositiveChecker = (*Scanner)(nil)
 
 type tokenType string
 
@@ -81,6 +82,14 @@ func (s Scanner) Keywords() []string {
 	return []string{"lark", "larksuite"}
 }
 
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_LarkSuite
+}
+
+func (s Scanner) Description() string {
+	return "LarkSuite is a collaborative suite that includes chat, calendar, and cloud storage features. The detected token can be used to access and interact with these services."
+}
+
 // FromData will find and optionally verify Larksuite secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
@@ -88,9 +97,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	for key, tokenPat := range tokenPats {
 		uniqueMatches := make(map[string]struct{})
 		for _, match := range tokenPat.FindAllStringSubmatch(dataStr, -1) {
-			if !isLikelyFilename(match[1]) {
-				uniqueMatches[match[1]] = struct{}{}
-			}
+			uniqueMatches[match[1]] = struct{}{}
 		}
 
 		for token := range uniqueMatches {
@@ -122,14 +129,6 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	}
 
 	return results, nil
-}
-
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_LarkSuite
-}
-
-func (s Scanner) Description() string {
-	return "LarkSuite is a collaborative suite that includes chat, calendar, and cloud storage features. The detected token can be used to access and interact with these services."
 }
 
 func verifyAccessToken(ctx context.Context, client *http.Client, url string, token string) (bool, error) {
@@ -209,10 +208,13 @@ func classifyErrorCode(code int) VerificationResult {
 	}
 }
 
-// isLikelyFilename - filter out tokens that end with common file extensions
-func isLikelyFilename(token string) bool {
-	_, ok := commonFileExtensions[strings.ToLower(path.Ext(token))]
-	return ok
+func (s Scanner) IsFalsePositive(result detectors.Result) (bool, string) {
+	if _, ok := commonFileExtensions[strings.ToLower(path.Ext(string(result.Raw)))]; ok {
+		return ok, ""
+	}
+
+	// back to the default false positive checks
+	return detectors.IsKnownFalsePositive(string(result.Raw), detectors.DefaultFalsePositives, true)
 }
 
 var commonFileExtensions = map[string]struct{}{
