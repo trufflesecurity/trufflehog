@@ -1600,6 +1600,7 @@ func buildDetectorList() []detectors.Detector {
 		&survicate.Scanner{},
 		&swell.Scanner{},
 		&swiftype.Scanner{},
+		&tableau.Scanner{},
 		&tailscale.Scanner{},
 		&tallyfy.Scanner{},
 		&tatumio.Scanner{},
@@ -1724,10 +1725,6 @@ func buildDetectorList() []detectors.Detector {
 		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
-		&stripepaymentintent.Scanner{},
-		&tableau.Scanner{},
-		&bitbucketapppassword.Scanner{},
-		&hasura.Scanner{},
 	}
 }
 
