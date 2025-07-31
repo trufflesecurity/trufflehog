@@ -142,19 +142,8 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, ui.common.KeyMap.Help):
-			case key.Matches(msg, ui.common.KeyMap.CmdQuit) && ui.activePage() != sourceConfigurePage:
-				// write 'q' in the analyze form field if on that page and 'q' is pressed
-				if ui.activePage() == analyzeFormPage && msg.String() == "q" {
-					updatedPage, cmd := ui.pages[analyzeFormPage].Update(tea.KeyMsg{
-						Type:  tea.KeyRunes,
-						Runes: []rune{'q'},
-						Alt:   false,
-					})
-
-					ui.pages[analyzeFormPage].Update(updatedPage)
-
-					return ui, cmd
-				}
+			case key.Matches(msg, ui.common.KeyMap.CmdQuit) &&
+				(ui.activePage() == wizardIntroPage || ui.activePage() == analyzeKeysPage || ui.activePage() == sourceSelectPage):
 
 				ui.args = nil
 				return ui, tea.Quit
