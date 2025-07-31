@@ -1487,6 +1487,7 @@ func buildDetectorList() []detectors.Detector {
 		&robinhoodcrypto.Scanner{},
 		&rocketreach.Scanner{},
 		// &rockset.Scanner{},
+		&rootly.Scanner{},
 		&route4me.Scanner{},
 		&rownd.Scanner{},
 		&rubygems.Scanner{},
@@ -1601,6 +1602,7 @@ func buildDetectorList() []detectors.Detector {
 		&survicate.Scanner{},
 		&swell.Scanner{},
 		&swiftype.Scanner{},
+		&tableau.Scanner{},
 		&tailscale.Scanner{},
 		&tallyfy.Scanner{},
 		&tatumio.Scanner{},
@@ -1725,12 +1727,6 @@ func buildDetectorList() []detectors.Detector {
 		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
-		&stripepaymentintent.Scanner{},
-		&tableau.Scanner{},
-		&bitbucketapppassword.Scanner{},
-		&hasura.Scanner{},
-		&rootly.Scanner{},
-	}
 }
 
 func DefaultDetectors() []detectors.Detector {

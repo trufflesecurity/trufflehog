@@ -41,7 +41,7 @@ require (
 	github.com/couchbase/gocb/v2 v2.10.1
 	github.com/crewjam/rfc5424 v0.1.0
 	github.com/csnewman/dextk v0.3.0
-	github.com/docker/docker v28.2.2+incompatible
+	github.com/docker/docker v28.3.3+incompatible
 	github.com/dustin/go-humanize v1.0.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/envoyproxy/protoc-gen-validate v1.2.1
