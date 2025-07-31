@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package dovico
+package anypointoauth2
 
 import (
 	"context"
@@ -9,24 +9,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kylelemons/godebug/pretty"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestDovico_FromChunk(t *testing.T) {
+func TestAnypointOAuth2_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("DOVICO_CLIENT")
-	user := testSecrets.MustGetField("DOVICO_USER")
-	inactiveSecret := testSecrets.MustGetField("DOVICO_CLIENT_INACTIVE")
-	inactiveUser := testSecrets.MustGetField("DOVICO_USER_INACTIVE")
+	clientID := testSecrets.MustGetField("ANYPOINT_CLIENT_ID")
+	clientSecret := testSecrets.MustGetField("ANYPOINT_CLIENT_SECRET")
+	inactiveSecret := testSecrets.MustGetField("ANYPOINT_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context
@@ -45,17 +45,13 @@ func TestDovico_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dovico secret %s within dovico user %s ", secret, user)),
+				data:   []byte(fmt.Sprintf("You can find an anypoint secret %s within anypoint organization id %s", clientSecret, clientID)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dovico,
+					DetectorType: detectorspb.DetectorType_AnypointOAuth2,
 					Verified:     true,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Dovico,
-					Verified:     false,
 				},
 			},
 			wantErr: false,
@@ -65,16 +61,12 @@ func TestDovico_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a dovico secret %s within dovico user %s but not valid", inactiveSecret, inactiveUser)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find an anypoint secret %s within anypoint organization id %s but not valid", inactiveSecret, clientID)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_Dovico,
-					Verified:     false,
-				},
-				{
-					DetectorType: detectorspb.DetectorType_Dovico,
+					DetectorType: detectorspb.DetectorType_AnypointOAuth2,
 					Verified:     false,
 				},
 			},
@@ -97,18 +89,28 @@ func TestDovico_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Dovico.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Anypoint.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
-				got[i].RawV2 = nil
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+				}
 			}
-			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Dovico.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
+			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
+				t.Errorf("AnypointOAuth2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

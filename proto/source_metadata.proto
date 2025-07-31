@@ -338,6 +338,8 @@ message Vector {
   google.protobuf.Timestamp timestamp = 1;
   string source_type = 2;
   string host = 3;
+  string locator = 4;
+  string link = 5;
 }
 
 message Webhook {
@@ -365,6 +367,17 @@ message Sentry {
 }
 
 message Stdin {}
+
+message SlackContinuous {
+  string channel_id = 1;
+  string channel_name = 2;
+  string timestamp = 3;
+  string user_id = 4;
+  string file = 5;
+  string email = 6;
+  Visibility visibility = 7;
+  string location = 8;
+}
 
 message MetaData {
   oneof data {
@@ -402,5 +415,6 @@ message MetaData {
     Huggingface huggingface = 32;
     Sentry sentry = 33;
     Stdin stdin = 34;
+    SlackContinuous slackContinuous = 35;
   }
 }
