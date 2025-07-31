@@ -445,16 +445,26 @@ func executeClone(ctx context.Context, params cloneParams) (*git.Repository, err
 			gitArgs = append(gitArgs, "-c", fmt.Sprintf("http.extraHeader=Authorization: Basic %s", authHeader))
 		}
 	}
-
-	if !feature.SkipAdditionalRefs.Load() {
+	// append clone argument
+	gitArgs = append(gitArgs, "clone")
+	var dstGitDir string
+	if feature.UseGitMirror.Load() {
 		gitArgs = append(gitArgs,
-			"-c",
-			"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
+			"--mirror",
+		)
+		dstGitDir = filepath.Join(params.clonePath, gitDirName) // <tmp>/.git
+	} else {
+		if !feature.SkipAdditionalRefs.Load() {
+			gitArgs = append(gitArgs,
+				"-c",
+				"remote.origin.fetch=+refs/*:refs/remotes/origin/*")
+		}
+		dstGitDir = params.clonePath
 	}
 
-	gitArgs = append(gitArgs, "clone",
+	gitArgs = append(gitArgs,
 		cloneURL.String(),
-		params.clonePath,
+		dstGitDir,
 		"--quiet", // https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--quietcode
 	)
 
@@ -724,7 +734,7 @@ func (s *Git) ScanCommits(ctx context.Context, repo *git.Repository, path string
 			continue
 		}
 
-		if diff.Len() > sources.ChunkSize+sources.PeekSize {
+		if diff.Len() > sources.DefaultChunkSize+sources.DefaultPeekSize {
 			s.gitChunk(ctx, diff, fileName, email, fullHash, when, remoteURL, reporter)
 			continue
 		}
@@ -785,7 +795,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 		line := make([]byte, len(originalChunk.Bytes())+1)
 		copy(line, originalChunk.Bytes())
 		line[len(line)-1] = byte('\n')
-		if len(line) > sources.ChunkSize || len(line)+newChunkBuffer.Len() > sources.ChunkSize {
+		if len(line) > sources.DefaultChunkSize || len(line)+newChunkBuffer.Len() > sources.DefaultChunkSize {
 			// Add oversize chunk info
 			if newChunkBuffer.Len() > 0 {
 				// Send the existing fragment.
@@ -807,7 +817,7 @@ func (s *Git) gitChunk(ctx context.Context, diff *gitparse.Diff, fileName, email
 				newChunkBuffer.Reset()
 				lastOffset = offset
 			}
-			if len(line) > sources.ChunkSize {
+			if len(line) > sources.DefaultChunkSize {
 				// Send the oversize line.
 				metadata := s.sourceMetadataFunc(fileName, email, hash, when, urlMetadata, int64(diff.LineStart+offset))
 				chunk := sources.Chunk{

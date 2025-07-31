@@ -38,7 +38,7 @@ jobs:
         with:
           go-version: "1.24"
       - name: Cosign install
-        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
       - name: Install UPX
         run: |
           sudo apt-get update

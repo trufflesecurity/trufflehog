@@ -78,7 +78,7 @@ type Resource struct {
 	MetaData       map[string]string
 }
 
-// appendResources append resource to secret info resources list
+// appendResource append resource to secret info resources list
 func (s *SecretInfo) appendResource(resource Resource) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

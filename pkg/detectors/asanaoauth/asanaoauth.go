@@ -3,6 +3,7 @@ package asanaoauth
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -46,25 +47,40 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			req, err := http.NewRequestWithContext(ctx, "GET", "https://app.asana.com/api/1.0/users/me", nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", resMatch))
-			res, err := client.Do(req)
-			if err == nil {
-				defer res.Body.Close()
-				if res.StatusCode >= 200 && res.StatusCode < 300 {
-					s1.Verified = true
-					s1.AnalysisInfo = map[string]string{"key": resMatch}
-				}
-			}
+			isVerified, err := verifyMatch(ctx, client, resMatch)
+			s1.Verified = isVerified
+			s1.SetVerificationError(err, resMatch)
+			s1.AnalysisInfo = map[string]string{"key": resMatch}
 		}
 
 		results = append(results, s1)
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://app.asana.com/api/1.0/users/me", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

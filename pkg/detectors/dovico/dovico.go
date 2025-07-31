@@ -3,8 +3,8 @@ package dovico
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
@@ -14,6 +14,7 @@ import (
 )
 
 type Scanner struct {
+	client *http.Client
 	detectors.DefaultMultiPartCredentialProvider
 }
 
@@ -21,7 +22,7 @@ type Scanner struct {
 var _ detectors.Detector = (*Scanner)(nil)
 
 var (
-	client = common.SaneHttpClient()
+	defaultClient = common.SaneHttpClient()
 
 	// Make sure that your group is surrounded in boundary characters such as below to reduce false positives.
 	keyPat  = regexp.MustCompile(detectors.PrefixRegex([]string{"dovico"}) + `\b([0-9a-z]{32}\.[0-9a-z]{1,}\b)`)
@@ -34,44 +35,83 @@ func (s Scanner) Keywords() []string {
 	return []string{"dovico"}
 }
 
+func (s Scanner) getClient() *http.Client {
+	if s.client != nil {
+		return s.client
+	}
+	return defaultClient
+}
+
 // FromData will find and optionally verify Dovico secrets in a given set of bytes.
 func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (results []detectors.Result, err error) {
 	dataStr := string(data)
 
-	matches := keyPat.FindAllStringSubmatch(dataStr, -1)
-	userMatches := userPat.FindAllStringSubmatch(dataStr, -1)
+	uniqueKeys := make(map[string]struct{})
+	for _, matches := range keyPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueKeys[matches[1]] = struct{}{}
+	}
 
-	for _, match := range matches {
-		resMatch := strings.TrimSpace(match[1])
-		for _, user := range userMatches {
-			resUser := strings.TrimSpace(user[1])
+	uniqueUserKeys := make(map[string]struct{})
+	for _, matches := range userPat.FindAllStringSubmatch(dataStr, -1) {
+		uniqueUserKeys[matches[1]] = struct{}{}
+	}
+
+	for key := range uniqueKeys {
+		for userKey := range uniqueUserKeys {
+			if key == userKey {
+				continue // Skip if ID and secret are the same.
+			}
 
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_Dovico,
-				Raw:          []byte(resMatch),
+				Raw:          []byte(key),
+				RawV2:        []byte(fmt.Sprintf("%s:%s", key, userKey)),
 			}
 
 			if verify {
-				req, err := http.NewRequestWithContext(ctx, "GET", "https://api.dovico.com/Employees/?version=7", nil)
-				if err != nil {
-					continue
-				}
-				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("Authorization", fmt.Sprintf(`WRAP access_token="client=%s&user_token=%s"`, resMatch, resUser))
-				res, err := client.Do(req)
-				if err == nil {
-					defer res.Body.Close()
-					if res.StatusCode >= 200 && res.StatusCode < 300 {
-						s1.Verified = true
-					}
-				}
+				client := s.getClient()
+				isVerified, err := verifyMatch(ctx, client, key, userKey)
+				s1.Verified = isVerified
+				s1.SetVerificationError(err, key, userKey)
 			}
 
 			results = append(results, s1)
+
+			// Credentials have 1:1 mapping so we can stop checking other user keys once it is verified
+			if s1.Verified {
+				break
+			}
 		}
 	}
 
 	return results, nil
+}
+
+func verifyMatch(ctx context.Context, client *http.Client, key, user string) (bool, error) {
+	// Reference: https://timesheet.dovico.com/developer/API_doc/#t=API_Overview.html
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.dovico.com/employees/?version=7", http.NoBody)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf(`WRAP access_token="client=%s&user_token=%s"`, key, user))
+	res, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+	}()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusUnauthorized:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
 }
 
 func (s Scanner) Type() detectorspb.DetectorType {

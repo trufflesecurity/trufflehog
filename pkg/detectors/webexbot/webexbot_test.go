@@ -1,47 +1,42 @@
-package airtableapikey
+package webexbot
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-var (
-	validPattern   = "app_pOcv67-Yuztyq / key_Yuztyq-pOcv67"
-	invalidPattern = "app_pOcv67%Yuztyq/key_Yuztyq*pOcv67"
-)
-
-func TestAirTableApiKey_Pattern(t *testing.T) {
+func TestWebexbot_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
-
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{
-			name:  "valid pattern - with key",
-			input: fmt.Sprintf("airtable secrets: %s", validPattern),
-			want:  []string{"app_pOcv67-Yuztyq:key_Yuztyq-pOcv67"},
+			name:  "typical pattern",
+			input: "webexbot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl'",
+			want:  []string{"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_asdkqw34-qwer-vbnm-asdf-qwertyuiopkl"},
 		},
 		{
-			name: "valid pattern - with personal key",
-			input: `document.addEventListener('DOMContentLoaded', function () {
-    base = new Airtable({ apiKey: 'patHSL6ZkPWx8Rkva.f0b2c1970c1cd8b5126d04eaf59d9fd500a39736c73bbb3a471fsf7eb3561ec0' }).base('appiiuioD2lBj2DaJ');
-
-   reloadData();`,
-			want: []string{"appiiuioD2lBj2DaJ:patHSL6ZkPWx8Rkva.f0b2c1970c1cd8b5126d04eaf59d9fd500a39736c73bbb3a471fsf7eb3561ec0"},
+			name: "finds multiple Webex Bot tokens",
+			input: `
+			webex_bot_token = 'ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert'
+			webexbot = "ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh"
+		`,
+			want: []string{
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_qwer_zxcv1234-asdf-ghjk-tyui-mnbvcxzqwert",
+				"ajlksdjasda9090sadsa9dsad0saasdkl0asd90asdcasc90asdajij2n2njkjn3_asdf_qwer4567-qwer-vbnm-asdf-xcvbnmasdfgh",
+			},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("airtable secrets: '%s'", invalidPattern),
-			want:  nil,
+			name:  "does not match invalid token name",
+			input: "webex = 'asdf1234qwer5678zxcv9012lkjh_asdf_qwer3456-qwer-vbnm-asdf-zxcvbnmasdfgh'",
+			want:  []string{},
 		},
 	}
 

@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package airtableapikey
+package anypointoauth2
 
 import (
 	"context"
@@ -11,22 +11,22 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestAirtableApiKey_FromChunk(t *testing.T) {
+func TestAnypointOAuth2_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors3")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("AIRTABLEAPIKEY_KEY")
-	inactiveSecret := testSecrets.MustGetField("AIRTABLEAPIKEY_KEY_INACTIVE")
-	app := testSecrets.MustGetField("AIRTABLEAPIKEY_APP")
+	clientID := testSecrets.MustGetField("ANYPOINT_CLIENT_ID")
+	clientSecret := testSecrets.MustGetField("ANYPOINT_CLIENT_SECRET")
+	inactiveSecret := testSecrets.MustGetField("ANYPOINT_INACTIVE_SECRET")
 
 	type args struct {
 		ctx    context.Context
@@ -45,13 +45,12 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a airtableapikey secret %s within airtable https://api.airtable.com/v0/%s/Projects", secret, app)),
+				data:   []byte(fmt.Sprintf("You can find an anypoint secret %s within anypoint organization id %s", clientSecret, clientID)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AirtableApiKey,
-					Redacted:     app,
+					DetectorType: detectorspb.DetectorType_AnypointOAuth2,
 					Verified:     true,
 				},
 			},
@@ -62,13 +61,12 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a airtableapikey secret %s within airtable %s", inactiveSecret, app)),
+				data:   []byte(fmt.Sprintf("You can find an anypoint secret %s within anypoint organization id %s but not valid", inactiveSecret, clientID)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_AirtableApiKey,
-					Redacted:     app,
+					DetectorType: detectorspb.DetectorType_AnypointOAuth2,
 					Verified:     false,
 				},
 			},
@@ -91,18 +89,28 @@ func TestAirtableApiKey_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("AirtableApiKey.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Anypoint.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
 				if len(got[i].Raw) == 0 {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
-				got[i].Raw = nil
+				gotErr := ""
+				if got[i].VerificationError() != nil {
+					gotErr = got[i].VerificationError().Error()
+				}
+				wantErr := ""
+				if tt.want[i].VerificationError() != nil {
+					wantErr = tt.want[i].VerificationError().Error()
+				}
+				if gotErr != wantErr {
+					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.want[i].VerificationError(), got[i].VerificationError())
+				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
-				t.Errorf("Airtable.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("AnypointOAuth2.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}

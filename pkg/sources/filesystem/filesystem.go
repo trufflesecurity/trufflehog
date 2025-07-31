@@ -120,7 +120,12 @@ func (s *Source) Chunks(ctx context.Context, chunksChan chan *sources.Chunk, _ .
 func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sources.Chunk) error {
 	workerPool := new(errgroup.Group)
 	workerPool.SetLimit(s.concurrency)
-	defer func() { _ = workerPool.Wait() }()
+	defer func() {
+		_ = workerPool.Wait()
+		s.ClearEncodedResumeInfoFor(path)
+	}()
+	startState := s.GetEncodedResumeInfoFor(path)
+	resuming := startState != ""
 
 	return fs.WalkDir(os.DirFS(path), ".", func(relativePath string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -147,10 +152,21 @@ func (s *Source) scanDir(ctx context.Context, path string, chunksChan chan *sour
 			return nil
 		}
 
+		if resuming {
+			// The start state holds the path that last completed
+			// scanning. When we find it, we can start scanning
+			// again on the next one.
+			if fullPath == startState {
+				resuming = false
+			}
+			return nil
+		}
+
 		workerPool.Go(func() error {
 			if err = s.scanFile(ctx, fullPath, chunksChan); err != nil {
 				ctx.Logger().Error(err, "error scanning file", "path", fullPath, "error", err)
 			}
+			s.SetEncodedResumeInfoFor(path, fullPath)
 			return nil
 		})
 

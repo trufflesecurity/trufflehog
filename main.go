@@ -136,6 +136,7 @@ var (
 	gitlabScanEndpoint     = gitlabScan.Flag("endpoint", "GitLab endpoint.").Default("https://gitlab.com").String()
 	gitlabScanRepos        = gitlabScan.Flag("repo", "GitLab repo url. You can repeat this flag. Leave empty to scan all repos accessible with provided credential. Example: https://gitlab.com/org/repo.git").Strings()
 	gitlabScanToken        = gitlabScan.Flag("token", "GitLab token. Can be provided with environment variable GITLAB_TOKEN.").Envar("GITLAB_TOKEN").Required().String()
+	gitlabScanGroupIds     = gitlabScan.Flag("group-id", "GitLab group ID. If provided, it will scan the group and its subgroups. You can repeat this flag.").Strings()
 	gitlabScanIncludePaths = gitlabScan.Flag("include-paths", "Path to file with newline separated regexes for files to include in scan.").Short('i').String()
 	gitlabScanExcludePaths = gitlabScan.Flag("exclude-paths", "Path to file with newline separated regexes for files to exclude in scan.").Short('x').String()
 	gitlabScanIncludeRepos = gitlabScan.Flag("include-repos", `Repositories to include in an org scan. This can also be a glob pattern. You can repeat this flag. Must use Gitlab repo full name. Example: "trufflesecurity/trufflehog", "trufflesecurity/t*"`).Strings()
@@ -184,7 +185,7 @@ var (
 	circleCiScanToken = circleCiScan.Flag("token", "CircleCI token. Can also be provided with environment variable").Envar("CIRCLECI_TOKEN").Required().String()
 
 	dockerScan         = cli.Command("docker", "Scan Docker Image")
-	dockerScanImages   = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, otherwise a image registry is assumed.").Required().Strings()
+	dockerScanImages   = dockerScan.Flag("image", "Docker image to scan. Use the file:// prefix to point to a local tarball, the docker:// prefix to point to the docker daemon, otherwise an image registry is assumed.").Required().Strings()
 	dockerScanToken    = dockerScan.Flag("token", "Docker bearer token. Can also be provided with environment variable").Envar("DOCKER_TOKEN").String()
 	dockerExcludePaths = dockerScan.Flag("exclude-paths", "Comma separated list of paths to exclude from scan").String()
 
@@ -275,8 +276,9 @@ func init() {
 
 	cli.Version("trufflehog " + version.BuildVersion)
 
-	// Support -h for help
+	// Support -h for help and write it to stdout.
 	cli.HelpFlag.Short('h')
+	cli.UsageWriter(os.Stdout)
 
 	// Check if the TUI environment variable is set.
 	if ok, err := strconv.ParseBool(os.Getenv("TUI_PARENT")); err == nil {
@@ -448,6 +450,13 @@ func run(state overseer.State) {
 
 	// OSS Default APK handling on
 	feature.EnableAPKHandler.Store(true)
+
+
+	// OSS Default Use Git Mirror on
+	feature.UseGitMirror.Store(true)
+
+	// OSS Default simplified gitlab enumeration
+	feature.UseSimplifiedGitlabEnumeration.Store(true)
 
 	conf := &config.Config{}
 	if *configFilename != "" {
@@ -780,10 +789,15 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
 		}
 
+		if len(*gitlabScanRepos) > 0 && len(*gitlabScanGroupIds) > 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both repositories and groups at the same time")
+		}
+
 		cfg := sources.GitlabConfig{
 			Endpoint:     *gitlabScanEndpoint,
 			Token:        *gitlabScanToken,
 			Repos:        *gitlabScanRepos,
+			GroupIds:     *gitlabScanGroupIds,
 			IncludeRepos: *gitlabScanIncludeRepos,
 			ExcludeRepos: *gitlabScanExcludeRepos,
 			Filter:       filter,

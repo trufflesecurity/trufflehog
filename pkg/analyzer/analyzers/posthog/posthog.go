@@ -269,7 +269,7 @@ func AnalyzeAndPrintPermissions(cfg *config.Config, key string) {
 	}
 
 	if info.organization == nil {
-		color.Yellow("\n[i] No permissions were verified for this key because the key does not have one of the necessary permissions (user:read or organization:read) required to verifiy other permissions.")
+		color.Yellow("\n[i] No permissions were verified for this key because the key does not have one of the necessary permissions (user:read or organization:read) required to verify other permissions.")
 	}
 
 	if info.orgPermissions != nil {
