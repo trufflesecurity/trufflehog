@@ -1727,6 +1727,7 @@ func buildDetectorList() []detectors.Detector {
 		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
+	}
 }
 
 func DefaultDetectors() []detectors.Detector {
