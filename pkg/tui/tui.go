@@ -142,7 +142,9 @@ func (ui *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch {
 			case key.Matches(msg, ui.common.KeyMap.Help):
-			case key.Matches(msg, ui.common.KeyMap.CmdQuit) && ui.activePage() != sourceConfigurePage:
+			case key.Matches(msg, ui.common.KeyMap.CmdQuit) &&
+				(ui.activePage() == wizardIntroPage || ui.activePage() == analyzeKeysPage || ui.activePage() == sourceSelectPage):
+
 				ui.args = nil
 				return ui, tea.Quit
 			case key.Matches(msg, ui.common.KeyMap.Quit):

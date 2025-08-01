@@ -1,4 +1,4 @@
-package aha
+package rootly
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
 )
 
-func TestAha_Pattern(t *testing.T) {
+func TestRootly_Pattern(t *testing.T) {
 	d := Scanner{}
 	ahoCorasickCore := ahocorasick.NewAhoCorasickCore([]detectors.Detector{d})
 
@@ -20,52 +20,19 @@ func TestAha_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "valid pattern",
-			input: `
-				[INFO] sending request to the aha.io API
-				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
-				[DEBUG] using host = example.aha.io
-				[INFO] response received: 200 OK
-			`,
-			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541cexample.aha.io"},
+			name:  "valid pattern",
+			input: "rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
 		},
 		{
-			name: "valid pattern - key out of prefix range",
-			input: `
-				[INFO] sending request to the aha.io API
-				[WARN] Do not commit the secrets
-				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
-				[DEBUG] using host = example.aha.io
-				[INFO] response received: 200 OK
-			`,
-			want: nil,
+			name:  "valid pattern - key out of prefix range",
+			input: "rootly keyword is not close to the real key in the data ='rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282'",
+			want:  []string{"rootly_7f1e8738d7d6b540bc52e1bc24c6e2c109dc44642f9e5d583be7e5d04f8bd282"},
 		},
 		{
-			name: "valid pattern - only key",
-			input: `
-				[INFO] sending request to the aha.io API
-				[DEBUG] using key = 81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541c
-				[INFO] response received: 200 OK
-			`,
-			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541caha.io"},
-		},
-		{
-			name: "valid pattern - only URL",
-			input: `
-				[INFO] sending request to the example.aha.io API
-				[INFO] response received: 200 OK
-			`,
-			want: nil,
-		},
-		{
-			name: "invalid pattern",
-			input: `
-				[INFO] sending request to the aha.io API
-				[DEBUG] using key = 81a1411a7e276fd88819df3137eJ406e0f281f8a8c417947ca4b025890c8541c
-				[DEBUG] using host = 1test.aha.io
-				[INFO] response received: 200 OK
-			`,
-			want: nil,
+			name:  "invalid pattern",
+			input: "rootly_A$3b9f8c1e2d4f5b6c7d8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
+			want:  nil,
 		},
 	}
 

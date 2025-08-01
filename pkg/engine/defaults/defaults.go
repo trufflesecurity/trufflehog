@@ -613,6 +613,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/roaring"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/robinhoodcrypto"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rocketreach"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rootly"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/route4me"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rownd"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/rubygems"
@@ -1486,6 +1487,7 @@ func buildDetectorList() []detectors.Detector {
 		&robinhoodcrypto.Scanner{},
 		&rocketreach.Scanner{},
 		// &rockset.Scanner{},
+		&rootly.Scanner{},
 		&route4me.Scanner{},
 		&rownd.Scanner{},
 		&rubygems.Scanner{},
@@ -1600,6 +1602,7 @@ func buildDetectorList() []detectors.Detector {
 		&survicate.Scanner{},
 		&swell.Scanner{},
 		&swiftype.Scanner{},
+		&tableau.Scanner{},
 		&tailscale.Scanner{},
 		&tallyfy.Scanner{},
 		&tatumio.Scanner{},
@@ -1724,10 +1727,6 @@ func buildDetectorList() []detectors.Detector {
 		&zohocrm.Scanner{},
 		&zonkafeedback.Scanner{},
 		&zulipchat.Scanner{},
-		&stripepaymentintent.Scanner{},
-		&tableau.Scanner{},
-		&bitbucketapppassword.Scanner{},
-		&hasura.Scanner{},
 	}
 }
 

@@ -136,6 +136,41 @@ func TestSource_Scan(t *testing.T) {
 			},
 			wantReposScanned: 1,
 		},
+		{
+			name: "token auth, group projects enumeration with include_subgroups",
+			init: init{
+				name: "test source group enumeration",
+				connection: &sourcespb.GitLab{
+					Credential: &sourcespb.GitLab_Token{
+						Token: token,
+					},
+					GroupIds: []string{"15013490"},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+				SourceName: "test source group enumeration",
+			},
+			wantReposScanned: 5,
+		},
+		{
+			name: "token auth, group projects enumeration with include_subgroups and exclude repositories",
+			init: init{
+				name: "test source group enumeration with exclude repos",
+				connection: &sourcespb.GitLab{
+					Credential: &sourcespb.GitLab_Token{
+						Token: token,
+					},
+					GroupIds:    []string{"15013490"},
+					IgnoreRepos: []string{"tes1188/test-user-count"},
+				},
+			},
+			wantChunk: &sources.Chunk{
+				SourceType: sourcespb.SourceType_SOURCE_TYPE_GITLAB,
+				SourceName: "test source group enumeration with exclude repos",
+			},
+			wantReposScanned: 4,
+		},
 	}
 
 	for _, tt := range tests {

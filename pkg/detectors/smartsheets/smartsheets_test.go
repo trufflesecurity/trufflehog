@@ -56,6 +56,31 @@ func TestSmartsheets_Pattern(t *testing.T) {
 			want: []string{},
 		},
 		{
+			name: "valid pattern - 26 characters",
+			input: `
+			# smartsheet credentials
+			sheet_token := "fakeiq999fakeecyfake3ifake"
+			`,
+			want: []string{"fakeiq999fakeecyfake3ifake"},
+		},
+		{
+			name: "valid pattern - 26 and 37 characters",
+			input: `
+			# smartsheet multiple length credentials
+			sheet_token := "fakeiq999fakeecyfake3ifake"
+			sheet_token2 := "fakezmdxfakenFAKELzhonda7tvMpkqJ3fake"
+			`,
+			want: []string{"fakeiq999fakeecyfake3ifake", "fakezmdxfakenFAKELzhonda7tvMpkqJ3fake"},
+		},
+		{
+			name: "invalid pattern - 30 characters",
+			input: `
+			# smartsheet invalid credentials
+			sheet_token := "fakeiq999fakeecyfake3ifakeuiop"
+			`,
+			want: []string{},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 			# smartsheet secret
