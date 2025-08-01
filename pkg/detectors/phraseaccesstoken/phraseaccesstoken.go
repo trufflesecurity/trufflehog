@@ -64,9 +64,8 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 				client = defaultClient
 			}
 
-			isVerified, extraData, verificationErr := verifyMatch(ctx, client, token)
+			isVerified, verificationErr := verifyMatch(ctx, client, token)
 			s1.Verified = isVerified
-			s1.ExtraData = extraData
 			s1.SetVerificationError(verificationErr, token)
 		}
 
@@ -76,10 +75,10 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return results, nil
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.phrase.com/v2/projects", nil)
+func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.phrase.com/v2/projects", http.NoBody)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 
 	// Phrase uses Authorization header with "token" prefix
@@ -87,7 +86,7 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 	res, err := client.Do(req)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -96,11 +95,11 @@ func verifyMatch(ctx context.Context, client *http.Client, token string) (bool, 
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return true, nil, nil
+		return true, nil
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return false, nil, nil
+		return false, nil
 	default:
-		return false, nil, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
+		return false, fmt.Errorf("unexpected HTTP response status %d", res.StatusCode)
 	}
 }
 
