@@ -1,7 +1,7 @@
 //go:build detectors
 // +build detectors
 
-package larksuite
+package rootly
 
 import (
 	"context"
@@ -10,21 +10,21 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
-func TestLarksuite_FromChunk(t *testing.T) {
+func TestRootly_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors5")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	tenantToken := testSecrets.MustGetField("LARKSUITE_TENANT")
-	userToken := testSecrets.MustGetField("LARKSUITE_USER")
-	appToken := testSecrets.MustGetField("LARKSUITE_APP")
+	secret := testSecrets.MustGetField("ROOTLY")
+	inactiveSecret := testSecrets.MustGetField("ROOTLY_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -39,48 +39,32 @@ func TestLarksuite_FromChunk(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "found tenant token, verified",
+			name: "found, verified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a larksuite token %s within", tenantToken)),
+				data:   []byte(fmt.Sprintf("You can find a rootly secret %s within", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LarkSuite,
+					DetectorType: detectorspb.DetectorType_Rootly,
 					Verified:     true,
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "found user token, verified",
+			name: "found, unverified",
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a larksuite token %s within", userToken)),
+				data:   []byte(fmt.Sprintf("You can find a rootly secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
 				{
-					DetectorType: detectorspb.DetectorType_LarkSuite,
-					Verified:     true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "found app token, unverified",
-			s:    Scanner{},
-			args: args{
-				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a larksuite app %s within", appToken)),
-				verify: true,
-			},
-			want: []detectors.Result{
-				{
-					DetectorType: detectorspb.DetectorType_LarkSuite,
+					DetectorType: detectorspb.DetectorType_Rootly,
 					Verified:     false,
 				},
 			},
@@ -103,7 +87,7 @@ func TestLarksuite_FromChunk(t *testing.T) {
 			s := Scanner{}
 			got, err := s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Larksuite.FromData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Rootly.FromData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			for i := range got {
@@ -111,10 +95,9 @@ func TestLarksuite_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
-				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
-				t.Errorf("Larksuite.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
+				t.Errorf("Rootly.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
 		})
 	}
