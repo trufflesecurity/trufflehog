@@ -2,21 +2,19 @@ package brandfetch
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"net/http"
 	"strconv"
-	"strings"
 
 	regexp "github.com/wasilibs/go-re2"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
-	client *http.Client // Optional: allow custom client
+	client *http.Client
 }
 
 func (s Scanner) Version() int { return 1 }
@@ -35,6 +33,14 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"brandfetch"}
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Brandfetch
+}
+
+func (s Scanner) Description() string {
+	return "Brandfetch is a service that provides brand data, including logos, colors, fonts, and more. Brandfetch API keys can be used to access this data."
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -62,54 +68,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyBrandFetch(ctx, s.getClient(), match)
+			isVerified, verificationErr := v2.VerifyMatch(ctx, s.getClient(), match)
 			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr)
+			s1.SetVerificationError(verificationErr, match)
 		}
 
 		results = append(results, s1)
 	}
 
 	return
-}
-
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Brandfetch
-}
-func (s Scanner) Description() string {
-	return "Brandfetch is a service that provides brand data, including logos, colors, fonts, and more. Brandfetch API keys can be used to access this data."
-}
-
-// docs: https://docs.brandfetch.com/docs/brand-api#overview
-func verifyBrandFetch(ctx context.Context, client *http.Client, key string) (bool, error) {
-	payload := strings.NewReader(`{
-		"domain": "www.example.com"
-		}`)
-
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.brandfetch.io/v1/color", payload)
-	if err != nil {
-		return false, err
-	}
-
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("x-api-key", key)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return false, err
-	}
-
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return true, nil
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return false, nil
-	default:
-		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
 }
