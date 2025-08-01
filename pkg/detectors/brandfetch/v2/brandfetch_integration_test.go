@@ -19,12 +19,12 @@ import (
 func TestBrandfetch_FromChunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors1")
+	testSecrets, err := common.GetSecret(ctx, "trufflehog-testing", "detectors6")
 	if err != nil {
 		t.Fatalf("could not get test secrets from GCP: %s", err)
 	}
-	secret := testSecrets.MustGetField("BRANDFETCH")
-	inactiveSecret := testSecrets.MustGetField("BRANDFETCH_INACTIVE")
+	secret := testSecrets.MustGetField("BRANDFETCH_V2")
+	inactiveSecret := testSecrets.MustGetField("BRANDFETCH_V2_INACTIVE")
 
 	type args struct {
 		ctx    context.Context
@@ -95,6 +95,7 @@ func TestBrandfetch_FromChunk(t *testing.T) {
 					t.Fatalf("no raw secret present: \n %+v", got[i])
 				}
 				got[i].Raw = nil
+				got[i].ExtraData = nil
 			}
 			if diff := pretty.Compare(got, tt.want); diff != "" {
 				t.Errorf("Brandfetch.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
