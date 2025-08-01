@@ -1043,7 +1043,9 @@ enum DetectorType {
   SalesforceRefreshToken = 1031;
   AnypointOAuth2 = 1032;
   WebexBot = 1033;
-  PhraseAccessToken = 1035;
+  TableauPersonalAccessToken = 1034;
+  Rootly = 1035;
+  PhraseAccessToken = 1036;
 }
 
 message Result {
