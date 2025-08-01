@@ -21,66 +21,55 @@ func TestBrandFetch_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "valid pattern",
-			input: `
-				func main() {
-					url := "https://api.example.com/v1/resource"
-
-					// Create a new request with the secret as a header
-					req, err := http.NewRequest("GET", url, http.NoBody)
-					if err != nil {
-						fmt.Println("Error creating request:", err)
-						return
-					}
-					
-					brandfetchAPIKey := "uHOAdwfQ7sD2yOpur72UqyUeIqnFwILOIlEPyBtJ"
-					req.Header.Set("x-api-key", brandfetchAPIKey) // brandfetch secret
-
-					// Perform the request
-					client := &http.Client{}
-					resp, _ := client.Do(req)
-					defer resp.Body.Close()
-				}
-				`,
-			want: []string{"uHOAdwfQ7sD2yOpur72UqyUeIqnFwILOIlEPyBtJ"},
+			name:  "valid pattern",
+			input: "brandfetch credentials: ZUfake+eKo3qNxLDfake/6vqjOtr4fa6u5wShfakes8=",
+			want:  []string{"ZUfake+eKo3qNxLDfake/6vqjOtr4fa6u5wShfakes8="},
 		},
 		{
-			name: "valid pattern - xml",
+			name:  "valid pattern - assignment format",
+			input: "BRANDFETCH_API_KEY=msCwufakeod43s2ad/D0em/LbIBpZqFAKE9P+H3UTno=",
+			want:  []string{"msCwufakeod43s2ad/D0em/LbIBpZqFAKE9P+H3UTno="},
+		},
+		{
+			name: "valid pattern - complex",
 			input: `
-				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
-  					<scope>GLOBAL</scope>
-  					<id>{uSiXZ-NMpDW-ZJQFSN-5wkT7SqQ8-mDbr9K2pl}</id>
-  					<secret>{brandfetch AQAAABAAA uSiXZNMpDWWhZJQFSNkE5wkT7SqQ8B3mDbr9K2pl}</secret>
-  					<description>configuration for production</description>
-					<creationDate>2023-05-18T14:32:10Z</creationDate>
-  					<owner>jenkins-admin</owner>
-				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			func main() {
+				url := "https://api.example.com/v1/resource"
+
+				// Create a new request with the secret as a header
+				req, err := http.NewRequest("GET", url, http.NoBody)
+				if err != nil {
+					fmt.Println("Error creating request:", err)
+					return
+				}
+				
+				brandfetchAPIKey := "0mWrufake4X1dRfake0mxS+E48ofakesTlyl55raNOs="
+				req.Header.Set("x-api-key", brandfetchAPIKey) // brandfetch secret
+
+				// Perform the request
+				client := &http.Client{}
+				resp, _ := client.Do(req)
+				defer resp.Body.Close()
+
+				// Check response status
+				if resp.StatusCode == http.StatusOK {
+					fmt.Println("Request successful!")
+				} else {
+					fmt.Println("Request failed with status:", resp.Status)
+				}
+			}
 			`,
-			want: []string{"uSiXZNMpDWWhZJQFSNkE5wkT7SqQ8B3mDbr9K2pl"},
+			want: []string{"0mWrufake4X1dRfake0mxS+E48ofakesTlyl55raNOs="},
 		},
 		{
-			name: "invalid pattern",
-			input: `
-				func main() {
-					url := "https://api.example.com/v1/resource"
-
-					// Create a new request with the secret as a header
-					req, err := http.NewRequest("GET", url, http.NoBody)
-					if err != nil {
-						fmt.Println("Error creating request:", err)
-						return
-					}
-					
-					brandfetchAPIKey := "yUeIqnFwILOIlEPyBt+=JOAdwfQ7sD2uHOAdwf2U[qy]UeIqnFwILOIlEPyBtJ^"
-					req.Header.Set("x-api-key", brandfetchAPIKey) // brandfetch secret
-
-					// Perform the request
-					client := &http.Client{}
-					resp, _ := client.Do(req)
-					defer resp.Body.Close()
-				}
-				`,
-			want: nil,
+			name:  "invalid pattern - wrong length",
+			input: "brandfetch credentials: yUeIqnFwILOIlEPyBt+=JOAdwfQ7sD2uHOAdwf2U",
+			want:  nil,
+		},
+		{
+			name:  "invalid pattern - invalid characters",
+			input: "brandfetch credentials: yUeIqnFwILOIlEPyBt+=JOAdwfQ7sD2uHOAdwf2U[qy]UeIqnFwILOIlEPyBtJ^fakes=",
+			want:  nil,
 		},
 	}
 

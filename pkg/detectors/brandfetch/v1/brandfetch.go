@@ -9,11 +9,12 @@ import (
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/common"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	v2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/brandfetch/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/pb/detectorspb"
 )
 
 type Scanner struct {
-	client *http.Client // Optional: allow custom client
+	client *http.Client
 }
 
 func (s Scanner) Version() int { return 1 }
@@ -32,6 +33,14 @@ var (
 // Use identifiers in the secret preferably, or the provider name.
 func (s Scanner) Keywords() []string {
 	return []string{"brandfetch"}
+}
+
+func (s Scanner) Type() detectorspb.DetectorType {
+	return detectorspb.DetectorType_Brandfetch
+}
+
+func (s Scanner) Description() string {
+	return "Brandfetch is a service that provides brand data, including logos, colors, fonts, and more. Brandfetch API keys can be used to access this data."
 }
 
 func (s Scanner) getClient() *http.Client {
@@ -59,20 +68,13 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		}
 
 		if verify {
-			isVerified, verificationErr := verifyBrandFetch(ctx, s.getClient(), match)
+			isVerified, verificationErr := v2.VerifyMatch(ctx, s.getClient(), match)
 			s1.Verified = isVerified
-			s1.SetVerificationError(verificationErr)
+			s1.SetVerificationError(verificationErr, match)
 		}
 
 		results = append(results, s1)
 	}
 
 	return
-}
-
-func (s Scanner) Type() detectorspb.DetectorType {
-	return detectorspb.DetectorType_Brandfetch
-}
-func (s Scanner) Description() string {
-	return "Brandfetch is a service that provides brand data, including logos, colors, fonts, and more. Brandfetch API keys can be used to access this data."
 }
