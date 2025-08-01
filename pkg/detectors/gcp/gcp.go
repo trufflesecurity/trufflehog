@@ -112,6 +112,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 			ExtraData: map[string]string{
 				"rotation_guide": "https://howtorotate.com/docs/tutorials/gcp/",
 				"project":        creds.ProjectID,
+				"private_key_id": creds.PrivateKeyID,
 			},
 			AnalysisInfo: map[string]string{
 				"key": string(credBytes),
