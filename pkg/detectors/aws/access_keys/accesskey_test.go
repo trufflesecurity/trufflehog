@@ -31,6 +31,20 @@ func TestAWS_Pattern(t *testing.T) {
 			want: []string{"ABIAS9L8MS5IPHTZPPUQ:v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{AKIAWGXZ9OPDOWUJMZGI}</id>
+  					<secret>{AQAAABAAA .v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63;}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"AKIAWGXZ9OPDOWUJMZGI:v2QPKHl7LcdVYsjaR4LgQiZ1zw3MAnMyiondXC63"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				aws credentials{

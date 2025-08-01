@@ -30,6 +30,20 @@ func TestAudd_Pattern(t *testing.T) {
 			want: []string{"60fzzcspq2balbxn7f3hi2nvg3h07h4z"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{audd}</id>
+  					<secret>{AQAAABAAA uv2kv0x8htfhgnugnsbys7a8oyky5ryb}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"uv2kv0x8htfhgnugnsbys7a8oyky5ryb"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the audd API

@@ -30,6 +30,20 @@ func TestAviationStack_Pattern(t *testing.T) {
 			want: []string{"osh0kjinsc2atoaqntoy1hdjppg54449"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{aviationstack}</id>
+  					<secret>{AQAAABAAA 464r3ib5xzipgd36zdzpvm09p00juu0b}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"464r3ib5xzipgd36zdzpvm09p00juu0b"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the aviationstack API

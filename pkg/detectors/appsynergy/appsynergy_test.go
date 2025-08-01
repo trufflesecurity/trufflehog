@@ -38,6 +38,20 @@ func TestAppSynergy_Pattern(t *testing.T) {
 			want: []string{"mg1pgwlndtq7rbk8i3kum344aso8ggp02ximdhsp8nsqasd3btxf84lz9ekfdpwo"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{appsynergy}</id>
+  					<secret>{AQAAABAAA ri1vn9m2otlg3yi8wwjegltc1t3bi4ljogg6c80onnrox2t9fuim6tce430fhklz}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"ri1vn9m2otlg3yi8wwjegltc1t3bi4ljogg6c80onnrox2t9fuim6tce430fhklz"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func validateAppSynergyKey() bool {

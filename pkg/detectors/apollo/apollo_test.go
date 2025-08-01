@@ -38,6 +38,20 @@ func TestApollo_Pattern(t *testing.T) {
 			want: []string{"897TJ1HevanW9Ye6nv6Ojj"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apollo}</id>
+  					<secret>{AQAAABAAA S2wg2NMlgalg9AUsrXPd1O}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"S2wg2NMlgalg9AUsrXPd1O"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func validateApolloKey() bool {

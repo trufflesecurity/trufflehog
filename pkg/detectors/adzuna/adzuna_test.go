@@ -31,6 +31,20 @@ func TestAdzuna_Pattern(t *testing.T) {
 			want: []string{"smcud4y6elxx7u6q58ewwv8rq01hpi3fcxu9w2g6"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{adzuna svkit0wx}</id>
+  					<secret>{adzuna AQAAABAAA atubvgvpd6jjo0ac1wjianofnpgr24ac}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"atubvgvpd6jjo0ac1wjianofnpgr24acsvkit0wx"},
+		},
+		{
 			name: "valid pattern - out of prefix range",
 			input: `
 				[INFO] Sending request to the adzuna API

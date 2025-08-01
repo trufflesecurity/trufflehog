@@ -30,6 +30,20 @@ func TestAirVisual_Pattern(t *testing.T) {
 			want: []string{"qscgyygcsq-wdvvok7slklklaasnd8afafxd"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{airvisual}</id>
+  					<secret>{airvisual AQAAABAAA rtcbsxiee3d5au8ik14g-8iqrsu8thl1pku8}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"rtcbsxiee3d5au8ik14g-8iqrsu8thl1pku8"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[DEBUG] airvisual api processing

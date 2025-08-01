@@ -41,6 +41,20 @@ func TestAnypoint_Pattern(t *testing.T) {
 			want: []string{"e3cd10a87f53b2dfa4b5fd606e7d9eca:ACE9d7E606Df5B4AFD2B35f78A01DC3E"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{anypoint id 17c55fba5c93de5646b10507c36fbc23}</id>
+  					<secret>{AQAAABAAA 8E6Ef8F8d5De05d8BF1491e1ecC37b31}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"17c55fba5c93de5646b10507c36fbc23:8E6Ef8F8d5De05d8BF1491e1ecC37b31"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				# Anypoint Secret Configuration File

@@ -30,6 +30,20 @@ func TestApiFonica_Pattern(t *testing.T) {
 			want: []string{"4rv0hdx5188-3q48-2luk-e8v5-dyuuf8l44ib7"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apifonica}</id>
+  					<secret>{AQAAABAAA fvzlzj17xzz-lwon-842u-46bs-5spcl2g7u9eb}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"fvzlzj17xzz-lwon-842u-46bs-5spcl2g7u9eb"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the apifonica API

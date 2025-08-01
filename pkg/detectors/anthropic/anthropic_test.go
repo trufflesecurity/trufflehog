@@ -39,6 +39,20 @@ func TestAnthropic_Pattern(t *testing.T) {
 			},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{anthropic}</id>
+  					<secret>{AQAAABAAA sk-ant-api03-Dtjm9IZ_rYhS_ihHLZmPXhjJ6PN8UPp7vNO7qO3735RRDpf8xbWGinsch0McONXznUm-4KWoA7WU2otvvwHBR5QRjiLakAA}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"sk-ant-api03-Dtjm9IZ_rYhS_ihHLZmPXhjJ6PN8UPp7vNO7qO3735RRDpf8xbWGinsch0McONXznUm-4KWoA7WU2otvvwHBR5QRjiLakAA"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				System Log - Authentication Token Issued

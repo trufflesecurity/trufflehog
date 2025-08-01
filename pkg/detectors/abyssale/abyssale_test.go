@@ -30,6 +30,20 @@ func TestAbyssale_Pattern(t *testing.T) {
 			want: []string{"rWE8I0axy6Fvw40RE8tsNS3L7zBU5vAhEnW4hq9G"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{abyssale}</id>
+  					<secret>{abyssale AQAAABAAA xTiPNSDg6JjzG8fWoLb8JlE8SBcMKkCx2fZLZD91}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"xTiPNSDg6JjzG8fWoLb8JlE8SBcMKkCx2fZLZD91"},
+		},
+		{
 			name: "valid pattern - out of prefix range",
 			input: `
 				[INFO] Sending request to abyssale API

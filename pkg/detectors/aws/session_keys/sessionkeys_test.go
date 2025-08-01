@@ -32,6 +32,21 @@ func TestAWSSessionKey_Pattern(t *testing.T) {
 			want: []string{"ASIABBKK02W42Q3IPSPG:fkhIiUwQY32Zu9e4a86g9r3WpTzfE1aXljVcgn8O:aSqfp/GTZbJP+tXPNCZ9GoveoM0vgxtlYXdzPQ2uYNMPPgUkt0VT7SoTLasAo7iVqWWREOUC6DEenlcgDEKyzIEgQW5Ju/b9K/Z176uD2HJYCfq/lyowHtt5PvJi7LRuf/urSorGbTcqNUvPi42YP1Ps/4F6He9hQA1io3EAGBC3ICGHXWf2IlvFoTNUyPTqhjnPEKMWZ42jblqNAdD7hLpzNXmmGhdLCjy99XK8+gjHdZHkOeD/FIjRPRZ7Jl0tdwdqFEwzRVCzL2uelMVMd3UaZ+d4I4Kf+J464piO//jxx48Fs/mG3zr5ba9m2S+6gvUZJq4j+0uJ+jf6cG/x2G9XSybqYQRwvxfNquKB4TcKiGVH5+ZbJT4ASkARadwoSPMGfvMPje+X2zAziSzXfsxYfIQKf6iJ9p7VavlDGi+Acr4kwFXW5IfQs4uGk6AVQFsoZK3o1hhLOkuOwWQEWhDQGNLXwJbFqXfELOnUQvM0Z5NUm46bjAAi4g+X9gLPNR/KjzXuuTTaWYrQEjXLb7PxS0sIttAb1w+sTXXtc1kDIsABC6KcsyGlEwji5sLkbkUa="},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{ASIABBKK02W42Q3IPSPG}</id>
+					<secret>{AQAAABAAA fkhIiUwQY32Zu9e4a86g9r3WpTzfE1aXljVcgn8O}</secret>
+  					<session>{AQAAABAAA aSqfp/GTZbJP+tXPNCZ9GoveoM0vgxtlYXdzPQ2uYNMPPgUkt0VT7SoTLasAo7iVqWWREOUC6DEenlcgDEKyzIEgQW5Ju/b9K/Z176uD2HJYCfq/lyowHtt5PvJi7LRuf/urSorGbTcqNUvPi42YP1Ps/4F6He9hQA1io3EAGBC3ICGHXWf2IlvFoTNUyPTqhjnPEKMWZ42jblqNAdD7hLpzNXmmGhdLCjy99XK8+gjHdZHkOeD/FIjRPRZ7Jl0tdwdqFEwzRVCzL2uelMVMd3UaZ+d4I4Kf+J464piO//jxx48Fs/mG3zr5ba9m2S+6gvUZJq4j+0uJ+jf6cG/x2G9XSybqYQRwvxfNquKB4TcKiGVH5+ZbJT4ASkARadwoSPMGfvMPje+X2zAziSzXfsxYfIQKf6iJ9p7VavlDGi+Acr4kwFXW5IfQs4uGk6AVQFsoZK3o1hhLOkuOwWQEWhDQGNLXwJbFqXfELOnUQvM0Z5NUm46bjAAi4g+X9gLPNR/KjzXuuTTaWYrQEjXLb7PxS0sIttAb1w+sTXXtc1kDIsABC6KcsyGlEwji5sLkbkUa=}</session>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"ASIABBKK02W42Q3IPSPG:fkhIiUwQY32Zu9e4a86g9r3WpTzfE1aXljVcgn8O:aSqfp/GTZbJP+tXPNCZ9GoveoM0vgxtlYXdzPQ2uYNMPPgUkt0VT7SoTLasAo7iVqWWREOUC6DEenlcgDEKyzIEgQW5Ju/b9K/Z176uD2HJYCfq/lyowHtt5PvJi7LRuf/urSorGbTcqNUvPi42YP1Ps/4F6He9hQA1io3EAGBC3ICGHXWf2IlvFoTNUyPTqhjnPEKMWZ42jblqNAdD7hLpzNXmmGhdLCjy99XK8+gjHdZHkOeD/FIjRPRZ7Jl0tdwdqFEwzRVCzL2uelMVMd3UaZ+d4I4Kf+J464piO//jxx48Fs/mG3zr5ba9m2S+6gvUZJq4j+0uJ+jf6cG/x2G9XSybqYQRwvxfNquKB4TcKiGVH5+ZbJT4ASkARadwoSPMGfvMPje+X2zAziSzXfsxYfIQKf6iJ9p7VavlDGi+Acr4kwFXW5IfQs4uGk6AVQFsoZK3o1hhLOkuOwWQEWhDQGNLXwJbFqXfELOnUQvM0Z5NUm46bjAAi4g+X9gLPNR/KjzXuuTTaWYrQEjXLb7PxS0sIttAb1w+sTXXtc1kDIsABC6KcsyGlEwji5sLkbkUa="},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				aws credentials{

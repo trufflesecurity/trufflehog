@@ -29,6 +29,20 @@ func TestAirtablepersonalaccesstoken_Pattern(t *testing.T) {
 			want: []string{"patfqpIZBPU6EAt5x.458546d9c77b21f8a98141f2a4039d5626010f19efc16c20d57c4f41d44c8c85"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{airtable}</id>
+  					<secret>{airtable AQAAABAAA pat2kATFGrujqJTbT.e2082656c470902d83b47dc804e693df1deb30161affbda39d879a2cf44bef13}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"pat2kATFGrujqJTbT.e2082656c470902d83b47dc804e693df1deb30161affbda39d879a2cf44bef13"},
+		},
+		{
 			name: "finds all matches",
 			input: `
 				[INFO] Sending request to the API

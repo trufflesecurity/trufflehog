@@ -45,6 +45,20 @@ func TestBeSnappy_Pattern(t *testing.T) {
 			want: []string{"f58c5d37d7876d32cfdd823f8fe4ded364a8d483b5dbfadcc55ad801b3be8523"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{besnappy}</id>
+  					<secret>{besnappy AQAAABAAA da5a2e65d83a40d6cebaac60ef01803f8c1a612baa428992ad4c7301df2759ba}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"da5a2e65d83a40d6cebaac60ef01803f8c1a612baa428992ad4c7301df2759ba"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

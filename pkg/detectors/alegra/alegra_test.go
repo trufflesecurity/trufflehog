@@ -31,6 +31,20 @@ func TestAlegra_Pattern(t *testing.T) {
 			want: []string{"wdvn-usa87a-fxp9ioas:testUser.1005@example.com"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{alegra kk18@example.com}</id>
+  					<secret>{alegra AQAAABAAA buihlmkfnh5m1lk5z6do}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"buihlmkfnh5m1lk5z6do:kk18@example.com"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[DEBUG] alegra api processing

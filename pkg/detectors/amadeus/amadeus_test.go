@@ -31,6 +31,20 @@ func TestAmadeus_Pattern(t *testing.T) {
 			want: []string{"ttdveNai3Gj6Zrjvgz4fyBEWRLARCG6a9wqrSr2qveaqgQns"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{amadeus ey6U46qCx26dqzMVWAGiibt6m65mM5w9}</id>
+  					<secret>{amadeus AQAAABAAA Ew3TfmLHYaRjPnYO}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"ey6U46qCx26dqzMVWAGiibt6m65mM5w9Ew3TfmLHYaRjPnYO"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[INFO] Sending request to the amadeus API

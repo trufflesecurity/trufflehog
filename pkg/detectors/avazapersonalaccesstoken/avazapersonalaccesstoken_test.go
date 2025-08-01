@@ -30,6 +30,20 @@ func TestAvazaPersonalAccessToken_Pattern(t *testing.T) {
 			want: []string{"01818612883613176996369293-f113ceb9cf4fa63dc367ab4815b0e1edf890745f"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{avaza}</id>
+  					<secret>{AQAAABAAA 6605785514902-06e236581be50b798459a53fcb7609032bf813f7}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"6605785514902-06e236581be50b798459a53fcb7609032bf813f7"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the avaza API

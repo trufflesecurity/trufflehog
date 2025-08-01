@@ -30,6 +30,20 @@ func TestAlienVault_Pattern(t *testing.T) {
 			want: []string{"3em7p52ec9ut4k9ccqha19rz3oyeqnij3mn3ivml577f8pb2179yz9totr648hmy"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{alienvault}</id>
+  					<secret>{AQAAABAAA xyi7bj56t5b0hkinw4vz8qgffqhfb2ypemdnt407bke6s0ouuswvcdf5c1qpvse0}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"xyi7bj56t5b0hkinw4vz8qgffqhfb2ypemdnt407bke6s0ouuswvcdf5c1qpvse0"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[INFO] Fetching data from alienvault

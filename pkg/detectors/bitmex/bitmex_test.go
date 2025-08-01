@@ -52,6 +52,20 @@ func TestBitmex_Pattern(t *testing.T) {
 			want: []string{"EPwUIxOIveS463D_2O9LFgkzW_HlMtrmELzXm4bSlWv49JLcgvg5hvu467WbbnpmoEA-RjrY"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{bitmex EPwUIxOIveS463D_2O9LFgkz }</id>
+  					<secret>{bitmex AQAAABAAA W_HlMtrmELzXm4bSlWv49JLcgvg5hvu467WbbnpmoEA-RjrY }</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"EPwUIxOIveS463D_2O9LFgkzW_HlMtrmELzXm4bSlWv49JLcgvg5hvu467WbbnpmoEA-RjrY"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

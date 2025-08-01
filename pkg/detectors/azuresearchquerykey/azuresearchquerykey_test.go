@@ -30,6 +30,20 @@ func TestAzureSearchQueryKey_Pattern(t *testing.T) {
 			want: []string{"OKalbM5EBt5hloqU46phTUCZqvNAlZ4S2Jd2gFUCOQ3HG0vQ2uEphttps://tzyexx2ktdfhha8w1cktqzbrgv37ywtu.search.windows.net/indexes/n81wg81jogjfq93cyxfi67vy2g7vwlcqfgi"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{azure https://w3fsj4c22rdn7mhkf1yxbt7orrvzd720a.search.windows.net/indexes/5934qi40xctuhmzba7ty}</id>
+  					<secret>{azure AQAAABAAA C3idqCYnGa1cTx7iEFJ684QCbSDcEz1jq4s7iRxDDPWYKoK3h3Lr}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"C3idqCYnGa1cTx7iEFJ684QCbSDcEz1jq4s7iRxDDPWYKoK3h3Lrhttps://w3fsj4c22rdn7mhkf1yxbt7orrvzd720a.search.windows.net/indexes/5934qi40xctuhmzba7ty"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				azure:

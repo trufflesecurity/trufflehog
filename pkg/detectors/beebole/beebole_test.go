@@ -45,6 +45,20 @@ func TestBeeBole_Pattern(t *testing.T) {
 			want: []string{"bn6htprmfpukfalts4muwalxh9j15ucvnrfdme8t"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{beebole}</id>
+  					<secret>{beebole AQAAABAAA rtwtgvvvekkik48t08tvf659hvyb5w8u4xnueh3u}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"rtwtgvvvekkik48t08tvf659hvyb5w8u4xnueh3u"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

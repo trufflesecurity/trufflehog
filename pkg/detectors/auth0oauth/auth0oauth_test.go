@@ -32,6 +32,21 @@ func TestAuth0oAuth_Pattern(t *testing.T) {
 			want: []string{"kYWr_tL4eYBtqIIvKfSf2-e4T9Cw1CtwE8ufoESVBB7Hi1UrXwGtKCleBsaUfpchggQEAy_yhzWnqv4_GzJivBif85bqiJi3ZA63DAauoJ2PF27fvS-MBqIYgxH0vZaL1s5314lgPDLqHXjZsY59PSew63A_L6rySqcy5J3rFcGcpdeSQ_tTx1kCXOZY_JUy"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{auth0 rP_yIAV6HD3Oe4zr6KawRXGbq6UCWbeC1kbjQkVhqG4vcLCc2}</id>
+  					<secret>{AQAAABAAA 1PMNVllg_WHl2OGdPLSs73Z1NHjQ85nafV2qqKbQivoqEz4RSo6MFBoNxF-XqFKjEyt6WJfZvAslDPrwY-B-MLsN13rgxRrAiFw9d8Rl1e0uC0FCNDC5EALR9kq7cs4Atz_Dv4r5YT8drkV1_T5HMjH8SJb2B-jD}</secret>
+  					<domain>{kXFuauth0.com}</domain>
+					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"rP_yIAV6HD3Oe4zr6KawRXGbq6UCWbeC1kbjQkVhqG4vcLCc21PMNVllg_WHl2OGdPLSs73Z1NHjQ85nafV2qqKbQivoqEz4RSo6MFBoNxF-XqFKjEyt6WJfZvAslDPrwY-B-MLsN13rgxRrAiFw9d8Rl1e0uC0FCNDC5EALR9kq7cs4Atz_Dv4r5YT8drkV1_T5HMjH8SJb2B-jD"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				# do not share these credentials

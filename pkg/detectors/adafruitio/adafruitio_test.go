@@ -30,6 +30,20 @@ func TestAdafruitio_Pattern(t *testing.T) {
 			want: []string{"aio_VxEqGaqgMgZej3DceezbBy03eWyW"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{adafruitio}</id>
+  					<secret>{AQAAABAAA aio_cQD77DF9SgsYbgWcxJbpLOlR5emX}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"aio_cQD77DF9SgsYbgWcxJbpLOlR5emX"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the API

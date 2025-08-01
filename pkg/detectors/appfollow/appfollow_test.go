@@ -32,6 +32,20 @@ func TestAppFollow_Pattern(t *testing.T) {
 			want: []string{"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.hdMLjiIayyb5cgbcVtjKywQwqeNKnsxZEhnJnX6wzhnblpmpjF4c2mbdmVVylTayE6M8ZE3h4V.fmnUM4cjvbe1JMFDuBSwWNEYQFHrD5AEm6p2Ir9w7K6"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{appfollow}</id>
+  					<secret>{AQAAABAAA eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.YwK6gJ8sMVylaDNuXRiGFLRR1kgZaLF45EbJ0qHSRaW4CRtWaqWciTZZXxkk4a4wLh8f7cTTlb.wvTVCRC1RLCpd98q4WK3ef6M3TBrb08AkS9-jNOdA_r}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.YwK6gJ8sMVylaDNuXRiGFLRR1kgZaLF45EbJ0qHSRaW4CRtWaqWciTZZXxkk4a4wLh8f7cTTlb.wvTVCRC1RLCpd98q4WK3ef6M3TBrb08AkS9-jNOdA_r"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func validateAppFollowKey() bool {

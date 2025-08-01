@@ -32,6 +32,21 @@ func TestAppCues_Pattern(t *testing.T) {
 			want: []string{"5g5n4yazu-dpqp3g6qt3gn59wrxhqf2mqipmtruffle-security-lrv10a8l4u23xp5gkvg819"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{appcues 91712}</id>
+					<username>{appcues ubdcpht45hlfdywxv89ympnvtcnydl3uv-0umfu}</username>
+  					<secret>{appcues AQAAABAAA w9hyyfghqirj8uwcmtv05-n4fppzl-in223u}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"w9hyyfghqirj8uwcmtv05-n4fppzl-in223uubdcpht45hlfdywxv89ympnvtcnydl3uv-0umfu"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the appcues API

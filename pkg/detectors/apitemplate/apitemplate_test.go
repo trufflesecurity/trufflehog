@@ -32,6 +32,20 @@ func TestApiTemplate_Pattern(t *testing.T) {
 			want: []string{"EeOPHL7PyBlUk0qkJX72sDtdNL3WLdpxg1czllR"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apitemplate}</id>
+  					<secret>{AQAAABAAA oVqX8yfzlUtzudNnvlWKNI4pNKTKTwlaKmxlcX5}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"oVqX8yfzlUtzudNnvlWKNI4pNKTKTwlaKmxlcX5"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func validateKey() bool {

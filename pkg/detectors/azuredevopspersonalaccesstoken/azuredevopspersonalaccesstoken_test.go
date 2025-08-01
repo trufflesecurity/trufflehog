@@ -30,6 +30,23 @@ func TestAzureDevopsPersonalAccessToken_Pattern(t *testing.T) {
 			want: []string{"uie5tff7m5h5lqnqjhaltetqli90a08p6dhv9rn59uo30jgzw8unWOkQXnjSxCyioEJRa8R6J39cN4Xfyy8CWl1BZksHYsevxVBFzG"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{azure dlMR9GIBfqCgAPr8qfkBa072OfaP6NbBhCwkPBX0cuHd}</id>
+  					<secret>{azure AQAAABAAA h0wpgbusyba8acyaec1uxxcbxlucgr490c6nvrvd8rylfocwkpg5}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{
+				"h0wpgbusyba8acyaec1uxxcbxlucgr490c6nvrvd8rylfocwkpg5dlMR9GIBfqCgAPr8qfkBa072OfaP6NbBhCwkPBX0cuHd",
+				"h0wpgbusyba8acyaec1uxxcbxlucgr490c6nvrvd8rylfocwkpg5AQAAABAAA",
+			},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 					azure:

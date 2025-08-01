@@ -45,6 +45,20 @@ func TestBlitApp_Pattern(t *testing.T) {
 			want: []string{"I_MncTA8nlFcqlBCakI5vwkwFD4_zRUYZKt8hyd"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{blitapp}</id>
+  					<secret>{blitapp AQAAABAAA 188hN_78_V86WbCBVJd6OLMQJTHva7cbSf8HDFo}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"188hN_78_V86WbCBVJd6OLMQJTHva7cbSf8HDFo"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

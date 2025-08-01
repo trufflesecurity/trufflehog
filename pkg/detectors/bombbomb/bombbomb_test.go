@@ -29,6 +29,20 @@ func TestBombBomb_Pattern(t *testing.T) {
 			want: []string{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{bombbomb}</id>
+  					<secret>{bombbomb AQAAABAAA eyJioGciOiJIU9I1NiIsInR5cCI6IkpXVCJ9.eyJJdWIiOiIxMjM0NTY3ODkwIiwibmFtZSJ6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5d}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"eyJioGciOiJIU9I1NiIsInR5cCI6IkpXVCJ9.eyJJdWIiOiIxMjM0NTY3ODkwIiwibmFtZSJ6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5d"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 					bombbombToken := "eyJhbGciOiJIUzI1N^iIsInRkpXVCJ9.ey$JzdWIiOiIxMjM0NTY3ODkwIiwibmFtZwiaWF0IjoxNTE2MjM5MDIyfQ.S&flKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"

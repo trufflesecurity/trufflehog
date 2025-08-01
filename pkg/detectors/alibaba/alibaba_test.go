@@ -31,6 +31,20 @@ func TestAliBaba_Pattern(t *testing.T) {
 			want: []string{"CwgR2UwgaWd7hgUdQkwFnK9vvEeO4RLTAIXgRPqwF1DhBf6Q1uZ5DrM"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{WX6OtM8pbcrXWMIGc5evYousFWBlBm}</id>
+  					<secret>{AQAAABAAA LTAImg3ZeAPatbAtEDS9HVZ}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"WX6OtM8pbcrXWMIGc5evYousFWBlBmLTAImg3ZeAPatbAtEDS9HVZ"},
+		},
+		{
 			name: "valid pattern - ignore special characters at end",
 			input: `
 				[INFO] Sending request to the API

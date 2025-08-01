@@ -30,6 +30,20 @@ func TestAirship_Pattern(t *testing.T) {
 			want: []string{"O3BV99CUDw3xYUAL0tHGYUe7mOj5PA5vTnLdJwULCTh9dxk9PmmTpL1kI846G3QGIsECVyVSsxZnIbfSwWc8xuX843W"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{airship}</id>
+  					<secret>{airship AQAAABAAA oVH3yIO1oAoXpK9Rc01EGNNTuw6d4Zyt07YNFmje644Ht00hvAaYwldNOV9vIPQw6dYHJLRgp2f75YdJ9OiICkYVhMI}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"oVH3yIO1oAoXpK9Rc01EGNNTuw6d4Zyt07YNFmje644Ht00hvAaYwldNOV9vIPQw6dYHJLRgp2f75YdJ9OiICkYVhMI"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[DEBUG] airship api processing

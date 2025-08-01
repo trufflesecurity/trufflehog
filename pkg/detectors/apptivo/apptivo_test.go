@@ -31,6 +31,20 @@ func TestApptivo_Pattern(t *testing.T) {
 			want: []string{"fox94at7-8dj92ns-cdxhag4470yqp0o2c8yC27YfQFKcUue8OxfEiAcqzrPVII-pb3V"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apptivo o9qB77Q9cCXfuV-TWyCWUumiAbZc2Z7i}</id>
+  					<secret>{apptivo AQAAABAAA juqc5-sw846p0cj43wy8eex6rr4v8-9oa3dh}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"juqc5-sw846p0cj43wy8eex6rr4v8-9oa3dho9qB77Q9cCXfuV-TWyCWUumiAbZc2Z7i"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the apptivo API

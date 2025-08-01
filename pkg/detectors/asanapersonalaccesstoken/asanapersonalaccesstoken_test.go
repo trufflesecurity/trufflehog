@@ -35,6 +35,20 @@ func TestAsanaPersonalAccessToken_Pattern(t *testing.T) {
 			},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{asana}</id>
+  					<secret>{AQAAABAAA 891435852083139681602524390768273271357927849104481/366163755073364840345913922341185329292536814045275090976491644844014597476863956806652784056747/17480879147700616278211801017829125:Hb7meGPLBz7jH7e1fiHetN355omiO9Zt8fewjSOX4qfUoWDzvvlNA6lBx9rNuR8EAEElmtmmL9J4ilO8m2D56n}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"891435852083139681602524390768273271357927849104481/366163755073364840345913922341185329292536814045275090976491644844014597476863956806652784056747/17480879147700616278211801017829125:Hb7meGPLBz7jH7e1fiHetN355omiO9Zt8fewjSOX4qfUoWDzvvlNA6lBx9rNuR8EAEElmtmmL9J4ilO8m2D56n"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the asana API

@@ -30,6 +30,20 @@ func TestAlconost_Pattern(t *testing.T) {
 			want: []string{"wdvnousa87acfxp9ioasrea4tbeasrfa"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{alconost}</id>
+  					<secret>{alconost AQAAABAAA Awxzhkwff46dtkt5pnvdlss6t2kA44a7}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"Awxzhkwff46dtkt5pnvdlss6t2kA44a7"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[DEBUG] alconost api processing

@@ -30,6 +30,20 @@ func TestAutoPilot_Pattern(t *testing.T) {
 			want: []string{"0fd87cfb1ca6c38c5f1ae5be7b0e395e"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{autopilot}</id>
+  					<secret>{AQAAABAAA 60aa8204a2b1dec8af7de45737fed7be}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"60aa8204a2b1dec8af7de45737fed7be"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the autopilot API

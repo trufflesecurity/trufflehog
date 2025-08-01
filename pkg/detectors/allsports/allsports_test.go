@@ -30,6 +30,20 @@ func TestAllSports_Pattern(t *testing.T) {
 			want: []string{"cq73u5azj3p3shfvzz3lw1typfqu6uduq7bophtq4veta7cnvd4s5htkb8lgk4vr"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{allsports}</id>
+  					<secret>{AQAAABAAA bj8yzu3awie5akwiwcb7esqygqx14gt65j9lrcpec0v28ckkswtyza1x9747gap5}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"bj8yzu3awie5akwiwcb7esqygqx14gt65j9lrcpec0v28ckkswtyza1x9747gap5"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[DEBUG] allsports api processing

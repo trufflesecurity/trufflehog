@@ -32,6 +32,20 @@ func TestApiMetrics_Pattern(t *testing.T) {
 			want: []string{"5po8TFGawiYNCc1ct4ofWkBqzIfA6IeO"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apimetrics}</id>
+  					<secret>{AQAAABAAA XpLTBFZccOgbbtVht4OaZzsrgKdh42RX}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"XpLTBFZccOgbbtVht4OaZzsrgKdh42RX"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func validateApiMetrics() bool {

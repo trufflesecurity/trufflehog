@@ -31,6 +31,20 @@ func TestAdobeIO_Pattern(t *testing.T) {
 			want: []string{"zoaw0c0m50m0hz2h1fm21y4tqfyl7ifiqCRbiIy1NJaW"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{adobe ftd7hkeafk0q}</id>
+  					<secret>{adobe AQAAABAAA siybmtkgho9nsgjhng5yhp92wnir2a9t}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"siybmtkgho9nsgjhng5yhp92wnir2a9tftd7hkeafk0q"},
+		},
+		{
 			name: "valid pattern - out of prefix range",
 			input: `
 				[INFO] Sending request to the adobe API

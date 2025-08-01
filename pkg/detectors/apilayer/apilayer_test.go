@@ -30,6 +30,20 @@ func TestApiLayer_Pattern(t *testing.T) {
 			want: []string{"qnHT110fihCn49wOm5b2h3ACTRmksbg0"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apilayer}</id>
+  					<secret>{AQAAABAAA HHTi3DYZIqt57j5WVHvXHHboXpCnm6CW}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"HHTi3DYZIqt57j5WVHvXHHboXpCnm6CW"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the apilayer API

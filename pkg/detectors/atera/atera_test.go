@@ -30,6 +30,20 @@ func TestAtera_Pattern(t *testing.T) {
 			want: []string{"yoo3d5pu3t4zxd6x1vhk7ykmjqarbsv1"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{atera}</id>
+  					<secret>{AQAAABAAA uvyn0qy0ec96pgxfr2s3i4bqv1znl7yg}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"uvyn0qy0ec96pgxfr2s3i4bqv1znl7yg"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the atera API

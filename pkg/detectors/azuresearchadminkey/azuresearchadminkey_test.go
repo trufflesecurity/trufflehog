@@ -30,6 +30,23 @@ func TestAzureSearchAdminKey_Pattern(t *testing.T) {
 			want: []string{"wRRPyhjv8m6JGRujUUrPKa8d3rJ0mrGAxhmqf3A68OgZmlWUJymaTestingService01", "wRRPyhjv8m6JGRujUUrPKa8d3rJ0mrGAxhmqf3A68OgZmlWUJymaazureKey"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{azure bhIIhGTLlW7gLxy4rM93gLPaPFwdRajJX}</id>
+  					<secret>{azure AQAAABAAA Pntv3pDD31oczaYT99OanBBZyYlnKGUpQb4WEFnK6uUsKiR0Mc09}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{
+				"Pntv3pDD31oczaYT99OanBBZyYlnKGUpQb4WEFnK6uUsKiR0Mc09bhIIhGTLlW7gLxy4rM93gLPaPFwdRajJX",
+				"Pntv3pDD31oczaYT99OanBBZyYlnKGUpQb4WEFnK6uUsKiR0Mc09AQAAABAAA",
+			},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				azure:

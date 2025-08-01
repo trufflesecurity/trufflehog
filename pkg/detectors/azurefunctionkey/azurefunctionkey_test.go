@@ -33,6 +33,20 @@ func TestAzureFunctionKey_Pattern(t *testing.T) {
 			},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{https://yaeuxPA9-H.azurewebsites.net/api/Hwy5K}</id>
+  					<secret>{azure AQAAABAAA Ijbql3DKRyIZNQIddzCYKICr}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"Ijbql3DKRyIZNQIddzCYKICrhttps://yaeuxPA9-H.azurewebsites.net/api/Hwy5K"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				azure:

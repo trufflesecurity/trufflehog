@@ -33,6 +33,20 @@ func TestApi2Cart_Pattern(t *testing.T) {
 			want: []string{"2afddb813193eb9d3b5bd99bf5d834cd"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{api2cart}</id>
+  					<secret>{AQAAABAAA b36c17e9dc0dba67480e864cf69879c3}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"b36c17e9dc0dba67480e864cf69879c3"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				To integrate with API2Cart, ensure you have the following credentials in your configuration file.

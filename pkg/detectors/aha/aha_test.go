@@ -31,6 +31,20 @@ func TestAha_Pattern(t *testing.T) {
 			want: []string{"81a1411a7e276fd88819df3137eb406e0f281f8a8c417947ca4b025890c8541cexample.aha.io"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{aha 3af0b286b668d9636fd68076d6c87a333fe285fd41593cfceab36b35606c915a}</id>
+  					<secret>{AQAAABAAA ACTp3nufSEO791nIReS5udnRVFcG9j6-CqBJogBxo1pbql.aha.io}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"3af0b286b668d9636fd68076d6c87a333fe285fd41593cfceab36b35606c915aACTp3nufSEO791nIReS5udnRVFcG9j6-CqBJogBxo1pbql.aha.io"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[INFO] sending request to the aha.io API

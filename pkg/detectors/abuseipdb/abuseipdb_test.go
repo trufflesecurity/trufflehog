@@ -30,6 +30,20 @@ func TestAbuseipdb_Pattern(t *testing.T) {
 			want: []string{"o8oqti3tghu2xic76ii4t7jb9bxuzd4200j1yrkdjl6s8834hx4dgz1wwo90diqraakjd13sljcjkfnf"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{abuseipdb}</id>
+  					<secret>{abuseipdb AQAAABAAA zgtj0q3v38u4pthc6nmy02n60bj244u5o9j47ln1jlue5mxzaasfi29x4dzcbxroawvkm26thtr61066}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"zgtj0q3v38u4pthc6nmy02n60bj244u5o9j47ln1jlue5mxzaasfi29x4dzcbxroawvkm26thtr61066"},
+		},
+		{
 			name: "valid pattern - out of prefix range",
 			input: `
 				[INFO] Sending request to abuseipdb API

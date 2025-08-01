@@ -29,6 +29,20 @@ func TestAlchemy_Pattern(t *testing.T) {
 			want: []string{"alcht_2Cy8xCLyvrAf7lZKfhQhyCr4RAID9D"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{alchemy}</id>
+  					<secret>{alchemy AQAAABAAA 5iqW7gKQVXvwnykF9xAVfenemmnUJznI}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"5iqW7gKQVXvwnykF9xAVfenemmnUJznI"},
+		},
+		{
 			name: "finds all matches",
 			input: `
 				[INFO] Sending request to the alchemy API

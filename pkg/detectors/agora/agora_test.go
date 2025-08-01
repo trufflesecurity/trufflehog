@@ -31,6 +31,20 @@ func TestAgora_Pattern(t *testing.T) {
 			want: []string{"6p77f9gjhxx9mwdj86of7y7820bh49vwqi6txx6vd0qzn6j01xj9rr6clyejvjw5"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{agora 3devtbiys8b282kidr9u78kjq8xdtlo1}</id>
+  					<secret>{AQAAABAAA bc7c6tag5jfuhz4y7v6v05dx2wq2z1ua}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"3devtbiys8b282kidr9u78kjq8xdtlo1bc7c6tag5jfuhz4y7v6v05dx2wq2z1ua"},
+		},
+		{
 			name: "valid pattern - out of prefix range",
 			input: `
 				[INFO] Sending request to the agora API

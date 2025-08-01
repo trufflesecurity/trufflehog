@@ -31,6 +31,20 @@ func TestAzureBatch_Pattern(t *testing.T) {
 			want: []string{"https://JrxlYxT+0hW.YSA.batch.azure.comBXIMbhBlC3=5hIbqCEKvq7opaV2ZfO0XWbcnasZmPm/AJfQqdcnt/AVmKkJ8Qw80Zc1rQDaw+2Ytxc1hDq1m/LB0"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{https://pb0bik2a59qznkh87pdd6twjlgzpmxz.pfv9bpr2hujs.batch.azure.com}</id>
+  					<secret>{AQAAABAAA XJc2nGZvqPAXYfHxsiwUDBA4ynHzGc9nQl1Ih16lk19=2+qqeJUDp5eBxWVrE0LQYlnbeu/orbEtblFL218S4Wko}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"https://pb0bik2a59qznkh87pdd6twjlgzpmxz.pfv9bpr2hujs.batch.azure.comXJc2nGZvqPAXYfHxsiwUDBA4ynHzGc9nQl1Ih16lk19=2+qqeJUDp5eBxWVrE0LQYlnbeu/orbEtblFL218S4Wko"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the ayrshare API

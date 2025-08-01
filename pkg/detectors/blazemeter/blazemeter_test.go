@@ -45,6 +45,20 @@ func TestBlazeMeter_Pattern(t *testing.T) {
 			want: []string{"sjbuxa3m-vs4n-ykl8-8jpv-i09hdidciolp"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{runscope}</id>
+  					<secret>{runscope AQAAABAAA vzn9dy84-mnvd-alqd-4pbf-cn618kvo26le}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"vzn9dy84-mnvd-alqd-4pbf-cn618kvo26le"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

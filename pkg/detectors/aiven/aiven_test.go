@@ -30,6 +30,20 @@ func TestAiven_Pattern(t *testing.T) {
 			want: []string{"yb+Ygm82FfUworm2exB+Uk255p0uQKmmfx4ut1KfsZ3YI3Gp2xPYyxZgrwYabMxXXO4WPsK7xlLJRy0BWIpM2SKnzA2p69P8aOmYbl24ZiVGlLXyQxeVDDy7gru5Yzt=Y1UDLBpsW=hhGIKsrPgc/7hpxuEfEqbXJe5IBYO484F+ekaTmYN4nTF94O==3WuG+WuSW7zaYzXH1V==kZFj07zBtmShS0z/lW=N3HipH=oJjXI2pyFxU+A7vM9yHdUHoiZEOVoWsyp5zO1ajBOqFr=3jIIaXWmbH33dP2ZNQFJhqbeg6JlXA9GpfMFht5=ZCC1IirWCNp=UILbmZtvu9d2M8U0YNHwAGKtjrPS5lZvAU+W5s2Ti"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{aiven}</id>
+  					<secret>{aiven AQAAABAAA IGhXNR6g7rogABp/H2iDQu7TgkXpvn9KnwzJfeh+8p7M=JVsI2QoQ38mmQHt450bQC4wBOGFhV+9QT2KGWSMfTOxTUrUXygaLlwsXo/RBxKXyOdh=/L8EGGrqG6=qbd0UzDAfc0xeAfXd30RGj+Ypsrrvdda=ZPa32BBID5r2ClfJSbgpfWIpVC1b5vlqCdy5LIWABZJzjBC5VweqZ04XFaCh+15NuSQ4E0KdGwPdkrfxxjY20I1wDvlKxzxL7dfCly3KVlQv7KBEFSLaLRNRocPYToUXqU4yAXKvXf03K=k1mahpxFUp94c35k/n055LVs=xbyL6AKdW=sCCa1AFIYKBDMBprTsZ6Al7DHx=XA6qLNWYxS7}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"IGhXNR6g7rogABp/H2iDQu7TgkXpvn9KnwzJfeh+8p7M=JVsI2QoQ38mmQHt450bQC4wBOGFhV+9QT2KGWSMfTOxTUrUXygaLlwsXo/RBxKXyOdh=/L8EGGrqG6=qbd0UzDAfc0xeAfXd30RGj+Ypsrrvdda=ZPa32BBID5r2ClfJSbgpfWIpVC1b5vlqCdy5LIWABZJzjBC5VweqZ04XFaCh+15NuSQ4E0KdGwPdkrfxxjY20I1wDvlKxzxL7dfCly3KVlQv7KBEFSLaLRNRocPYToUXqU4yAXKvXf03K=k1mahpxFUp94c35k/n055LVs=xbyL6AKdW=sCCa1AFIYKBDMBprTsZ6Al7DHx=XA6qLNWYxS7"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[DEBUG] aiven api processing

@@ -30,6 +30,20 @@ func TestBitbucketAppPassword_FromData(t *testing.T) {
 			want: []string{"myuser:ATBB123abcDEF456ghiJKL789mnoPQR"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{}</id>
+  					<secret>{AQAAABAAA https://trufflesec:ATBBa9iO-tyg7u_op@bitbucket.org}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"trufflesec:ATBBa9iO-tyg7u_op"},
+		},
+		{
 			name:  "valid app password by itself (should not be found)",
 			input: "ATBB123abcDEF456ghiJKL789mnoPQR",
 			want:  []string{},

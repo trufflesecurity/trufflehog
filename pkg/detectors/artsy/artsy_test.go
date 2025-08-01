@@ -31,6 +31,20 @@ func TestArtsy_Pattern(t *testing.T) {
 			want: []string{"rU0K6hwGw9AeANtXrZ8FQJT9jn4sRdljhvQ2fMvUPNczDCdmzi0i"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{artsy Mbw4Tihfv1ttrspD1yXk}</id>
+  					<secret>{artsy AQAAABAAA 3V4gtw8ZmDShAfzq2KKb3w0gZODnzxp7}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"3V4gtw8ZmDShAfzq2KKb3w0gZODnzxp7Mbw4Tihfv1ttrspD1yXk"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the artsy API

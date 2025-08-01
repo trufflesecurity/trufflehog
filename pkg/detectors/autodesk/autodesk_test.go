@@ -31,6 +31,20 @@ func TestAutoDesk_Pattern(t *testing.T) {
 			want: []string{"2j8Rl67MjoMruYfyIBgGzy2pxcxIQfetrHfzZhsSRruLM3Fn"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{autodesk 0xjHuuRZc8n0YS6MGd8e3OakAySlK27q}</id>
+  					<secret>{autodesk AQAAABAAA 0TvJm15Ew8KADWTN}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"0xjHuuRZc8n0YS6MGd8e3OakAySlK27q0TvJm15Ew8KADWTN"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the API

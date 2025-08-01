@@ -52,6 +52,20 @@ func TestBilloMat_Pattern(t *testing.T) {
 			},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{billomat m2o8fqf8}</id>
+  					<secret>{billomat AQAAABAAA 36a584c280b5b617e8eb25dae6b64d63}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"36a584c280b5b617e8eb25dae6b64d63m2o8fqf8"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				req, err := http.NewRequest("GET", url, http.NoBody)

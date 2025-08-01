@@ -31,6 +31,20 @@ func TestAirBrakeProjectKey_Pattern(t *testing.T) {
 			want: []string{"7B759RwRR5Txo9pDxXtPNcrTOj0zhvmR856019"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{airbrake 691149}</id>
+  					<secret>{airbrake AQAAABAAA hYNK8PlcGXZ6PXXDFJI89LCjpoM8koTx}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"hYNK8PlcGXZ6PXXDFJI89LCjpoM8koTx691149"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[INFO] airbrake API request handling

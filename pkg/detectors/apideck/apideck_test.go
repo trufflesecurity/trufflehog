@@ -33,6 +33,20 @@ func TestApiDeck_Pattern(t *testing.T) {
 			},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apideck id J6rYP2lzThxp9JeGg74TDgAXvfQsvzonsHpYHDsG}</id>
+  					<secret>{apideck AQAAABAAA sk_live_R5S2B88smT6QfTsUc3o3DedI2hbbcnZwvQKjyudQ41V0T38L8qUDPUTlBDcVE2NwRp1PowPYqnmAHlZ-W1Yr7AWGvpCvT}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"sk_live_R5S2B88smT6QfTsUc3o3DedI2hbbcnZwvQKjyudQ41V0T38L8qUDPUTlBDcVE2NwRp1PowPYqnmAHlZ-W1Yr7AWGvpCvTJ6rYP2lzThxp9JeGg74TDgAXvfQsvzonsHpYHDsG"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the apideck API

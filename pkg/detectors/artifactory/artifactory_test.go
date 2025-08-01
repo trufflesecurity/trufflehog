@@ -36,6 +36,23 @@ func TestArtifactory_Pattern(t *testing.T) {
 			want:             []string{"cmVmdGtuOjAxOjE3ODA1NTFAKEM6S2J2MGswemNzZzhaRnFlVUFAKEk3amlLcGZgrwxtOp.jfrog.io"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{artifactory}</id>
+  					<secret>{AQAAABAAA KUd8GOVfcXnIv1nJ5qmnNzrqkLvseoPRMuwsdDVr9QthonFogtMaoJ3pgtO4eHXC}</secret>
+					<domain>{HTTPnGQZ79vjWXze.jfrog.io}</domain>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			useCloudEndpoint: false,
+			useFoundEndpoint: true,
+			want:             []string{"KUd8GOVfcXnIv1nJ5qmnNzrqkLvseoPRMuwsdDVr9QthonFogtMaoJ3pgtO4eHXCHTTPnGQZ79vjWXze.jfrog.io"},
+		},
+		{
 			name: "valid pattern - with cloud endpoints",
 			input: `
 				[INFO] Sending request to the artifactory API

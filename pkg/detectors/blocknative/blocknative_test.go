@@ -45,6 +45,20 @@ func TestBlockNative_Pattern(t *testing.T) {
 			want: []string{"76e50995-059f-3d1a-af8e-cc85fc05eb03"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{blocknative}</id>
+  					<secret>{blocknative AQAAABAAA 7b15f7f8-52a8-849d-384e-20b4c0de82dd}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"7b15f7f8-52a8-849d-384e-20b4c0de82dd"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

@@ -44,6 +44,20 @@ func TestBeamer_Pattern(t *testing.T) {
 			want: []string{"DyVdf7+cAXw4MH9gT1CPotU31RMl__aLKbrABRWvT7TyO="},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{beamer}</id>
+  					<secret>{beamer AQAAABAAA _FXYx2kyyNv6n_CBb9LrMHZPXa_S8iaj89zYn9mICmkB4=}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"_FXYx2kyyNv6n_CBb9LrMHZPXa_S8iaj89zYn9mICmkB4="},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

@@ -30,6 +30,20 @@ func TestAsanaOauth_Pattern(t *testing.T) {
 			want: []string{"q5przi0tmp6xpo7rpsd0q:kl0qg:2gdj3jyumq04q9kcqk/qxdo"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{asana}</id>
+  					<secret>{AQAAABAAA omzmg54nn5wa21sh6qwg:dos10bfl1f6vnqcs9lcdwkbqb68gti}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"omzmg54nn5wa21sh6qwg:dos10bfl1f6vnqcs9lcdwkbqb68gti"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the asana API

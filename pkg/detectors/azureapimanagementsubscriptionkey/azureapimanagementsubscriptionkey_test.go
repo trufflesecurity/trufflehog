@@ -29,6 +29,20 @@ func TestAzureAPIManagementSubscriptionKey_Pattern(t *testing.T) {
 			want: []string{"https://trufflesecuritytest.azure-api.net:2c69j0dc327c4929b74d3a832a04266b"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{https://dffe5e2teoezcct050ch-2au74tmls8jm1p.azure-api.net}</id>
+  					<secret>{AQAAABAAA uEDFd7-zSeH6dwwzLbGjVrAlfgXoV1Xv}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"https://dffe5e2teoezcct050ch-2au74tmls8jm1p.azure-api.net:uEDFd7-zSeH6dwwzLbGjVrAlfgXoV1Xv"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				AZURE_API_MANAGEMENT_GATEWAY_URL=https://trufflesecuritytest.azure-api.net

@@ -29,6 +29,20 @@ func TestAirtableoauth_Pattern(t *testing.T) {
 			want: []string{"oaajtCy2lVMUN1Cm5.v1.eyJ1c2VySWQiOiJ1c3JjQ09QVlJudGlrU1lzdyIsImV4cGlyZXNBdCI6IjIwMjUtMDItMDNUMTk6NTY6MzcuMDAwWiIsIm9hdXRoQXBwbGljYXRpb25JZCI6Im9hcG14aXcyUlRrVGlzcHJIIiwic2VjcmV0IjoiMzczNThlNzdlZjlhMjljY2Q5MWIwNmNlNTdkZDYxNDg0MWVmNmIyOWYwYjQ5ZWE0MTMxZGI4NzBkNTAzYTE1NyJ9.0d67c8b334048135a93615610445e4aa90c6af6222392b49eea9419e1d6717d0"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{airtable}</id>
+  					<secret>{airtable AQAAABAAA iKMJv6D1mmUvunFTZLfm4RrYhdrt5JCBMv.v1.r8IBnGw7b_vW0fl0MDJqPRUEsDdHtNYW9ANwPFm40V_M4knoEaulKL-5lmtWoRq9fjG-GORe8efob5e658nTiOkdYC.8a8d3}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"iKMJv6D1mmUvunFTZLfm4RrYhdrt5JCBMv.v1.r8IBnGw7b_vW0fl0MDJqPRUEsDdHtNYW9ANwPFm40V_M4knoEaulKL-5lmtWoRq9fjG-GORe8efob5e658nTiOkdYC.8a8d3"},
+		},
+		{
 			name: "finds all matches",
 			input: `
 				[INFO] Sending request to the airtable API

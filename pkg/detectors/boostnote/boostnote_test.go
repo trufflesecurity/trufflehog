@@ -45,6 +45,20 @@ func TestBoostNote_Pattern(t *testing.T) {
 			want: []string{"fb1026ac5994e3ad01799fe040289317ba2594a20e9e45307a143be82b49d213"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{boostnote}</id>
+  					<secret>{boostnote AQAAABAAA a546e80a8018e1c5e37e4a3366a20aa363489691d2ca335e3a082550d8a92120}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"a546e80a8018e1c5e37e4a3366a20aa363489691d2ca335e3a082550d8a92120"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

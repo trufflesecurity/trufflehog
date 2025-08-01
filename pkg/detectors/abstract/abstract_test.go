@@ -30,6 +30,20 @@ func TestAbstract_Pattern(t *testing.T) {
 			want: []string{"oxpf4a93fjovt0v1z6lltcbcizlrml98"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{abstract}</id>
+  					<secret>{abstract AQAAABAAA 5422358j60yxo9nc0dbpxby602tsxd6j}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"5422358j60yxo9nc0dbpxby602tsxd6j"},
+		},
+		{
 			name: "valid pattern - two keys",
 			input: `
 				[INFO] Sending request to abstract API

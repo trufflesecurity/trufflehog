@@ -45,6 +45,20 @@ func TestBetterStack_Pattern(t *testing.T) {
 			want: []string{"ntJD0ER8QpuT0O1WqsclApO2"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{betterstack}</id>
+  					<secret>{betterstack AQAAABAAA RtSmhl4GkEcFS84Oyi0zlYbE}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"RtSmhl4GkEcFS84Oyi0zlYbE"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

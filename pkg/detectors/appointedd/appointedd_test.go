@@ -38,6 +38,20 @@ func TestAppFollow_Pattern(t *testing.T) {
 			want: []string{"Ci0a2bSpRyFcZyEXBEr9RHzf3xXllqO=XVoh+t0L0s8T2s3MFntfWhBlovqLaqEadtuJ9=Jy6yCOXmhbpEZPfY7Y"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{appointedd}</id>
+  					<secret>{AQAAABAAA 2pRMKW=JrG9+xYmqlJMa4Omf9goqsSqsM3mIaqG8tG4lwnVrKIslbn=IpLIz7GTDEJUcQ0wlr6B+UjfvSY9XKXwu}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"2pRMKW=JrG9+xYmqlJMa4Omf9goqsSqsM3mIaqG8tG4lwnVrKIslbn=IpLIz7GTDEJUcQ0wlr6B+UjfvSY9XKXwu"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func validateAppointeddKey() bool {

@@ -30,6 +30,20 @@ func TestAutoKlose_Pattern(t *testing.T) {
 			want: []string{"KRXaU9GK3f9yHG1FS-mbwhsIXdW22epH"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{autoklose}</id>
+  					<secret>{AQAAABAAA Z6Q4KENlmgGJT-M-BLoup9Dmyj2YVC-I}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"Z6Q4KENlmgGJT-M-BLoup9Dmyj2YVC-I"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the autoklose API

@@ -19,13 +19,27 @@ func TestAtlassian_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "typical pattern",
+			name: "valid pattern",
 			input: `
 				[INFO] Sending request to the atlassian API
 				[DEBUG] Using Key=aB1cD2eF3gH4iJ5kL6mN7oP8
 				[INFO] Response received: 200 OK
 			`,
 			want: []string{"aB1cD2eF3gH4iJ5kL6mN7oP8"},
+		},
+		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{atlassian}</id>
+  					<secret>{AQAAABAAA r6RkiQao3PgqY9MOKtonpJdU}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"r6RkiQao3PgqY9MOKtonpJdU"},
 		},
 	}
 

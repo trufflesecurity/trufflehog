@@ -32,6 +32,20 @@ func TestAylien_Pattern(t *testing.T) {
 			want: []string{"cr479du2l9pkmhar8gw5hufofvwp86q9y3ejw028"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{aylien wmxv7ckn}</id>
+  					<secret>{aylien AQAAABAAA i09t8rb5r7otvq8sdrfjunakcso157mh}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"i09t8rb5r7otvq8sdrfjunakcso157mhwmxv7ckn"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				# do not share these credentials

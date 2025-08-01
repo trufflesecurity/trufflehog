@@ -29,6 +29,20 @@ func TestAzureDirectManagementAPIKey_Pattern(t *testing.T) {
 			want: []string{"https://trufflesecuritytest.management.azure-api.net:UJh1Wn7txjls2GPK1YxO9+3tpqQffSfxb+97PmT8j3cSQoXvGa74lCKpBqPeppTHCharbaMeKqKs/H4gA/go1w=="},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{https://0q66287uqx.management.azure-api.net}</id>
+  					<secret>{AQAAABAAA Ub4yMRDBBdEX/BNyNFM6i6Odj25TB0Zd1BRNx57ZeMGpqzkeokXheNpkkTBtvPQb692id65yc2xLKhZ183rg==}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"https://0q66287uqx.management.azure-api.net:Ub4yMRDBBdEX/BNyNFM6i6Odj25TB0Zd1BRNx57ZeMGpqzkeokXheNpkkTBtvPQb692id65yc2xLKhZ183rg=="},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				AZURE_MANGEMENT_API_KEY=UJh1Wn7txjls2GPK1YxO9+3tpqQffSfxb+97PmT8j3cSQoXvGa74lCKp

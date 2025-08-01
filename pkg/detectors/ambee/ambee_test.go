@@ -30,6 +30,20 @@ func TestAmbee_Pattern(t *testing.T) {
 			want: []string{"eccb41cc2d4dab96b748ed040e9b308161279820447ef4553ba6e6d20ecb9962"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{ambee}</id>
+  					<secret>{ambee AQAAABAAA b91280c63e1571ad928d52947cc31a14ad1bf5a83088d0346b94f6683cf22138}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"b91280c63e1571ad928d52947cc31a14ad1bf5a83088d0346b94f6683cf22138"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[INFO] Fetching data from ambee

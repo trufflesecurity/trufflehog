@@ -31,6 +31,20 @@ func TestAlgoliaAdminKey_Pattern(t *testing.T) {
 			want: []string{"844XQV5SUA:BsDaN7ZU7kFiUX5CpN8CUf3nkMaSeZYn"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{appId 0VJ9I1WV78}</id>
+  					<secret>{algolia AQAAABAAA 4AYm3wz7nfnX7Bqtw5e5Qo3Z5vfBe0eS}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"0VJ9I1WV78:4AYm3wz7nfnX7Bqtw5e5Qo3Z5vfBe0eS"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[INFO] Sending request to the algolia API

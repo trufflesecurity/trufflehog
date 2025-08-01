@@ -30,6 +30,20 @@ func TestAccuWeather_Pattern(t *testing.T) {
 			want: []string{"Qh6DP6Zf7vHtmnDDsbS219qcz4d883Y9"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{accuweather}</id>
+  					<secret>{accuweather AQAAABAAA BJDD9bYh8bR586Wcw3F1lvkUYy3RZZbD}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"BJDD9bYh8bR586Wcw3F1lvkUYy3RZZbD"},
+		},
+		{
 			name: "valid pattern - out of prefix range",
 			input: `
 				[INFO] Sending request to accuweather API

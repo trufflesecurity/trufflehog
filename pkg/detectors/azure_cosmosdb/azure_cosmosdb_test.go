@@ -32,6 +32,20 @@ func TestCosmosDB_Pattern(t *testing.T) {
 			want: []string{"key: FakeeP35zYGPXaEUfakeU7S8kcOY7NI7id8ddbHfakeAifake8Bbql1mXhMF2t0wQ0FAKEPQrwZZACDb3msoAg== account_url: trufflesecurity-fake.documents.azure.com"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{jc0338vpo7bd3rn99vu2trdbo.table.cosmos.azure.com}</id>
+  					<secret>{AQAAABAAA tiHd2l1I3MptBj4s1zomhyIAuCJmR1bzxvGluBVW2k0JJ7Z6vmybKYiM7OY5HtDkvLVxyDD2ACW0GW2fug0cET==}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"key: tiHd2l1I3MptBj4s1zomhyIAuCJmR1bzxvGluBVW2k0JJ7Z6vmybKYiM7OY5HtDkvLVxyDD2ACW0GW2fug0cET== account_url: jc0338vpo7bd3rn99vu2trdbo.table.cosmos.azure.com"},
+		},
+		{
 			name: "valid table db pattern",
 			input: `
 				Cluster name: Cluster name must be at least 3 characters and at most 40 characters.

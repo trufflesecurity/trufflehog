@@ -30,6 +30,20 @@ func TestAssemblyAI_Pattern(t *testing.T) {
 			want: []string{"mlhekyjhs96mx0r2cxbzky4jzr83fw1q"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{assemblyai}</id>
+  					<secret>{AQAAABAAA s0c8a99g0w6qbwybdxn4uowzemk1xlca}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"s0c8a99g0w6qbwybdxn4uowzemk1xlca"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the API

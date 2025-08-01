@@ -28,6 +28,20 @@ func TestAzureAPIManagementRepositoryKey_Pattern(t *testing.T) {
 			want: []string{"test.scm.azure-api.netgit&202503251200&R2xlVEmqi+OW130dxWIDhfw1K6XKw/gxc5P9te3cwWBtnK2XkZq5k+VUAdnuX1Y0T/I5CRK9fJyBJr31SmFEYw=="},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{url 726o3.scm.azure-api.net}</id>
+  					<secret>{password AQAAABAAA git&303102631708&ZidF02ZVakrtuWcW00cgvhZ6YUiZbIsZ84bE3u01jOXdKv7VXr0t6DE9OtdJnUTaBAz843vSDvVpCjRFEYSJq3==}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"726o3.scm.azure-api.netgit&303102631708&ZidF02ZVakrtuWcW00cgvhZ6YUiZbIsZ84bE3u01jOXdKv7VXr0t6DE9OtdJnUTaBAz843vSDvVpCjRFEYSJq3=="},
+		},
+		{
 			name: `invalid host pattern`,
 			input: `
 				AZURE_URL=https://test.scm.azure.net

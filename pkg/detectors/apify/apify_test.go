@@ -30,6 +30,20 @@ func TestApiFy_Pattern(t *testing.T) {
 			want: []string{"apify_api_dXB1vLsglgTexUYm3JTAx2BHTjVuDBbvPl8R"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{user-id}</id>
+  					<secret>{AQAAABAAA apify_api_RpTLEX9U18xfGl90wDaT2V9R-YX0TlMpxIzi}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"apify_api_RpTLEX9U18xfGl90wDaT2V9R-YX0TlMpxIzi"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the API

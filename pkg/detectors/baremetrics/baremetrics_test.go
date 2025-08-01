@@ -45,6 +45,20 @@ func TestBareMetrics_Pattern(t *testing.T) {
 			want: []string{"sk_nGDJWCkPiFAKE5XFTzUUA"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{baremetrics}</id>
+  					<secret>{baremetrics AQAAABAAA lk_JcWYJEi80ZzQA1nRXD}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"lk_JcWYJEi80ZzQA1nRXD"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

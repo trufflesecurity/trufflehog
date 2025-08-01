@@ -30,6 +30,20 @@ func TestAleTheIaAPI_Pattern(t *testing.T) {
 			want: []string{"LY027C40U2KNNZLFO1WEU3XQZ13LW515"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{aletheiaapi}</id>
+  					<secret>{aletheiaapi AQAAABAAA K7SOW2B8QH9QE435NLH07PH22XL4YOPG}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"K7SOW2B8QH9QE435NLH07PH22XL4YOPG"},
+		},
+		{
 			name: "valid pattern - key out of prefix range",
 			input: `
 				[DEBUG] aletheiaapi api processing

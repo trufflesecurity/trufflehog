@@ -30,6 +30,20 @@ func TestAxonaut_Pattern(t *testing.T) {
 			want: []string{"4ve4aj6v38uiadaq9hcgpupp2b3lh2k8"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{axonaut}</id>
+  					<secret>{AQAAABAAA m7mnuk7p3buc87b2ok29e7ykp2xqkkx0}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"m7mnuk7p3buc87b2ok29e7ykp2xqkkx0"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the axonaut API

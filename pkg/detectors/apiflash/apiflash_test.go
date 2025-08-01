@@ -30,6 +30,20 @@ func TestApiFlash_Pattern(t *testing.T) {
 			want: []string{"grevetn5owrs1ybhxtcen0ibvg2mi85x"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apiflash}</id>
+  					<secret>{AQAAABAAA axlzvcf9m7jyyts833f9gmtcpqe5b26o}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"axlzvcf9m7jyyts833f9gmtcpqe5b26o"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				[INFO] Sending request to the apiflash API

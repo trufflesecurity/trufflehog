@@ -33,6 +33,23 @@ func TestBitFinex_Pattern(t *testing.T) {
 			want: []string{"HxfuG198amaeCcYkASkto5VuIO-oXcplDV6JZ7OIEQZ", "Pf3-3v989gPbJT54D3oDBiFZmJoLpWoTHGvF8xuSBPP"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{bitfinex bdiODwPukXLKUjSLvfeTlKVEwm89zqOhQ2a9chacKcr}</id>
+  					<secret>{bitfinex AQAAABAAA MTvK78juiZmddv3eEyoz1gqRwP89OHreiX6fnXkfbce}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{
+				"bdiODwPukXLKUjSLvfeTlKVEwm89zqOhQ2a9chacKcr",
+				"MTvK78juiZmddv3eEyoz1gqRwP89OHreiX6fnXkfbce",
+			},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {

@@ -49,6 +49,20 @@ func TestBitCoinAverage_Pattern(t *testing.T) {
 			want: []string{"WZizqeWvRnhZmFlpc5pMc92NP1Du19wxxpd5zjsYY8F"},
 		},
 		{
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{bitcoinaverage}</id>
+  					<secret>{bitcoinaverage AQAAABAAA gVXtVKIj5CO3b0F12XjibnE2TvwS5rL5nJ0kQ2NZkso}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"gVXtVKIj5CO3b0F12XjibnE2TvwS5rL5nJ0kQ2NZkso"},
+		},
+		{
 			name: "invalid pattern",
 			input: `
 				func main() {
