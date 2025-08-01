@@ -2,18 +2,13 @@ package abstract
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "qwerty12345iugt67s7a7sa0akhsxz82"
-	invalidPattern = "zxcvbr12345iugt67s7a7sa0akhsXz820"
 )
 
 func TestAbstract_Pattern(t *testing.T) {
@@ -26,19 +21,58 @@ func TestAbstract_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("abstract token = '%s'", validPattern),
-			want:  []string{validPattern},
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to abstract API
+				[DEBUG] Using API_KEY=oxpf4a93fjovt0v1z6lltcbcizlrml98
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"oxpf4a93fjovt0v1z6lltcbcizlrml98"},
 		},
 		{
-			name:  "valid pattern - out of prefix range",
-			input: fmt.Sprintf("abstract token keyword is not close to the real token = '%s'", validPattern),
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{abstract}</id>
+  					<secret>{abstract AQAAABAAA 5422358j60yxo9nc0dbpxby602tsxd6j}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"5422358j60yxo9nc0dbpxby602tsxd6j"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("abstract = '%s'", invalidPattern),
-			want:  nil,
+			name: "valid pattern - two keys",
+			input: `
+				[INFO] Sending request to abstract API
+				[DEBUG] Using API_KEY=oxpf4a93fjovt0v1z6lltcbcizlrml98
+				[Error] Response received: 401 UnAuthorized
+				[INFO] Sending request to abstract API
+				[DEBUG] Using API_KEY=muytrs09876iugt67s7a7sa0akhsxz82
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"oxpf4a93fjovt0v1z6lltcbcizlrml98", "muytrs09876iugt67s7a7sa0akhsxz82"},
+		},
+		{
+			name: "valid pattern - out of prefix range",
+			input: `
+				[INFO] Sending request to abstract API
+				[INFO] Processing request
+				[Info] Response received: 200 OK
+				[DEBUG] Used API_KEY=oxpf4a93fjovt0v1z6lltcbcizlrml98
+			`,
+			want: nil,
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to abstract API
+				[DEBUG] Using API_KEY=zxcvbr12345iugt67s7a7sa0akhsXz820
+				[ERROR] Response received: 400 BadRequest
+			`,
+			want: nil,
 		},
 	}
 
@@ -46,22 +80,15 @@ func TestAbstract_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -73,6 +100,7 @@ func TestAbstract_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

@@ -2,20 +2,13 @@ package apiflash
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern = `
-	apiflash_key: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-	`
-	invalidPattern = "0123456789Gbcde^0123456789abcdef"
 )
 
 func TestApiFlash_Pattern(t *testing.T) {
@@ -28,14 +21,36 @@ func TestApiFlash_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("apiflash credentials: %s", validPattern),
-			want:  []string{"a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"},
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to the apiflash API
+				[DEBUG] Using Key=grevetn5owrs1ybhxtcen0ibvg2mi85x
+				[INFO] Response received: 200 OK
+			`,
+			want: []string{"grevetn5owrs1ybhxtcen0ibvg2mi85x"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("apiflash credentials: %s", invalidPattern),
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apiflash}</id>
+  					<secret>{AQAAABAAA axlzvcf9m7jyyts833f9gmtcpqe5b26o}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"axlzvcf9m7jyyts833f9gmtcpqe5b26o"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the apiflash API
+				[DEBUG] Using Key=grevetn5owRs1ybhxtcen0ibvg2mi85x
+				[ERROR] Response received: 401 UnAuthorized
+			`,
+			want: nil,
 		},
 	}
 
@@ -43,22 +58,15 @@ func TestApiFlash_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -70,6 +78,7 @@ func TestApiFlash_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

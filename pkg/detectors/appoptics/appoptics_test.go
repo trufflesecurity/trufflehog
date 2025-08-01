@@ -2,18 +2,13 @@ package appoptics
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validPattern   = "IABJPR08RmvsGrebJhr1TUdo27-KtTn0mLCKkJJqj5lyba-otXPklygO9DK62o3QSPoIJ4E"
-	invalidPattern = "IABJPR08Rmvs.GrebJhr1TUdo27_KtTn0mLCKkJJqj5lyba&otXPklygO9DK62o3QSPoIJ4E"
 )
 
 func TestAppOptics_Pattern(t *testing.T) {
@@ -26,14 +21,52 @@ func TestAppOptics_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("appoptics credential: %s", validPattern),
-			want:  []string{"IABJPR08RmvsGrebJhr1TUdo27-KtTn0mLCKkJJqj5lyba-otXPklygO9DK62o3QSPoIJ4E"},
+			name: "valid pattern",
+			input: `
+				func validateAppOpticsKey() bool {
+					appopticsKey := "Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2he3a1tzkpJ4-PznQukQruRjqMFbEG73L92LJyBGMZ"
+					log.Println("Checking API key status...")
+
+					if !isActive(appopticsKey) {
+						log.Println("API key is inactive or invalid.")
+						return false
+					}
+
+					log.Println("API key is valid and active.")
+					return true
+				}`,
+			want: []string{"Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2he3a1tzkpJ4-PznQukQruRjqMFbEG73L92LJyBGMZ"},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("appoptics credential: %s", invalidPattern),
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{appoptics}</id>
+  					<secret>{AQAAABAAA zxsb8yzT0RbIJ1TAalB87LOVUcT1b4uEgvT4tXCcSqv_gcmlrx5aQRleHPDFKePjpHFof5J}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"zxsb8yzT0RbIJ1TAalB87LOVUcT1b4uEgvT4tXCcSqv_gcmlrx5aQRleHPDFKePjpHFof5J"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				func validateAppOpticsKey() bool {
+					appopticsKey := "Xwl4ViaAFDLrAmFX9g1blkUVC5dJj2h:3a1tzkpJ43PznQukQruRjqMFbEG73L92LJyBGMZ"
+					log.Println("Checking API key status...")
+
+					if !isActive(appopticsKey) {
+						log.Println("API key is inactive or invalid.")
+						return false
+					}
+
+					log.Println("API key is valid and active.")
+					return true
+				}`,
+			want: nil,
 		},
 	}
 
@@ -41,22 +74,15 @@ func TestAppOptics_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -68,6 +94,7 @@ func TestAppOptics_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}

@@ -2,20 +2,13 @@ package apideck
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/engine/ahocorasick"
-)
-
-var (
-	validKeyPattern = "sk_live_abc123def456ghi789jklmno123456pqrstuvwxyz-1234567890123456789012345678901234567890AAui09pU8as"
-	validIdPattern  = "apideck_id: 1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t"
-	invalidPattern  = strings.ReplaceAll(validKeyPattern, "sk_live", "sk_inactive") + strings.ReplaceAll(validIdPattern, "1", "$")
 )
 
 func TestApiDeck_Pattern(t *testing.T) {
@@ -28,16 +21,40 @@ func TestApiDeck_Pattern(t *testing.T) {
 		want  []string
 	}{
 		{
-			name:  "valid pattern",
-			input: fmt.Sprintf("credentials: %s \n %s", validKeyPattern, validIdPattern),
+			name: "valid pattern",
+			input: `
+				[INFO] Sending request to the apideck API
+				[DEBUG] Using Key=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
+				[DEBUG] Using apideck ID=VfKE9Zh2ZatnqmrloqDu3PCnkNBR6Io4TlSbsG1P
+				[INFO] Response received: 200 OK
+			`,
 			want: []string{
-				validKeyPattern + "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t",
+				"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",
 			},
 		},
 		{
-			name:  "invalid pattern",
-			input: fmt.Sprintf("credentials: %s", invalidPattern),
-			want:  nil,
+			name: "valid pattern - xml",
+			input: `
+				<com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+  					<scope>GLOBAL</scope>
+  					<id>{apideck id J6rYP2lzThxp9JeGg74TDgAXvfQsvzonsHpYHDsG}</id>
+  					<secret>{apideck AQAAABAAA sk_live_R5S2B88smT6QfTsUc3o3DedI2hbbcnZwvQKjyudQ41V0T38L8qUDPUTlBDcVE2NwRp1PowPYqnmAHlZ-W1Yr7AWGvpCvT}</secret>
+  					<description>configuration for production</description>
+					<creationDate>2023-05-18T14:32:10Z</creationDate>
+  					<owner>jenkins-admin</owner>
+				</com.cloudbees.plugins.credentials.impl.StringCredentialsImpl>
+			`,
+			want: []string{"sk_live_R5S2B88smT6QfTsUc3o3DedI2hbbcnZwvQKjyudQ41V0T38L8qUDPUTlBDcVE2NwRp1PowPYqnmAHlZ-W1Yr7AWGvpCvTJ6rYP2lzThxp9JeGg74TDgAXvfQsvzonsHpYHDsG"},
+		},
+		{
+			name: "invalid pattern",
+			input: `
+				[INFO] Sending request to the apideck API
+				[DEBUG] Using Key=sk_live_GKE08ADdkDV1DQ4vDfaW4ejDHy-TkotfxDmHvQMLX0HRvhtfPwku6olGvsG2vXBg869A0hsOPHHOw48SAF2GO7jBMs6Rt
+				[DEBUG] Using apideck ID=VfKE9Zh2ZatnqmrloqDu3PC_kNBR6Io4TlSbsG1P
+				[ERROR] Response received: 401 UnAuthorized
+			`,
+			want: nil,
 		},
 	}
 
@@ -45,22 +62,15 @@ func TestApiDeck_Pattern(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			matchedDetectors := ahoCorasickCore.FindDetectorMatches([]byte(test.input))
 			if len(matchedDetectors) == 0 {
-				t.Errorf("keywords '%v' not matched by: %s", d.Keywords(), test.input)
+				t.Errorf("test %q failed: expected keywords %v to be found in the input", test.name, d.Keywords())
 				return
 			}
 
 			results, err := d.FromData(context.Background(), false, []byte(test.input))
-			if err != nil {
-				t.Errorf("error = %v", err)
-				return
-			}
+			require.NoError(t, err)
 
 			if len(results) != len(test.want) {
-				if len(results) == 0 {
-					t.Errorf("did not receive result")
-				} else {
-					t.Errorf("expected %d results, only received %d", len(test.want), len(results))
-				}
+				t.Errorf("mismatch in result count: expected %d, got %d", len(test.want), len(results))
 				return
 			}
 
@@ -72,6 +82,7 @@ func TestApiDeck_Pattern(t *testing.T) {
 					actual[string(r.Raw)] = struct{}{}
 				}
 			}
+
 			expected := make(map[string]struct{}, len(test.want))
 			for _, v := range test.want {
 				expected[v] = struct{}{}
