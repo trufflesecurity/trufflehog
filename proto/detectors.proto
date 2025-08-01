@@ -1044,6 +1044,7 @@ enum DetectorType {
   AnypointOAuth2 = 1032;
   WebexBot = 1033;
   TableauPersonalAccessToken = 1034;
+  HashiCorpVaultAuth = 1035;
 }
 
 message Result {
