@@ -15,10 +15,13 @@ import (
 
 type Scanner struct {
 	client *http.Client
+	detectors.DefaultMultiPartCredentialProvider
+	detectors.EndpointSetter
 }
 
 // Ensure the Scanner satisfies the interface at compile time.
 var _ detectors.Detector = (*Scanner)(nil)
+var _ detectors.EndpointCustomizer = (*Scanner)(nil)
 
 var (
 	defaultClient = common.SaneHttpClient()
@@ -27,6 +30,8 @@ var (
 	// Pattern to match Make.com URLs in the data
 	urlPat = regexp.MustCompile(`\bhttps://(eu[12]|us[12])\.make\.(?:com|celonis\.com)/api/v2/`)
 )
+
+func (Scanner) CloudEndpoint() string { return "" }
 
 // Keywords are used for efficiently pre-filtering chunks.
 // Use identifiers in the secret preferably, or the provider name.
@@ -49,14 +54,17 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 		foundURLs = append(foundURLs, match[0])
 	}
 
-	// If URLs were found, create combinations of tokens and URLs
-	if len(foundURLs) > 0 {
-		for match := range uniqueMatches {
-			for _, foundURL := range foundURLs {
+	// Get endpoints using EndpointCustomizer
+	endpoints := s.Endpoints(foundURLs...)
+
+	for match := range uniqueMatches {
+		if len(endpoints) > 0 {
+			// Create results for each endpoint
+			for _, endpoint := range endpoints {
 				s1 := detectors.Result{
 					DetectorType: detectorspb.DetectorType_MakeApiToken,
 					Raw:          []byte(match),
-					RawV2:        []byte(match + ":" + foundURL),
+					RawV2:        []byte(match + ":" + endpoint),
 				}
 
 				if verify {
@@ -65,7 +73,7 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 						client = defaultClient
 					}
 
-					isVerified, extraData, verificationErr := verifyMatch(ctx, client, match, foundURLs)
+					isVerified, extraData, verificationErr := verifyMatch(ctx, client, match, []string{endpoint})
 					s1.Verified = isVerified
 					s1.ExtraData = extraData
 					s1.SetVerificationError(verificationErr, match)
@@ -73,25 +81,11 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 
 				results = append(results, s1)
 			}
-		}
-	} else {
-		// No URLs found, just return tokens
-		for match := range uniqueMatches {
+		} else {
+			// No endpoints configured or found, return unverified result
 			s1 := detectors.Result{
 				DetectorType: detectorspb.DetectorType_MakeApiToken,
 				Raw:          []byte(match),
-			}
-
-			if verify {
-				client := s.client
-				if client == nil {
-					client = defaultClient
-				}
-
-				isVerified, extraData, verificationErr := verifyMatch(ctx, client, match, foundURLs)
-				s1.Verified = isVerified
-				s1.ExtraData = extraData
-				s1.SetVerificationError(verificationErr, match)
 			}
 
 			results = append(results, s1)
@@ -101,36 +95,14 @@ func (s Scanner) FromData(ctx context.Context, verify bool, data []byte) (result
 	return
 }
 
-func verifyMatch(ctx context.Context, client *http.Client, token string, foundURLs []string) (bool, map[string]string, error) {
-	baseURLs := []string{
-		"https://eu1.make.com/api/v2/",
-		"https://eu2.make.com/api/v2/",
-		"https://us1.make.com/api/v2/",
-		"https://us2.make.com/api/v2/",
-		"https://us1.make.celonis.com/api/v2/",
-		"https://eu1.make.celonis.com/api/v2/",
+func verifyMatch(ctx context.Context, client *http.Client, token string, endpoints []string) (bool, map[string]string, error) {
+	if len(endpoints) == 0 {
+		return false, nil, nil
 	}
 
-
-	// If we found URLs in the data, try those first
-	if len(foundURLs) > 0 {
-		for _, foundURL := range foundURLs {
-			verified, err := tryURL(ctx, client, foundURL, token)
-			if verified {
-				return true, nil, nil
-			}
-			if err != nil {
-				// If the matched URL failed, continue to try all base URLs
-				break
-			}
-			// If the matched URL returned a determinate failure (401), we still try other base URLs
-		}
-	}
-
-	// Try all base URLs
 	var lastErr error
-	for _, baseURL := range baseURLs {
-		verified, err := tryURL(ctx, client, baseURL, token)
+	for _, endpoint := range endpoints {
+		verified, err := tryURL(ctx, client, endpoint, token)
 		if verified {
 			return true, nil, nil
 		}

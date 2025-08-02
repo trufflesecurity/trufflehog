@@ -45,7 +45,7 @@ func TestMake_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a make secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a make secret %s and endpoint https://us2.make.com/api/v2/", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -62,7 +62,7 @@ func TestMake_FromChunk(t *testing.T) {
 			s:    Scanner{},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a make secret %s within but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
+				data:   []byte(fmt.Sprintf("You can find a make secret %s and endpoint https://us2.make.com/api/v2/ but not valid", inactiveSecret)), // the secret would satisfy the regex but not pass validation
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -91,7 +91,7 @@ func TestMake_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.SaneHttpClientTimeOut(1 * time.Microsecond)},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a make secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a make secret %s and endpoint https://us2.make.com/api/v2/", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -108,7 +108,7 @@ func TestMake_FromChunk(t *testing.T) {
 			s:    Scanner{client: common.ConstantResponseHttpClient(404, "")},
 			args: args{
 				ctx:    context.Background(),
-				data:   []byte(fmt.Sprintf("You can find a make secret %s within", secret)),
+				data:   []byte(fmt.Sprintf("You can find a make secret %s and endpoint https://us2.make.com/api/v2/", secret)),
 				verify: true,
 			},
 			want: []detectors.Result{
@@ -123,6 +123,8 @@ func TestMake_FromChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.s.UseFoundEndpoints(true)
+
 			got, err := tt.s.FromData(tt.args.ctx, tt.args.verify, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Make.FromData() error = %v, wantErr %v", err, tt.wantErr)
@@ -136,7 +138,7 @@ func TestMake_FromChunk(t *testing.T) {
 					t.Fatalf("wantVerificationError = %v, verification error = %v", tt.wantVerificationErr, got[i].VerificationError())
 				}
 			}
-			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "verificationError", "primarySecret")
+			ignoreOpts := cmpopts.IgnoreFields(detectors.Result{}, "Raw", "RawV2", "verificationError", "primarySecret")
 			if diff := cmp.Diff(got, tt.want, ignoreOpts); diff != "" {
 				t.Errorf("Make.FromData() %s diff: (-got +want)\n%s", tt.name, diff)
 			}
