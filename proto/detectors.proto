@@ -1044,8 +1044,9 @@ enum DetectorType {
   AnypointOAuth2 = 1032;
   WebexBot = 1033;
   TableauPersonalAccessToken = 1034;
-  MakeApiToken = 1035;
-  MakeMcpToken = 1036;
+  Rootly = 1035;
+  MakeApiToken = 1036;
+  MakeMcpToken = 1037;
 }
 
 message Result {
