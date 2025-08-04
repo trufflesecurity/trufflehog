@@ -106,7 +106,7 @@ func verifyMatch(ctx context.Context, client *http.Client, usernameMatch string,
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://auth.lambdatest.com/api/user/token/auth", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
