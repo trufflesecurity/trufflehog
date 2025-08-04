@@ -4143,6 +4143,8 @@ func (m *SlackContinuous) validate(all bool) error {
 
 	// no validation rules for UserId
 
+	// no validation rules for Link
+
 	// no validation rules for File
 
 	// no validation rules for Email
